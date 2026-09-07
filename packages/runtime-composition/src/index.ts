@@ -10,6 +10,7 @@ export {
   DuplicateFeatureError,
   DuplicateProviderError,
   FeatureConfigError,
+  FeatureApiUnavailableError,
   MissingProviderError,
   RoleContributionError,
 } from "./boot-errors.ts";
@@ -20,6 +21,7 @@ export {
   type TokenMap,
   tokenName,
 } from "./dependency-token.ts";
+export { featureApi, FeatureApiToken } from "./feature-api-token.ts";
 export {
   type FeatureConfigSchema,
   type AppDefinition,

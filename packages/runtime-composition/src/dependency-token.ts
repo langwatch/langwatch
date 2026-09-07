@@ -1,13 +1,12 @@
-/**
- * A dependency token is the abstract contract service class a provider
- * satisfies. Not a string, not a symbol, not a type alias: the class carries
- * the members, so a provider that no longer answers the contract fails to
- * compile, and the class NAME is what a boot failure can print.
- */
-export type DependencyToken<T> = abstract new (...args: never[]) => T;
+import type { FeatureApiIdentity, FeatureApiToken } from "./feature-api-token.ts";
+
+/** Constructor tokens remain for installers awaiting the feature API cutover. */
+export type DependencyToken<T> = FeatureApiToken<T> | (abstract new (...args: never[]) => T);
+
+export type TokenIdentity = FeatureApiIdentity | (abstract new (...args: never[]) => unknown);
 
 /** The dependency keys a feature declares, each pointing at its token. */
-export type TokenMap = Readonly<Record<string, DependencyToken<unknown>>>;
+export type TokenMap = Readonly<Record<string, TokenIdentity>>;
 
 /** The instances a {@link TokenMap} resolves to once the graph is built. */
 export type ResolvedTokens<Tokens extends TokenMap> = {
@@ -20,7 +19,6 @@ export type ResolvedTokens<Tokens extends TokenMap> = {
 export const NO_TOKENS: Readonly<Record<never, never>> = Object.freeze({});
 
 /** The name a boot error prints for a token. */
-export function tokenName(token: DependencyToken<unknown>): string {
-  const named = token as { name?: string };
-  return named.name && named.name.length > 0 ? named.name : "<anonymous token>";
+export function tokenName(token: TokenIdentity): string {
+  return token.name.length > 0 ? token.name : "<anonymous token>";
 }

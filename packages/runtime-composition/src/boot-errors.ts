@@ -64,3 +64,16 @@ export class FeatureConfigError extends Error {
     this.name = "FeatureConfigError";
   }
 }
+
+/** Peer references exist during construction, but operations become available together. */
+export class FeatureApiUnavailableError extends Error {
+  constructor(
+    readonly feature: string,
+    readonly phase: "constructing" | "closed",
+  ) {
+    super(
+      `Feature API "${feature}" cannot be accessed while the process is ${phase}. Store peer API references during construction and call them after boot.`,
+    );
+    this.name = "FeatureApiUnavailableError";
+  }
+}

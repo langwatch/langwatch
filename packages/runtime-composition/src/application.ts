@@ -1,5 +1,10 @@
 /** Declares, constructs and starts the process graph; see ADR-133. */
-import { type DependencyToken, type TokenMap, tokenName } from "./dependency-token.ts";
+import {
+  type DependencyToken,
+  type TokenIdentity,
+  type TokenMap,
+  tokenName,
+} from "./dependency-token.ts";
 import {
   DependencyCycleError,
   DuplicateFeatureError,
@@ -17,6 +22,8 @@ import type {
 } from "./feature-installer.ts";
 import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
+import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
+import { LocalFeatureApis } from "./local-feature-api.ts";
 export type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /** What a booted runtime hands back for one feature. */
@@ -39,7 +46,7 @@ export class BootedRuntime<Infrastructure> {
     readonly role: ServerRole,
     readonly infrastructure: Infrastructure,
     private readonly installed: ReadonlyMap<string, InstalledFeatureState>,
-    private readonly provided: ReadonlyMap<DependencyToken<unknown>, unknown>,
+    private readonly provided: ReadonlyMap<TokenIdentity, unknown>,
     scope: ResourceScope,
     services: readonly RuntimeService[],
   ) {
@@ -109,6 +116,7 @@ export class BootedRuntime<Infrastructure> {
 /** One feature declared on an application, before boot looks at it. */
 interface DeclaredFeature {
   readonly name: string;
+  readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
@@ -119,7 +127,7 @@ interface DeclaredFeature {
 /** An application with its infrastructure named, collecting declarations. */
 export class ApplicationBuilder<Infrastructure> {
   private readonly features: DeclaredFeature[] = [];
-  private readonly preProvided = new Map<DependencyToken<unknown>, unknown>();
+  private readonly preProvided = new Map<TokenIdentity, unknown>();
   private readonly services: RuntimeService[] = [];
 
   constructor(
@@ -138,7 +146,10 @@ export class ApplicationBuilder<Infrastructure> {
     options?: { infrastructure: FeatureInfrastructure },
   ): this {
     if (options) return this.addFeature(declaration, options.infrastructure);
-    return this.addFeature(declaration, this.infrastructure as Infrastructure & FeatureInfrastructure);
+    return this.addFeature(
+      declaration,
+      this.infrastructure as Infrastructure & FeatureInfrastructure,
+    );
   }
 
   private addFeature<FeatureInfrastructure>(
@@ -147,6 +158,7 @@ export class ApplicationBuilder<Infrastructure> {
   ): this {
     this.features.push({
       name: declaration.name,
+      apiContract: declaration.apiContract,
       dependencies: declaration.dependencies,
       transportDependencies: declaration.transportDependencies,
       providers: declaration.providers,
@@ -156,15 +168,8 @@ export class ApplicationBuilder<Infrastructure> {
     return this;
   }
 
-  /**
-   * Hands an already-constructed service in under its token.
-   *
-   * This is the seam that lets a converted feature depend on one that is still
-   * composed by hand: the existing composition builds the service as it always
-   * did and provides it here, and the graph validates exactly as if a
-   * declaration had provided it.
-   */
-  withProvided<Instance>(token: DependencyToken<Instance>, instance: Instance): this {
+  /** Supplies an existing implementation while its installer is being migrated. */
+  withProvided<Instance>(token: DependencyToken<Instance>, instance: NoInfer<Instance>): this {
     if (this.preProvided.has(token)) {
       throw new DuplicateProviderError(tokenName(token), ["<already provided>"]);
     }
@@ -178,10 +183,7 @@ export class ApplicationBuilder<Infrastructure> {
     return this;
   }
 
-  /**
-   * Validates the declarations, then constructs in dependency order. Nothing is
-   * constructed until every refusal below has been ruled out.
-   */
+  /** Validates providers, allocates peer clients and constructs Apps before serving. */
   async boot(options: {
     role: ServerRole;
     /** One slice per feature name, for the features that declared a config. */
@@ -195,13 +197,16 @@ export class ApplicationBuilder<Infrastructure> {
     // it claims twice, which is the thing a reader can act on. A feature that
     // provides nothing still gets the plainer refusal below.
     const providerOf = this.resolveProviders(declarations);
+    this.assertApiDeclarations(declarations);
     this.assertUniqueFeatures(declarations);
     this.assertEveryDependencyProvided(declarations, providerOf, role);
     const order = orderByDependency(declarations, providerOf, role);
 
     const scope = new ResourceScope();
     const installed = new Map<string, InstalledFeatureState>();
-    const provided = new Map<DependencyToken<unknown>, unknown>(this.preProvided);
+    const provided = new Map<TokenIdentity, unknown>(this.preProvided);
+    const apis = new LocalFeatureApis();
+    this.allocateApiClients(apis, providerOf, provided);
     try {
       for (const declaration of order) {
         const resources = new ResourceScope();
@@ -211,14 +216,21 @@ export class ApplicationBuilder<Infrastructure> {
           config: config[declaration.name],
           infrastructure: this.infrastructure,
           role,
-          resolve: (token) => provided.get(token),
+          resolve: (token) =>
+            token instanceof FeatureApiToken ? apis.reference(token) : provided.get(token),
         });
-        installed.set(declaration.name, state);
-        for (const provider of declaration.providers) {
-          provided.set(provider.token, provider.read(state.provided as never));
-        }
+        this.bindProviders(declaration, state, apis, provided);
+        installed.set(
+          declaration.name,
+          declaration.apiContract
+            ? { ...state, provided: apis.reference(declaration.apiContract) }
+            : state,
+        );
       }
+      apis.ready();
+      scope.own("feature API bindings", () => apis.close());
     } catch (error) {
+      apis.close();
       return cleanupAfterFailure(error, () => scope.close());
     }
 
@@ -227,9 +239,39 @@ export class ApplicationBuilder<Infrastructure> {
     ]);
   }
 
-  private assertUniqueFeatures(
-    declarations: readonly DeclaredFeature[],
+  private allocateApiClients(
+    apis: LocalFeatureApis,
+    providerOf: ReadonlyMap<TokenIdentity, string>,
+    provided: Map<TokenIdentity, unknown>,
   ): void {
+    for (const token of providerOf.keys()) {
+      if (token instanceof FeatureApiToken) apis.declare(token);
+    }
+    for (const [token, value] of this.preProvided) {
+      if (!(token instanceof FeatureApiToken)) continue;
+      apis.bind(token, value);
+      provided.set(token, apis.reference(token));
+    }
+  }
+
+  private bindProviders(
+    declaration: DeclaredFeature,
+    state: InstalledFeatureState,
+    apis: LocalFeatureApis,
+    provided: Map<TokenIdentity, unknown>,
+  ): void {
+    for (const provider of declaration.providers) {
+      const value = provider.read(state.provided as never);
+      if (provider.token instanceof FeatureApiToken) {
+        apis.bind(provider.token, value);
+        provided.set(provider.token, apis.reference(provider.token));
+      } else {
+        provided.set(provider.token, value);
+      }
+    }
+  }
+
+  private assertUniqueFeatures(declarations: readonly DeclaredFeature[]): void {
     const seen = new Set<string>();
     for (const declaration of declarations) {
       if (seen.has(declaration.name)) throw new DuplicateFeatureError(declaration.name);
@@ -240,26 +282,53 @@ export class ApplicationBuilder<Infrastructure> {
   /** Which feature answers for each token, refusing a token claimed twice. */
   private resolveProviders(
     declarations: readonly DeclaredFeature[],
-  ): ReadonlyMap<DependencyToken<unknown>, string> {
-    const providerOf = new Map<DependencyToken<unknown>, string>();
+  ): ReadonlyMap<TokenIdentity, string> {
+    const providerOf = new Map<TokenIdentity, string>();
+    const apiOwners = new Map<string, string>();
+    const register = (token: TokenIdentity, owner: string): void => {
+      const existing =
+        token instanceof FeatureApiToken ? apiOwners.get(token.name) : providerOf.get(token);
+      if (existing !== void 0) {
+        throw new DuplicateProviderError(tokenName(token), [existing, owner]);
+      }
+      if (token instanceof FeatureApiToken) apiOwners.set(token.name, owner);
+      providerOf.set(token, owner);
+    };
     for (const token of this.preProvided.keys()) {
-      providerOf.set(token, "<provided by the application root>");
+      register(token, "<provided by the application root>");
     }
     for (const declaration of declarations) {
       for (const provider of declaration.providers) {
-        const existing = providerOf.get(provider.token);
-        if (existing !== undefined) {
-          throw new DuplicateProviderError(tokenName(provider.token), [existing, declaration.name]);
-        }
-        providerOf.set(provider.token, declaration.name);
+        register(provider.token, declaration.name);
       }
     }
     return providerOf;
   }
 
+  private assertApiDeclarations(declarations: readonly DeclaredFeature[]): void {
+    for (const declaration of declarations) {
+      if (!declaration.apiContract) {
+        assertLegacyProviders(declaration);
+        continue;
+      }
+      if (declaration.apiContract.name !== declaration.name) {
+        throw new Error(
+          `Feature "${declaration.name}" cannot provide API "${declaration.apiContract.name}".`,
+        );
+      }
+      for (const [key, token] of Object.entries(declaration.dependencies)) {
+        if (!(token instanceof FeatureApiToken)) {
+          throw new Error(
+            `Feature "${declaration.name}" dependency "${key}" must use a peer API token.`,
+          );
+        }
+      }
+    }
+  }
+
   private assertEveryDependencyProvided(
     declarations: readonly DeclaredFeature[],
-    providerOf: ReadonlyMap<DependencyToken<unknown>, string>,
+    providerOf: ReadonlyMap<TokenIdentity, string>,
     role: ServerRole,
   ): void {
     for (const declaration of declarations) {
@@ -291,20 +360,16 @@ export function createApp(options: { name: string }): {
 function dependenciesFor(
   declaration: DeclaredFeature,
   role: ServerRole,
-): ReadonlyArray<readonly [string, DependencyToken<unknown>]> {
+): ReadonlyArray<readonly [string, TokenIdentity]> {
   const always = Object.entries(declaration.dependencies);
   const transport = role === "api" ? Object.entries(declaration.transportDependencies) : [];
   return [...always, ...transport];
 }
 
-/**
- * Construction order: a feature is constructed after every feature that
- * provides something it needs. Depth-first, refusing a cycle by the path that
- * closed it rather than by a stack overflow ten frames later.
- */
+/** Only legacy constructor dependencies impose construction order; API clients are preallocated. */
 function orderByDependency(
   declarations: readonly DeclaredFeature[],
-  providerOf: ReadonlyMap<DependencyToken<unknown>, string>,
+  providerOf: ReadonlyMap<TokenIdentity, string>,
   role: ServerRole,
 ): readonly DeclaredFeature[] {
   const byName = new Map(declarations.map((declaration) => [declaration.name, declaration]));
@@ -321,10 +386,8 @@ function orderByDependency(
       ]);
     }
     path.push(declaration.name);
-    for (const [, token] of dependenciesFor(declaration, role)) {
-      const provider = providerOf.get(token);
-      const dependency = provider === undefined ? undefined : byName.get(provider);
-      if (dependency) visit(dependency);
+    for (const dependency of constructorDependencies(declaration, role, providerOf, byName)) {
+      visit(dependency);
     }
     path.pop();
     done.add(declaration.name);
@@ -333,6 +396,33 @@ function orderByDependency(
 
   for (const declaration of declarations) visit(declaration);
   return ordered;
+}
+
+function assertLegacyProviders(declaration: DeclaredFeature): void {
+  const providesApi = declaration.providers.some(
+    (provider) => provider.token instanceof FeatureApiToken,
+  );
+  if (providesApi) {
+    throw new Error(
+      `Feature "${declaration.name}" must provide its API through defineFeature().withApp().`,
+    );
+  }
+}
+
+function constructorDependencies(
+  declaration: DeclaredFeature,
+  role: ServerRole,
+  providerOf: ReadonlyMap<TokenIdentity, string>,
+  byName: ReadonlyMap<string, DeclaredFeature>,
+): DeclaredFeature[] {
+  const dependencies: DeclaredFeature[] = [];
+  for (const [, token] of dependenciesFor(declaration, role)) {
+    if (token instanceof FeatureApiToken) continue;
+    const provider = providerOf.get(token);
+    const dependency = provider === void 0 ? void 0 : byName.get(provider);
+    if (dependency) dependencies.push(dependency);
+  }
+  return dependencies;
 }
 
 function unavailable(feature: string, role: ServerRole, contribution: string): () => never {

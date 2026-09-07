@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const installer = resolve(root, "src/feature-installer.ts");
 const application = resolve(root, "src/application.ts");
+const contract = resolve(root, "src/contract.ts");
 const tsc = resolve(root, "node_modules/.bin/tsc");
 type Diagnostic = { line: number; code: string; text: string };
 
@@ -17,7 +18,10 @@ function diagnosticsFor(source: string): Diagnostic[] {
   const config = join(directory, "tsconfig.json");
   writeFileSync(
     file,
-    source.replaceAll("__INSTALLER__", installer).replaceAll("__APPLICATION__", application),
+    source
+      .replaceAll("__INSTALLER__", installer)
+      .replaceAll("__APPLICATION__", application)
+      .replaceAll("__CONTRACT__", contract),
   );
   writeFileSync(
     config,
@@ -42,13 +46,24 @@ function diagnosticsFor(source: string): Diagnostic[] {
     return [];
   } catch (error) {
     const result = error as { stdout?: string; stderr?: string };
-    return `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split("\n").flatMap((line) => {
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    const diagnostics = output.split("\n").flatMap((line) => {
       const match = line.match(/fixture\.ts\((\d+),\d+\): error (TS\d+): (.*)$/);
       const [, lineNumber, code, text] = match ?? [];
       return lineNumber !== undefined && code !== undefined && text !== undefined
         ? [{ line: Number(lineNumber), code, text }]
         : [];
     });
+    const hasExternalError = output.split("\n").some((line) => {
+      return line.includes("error TS") && !line.includes("fixture.ts(");
+    });
+    const failedOutsideFixture = diagnostics.length === 0 || hasExternalError;
+    if (failedOutsideFixture) {
+      throw new Error(`Fixture compiler failed outside the expected source: ${output}`, {
+        cause: error,
+      });
+    }
+    return diagnostics;
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -72,7 +87,75 @@ describe("defineFeature compiler diagnostics", () => {
     expect(diagnostics).toEqual([]);
   });
 
+  it("accepts inferred peer APIs and an implementation with private state", () => {
+    expect(
+      diagnosticsFor(`
+      import { createApp } from "__APPLICATION__";
+      import { defineFeature, type FeatureSetup } from "__INSTALLER__";
+      import { featureApi } from "__CONTRACT__";
+      interface ProjectApi { name(): string; }
+      const ProjectApi = featureApi<ProjectApi>("project");
+      interface AnnotationApi { projectName(): string; }
+      const AnnotationApi = featureApi<AnnotationApi>("annotation");
+      class App implements AnnotationApi {
+        static readonly contract = AnnotationApi;
+        static readonly dependencies = { projects: ProjectApi };
+        readonly #projects: ProjectApi;
+        private constructor(projects: ProjectApi) { this.#projects = projects; }
+        static create({ dependencies }: FeatureSetup<typeof App.dependencies, {}, undefined>): App {
+          return new App(dependencies.projects);
+        }
+        projectName(): string { return this.#projects.name(); }
+      }
+      const feature = defineFeature("annotation").withApp(App).build();
+      createApp({ name: "typed" }).withInfrastructure({})
+        .withProvided(ProjectApi, { name: () => "project" }).withFeature(feature);
+    `),
+    ).toEqual([]);
+  });
+
   const cases = [
+    [
+      "rejects explicit generic widening of a provided API",
+      "TS2345",
+      `
+      import { createApp } from "__APPLICATION__";
+      import { featureApi } from "__CONTRACT__";
+      interface ProjectApi { name(): string; }
+      const ProjectApi = featureApi<ProjectApi>("project");
+      createApp({ name: "invalid" }).withInfrastructure({}).withProvided<{}>(ProjectApi, {}); // EXPECT
+    `,
+    ],
+    [
+      "rejects a factory that omits a linked API operation",
+      "TS2769",
+      `
+      import { defineFeature } from "__INSTALLER__";
+      import { featureApi } from "__CONTRACT__";
+      interface AnnotationApi { save(): string; }
+      const AnnotationApi = featureApi<AnnotationApi>("annotation");
+      class App { static readonly contract = AnnotationApi; static readonly dependencies = {}; static create() { return { wrong: true }; } }
+      defineFeature("annotation").withApp(App).build(); // EXPECT
+    `,
+    ],
+    [
+      "rejects service constructor dependencies on API Apps",
+      "TS2769",
+      `
+      import { defineFeature, type FeatureSetup } from "__INSTALLER__";
+      import { featureApi } from "__CONTRACT__";
+      abstract class ProjectService { abstract name(): string; }
+      interface AnnotationApi { save(): string; }
+      const AnnotationApi = featureApi<AnnotationApi>("annotation");
+      class App {
+        static readonly contract = AnnotationApi;
+        static readonly dependencies = { projects: ProjectService };
+        static create(setup: FeatureSetup<typeof App.dependencies, {}, undefined>): AnnotationApi { return { save: () => "saved" }; }
+      }
+      defineFeature("annotation").withApp(App).build(); // EXPECT
+    `,
+    ],
+
     [
       "rejects a root without required infrastructure",
       "TS2345",

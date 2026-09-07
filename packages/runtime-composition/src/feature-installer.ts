@@ -1,9 +1,15 @@
 /** One feature installer. A feature declares its config, the contract services */
-import type { DependencyToken, ResolvedTokens, TokenMap } from "./dependency-token.ts";
+import type {
+  DependencyToken,
+  ResolvedTokens,
+  TokenIdentity,
+  TokenMap,
+} from "./dependency-token.ts";
 import type { FeatureName, PublicNamespace } from "./feature-namespace.ts";
 import { publicNamespace, publicNamespaceFromUnknown } from "./feature-namespace.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 import { FeatureConfigError } from "./boot-errors.ts";
+import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
 
 /** Which process is booting. A role hosts only the work that role owns. */
 export type ServerRole = "api" | "worker" | "task";
@@ -21,28 +27,36 @@ export interface FeatureSetup<Dependencies extends TokenMap, Infrastructure, Con
   readonly resources: ResourceOwnership;
 }
 
+type AppContract<Dependencies extends TokenMap, App> =
+  | Readonly<{
+      contract: FeatureApiToken<App>;
+      dependencies: Dependencies & Readonly<Record<string, FeatureApiIdentity>>;
+    }>
+  | Readonly<{ contract: abstract new (...args: never[]) => App; dependencies: Dependencies }>;
+
 /** Static construction metadata owned by a server app implementation. */
-export type AppDefinition<Dependencies extends TokenMap, Infrastructure, Config, App> = Readonly<{
-  readonly contract: DependencyToken<App>;
-  readonly dependencies: Dependencies;
-  readonly configSchema: FeatureConfigSchema<Config>;
-  readonly create: (
-    setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, NoInfer<Config>>,
-  ) => NoInfer<App>;
-}>;
+export type AppDefinition<Dependencies extends TokenMap, Infrastructure, Config, App> = AppContract<
+  Dependencies,
+  App
+> &
+  Readonly<{
+    readonly configSchema: FeatureConfigSchema<Config>;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, NoInfer<Config>>,
+    ) => NoInfer<App>;
+  }>;
 
 /** Static construction metadata for an app with no semantic configuration. */
 export type AppDefinitionWithoutConfig<
   Dependencies extends TokenMap,
   Infrastructure,
   App,
-> = Readonly<{
-  readonly contract: DependencyToken<App>;
-  readonly dependencies: Dependencies;
-  readonly create: (
-    setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, undefined>,
-  ) => NoInfer<App>;
-}>;
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, undefined>,
+    ) => NoInfer<App>;
+  }>;
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
@@ -103,7 +117,7 @@ export interface FeatureWorkerArguments<
 
 /** One token this feature answers for, and the instance behind it. */
 export interface FeatureProvider<Provided> {
-  readonly token: DependencyToken<unknown>;
+  readonly token: TokenIdentity;
   read(provided: Provided): unknown;
 }
 
@@ -123,7 +137,7 @@ export interface FeatureInstallArguments<Infrastructure> {
   readonly infrastructure: Infrastructure;
   readonly role: ServerRole;
   /** The instance the graph resolved for one token. */
-  resolve(token: DependencyToken<unknown>): unknown;
+  resolve(token: TokenIdentity): unknown;
 }
 
 /**
@@ -133,6 +147,7 @@ export interface FeatureInstallArguments<Infrastructure> {
  */
 export interface InstallableServerFeature<Infrastructure> {
   readonly name: string;
+  readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
@@ -599,12 +614,7 @@ export function serverFeature<Infrastructure>(
   });
 }
 
-/**
- * Names a feature whose server app owns its construction metadata.
- *
- * `withApp` is the new declaration path. The existing `serverFeature` builder
- * remains available for features that still expose the older transport stages.
- */
+/** Names a feature whose App owns its factory and peer API declarations. */
 export function defineFeature<const Name extends FeatureName>(
   name: Name,
 ): DefinedFeatureBuilder<Name> {
@@ -685,7 +695,10 @@ class ConfiguredAppBuilder<
       )
       .provides(app.contract)
       .build();
-    return declaration;
+    return {
+      ...declaration,
+      ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
+    };
   }
 }
 
@@ -718,7 +731,7 @@ class UnconfiguredAppBuilder<
     undefined
   > {
     const app = this.app;
-    return serverFeature<Infrastructure>(this.name)
+    const declaration = serverFeature<Infrastructure>(this.name)
       .withConfig({ parse: () => void 0 })
       .withDependencies(app.dependencies)
       .withSetup(({ dependencies, infrastructure, config, resources }) =>
@@ -731,6 +744,10 @@ class UnconfiguredAppBuilder<
       )
       .provides(app.contract)
       .build();
+    return {
+      ...declaration,
+      ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
+    };
   }
 }
 
@@ -816,7 +833,7 @@ function parseFeatureConfig<Config>(
 
 function resolveTokens(
   tokens: TokenMap,
-  resolve: (token: DependencyToken<unknown>) => unknown,
+  resolve: (token: TokenIdentity) => unknown,
 ): Record<string, unknown> {
   const resolved: Record<string, unknown> = {};
   for (const [key, token] of Object.entries(tokens)) {
