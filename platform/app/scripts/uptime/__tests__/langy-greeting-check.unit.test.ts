@@ -69,7 +69,7 @@ describe("buildGreetingRequest", () => {
     expect(request.url).toBe(`${BASE_URL}${LANGY_CONVERSATIONS_PATH}`);
     expect(request.headers["X-Auth-Token"]).toBe(API_KEY);
     expect(request.headers.Prefer).toBe(`wait=${LANGY_GREETING_WAIT_SECONDS}`);
-    expect(LANGY_GREETING_WAIT_SECONDS).toBeLessThan(60);
+    expect(LANGY_GREETING_WAIT_SECONDS).toBeLessThan(120);
     expect(JSON.parse(request.body)).toEqual({
       messages: [{ role: "user", content: LANGY_GREETING_TEXT }],
       idempotencyKey: "k-1",
@@ -303,7 +303,8 @@ describe("the Better Stack script", () => {
       `const PATH = ${JSON.stringify(LANGY_CONVERSATIONS_PATH)};`,
     );
     expect(script).toContain('"X-Auth-Token": apiKey');
-    expect(script).toContain("crypto.randomUUID()");
+    expect(script).toContain("randomUUID()");
+    expect(script).toContain('import { randomUUID } from "node:crypto";');
     for (const reason of GREETING_FAILURE_REASONS) {
       expect(script, `script must name reason ${reason}`).toContain(
         `"${reason}"`,

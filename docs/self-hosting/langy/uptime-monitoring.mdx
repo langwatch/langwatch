@@ -22,7 +22,7 @@ mint a random idempotencyKey
    ▼
 POST {LANGY_BASE_URL}/api/langy/conversations
   X-Auth-Token: <Langy user API key>
-  Prefer: wait=30
+  Prefer: wait=90
   { "messages": [{ "role": "user", "content": "Hi Langy." }],
     "idempotencyKey": "<uuid>" }
    │
@@ -87,7 +87,7 @@ in `scripts/uptime/langy-greeting.betterstack.js`.
 | `LANGY_API_KEY` | yes | | The monitoring user's key. Stored as a monitor environment variable, never in the script |
 | `BETTERSTACK_MONITOR_NAME` | no | `Langy greeting` | Name the monitor is found by on later runs |
 | `BETTERSTACK_REGION` | no | `eu` | One of `us`, `eu`, `as`, `au`. One region only |
-| `BETTERSTACK_CHECK_FREQUENCY_SECONDS` | no | `180` | Must be at least 60, the monitor's timeout |
+| `BETTERSTACK_CHECK_FREQUENCY_SECONDS` | no | `180` | Must be at least 120, the monitor's timeout |
 | `BETTERSTACK_TEAM_NAME` | no | | Only with a global API token |
 
 The monitor runs from one region on purpose. Each check is a real turn, and a
@@ -107,7 +107,7 @@ in the logged line.
 
 | Reason | What happened | Where to look |
 |---|---|---|
-| `not_settled` | The turn was accepted but produced no reply within 30 seconds | Langy worker pod, model provider latency |
+| `not_settled` | The turn was accepted but produced no reply within 90 seconds. Every check is a cold start, so a slow worker boot lands here first | Langy worker pod, model provider latency |
 | `turn_failed` | The turn ran and ended in an error; the error message is carried | Langy worker logs, model provider credentials and budget |
 | `empty_reply` | The turn ended with a reply that has no text | Model configuration for the monitoring project |
 | `surface_dark` | The route answered 404 | The `release_langy_api_key_turns_enabled` flag for the monitoring project, or the app not deployed |
@@ -122,5 +122,8 @@ in the logged line.
 - The check proves a reply exists. It does not judge whether the reply is a good
   answer.
 - It exercises one turn with no tools, retrieval or session keys.
+- Each check opens a new conversation, which spawns a fresh Langy worker. At
+  the default frequency that is 480 worker boots a day on the monitoring
+  project; raise the frequency if that is too much.
 - History and latency live in Better Stack. The platform keeps the turns
   themselves in the monitoring project's Langy history.

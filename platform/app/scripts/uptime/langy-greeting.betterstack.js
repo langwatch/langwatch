@@ -14,10 +14,11 @@
 // for the same project and user without running the assistant, so a fixed key
 // would keep this monitor green through an outage.
 
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 const GREETING = "Hi Langy.";
-const WAIT_SECONDS = 30;
+const WAIT_SECONDS = 90;
 const PATH = "/api/langy/conversations";
 
 function required(name) {
@@ -69,7 +70,9 @@ function detailOf(envelope, apiKey) {
     (isRecord(envelope.error) ? envelope.error.message : envelope.error) ??
     envelope.status ??
     null;
-  return typeof raw === "string" ? raw.split(apiKey).join("<redacted>") : raw;
+  return typeof raw === "string" && apiKey.length > 0
+    ? raw.split(apiKey).join("<redacted>")
+    : raw;
 }
 
 async function postGreeting(baseUrl, apiKey, idempotencyKey) {
@@ -90,7 +93,7 @@ async function postGreeting(baseUrl, apiKey, idempotencyKey) {
 test("Langy answers a greeting", async () => {
   const baseUrl = required("LANGY_BASE_URL").replace(/\/+$/, "");
   const apiKey = required("LANGY_API_KEY");
-  const idempotencyKey = crypto.randomUUID();
+  const idempotencyKey = randomUUID();
 
   const started = Date.now();
   let response;

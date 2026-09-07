@@ -22,11 +22,14 @@
 export const LANGY_GREETING_TEXT = "Hi Langy.";
 
 /**
- * Under the 60s Better Stack request timeout the monitor is provisioned with,
- * and well under the platform's own 120s wait ceiling: a hung turn fails the
- * check as `not_settled` instead of the monitor timing out first.
+ * Every check opens a new conversation, so every check is a cold start: the
+ * worker is spawned, its home laid out and its skills loaded before the model
+ * sees the greeting, and nothing pre-warms it the way the panel does for a
+ * person. The budget is therefore most of the platform's 120s wait ceiling,
+ * while staying under the monitor's own request timeout so a hung turn fails
+ * the check as `not_settled` instead of the monitor timing out first.
  */
-export const LANGY_GREETING_WAIT_SECONDS = 30;
+export const LANGY_GREETING_WAIT_SECONDS = 90;
 
 export const LANGY_CONVERSATIONS_PATH = "/api/langy/conversations";
 
@@ -302,13 +305,18 @@ export async function runLangyGreetingCheck(input: {
     // where it is known, and nowhere downstream needs to know it.
     ...(outcome.healthy
       ? {}
-      : { detail: outcome.detail.split(input.apiKey).join(REDACTED_SECRET) }),
+      : { detail: scrubSecret(outcome.detail, input.apiKey) }),
     idempotencyKey,
     durationMs,
   };
 }
 
 export const REDACTED_SECRET = "<redacted>";
+
+/** An empty secret would split between every character; there is nothing to hide. */
+function scrubSecret(text: string, secret: string): string {
+  return secret.length === 0 ? text : text.split(secret).join(REDACTED_SECRET);
+}
 
 /**
  * One log line per check. Carries ids and timing so a red check can be found

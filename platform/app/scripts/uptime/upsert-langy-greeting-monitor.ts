@@ -24,7 +24,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const BETTERSTACK_API_BASE = "https://uptime.betterstack.com/api/v2";
 export const BETTERSTACK_REGIONS = ["us", "eu", "as", "au"] as const;
-export const MONITOR_REQUEST_TIMEOUT_SECONDS = 60;
+export const MONITOR_REQUEST_TIMEOUT_SECONDS = 120;
 export const DEFAULT_MONITOR_NAME = "Langy greeting";
 export const DEFAULT_CHECK_FREQUENCY_SECONDS = 180;
 export const REDACTED = "<redacted>";
