@@ -296,6 +296,14 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And the rotated key is the only live one
     And none of the previous tokens authorize trace writes
 
+  @integration @ingest-api-key @rotate @personal
+  Scenario: Rotate says how many keys it revokes and which machines hold them
+    Given jane has two live "claude_cowork" keys, on "MacBook Pro" and on a machine with no label
+    When she opens the install drawer for that source on her personal ingest tile
+    Then the warning names both machines and says two keys will be revoked
+    And a key with no machine label is named "unknown device"
+    And the rotate button says how many keys it revokes
+
   @unit @ingest-api-key @rotate
   Scenario: A rotation that cannot kill every prior key mints nothing
     Given a rotation over several live keys
