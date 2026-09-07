@@ -26,7 +26,7 @@ let unrelatedIdentity: SigningIdentity;
 
 async function signingIdentity(commonName: string): Promise<SigningIdentity> {
   const pem = await generate([{ name: "commonName", value: commonName }], {
-    days: 30,
+    notAfterDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     keySize: 2048,
   });
   const idp = samlify.IdentityProvider({
@@ -139,6 +139,16 @@ function authFor(metadata: string) {
       },
       delete: async (key) => {
         secondary.delete(key);
+      },
+      getAndDelete: async (key) => {
+        const value = secondary.get(key) ?? null;
+        secondary.delete(key);
+        return value;
+      },
+      increment: async (key) => {
+        const next = Number(secondary.get(key) ?? "0") + 1;
+        secondary.set(key, String(next));
+        return next;
       },
     },
     plugins: [

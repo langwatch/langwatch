@@ -322,7 +322,7 @@ describe("the session shape", () => {
     it("names the identifier the provider's sign-in belongs to", async () => {
       const service = new SessionClaimsService({
         identifiers: { findIdentifierIdFor: async () => "id_credential" },
-        assertions: { assertedFactorsFor: async () => [] },
+        assertions: { authenticatedAccountFor: async () => null },
       });
       expect(
         await service.claimsForMint({
@@ -333,19 +333,19 @@ describe("the session shape", () => {
     });
 
     it("asks no identity provider anything on a credential sign-in", async () => {
-      const assertedFactorsFor = vi.fn(async () => []);
+      const authenticatedAccountFor = vi.fn(async () => null);
       const service = new SessionClaimsService({
         identifiers: { findIdentifierIdFor: async () => null },
-        assertions: { assertedFactorsFor },
+        assertions: { authenticatedAccountFor },
       });
       await service.claimsForMint({ userId: "sam", path: "/sign-in/email" });
-      expect(assertedFactorsFor).not.toHaveBeenCalled();
+      expect(authenticatedAccountFor).not.toHaveBeenCalled();
     });
 
     it("records nothing for a path that mints a session no sign-in made", async () => {
       const service = new SessionClaimsService({
         identifiers: { findIdentifierIdFor: async () => "id_credential" },
-        assertions: { assertedFactorsFor: async () => [] },
+        assertions: { authenticatedAccountFor: async () => null },
       });
       expect(
         await service.claimsForMint({ userId: "sam", path: "/get-session" }),

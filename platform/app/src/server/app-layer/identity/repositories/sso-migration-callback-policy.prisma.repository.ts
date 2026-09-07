@@ -192,7 +192,16 @@ export class PrismaSsoMigrationCallbackPolicy
     userId: string;
     path: string | undefined;
     authenticatedAt: Date;
-  }) {
+  }): Promise<
+    | { action: "continue" }
+    | {
+        action: "reject";
+        code:
+          | "SSO_LEGACY_AUTH_RETIRED"
+          | "SSO_MIGRATION_AUTH_AMBIGUOUS"
+          | "SSO_MIGRATION_AUTH_NOT_ALLOWED";
+      }
+  > {
     const callback = ssoCallbackProviderFromPath(path);
     if (!callback) return { action: "continue" } as const;
 
@@ -212,16 +221,17 @@ export class PrismaSsoMigrationCallbackPolicy
             code: "SSO_MIGRATION_AUTH_NOT_ALLOWED",
           } as const;
         }
+        const pairs =
+          "authenticationPairs" in context && context.authenticationPairs
+            ? context.authenticationPairs
+            : context.pairs;
         const decision = migrationAuthenticationDecision({
           callback,
           account: {
             provider: callback.providerId,
             providerAccountId: accepted.providerAccountId,
           },
-          pairs:
-            "authenticationPairs" in context
-              ? context.authenticationPairs
-              : context.pairs,
+          pairs,
         });
         if (decision.action !== "record") return decision;
 
