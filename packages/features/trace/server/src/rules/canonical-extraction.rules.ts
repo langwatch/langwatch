@@ -23,6 +23,63 @@ type ExtractMessagesConfig = {
   extractSystemInstructions: boolean;
 };
 
+/** Whether one attribute key carried the messages this extraction wanted. */
+const extractMessagesFromAttr = (
+  ctx: ExtractorContext,
+  key: string,
+  ruleId: string,
+  config: ExtractMessagesConfig,
+): boolean => {
+  const raw = ctx.bag.attrs.take(key);
+  if (raw === void 0) return false;
+
+  const msgs = normalizeToMessages(decodeMessagesPayload(raw), config.defaultRole);
+  if (!msgs) return false;
+
+  if (config.extractSystemInstructions) {
+    const systemInstruction = extractSystemInstructionFromMessages(msgs);
+    // Strip system messages — they go to gen_ai.system_instructions
+    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    if (chatMsgs.length > 0) {
+      ctx.setAttr(config.attrKey, chatMsgs);
+    }
+    if (systemInstruction !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
+    }
+    ctx.recordRule(ruleId);
+
+    return true;
+  }
+  if (msgs.length === 0) return false;
+
+  ctx.setAttr(config.attrKey, msgs);
+  ctx.recordRule(ruleId);
+
+  return true;
+};
+
+/** Whether one event source carried the messages this extraction wanted. */
+const extractMessagesFromEvents = (
+  ctx: ExtractorContext,
+  source: Extract<MessageSource, { type: "event" }>,
+  ruleId: string,
+  config: ExtractMessagesConfig,
+): boolean => {
+  const messages: unknown[] = [];
+  for (const ev of ctx.bag.events.takeAll(source.name)) {
+    const extracted = source.extractor(ev);
+    if (extracted !== void 0) {
+      messages.push(extracted);
+    }
+  }
+  if (messages.length === 0) return false;
+
+  ctx.setAttr(config.attrKey, messages);
+  ctx.recordRule(ruleId);
+
+  return true;
+};
+
 const extractMessages = (
   ctx: ExtractorContext,
   sources: MessageSource[],
@@ -34,53 +91,14 @@ const extractMessages = (
   }
 
   for (const source of sources) {
-    if (source.type === "attr") {
-      for (const key of source.keys) {
-        const raw = ctx.bag.attrs.take(key);
-        if (raw !== void 0) {
-          const decoded = decodeMessagesPayload(raw);
-          const msgs = normalizeToMessages(decoded, config.defaultRole);
-          if (!msgs) {
-            continue;
-          }
+    if (source.type === "event") {
+      if (extractMessagesFromEvents(ctx, source, ruleId, config)) return true;
 
-          if (config.extractSystemInstructions) {
-            const systemInstruction = extractSystemInstructionFromMessages(msgs);
-            // Strip system messages — they go to gen_ai.system_instructions
-            const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
-            if (chatMsgs.length > 0) {
-              ctx.setAttr(config.attrKey, chatMsgs);
-            }
-            if (systemInstruction !== null) {
-              ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
-            }
-            ctx.recordRule(ruleId);
-            return true;
-          }
+      continue;
+    }
 
-          if (msgs.length > 0) {
-            ctx.setAttr(config.attrKey, msgs);
-            ctx.recordRule(ruleId);
-            return true;
-          }
-        }
-      }
-    } else if (source.type === "event") {
-      const events = ctx.bag.events.takeAll(source.name);
-      if (events.length > 0) {
-        const messages: unknown[] = [];
-        for (const ev of events) {
-          const extracted = source.extractor(ev);
-          if (extracted !== void 0) {
-            messages.push(extracted);
-          }
-        }
-        if (messages.length > 0) {
-          ctx.setAttr(config.attrKey, messages);
-          ctx.recordRule(ruleId);
-          return true;
-        }
-      }
+    for (const key of source.keys) {
+      if (extractMessagesFromAttr(ctx, key, ruleId, config)) return true;
     }
   }
 
@@ -168,6 +186,23 @@ export type UsageTokenSources =
   | { input?: readonly string[]; output?: readonly string[] }
   | { object: string };
 
+/**
+ * Takes each key in turn and stops at the first that reads as a number; the
+ * last value taken is the answer, so an all-unreadable list gives null.
+ */
+const takeFirstTokenCount = (ctx: ExtractorContext, keys: readonly string[]): number | null => {
+  let count: number | null = null;
+  for (const key of keys) {
+    const val = ctx.bag.attrs.take(key);
+    if (val === void 0) continue;
+
+    count = asNumber(val);
+    if (count !== null) break;
+  }
+
+  return count;
+};
+
 export const extractUsageTokens = (
   ctx: ExtractorContext,
   sources: UsageTokenSources,
@@ -183,28 +218,9 @@ export const extractUsageTokens = (
       outTok = asNumber(usageObj.completionTokens);
     }
   } else {
-    if (sources.input) {
-      for (const key of sources.input) {
-        const val = ctx.bag.attrs.take(key);
-        if (val !== void 0) {
-          inTok = asNumber(val);
-          if (inTok !== null) {
-            break;
-          }
-        }
-      }
-    }
-    if (sources.output) {
-      for (const key of sources.output) {
-        const val = ctx.bag.attrs.take(key);
-        if (val !== void 0) {
-          outTok = asNumber(val);
-          if (outTok !== null) {
-            break;
-          }
-        }
-      }
-    }
+    if (sources.input) inTok = takeFirstTokenCount(ctx, sources.input);
+
+    if (sources.output) outTok = takeFirstTokenCount(ctx, sources.output);
   }
 
   if (inTok !== null) {

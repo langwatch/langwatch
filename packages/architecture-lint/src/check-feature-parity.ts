@@ -1244,6 +1244,38 @@ export function collectGoBindings(testRoots: string[]): CollectedBinding[] {
   return bindings;
 }
 
+/** The offset just past the `(`-balanced group opening at `open`. */
+function pastBalancedParens(src: string, open: number): number {
+  const len = src.length;
+  let depth = 1;
+  let j = open + 1;
+  while (j < len && depth > 0) {
+    const c = src[j];
+    if (c === "(") depth++;
+    else if (c === ")") depth--;
+
+    j++;
+  }
+
+  return j;
+}
+
+/**
+ * The offset just past a Python decorator at `at`, including parenthesised
+ * multi-line forms like @pytest.mark.parametrize("a,b", [...]).
+ */
+function pastPythonDecorator(src: string, at: number): number {
+  const len = src.length;
+  let j = at + 1;
+  while (j < len && src[j] !== "\n" && src[j] !== "(") j++;
+
+  if (j < len && src[j] === "(") j = pastBalancedParens(src, j);
+
+  while (j < len && src[j] !== "\n") j++;
+
+  return j + 1;
+}
+
 /**
  * Python binding form (block-comment matching the TS form, OR a hash
  * comment matching the Bats form — either is valid):
@@ -1276,26 +1308,7 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
     }
 
     if (ch === "@") {
-      // Skip Python decorators, including parenthesised multi-line forms
-      // like @pytest.mark.parametrize("a,b", [...]) that span many lines.
-      let j = i + 1;
-      while (j < len && src[j] !== "\n" && src[j] !== "(") j++;
-
-      if (j < len && src[j] === "(") {
-        let depth = 1;
-        j++;
-        while (j < len && depth > 0) {
-          const c = src[j];
-          if (c === "(") depth++;
-          else if (c === ")") depth--;
-
-          j++;
-        }
-      }
-
-      while (j < len && src[j] !== "\n") j++;
-
-      i = j + 1;
+      i = pastPythonDecorator(src, i);
       continue;
     }
 

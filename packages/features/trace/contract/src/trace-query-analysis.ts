@@ -236,36 +236,39 @@ export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
   const memberToGroupId = new Map<string, string>();
   const fieldToGroupIds = new Map<string, string[]>();
 
+  /** Records the group this OR node forms, or reports that it forms none. */
+  const recordOrGroup = (node: Extract<LiqeQuery, { type: "LogicalExpression" }>): boolean => {
+    const members = collectOrMembers(node);
+    if (members.length <= 1) return false;
+
+    const id = `or-${node.location.start}-${node.location.end}`;
+    const fields = new Set(members.map((m) => m.field));
+    groups.push({
+      id,
+      fields,
+      members,
+      start: node.location.start,
+      end: node.location.end,
+    });
+    for (const m of members) {
+      memberToGroupId.set(memberKey(m.field, m.value), id);
+    }
+    for (const f of fields) {
+      const existing = fieldToGroupIds.get(f);
+      if (!existing) {
+        fieldToGroupIds.set(f, [id]);
+        continue;
+      }
+      if (!existing.includes(id)) existing.push(id);
+    }
+
+    return true;
+  };
+
   const visit = (node: LiqeQuery): void => {
     if (node.type === "LogicalExpression") {
-      if (node.operator.operator === "OR") {
-        const members = collectOrMembers(node);
-        if (members.length > 1) {
-          const id = `or-${node.location.start}-${node.location.end}`;
-          const fields = new Set(members.map((m) => m.field));
-          groups.push({
-            id,
-            fields,
-            members,
-            start: node.location.start,
-            end: node.location.end,
-          });
-          for (const m of members) {
-            memberToGroupId.set(memberKey(m.field, m.value), id);
-          }
-          for (const f of fields) {
-            const existing = fieldToGroupIds.get(f);
-            if (existing) {
-              if (!existing.includes(id)) {
-                existing.push(id);
-              }
-            } else {
-              fieldToGroupIds.set(f, [id]);
-            }
-          }
-          return;
-        }
-      }
+      if (node.operator.operator === "OR" && recordOrGroup(node)) return;
+
       visit(node.left);
       visit(node.right);
       return;

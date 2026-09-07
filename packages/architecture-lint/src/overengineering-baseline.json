@@ -1,7 +1,4 @@
 {
   "version": 0,
-  "sites": [
-    "layer-class|apps/worker/src/app/worker-automation-graph.composition.ts",
-    "layer-class|packages/features/agent/server/src/transport/api-rest/agent-legacy-facade.api.ts"
-  ]
+  "sites": []
 }

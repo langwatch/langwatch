@@ -10277,6 +10277,9 @@ importers:
       '@langwatch/secret-server':
         specifier: workspace:*
         version: link:../features/secret/server
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../features/workflow/contract

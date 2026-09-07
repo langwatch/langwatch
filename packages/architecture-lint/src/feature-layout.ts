@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files.ts";
+import { lintFeatureAppContracts } from "./feature-app-contract.ts";
 import {
   CONTRACT_ARTIFACT,
   PROCESS_MANAGER_SERVICE_PATTERN,
@@ -475,6 +476,69 @@ function resolveBindingOrigin(
  * re-exports, and locally declared values), ultimately exposes any value
  * declared under a feature server's private directories.
  */
+/** The named-export elements whose binding is declared in a private module. */
+function privateNamedExports({
+  origin,
+  clause,
+  pkg,
+  allowTestingDoubles,
+}: {
+  origin: string;
+  clause: ts.NamedExports;
+  pkg: ClassifiedPackage;
+  allowTestingDoubles: boolean;
+}): ts.ExportSpecifier[] {
+  return clause.elements.filter(
+    (element) =>
+      !element.isTypeOnly &&
+      resolveBindingOrigin(origin, exportName(element), pkg, new Set(), allowTestingDoubles),
+  );
+}
+
+/** One statement's verdict for `fileExposesPrivateValue`. */
+function statementExposesPrivateValue({
+  statement,
+  file,
+  pkg,
+  visited,
+  allowTestingDoubles,
+}: {
+  statement: ts.Statement;
+  file: string;
+  pkg: ClassifiedPackage;
+  visited: Set<string>;
+  allowTestingDoubles: boolean;
+}): boolean {
+  if (!ts.isExportDeclaration(statement)) {
+    return (
+      isExportedValueDeclaration(statement) && isPrivateServerPath(pkg, file, allowTestingDoubles)
+    );
+  }
+
+  if (statement.isTypeOnly) return false;
+
+  const clause = statement.exportClause;
+  if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+    const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+    if (!target) return false;
+
+    if (!clause || ts.isNamespaceExport(clause)) {
+      return fileExposesPrivateValue(target, pkg, visited, allowTestingDoubles);
+    }
+
+    return (
+      ts.isNamedExports(clause) &&
+      privateNamedExports({ origin: target, clause, pkg, allowTestingDoubles }).length > 0
+    );
+  }
+
+  return (
+    clause !== undefined &&
+    ts.isNamedExports(clause) &&
+    privateNamedExports({ origin: file, clause, pkg, allowTestingDoubles }).length > 0
+  );
+}
+
 function fileExposesPrivateValue(
   file: string,
   pkg: ClassifiedPackage,
@@ -486,45 +550,9 @@ function fileExposesPrivateValue(
   visited.add(file);
   if (!existsSync(file)) return false;
 
-  const sourceFile = parseModule(file);
-
-  for (const statement of sourceFile.statements) {
-    if (ts.isExportDeclaration(statement)) {
-      if (statement.isTypeOnly) continue;
-
-      if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
-        const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
-        if (!target) continue;
-
-        if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
-          if (fileExposesPrivateValue(target, pkg, visited, allowTestingDoubles)) return true;
-        } else if (ts.isNamedExports(statement.exportClause)) {
-          for (const element of statement.exportClause.elements) {
-            if (element.isTypeOnly) continue;
-
-            if (
-              resolveBindingOrigin(target, exportName(element), pkg, new Set(), allowTestingDoubles)
-            )
-              return true;
-          }
-        }
-      } else if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-        for (const element of statement.exportClause.elements) {
-          if (element.isTypeOnly) continue;
-
-          if (resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles))
-            return true;
-        }
-      }
-    } else if (
-      isExportedValueDeclaration(statement) &&
-      isPrivateServerPath(pkg, file, allowTestingDoubles)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  return parseModule(file).statements.some((statement) =>
+    statementExposesPrivateValue({ statement, file, pkg, visited, allowTestingDoubles }),
+  );
 }
 
 function lintPrivateServerExportsForEntry(
@@ -580,14 +608,13 @@ function lintPrivateServerExportsForEntry(
           add(statement, specifierText);
         }
       } else if (ts.isNamedExports(statement.exportClause)) {
-        for (const element of statement.exportClause.elements) {
-          if (element.isTypeOnly) continue;
-
-          if (
-            resolveBindingOrigin(target, exportName(element), pkg, new Set(), allowTestingDoubles)
-          ) {
-            add(element, specifierText);
-          }
+        for (const element of privateNamedExports({
+          origin: target,
+          clause: statement.exportClause,
+          pkg,
+          allowTestingDoubles,
+        })) {
+          add(element, specifierText);
         }
       }
 
@@ -595,11 +622,13 @@ function lintPrivateServerExportsForEntry(
     }
 
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-      for (const element of statement.exportClause.elements) {
-        if (element.isTypeOnly) continue;
-
-        if (resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles))
-          add(element);
+      for (const element of privateNamedExports({
+        origin: file,
+        clause: statement.exportClause,
+        pkg,
+        allowTestingDoubles,
+      })) {
+        add(element);
       }
     }
   }
@@ -629,6 +658,8 @@ export function lintFeatureLayouts(
 
     return resolver;
   };
+  violations.push(...lintFeatureAppContracts(packages, getResolver()));
+
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
 

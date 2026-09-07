@@ -853,6 +853,41 @@ function lintWebPublicExports(webPackages: readonly WebPackage[]): ArchitectureV
   return violations;
 }
 
+/** The cross-feature implementation import this in-tree target amounts to. */
+function crossFeatureImplementationImport({
+  featuresRoot,
+  target,
+  file,
+  sourceImport,
+  importerFeatureRoot,
+  featureEdges,
+}: {
+  featuresRoot: string;
+  target: string;
+  file: string;
+  sourceImport: SourceImport;
+  importerFeatureRoot: string;
+  featureEdges: Map<string, Set<string>>;
+}): ArchitectureViolation[] {
+  const targetFeatureRoot = featureForFile(featuresRoot, target);
+  if (!targetFeatureRoot || targetFeatureRoot === importerFeatureRoot) return [];
+
+  const edges = featureEdges.get(importerFeatureRoot) ?? new Set<string>();
+  edges.add(targetFeatureRoot);
+  featureEdges.set(importerFeatureRoot, edges);
+
+  return [
+    {
+      policy: "ui-feature-implementation-import",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message: `Frontend feature ${JSON.stringify(importerFeatureRoot)} may not import implementation from frontend feature ${JSON.stringify(targetFeatureRoot)}.`,
+      allowed: "Use an explicit feature-web surface declared in the UI feature catalogue.",
+    },
+  ];
+}
+
 function lintUiSourceBoundaries(
   root: string,
   catalogue: UiFeatureCatalogue,
@@ -1007,20 +1042,16 @@ function lintUiSourceBoundaries(
         }
 
         if (importerFeatureRoot) {
-          const targetFeatureRoot = featureForFile(featuresRoot, target);
-          if (targetFeatureRoot && targetFeatureRoot !== importerFeatureRoot) {
-            violations.push({
-              policy: "ui-feature-implementation-import",
+          violations.push(
+            ...crossFeatureImplementationImport({
+              featuresRoot,
+              target,
               file,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: `Frontend feature ${JSON.stringify(importerFeatureRoot)} may not import implementation from frontend feature ${JSON.stringify(targetFeatureRoot)}.`,
-              allowed: "Use an explicit feature-web surface declared in the UI feature catalogue.",
-            });
-            const edges = featureEdges.get(importerFeatureRoot) ?? new Set<string>();
-            edges.add(targetFeatureRoot);
-            featureEdges.set(importerFeatureRoot, edges);
-          }
+              sourceImport,
+              importerFeatureRoot,
+              featureEdges,
+            }),
+          );
         }
       }
 
@@ -1157,6 +1188,85 @@ function forbiddenSurfaceDirectory(packageSourceRoot: string, file: string): str
   return segments.find((segment) => SURFACE_FORBIDDEN_DIRECTORIES.has(segment));
 }
 
+/** One module of a screen's closure: what it violates, and what it pulls in. */
+function screenClosureStep({
+  root,
+  sourceRoot,
+  current,
+  exportPath,
+  portable,
+}: {
+  root: string;
+  sourceRoot: string;
+  current: string;
+  exportPath: string;
+  portable: PortableModuleOracle;
+}): { violations: ArchitectureViolation[]; next: string[] } {
+  const violations: ArchitectureViolation[] = [];
+  const next: string[] = [];
+  for (const browserCapability of browserCapabilitySourceViolations(
+    readFileSync(current, "utf8"),
+  )) {
+    violations.push({
+      policy: "ui-screen-closure",
+      file: current,
+      specifier: exportPath,
+      message: `An owner-only screen may not use ${browserCapability} directly.`,
+      allowed: "Receive browser data and actions from its owning frontend feature.",
+    });
+  }
+
+  for (const sourceImport of moduleImports({ file: current })) {
+    if (sourceImport.nonLiteral) {
+      violations.push({
+        policy: "ui-screen-closure",
+        file: current,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: "An owner-only screen may not load a non-literal module specifier.",
+      });
+      continue;
+    }
+
+    const forbiddenImport =
+      forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
+      (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
+        ? "legacy platform/app implementation"
+        : void 0);
+    if (forbiddenImport) {
+      violations.push({
+        policy: "ui-screen-closure",
+        file: current,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `An owner-only screen may not import ${forbiddenImport}.`,
+      });
+    }
+
+    const targetFile = resolveRelativeModule({
+      file: sourceImport.file,
+      specifier: sourceImport.specifier,
+    });
+    if (!targetFile) continue;
+
+    if (!isWithin(sourceRoot, targetFile)) {
+      violations.push({
+        policy: "ui-screen-closure",
+        file: current,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: "An owner-only screen may not reach source outside its web package.",
+        allowed: "Import portable contracts through their public workspace package.",
+      });
+      continue;
+    }
+
+    next.push(targetFile);
+  }
+
+  return { violations, next };
+}
+
 function lintWebScreenClosures(
   root: string,
   webPackages: readonly WebPackage[],
@@ -1189,69 +1299,131 @@ function lintWebScreenClosures(
         if (visited.has(current)) continue;
 
         visited.add(current);
-        const currentSource = readFileSync(current, "utf8");
-        for (const browserCapability of browserCapabilitySourceViolations(currentSource)) {
-          violations.push({
-            policy: "ui-screen-closure",
-            file: current,
-            specifier: exportPath,
-            message: `An owner-only screen may not use ${browserCapability} directly.`,
-            allowed: "Receive browser data and actions from its owning frontend feature.",
-          });
-        }
-
-        for (const sourceImport of moduleImports({ file: current })) {
-          if (sourceImport.nonLiteral) {
-            violations.push({
-              policy: "ui-screen-closure",
-              file: current,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: "An owner-only screen may not load a non-literal module specifier.",
-            });
-            continue;
-          }
-
-          const forbiddenImport =
-            forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
-            (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
-              ? "legacy platform/app implementation"
-              : void 0);
-          if (forbiddenImport) {
-            violations.push({
-              policy: "ui-screen-closure",
-              file: current,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: `An owner-only screen may not import ${forbiddenImport}.`,
-            });
-          }
-
-          const targetFile = resolveRelativeModule({
-            file: sourceImport.file,
-            specifier: sourceImport.specifier,
-          });
-          if (!targetFile) continue;
-
-          if (!isWithin(sourceRoot, targetFile)) {
-            violations.push({
-              policy: "ui-screen-closure",
-              file: current,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: "An owner-only screen may not reach source outside its web package.",
-              allowed: "Import portable contracts through their public workspace package.",
-            });
-            continue;
-          }
-
-          pending.push(targetFile);
-        }
+        const step = screenClosureStep({ root, sourceRoot, current, exportPath, portable });
+        violations.push(...step.violations);
+        pending.push(...step.next);
       }
     }
   }
 
   return violations;
+}
+
+/** One module of a surface's closure: what it violates, and what it pulls in. */
+function surfaceClosureStep({
+  root,
+  sourceRoot,
+  current,
+  chain,
+  exportPath,
+  capability,
+  implementationRoots,
+  portable,
+  webPackages,
+  ownPackageName,
+}: {
+  root: string;
+  sourceRoot: string;
+  current: string;
+  chain: readonly string[];
+  exportPath: string;
+  capability: { id: string };
+  implementationRoots: readonly string[];
+  portable: PortableModuleOracle;
+  webPackages: readonly WebPackage[];
+  ownPackageName: string;
+}): { violations: ArchitectureViolation[]; next: { file: string; chain: string[] }[] } {
+  const violations: ArchitectureViolation[] = [];
+  const next: { file: string; chain: string[] }[] = [];
+  for (const used of browserCapabilitySourceViolations(readFileSync(current, "utf8"))) {
+    violations.push({
+      policy: "ui-surface-closure",
+      file: current,
+      specifier: exportPath,
+      message: `A shareable surface may not use ${used} directly.`,
+      allowed: "Receive portable values and controlled actions from the consuming feature.",
+    });
+  }
+
+  const forbidden = forbiddenSurfaceDirectory(sourceRoot, current);
+  const surfaceId = surfaceIdForPath(sourceRoot, current);
+  const escapedSurface = !implementationRoots.some((implementation) =>
+    isWithin(implementation, current),
+  );
+  if (forbidden || escapedSurface || (surfaceId !== void 0 && surfaceId !== capability.id)) {
+    const dependencyPath = chain
+      .map((path) => relative(sourceRoot, path).split(sep).join("/"))
+      .join(" -> ");
+    violations.push({
+      policy: "ui-surface-closure",
+      file: current,
+      specifier: exportPath,
+      message: forbidden
+        ? `Surface ${JSON.stringify(capability.id)} reaches forbidden local ${JSON.stringify(forbidden)} implementation via ${dependencyPath}.`
+        : escapedSurface
+          ? `Surface ${JSON.stringify(capability.id)} escapes its package implementation layers via ${dependencyPath}.`
+          : `Surface ${JSON.stringify(capability.id)} reaches another surface ${JSON.stringify(surfaceId)} via ${dependencyPath}.`,
+      allowed:
+        "A shareable surface may depend only on its own implementation and portable presentation collaborators.",
+    });
+
+    return { violations, next };
+  }
+
+  for (const sourceImport of moduleImports({ file: current })) {
+    if (sourceImport.nonLiteral) {
+      violations.push({
+        policy: "ui-surface-closure",
+        file: current,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: "A shareable surface may not load a non-literal module specifier.",
+      });
+      continue;
+    }
+
+    const forbiddenImport =
+      forbiddenWebPresentationImport({
+        specifier: sourceImport.specifier,
+        portable,
+        collaboratingSurface: (edge) =>
+          collaboratingSurfaceImport({ specifier: edge, webPackages, ownPackageName }),
+      }) ??
+      (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
+        ? "legacy platform/app implementation"
+        : void 0);
+    if (forbiddenImport) {
+      violations.push({
+        policy: "ui-surface-closure",
+        file: current,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `A shareable surface may not import ${forbiddenImport}.`,
+      });
+    }
+
+    const targetFile = resolveRelativeModule({
+      file: sourceImport.file,
+      specifier: sourceImport.specifier,
+    });
+    if (!targetFile) continue;
+
+    if (!isWithin(sourceRoot, targetFile)) {
+      violations.push({
+        policy: "ui-surface-closure",
+        file: current,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: "A shareable surface may not reach source outside its web package.",
+        allowed: "Import portable contracts through their public workspace package.",
+      });
+      continue;
+    }
+
+    next.push({ file: targetFile, chain: [...chain, targetFile] });
+  }
+
+  return { violations, next };
 }
 
 function lintWebSurfaceClosures(
@@ -1299,95 +1471,20 @@ function lintWebSurfaceClosures(
         if (visited.has(current)) continue;
 
         visited.add(current);
-        const currentSource = readFileSync(current, "utf8");
-        for (const capability of browserCapabilitySourceViolations(currentSource)) {
-          violations.push({
-            policy: "ui-surface-closure",
-            file: current,
-            specifier: exportPath,
-            message: `A shareable surface may not use ${capability} directly.`,
-            allowed: "Receive portable values and controlled actions from the consuming feature.",
-          });
-        }
-
-        const forbidden = forbiddenSurfaceDirectory(sourceRoot, current);
-        const surfaceId = surfaceIdForPath(sourceRoot, current);
-        const escapedSurface = !implementationRoots.some((root) => isWithin(root, current));
-        if (forbidden || escapedSurface || (surfaceId !== void 0 && surfaceId !== capability.id)) {
-          const dependencyPath = chain
-            .map((path) => relative(sourceRoot, path).split(sep).join("/"))
-            .join(" -> ");
-          violations.push({
-            policy: "ui-surface-closure",
-            file: current,
-            specifier: exportPath,
-            message: forbidden
-              ? `Surface ${JSON.stringify(capability.id)} reaches forbidden local ${JSON.stringify(forbidden)} implementation via ${dependencyPath}.`
-              : escapedSurface
-                ? `Surface ${JSON.stringify(capability.id)} escapes its package implementation layers via ${dependencyPath}.`
-                : `Surface ${JSON.stringify(capability.id)} reaches another surface ${JSON.stringify(surfaceId)} via ${dependencyPath}.`,
-            allowed:
-              "A shareable surface may depend only on its own implementation and portable presentation collaborators.",
-          });
-          continue;
-        }
-
-        for (const sourceImport of moduleImports({ file: current })) {
-          if (sourceImport.nonLiteral) {
-            violations.push({
-              policy: "ui-surface-closure",
-              file: current,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: "A shareable surface may not load a non-literal module specifier.",
-            });
-            continue;
-          }
-
-          const forbiddenImport =
-            forbiddenWebPresentationImport({
-              specifier: sourceImport.specifier,
-              portable,
-              collaboratingSurface: (edge) =>
-                collaboratingSurfaceImport({
-                  specifier: edge,
-                  webPackages,
-                  ownPackageName: pkg.name,
-                }),
-            }) ??
-            (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
-              ? "legacy platform/app implementation"
-              : void 0);
-          if (forbiddenImport) {
-            violations.push({
-              policy: "ui-surface-closure",
-              file: current,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: `A shareable surface may not import ${forbiddenImport}.`,
-            });
-          }
-
-          const targetFile = resolveRelativeModule({
-            file: sourceImport.file,
-            specifier: sourceImport.specifier,
-          });
-          if (!targetFile) continue;
-
-          if (!isWithin(sourceRoot, targetFile)) {
-            violations.push({
-              policy: "ui-surface-closure",
-              file: current,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: "A shareable surface may not reach source outside its web package.",
-              allowed: "Import portable contracts through their public workspace package.",
-            });
-            continue;
-          }
-
-          pending.push({ file: targetFile, chain: [...chain, targetFile] });
-        }
+        const step = surfaceClosureStep({
+          root,
+          sourceRoot,
+          current,
+          chain,
+          exportPath,
+          capability,
+          implementationRoots,
+          portable,
+          webPackages,
+          ownPackageName: pkg.name,
+        });
+        violations.push(...step.violations);
+        pending.push(...step.next);
       }
     }
   }
@@ -1567,6 +1664,182 @@ function canPrivateLayerDependOn(
   );
 }
 
+/** Every private-layout verdict one governed feature-web import earns. */
+function webPrivateImportViolations({
+  sourceRoot,
+  file,
+  targetFile,
+  sourceImport,
+  module,
+  target,
+  declarations,
+  featureEdges,
+}: {
+  sourceRoot: string;
+  file: string;
+  targetFile: string;
+  sourceImport: SourceImport;
+  module: WebPrivateModule;
+  target: WebPrivateModule;
+  declarations: Map<string, WebFeatureDeclaration>;
+  featureEdges: Map<string, Set<string>>;
+}): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  if (
+    (module.kind === "global" || module.kind === "feature" || module.kind === "feature-entry") &&
+    (target.kind === "screen" || target.kind === "surface")
+  ) {
+    violations.push({
+      policy: "ui-web-public-boundary-leakage",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message:
+        "Private feature-web implementation may not depend inward on a public screen or surface boundary.",
+    });
+
+    return violations;
+  }
+
+  // A door is the package's own front step onto its shared implementation,
+  // so it reaches the global model, behavior and ui layers the same way the
+  // surface closure walk admits them. What stays out is a package-private
+  // feature and an owner-only screen.
+  if (module.kind === "surface" && target.kind !== "surface" && target.kind !== "global") {
+    violations.push({
+      policy: "ui-web-surface-leakage",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message: "A public surface may not reach package-private features or a screen.",
+    });
+
+    return violations;
+  }
+
+  if (module.kind === "screen" && target.kind === "screen") {
+    const sourceScreen = relative(sourceRoot, file).split(sep)[1];
+    const targetScreen = relative(sourceRoot, targetFile).split(sep)[1];
+    if (sourceScreen !== targetScreen) {
+      violations.push({
+        policy: "ui-web-screen-leakage",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: "A screen may not compose another owner-only screen.",
+        allowed: "Extract a narrow surface or compose named private feature sections.",
+      });
+
+      return violations;
+    }
+  }
+
+  if (module.kind === "global" && (target.kind === "feature" || target.kind === "feature-entry")) {
+    violations.push({
+      policy: "ui-web-global-feature-leakage",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message:
+        "Package-global model, behavior, and ui may not depend on a private feature implementation.",
+    });
+
+    return violations;
+  }
+
+  if (
+    module.kind === "feature-entry" &&
+    ((target.kind === "feature" && target.feature !== module.feature) ||
+      (target.kind === "feature-entry" && target.feature !== module.feature))
+  ) {
+    violations.push({
+      policy: "ui-web-feature-entry-leakage",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message: `Web feature entry ${JSON.stringify(module.feature)} may not compose another private feature.`,
+      allowed:
+        "Keep the entry to its own feature API; compose another feature only from a ui/sections module with a declared dependency.",
+    });
+
+    return violations;
+  }
+
+  if (module.kind === "feature" && target.kind === "feature-entry") {
+    if (module.feature === target.feature) return violations;
+
+    if (module.layer !== "ui" || module.uiLayer !== "sections") {
+      violations.push({
+        policy: "ui-web-feature-layer-dependency",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message:
+          "Only a feature ui/sections module may compose another private feature's public entry.",
+        allowed: "Promote lower-level reuse to package-global model, behavior, or ui.",
+      });
+    }
+
+    const declaration = declarations.get(module.feature);
+    if (!declaration?.dependencies.includes(target.feature)) {
+      violations.push({
+        policy: "ui-web-feature-dependency-declaration",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `Web feature ${JSON.stringify(module.feature)} must declare ${JSON.stringify(target.feature)} before using its public entry.`,
+        allowed: `Add ${JSON.stringify(target.feature)} to features/${module.feature}/feature.json dependencies.`,
+      });
+    }
+
+    const edges = featureEdges.get(module.feature) ?? new Set<string>();
+    edges.add(target.feature);
+    featureEdges.set(module.feature, edges);
+
+    return violations;
+  }
+
+  if (module.kind === "feature" && target.kind === "feature" && module.feature !== target.feature) {
+    violations.push({
+      policy: "ui-web-feature-deep-import",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message: `Web feature ${JSON.stringify(module.feature)} may only import the public entry of ${JSON.stringify(target.feature)}.`,
+      allowed: `Import features/${target.feature}/index.ts and declare the dependency.`,
+    });
+    const edges = featureEdges.get(module.feature) ?? new Set<string>();
+    edges.add(target.feature);
+    featureEdges.set(module.feature, edges);
+
+    return violations;
+  }
+
+  if (
+    (module.kind === "global" || module.kind === "feature") &&
+    (target.kind === "global" || target.kind === "feature") &&
+    !(
+      module.kind === "feature" &&
+      target.kind === "feature" &&
+      module.feature !== target.feature
+    ) &&
+    !canPrivateLayerDependOn(module, target)
+  ) {
+    violations.push({
+      policy: "ui-web-layer-direction",
+      file,
+      line: sourceImport.line,
+      specifier: sourceImport.specifier,
+      message:
+        "Feature-web private layers may not depend upward on a composing UI or behavior layer.",
+      allowed:
+        "model is independent; behavior uses model; elements use model; blocks compose elements; sections compose blocks, elements, and behavior.",
+    });
+  }
+
+  return violations;
+}
+
 function lintWebPrivateStructure(webPackages: readonly WebPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of webPackages) {
@@ -1637,159 +1910,18 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           continue;
         }
 
-        if (
-          (module.kind === "global" ||
-            module.kind === "feature" ||
-            module.kind === "feature-entry") &&
-          (target.kind === "screen" || target.kind === "surface")
-        ) {
-          violations.push({
-            policy: "ui-web-public-boundary-leakage",
+        violations.push(
+          ...webPrivateImportViolations({
+            sourceRoot,
             file,
-            line: sourceImport.line,
-            specifier: sourceImport.specifier,
-            message:
-              "Private feature-web implementation may not depend inward on a public screen or surface boundary.",
-          });
-          continue;
-        }
-
-        // A door is the package's own front step onto its shared implementation,
-        // so it reaches the global model, behavior and ui layers the same way the
-        // surface closure walk admits them. What stays out is a package-private
-        // feature and an owner-only screen.
-        if (module.kind === "surface" && target.kind !== "surface" && target.kind !== "global") {
-          violations.push({
-            policy: "ui-web-surface-leakage",
-            file,
-            line: sourceImport.line,
-            specifier: sourceImport.specifier,
-            message: "A public surface may not reach package-private features or a screen.",
-          });
-          continue;
-        }
-
-        if (module.kind === "screen" && target.kind === "screen") {
-          const sourceScreen = relative(sourceRoot, file).split(sep)[1];
-          const targetScreen = relative(sourceRoot, targetFile).split(sep)[1];
-          if (sourceScreen !== targetScreen) {
-            violations.push({
-              policy: "ui-web-screen-leakage",
-              file,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: "A screen may not compose another owner-only screen.",
-              allowed: "Extract a narrow surface or compose named private feature sections.",
-            });
-            continue;
-          }
-        }
-
-        if (
-          module.kind === "global" &&
-          (target.kind === "feature" || target.kind === "feature-entry")
-        ) {
-          violations.push({
-            policy: "ui-web-global-feature-leakage",
-            file,
-            line: sourceImport.line,
-            specifier: sourceImport.specifier,
-            message:
-              "Package-global model, behavior, and ui may not depend on a private feature implementation.",
-          });
-          continue;
-        }
-
-        if (
-          module.kind === "feature-entry" &&
-          ((target.kind === "feature" && target.feature !== module.feature) ||
-            (target.kind === "feature-entry" && target.feature !== module.feature))
-        ) {
-          violations.push({
-            policy: "ui-web-feature-entry-leakage",
-            file,
-            line: sourceImport.line,
-            specifier: sourceImport.specifier,
-            message: `Web feature entry ${JSON.stringify(module.feature)} may not compose another private feature.`,
-            allowed:
-              "Keep the entry to its own feature API; compose another feature only from a ui/sections module with a declared dependency.",
-          });
-          continue;
-        }
-
-        if (module.kind === "feature" && target.kind === "feature-entry") {
-          if (module.feature === target.feature) continue;
-
-          if (module.layer !== "ui" || module.uiLayer !== "sections") {
-            violations.push({
-              policy: "ui-web-feature-layer-dependency",
-              file,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message:
-                "Only a feature ui/sections module may compose another private feature's public entry.",
-              allowed: "Promote lower-level reuse to package-global model, behavior, or ui.",
-            });
-          }
-
-          const declaration = declarations.get(module.feature);
-          if (!declaration?.dependencies.includes(target.feature)) {
-            violations.push({
-              policy: "ui-web-feature-dependency-declaration",
-              file,
-              line: sourceImport.line,
-              specifier: sourceImport.specifier,
-              message: `Web feature ${JSON.stringify(module.feature)} must declare ${JSON.stringify(target.feature)} before using its public entry.`,
-              allowed: `Add ${JSON.stringify(target.feature)} to features/${module.feature}/feature.json dependencies.`,
-            });
-          }
-
-          const edges = featureEdges.get(module.feature) ?? new Set<string>();
-          edges.add(target.feature);
-          featureEdges.set(module.feature, edges);
-          continue;
-        }
-
-        if (
-          module.kind === "feature" &&
-          target.kind === "feature" &&
-          module.feature !== target.feature
-        ) {
-          violations.push({
-            policy: "ui-web-feature-deep-import",
-            file,
-            line: sourceImport.line,
-            specifier: sourceImport.specifier,
-            message: `Web feature ${JSON.stringify(module.feature)} may only import the public entry of ${JSON.stringify(target.feature)}.`,
-            allowed: `Import features/${target.feature}/index.ts and declare the dependency.`,
-          });
-          const edges = featureEdges.get(module.feature) ?? new Set<string>();
-          edges.add(target.feature);
-          featureEdges.set(module.feature, edges);
-          continue;
-        }
-
-        if (
-          (module.kind === "global" || module.kind === "feature") &&
-          (target.kind === "global" || target.kind === "feature") &&
-          !(
-            module.kind === "feature" &&
-            target.kind === "feature" &&
-            module.feature !== target.feature
-          ) &&
-          !canPrivateLayerDependOn(module, target)
-        ) {
-          violations.push({
-            policy: "ui-web-layer-direction",
-            file,
-            line: sourceImport.line,
-            specifier: sourceImport.specifier,
-            message:
-              "Feature-web private layers may not depend upward on a composing UI or behavior layer.",
-            allowed:
-              "model is independent; behavior uses model; elements use model; blocks compose elements; sections compose blocks, elements, and behavior.",
-          });
-        }
+            targetFile,
+            sourceImport,
+            module,
+            target,
+            declarations,
+            featureEdges,
+          }),
+        );
       }
     }
 

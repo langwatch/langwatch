@@ -754,6 +754,35 @@ export function combineFilters(translations: FilterTranslation[]): FilterTransla
   };
 }
 
+/** The translations one nested filter value yields, at one or two key levels. */
+function translateNestedFilter({
+  field,
+  value,
+  spanTimePredicate,
+}: {
+  field: FilterField;
+  value: Record<string, string[]> | Record<string, Record<string, string[]>>;
+  spanTimePredicate?: string;
+}): FilterTranslation[] {
+  const translations: FilterTranslation[] = [];
+
+  for (const [key, subValue] of Object.entries(value)) {
+    if (Array.isArray(subValue)) {
+      translations.push(translateFilter(field, subValue, key, undefined, spanTimePredicate));
+      continue;
+    }
+    if (typeof subValue !== "object") continue;
+
+    for (const [subkey, subSubValue] of Object.entries(subValue)) {
+      if (Array.isArray(subSubValue)) {
+        translations.push(translateFilter(field, subSubValue, key, subkey, spanTimePredicate));
+      }
+    }
+  }
+
+  return translations;
+}
+
 /**
  * Translate all filters from a filter object
  */
@@ -776,23 +805,9 @@ export function translateAllFilters(
         translateFilter(field as FilterField, value, undefined, undefined, spanTimePredicate),
       );
     } else if (typeof value === "object") {
-      // Nested filter with key
-      for (const [key, subValue] of Object.entries(value)) {
-        if (Array.isArray(subValue)) {
-          translations.push(
-            translateFilter(field as FilterField, subValue, key, undefined, spanTimePredicate),
-          );
-        } else if (typeof subValue === "object") {
-          // Double nested with key and subkey
-          for (const [subkey, subSubValue] of Object.entries(subValue)) {
-            if (Array.isArray(subSubValue)) {
-              translations.push(
-                translateFilter(field as FilterField, subSubValue, key, subkey, spanTimePredicate),
-              );
-            }
-          }
-        }
-      }
+      translations.push(
+        ...translateNestedFilter({ field: field as FilterField, value, spanTimePredicate }),
+      );
     }
   }
 

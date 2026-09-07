@@ -3,7 +3,7 @@ import {
   AutomationClockPort,
   AutomationDispatchErrorPort,
   AutomationEmailCapService,
-  AutomationEmailCapStorePort,
+  type AutomationEmailCapStorePort,
   AutomationGraphActivityPort,
   AutomationLoggerPort,
   AutomationProjectIdentityPort,
@@ -104,7 +104,7 @@ export function tryCreateWorkerAutomationDelivery(options: {
       logger,
     }),
     emailCaps: AutomationEmailCapService.create({
-      store: options.redis ? new WorkerAutomationEmailCapStore(options.redis) : null,
+      store: options.redis ? createWorkerAutomationEmailCapStore(options.redis) : null,
     }),
     crypto: resolveWorkerStoredSecretCipher(config),
   };
@@ -281,44 +281,19 @@ class WorkerAutomationDispatchErrors extends AutomationDispatchErrorPort {
 }
 
 /**
- * The five Redis operations the email ceilings need, and no more.
- *
- * `AutomationEmailCapStorePort` is a nominal abstract class, so binding it to a
- * connection takes a class, and three of the five verbs already carry Redis's
- * own names — which is what makes this read to `layer-class` as a pass-through
- * layer. It is recorded in `overengineering-baseline.json` rather than
- * contorted: the alternative the policy suggests, holding the collaborator at
- * the caller, would mean handing the cap service an ioredis client and letting
- * a feature package name a transport it must not know about.
+ * The five Redis operations the email ceilings need, bound to the connection
+ * here at the composition root so the cap service names a narrow capability
+ * and never an ioredis client.
  */
-class WorkerAutomationEmailCapStore extends AutomationEmailCapStorePort {
-  constructor(private readonly connection: RedisConnection) {
-    super();
-  }
-
-  trySet(
-    key: string,
-    value: string,
-    expiry: "EX",
-    seconds: number,
-    condition: "NX",
-  ): Promise<string | null> {
-    return this.connection.set(key, value, expiry, seconds, condition);
-  }
-
-  tryGet(key: string): Promise<string | null> {
-    return this.connection.get(key);
-  }
-
-  incr(key: string): Promise<number> {
-    return this.connection.incr(key);
-  }
-
-  incrby(key: string, increment: number): Promise<number> {
-    return this.connection.incrby(key, increment);
-  }
-
-  eval(script: string, keyCount: number, key: string, seconds: string): Promise<unknown> {
-    return this.connection.eval(script, keyCount, key, seconds);
-  }
+function createWorkerAutomationEmailCapStore(
+  connection: RedisConnection,
+): AutomationEmailCapStorePort {
+  return {
+    trySet: (key, value, expiry, seconds, condition) =>
+      connection.set(key, value, expiry, seconds, condition),
+    tryGet: (key) => connection.get(key),
+    incr: (key) => connection.incr(key),
+    incrby: (key, increment) => connection.incrby(key, increment),
+    eval: (script, keyCount, key, seconds) => connection.eval(script, keyCount, key, seconds),
+  };
 }

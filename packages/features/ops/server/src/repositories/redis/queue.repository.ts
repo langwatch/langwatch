@@ -883,11 +883,9 @@ export class QueueRedisRepository extends QueueRepository {
         const pipelineNames = new Map<string, string>();
         for (let i = 0; i < jobDataRequests.length; i++) {
           const raw = jobDataResults?.[i]?.[1] as string | null;
-          if (raw) {
-            const pipelineName = readJobRoutingMeta(raw).pipelineName;
-            if (pipelineName) {
-              pipelineNames.set(jobDataRequests[i]!.groupId, pipelineName);
-            }
+          const pipelineName = raw ? readJobRoutingMeta(raw).pipelineName : void 0;
+          if (pipelineName) {
+            pipelineNames.set(jobDataRequests[i]!.groupId, pipelineName);
           }
         }
 
@@ -902,12 +900,7 @@ export class QueueRedisRepository extends QueueRepository {
           const clusterKey = `${pipelineName ?? ""}::${normalized}`;
 
           const existing = clusterMap.get(clusterKey);
-          if (existing) {
-            existing.count++;
-            if (existing.sampleGroupIds.length < 5) {
-              existing.sampleGroupIds.push(groupId);
-            }
-          } else {
+          if (!existing) {
             clusterMap.set(clusterKey, {
               normalizedMessage: normalized,
               sampleMessage: message,
@@ -917,6 +910,12 @@ export class QueueRedisRepository extends QueueRepository {
               queueName,
               sampleGroupIds: [groupId],
             });
+            continue;
+          }
+
+          existing.count++;
+          if (existing.sampleGroupIds.length < 5) {
+            existing.sampleGroupIds.push(groupId);
           }
         }
       } while (cursor !== "0");
@@ -1400,15 +1399,11 @@ export class QueueRedisRepository extends QueueRepository {
         pipeline,
         rerun: (index) => moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
       });
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const moved = Number(result);
-            if (moved >= 0) {
-              movedCount++;
-              jobsMoved += moved;
-            }
-          }
+      for (const [err, result] of results ?? []) {
+        const moved = err ? -1 : Number(result);
+        if (moved >= 0) {
+          movedCount++;
+          jobsMoved += moved;
         }
       }
     } while (cursor !== "0");
@@ -1492,15 +1487,11 @@ export class QueueRedisRepository extends QueueRepository {
         pipeline,
         rerun: (index) => replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
       });
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const replayed = Number(result);
-            if (replayed > 0) {
-              replayedCount++;
-              jobsReplayed += replayed;
-            }
-          }
+      for (const [err, result] of results ?? []) {
+        const replayed = err ? 0 : Number(result);
+        if (replayed > 0) {
+          replayedCount++;
+          jobsReplayed += replayed;
         }
       }
     } while (cursor !== "0");

@@ -24,6 +24,26 @@ export function canonicaliseLangWatchValues(ctx: ExtractorContext): void {
   }
 }
 
+/** The gen_ai input messages and system instruction a chat_messages input carries. */
+function publishInputChatMessages(
+  ctx: ExtractorContext,
+  cleanedValue: ReturnType<typeof stripTrailingAssistantMessages>,
+): void {
+  const messages = normalizeToMessages(cleanedValue, "user");
+  if (!messages) return;
+
+  const systemInstruction = extractSystemInstructionFromMessages(messages);
+  if (systemInstruction !== null) {
+    ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
+  }
+
+  const chatMsgs = systemInstruction ? stripSystemMessages(messages) : messages;
+  if (chatMsgs.length > 0) {
+    ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+  }
+  ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:input.chat_messages->gen_ai.input.messages`);
+}
+
 function canonicaliseInput(ctx: ExtractorContext, reservedTypes: string[]): void {
   const { attrs } = ctx.bag;
   const rawInput = attrs.take(ATTR_KEYS.LANGWATCH_INPUT);
@@ -33,20 +53,7 @@ function canonicaliseInput(ctx: ExtractorContext, reservedTypes: string[]): void
 
       if (rawInput.type === "chat_messages" && Array.isArray(rawInput.value)) {
         const cleanedValue = stripTrailingAssistantMessages(rawInput.value);
-        const messages = normalizeToMessages(cleanedValue, "user");
-
-        if (messages) {
-          const systemInstruction = extractSystemInstructionFromMessages(messages);
-          if (systemInstruction !== null) {
-            ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, systemInstruction);
-          }
-
-          const chatMsgs = systemInstruction ? stripSystemMessages(messages) : messages;
-          if (chatMsgs.length > 0) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
-          }
-          ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:input.chat_messages->gen_ai.input.messages`);
-        }
+        publishInputChatMessages(ctx, cleanedValue);
 
         ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, {
           ...rawInput,

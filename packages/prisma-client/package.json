@@ -49,6 +49,7 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/secret-server": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@types/bcrypt": "^6.0.0",
     "@types/lodash-es": "^4.17.12",

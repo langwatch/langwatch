@@ -74,6 +74,7 @@ import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
+import { SecretEnvironmentService } from "@langwatch/secrets";
 import { PrismaDriverAdapterService } from "../src/driver-adapter.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 
@@ -100,12 +101,6 @@ const ADMIN_NAME = "Haven Local Admin";
 
 // Must match domain.DefaultLocalAPIKey in tools/thuishaven/domain/overlay.go.
 const DEFAULT_INGESTION_KEY = "sk-lw-local-development-key";
-const API_KEY_PEPPER: string =
-  process.env.CREDENTIALS_SECRET ??
-  process.env.NEXTAUTH_SECRET ??
-  (() => {
-    throw new Error("CREDENTIALS_SECRET or NEXTAUTH_SECRET is required to seed API keys");
-  })();
 
 const PRIVATE_TOKEN_LOOKUP_ID = "LocalDevPrivate1";
 const PRIVATE_TOKEN_SECRET = "LocalDevPrivateAccessTokenSecretFixedValue000000";
@@ -122,7 +117,23 @@ const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 const DEFAULT_PROMPT_TAG = "production";
 const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
 
+/**
+ * The hashing and encryption pepper, resolved through the same ordered source
+ * chain every process boots with (ADR-132), so the seed writes hashes the
+ * application can verify.
+ */
+async function resolveApiKeyPepper(): Promise<string> {
+  const { environment } = await SecretEnvironmentService.create({ source: process.env }).resolve();
+  const pepper = environment.CREDENTIALS_SECRET ?? environment.NEXTAUTH_SECRET;
+  if (typeof pepper !== "string") {
+    throw new Error("CREDENTIALS_SECRET or NEXTAUTH_SECRET is required to seed API keys");
+  }
+
+  return pepper;
+}
+
 async function main() {
+  const apiKeyPepper = await resolveApiKeyPepper();
   // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
   // platform never carries LANGWATCH_API_KEY anymore, but keep it as a fallback for
   // non-haven flows that still pass one explicitly.
@@ -297,14 +308,14 @@ async function main() {
       name: "Local Dev Private Access Token",
       description: "Static local-dev personal access token seeded by prisma/seed.ts",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
       permissionMode: "all",
       userId: user.id,
       createdByUserId: user.id,
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
       userId: user.id,
       organizationId: organization.id,
       revokedAt: null,
@@ -349,12 +360,12 @@ async function main() {
       name: "Local Dev Public Ingestion Token",
       description: "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
       permissionMode: "restricted",
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
       organizationId: organization.id,
       revokedAt: null,
     },
@@ -405,7 +416,7 @@ async function main() {
     update: {},
   });
 
-  await seedModelProvidersFromEnv(organization.id);
+  await seedModelProvidersFromEnv(organization.id, apiKeyPepper);
 
   if (process.env.HAVEN_SEED_PRESET === "demo") {
     await seedDemoPlatform({
@@ -447,14 +458,10 @@ const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 /**
  * The at-rest format for ModelProvider.customKeys: AES-256-GCM under the
  * deployment's own 32-byte hex pepper, written `iv:ciphertext:authTag`.
- * `@langwatch/secret-server` owns that format; the seed names only where the
- * key comes from, which is the same pair every process reads.
+ * `@langwatch/secret-server` owns that format; the key is the one the boot
+ * seam resolved.
  */
-function encryptCredentials(value: string): string {
-  const key = process.env.CREDENTIALS_SECRET ?? process.env.NEXTAUTH_SECRET;
-  if (!key) {
-    throw new Error("CREDENTIALS_SECRET is not set in the environment variables");
-  }
+function encryptCredentials(value: string, key: string): string {
   return AesGcmSecretEncryptionAdapter.create({ key }).encrypt(value);
 }
 
@@ -488,7 +495,7 @@ function schemaKeyNames(schema: unknown): string[] {
   return inner?.shape ? Object.keys(inner.shape) : [];
 }
 
-async function seedModelProvidersFromEnv(organizationId: string) {
+async function seedModelProvidersFromEnv(organizationId: string, pepper: string) {
   const flag = process.env.HAVEN_SEED_MODEL_PROVIDERS;
   if (flag === "0" || flag === "false") {
     console.log("⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
@@ -534,7 +541,7 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     }
 
     const id = MODEL_PROVIDER_ID_PREFIX + provider;
-    const customKeys = encryptCredentials(JSON.stringify(keys));
+    const customKeys = encryptCredentials(JSON.stringify(keys), pepper);
     const row = await prisma.modelProvider.upsert({
       where: { id },
       create: {

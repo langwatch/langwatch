@@ -222,6 +222,20 @@ export class TraceAttributeCapService {
     return false;
   }
 
+  /** Whether any attribute in one list carries a value over `maxBytes`. */
+  private anyValueExceeds(
+    attributes: readonly { value?: OtlpAnyValue | null }[] | null | undefined,
+    maxBytes: number,
+  ): boolean {
+    if (!Array.isArray(attributes)) {
+      return false;
+    }
+
+    return attributes.some(
+      (attr) => Boolean(attr?.value) && this.valueExceeds(attr.value, maxBytes),
+    );
+  }
+
   /**
    * Returns true iff any attribute value exceeds `maxBytes` across the SAME
    * surfaces that `capOversizedAttributes` walks: `span.attributes`,
@@ -238,40 +252,24 @@ export class TraceAttributeCapService {
     maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   ): boolean {
     try {
-      if (Array.isArray(span.attributes)) {
-        for (const attr of span.attributes) {
-          if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
-            return true;
-          }
-        }
+      if (this.anyValueExceeds(span.attributes, maxBytes)) {
+        return true;
       }
 
       for (const event of span.events ?? []) {
-        if (Array.isArray(event.attributes)) {
-          for (const attr of event.attributes) {
-            if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
-              return true;
-            }
-          }
+        if (this.anyValueExceeds(event.attributes, maxBytes)) {
+          return true;
         }
       }
 
       for (const link of span.links ?? []) {
-        if (Array.isArray(link.attributes)) {
-          for (const attr of link.attributes) {
-            if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
-              return true;
-            }
-          }
+        if (this.anyValueExceeds(link.attributes, maxBytes)) {
+          return true;
         }
       }
 
-      if (resource && Array.isArray(resource.attributes)) {
-        for (const attr of resource.attributes) {
-          if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
-            return true;
-          }
-        }
+      if (resource && this.anyValueExceeds(resource.attributes, maxBytes)) {
+        return true;
       }
     } catch {
       return false;

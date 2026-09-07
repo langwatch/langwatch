@@ -935,6 +935,64 @@ export class ProjectionRouter<
     }
   }
 
+  /**
+   * The inline path's execute for one map projection, minus its error seam:
+   * the replay-marker gate, the metered execute, and the subscriber dispatch
+   * that a produced record earns.
+   */
+  private async executeInlineMapProjection({
+    name,
+    mapProj,
+    event,
+  }: {
+    name: string;
+    mapProj: MapProjectionDefinition<any, EventType>;
+    event: EventType;
+  }): Promise<void> {
+    if (this.replayMarkerChecker) {
+      const decision = await this.replayMarkerChecker.check(name, event);
+      if (decision === "skip") return;
+    }
+
+    const storeContext = await this.buildStoreContext({ event });
+    const record = await withMetrics({
+      fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
+      onComplete: (ms) => {
+        incrementEsMapProjectionTotal({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          status: "completed",
+        });
+        observeEsMapProjectionDuration({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          durationMs: ms,
+        });
+      },
+      onFail: (ms) => {
+        incrementEsMapProjectionTotal({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          status: "failed",
+        });
+        observeEsMapProjectionDuration({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          durationMs: ms,
+        });
+      },
+    });
+
+    const mapSubscribers = this.subscribersForMap.get(name);
+    if (record !== null && mapSubscribers && mapSubscribers.length > 0) {
+      await this.dispatchToSubscribers({
+        projectionName: name,
+        subscribers: mapSubscribers,
+        deliveries: [{ event, foldState: record }],
+      });
+    }
+  }
+
   private async dispatchToMapProjections(
     events: readonly EventType[],
     _context: EventStoreReadContext<EventType>,
@@ -1053,51 +1111,7 @@ export class ProjectionRouter<
           });
 
           try {
-            // Defer or skip if projection-replay is active for this aggregate.
-            // Mirrors the fold projection replay-marker check.
-            if (this.replayMarkerChecker) {
-              const decision = await this.replayMarkerChecker.check(name, event);
-              if (decision === "skip") continue;
-            }
-
-            const storeContext = await this.buildStoreContext({ event });
-            const record = await withMetrics({
-              fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
-              onComplete: (ms) => {
-                incrementEsMapProjectionTotal({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  status: "completed",
-                });
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-              onFail: (ms) => {
-                incrementEsMapProjectionTotal({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  status: "failed",
-                });
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-            });
-
-            // Dispatch to map subscribers after map execute succeeds
-            const mapSubscribers = this.subscribersForMap.get(name);
-            if (record !== null && mapSubscribers && mapSubscribers.length > 0) {
-              await this.dispatchToSubscribers({
-                projectionName: name,
-                subscribers: mapSubscribers,
-                deliveries: [{ event, foldState: record }],
-              });
-            }
+            await this.executeInlineMapProjection({ name, mapProj, event });
           } catch (error) {
             handleError(error, categorizeError(error), this.logger, {
               handlerName: name,

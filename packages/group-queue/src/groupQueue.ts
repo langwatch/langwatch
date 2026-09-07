@@ -935,6 +935,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   }
 
   /**
+   * The definition's own span attributes, keeping only the scalar ones. A
+   * throwing definition contributes what it managed to yield and no more.
+   */
+  private customSpanAttributes(payload: Payload): Record<string, string | number | boolean> {
+    const scalars: Record<string, string | number | boolean> = {};
+    if (!this.spanAttributes) return scalars;
+
+    try {
+      for (const [key, value] of Object.entries(this.spanAttributes(payload))) {
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+          scalars[key] = value;
+        }
+      }
+    } catch {
+      // If spanAttributes throws, continue with base attributes
+    }
+
+    return scalars;
+  }
+
+  /**
    * Processes a dispatched job with retries, OTEL tracing, heartbeats, and
    * error handling.
    */
@@ -1168,22 +1189,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         "queue.attempt_source": attempt === 1 ? "fresh" : jobAttempt >= attempt ? "job" : "group",
       };
 
-      // Add custom span attributes from the definition
-      if (this.spanAttributes) {
-        try {
-          const custom = this.spanAttributes(payload);
-          for (const [key, value] of Object.entries(custom)) {
-            if (
-              value !== undefined &&
-              (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
-            ) {
-              spanAttributes[key] = value;
-            }
-          }
-        } catch {
-          // If spanAttributes throws, continue with base attributes
-        }
-      }
+      Object.assign(spanAttributes, this.customSpanAttributes(payload));
 
       const executeWithSpan = async () => {
         await withActiveSpan(

@@ -8990,86 +8990,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "max-depth|packages/architecture-lint/src/check-feature-parity.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/architecture-lint/src/feature-layout.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/architecture-lint/src/frontend-ui-boundaries.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/eventing/src/projections/projectionRouter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.filter-translator.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/analytics/server/src/services/analytics-tripwire.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/experiment/web/src/ui/sections/batch-evaluation-results.types.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/experiment/web/src/ui/sections/batch-results/comparison-charts.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/langy/web/src/model/langy-choices-timeline.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/ops/server/src/repositories/redis/queue.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/contract/src/trace-query-analysis.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/server/src/rules/canonical-extraction.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/server/src/rules/langwatch-value.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/server/src/services/gen-ai-span.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/server/src/services/mastra-canonicaliser.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/web/src/behavior/transcript/content-parser.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/web/src/model/prompt-attributes.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/features/trace/web/src/model/transcript/block-stack-items.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "max-depth|packages/group-queue/src/groupQueue.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|apps/api/src/api-secret-rest.feature.ts",
       "measured": "2026-09-06"
     },
@@ -11391,10 +11311,6 @@
     },
     {
       "key": "plan-literals|packages/features/entitlement/server/src/services/plan-next-step.service.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "secrets-through-source|packages/prisma-client/prisma/seed.ts",
       "measured": "2026-09-07"
     },
     {

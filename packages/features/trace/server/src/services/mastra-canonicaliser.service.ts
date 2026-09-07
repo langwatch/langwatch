@@ -10,7 +10,10 @@ import {
   stripSystemMessages,
 } from "../rules/canonical-message.rules.ts";
 import { MastraValuesService } from "./mastra-value.service.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type {
+  CanonicalAttributesPort,
+  ExtractorContext,
+} from "../ports/canonical-attributes.port.ts";
 
 const mastraValuesService = MastraValuesService.create();
 
@@ -182,19 +185,7 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
             ctx.recordRule(`${this.id}:orphan.model_step.output->langwatch.output`);
           }
         } else {
-          const text = mastraValuesService.tryExtractTextFromOutput(rawOutput);
-          if (text) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            if (
-              ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === void 0 &&
-              !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)
-            ) {
-              ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content: text }]);
-              recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
-            }
-
-            ctx.recordRule(`${this.id}:mastra.model_step.output->langwatch.output`);
-          }
+          this.applyModelStepTextOutput(ctx, rawOutput);
         }
       }
     }
@@ -227,6 +218,25 @@ export class MastraCanonicaliserService implements CanonicalAttributesPort {
       ctx.span.name = displayName;
       ctx.recordRule(`${this.id}:display_name`);
     }
+  }
+
+  /** The model_step text output, and the assistant message a bare text implies. */
+  private applyModelStepTextOutput(ctx: ExtractorContext, rawOutput: unknown): void {
+    const text = mastraValuesService.tryExtractTextFromOutput(rawOutput);
+    if (!text) {
+      return;
+    }
+
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
+    if (
+      ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === void 0 &&
+      !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)
+    ) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content: text }]);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
+
+    ctx.recordRule(`${this.id}:mastra.model_step.output->langwatch.output`);
   }
 
   /** Extract threadId and map to gen_ai.conversation.id. */
