@@ -42,6 +42,20 @@ export interface CeremonyAccountRow {
   issuer?: unknown;
   accountId?: unknown;
   createdAt?: unknown;
+  idToken?: unknown;
+}
+
+export interface VerifiedProviderAssertionsPort {
+  recordVerifiedCallbackToken(args: {
+    providerId: string;
+    path: string | undefined;
+    verifiedIdToken: string | undefined;
+  }): void;
+  recordAuthenticatedCallbackAccount(args: {
+    providerId: string;
+    providerAccountId: string;
+    path: string | undefined;
+  }): void;
 }
 
 /** The two account ceremonies `databaseHooks` binds (ADR-116 §5). */
@@ -71,6 +85,8 @@ export interface DatabaseHooksDeps {
   accountCeremonies: () => AccountCeremoniesPort;
   /** What a session records at mint: the identifier, and what was proved. */
   sessionClaims: () => SessionClaimsPort;
+  /** The verified current callback token whose claims the session may carry. */
+  providerAssertions: () => VerifiedProviderAssertionsPort;
 }
 
 /**
@@ -86,6 +102,7 @@ export function databaseHooks({
   userErasure,
   accountCeremonies,
   sessionClaims,
+  providerAssertions,
 }: DatabaseHooksDeps): BetterAuthOptions["databaseHooks"] {
   return {
     user: {
@@ -117,13 +134,19 @@ export function databaseHooks({
     },
     account: {
       create: {
-        before: async (account) => {
+        before: async (account, context) => {
           await hooks().beforeAccountCreate({
             account: {
               userId: account.userId,
               providerId: account.providerId,
               accountId: account.accountId,
             },
+          });
+          providerAssertions().recordVerifiedCallbackToken({
+            providerId: account.providerId,
+            path: (context as { path?: string } | undefined)?.path,
+            verifiedIdToken:
+              typeof account.idToken === "string" ? account.idToken : undefined,
           });
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live
@@ -135,7 +158,12 @@ export function databaseHooks({
           // append the event twice whenever the first fold had not landed.
           return accountCeremonies().beforeAccountCreate(account);
         },
-        after: async (account) => {
+        after: async (account, context) => {
+          providerAssertions().recordAuthenticatedCallbackAccount({
+            providerId: account.providerId,
+            providerAccountId: account.accountId,
+            path: (context as { path?: string } | undefined)?.path,
+          });
           if (!account.userId || !account.providerId || !account.accountId)
             return;
           await hooks().afterAccountCreate({
@@ -148,7 +176,26 @@ export function databaseHooks({
         },
       },
       update: {
-        after: async (account) => {
+        before: async (account, context) => {
+          if (typeof account.providerId !== "string") return;
+          providerAssertions().recordVerifiedCallbackToken({
+            providerId: account.providerId,
+            path: (context as { path?: string } | undefined)?.path,
+            verifiedIdToken:
+              typeof account.idToken === "string" ? account.idToken : undefined,
+          });
+        },
+        after: async (account, context) => {
+          if (
+            typeof account.providerId === "string" &&
+            typeof account.accountId === "string"
+          ) {
+            providerAssertions().recordAuthenticatedCallbackAccount({
+              providerId: account.providerId,
+              providerAccountId: account.accountId,
+              path: (context as { path?: string } | undefined)?.path,
+            });
+          }
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.
