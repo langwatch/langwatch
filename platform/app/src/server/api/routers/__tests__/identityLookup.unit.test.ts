@@ -18,7 +18,10 @@ const { activityRows, mockAuditLog, mockLookup } = vi.hoisted(() => ({
 }));
 
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: mockAuditLog }));
-vi.mock("~/server/app-layer/identity/runtime", () => ({
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
   identityLookup: () => mockLookup,
   identityStorageAdapter: () => memoryAdapter({}),
   secondaryStorage: () => ({ configured: false, connection: () => null }),
