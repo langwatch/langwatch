@@ -264,6 +264,30 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the screen names "acme" as the organization asking, and setting it up as the way in
     And "sam"'s personal organization is reachable throughout
 
+  # Bound by `two-step-verification.standing.unit.test.ts`. These are three
+  # separate trust-boundary outcomes: the recovery read, the session boundary,
+  # and membership privacy.
+  @unit
+  Scenario: A held member can read the standing needed to recover
+    Given "acme" requires two-step verification
+    And "sam" is a member who has not enrolled
+    When "sam" asks for their standing in "acme"
+    Then the answer names "acme" and says the requirement is unsatisfied
+    And that answer can paint the enrollment gate without first satisfying it
+
+  @unit
+  Scenario: A standing read still requires an authenticated person
+    Given "acme" requires two-step verification
+    When a caller with no authenticated person asks for standing in "acme"
+    Then the request is refused before any organization standing is read
+
+  @unit
+  Scenario: A stranger cannot use standing to inspect an organization
+    Given "mallory" is authenticated but is not a member of "acme"
+    When "mallory" asks for standing in "acme"
+    Then the answer does not reveal the organization's name or requirement
+    And no account factor is read for "mallory"
+
   @integration
   Scenario: Setting it up opens the gate on the session they already hold
     Given "sam" is held at the enrollment gate for "acme"
@@ -359,6 +383,60 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then "sam" is held at the enrollment gate like any other member
     And setting one up here is the way through
     And nothing infers a factor the provider did not assert
+
+  # `session-claims.service.unit.test.ts` binds request scoping, subject
+  # binding and claim propagation after the verified-token seam. The provider
+  # config invariant is in `oidcProviders.test.ts`; these parser-level tokens
+  # are not themselves proof of cryptographic verification. The Prisma
+  # adapter's exact Auth0/Okta lookup is separately covered by
+  # `session-identifiers.prisma.repository.integration.test.ts`.
+  @unit
+  Scenario Outline: An enterprise callback records the exact accepted account
+    Given "sam" has an identifier for "<provider>" subject "<subject>"
+    And that provider requires cryptographic ID-token verification
+    When its accepted callback carries subject "<subject>"
+    Then the session records that exact identifier
+    And an identifier for another provider or subject is not selected
+
+    Examples:
+      | provider | subject        |
+      | auth0    | auth0\|sam    |
+      | okta     | okta-user-sam |
+
+  @unit
+  Scenario: Current verified Auth0 factors are recorded on the new session
+    Given Auth0 requires cryptographic ID-token verification
+    When the accepted callback for "sam" asserts "pwd otp unknown"
+    Then the new session records "oidc pwd otp"
+    And the unsupported assertion is omitted
+
+  @unit
+  Scenario: A stored MFA assertion cannot speak for a later callback
+    Given an older Auth0 token for "sam" asserted "pwd otp"
+    And the current accepted Auth0 callback carries no ID token
+    When that callback mints a session
+    Then the session is attributed to the accepted Auth0 account
+    But the session records no authentication methods
+
+  @unit
+  Scenario: Simultaneous provider callbacks cannot exchange evidence
+    Given an Auth0 callback for "sam" and an Okta callback for another subject overlap
+    When both accepted account writes complete
+    Then each request keeps its own provider subject
+    And neither request carries authentication methods from the other
+
+  @unit
+  Scenario Outline: Unbound token claims earn no authentication credit
+    Given a callback token asserts the factor "otp"
+    When <unsafe evidence>
+    Then the token contributes no authentication methods
+    And identifier attribution comes only from the accepted callback account
+
+    Examples:
+      | unsafe evidence                                                |
+      | the callback provider does not guarantee token verification |
+      | the claims are requested for a different callback provider    |
+      | the token subject differs from the accepted provider account  |
 
   @integration
   Scenario: An administrator is told when their connection asserts nothing
