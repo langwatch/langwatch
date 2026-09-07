@@ -104,10 +104,18 @@ function getHealth(headers: Record<string, string> = {}) {
   });
 }
 
+/**
+ * Everything a caller could read off a response. The dark 404 is compared to
+ * an unmounted path's through this, so a header the probe adds on its other
+ * paths (Cache-Control) counts as a difference: a live probe against a stack
+ * with the surface off showed the 404 carries no such header, and a comparator
+ * that skipped headers had let the spec promise one anyway.
+ */
 async function describeResponse(res: Response) {
   return {
     status: res.status,
     contentType: res.headers.get("content-type"),
+    cacheControl: res.headers.get("cache-control"),
     body: await res.text(),
   };
 }

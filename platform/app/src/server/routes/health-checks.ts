@@ -710,8 +710,13 @@ secured
       return c.json({ message: auth.error }, { status: auth.status });
     }
     // The Langy API surface is dark for this project: answer as the turn
-    // routes do, with the same 404 an unmounted path gives.
-    if (auth.dark) return c.notFound();
+    // routes do, with the same 404 an unmounted path gives. Headers included:
+    // the no-store set above would itself reveal that the surface exists, and
+    // Hono's not-found keeps headers already staged on the context.
+    if (auth.dark) {
+      c.header("Cache-Control", undefined);
+      return c.notFound();
+    }
 
     const result = await runLangyHealthCanary({
       projectId: auth.projectId,

@@ -22,8 +22,11 @@ Feature: A Langy health check that sends a real greeting and says what broke
   request at 60 seconds, and Langy's first turn on a cold worker is the
   slowest part of the path, so there is no room for a second attempt inside
   one request; the monitor's own confirmation retry covers the noise a single
-  LLM turn carries. Every response carries `Cache-Control: no-store`, so a
-  monitor always sees the current turn's result rather than a cached one.
+  LLM turn carries. Every response the probe answers itself carries
+  `Cache-Control: no-store`, so a monitor always sees the current turn's
+  result rather than a cached one. The dark 404 is the one exception: it must
+  be byte-identical to an unmounted path, headers included, or the header
+  itself would reveal that the surface exists.
 
   It sits beside the other subsystem probes under /api/health, declared public
   like them and authenticating in-handler like them, and answers a refusal in
@@ -168,7 +171,7 @@ Feature: A Langy health check that sends a real greeting and says what broke
   Scenario: A switched-off surface answers the health check as a route that does not exist
     Given the Langy API surface flag is off for the key's project
     When GET /api/health/langy is called with a valid key
-    Then the response is byte-identical to an unmounted path's 404
+    Then the response is byte-identical to an unmounted path's 404, headers included
     And no turn is started
 
   @unit
