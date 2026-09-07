@@ -424,7 +424,11 @@ const signInRouterService = new SignInRouterService({
   domains: signInDomainRoutingPort(),
   policy: signInMethodPolicyPort,
   breakGlass: breakGlassLimiter,
-  accounts: new ProjectionSignInAccountLookup(identityHeads),
+  accounts: new ProjectionSignInAccountLookup(
+    identityHeads,
+    identityUsers,
+    isLatched,
+  ),
 });
 
 export function signInRouter(): SignInRouterService {
