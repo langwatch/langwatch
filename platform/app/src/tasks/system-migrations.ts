@@ -14,5 +14,17 @@ export default async function runSystemMigrations(): Promise<void> {
 
   initializeMigrationApp();
   await assertRedisReady();
-  await boot.runSystemMigrationsToQuiescence({ redis: getApp().redis });
+  const app = getApp();
+  const eventSourcing = app.eventSourcing;
+  const queue = eventSourcing?.globalQueue;
+  const waitUntilIdle = queue?.waitUntilPreflightIdle;
+  if (!waitUntilIdle) {
+    throw new Error(
+      "Migration preflight queue does not expose a completion barrier",
+    );
+  }
+  await boot.runSystemMigrationsToQuiescence({
+    redis: app.redis,
+    awaitPassEffects: () => waitUntilIdle.call(queue),
+  });
 }

@@ -7,6 +7,8 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
  * drives them.
  */
 export interface SystemMigration {
+  /** Whether a held outcome must prevent startup. Defaults to finite. */
+  readonly startupSettlement?: "finite" | "recurring";
   /**
    * Stable identifier - the state table's key. Renaming it orphans every
    * stored record, so never do that; what operators read is `title`.

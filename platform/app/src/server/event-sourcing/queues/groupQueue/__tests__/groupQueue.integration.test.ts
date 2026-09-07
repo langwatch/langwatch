@@ -126,7 +126,10 @@ function readDispatchRoots({
 }: {
   sizes: number[];
   maxWorkable: number;
-}): { roots: number[]; expected: number[] } {
+}): {
+  roots: number[];
+  expected: number[];
+} {
   const roots: number[] = [];
   const expected: number[] = [];
   // Each iteration takes the next unaccounted-for call as a new dispatch root
@@ -180,6 +183,99 @@ describe.skipIf(!hasTestcontainers)(
       queues.push(queue);
       return queue;
     }
+
+    it("dispatches and drains only groups registered by a preflight consumer", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const processed: string[] = [];
+      const definition = createQueueDefinition({
+        name,
+        process: async (payload) => {
+          processed.push(payload.groupId);
+        },
+      });
+      const producer = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+      });
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
+      });
+      queues.push(producer, preflight);
+
+      await producer.send({ id: "foreign", groupId: "foreign", value: "x" });
+      await preflight.send({ id: "owned", groupId: "owned", value: "x" });
+      expect(
+        await redis.zrange(`${name}:gq:test-allow-list:candidates`, 0, -1),
+      ).toEqual(["owned"]);
+      expect(await redis.zrange(`${name}:gq:ready`, 0, -1)).toContain("owned");
+      await preflight.waitUntilPreflightIdle();
+
+      expect(processed).toEqual(["owned"]);
+      expect(await redis.zcard(`${name}:gq:group:foreign:jobs`)).toBe(1);
+    });
+
+    it("fails closed when preflight routing cannot resolve a group", async () => {
+      const definition = createQueueDefinition({
+        groupKey: () => "__unknown__",
+        process: async () => {},
+      });
+      const queue = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: `${definition.name}:gq:test-allow-list`,
+      });
+      queues.push(queue);
+
+      await expect(
+        queue.send({ id: "unknown", groupId: "ignored", value: "x" }),
+      ).rejects.toThrow("refused unresolved group");
+    });
+
+    it("propagates terminal errors from an allow-listed group barrier", async () => {
+      const definition = createQueueDefinition({ process: async () => {} });
+      const allowList = `${definition.name}:gq:test-allow-list`;
+      const queue = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: allowList,
+      });
+      queues.push(queue);
+      await redis.sadd(allowList, "owned");
+      await redis.hset(
+        `${definition.name}:gq:group:owned:error`,
+        "message",
+        "failed",
+      );
+
+      await expect(queue.waitUntilPreflightIdle()).rejects.toThrow(
+        "failed and 0 blocked",
+      );
+    });
+
+    it("propagates the target scope when an unrestricted worker performs fan-out", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const allowList = `${name}:gq:test-allow-list`;
+      const processed: string[] = [];
+      let worker: GroupQueueProcessor<TestPayload>;
+      const definition = createQueueDefinition({
+        name,
+        process: async (payload) => {
+          processed.push(payload.groupId);
+          if (payload.groupId === "root") {
+            await worker.send({ id: "child", groupId: "child", value: "x" });
+          }
+        },
+      });
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        consumerEnabled: false,
+        dispatchGroupAllowListKey: allowList,
+      });
+      worker = new GroupQueueProcessor(definition, redis);
+      queues.push(preflight, worker);
+
+      await preflight.send({ id: "root", groupId: "root", value: "x" });
+      await preflight.waitUntilPreflightIdle();
+
+      expect(processed).toEqual(["root", "child"]);
+      expect(new Set(await redis.smembers(allowList))).toEqual(
+        new Set(["root", "child"]),
+      );
+    });
 
     /**
      * Stages a whole group through a producer-only processor, then starts the

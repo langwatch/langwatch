@@ -3,7 +3,11 @@ import type { ProcessRole } from "~/server/app-layer/config";
 import { EventSourcing } from "../../eventSourcing";
 
 const captured = vi.hoisted(() => ({
-  queues: [] as Array<{ name: string; consumerEnabled?: boolean }>,
+  queues: [] as Array<{
+    name: string;
+    consumerEnabled?: boolean;
+    allowList?: string;
+  }>,
 }));
 
 vi.mock("../../queues/groupQueue/groupQueue", async (importOriginal) => {
@@ -14,11 +18,15 @@ vi.mock("../../queues/groupQueue/groupQueue", async (importOriginal) => {
     constructor(
       definition: { name: string },
       _redis: unknown,
-      options?: { consumerEnabled?: boolean },
+      options?: {
+        consumerEnabled?: boolean;
+        dispatchGroupAllowListKey?: string;
+      },
     ) {
       captured.queues.push({
         name: definition.name,
         consumerEnabled: options?.consumerEnabled,
+        allowList: options?.dispatchGroupAllowListKey,
       });
     }
 
@@ -45,16 +53,16 @@ describe("EventSourcing process roles", () => {
     captured.queues.length = 0;
   });
 
-  it("keeps the migration role off the shared queue", async () => {
+  it("uses the shared queue with an isolated dispatch allow-list", async () => {
     await initializeQueueFor("migration");
 
     expect(captured.queues).toEqual([
       expect.objectContaining({
-        name: expect.stringContaining("event-sourcing/migration-jobs"),
+        name: expect.stringContaining("event-sourcing/jobs"),
         consumerEnabled: true,
+        allowList: expect.stringContaining("preflight:"),
       }),
     ]);
-    expect(captured.queues[0]?.name).not.toContain("event-sourcing/jobs");
   });
 
   it("enables the shared queue consumer for the worker role", async () => {

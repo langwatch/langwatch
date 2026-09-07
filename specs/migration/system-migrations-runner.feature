@@ -72,16 +72,25 @@ Feature: Running system migrations across organizations
   Scenario: Preflight projection work cannot consume application traffic
     Given the preflight emits events while an existing worker is still running
     When those events and application events are queued concurrently
-    Then the preflight consumes only its isolated migration queue
+    Then the preflight uses the canonical queue and its aggregate locks
+    And it dispatches only groups registered by that preflight
+    And pending, delayed, blocked, or failed work in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
 
   @unit
-  Scenario: A held tenant that never advances does not loop forever
-    Given an organization held with a disagreement nothing resolves
+  Scenario: A recurring reconciliation does not loop forever
+    Given a migration declares its held outcome to be recurring reconciliation
     When the app starts
     Then it is re-proved once and the run ends
     And being re-proved into the same state does not count as progress
+
+  @unit
+  Scenario: A finite held or parked migration prevents startup
+    Given a finite migration remains held or parked after its pass
+    When the app starts
+    Then the preflight fails
+    And runtime processes do not start
 
   @unit
   Scenario: Cancelling startup stops the loop between passes
@@ -97,7 +106,7 @@ Feature: Running system migrations across organizations
   # pod actually holding the claims is then evicted, nothing drives the rest.
   @unit
   Scenario: A pass shut out by another process is not convergence
-    Given every organization claimed by another process
+    Given any organization is claimed by another process
     When the pass advances nothing
     Then the run continues rather than stopping
     But an installation with no organizations at all is converged
