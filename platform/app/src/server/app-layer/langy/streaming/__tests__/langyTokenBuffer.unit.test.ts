@@ -206,6 +206,59 @@ describe("LangyTokenBuffer hybrid flush", () => {
         expect(entries.at(-1)?.type).toBe("end");
       });
 
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("stays quiet when the turn said its lines through the say tool", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "start",
+          input: {
+            text: "All ready! Let me know if there is anything I can help with.",
+          },
+        });
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "end",
+          output: "Said.",
+        });
+        const { backstopped } = await buffer.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("reads the said line off the stream when the ending buffer never saw it", async () => {
+        const { redis, entries } = makeRedis();
+        const starting = new LangyTokenBuffer({ redis });
+        await starting.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "start",
+          input: { text: "Running it against your agent now." },
+        });
+
+        const ending = new LangyTokenBuffer({ redis });
+        const { backstopped } = await ending.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+      });
+
       /** @scenario "A turn that ends on a card says what the card is waiting for" */
       it("says what the card is waiting for when the turn ends on one", async () => {
         const { redis, entries } = makeRedis();
