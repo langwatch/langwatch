@@ -15,17 +15,17 @@
  */
 
 import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root.js";
 import { describe, expect, it } from "vitest";
 
-import { OtlpBodyTooLargeError } from "../errors";
+import { OtlpBodyTooLargeError } from "../errors.ts";
 import {
   OTLP_MAX_BODY_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,
   readOtlpBody,
-} from "../body";
+} from "../body.ts";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;

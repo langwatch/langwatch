@@ -34,12 +34,12 @@ import type {
   IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
-import * as rootModule from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import * as rootModule from "@opentelemetry/otlp-transformer/build/src/generated/root.js";
 import {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
   OtlpUnsupportedEncodingError,
-} from "./errors";
+} from "./errors.ts";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
