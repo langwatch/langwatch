@@ -2,6 +2,7 @@
  * The experiment application: the rules that moved off its two doors onto it.
  * @vitest-environment node
  */
+import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
@@ -217,7 +218,9 @@ describe("ExperimentApp", () => {
         { projectId: "project-1", id: "experiment-1", state: {} },
         {
           kind: "credential",
-          resolved: apiKeyToken({ userId: "user-2", isLangySessionKey: false }),
+          credential: credentialPrincipalOfToken(
+            apiKeyToken({ userId: "user-2", isLangySessionKey: false }),
+          ),
         },
       );
 
@@ -232,7 +235,7 @@ describe("ExperimentApp", () => {
 
       await app.saveWorkbenchState(
         { projectId: "project-1", id: "experiment-1", state: {} },
-        { kind: "credential", resolved: null },
+        { kind: "credential", credential: null },
       );
 
       expect(firstCall(experiments.saveWorkbenchState).actor).toEqual({ label: "api" });
@@ -245,7 +248,9 @@ describe("ExperimentApp", () => {
         { projectId: "project-1", id: "experiment-1", state: {} },
         {
           kind: "credential",
-          resolved: apiKeyToken({ userId: "user-2", isLangySessionKey: true }),
+          credential: credentialPrincipalOfToken(
+            apiKeyToken({ userId: "user-2", isLangySessionKey: true }),
+          ),
         },
       );
 

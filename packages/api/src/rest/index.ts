@@ -249,7 +249,11 @@ export {
 export {
   credentialPrincipalOf,
   credentialPrincipalOfToken,
+  organizationCredentialPrincipalOf,
+  organizationCredentialPrincipalOfToken,
   type RestCredentialPrincipal,
+  type RestOrganizationCredentialPrincipal,
+  type RestProjectCredentialPrincipal,
 } from "./credential-principal.ts";
 
 // Who is behind a personal-workspace key.

@@ -72,7 +72,7 @@ function mount(
       return {
         ok: true,
         project: REST_AUTH_PROJECT,
-        resolved: null,
+        credential: null,
         markUsed: () => {},
       };
     }) as never,

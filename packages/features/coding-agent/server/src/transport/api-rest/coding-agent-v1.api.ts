@@ -35,6 +35,7 @@ import {
   managementActor,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  organizationCredentialPrincipalOf,
   organizationOf,
   type OrganizationScopedContext,
   resolver,
@@ -76,12 +77,10 @@ export function createCodingAgentV1RestApp(options: {
     input: z.infer<typeof pullRequestUsageQuerySchema>,
   ) => {
     const organization = organizationOf(c);
-    const apiKeyId = c.get("apiKeyId");
-    if (apiKeyId === undefined) {
-      // The organization door always resolves a key. Refusing here rather than
-      // reading a blank principal, which would widen the cut instead of failing.
-      throw new Error("No organization API key on the request context");
-    }
+    // The organization door always resolves a key; the accessor refuses rather
+    // than reading a blank principal, which would widen the cut instead of
+    // failing.
+    const credential = organizationCredentialPrincipalOf(c);
     const application = app();
     const host = input.host ?? new URL(application.githubWebBase()).hostname;
 
@@ -98,8 +97,8 @@ export function createCodingAgentV1RestApp(options: {
       },
       {
         kind: "apiKey",
-        apiKeyId,
-        userId: c.get("apiKeyUserId") ?? null,
+        apiKeyId: credential.apiKeyId,
+        userId: credential.userId,
       },
     );
 

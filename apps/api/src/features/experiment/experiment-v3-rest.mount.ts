@@ -2,7 +2,11 @@
  * No analytics sink means `evaluation_ran` is intentionally dropped; no
  * progress store means the run doors answer 503 rather than unregistering.
  */
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  credentialPrincipalOfToken,
+  type AppRestSecurity,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import {
@@ -39,6 +43,23 @@ export type ApiExperimentV3RestCollaborators = Readonly<{
 }>;
 
 /**
+ * The process's resolved credential as the workbench family takes it: the
+ * credential's CLASS and the member it acts as, rather than the whole token,
+ * so a write's attribution is read from one typed principal everywhere.
+ */
+function experimentV3CredentialOf(
+  credential: HandlerManagedCredential,
+): ExperimentV3RestCredential {
+  if (!credential.ok) return credential;
+  return {
+    ok: true,
+    project: credential.project,
+    credential: credential.resolved ? credentialPrincipalOfToken(credential.resolved) : null,
+    markUsed: credential.markUsed,
+  };
+}
+
+/**
  * `/api/experiments/*` and its `/api/evaluations/v3/*` alias. Returned in
  * registration order: the alias re-dispatches into the canonical family, so
  * it must be mounted after it.
@@ -56,7 +77,7 @@ export function mountExperimentV3Rest(options: {
       probeProjectPermission: (session, projectId, permission) =>
         collaborators.session.permitted({ session, projectId, permission }),
       authenticateCredential: async (input) =>
-        (await collaborators.credential(input)) as ExperimentV3RestCredential,
+        experimentV3CredentialOf(await collaborators.credential(input)),
       experiments: collaborators.experiments,
       // The composed run loop satisfies the family's port shape exactly: it is
       // what the packaged input types were carved out of.

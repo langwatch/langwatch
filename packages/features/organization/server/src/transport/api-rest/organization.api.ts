@@ -33,6 +33,7 @@ import {
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  organizationCredentialPrincipalOf,
   type AppRestSecurity,
   type ServiceContext,
 } from "@langwatch/api/rest";
@@ -360,8 +361,7 @@ const storedTeamAssignmentSchema = z.object({
 const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
 
 /** The member the credential acts as; null for a service key. */
-const actorUserIdOf = (c: Context): string | null =>
-  (c.get("apiKeyUserId") as string | null) ?? null;
+const actorUserIdOf = (c: Context): string | null => organizationCredentialPrincipalOf(c).userId;
 
 /**
  * REST for one organization's profile, membership and invitations, built

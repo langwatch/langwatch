@@ -1,7 +1,6 @@
 /**
  * The experiment feature's application: what both of its doors call.
  */
-import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
 import type {
   CommitWorkbenchVersionInput,
@@ -43,7 +42,10 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
-import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import {
+  workbenchActorFrom,
+  type WorkbenchCredential,
+} from "../rules/experiment-workbench-actor.rules.ts";
 
 /**
  * The project-scoped signal fan-out an editor tab follows. Declared as the two
@@ -68,7 +70,7 @@ export type ExperimentMonitorCascade = Readonly<{
  */
 export type ExperimentCaller =
   | Readonly<{ kind: "user"; id: string }>
-  | Readonly<{ kind: "credential"; resolved: ResolvedApiKeyToken | null | undefined }>;
+  | Readonly<{ kind: "credential"; credential: WorkbenchCredential | null | undefined }>;
 
 /** One experiment with the run history the list and read surfaces show beside it. */
 export type ExperimentWithRuns = Readonly<{
@@ -406,6 +408,6 @@ export class ExperimentApp {
    */
   private static actorFor(by: ExperimentCaller): WorkbenchActor {
     if (by.kind === "user") return { userId: by.id, label: "user" };
-    return workbenchActorFrom({ resolved: by.resolved });
+    return workbenchActorFrom({ credential: by.credential });
   }
 }

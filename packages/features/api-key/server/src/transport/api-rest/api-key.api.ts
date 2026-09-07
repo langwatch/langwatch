@@ -25,6 +25,7 @@ import {
   HttpError,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  organizationCredentialPrincipalOf,
 } from "@langwatch/api/rest";
 import {
   CREATE_API_KEY,
@@ -183,19 +184,18 @@ const resolveCallerIsAdmin = async ({
  * two to reach.
  */
 const resolveCallerCanReadAnyKey = async ({
-  c,
+  apiKeyId,
   service,
   permissions,
   organizationId,
   callerUserId,
 }: {
-  c: Context;
+  apiKeyId: string;
   service: ApiKeyService;
   permissions: AuthzService;
   organizationId: string;
   callerUserId: string | null;
 }): Promise<boolean> => {
-  const apiKeyId = c.get("apiKeyId") as string;
   const callerIsAdmin = await resolveCallerIsAdmin({
     service,
     organizationId,
@@ -300,14 +300,14 @@ const privilegedMintRefusal = ({
  * would, and asking about `keyType` alone would wave it through.
  */
 const refuseNonAdminPrivilegedMint = async ({
-  c,
+  apiKeyId,
   service,
   organizationId,
   callerUserId,
   isService,
   assignedToUserId,
 }: {
-  c: Context;
+  apiKeyId: string;
   service: ApiKeyService;
   organizationId: string;
   callerUserId: string | null;
@@ -321,7 +321,7 @@ const refuseNonAdminPrivilegedMint = async ({
     service,
     organizationId,
     callerUserId,
-    apiKeyId: c.get("apiKeyId") as string,
+    apiKeyId,
   });
   if (callerIsAdmin) return;
   throw new ApiKeyForbidden(privilegedMintRefusal({ isService, isAssignedToAnother }));
@@ -361,12 +361,13 @@ export function createApiKeysRestApp(options: {
 
   const listHandler = async (c: Context) => {
     const organization = c.get("organization");
-    const userId = c.get("apiKeyUserId");
+    const credential = organizationCredentialPrincipalOf(c);
+    const userId = credential.userId;
     const keys = apiKeys();
 
     if (!userId) {
       const canManage = await permissions().hasApiKeyPermission({
-        apiKeyId: c.get("apiKeyId"),
+        apiKeyId: credential.apiKeyId,
         userId: null,
         organizationId: organization.id,
         scope: { type: "org", id: organization.id },
@@ -404,12 +405,13 @@ export function createApiKeysRestApp(options: {
 
   const createHandler = async (c: Context, input: z.infer<typeof createApiKeySchema>) => {
     const organization = c.get("organization");
-    const callerUserId = c.get("apiKeyUserId");
+    const credential = organizationCredentialPrincipalOf(c);
+    const callerUserId = credential.userId;
     const keys = apiKeys();
     const isService = input.keyType === "service";
 
     await refuseNonAdminPrivilegedMint({
-      c,
+      apiKeyId: credential.apiKeyId,
       service: keys,
       organizationId: organization.id,
       callerUserId,
@@ -451,7 +453,8 @@ export function createApiKeysRestApp(options: {
 
   const getHandler = async (c: Context, input: z.infer<typeof idParamsSchema>) => {
     const organization = c.get("organization");
-    const callerUserId = c.get("apiKeyUserId");
+    const credential = organizationCredentialPrincipalOf(c);
+    const callerUserId = credential.userId;
     const keys = apiKeys();
 
     const apiKey = await keys.getByIdForCaller({
@@ -459,7 +462,7 @@ export function createApiKeysRestApp(options: {
       organizationId: organization.id,
       callerUserId,
       callerCanReadAnyKey: await resolveCallerCanReadAnyKey({
-        c,
+        apiKeyId: credential.apiKeyId,
         service: keys,
         permissions: permissions(),
         organizationId: organization.id,
@@ -486,14 +489,15 @@ export function createApiKeysRestApp(options: {
     input: z.infer<typeof idParamsSchema> & z.infer<typeof updateApiKeySchema>,
   ) => {
     const organization = c.get("organization");
-    const callerUserId = c.get("apiKeyUserId");
+    const credential = organizationCredentialPrincipalOf(c);
+    const callerUserId = credential.userId;
     const keys = apiKeys();
 
     const callerIsAdmin = await resolveCallerIsAdmin({
       service: keys,
       organizationId: organization.id,
       callerUserId,
-      apiKeyId: c.get("apiKeyId"),
+      apiKeyId: credential.apiKeyId,
     });
 
     try {
@@ -541,7 +545,8 @@ export function createApiKeysRestApp(options: {
 
   const revokeHandler = async (c: Context, input: z.infer<typeof idParamsSchema>) => {
     const organization = c.get("organization");
-    const userId = c.get("apiKeyUserId");
+    const credential = organizationCredentialPrincipalOf(c);
+    const userId = credential.userId;
     const keys = apiKeys();
 
     // Real adminness, so revoke() can enforce its owner-only path: without
@@ -550,7 +555,7 @@ export function createApiKeysRestApp(options: {
       service: keys,
       organizationId: organization.id,
       callerUserId: userId,
-      apiKeyId: c.get("apiKeyId"),
+      apiKeyId: credential.apiKeyId,
     });
 
     await keys.revoke({

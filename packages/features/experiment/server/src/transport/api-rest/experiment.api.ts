@@ -8,6 +8,7 @@ import { requires } from "@langwatch/api";
 import {
   type AppRestSecurity,
   baseResponses,
+  credentialPrincipalOf,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
@@ -202,7 +203,7 @@ export function createExperimentsRestApp(options: {
         ...(input.name ? { name: input.name } : {}),
         ...(input.state ? { state: input.state } : {}),
       },
-      { kind: "credential", resolved: c.get("resolvedToken") },
+      { kind: "credential", credential: credentialPrincipalOf(c) },
     );
 
     logger.info({ projectId: project.id, slug: created.slug }, "Experiment created over REST");

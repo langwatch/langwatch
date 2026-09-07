@@ -6,6 +6,7 @@
 
 import { handlerManagedAuth, requires } from "@langwatch/api";
 import {
+  credentialPrincipalOf,
   MANAGEMENT_API_VERSION,
   projectOf,
   type AppRestSecurity,
@@ -120,7 +121,8 @@ export function createLangyLocalControlRestApp(options: {
    * reveals which requests exist.
    */
   const requireUser = (c: ControlContext): string => {
-    const userId = c.get("apiKeyUserId") as string | undefined;
+    const credential = credentialPrincipalOf(c);
+    const userId = credential.kind === "apiKey" ? credential.userId : null;
     if (!userId) throw new LangyLocalRequestInvalidError();
     return userId;
   };

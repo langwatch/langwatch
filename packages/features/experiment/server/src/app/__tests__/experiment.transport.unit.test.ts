@@ -78,7 +78,13 @@ function testSecurity({ requireToken = false } = {}): {
       isPersonal: false,
       ownerUserId: null,
     });
-    c.set("resolvedToken", { type: "apiKey", apiKeyId: "key-1", userId: "user-1" });
+    c.set("resolvedToken", {
+      type: "apiKey",
+      apiKeyId: "key-1",
+      userId: "user-1",
+      organizationId: "organization-1",
+      project: { id: "project-1", slug: "project-one", teamId: "team-1" },
+    });
     await next();
   };
 
@@ -323,7 +329,17 @@ describe("createExperimentsRestApp", () => {
 
       expect(stub.createEvaluationsV3).toHaveBeenCalledWith(
         { projectId: "project-1", name: "Support email classifier" },
-        { kind: "credential", resolved: { type: "apiKey", apiKeyId: "key-1", userId: "user-1" } },
+        {
+          kind: "credential",
+          credential: {
+            kind: "apiKey",
+            apiKeyId: "key-1",
+            userId: "user-1",
+            organizationId: "organization-1",
+            projectId: "project-1",
+            teamId: "team-1",
+          },
+        },
       );
     });
 

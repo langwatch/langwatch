@@ -4,7 +4,6 @@
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
-import type { ResolvedOrganizationApiKeyToken as OrgResolvedToken } from "@langwatch/api-key-contract";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -32,6 +31,7 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
   NotFoundError,
+  organizationCredentialPrincipalOf,
 } from "@langwatch/api/rest";
 import {
   ARCHIVE_PROJECT,
@@ -167,12 +167,12 @@ export function createProjectRestApp(options: {
 
     // Read the resolved credential itself rather than the loose context key:
     // this family authenticates organization API keys only, so `apiKeyId` is
-    // always a real key here, and taking it from the typed token is what keeps
-    // that true if the family ever grows another credential class.
-    const resolved = c.get("orgResolvedToken") as OrgResolvedToken;
+    // always a real key here, and taking it from the typed principal is what
+    // keeps that true if the family ever grows another credential class.
+    const credential = organizationCredentialPrincipalOf(c);
 
     const visible = await apiKeys().resolveVisibleProjects({
-      apiKeyId: resolved.apiKeyId,
+      apiKeyId: credential.apiKeyId,
       organizationId: organization.id,
     });
 
@@ -191,7 +191,7 @@ export function createProjectRestApp(options: {
 
   const createHandler = async (c: Context, input: z.infer<typeof createProjectSchema>) => {
     const organization = c.get("organization");
-    const userId = c.get("apiKeyUserId");
+    const userId = organizationCredentialPrincipalOf(c).userId;
 
     let project;
     try {

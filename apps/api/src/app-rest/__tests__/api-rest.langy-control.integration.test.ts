@@ -255,6 +255,17 @@ function passThroughSecurity(): AppRestSecurity {
   const asProject: MiddlewareHandler = async (c, next) => {
     c.set("project", project);
     c.set("apiKeyUserId", actingUserId);
+    // The whole resolved credential, as the process's own authentication
+    // installs it: handlers read their caller off this, never off loose keys.
+    c.set("resolvedToken", {
+      type: "apiKey",
+      apiKeyId: "key-langy-control",
+      userId: actingUserId,
+      organizationId: "organization-1",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      project,
+    });
     await next();
   };
   return createAppRestSecurity({

@@ -62,7 +62,10 @@ import {
   workbenchStateResponseSchema,
   workbenchVersionProbeResponseSchema,
 } from "../../rules/experiment-schemas.rules.ts";
-import { workbenchActorFrom } from "../../rules/experiment-workbench-actor.rules.ts";
+import {
+  workbenchActorFrom,
+  type WorkbenchCredential,
+} from "../../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
@@ -74,7 +77,7 @@ export type ExperimentV3RestCredential =
   | Readonly<{
       ok: true;
       project: Readonly<{ id: string; slug: string }>;
-      resolved: Parameters<typeof workbenchActorFrom>[0]["resolved"];
+      credential: WorkbenchCredential | null;
       markUsed: () => void;
     }>
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
@@ -555,7 +558,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     if (!credential.ok) {
       return c.json(credential.body, credential.status);
     }
-    const { project, resolved, markUsed } = credential;
+    const { project, credential: principal, markUsed } = credential;
     const experiments = ports.experiments();
 
     // Read once here to validate the stored setup before any work starts, and
@@ -713,7 +716,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
         ? {
             persistResults: {
               experiments: experiments.experimentService,
-              actor: workbenchActorFrom({ resolved }),
+              actor: workbenchActorFrom({ credential: principal }),
             },
           }
         : {}),
@@ -1007,7 +1010,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     if (!credential.ok) {
       return c.json(credential.body, credential.status);
     }
-    const { project, resolved, markUsed } = credential;
+    const { project, credential: principal, markUsed } = credential;
 
     const body = input;
 
@@ -1019,7 +1022,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
         ...(body.expectedVersion !== undefined ? { expectedVersion: body.expectedVersion } : {}),
         ...(body.commitMessage ? { commitMessage: body.commitMessage } : {}),
       },
-      { kind: "credential", resolved },
+      { kind: "credential", credential: principal },
     );
 
     markUsed();
@@ -1090,7 +1093,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     if (!credential.ok) {
       return c.json(credential.body, credential.status);
     }
-    const { project, resolved, markUsed } = credential;
+    const { project, credential: principal, markUsed } = credential;
 
     const experiments = ports.experiments();
     const workbench = await experiments.getWorkbenchState({ projectId: project.id, slug });
@@ -1110,7 +1113,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
 
     const restored = await experiments.restoreWorkbenchVersion(
       { projectId: project.id, id: workbench.experimentId, version: parsedVersion },
-      { kind: "credential", resolved },
+      { kind: "credential", credential: principal },
     );
 
     logger.info(

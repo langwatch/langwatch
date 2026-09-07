@@ -390,6 +390,14 @@ function organizationSecurity(options: {
     }
     c.set("organization", { id: TEST_ORGANIZATION_ID, name: "Acme", slug: "acme" });
     if (options.actingUserId !== null) c.set("apiKeyUserId", options.actingUserId);
+    // The whole resolved credential, as the organization door installs it:
+    // handlers read their caller off this, never off loose keys.
+    c.set("orgResolvedToken", {
+      type: "apiKey-org",
+      apiKeyId: "key-organization",
+      userId: options.actingUserId,
+      organizationId: TEST_ORGANIZATION_ID,
+    });
     await next();
   };
 
