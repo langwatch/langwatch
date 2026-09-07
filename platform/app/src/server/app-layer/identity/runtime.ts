@@ -227,6 +227,12 @@ export function identityEmail(): IdentityEmailService {
   return identityEmailService;
 }
 
+export function clearSignUpConfirmationPending(args: {
+  userId: string;
+}): Promise<void> {
+  return identityUsers.clearSignUpConfirmationPending(args);
+}
+
 /**
  * The write surface. Composed per call like `grantsService()`: the ledger
  * writer resolves the pipeline handle lazily, so a ceremony composed before
