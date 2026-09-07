@@ -4,37 +4,37 @@ import {
 } from "@langwatch/identity";
 import type {
   IdentityHeadsRepository,
+  IdentityUserGate,
   SignInAccountLookupPort,
 } from "@langwatch/identity-server";
 
+/** The non-secret legacy answer used while identifier backfill is pending. */
+export interface LegacySignInAccount {
+  userId: string;
+  methods: AccountSignInMethods;
+}
+
+export interface LegacySignInAccountDirectory {
+  findLegacySignInAccount(args: {
+    normalizedValue: string;
+  }): Promise<LegacySignInAccount | null>;
+}
+
 /**
- * What the address's account holds, for the sign-in router (ADR-117, revision
- * 2026-08-25).
+ * What the address's account holds, for the sign-in router (ADR-117).
  *
- * Built entirely on the identifier projection, over the repository the guards
- * and ceremonies already read: `findActiveIdentifierByValue` answers whether
- * anybody holds the address, and `findHeads` answers what else that person
- * holds. Nothing new is queried and no new index is needed — the two reads are
- * the ones D01 already put in place.
- *
- * ── What it deliberately does not read ──────────────────────────────────
- *
- * `AccountCredential`, and by extension `Account.password`. A password is
- * present in the projection as an identifier whose provider is `credential`,
- * and that row is the fact the screen needs: "this account can sign in with a
- * password". Reading the secrets table to answer it would put a hashed
- * credential one destructuring away from a decision object that a public,
- * unauthenticated endpoint returns.
- *
- * ── Why only live identifiers count ─────────────────────────────────────
- *
- * A detached identifier is a method somebody REMOVED. Offering it back would
- * be the screen contradicting a settings page, and worse, it would offer a way
- * in that no longer works. `isLiveIdentifierState` is the same predicate the
- * rest of the identity surface filters on, imported rather than restated.
+ * Finalized users resolve from the Identifier projection. A miss falls back
+ * to legacy User/Account/Passkey rows only when that user's D01 migration has
+ * not latched, preserving the same per-user fork as the storage adapter.
+ * Detached identifiers never count, and the repository exposes only method
+ * presence, never credential material.
  */
 export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
-  constructor(private readonly heads: IdentityHeadsRepository) {}
+  constructor(
+    private readonly heads: IdentityHeadsRepository,
+    private readonly legacy: LegacySignInAccountDirectory,
+    private readonly isLatched: IdentityUserGate,
+  ) {}
 
   async findAccountMethods({
     normalizedValue,
@@ -44,9 +44,15 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
     const holder = await this.heads.findActiveIdentifierByValue({
       normalizedValue,
     });
-    // Nobody holds the address. The routing answer, not an error: it is what
-    // sends somebody to sign-up rather than to a credential box.
-    if (!holder) return null;
+    if (!holder) {
+      return await this.findLegacyAccountMethods({ normalizedValue });
+    }
+    if (!(await this.isLatched({ userId: holder.userId }))) {
+      return await this.findLegacyAccountMethods({
+        normalizedValue,
+        knownUnlatchedUserId: holder.userId,
+      });
+    }
 
     const heads = await this.heads.findHeads({ userId: holder.userId });
     const live = Object.values(heads.identifiers).filter((identifier) =>
@@ -69,5 +75,29 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
         ),
       ],
     };
+  }
+
+  private async findLegacyAccountMethods({
+    normalizedValue,
+    knownUnlatchedUserId,
+  }: {
+    normalizedValue: string;
+    knownUnlatchedUserId?: string;
+  }): Promise<AccountSignInMethods | null> {
+    const account = await this.legacy.findLegacySignInAccount({
+      normalizedValue,
+    });
+    if (!account) {
+      return null;
+    }
+    const alreadyKnownUnlatched = knownUnlatchedUserId === account.userId;
+    if (
+      !alreadyKnownUnlatched &&
+      (await this.isLatched({ userId: account.userId }))
+    ) {
+      return null;
+    }
+
+    return account.methods;
   }
 }

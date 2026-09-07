@@ -78,6 +78,15 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up with the reason code "identifier_unknown"
 
   @unit
+  Scenario: An account still waiting for identifier backfill keeps its way in
+    Given "home.net" belongs to no ACTIVE connection
+    And an existing account holds "legacy@home.net"
+    And that account's identifier backfill is not finalized
+    When "legacy@home.net" is submitted to the router
+    Then the decision offers the account's legacy sign-in method
+    And the decision never routes to sign-up with the reason code "identifier_unknown"
+
+  @unit
   Scenario: The methods offered are the ones that account holds
     Given "home.net" belongs to no ACTIVE connection
     And the account for "sam@home.net" holds a passkey and no password

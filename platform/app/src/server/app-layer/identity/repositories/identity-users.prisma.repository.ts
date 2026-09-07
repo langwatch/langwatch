@@ -1,5 +1,9 @@
 import type { IdentityUsersRepository } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type {
+  LegacySignInAccount,
+  LegacySignInAccountDirectory,
+} from "../signin-account-lookup";
 
 /**
  * The `User` columns identity touches.
@@ -13,7 +17,9 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * Identifier/Account exemption, so these queries carry no `projectId` — the
  * model has none, and a user is not scoped to a project.
  */
-export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
+export class PrismaIdentityUsersRepository
+  implements IdentityUsersRepository, LegacySignInAccountDirectory
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async storeUserHashKeyIfMissing({
@@ -60,6 +66,52 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
       select: { id: true },
     });
     return user?.id ?? null;
+  }
+
+  /**
+   * The legacy method answer for an unlatched sign-in. Password presence is
+   * evaluated inside Prisma, so no credential hash crosses this boundary.
+   * Finding a user with only provider accounts is still an account answer;
+   * the router then preserves the deployment's existing Auth0/Okta method.
+   */
+  async findLegacySignInAccount({
+    normalizedValue,
+  }: {
+    normalizedValue: string;
+  }): Promise<LegacySignInAccount | null> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedValue, mode: "insensitive" },
+      },
+      select: {
+        id: true,
+        accounts: {
+          where: { provider: "credential", password: { not: "" } },
+          select: { id: true },
+          take: 1,
+        },
+        accountCredentials: {
+          where: { provider: "credential", password: { not: "" } },
+          select: { id: true },
+          take: 1,
+        },
+        passkeys: { select: { id: true }, take: 1 },
+      },
+    });
+    if (!user) {
+      return null;
+    }
+
+    return {
+      userId: user.id,
+      methods: {
+        hasPassword:
+          user.accounts.length > 0 || user.accountCredentials.length > 0,
+        hasPasskey: user.passkeys.length > 0,
+        // Legacy providers are instance methods, not D04 connection ids.
+        connectionIds: [],
+      },
+    };
   }
 
   /**
