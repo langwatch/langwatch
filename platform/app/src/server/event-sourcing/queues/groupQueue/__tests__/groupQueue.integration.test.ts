@@ -184,6 +184,7 @@ describe.skipIf(!hasTestcontainers)(
       return queue;
     }
 
+    /** @scenario "Preflight projection work cannot consume application traffic" */
     it("dispatches and drains only groups registered by a preflight consumer", async () => {
       const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
       const processed: string[] = [];

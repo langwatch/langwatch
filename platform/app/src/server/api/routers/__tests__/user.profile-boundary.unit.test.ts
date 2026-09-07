@@ -12,7 +12,7 @@ vi.mock("~/server/rateLimit", () => ({
 }));
 
 vi.mock("@ee/audit-log/auditLog", () => ({
-  auditLog: vi.fn().mockResolvedValue(undefined),
+  auditLog: vi.fn().mockResolvedValue(void 0),
 }));
 
 describe("userRouter profile boundary", () => {

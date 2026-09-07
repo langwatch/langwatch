@@ -102,10 +102,10 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   @unit
   Scenario: Only what the deployment offers is offered
-    Given two-step verification is offered here and passkeys are not
+    Given passkeys are offered here and two-step verification is not
     And "sam" has neither
     When the signed-in shell asks what to offer "sam"
-    Then two-step verification is offered and a passkey is not
+    Then a passkey is offered and two-step verification is not
 
   @unit
   Scenario: One dismissal answers the whole offer
