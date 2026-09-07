@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,8 +43,33 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEsc}
 	case "ctrl+c":
 		return tea.KeyMsg{Type: tea.KeyCtrlC}
+	case "up":
+		return tea.KeyMsg{Type: tea.KeyUp}
+	case "down":
+		return tea.KeyMsg{Type: tea.KeyDown}
+	case "pgup":
+		return tea.KeyMsg{Type: tea.KeyPgUp}
+	case "pgdown":
+		return tea.KeyMsg{Type: tea.KeyPgDown}
+	case "home":
+		return tea.KeyMsg{Type: tea.KeyHome}
+	case "end":
+		return tea.KeyMsg{Type: tea.KeyEnd}
+	case "enter":
+		return tea.KeyMsg{Type: tea.KeyEnter}
+	case "backspace":
+		return tea.KeyMsg{Type: tea.KeyBackspace}
 	default:
 		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	}
+}
+
+// pushLines writes n lines of the form "<label> N" straight into a group's
+// ring, bypassing file ingestion — the scroll/search tests only care about
+// buffer content and position, not the file-tailing path.
+func pushLines(m *viewerModel, group, label string, n int) {
+	for i := 0; i < n; i++ {
+		m.push(group, fmt.Sprintf("%s %d", label, i))
 	}
 }
 
@@ -466,3 +492,311 @@ func TestFailedStopKeepsTheViewerOpen(t *testing.T) {
 }
 
 var errStopFailed = errors.New("no registered stack \"feat-x\"")
+
+// @scenario "Scrolling back leaves following mode"
+func TestViewerScrollLeavesFollowing(t *testing.T) {
+	newModel := func() *viewerModel {
+		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+		pushLines(m, viewerAllGroup, "line", 30)
+		return m
+	}
+
+	t.Run("given a fresh viewer at the bottom", func(t *testing.T) {
+		t.Run("when the developer presses up", func(t *testing.T) {
+			m := newModel()
+			m.handleKey("up")
+			if m.scroll[viewerAllGroup] != 1 {
+				t.Fatalf("scroll = %d, want 1", m.scroll[viewerAllGroup])
+			}
+			if !strings.Contains(m.logFooter(viewerAllGroup), "1 lines above") {
+				t.Error("footer must show the scroll-back count")
+			}
+			if !strings.Contains(m.logFooter(viewerAllGroup), "f to follow") {
+				t.Error("footer must name f as the way back to following")
+			}
+		})
+
+		t.Run("when the developer presses PgUp", func(t *testing.T) {
+			m := newModel()
+			m.handleKey("pgup")
+			if m.scroll[viewerAllGroup] != m.bodyHeight() {
+				t.Fatalf("scroll = %d, want a full page (%d)", m.scroll[viewerAllGroup], m.bodyHeight())
+			}
+		})
+
+		t.Run("when the developer scrolls the mouse wheel up", func(t *testing.T) {
+			m := newModel()
+			m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+			if m.scroll[viewerAllGroup] != mouseWheelScrollLines {
+				t.Fatalf("scroll = %d, want %d", m.scroll[viewerAllGroup], mouseWheelScrollLines)
+			}
+		})
+
+		t.Run("when the developer presses Home", func(t *testing.T) {
+			m := newModel()
+			m.handleKey("home")
+			if m.scroll[viewerAllGroup] != len(m.lines[viewerAllGroup]) {
+				t.Fatalf("Home should scroll to the very top, scroll=%d", m.scroll[viewerAllGroup])
+			}
+		})
+	})
+}
+
+// @scenario "New output does not yank a scrolled-back view"
+func TestViewerScrollPinnedAgainstNewOutput(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	m.height = 10 // a small terminal, so the body holds only a few lines
+	pushLines(m, viewerAllGroup, "line", 30)
+	m.scrollBy(viewerAllGroup, 15)
+
+	before := m.visibleLines(viewerAllGroup, m.bodyHeight())
+	pushLines(m, viewerAllGroup, "new", 5)
+	after := m.visibleLines(viewerAllGroup, m.bodyHeight())
+
+	if strings.Join(before, "|") != strings.Join(after, "|") {
+		t.Errorf("scrolled-back view moved: before=%v after=%v", before, after)
+	}
+	if m.scroll[viewerAllGroup] != 20 {
+		t.Errorf("scroll offset = %d, want 20 (15 + 5 new lines)", m.scroll[viewerAllGroup])
+	}
+}
+
+// @scenario "Returning to the bottom resumes following"
+func TestViewerFollowResumes(t *testing.T) {
+	newScrolledModel := func() *viewerModel {
+		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+		pushLines(m, viewerAllGroup, "line", 30)
+		m.scrollBy(viewerAllGroup, 10)
+		return m
+	}
+
+	t.Run("given a scrolled-back view", func(t *testing.T) {
+		t.Run("when f is pressed", func(t *testing.T) {
+			m := newScrolledModel()
+			m.handleKey("f")
+			if m.scroll[viewerAllGroup] != 0 {
+				t.Fatalf("scroll = %d, want 0", m.scroll[viewerAllGroup])
+			}
+			if strings.Contains(m.logFooter(viewerAllGroup), "lines above") {
+				t.Error("the scroll-back indicator must be gone once following resumes")
+			}
+		})
+
+		t.Run("when End is pressed", func(t *testing.T) {
+			m := newScrolledModel()
+			m.handleKey("end")
+			if m.scroll[viewerAllGroup] != 0 {
+				t.Fatalf("scroll = %d, want 0", m.scroll[viewerAllGroup])
+			}
+		})
+
+		t.Run("when scrolling all the way down", func(t *testing.T) {
+			m := newScrolledModel()
+			for i := 0; i < 20; i++ {
+				m.handleKey("down")
+			}
+			if m.scroll[viewerAllGroup] != 0 {
+				t.Fatalf("scroll = %d, want 0 after scrolling past the bottom", m.scroll[viewerAllGroup])
+			}
+		})
+	})
+}
+
+// @scenario "Slash opens a search prompt in the footer"
+func TestViewerSearchPromptCapturesInput(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	pushLines(m, viewerAllGroup, "line", 5)
+
+	m.handleKey("/")
+	if !m.searchPrompt {
+		t.Fatal("/ must open the search prompt")
+	}
+	if !strings.Contains(m.logFooter(viewerAllGroup), "enter searches") {
+		t.Error("the footer must show the live search prompt")
+	}
+
+	// While the prompt is open, a normally-scrolling key is captured as text
+	// instead of scrolling — only single runes are typed; multi-rune key
+	// names like "down" are silently ignored rather than leaking into the query.
+	m.handleKey("down")
+	if m.scroll[viewerAllGroup] != 0 {
+		t.Error("scrolling keys must not scroll while the search prompt is open")
+	}
+
+	m.handleKey("h")
+	m.handleKey("i")
+	if m.searchInput != "hi" {
+		t.Fatalf("searchInput = %q, want %q", m.searchInput, "hi")
+	}
+	m.handleKey("backspace")
+	if m.searchInput != "h" {
+		t.Fatalf("searchInput after backspace = %q, want %q", m.searchInput, "h")
+	}
+}
+
+// @scenario "Enter jumps to the nearest match and highlights every match on screen"
+func TestViewerSearchJumpsAndHighlights(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	for i := 0; i < 10; i++ {
+		m.push(viewerAllGroup, fmt.Sprintf("plain line %d", i))
+	}
+	m.push(viewerAllGroup, "an ERROR occurred here")
+
+	m.handleKey("/")
+	for _, r := range "error" { // lower-case query against an upper-case match
+		m.handleKey(string(r))
+	}
+	m.handleKey("enter")
+
+	if m.searchQuery != "error" {
+		t.Fatalf("searchQuery = %q, want %q", m.searchQuery, "error")
+	}
+	if m.matchIdx < 0 {
+		t.Fatal("Enter must land on a match")
+	}
+	view := m.View()
+	if !strings.Contains(view, "\x1b[7mERROR\x1b[27m") {
+		t.Errorf("view must highlight the match in its original case, got: %q", view)
+	}
+}
+
+// @scenario "n and N step across the whole buffer of the current tab"
+func TestViewerSearchStepWraps(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	for i := 0; i < 3; i++ {
+		m.push(viewerAllGroup, fmt.Sprintf("needle %d", i))
+		m.push(viewerAllGroup, "filler")
+	}
+	m.searchQuery = "needle"
+	m.jumpToNearestMatch()
+
+	matches := m.searchMatches(viewerAllGroup)
+	if len(matches) != 3 {
+		t.Fatalf("matches = %v, want 3 needles", matches)
+	}
+
+	seen := []int{m.matchIdx}
+	for i := 0; i < 3; i++ {
+		m.stepMatch(1)
+		seen = append(seen, m.matchIdx)
+	}
+	if seen[3] != seen[0] {
+		t.Errorf("stepping forward 3 times over 3 matches should wrap back, seen=%v", seen)
+	}
+
+	m.stepMatch(-1)
+	if m.matchIdx != seen[2] {
+		t.Errorf("N should step backward, matchIdx=%d want %d", m.matchIdx, seen[2])
+	}
+}
+
+// @scenario "Escape clears the search"
+func TestViewerEscapeClearsSearch(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	pushLines(m, viewerAllGroup, "needle", 3)
+	m.searchQuery = "needle"
+
+	m.handleKey("esc")
+	if m.searchQuery != "" {
+		t.Fatalf("esc must clear the query, still %q", m.searchQuery)
+	}
+	// \x1b[27m only ever appears as the closing half of a search highlight
+	// (the tab bar's own reverse-video uses \x1b[0m to reset), so its absence
+	// proves the highlighting is gone rather than merely the tab styling.
+	if strings.Contains(m.View(), "\x1b[27m") {
+		t.Error("highlighting must disappear once the query is cleared")
+	}
+
+	// A second esc, with no search left to clear, falls through to the
+	// ordinary detach behavior.
+	_, cmd := m.handleKey("esc")
+	if cmd == nil {
+		t.Fatal("esc must still detach the viewer once there is no search to clear")
+	}
+}
+
+// @scenario "A search persists across tabs"
+func TestViewerSearchPersistsAcrossTabs(t *testing.T) {
+	dir := t.TempDir()
+	base := time.Now().UTC()
+	for _, svc := range []string{"app", "nlp"} {
+		line := base.Format(time.RFC3339Nano) + " a restart happened in " + svc + "\n"
+		if err := os.WriteFile(filepath.Join(dir, svc+".log"), []byte(line), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.ingest() // groups = [all app nlp]
+
+	m.handleKey("2") // land on "app"
+	m.handleKey("/")
+	for _, r := range "restart" {
+		m.handleKey(string(r))
+	}
+	m.handleKey("enter")
+	if len(m.searchMatches("app")) == 0 {
+		t.Fatal("expected a match on the app tab")
+	}
+
+	m.handleKey("3") // switch to "nlp"
+	if m.searchQuery != "restart" {
+		t.Fatalf("query must survive the tab switch, got %q", m.searchQuery)
+	}
+	if len(m.searchMatches("nlp")) == 0 {
+		t.Fatal("the same query must also match nlp's own buffer")
+	}
+	m.handleKey("n")
+	if m.matchIdx < 0 {
+		t.Fatal("n on the new tab must search that tab's own matches, not the old tab's")
+	}
+}
+
+// @scenario "Existing bindings keep working"
+func TestViewerExistingBindingsUnaffectedBySearchAndScroll(t *testing.T) {
+	dir := t.TempDir()
+	line := time.Now().UTC().Format(time.RFC3339Nano) + " hi\n"
+	if err := os.WriteFile(filepath.Join(dir, "app.log"), []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.ingest() // groups = [all app]
+
+	m.handleKey("2")
+	if m.groups[m.selected] != "app" {
+		t.Fatalf("digit jump broken, landed on %q", m.groups[m.selected])
+	}
+	m.handleKey("left")
+	if m.groups[m.selected] != viewerAllGroup {
+		t.Fatalf("left-cycle broken, landed on %q", m.groups[m.selected])
+	}
+	m.handleKey("tab")
+	if m.groups[m.selected] != "app" {
+		t.Fatalf("tab-cycle broken, landed on %q", m.groups[m.selected])
+	}
+
+	if _, cmd := m.handleKey("q"); cmd == nil {
+		t.Error("q must still detach")
+	}
+	m2 := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	if _, cmd := m2.handleKey("ctrl+c"); cmd == nil {
+		t.Error("ctrl+c must still detach")
+	}
+
+	stops := 0
+	m3 := dashModel(t, []app.SessionServiceStatus{{Name: "app", Restartable: true}}, nil)
+	m3.session.Down = func() error { stops++; return nil }
+	m3.handleKey("X")
+	if _, cmd := m3.handleKey("X"); cmd == nil || stops != 0 {
+		t.Fatal("X twice must dispatch a stop")
+	} else {
+		cmd()
+		if stops != 1 {
+			t.Fatalf("stops = %d, want 1 after the confirmed X", stops)
+		}
+	}
+
+	m3.handleKey("down")
+	if m3.cursor != 0 {
+		t.Error("the dashboard's own down binding must still move the cursor, not scroll")
+	}
+}

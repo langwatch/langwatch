@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -28,6 +29,9 @@ const viewerRingCap = 2000
 
 // viewerAllGroup is the combined launcher stream's tab label.
 const viewerAllGroup = "all"
+
+// mouseWheelScrollLines is how many lines one wheel notch moves a log tab.
+const mouseWheelScrollLines = 3
 
 // sessionGroup is the leading dashboard tab, present only when the viewer is
 // wired to an action surface (the interactive up/play paths, never the tests
@@ -78,7 +82,7 @@ func (d deps) sessionActions(slug string) sessionActions {
 }
 
 func runViewer(ctx context.Context, m *viewerModel) error {
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx))
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	if err != nil && ctx.Err() != nil { // Ctrl-C via the signal context is a clean quit
 		return nil
@@ -116,6 +120,19 @@ type viewerModel struct {
 	preferred string
 	lines     map[string][]string // rendered lines per group, ring-capped
 	offsets   map[string]int64    // read offset per file key ("all" or file service name)
+	// scroll holds, per group, how many lines the view is pulled back from the
+	// live bottom (0 = following: new output stays on screen as it arrives).
+	// push() advances it in lockstep with new lines so a scrolled-back view
+	// keeps showing the same content instead of drifting as output streams in.
+	scroll map[string]int
+	// searchQuery is the committed, case-insensitive substring search, shared
+	// across every log tab. searchPrompt/searchInput hold an in-progress "/"
+	// entry before Enter commits it. matchIdx is the current tab's position
+	// within its own match list, reset whenever the tab changes.
+	searchQuery  string
+	searchPrompt bool
+	searchInput  string
+	matchIdx     int
 
 	// session, when set, drives the leading dashboard tab.
 	session       *sessionActions
@@ -140,6 +157,8 @@ func newViewerModel(slug, combined, capDir string) *viewerModel {
 		groups:   []string{viewerAllGroup},
 		lines:    map[string][]string{},
 		offsets:  map[string]int64{},
+		scroll:   map[string]int{},
+		matchIdx: -1,
 		banner:   fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
 	}
 }
@@ -188,6 +207,25 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg.String())
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
+	}
+	return m, nil
+}
+
+// handleMouse scrolls the current log tab on a wheel notch. Inert on the
+// dashboard tab, which has no scrollable buffer.
+func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.onDashboard() {
+		return m, nil
+	}
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		m.scrollBy(m.currentGroup(), mouseWheelScrollLines)
+	case tea.MouseButtonWheelDown:
+		m.scrollBy(m.currentGroup(), -mouseWheelScrollLines)
+	default:
+		// Every other button/gesture is outside this viewer's scope.
 	}
 	return m, nil
 }
@@ -195,27 +233,80 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleKey routes a keypress: dashboard row actions first when the session tab
 // is showing, then the tab-navigation and quit bindings shared by every tab.
 func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
-	if m.onDashboard() {
-		switch s {
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-			return m, nil
-		case "down", "j":
-			if m.cursor < len(m.snap.Services)-1 {
-				m.cursor++
-			}
-			return m, nil
-		case "enter":
-			m.openSelectedLogs()
-			return m, nil
-		case "r":
-			return m, m.restartSelected()
-		case "a":
-			return m, m.restartAll()
-		}
+	if m.searchPrompt {
+		return m.handleSearchInput(s)
 	}
+	if m.onDashboard() {
+		if model, cmd, handled := m.handleDashboardKey(s); handled {
+			return model, cmd
+		}
+	} else if m.handleLogTabKey(s) {
+		return m, nil
+	}
+	return m.handleCommonKey(s)
+}
+
+// handleDashboardKey is tab one's own row navigation and actions. handled is
+// false for every key the dashboard does not claim, so those fall through to
+// handleCommonKey (tab switching, quit, stop) unchanged.
+func (m *viewerModel) handleDashboardKey(s string) (tea.Model, tea.Cmd, bool) {
+	switch s {
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		return m, nil, true
+	case "down", "j":
+		if m.cursor < len(m.snap.Services)-1 {
+			m.cursor++
+		}
+		return m, nil, true
+	case "enter":
+		m.openSelectedLogs()
+		return m, nil, true
+	case "r":
+		return m, m.restartSelected(), true
+	case "a":
+		return m, m.restartAll(), true
+	default:
+		return m, nil, false
+	}
+}
+
+// handleLogTabKey is scrolling and search-entry for a log tab. handled is
+// false for every key it does not own, so tab-switching, quit and stop still
+// reach handleCommonKey.
+func (m *viewerModel) handleLogTabKey(s string) bool {
+	group := m.currentGroup()
+	switch s {
+	case "/":
+		m.searchPrompt = true
+		m.searchInput = ""
+	case "n":
+		m.stepMatch(1)
+	case "N":
+		m.stepMatch(-1)
+	case "f", "end":
+		m.scroll[group] = 0
+	case "pgup":
+		m.scrollBy(group, m.bodyHeight())
+	case "pgdown":
+		m.scrollBy(group, -m.bodyHeight())
+	case "up", "k":
+		m.scrollBy(group, 1)
+	case "down", "j":
+		m.scrollBy(group, -1)
+	case "home":
+		m.scroll[group] = len(m.lines[group])
+	default:
+		return false
+	}
+	return true
+}
+
+// handleCommonKey is every binding shared by the dashboard and every log tab:
+// stop, quit/detach, and tab switching.
+func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 	if s != "X" {
 		m.confirmStop = false
 	}
@@ -223,10 +314,14 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 	case "X":
 		return m.handleStopKey()
 	case "esc":
-		// esc is the universal "back out of this screen" key, and on the play
-		// viewer quitting irreversibly destroys the sandbox — databases,
-		// containers, checkout. Only the keys the banner actually names (q, and
-		// ctrl+c as the usual interrupt) may do that.
+		// esc is the universal "back out of this screen" key. A live search
+		// clears first — the play viewer's destroy contract still wins below
+		// once there is nothing left to back out of. Only the keys the banner
+		// actually names (q, and ctrl+c as the usual interrupt) may destroy.
+		if m.searchQuery != "" {
+			m.clearSearch()
+			return m, nil
+		}
 		if m.destroyOnQuit {
 			m.setToast("press q to quit — it DESTROYS this sandbox")
 			return m, nil
@@ -237,14 +332,43 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 	case "right", "l", "tab":
 		m.preferred = ""
 		m.selected = (m.selected + 1) % len(m.groups)
+		m.matchIdx = -1
 	case "left", "h", "shift+tab":
 		m.preferred = ""
 		m.selected = (m.selected - 1 + len(m.groups)) % len(m.groups)
+		m.matchIdx = -1
 	default:
 		// A digit jumps straight to that tab (1 = the first tab).
 		if n := digitKey(s); n > 0 && n <= len(m.groups) {
 			m.preferred = ""
 			m.selected = n - 1
+			m.matchIdx = -1
+		}
+	}
+	return m, nil
+}
+
+// handleSearchInput captures keystrokes while the "/" prompt is open: Enter
+// commits the query and jumps to the nearest match, Esc cancels without
+// touching any search already committed, Backspace edits, everything else
+// (a single rune) is appended.
+func (m *viewerModel) handleSearchInput(s string) (tea.Model, tea.Cmd) {
+	switch s {
+	case "enter":
+		m.commitSearch()
+	case "esc":
+		m.searchPrompt = false
+		m.searchInput = ""
+	case "backspace":
+		if m.searchInput != "" {
+			_, size := utf8.DecodeLastRuneInString(m.searchInput)
+			m.searchInput = m.searchInput[:len(m.searchInput)-size]
+		}
+	case "ctrl+c":
+		return m, tea.Quit
+	default:
+		if r := []rune(s); len(r) == 1 {
+			m.searchInput += s
 		}
 	}
 	return m, nil
@@ -482,12 +606,194 @@ func (m *viewerModel) readFresh(key, path string) []string {
 	return out
 }
 
+// push appends one line to a group's ring. When the group is scrolled back
+// (scroll[group] > 0), the offset advances in lockstep so the window keeps
+// showing the same content instead of the new line silently shifting it —
+// "following" only resumes when the viewer (or the user, via f/End) sets the
+// offset back to 0.
 func (m *viewerModel) push(group, line string) {
 	ring := append(m.lines[group], line)
 	if len(ring) > viewerRingCap {
 		ring = ring[len(ring)-viewerRingCap:]
 	}
 	m.lines[group] = ring
+	if m.scroll[group] > 0 {
+		m.scroll[group]++
+		if m.scroll[group] > len(ring) {
+			m.scroll[group] = len(ring)
+		}
+	}
+}
+
+// currentGroup is the tab currently on screen.
+func (m *viewerModel) currentGroup() string { return m.groups[m.selected] }
+
+// bodyHeight is how many log lines fit between the tab bar and the footer.
+func (m *viewerModel) bodyHeight() int {
+	body := m.height - 6
+	if body < 1 {
+		body = 20
+	}
+	return body
+}
+
+// scrollBy moves a group's scroll-back offset, clamped to [0, len(lines)].
+// Positive delta scrolls up (toward older lines); negative scrolls down.
+func (m *viewerModel) scrollBy(group string, delta int) {
+	n := m.scroll[group] + delta
+	if n < 0 {
+		n = 0
+	}
+	if top := len(m.lines[group]); n > top {
+		n = top
+	}
+	m.scroll[group] = n
+}
+
+// visibleLines slices a group's ring to the window the current scroll offset
+// selects, at most `body` lines.
+func (m *viewerModel) visibleLines(group string, body int) []string {
+	lines := m.lines[group]
+	scroll := m.scroll[group]
+	if scroll > len(lines) {
+		scroll = len(lines)
+	}
+	end := len(lines) - scroll
+	start := end - body
+	if start < 0 {
+		start = 0
+	}
+	return lines[start:end]
+}
+
+// searchMatches finds every line in a group containing the committed query,
+// case-insensitive. Returns nil when there is no active search.
+func (m *viewerModel) searchMatches(group string) []int {
+	if m.searchQuery == "" {
+		return nil
+	}
+	q := strings.ToLower(m.searchQuery)
+	var idx []int
+	for i, l := range m.lines[group] {
+		if strings.Contains(strings.ToLower(l), q) {
+			idx = append(idx, i)
+		}
+	}
+	return idx
+}
+
+// commitSearch closes the prompt, adopts its text as the active query (which
+// then applies across every tab), and jumps to the nearest match in this one.
+func (m *viewerModel) commitSearch() {
+	m.searchPrompt = false
+	m.searchQuery = m.searchInput
+	m.searchInput = ""
+	m.jumpToNearestMatch()
+}
+
+// clearSearch drops the active query and its highlighting, leaving scroll
+// position where it is.
+func (m *viewerModel) clearSearch() {
+	m.searchQuery = ""
+	m.matchIdx = -1
+}
+
+// jumpToNearestMatch lands on the first match at or after the line currently
+// at the bottom of the view, wrapping to the last match if the view is
+// already scrolled past every match.
+func (m *viewerModel) jumpToNearestMatch() {
+	group := m.currentGroup()
+	matches := m.searchMatches(group)
+	if len(matches) == 0 {
+		m.matchIdx = -1
+		return
+	}
+	end := len(m.lines[group]) - m.scroll[group]
+	best := len(matches) - 1
+	for i, idx := range matches {
+		if idx >= end-1 {
+			best = i
+			break
+		}
+	}
+	m.matchIdx = best
+	m.revealMatch(group, matches[best])
+}
+
+// stepMatch moves forward (dir=1) or back (dir=-1) across the current tab's
+// whole match buffer, wrapping at either end.
+func (m *viewerModel) stepMatch(dir int) {
+	group := m.currentGroup()
+	matches := m.searchMatches(group)
+	if len(matches) == 0 {
+		return
+	}
+	if m.matchIdx < 0 {
+		m.jumpToNearestMatch()
+		return
+	}
+	m.matchIdx = ((m.matchIdx+dir)%len(matches) + len(matches)) % len(matches)
+	m.revealMatch(group, matches[m.matchIdx])
+}
+
+// revealMatch scrolls a group so the given absolute line index sits at the
+// bottom of the visible window.
+func (m *viewerModel) revealMatch(group string, lineIdx int) {
+	lines := m.lines[group]
+	scroll := len(lines) - lineIdx - 1
+	if scroll < 0 {
+		scroll = 0
+	}
+	if scroll > len(lines) {
+		scroll = len(lines)
+	}
+	m.scroll[group] = scroll
+}
+
+// highlightMatches wraps every case-insensitive occurrence of query in line
+// with reverse video, leaving any pre-existing ANSI color codes intact.
+func highlightMatches(line, query string) string {
+	if query == "" {
+		return line
+	}
+	lower := strings.ToLower(line)
+	q := strings.ToLower(query)
+	var b strings.Builder
+	i := 0
+	for {
+		j := strings.Index(lower[i:], q)
+		if j < 0 {
+			b.WriteString(line[i:])
+			break
+		}
+		start := i + j
+		end := start + len(q)
+		b.WriteString(line[i:start])
+		b.WriteString("\x1b[7m")
+		b.WriteString(line[start:end])
+		b.WriteString("\x1b[27m")
+		i = end
+	}
+	return b.String()
+}
+
+// logFooter is the help/status line under a log tab: key bindings normally,
+// the live "/" prompt while typing one, and a scroll-position indicator once
+// the view has left the following bottom.
+func (m *viewerModel) logFooter(group string) string {
+	if m.searchPrompt {
+		return "\x1b[2m/\x1b[0m" + m.searchInput + "\x1b[7m \x1b[0m\x1b[2m  enter searches · esc cancels\x1b[0m"
+	}
+	help := "\x1b[2m↑↓/jk scroll · pgup/pgdn page · home/end · / search"
+	if m.searchQuery != "" {
+		matches := m.searchMatches(group)
+		help += fmt.Sprintf(" · %q: %d match(es) · n/N step · esc clears", m.searchQuery, len(matches))
+	}
+	if scroll := m.scroll[group]; scroll > 0 {
+		help += fmt.Sprintf(" · ↑ %d lines above · f to follow", scroll)
+	}
+	help += "\x1b[0m"
+	return help
 }
 
 // formatCombinedLine renders a combined-stream line, whose lane comes from the
@@ -518,20 +824,15 @@ func (m *viewerModel) View() string {
 		b.WriteString(m.dashboardBody())
 		return b.String()
 	}
-	body := m.height - 4
-	if body < 1 {
-		body = 20
-	}
-	lines := m.lines[m.groups[m.selected]]
-	if len(lines) > body {
-		lines = lines[len(lines)-body:]
-	}
+	group := m.currentGroup()
+	lines := m.visibleLines(group, m.bodyHeight())
 	if len(lines) == 0 {
 		b.WriteString(" \x1b[2mwaiting for output…\x1b[0m\n")
 	}
 	for _, l := range lines {
-		b.WriteString(" " + l + "\n")
+		b.WriteString(" " + highlightMatches(l, m.searchQuery) + "\n")
 	}
+	b.WriteString("\n " + m.logFooter(group) + "\n")
 	return b.String()
 }
 
