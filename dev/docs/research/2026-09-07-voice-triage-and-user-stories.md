@@ -10,7 +10,7 @@ Status: research document, second pass. On 2026-09-07, 17 scenario issues verifi
 
 - **90 open voice/audio issues** across the org after this pass, down from 107. Scenario SDK 63, platform 19, langwatch-saas 6, two elsewhere. None carry a `voice` or `audio` label, in any repo.
 - **17 closed as verified delivered, 31 "looked done" ones are not.** Of 48 issues that referenced a merged PR, only 17 survived a code check. The cross-reference signal is mostly dependency bumps. Details in 2.3.
-- **The product story is a phone call from the app.** A QA lead registers the agent's phone number, describes the caller, presses Call, and reviews the call. The platform already has a server-side scenario runner and per-turn audio rendering. Missing: a phone target type, Twilio credentials, a media ingress, a long-lived call session, run-level audio and latency, and above all the ability to dial a number outside your own Twilio account (scenario 762). Section 4.
+- **The product story is a phone call from the app, and v1 is the tester's own voice.** A QA lead types the agent's number, presses Call, talks through the browser mic, and gets the call back as a run with recording, transcript and verdict. That path needs no user config and no work in the scenario SDK. The simulated-caller path is v2 and is blocked on scenario 762. Section 4.
 - **Two urgent items.** An ElevenLabs key leaks through the Gemini passthrough lane (security, PR open), and a reproducible voice test failure is blocking all JavaScript CI in the scenario repo.
 - **Feature completeness is strong at the edges, thin in the middle.** Scenario SDK voice testing and the trace/simulation audio players are mature. The gateway can mint realtime sessions but cannot relay or govern a call mid-flight. No audio evaluators, no SDK audio helpers, no voice in Langy.
 - **Biggest product gap for "voice through the app".** The SDK computes per-run recordings, timelines, and latency metrics for every voice scenario, and none of it reaches the platform. The UI only ever sees per-message audio parts.
@@ -177,103 +177,112 @@ Correction to a researcher claim: Python still JSON-stringifies structured conte
 
 ---
 
-## 4. User stories: black-box phone-call testing from the platform
+## 4. User stories: call the agent under test from the platform
 
 ### 4.1 The story in one paragraph
 
-A QA lead or AI product owner has a voice agent live on a phone number. They open LangWatch, register that number as a test target, describe the caller they want to simulate and what a good call looks like, and press Call. The platform dials the agent over Twilio, a simulated caller talks to it, and the finished call appears in the app with recording, transcript, verdict, latency and cost. No SDK, no local code, no tunnel.
+A QA lead has a voice agent live on a phone number. They open LangWatch, type the number, press Call, and talk to the agent through their browser mic. When they hang up, the call is in the app as a run: recording, transcript, and optionally a verdict against criteria they wrote. No SDK, no local code, no Twilio account, no tunnel. Later, the same screen can run a simulated caller instead of a human.
 
-### 4.2 What exists today, what is missing
+### 4.2 Three paths, kept apart
+
+The word "voice test" hides three different pipelines. Only one is cheap.
+
+| Path | Who talks to the agent | What the platform needs | Blocked on |
+|---|---|---|---|
+| **Live** (v1) | The tester, through the browser mic | A LangWatch-owned Twilio number, a browser softphone token, a TwiML bridge that dials the target number with recording on, a recording webhook, STT on the recording, a run record | Nothing outside the platform. Twilio browser calling and call recording are standard Twilio features. |
+| **Simulated** (v2) | A synthetic caller: persona text, TTS or a realtime model | Everything the SDK Twilio adapter has today, hosted server-side: media-stream ingress, long-lived call session, dial to an external number | https://github.com/langwatch/scenario/issues/762 (A-leg media stream), no `phone` target type, no media ingress, no long-lived runner |
+| **Upload** (later) | Nobody, the call already happened | Attach a recording, transcribe, judge | https://github.com/langwatch/langwatch/issues/6283 (file attach in authoring) |
+
+Why Live is cheap: bridging a browser call to a phone number is a Twilio `<Dial>` with `record` set. Audio never passes through LangWatch during the call. Twilio posts the recording URL when the call ends. The gateway already exposes `POST /v1/audio/transcriptions`, and the run UI already renders audio parts, transcript, verdict and criteria. The missing pieces are a Twilio number owned by LangWatch, a token endpoint, one TwiML handler, one webhook, and a page.
+
+Why Simulated is not: the caller's audio has to be generated and streamed in real time from LangWatch's side, which is the media-stream topology the SDK only supports against numbers in your own Twilio account.
+
+### 4.3 What exists today for the Live path
 
 | Building block | Status | Evidence |
 |---|---|---|
-| Server-side scenario runner in the platform | Exists | `platform/app/src/server/scenarios/execution/execution-pool.ts`. Event-driven queue, child processes, concurrency 3 per pod. |
-| Target types the runner can drive | Exists, no voice | `platform/app/src/server/scenarios/simulation-target.ts:11-14`: `prompt`, `http`, `code`, `workflow`, `connected`. No `phone` or `voice`. |
-| SDK Twilio adapter placing a real call | Partial | `python/scenario/voice/adapters/twilio.py:66-90` calls Twilio REST `calls.create`, but attaches media by rewriting the callee's webhook, so the callee must be a number in your own Twilio account. |
-| Dialing an arbitrary external number (the agent's real line) | Absent | https://github.com/langwatch/scenario/issues/762. Needs A-leg `<Connect><Stream>` on the originated leg. Pulled back to backlog, no written plan, nine named safety gaps. |
-| Twilio credentials in the platform | Absent | No Twilio, SIP or telephony code anywhere in `platform/`, `services/`, `specs/`. Generic encrypted `ModelProvider.customKeys` already hosts ElevenLabs credentials and could hold Twilio SID and token. |
-| Public media-stream ingress | Absent | SDK needs `public_base_url` and spins up a cloudflared tunnel. Platform has no websocket ingress for Twilio media. |
-| Long-lived call session runner | Absent | Existing pool is short-lived batch child processes, not held call sessions with inbound webhooks. |
-| Review UI: per-turn audio, transcript, verdict, criteria | Exists | `MediaPart.tsx`, `RunCriteriaChip.tsx`, `CriteriaDetails.tsx`. |
-| Review UI: whole-call recording, timeline, latency, interruptions | Absent | SDK computes `ScenarioResult.audio`, `.timeline`, `.latency` (`scenario_executor.py:998-1030`) and never sends them (`scenario_executor.py:2088-2115`). `MetricsSummary.tsx` shows only run duration. |
-| Docs | Over-promise | `docs/agent-testing/voice-agents.mdx` advertises per-turn TTFB and p50/p95 latency. The app never receives it. |
+| Twilio anything in the platform | Absent | No Twilio, SIP or telephony code in `platform/`, `services/`, `specs/`. |
+| Credential store for a platform-owned Twilio account | Exists | Encrypted `ModelProvider.customKeys` already hosts ElevenLabs credentials. For v1 the account is LangWatch's, set by env, not per project. |
+| Transcription | Exists | Gateway `POST /v1/audio/transcriptions` (`services/aigateway/adapters/providers/bifrost_audio.go`, `elevenlabs.go`). |
+| Audio storage | Exists | Stored objects service, S3 and self-hosted backends. Self-hosted gaps in langwatch-saas 494, 796, 799 are not v1. |
+| Run record and review UI | Exists | Simulation runs render audio parts (`MediaPart.tsx`), transcript, verdict (`RunCriteriaChip.tsx`, `CriteriaDetails.tsx`). Whole-call player with seek is not there (langwatch 4627, 5582). |
+| Judge on a transcript | Exists | The scenario judge runs on messages. A recorded call becomes a two-role transcript after STT with diarization or two-channel recording. |
+| Browser softphone | Absent | No WebRTC client code in the app. Twilio's browser SDK needs a short-lived access token minted server-side. |
+| Target type `phone` | Absent | `platform/app/src/server/scenarios/simulation-target.ts:11-14` has `prompt`, `http`, `code`, `workflow`, `connected`. |
 
-### 4.3 Stories
+### 4.4 Stories
 
-Persona: **Maya, QA lead** for a company whose support agent answers a phone number. She does not write code. Secondary persona: **Dev, the agent's engineer**, who instruments the agent and reads traces.
+Persona: **Maya, QA lead**. She does not write code. Secondary: **Dev, the agent's engineer**.
 
-**P1. Register my agent's phone number as a test target.**
-As Maya, I want to add a phone number as a scenario target, so that every voice scenario in the project can be run against the live agent.
-Accept: new target type `phone` next to prompt, http, code, workflow, connected. Fields: number in E.164, label, country, allowed calling hours, optional IVR path. Number must be verified once (a call that reads a code, or an allowlist set by an admin) before it can be dialed.
-Requires: `SimulationTarget` type extension, destination allowlist (safety gap named in scenario 762).
+**V1, the Live path. Least config: a phone number.**
 
-**P2. Connect Twilio to my project.**
-As a project admin, I want to store Twilio account SID, auth token and the caller number LangWatch dials from, so that calls are placed from our own account and billed to us.
-Accept: stored encrypted in the same provider-credential store used for ElevenLabs. Test button places a call to the caller number itself. Option for a LangWatch-provided number on cloud so a trial user needs no Twilio account.
-Requires: Twilio entry in the provider credential model.
+**L1. Call my agent from the app and talk to it.**
+As Maya, I want to enter the agent's phone number, press Call, and talk to it through my browser mic, so that I can check a deployed agent by hand in under a minute.
+Accept: one page: number field in E.164, Call button, mic permission prompt, live status (dialing, ringing, connected, ended), Hang up button. Timer visible. Call ends automatically at a max duration. Works on LangWatch cloud with no setup beyond a project.
+Requires: LangWatch-owned Twilio number, token endpoint for the browser client, TwiML handler that dials the target with two-channel recording.
 
-**P3. Describe the caller and what a good call looks like.**
-As Maya, I want to author the simulated caller in the UI: who they are, what they want, how they speak (voice, pace, accent, background noise), and the pass criteria, so that the test reflects a real customer.
-Accept: reuses the existing scenario authoring form. Adds voice style, background noise preset and language. Criteria are judged on the transcript, with audio metrics as thresholds (see P6).
-Requires: voice style wiring (scenario 533, 862) exposed as UI fields.
+**L2. See the call as a run when I hang up.**
+As Maya, I want the finished call to appear in the simulations list as a run with the recording and a transcript split by speaker, so that I can review and share it.
+Accept: run appears within a minute of hang-up. Player for the whole recording. Transcript with two speakers labeled Tester and Agent. Duration, target number, who called. Playable in the same conversation view as SDK runs.
+Requires: recording webhook, STT through the gateway with two-channel input, run record with a new `phone` target type.
 
-**P4. Press Call and watch it happen.**
-As Maya, I want to press Call in the app and see the call progress live: dialing, ringing, answered, caller speaking, agent speaking, hung up, so that I know the test is working without waiting for the end.
-Accept: the platform originates the call from the caller number to the target number, attaches a media stream on the originated leg, and streams turn events into the existing simulation console. Hard stop at a max duration. Cancel button hangs up.
-Requires: A-leg `<Connect><Stream>` topology (scenario 762), a websocket media ingress on the platform with a public URL, a long-lived call session in the runner, and the realtime or composable simulated user running server-side.
+**L3. Judge the call against criteria I wrote.**
+As Maya, I want to write pass criteria before calling and get a verdict on the transcript after, so that manual calls produce the same evidence as automated scenarios.
+Accept: optional criteria textarea on the call page. Verdict and per-criterion chips as in SDK runs. No criteria, no verdict.
+Requires: run the existing judge on the STT transcript.
 
-**P5. Keep me safe from calling the wrong number or running up a bill.**
-As a project admin, I want destination allowlists, max call duration, per-call and per-day cost caps, calling-hours windows and a recorded consent line, so that a mistyped number or a runaway loop cannot cause harm.
-Accept: a call outside the allowlist or window is refused before dialing. Cost cap uses the audio pricing already in the spend rater. Every call logs who started it.
-Requires: the safety gaps enumerated in scenario 762 turned into platform policy. This is the story that decides whether the feature can ship.
+**L4. Tell me why the call did not connect.**
+As Maya, I want a plain reason when nothing happened: no answer, busy, invalid number, mic blocked, Twilio error, so that I fix it instead of guessing.
+Accept: distinct statuses on the run with the Twilio error code where present.
+Requires: mapping Twilio call status callbacks to run status.
 
-**P6. Review the call as one recording with the numbers that matter.**
-As Maya, I want to open the finished run and play the whole call as one recording with turn markers, read the transcript, see the verdict and criteria, and see time to first word, per-turn response latency, interruptions and silence gaps, so that I can tell wording problems from responsiveness problems.
-Accept: single player with seek. Per-turn table of latency. Verdict and criteria as today. Cost of the call.
-Requires: run-level audio, timeline and latency carried to the platform (new fields on run finished or a new event), plus the whole-call player (langwatch 4627, currently parked). Fixes seek (5582) and transcript truncation (5539) on the way.
+**V2, the Simulated path.**
 
-**P7. Get through the IVR menu first.**
-As Maya, I want the simulated caller to press keys or speak menu choices to reach the agent behind an IVR, so that I can test agents that sit behind a phone tree.
-Accept: IVR path defined on the target as a sequence of DTMF digits or spoken phrases with waits. DTMF events appear on the timeline.
-Requires: DTMF support already in the SDK (`dtmf_ivr` example, scenario 464 delivered) surfaced in the platform runner.
+**S1. Register the number as a target and run a scenario against it.**
+As Maya, I want the number saved as a `phone` target so that any scenario in the project can be run against it by a simulated caller.
+Requires: `SimulationTarget` extension, server-side Twilio adapter with media-stream ingress and a long-lived call session, and the external-dial fix in scenario 762. Voice style fields from scenario 533 and 862.
 
-**P8. Run a batch of callers and compare over time.**
-As Maya, I want to run a set of caller personas against the number on a schedule and see pass rate and latency trend per persona, so that I catch regressions after each agent deploy.
-Accept: reuses scenario sets and scheduling. Trend chart of pass rate and p50 latency per set. Concurrency cap per project so a batch cannot flood the agent's line.
-Requires: P4 and P6.
+**S2. Run a batch of callers on a schedule and trend it.**
+As Maya, I want a set of caller personas run after each agent deploy with pass rate and latency per persona.
+Requires: S1 plus run-level timeline and latency carried to the platform (today computed in the SDK and never sent, `scenario_executor.py:2088-2115`).
 
-**P9. Link the call to the agent's own trace.**
-As Dev, I want the call run to link to the trace my agent emitted for that call, so that I can jump from a failed criterion to the model calls and tool calls behind it.
-Accept: match by Twilio call SID when the agent is instrumented with LangWatch, else by caller number and time window. View Trace button on each turn, as already exists for SDK voice runs.
-Requires: SDK audio and realtime helpers (langwatch 3968, 3969, scenario 674) so the agent side emits call SID and audio.
+**S3. Get through an IVR menu first.**
+As Maya, I want the simulated caller to press keys to reach the agent behind a phone tree.
+Requires: S1, plus the SDK DTMF work in scenario 464.
 
-**P10. Tell me why the call failed to connect.**
-As Maya, I want a clear reason when the call did not happen: no answer, busy, voicemail, refused by allowlist, Twilio auth error, one-way audio, so that I fix the setup instead of guessing.
-Accept: failure reasons are distinct statuses on the run, with the Twilio error code where there is one.
-Requires: terminal-versus-transient error handling now being unified in scenario PR 872.
+**Cross-cutting, either path.**
 
-**P11. Bring my own Twilio on self-hosted.**
-As a self-hosted admin, I want the same flow to work with our own Twilio account and our own object store, with the platform exposing the media ingress URL itself, so that no tunnel or cloud dependency is needed.
-Accept: ingress URL derived from the platform's public base URL. Audio lands in S3 or Azure Blob. Clear error when no store is configured.
-Requires: langwatch-saas 494, 796, 799.
+**X1. Link the call to the agent's trace.**
+As Dev, I want the run to link to the trace my agent emitted for that call, matched by Twilio call SID or by caller number and time window.
+Requires: SDK audio and realtime helpers (langwatch 3968, 3969, scenario 674).
 
-### 4.4 Build order
+**X2. Play the whole call with turn markers and latency.**
+As Maya, I want one player with seek and per-turn response latency, so that I can tell wording problems from slowness.
+Requires: langwatch 4627 (parked), 5582 (seek), and for the Live path a per-turn split derived from the two-channel recording.
 
-1. **P2, P1, P5.** Credentials, target type, safety policy. Small, unblocks everything, and P5 decides whether the feature can ship at all.
-2. **P4 with an account-owned number only.** Reuse today's SDK topology to get the server-side call session, media ingress and live console working before the A-leg risk. Dogfood on our own Twilio numbers.
-3. **P6.** Run-level audio, timeline and latency to the platform. This also fixes the docs over-promise for SDK users and is worth doing even if the phone runner slips.
-4. **P4 external numbers.** Scenario 762 A-leg topology. Needs a written plan first.
-5. **P7, P10.** IVR and failure reasons.
-6. **P8, P9, P11.** Batches, trace linkage, self-hosted.
+### 4.5 Build order
 
-### 4.5 Secondary stories, kept for the backlog
+1. **L1.** Softphone page, token endpoint, TwiML bridge with two-channel recording, hang-up and max duration. Dogfood against our own demo agents.
+2. **L2.** Recording webhook, STT via the gateway, `phone` target type, run record, playback in the existing run view.
+3. **L3, L4.** Judge on transcript, connect-failure statuses. This is a complete v1.
+4. **X2.** Whole-call player. Also benefits SDK users.
+5. **S1.** Only after a written plan for scenario 762. Then S3, S2, X1.
+
+Dropped from the earlier draft: the standalone safety policy story (allowlists, cost caps, hours) is out of scope. The Live path has a human on the line and a max duration, which is enough for v1. The self-hosted bring-your-own-Twilio story is folded away: v1 runs on a LangWatch-owned number on cloud only.
+
+### 4.6 Open questions for the product owner
+
+- Which number does the agent see as caller ID? A LangWatch number means agents that whitelist callers will reject the test.
+- Two-channel recording gives clean speaker separation. Confirm the Twilio plan supports it.
+- Recording consent varies by country. v1 shows a consent notice on the call page. Confirm that is enough for the target markets.
+
+### 4.7 Secondary stories, kept for the backlog
 
 - Developer: one-line SDK helper to trace a live realtime call with audio stored out of band (langwatch 3968, 3969, scenario 674, 599).
 - Platform admin: cut a gateway realtime session off when budget runs out (ADR-097 relay, four gates unmet).
 - AI engineer: audio evaluators for transcription accuracy and silence gaps (langevals, absent).
 - TS developer: LiveKit, Vapi and WebRTC adapters and TS docs tabs (scenario 563, 566).
 - Lead: voice cost broken out per project (spend rater has the data).
-- New user: voice features listed in the product feature map.
 - Any user: talk to Langy. No groundwork, later.
 
 ## 5. Next actions
@@ -283,6 +292,7 @@ Requires: langwatch-saas 494, 796, 799.
 - Reviewer queue, in order: 7830, 872 (undraft), 907, 950, 973, 863, 851 (rebase). Section 2.5.
 - Human call on scenario 453 (Notion board) and langwatch 4157 (record the decision on the issue).
 - Add a `voice` label in `langwatch/langwatch` and `langwatch/scenario` so this survey does not need 23 search terms next time.
-- Write the plan for scenario 762 (Twilio A-leg to external numbers). It is the critical path for section 4 and has none.
-- Spec P6 (run-level audio, timeline, latency to the platform). Worth doing even if the phone runner slips, and it fixes the docs over-promise.
+- Answer the three questions in 4.6, then spec L1 and L2. Provision a LangWatch-owned Twilio number for cloud.
+- Write the plan for scenario 762 (Twilio A-leg to external numbers) before any v2 simulated-caller work.
+- Spec run-level audio, timeline and latency to the platform. Worth doing even if the phone runner slips, and it fixes the docs over-promise.
 - Fix the docs claim in `docs/agent-testing/voice-agents.mdx` that the app shows per-turn TTFB and p50/p95. It does not.
