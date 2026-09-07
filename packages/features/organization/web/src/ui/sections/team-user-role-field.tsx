@@ -58,6 +58,40 @@ export const TeamRoleSelectItemContent = ({ option }: { option: RoleOption }) =>
   </VStack>
 );
 
+/** The role picker's selected option, from the raw stored role value. */
+function resolveSelectedRole({
+  selectedRoleValue,
+  customRole,
+}: {
+  selectedRoleValue: TeamRoleValue;
+  customRole?: {
+    id: string;
+    name: string;
+    description: string | null;
+    permissions: string[];
+  };
+}): RoleOption {
+  const isMissingCustomRole =
+    selectedRoleValue === TeamUserRole.CUSTOM || selectedRoleValue === MISSING_CUSTOM_ROLE_VALUE;
+  if (isMissingCustomRole) {
+    return {
+      label: "Missing Custom Role",
+      value: MISSING_CUSTOM_ROLE_VALUE,
+      description: "This member references a deleted or unavailable custom role",
+    };
+  }
+  if (selectedRoleValue.startsWith("custom:")) {
+    return {
+      label: customRole?.name ?? "Custom Role",
+      value: selectedRoleValue,
+      description: customRole?.description ?? `${customRole?.permissions.length ?? 0} permissions`,
+      isCustom: true,
+      customRoleId: selectedRoleValue.replace("custom:", ""),
+    };
+  }
+  return teamRolesOptions[selectedRoleValue as Exclude<TeamUserRole, "CUSTOM">];
+}
+
 export const TeamUserRoleField = ({
   currentRole,
   organizationId,
@@ -82,23 +116,7 @@ export const TeamUserRoleField = ({
     (value as TeamRoleValue | undefined) ??
     (currentRole === TeamUserRole.CUSTOM && customRole ? `custom:${customRole.id}` : currentRole);
 
-  const selectedRole: RoleOption =
-    selectedRoleValue === TeamUserRole.CUSTOM || selectedRoleValue === MISSING_CUSTOM_ROLE_VALUE
-      ? {
-          label: "Missing Custom Role",
-          value: MISSING_CUSTOM_ROLE_VALUE,
-          description: "This member references a deleted or unavailable custom role",
-        }
-      : selectedRoleValue.startsWith("custom:")
-        ? {
-            label: customRole?.name ?? "Custom Role",
-            value: selectedRoleValue,
-            description:
-              customRole?.description ?? `${customRole?.permissions.length ?? 0} permissions`,
-            isCustom: true,
-            customRoleId: selectedRoleValue.replace("custom:", ""),
-          }
-        : teamRolesOptions[selectedRoleValue as Exclude<TeamUserRole, "CUSTOM">];
+  const selectedRole: RoleOption = resolveSelectedRole({ selectedRoleValue, customRole });
 
   return (
     <VStack align="start">

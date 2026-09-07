@@ -15,12 +15,9 @@ export function extractErrorMessages(error: unknown): string[] {
     if (!obj || typeof obj !== "object") return;
 
     // Handle single field error
-    if (
-      obj &&
-      typeof obj === "object" &&
-      "message" in obj &&
-      typeof (obj as { message?: unknown }).message === "string"
-    ) {
+    const hasStringMessage =
+      "message" in obj && typeof (obj as { message?: unknown }).message === "string";
+    if (hasStringMessage) {
       messages.push((obj as { message: string }).message);
       return;
     }

@@ -161,7 +161,8 @@ function collectSources(root: string): string[] {
       found.push(...collectSources(full));
       continue;
     }
-    if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) found.push(full);
+    const isSourceFile = entry.name.endsWith(".ts") || entry.name.endsWith(".tsx");
+    if (isSourceFile) found.push(full);
   }
   return found;
 }

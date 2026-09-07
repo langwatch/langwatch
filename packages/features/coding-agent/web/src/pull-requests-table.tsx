@@ -439,11 +439,11 @@ function matchesPullRequestSearch({
   if (needle === "") return true;
 
   const digits = needle.startsWith("#") ? needle.slice(1) : needle;
-  if (
+  const isNumberMatch =
     /^\d+$/.test(digits) &&
     row.pullRequest !== null &&
-    String(row.pullRequest.number).includes(digits)
-  ) {
+    String(row.pullRequest.number).includes(digits);
+  if (isNumberMatch) {
     return true;
   }
 

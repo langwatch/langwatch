@@ -40,7 +40,8 @@ export function Link({ href, isExternal, children, onClick, ...props }: AppLinkP
         if (event.defaultPrevented) return;
         // Every modified click stays the browser's: a new tab, a new window and
         // a download are all things the reader asked the BROWSER for.
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const isModifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+        if (isModifiedClick) return;
         if (event.button !== 0) return;
         event.preventDefault();
         host.navigate(href ?? "");

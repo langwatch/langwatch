@@ -5,12 +5,12 @@ export function toolResultBodyToString(content: unknown): string {
     return content
       .map((item) => {
         if (typeof item === "string") return item;
-        if (
-          item &&
+        const hasTextField =
+          !!item &&
           typeof item === "object" &&
           "text" in item &&
-          typeof (item as { text?: unknown }).text === "string"
-        ) {
+          typeof (item as { text?: unknown }).text === "string";
+        if (hasTextField) {
           return (item as { text: string }).text;
         }
         try {

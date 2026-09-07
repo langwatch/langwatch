@@ -198,6 +198,11 @@ function AnnotationCommentEditorSkeleton({ actor }: { actor: ReactNode }) {
   );
 }
 
+/** How a selected score value reads on the trigger button. */
+function valueDisplay(value: string | string[]): string {
+  return Array.isArray(value) ? value.join(", ") : value.toString();
+}
+
 function AnnotationCommentScoreBlock({
   scoreType,
   value,
@@ -222,11 +227,13 @@ function AnnotationCommentScoreBlock({
     if (value) setTemporaryValue(value);
   }, [value]);
 
+  const triggerLabel = value ? valueDisplay(value) : scoreType.name;
+
   return (
     <Popover.Root open={open} onOpenChange={(event) => setOpen(event.open)}>
       <Popover.Trigger asChild>
         <Button size="xs" variant="outline">
-          {value ? (Array.isArray(value) ? value.join(", ") : value.toString()) : scoreType.name}
+          {triggerLabel}
           <ChevronDown size={16} />
         </Button>
       </Popover.Trigger>

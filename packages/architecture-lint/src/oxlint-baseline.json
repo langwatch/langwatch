@@ -4970,34 +4970,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/annotation/web/src/model/annotation-export.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/annotation/web/src/model/annotation-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/annotation/web/src/model/annotation-row.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/annotation/web/src/screens/annotation-scores/annotation-score-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/annotation/web/src/ui/blocks/annotation-score-fields.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/annotation/web/src/ui/elements/annotation-hover-chip.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/annotation/web/src/ui/sections/send-to-queue-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
@@ -5010,55 +4982,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/api-key/web/src/model/__tests__/api-key-scope-filter.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/api-key/web/src/model/api-key-permissions.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/api-key/web/src/model/api-key-snippets.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/api-key/web/src/ui/sections/__tests__/token-created-snippets.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/api-key/web/src/ui/sections/edit-api-key-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/auth/server/src/transport/api-rest/auth.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/behavior/auth-client.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/behavior/use-passkey-autofill.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/model/castle-snake.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/screens/auth/reset-password.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/ui/elements/form-error-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/ui/sections/credential-sign-in-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/auth/web/src/ui/sections/identifier-step-form.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -5174,19 +5098,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/coding-agent/web/src/pull-requests-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/web/src/session-filters.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/coding-agent/web/src/short-date.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/web/src/trace/context-health.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5206,19 +5118,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/coding-agent/web/src/trace/terminal-tool-spans.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/coding-agent/web/src/trace/terminal-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/web/src/trace/token-timeline.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/coding-agent/web/src/trace/tool-result-body.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5403,10 +5303,6 @@
     },
     {
       "key": "condition-shape|packages/features/feature-flag/server/src/services/feature-flag.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/feature-flag/web/src/model/targeting-summary.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5614,51 +5510,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/monitor/web/src/ui/elements/monitor-link.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/behavior/use-command-bar-items.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/behavior/use-filtered-projects.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/behavior/use-navigation-shell-state.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/behavior/use-product-flags-by-organization.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/model/products.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/ui/elements/navigation-link.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/ui/sections/__tests__/navigation-shell.integration.test.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/ui/sections/shell-page-body.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/navigation/web/src/ui/sections/usage-indicator.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/notification/server/src/services/email-provider.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/onboarding/web/src/model/shared/build-mcp-config.ts",
       "measured": "2026-09-06"
     },
     {
@@ -5694,18 +5546,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/organization/web/src/model/audit-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/organization/web/src/ui/elements/form-error-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/organization/web/src/ui/sections/member-detail-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/presence/server/src/adapters/broadcast.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -5727,14 +5567,6 @@
     },
     {
       "key": "condition-shape|packages/features/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/project/web/src/ui/elements/app-link.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/project/web/src/ui/elements/form-error-display.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6031,22 +5863,6 @@
     },
     {
       "key": "condition-shape|packages/features/user/server/src/transport/api-trpc/user.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/user/web/src/model/handled-error.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/user/web/src/ui/sections/devices-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/user/web/src/ui/sections/model-provider-tile.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6698,55 +6514,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/annotation/web/src/ui/blocks/annotation-comment-editor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/annotation/web/src/ui/blocks/annotation-score-editor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/annotation/web/src/ui/blocks/annotation-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/annotation/web/src/ui/elements/annotation-queue-filter.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/annotation/web/src/ui/sections/annotation-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "nested-ternary|packages/features/api-key/server/src/services/api-key-grant-policy.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/api-key/web/src/ui/sections/edit-api-key-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/auth/web/src/behavior/auth-client.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/auth/web/src/model/read-handled-error.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/auth/web/src/screens/auth/sign-in-error.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/auth/web/src/screens/auth/signup.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/auth/web/src/ui/sections/sign-up-credential-form.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6854,23 +6626,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/coding-agent/web/src/pull-request-detail-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/coding-agent/web/src/trace/session-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/coding-agent/web/src/trace/terminal-diff.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/coding-agent/web/src/trace/terminal-patch.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/coding-agent/web/src/trace/terminal-session.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7210,10 +6966,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/navigation/web/src/ui/sections/command-palette.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/notification/web/src/screens/email-suppressions/email-suppressions.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -7255,22 +7007,6 @@
     },
     {
       "key": "nested-ternary|packages/features/organization/web/src/screens/organization/teams.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/organization/web/src/ui/sections/group-detail-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/organization/web/src/ui/sections/member-detail-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/organization/web/src/ui/sections/team-user-role-field.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/presence/web/src/presence-marker.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7410,10 +7146,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/share/web/src/share-links-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
       "measured": "2026-09-06"
     },
@@ -7507,30 +7239,6 @@
     },
     {
       "key": "nested-ternary|packages/features/user/server/src/transport/api-trpc/user.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/personal-sessions.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/project-pull-requests.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/project-sessions.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/ui/sections/devices-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/ui/sections/personal-otlp-endpoint-panel.tsx",
       "measured": "2026-09-06"
     },
     {

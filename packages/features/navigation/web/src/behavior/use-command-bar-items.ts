@@ -68,7 +68,8 @@ export function useCommandBarItems(
 
   // Create "Search in traces" item when query is long enough
   const searchInTracesItem = useMemo<ListItem | null>(() => {
-    if (!query.trim() || query.trim().length < MIN_SEARCH_QUERY_LENGTH) {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
       return null;
     }
     // Don't create invalid path when projectSlug is missing
@@ -89,7 +90,8 @@ export function useCommandBarItems(
 
   // Create "Search in docs" item when query is long enough
   const searchInDocsItem = useMemo<ListItem | null>(() => {
-    if (!query.trim() || query.trim().length < MIN_SEARCH_QUERY_LENGTH) {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
       return null;
     }
     return {

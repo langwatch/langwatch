@@ -30,11 +30,9 @@ export function ProjectSessionsScreen() {
       {/* The project is resolved before anything is claimed about it.
             Saying "no sessions" while the project is still loading states a
             fact that is not known to be true. */}
-      {!isResolved ? (
-        <Skeleton height="180px" borderRadius="md" />
-      ) : project ? (
-        <SessionsTable projectId={project.id} projectSlug={project.slug} />
-      ) : (
+      {!isResolved && <Skeleton height="180px" borderRadius="md" />}
+      {isResolved && project && <SessionsTable projectId={project.id} projectSlug={project.slug} />}
+      {isResolved && !project && (
         <Text fontSize="sm" color="fg.muted">
           No sessions yet
         </Text>

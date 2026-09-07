@@ -117,6 +117,81 @@ export default function Error() {
   );
 }
 
+/** The alert body for one sign-in error code. */
+function SignInErrorDescription({
+  error,
+  callbackUrl,
+}: {
+  error: string;
+  callbackUrl: string | undefined;
+}) {
+  if (error === "OAuthAccountNotLinked") {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            This email is already registered with a different sign-in method. To get back in, sign
+            out completely and sign in again using the method you used originally.
+            <br />
+            <br />
+            If your organization uses single sign-on, enter your work email and choose your company
+            login.
+          </Text>
+          <Button asChild marginTop={4} color="white">
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
+  if (error === "DIFFERENT_EMAIL_NOT_ALLOWED") {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            You cannot link an account with a different email address. Please use the same email
+            address as your current account.
+          </Text>
+          <Button asChild marginTop={4} color="white">
+            <Link href="/settings/authentication">Back to Settings</Link>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
+  if (error === "SSO_PROVIDER_NOT_ALLOWED") {
+    return (
+      <Alert.Description>
+        <VStack gap={1} align="start">
+          <Text>
+            Your organization requires single sign-on. Sign out and sign in again by entering your
+            company email address, then choose your organization's login.
+          </Text>
+          <Button asChild marginTop={4} color="white">
+            <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
+          </Button>
+        </VStack>
+      </Alert.Description>
+    );
+  }
+
+  return (
+    <Alert.Description>
+      Redirecting back to sign in, please try again...
+      <br />
+      <Button asChild marginTop={4} color="white">
+        <Link
+          href={`/auth/signin${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+        >
+          Try Sign In Again
+        </Link>
+      </Button>
+    </Alert.Description>
+  );
+}
+
 export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
@@ -138,62 +213,7 @@ export function SignInError({ error: rawError }: { error: string }) {
             <Alert.Indicator />
             <Alert.Content gap={4}>
               <Alert.Title fontWeight="bold">{errorTitle(error)}</Alert.Title>
-              {error === "OAuthAccountNotLinked" ? (
-                <Alert.Description>
-                  <VStack gap={1} align="start">
-                    <Text>
-                      This email is already registered with a different sign-in method. To get back
-                      in, sign out completely and sign in again using the method you used
-                      originally.
-                      <br />
-                      <br />
-                      If your organization uses single sign-on, enter your work email and choose
-                      your company login.
-                    </Text>
-                    <Button asChild marginTop={4} color="white">
-                      <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-                    </Button>
-                  </VStack>
-                </Alert.Description>
-              ) : error === "DIFFERENT_EMAIL_NOT_ALLOWED" ? (
-                <Alert.Description>
-                  <VStack gap={1} align="start">
-                    <Text>
-                      You cannot link an account with a different email address. Please use the same
-                      email address as your current account.
-                    </Text>
-                    <Button asChild marginTop={4} color="white">
-                      <Link href="/settings/authentication">Back to Settings</Link>
-                    </Button>
-                  </VStack>
-                </Alert.Description>
-              ) : error === "SSO_PROVIDER_NOT_ALLOWED" ? (
-                <Alert.Description>
-                  <VStack gap={1} align="start">
-                    <Text>
-                      Your organization requires single sign-on. Sign out and sign in again by
-                      entering your company email address, then choose your organization's login.
-                    </Text>
-                    <Button asChild marginTop={4} color="white">
-                      <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
-                    </Button>
-                  </VStack>
-                </Alert.Description>
-              ) : (
-                <Alert.Description>
-                  Redirecting back to sign in, please try again...
-                  <br />
-                  <Button asChild marginTop={4} color="white">
-                    <Link
-                      href={`/auth/signin${
-                        callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
-                      }`}
-                    >
-                      Try Sign In Again
-                    </Link>
-                  </Button>
-                </Alert.Description>
-              )}
+              <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
             </Alert.Content>
           </Alert.Root>
         </Card.Body>

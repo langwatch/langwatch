@@ -37,7 +37,8 @@ export function MonitorLink({ href, children, onClick, ...props }: MonitorLinkPr
         if (event.defaultPrevented) return;
         // A modified click is the reader asking the BROWSER for a new tab or
         // window; taking it over would be taking that away.
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const isModifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+        if (isModifiedClick) return;
         if (event.button !== 0) return;
         event.preventDefault();
         host.navigate(href);

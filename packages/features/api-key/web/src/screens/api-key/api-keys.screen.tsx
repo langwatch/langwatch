@@ -345,8 +345,9 @@ export default function ApiKeysScreen() {
   }, [projectApiKey, scope.projectId, scope.teamId, scopeFilter, hierarchy]);
 
   const getStatus = (key: ApiKeyRow) => {
-    if (key.expiresAt && toEpochMs(key.expiresAt) < nowInstant().epochMilliseconds)
-      return "Expired";
+    const expiresAtMs = key.expiresAt ? toEpochMs(key.expiresAt) : null;
+    const isExpired = expiresAtMs !== null && expiresAtMs < nowInstant().epochMilliseconds;
+    if (isExpired) return "Expired";
     return "Active";
   };
 

@@ -27,6 +27,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** The candidate's error code, from whichever of the two fields the server used. */
+function errorCandidateCode(candidate: Record<string, unknown>): string | null {
+  if (typeof candidate.code === "string") return candidate.code;
+  if (typeof candidate.kind === "string") return candidate.kind;
+  return null;
+}
+
 /** More than this above a form is a document, not remediation. */
 const MAX_TIPS = 4;
 
@@ -66,12 +73,7 @@ export function readHandledError(error: unknown): AuthHandledError | null {
   const candidate = (error as { data?: { error?: unknown } } | null)?.data?.error;
   if (!isRecord(candidate)) return null;
 
-  const code =
-    typeof candidate.code === "string"
-      ? candidate.code
-      : typeof candidate.kind === "string"
-        ? candidate.kind
-        : null;
+  const code = errorCandidateCode(candidate);
   if (code === null) return null;
   if (typeof candidate.httpStatus !== "number") return null;
 

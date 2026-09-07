@@ -35,11 +35,11 @@ export function PersonalSessionsScreen() {
             `ready` alone still leaves a window with no project id yet. Saying
             "no sessions" in that window states a fact that is not known to be
             true. */}
-        {!ready || !isPersonalProjectResolved ? (
-          <Skeleton height="180px" borderRadius="md" />
-        ) : personalProjectId ? (
+        {(!ready || !isPersonalProjectResolved) && <Skeleton height="180px" borderRadius="md" />}
+        {ready && isPersonalProjectResolved && personalProjectId && (
           <SessionsTable projectId={personalProjectId} projectSlug={personalProjectSlug} />
-        ) : (
+        )}
+        {ready && isPersonalProjectResolved && !personalProjectId && (
           <Text fontSize="sm" color="fg.muted">
             No sessions yet
           </Text>

@@ -71,12 +71,12 @@ export function findCacheRebuilds(entries: TranscriptEntry[]): CacheRebuildEvent
     callIndex++;
     const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
 
-    if (
+    const rebuiltAfterCompaction =
       callIndex > 0 &&
       entry.cacheCreationTokens >= REBUILD_MIN_TOKENS &&
       previousContextTokens > 0 &&
-      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD
-    ) {
+      entry.cacheCreationTokens / previousContextTokens >= REBUILD_RATIO_THRESHOLD;
+    if (rebuiltAfterCompaction) {
       events.push({
         callIndex,
         atMs: entry.atMs,

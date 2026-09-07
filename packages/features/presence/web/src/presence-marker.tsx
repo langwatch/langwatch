@@ -162,13 +162,14 @@ function computeInitials(name: string): string {
   return (first + second).toUpperCase() || "?";
 }
 
+function tooltipHead(names: string[]): string {
+  if (names.length === 1) return `${names[0]} is here`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are here`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more are here`;
+}
+
 function formatTooltip(peers: PresenceSession[], suffix: string | undefined): string {
   const names = peers.map(presenceDisplayName);
-  const head =
-    names.length === 1
-      ? `${names[0]} is here`
-      : names.length === 2
-        ? `${names[0]} and ${names[1]} are here`
-        : `${names[0]}, ${names[1]} and ${names.length - 2} more are here`;
+  const head = tooltipHead(names);
   return suffix ? `${head} · ${suffix}` : head;
 }

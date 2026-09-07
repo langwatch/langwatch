@@ -66,7 +66,8 @@ interface IssuedKey {
  */
 function humanizeZodMessage(raw: string): string {
   const trimmed = raw.trim();
-  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return raw;
+  const looksLikeJson = trimmed.startsWith("[") || trimmed.startsWith("{");
+  if (!looksLikeJson) return raw;
   try {
     const parsed = JSON.parse(trimmed);
     const issues = Array.isArray(parsed) ? parsed : [parsed];

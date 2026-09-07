@@ -165,7 +165,8 @@ function ageRanges(rules: FeatureFlagRules): DecidedRange[] {
     const date = rule.match.organizationCreatedAfter;
     // An unreadable date matches nobody in the resolver, so it decides
     // nothing here either and does not get to bound a range.
-    if (!date || Object.keys(rule.match).length > 1 || !readable(date)) {
+    const isBoundingDate = !!date && Object.keys(rule.match).length <= 1 && readable(date);
+    if (!isBoundingDate) {
       return [];
     }
     return [{ date, enabled: rule.enabled }];

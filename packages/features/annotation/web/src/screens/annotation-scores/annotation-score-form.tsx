@@ -121,7 +121,8 @@ export const AnnotationScoreForm = ({
   const [defaultCheckboxOption, setDefaultCheckboxOption] = useState<string[]>([]);
 
   const onSubmit = (data: FormData) => {
-    if (scoreTypeOptions.every((option) => !option.trim())) {
+    const hasNoOption = scoreTypeOptions.every((option) => !option.trim());
+    if (hasNoOption) {
       host.failed({
         error: new Error("An annotation score needs at least one option"),
         fallbackTitle: annotationScoreId

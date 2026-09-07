@@ -66,13 +66,13 @@ export function DevicesPanel() {
         />
       )}
 
-      {!ready || sessionsQuery.isLoading ? (
+      {(!ready || sessionsQuery.isLoading) && (
         <Text fontSize="sm" color="fg.muted" paddingY={8}>
           Loading devices…
         </Text>
-      ) : sessions.length === 0 ? (
-        <NoDevicesState />
-      ) : (
+      )}
+      {ready && !sessionsQuery.isLoading && sessions.length === 0 && <NoDevicesState />}
+      {ready && !sessionsQuery.isLoading && sessions.length > 0 && (
         <VStack align="stretch" gap={2}>
           {sessions.map((session) => (
             <DeviceRow
@@ -306,9 +306,11 @@ const fmtAbsolute = (ms: number | null | undefined): string =>
 const platformIcon = (platform: string | null) => {
   if (!platform) return Server;
   const p = platform.toLowerCase();
-  if (p.includes("darwin") || p.includes("mac")) return Laptop;
+  const isMac = p.includes("darwin") || p.includes("mac");
+  if (isMac) return Laptop;
   if (p.includes("linux")) return Monitor;
   if (p.includes("win")) return Laptop;
-  if (p.includes("ios") || p.includes("android")) return Smartphone;
+  const isMobile = p.includes("ios") || p.includes("android");
+  if (isMobile) return Smartphone;
   return Server;
 };

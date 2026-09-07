@@ -82,9 +82,19 @@ function newLineNumbers(hunk: PatchHunk): Array<number | null> {
   return numbers;
 }
 
+/** The row background and text color for a patch line, by its +/- prefix. */
+function patchLineVisuals(line: string): { bg: string | undefined; fg: string } {
+  if (line.startsWith("+")) {
+    return { bg: DIFF_TOKENS.addBg, fg: DIFF_TOKENS.addFg };
+  }
+  if (line.startsWith("-")) {
+    return { bg: DIFF_TOKENS.removeBg, fg: DIFF_TOKENS.removeFg };
+  }
+  return { bg: undefined, fg: TERMINAL_TOKENS.screenFg };
+}
+
 function PatchLine({ line, lineNumber }: { line: string; lineNumber: number | null }) {
-  const isAdd = line.startsWith("+");
-  const isRemove = line.startsWith("-");
+  const { bg, fg } = patchLineVisuals(line);
 
   return (
     <HStack
@@ -94,7 +104,7 @@ function PatchLine({ line, lineNumber }: { line: string; lineNumber: number | nu
       minWidth="full"
       // Full-width, saturated — the same block a real diff pager draws, not
       // a subtle tint clinging to the text.
-      bg={isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined}
+      bg={bg}
     >
       <Text
         {...CELL}
@@ -107,14 +117,7 @@ function PatchLine({ line, lineNumber }: { line: string; lineNumber: number | nu
       >
         {lineNumber ?? ""}
       </Text>
-      <Text
-        {...CELL}
-        whiteSpace="pre"
-        flex={1}
-        color={
-          isAdd ? DIFF_TOKENS.addFg : isRemove ? DIFF_TOKENS.removeFg : TERMINAL_TOKENS.screenFg
-        }
-      >
+      <Text {...CELL} whiteSpace="pre" flex={1} color={fg}>
         {line}
       </Text>
     </HStack>

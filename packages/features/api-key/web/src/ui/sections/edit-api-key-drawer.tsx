@@ -53,6 +53,19 @@ type MyBindings = {
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
 
+/** The most permissive selection a category's availability allows. */
+function defaultPermissionSelection({
+  canRead,
+  canWrite,
+}: {
+  canRead: boolean;
+  canWrite: boolean;
+}): PermissionSelection {
+  if (canWrite) return "write";
+  if (canRead) return "read";
+  return "none";
+}
+
 export function EditApiKeyDrawer({
   apiKey,
   isUpdating,
@@ -170,17 +183,18 @@ export function EditApiKeyDrawer({
 
   const handlePermissionModeChange = (mode: "all" | "restricted") => {
     setPermissionMode(mode);
-    if (
-      mode === "restricted" &&
-      Object.values(effectiveCategorySelections).every((v) => !v || v === "none")
-    ) {
+    const noCategorySelected = Object.values(effectiveCategorySelections).every(
+      (v) => !v || v === "none",
+    );
+    const shouldPreselectAll = mode === "restricted" && noCategorySelected;
+    if (shouldPreselectAll) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
         const { canRead, canWrite } = categoryAccessAvailability({
           category: cat,
           userPermissions,
         });
-        allSelected[cat.key] = canWrite ? "write" : canRead ? "read" : "none";
+        allSelected[cat.key] = defaultPermissionSelection({ canRead, canWrite });
       }
       setCategorySelections(allSelected);
     }

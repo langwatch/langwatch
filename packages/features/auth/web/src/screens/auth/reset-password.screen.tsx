@@ -51,7 +51,8 @@ function describeResetRefusal(error: {
 }): { message: string; linkIsDead: boolean } {
   const code = (error.code ?? "").toUpperCase();
   const message = (error.message ?? "").toLowerCase();
-  if (code.includes("TOKEN") || message.includes("token")) {
+  const namesTokenIssue = code.includes("TOKEN") || message.includes("token");
+  if (namesTokenIssue) {
     return { message: INVALID_LINK_MESSAGE, linkIsDead: true };
   }
   if (error.status === 429) {
@@ -60,7 +61,8 @@ function describeResetRefusal(error: {
       linkIsDead: false,
     };
   }
-  if (code.includes("PASSWORD") || message.includes("password")) {
+  const namesPasswordIssue = code.includes("PASSWORD") || message.includes("password");
+  if (namesPasswordIssue) {
     return {
       message: "That password was not accepted. Choose a different one.",
       linkIsDead: false,

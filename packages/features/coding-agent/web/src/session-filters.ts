@@ -28,10 +28,10 @@ export function matchesSessionSearch({
   if (needle === "") return true;
 
   const digits = needle.startsWith("#") ? needle.slice(1) : needle;
-  if (
+  const isNumberMatch =
     /^\d+$/.test(digits) &&
-    row.pullRequests.some((pullRequest) => String(pullRequest.number).includes(digits))
-  ) {
+    row.pullRequests.some((pullRequest) => String(pullRequest.number).includes(digits));
+  if (isNumberMatch) {
     return true;
   }
 

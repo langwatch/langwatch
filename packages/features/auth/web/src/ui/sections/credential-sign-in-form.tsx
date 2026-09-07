@@ -102,7 +102,8 @@ export function CredentialSignInForm({
     },
     onChange: () => {
       // Clearing only: typing can lift a rejection, never earn one.
-      if (!form.formState.errors.password) return;
+      const passwordError = form.formState.errors.password;
+      if (!passwordError) return;
       const parsed = credentialSchema.safeParse({
         password: form.getValues("password"),
       });

@@ -117,10 +117,10 @@ export function productFromPathname(pathname: string): ProductId | null {
     "/mcp",
     "/@project",
   ];
-  if (
+  const isNonProductPath =
     pathname === "/" ||
-    nonProductPrefixes.some((prefix) => isPathUnder({ pathname, base: prefix }))
-  ) {
+    nonProductPrefixes.some((prefix) => isPathUnder({ pathname, base: prefix }));
+  if (isNonProductPath) {
     return null;
   }
   // Everything else is a /:project page (including the next-router

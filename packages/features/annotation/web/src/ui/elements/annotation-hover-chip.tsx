@@ -127,7 +127,8 @@ function formatAnnotationTime(createdAt: TimeInput | null): string {
     return "";
   }
   const date = readableDate(createdAt);
-  if (Number.isNaN(date.getTime())) {
+  const dateIsInvalid = Number.isNaN(date.getTime());
+  if (dateIsInvalid) {
     return "";
   }
   return date.toLocaleString();

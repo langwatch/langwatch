@@ -53,12 +53,12 @@ export function queuedDestination({
     if (slug) return { label: "View queue", href: `/${projectSlug}/annotations/${slug}` };
   }
 
-  if (
+  const isOwnInbox =
     userIds.length === 1 &&
     queueIds.length === 0 &&
     !!sessionUserId &&
-    userIds[0] === sessionUserId
-  ) {
+    userIds[0] === sessionUserId;
+  if (isOwnInbox) {
     return { label: "View inbox", href: `/${projectSlug}/annotations/me` };
   }
 

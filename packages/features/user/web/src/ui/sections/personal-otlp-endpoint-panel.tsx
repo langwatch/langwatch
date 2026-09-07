@@ -6,6 +6,12 @@ import { usePersonalDeployment } from "../../behavior/personal-workspace-session
 
 const SECRET_MASK = "•".repeat(36);
 
+/** The API key field's display value: masked, revealed, or a placeholder. */
+function apiKeyDisplay({ apiKey, showSecret }: { apiKey: string; showSecret: boolean }): string {
+  if (!apiKey) return "—";
+  return showSecret ? apiKey : SECRET_MASK;
+}
+
 export function PersonalOtlpEndpointPanel({ apiKey }: { apiKey: string }) {
   const toaster = usePersonalToaster();
   const { appBaseUrl: baseHost } = usePersonalDeployment();
@@ -40,7 +46,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${showSecret ? apiKey : 
 
       <Row label="API key">
         <Text fontSize="sm" fontFamily="mono" wordBreak="break-all" flex={1}>
-          {apiKey ? (showSecret ? apiKey : SECRET_MASK) : "—"}
+          {apiKeyDisplay({ apiKey, showSecret })}
         </Text>
         <Button
           size="xs"

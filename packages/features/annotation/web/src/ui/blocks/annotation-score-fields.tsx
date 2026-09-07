@@ -26,7 +26,9 @@ const scoreOptionsSchema = z.array(scoreOptionSchema);
  * gave it changes nothing about where it lands.
  */
 export function ScoreFields({ state }: { state: AnnotationFormState }) {
-  if (!state.scores.data || state.scores.data.length === 0) return null;
+  const scores = state.scores.data;
+  const hasNoScores = !scores || scores.length === 0;
+  if (hasNoScores) return null;
   return (
     <VStack align="stretch" gap={1.5}>
       <Text
@@ -39,7 +41,7 @@ export function ScoreFields({ state }: { state: AnnotationFormState }) {
         Scores
       </Text>
       <HStack gap={1.5} wrap="wrap">
-        {state.scores.data.map((s) => {
+        {scores.map((s) => {
           const parsedOptions = scoreOptionsSchema.safeParse(s.options);
           const options: AnnotationScoreOption[] = parsedOptions.success ? parsedOptions.data : [];
           return (

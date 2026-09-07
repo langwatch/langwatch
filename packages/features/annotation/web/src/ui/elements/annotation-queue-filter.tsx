@@ -6,6 +6,21 @@ import { Menu } from "@langwatch/design-system/menu";
 /** A queue the reviewer can narrow the list to. */
 export type FilterableQueue = { id: string; name: string };
 
+/** How the current selection reads on the filter trigger. */
+function queueFilterLabel({
+  queues,
+  selected,
+}: {
+  queues: FilterableQueue[];
+  selected: Set<string>;
+}): string {
+  if (selected.size === 0) return "All";
+  if (selected.size === 1) {
+    return queues.find((queue) => selected.has(queue.id))?.name ?? "1 queue";
+  }
+  return `${selected.size} queues`;
+}
+
 /**
  * Which queues the inbox reads. The inbox pools every queue the reviewer
  * belongs to, so on a project with several of them the list is a mix nobody
@@ -27,12 +42,7 @@ export function AnnotationQueueFilter({
   if (queues.length === 0) return null;
 
   const selected = new Set(selectedQueueIds);
-  const label =
-    selected.size === 0
-      ? "All"
-      : selected.size === 1
-        ? (queues.find((queue) => selected.has(queue.id))?.name ?? "1 queue")
-        : `${selected.size} queues`;
+  const label = queueFilterLabel({ queues, selected });
 
   const toggle = (queueId: string) => {
     const next = new Set(selected);

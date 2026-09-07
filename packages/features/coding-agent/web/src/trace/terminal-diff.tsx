@@ -77,16 +77,24 @@ export const TerminalDiff = memo(function TerminalDiff({
   );
 });
 
+/** The gutter background, foreground color and sign for one diff line kind. */
+function diffRowVisuals(kind: DiffLine["kind"]): {
+  bg: string | undefined;
+  gutterColor: string;
+  sign: string;
+} {
+  if (kind === "add") {
+    return { bg: DIFF_TOKENS.addBg, gutterColor: DIFF_TOKENS.addFg, sign: "+" };
+  }
+  if (kind === "remove") {
+    return { bg: DIFF_TOKENS.removeBg, gutterColor: DIFF_TOKENS.removeFg, sign: "-" };
+  }
+  return { bg: undefined, gutterColor: TERMINAL_TOKENS.faint, sign: " " };
+}
+
 function DiffRow({ line }: { line: DiffLine }) {
   const isAdd = line.kind === "add";
-  const isRemove = line.kind === "remove";
-  const bg = isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined;
-  const gutterColor = isAdd
-    ? DIFF_TOKENS.addFg
-    : isRemove
-      ? DIFF_TOKENS.removeFg
-      : TERMINAL_TOKENS.faint;
-  const sign = isAdd ? "+" : isRemove ? "-" : " ";
+  const { bg, gutterColor, sign } = diffRowVisuals(line.kind);
   const lineNo = isAdd ? line.newLineNo : line.oldLineNo;
 
   return (
@@ -108,7 +116,7 @@ function DiffRow({ line }: { line: DiffLine }) {
       </Text>
       <Text
         as="span"
-        color={isAdd || isRemove ? gutterColor : TERMINAL_TOKENS.screenFg}
+        color={line.kind !== "context" ? gutterColor : TERMINAL_TOKENS.screenFg}
         whiteSpace="pre-wrap"
         wordBreak="break-word"
         flex={1}

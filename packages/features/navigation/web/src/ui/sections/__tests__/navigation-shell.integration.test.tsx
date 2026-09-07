@@ -363,7 +363,8 @@ describe("the product-switcher top bar", () => {
 
       // Enter alone opens it, which is the point of the highlight.
       fireEvent.keyDown(field, { key: "Enter", code: "Enter" });
-      if (navigateMock.mock.calls.length === 0) {
+      const navigateWasNotCalled = navigateMock.mock.calls.length === 0;
+      if (navigateWasNotCalled) {
         // Once two or more Menu/Combobox machines have opened earlier in the same jsdom
         // process, Ark's combobox can lag its own `aria-activedescendant` sync by a tick, so
         // `Enter` closes the popup without picking anything (unreproducible as an isolated run,

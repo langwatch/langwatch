@@ -63,12 +63,11 @@ export function useFilteredProjects(
           if (proj.slug === currentProjectSlug) continue;
 
           // Show all projects if searching category, or filter by name/org/team
-          if (
-            isSearchingCategory ||
+          const matchesQuery =
             proj.name.toLowerCase().includes(lowerQuery) ||
             org.name.toLowerCase().includes(lowerQuery) ||
-            team.name.toLowerCase().includes(lowerQuery)
-          ) {
+            team.name.toLowerCase().includes(lowerQuery);
+          if (isSearchingCategory || matchesQuery) {
             const orgTeam = team.name !== org.name ? `${org.name} / ${team.name}` : org.name;
             projects.push({ slug: proj.slug, name: proj.name, orgTeam });
           }

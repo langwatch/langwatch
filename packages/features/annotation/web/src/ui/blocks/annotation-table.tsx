@@ -57,6 +57,26 @@ export type AnnotationTableProps = {
   ) => ReactNode;
 };
 
+/** The header select-all checkbox's tri-state, from the row selection counts. */
+function headerCheckedState({
+  allRowsSelected,
+  someRowsSelected,
+}: {
+  allRowsSelected: boolean;
+  someRowsSelected: boolean;
+}): boolean | "indeterminate" {
+  if (allRowsSelected) return true;
+  if (someRowsSelected) return "indeterminate";
+  return false;
+}
+
+/** A checkbox's boolean-or-indeterminate state, as the string `aria-checked` wants. */
+function ariaCheckedValue(checked: boolean | "indeterminate"): "true" | "false" | "mixed" {
+  if (checked === true) return "true";
+  if (checked === false) return "false";
+  return "mixed";
+}
+
 export function AnnotationTable({
   rows,
   activeScoreTypes,
@@ -82,7 +102,7 @@ export function AnnotationTable({
             {rows.length > 0 && (
               <SelectCheckbox
                 ariaLabel="Select all on this page"
-                checked={allRowsSelected ? true : someRowsSelected ? "indeterminate" : false}
+                checked={headerCheckedState({ allRowsSelected, someRowsSelected })}
                 onToggle={() => onToggleAll(!allRowsSelected)}
               />
             )}
@@ -185,7 +205,7 @@ function SelectCheckbox({
       type="button"
       role="checkbox"
       aria-label={ariaLabel}
-      aria-checked={checked === true ? "true" : checked === false ? "false" : "mixed"}
+      aria-checked={ariaCheckedValue(checked)}
       display="flex"
       alignItems="center"
       justifyContent="center"

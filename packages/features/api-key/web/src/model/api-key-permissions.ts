@@ -306,7 +306,9 @@ export function bindingsToPermissionMode(apiKey: {
 }): "all" | "restricted" {
   const mode = apiKey.permissionMode as PermissionMode;
   if (mode === "readonly" || mode === "restricted") return "restricted";
-  if (apiKey.roleBindings.length === 1 && apiKey.roleBindings[0]!.role === "CUSTOM") {
+  const [onlyBinding] = apiKey.roleBindings;
+  const hasSingleCustomBinding = apiKey.roleBindings.length === 1 && onlyBinding?.role === "CUSTOM";
+  if (hasSingleCustomBinding) {
     return "restricted";
   }
   return "all";

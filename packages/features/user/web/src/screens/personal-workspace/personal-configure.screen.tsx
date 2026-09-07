@@ -85,6 +85,7 @@ export function PersonalConfigureScreen() {
     { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
   );
   const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
+  const personalWorkspaceApiKey = personalContextQuery.data?.workspace.project.apiKey;
 
   const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
     { projectId: personalProjectId ?? "" },
@@ -318,14 +319,12 @@ export function PersonalConfigureScreen() {
           </SectionCard>
         ) : null}
 
-        {personalContextQuery.data?.workspace.project.apiKey ? (
+        {personalWorkspaceApiKey ? (
           <SectionCard
             title="Personal OTLP Endpoint"
             description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
           >
-            <PersonalOtlpEndpointPanel
-              apiKey={personalContextQuery.data.workspace.project.apiKey}
-            />
+            <PersonalOtlpEndpointPanel apiKey={personalWorkspaceApiKey} />
           </SectionCard>
         ) : null}
 
@@ -357,9 +356,10 @@ export function PersonalConfigureScreen() {
 
         {ctx.budgetOverview.gatewayAccess && (
           <SectionCard title="Budgets that apply to you">
-            {ctx.budgetOverview.budgets.length > 0 ? (
+            {ctx.budgetOverview.budgets.length > 0 && (
               <BudgetOverviewList items={ctx.budgetOverview.budgets} />
-            ) : ctx.budgetOverview.isResolved ? (
+            )}
+            {ctx.budgetOverview.budgets.length === 0 && ctx.budgetOverview.isResolved && (
               <VStack align="start" gap={1}>
                 <Text fontSize="sm" color="fg.muted">
                   No budgets apply to your usage yet.
@@ -368,7 +368,7 @@ export function PersonalConfigureScreen() {
                   If you'd like one, ask your admin.
                 </Text>
               </VStack>
-            ) : null}
+            )}
           </SectionCard>
         )}
       </VStack>
@@ -426,6 +426,13 @@ function Field({ label, value, hint }: { label: string; value: React.ReactNode; 
   );
 }
 
+/** The device icon for an API key's recorded operating system. */
+function apiKeyOsIcon(os: string): typeof Laptop {
+  if (os === "macOS" || os === "Windows") return Laptop;
+  if (os === "Linux") return Monitor;
+  return Server;
+}
+
 function ApiKeyRow({
   apiKey,
   isPendingRevoke,
@@ -441,12 +448,7 @@ function ApiKeyRow({
   onCancelRevoke: () => void;
   onConfirmRevoke: () => void;
 }) {
-  const Icon =
-    apiKey.os === "macOS" || apiKey.os === "Windows"
-      ? Laptop
-      : apiKey.os === "Linux"
-        ? Monitor
-        : Server;
+  const Icon = apiKeyOsIcon(apiKey.os);
 
   return (
     <VStack

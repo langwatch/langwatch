@@ -79,12 +79,12 @@ export function indexToolSpansBySpanId({
   // A failing tool body shows up on the `tool.execution` child, not the parent.
   const failedParents = new Set<string>();
   for (const span of spans) {
-    if (
-      span.name === TOOL_EXECUTION_SPAN &&
-      span.parentSpanId !== null &&
-      (span.status === "error" || span.params?.success === "false")
-    ) {
-      failedParents.add(span.parentSpanId);
+    const { parentSpanId } = span;
+    const failed = span.status === "error" || span.params?.success === "false";
+    const isFailedToolExecution =
+      span.name === TOOL_EXECUTION_SPAN && parentSpanId !== null && failed;
+    if (isFailedToolExecution && parentSpanId !== null) {
+      failedParents.add(parentSpanId);
     }
   }
 
@@ -154,7 +154,8 @@ export function parsePatchHunks(diff: string | null): PatchHunk[] | null {
     if (typeof raw !== "object" || raw === null) return null;
     const hunk = raw as Record<string, unknown>;
     const lines = hunk.lines;
-    if (!Array.isArray(lines) || !lines.every((l) => typeof l === "string")) {
+    const linesAreStrings = Array.isArray(lines) && lines.every((l) => typeof l === "string");
+    if (!linesAreStrings) {
       return null;
     }
     hunks.push({

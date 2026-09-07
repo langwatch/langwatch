@@ -9,7 +9,10 @@ import {
   type NavigationProject,
   type NavigationUser,
 } from "../model/navigation-host.ts";
-import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "../model/shell-layout.ts";
+import {
+  SHELL_SIDEBAR_WIDTH_COMPACT,
+  SHELL_SIDEBAR_WIDTH_EXPANDED,
+} from "../model/shell-layout.ts";
 import {
   projectNavItemAt,
   toProjectRoutePattern,
@@ -61,7 +64,8 @@ export function useNavigationShellState({
   const team = host.team();
   const pathname = host.pathname();
 
-  if (host.projectParam() !== void 0 && !host.isLoading() && !project) {
+  const hasUnresolvedProjectParam = host.projectParam() !== void 0 && !host.isLoading() && !project;
+  if (hasUnresolvedProjectParam) {
     return { status: "not-found" };
   }
 
