@@ -60,6 +60,7 @@ function buildHarness({
     { identifier: string; expires: Date; spentUntil: Date | null }
   >();
   let sentToken = "";
+  let sentEmail = "";
   let tokenSequence = 0;
 
   const tokens: SignUpVerificationTokenStore = {
@@ -73,6 +74,28 @@ function buildHarness({
       }
       row.spentUntil = keepSpentUntil;
       return { identifier: row.identifier };
+    },
+    claimExpected: async ({ token, identifier, now: claimedAt }) => {
+      const row = issued.get(token);
+      if (
+        !row ||
+        row.spentUntil !== null ||
+        row.expires <= claimedAt ||
+        row.identifier !== identifier
+      ) {
+        return false;
+      }
+      issued.delete(token);
+      return true;
+    },
+    hasExpected: async ({ token, identifier, now: checkedAt }) => {
+      const row = issued.get(token);
+      return Boolean(
+        row &&
+          row.spentUntil === null &&
+          row.expires > checkedAt &&
+          row.identifier === identifier,
+      );
     },
     findSpent: async ({ token, now: reopenedAt }) => {
       const row = issued.get(token);
@@ -94,18 +117,9 @@ function buildHarness({
           : "confirmed";
       },
     },
-    accounts: {
-      createCredentialAccount: async () => {},
-      markAddressConfirmed: async () => {
-        const user = db.user[0];
-        if (user) {
-          user.emailVerified = true;
-          user.signupConfirmationPending = false;
-        }
-      },
-    },
     mailer: {
-      sendVerificationLink: async ({ verificationUrl }) => {
+      sendVerificationLink: async ({ email: recipient, verificationUrl }) => {
+        sentEmail = recipient;
         sentToken = new URL(verificationUrl).searchParams.get("token") ?? "";
       },
     },
@@ -148,10 +162,46 @@ function buildHarness({
     verification,
     confirm,
     sentToken: () => sentToken,
+    sentEmail: () => sentEmail,
   };
 }
 
 describe("real BetterAuth sign-up confirmation lifecycle", () => {
+  /** @scenario "Asking for verification creates no account" */
+  it("sends a proof link without creating a user, credential, or session", async () => {
+    const harness = buildHarness();
+
+    await harness.verification.requestVerification({ email: harness.email });
+
+    expect(harness.sentEmail()).toBe(harness.email);
+    expect(harness.sentToken()).not.toBe("");
+    expect(harness.db.user).toHaveLength(0);
+    expect(harness.db.account).toHaveLength(0);
+    expect(harness.db.session).toHaveLength(0);
+  });
+
+  it("refuses an invalid link without changing state or setting a cookie", async () => {
+    const harness = buildHarness();
+    const before = structuredClone({
+      users: harness.db.user,
+      accounts: harness.db.account,
+      sessions: harness.db.session,
+    });
+
+    const response = await harness.confirm("never-issued");
+
+    expect(response.status).toBe(410);
+    expect(
+      z.object({ error: z.string() }).parse(await response.json()).error,
+    ).toBe("identity_verification_expired");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect({
+      users: harness.db.user,
+      accounts: harness.db.account,
+      sessions: harness.db.session,
+    }).toEqual(before);
+  });
+
   /** @scenario Opening the link unlocks credential choice */
   it("returns one proof for a fresh address without creating a user or session", async () => {
     const harness = buildHarness();
