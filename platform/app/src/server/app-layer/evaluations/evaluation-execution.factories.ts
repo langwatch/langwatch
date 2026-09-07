@@ -97,6 +97,7 @@ export async function setupModelEnv(
       .filter(
         ([, candidate]) =>
           candidate.enabled &&
+          !candidate.embeddingsUnsupported &&
           ((candidate.embeddingsModels?.length ?? 0) > 0 ||
             (candidate.customEmbeddingsModels?.length ?? 0) > 0),
       )
