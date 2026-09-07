@@ -113,9 +113,8 @@ function PageWithPositionedLayer() {
   );
 }
 
-describe("DashboardPageBody banners", () => {
-  describe("when the message limit is exceeded and the page paints a positioned layer", () => {
-    /** @scenario The plan-limit banner stays above page content that bleeds over it */
+describe("given a project whose message limit is exceeded", () => {
+  describe("when the page paints a positioned layer of its own", () => {
     it("stacks the banner above the page's own layer", () => {
       render(
         <ChakraProvider value={defaultSystem}>
