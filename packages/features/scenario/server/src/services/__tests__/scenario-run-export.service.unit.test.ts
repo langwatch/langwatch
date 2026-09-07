@@ -6,10 +6,10 @@
 
 import Parse from "papaparse";
 import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
-import { SimulationClickHouseAdapter, SimulationExecutionPort } from "../../index";
+import { SimulationClickHouseAdapter, SimulationExecutionPort } from "../../index.ts";
 import { describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { ScenarioRunExportService } from "../scenario-run-export.service";
+import { ScenarioRunExportService } from "../scenario-run-export.service.ts";
 import type { ScenarioRunExportRequest } from "@langwatch/scenario-contract";
 
 function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {

@@ -4,7 +4,7 @@
 import { SPEND_STATUS_IN_FLIGHT, spendFilterQueryShape } from "@langwatch/gateway-server";
 import { describe, expect, it } from "vitest";
 
-import openapi from "../openapi-document.json";
+import openapi from "../openapi-document.json" with { type: "json" };
 
 const EVENTS = "/api/gateway/v1/spend-events";
 const SUMMARIES = "/api/gateway/v1/spend-summaries";

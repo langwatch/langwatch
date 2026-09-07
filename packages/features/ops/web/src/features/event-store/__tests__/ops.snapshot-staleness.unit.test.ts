@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSnapshotStale, SNAPSHOT_STALE_AFTER_MS } from "../../../index";
+import { isSnapshotStale, SNAPSHOT_STALE_AFTER_MS } from "../../../index.ts";
 
 const NOW = new Date("2026-08-13T12:00:00.000Z").getTime();
 

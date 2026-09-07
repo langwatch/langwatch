@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { AnnotationTable, type AnnotationRow } from "../../../index";
+import { AnnotationTable, type AnnotationRow } from "../../../index.ts";
 
 afterEach(cleanup);
 

@@ -9,18 +9,18 @@ import type { AgentStateStorePort } from "@langwatch/agent-contract";
 import {
   type LocalCallBuffer,
   LocalCallDispatcherService,
-} from "../services/langy-local-call-dispatcher.service";
+} from "../services/langy-local-call-dispatcher.service.ts";
 import {
   ControlRequestService,
   type ControlRequestKeyMinter,
   type ControlRequestProjects,
-} from "../services/langy-local-control-request.service";
-import { LangyLocalPresenceAdapter } from "./redis.langy-local-presence.adapter";
+} from "../services/langy-local-control-request.service.ts";
+import { LangyLocalPresenceAdapter } from "./redis.langy-local-presence.adapter.ts";
 import {
   type UserWaitBuffer,
   type UserWaitEvents,
   UserWaitService,
-} from "../services/langy-local-user-wait.service";
+} from "../services/langy-local-user-wait.service.ts";
 
 export interface LocalControlRuntime {
   store: AgentStateStorePort;
@@ -102,7 +102,7 @@ export class LangyLocalControlRuntimeAdapter {
       conversationId,
       turnId,
     })) {
-      await runtime.dispatcher.cancel({ callId: call.callId });
+      await runtime.dispatcher.tryCancel({ callId: call.callId });
     }
     await runtime.waits.cancelTurn({ conversationId, turnId });
   }

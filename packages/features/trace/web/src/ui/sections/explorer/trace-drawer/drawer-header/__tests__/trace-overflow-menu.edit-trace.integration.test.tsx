@@ -13,11 +13,11 @@ const mocks = vi.hoisted(() => ({
   openDrawer: vi.fn(),
 }));
 
-vi.mock("../../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: (permission: string) =>
@@ -25,7 +25,7 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-conversation-turns", () => ({
+vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: undefined }),
 }));
 
@@ -33,11 +33,11 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("../../../../errors", () => ({
+vi.mock("../../../../errors/index.ts", () => ({
   showErrorToast: vi.fn(),
 }));
 
-vi.mock("../../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       pinnedTrace: { getPin: { invalidate: vi.fn() } },
@@ -50,9 +50,9 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-const { useDrawerStore } = await import("../../../../../../index");
-const { useTraceEditStore } = await import("../../../../../../index");
-const { TraceOverflowMenu } = await import("../trace-overflow-menu");
+const { useDrawerStore } = await import("../../../../../../index.ts");
+const { useTraceEditStore } = await import("../../../../../../index.ts");
+const { TraceOverflowMenu } = await import("../trace-overflow-menu.tsx");
 
 const renderMenu = ({
   readOnly = false,

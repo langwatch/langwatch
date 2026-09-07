@@ -32,7 +32,7 @@
  */
 
 import type { DlpServiceClient } from "@google-cloud/dlp";
-import type { google } from "@google-cloud/dlp/build/protos/protos";
+import type { google } from "@google-cloud/dlp/build/protos/protos.js";
 import type { BatchEvaluationResult } from "@langwatch/evaluator-contract";
 import { type PiiAnalysisMetricsPort, PiiAnalysisPort } from "@langwatch/data-privacy-server";
 import { normalizePresidioMarkers, PRESIDIO_STRICT_ENTITIES } from "@langwatch/redaction";
@@ -43,7 +43,7 @@ import {
   subtractProtectedRanges,
 } from "@langwatch/redaction/pii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import type { WorkerTracePrivacyConfig } from "../config/worker.config";
+import type { WorkerTracePrivacyConfig } from "../config/worker.config.ts";
 
 type DlpClient = DlpServiceClient & { close?: () => Promise<void> };
 

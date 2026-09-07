@@ -24,7 +24,7 @@ import {
   McpSessionGrantPort,
   type HostedMcpRedis,
   type McpHandler,
-} from "../../../index";
+} from "../../../index.ts";
 
 // ---------------------------------------------------------------------------
 // Mocks

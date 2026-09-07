@@ -14,9 +14,9 @@ import {
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { AttributeFormat } from "../../../../model/attribute-format";
-import type { ChatMessage } from "../../../../model/transcript/types";
-import { contentToString } from "../../../../model/explorer/trace-table/chat-content";
+import type { AttributeFormat } from "../../../../model/attribute-format.ts";
+import type { ChatMessage } from "../../../../model/transcript/types.ts";
+import { contentToString } from "../../../../model/explorer/trace-table/chat-content.ts";
 import {
   buildInlineDescriptor,
   KNOWN_CHAT_ROLES,
@@ -26,9 +26,9 @@ import {
   stringifyForCopy,
   tryParseJson,
   useCopyToClipboard,
-} from "../../../../index";
-import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select";
-import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight";
+} from "../../../../index.ts";
+import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
+import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 
 const EM_DASH = "—";
 const MAX_CHAT_MESSAGES_RENDERED = 100;

@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { SpanStatusCode } from "@opentelemetry/api";
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 import { generate } from "@langwatch/ksuid";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   TRACK_EVENT_SPAN_NAME,
   type TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
-import type { TraceSpanCollectionService } from "./trace-ingestion.service";
+import type { TraceSpanCollectionService } from "./trace-ingestion.service.ts";
 
 /**
  * The ksuid prefix every tracked-event id ever written carries.

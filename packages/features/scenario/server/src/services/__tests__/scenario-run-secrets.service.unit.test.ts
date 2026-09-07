@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ScenarioSecretCipherPort } from "../../index";
-import { ScenarioRunSecretsService } from "../scenario-run-secrets.service";
+import { ScenarioSecretCipherPort } from "../../index.ts";
+import { ScenarioRunSecretsService } from "../scenario-run-secrets.service.ts";
 
 class ReversibleCipherPort extends ScenarioSecretCipherPort {
   encrypt(plaintext: string): string {

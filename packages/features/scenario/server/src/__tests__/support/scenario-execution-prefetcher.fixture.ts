@@ -26,7 +26,7 @@ import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
   ScenarioSecretCipherPort,
-} from "../../index";
+} from "../../index.ts";
 
 export interface ScenarioFetcher {
   getById(input: { projectId: string; id: string }): Promise<{

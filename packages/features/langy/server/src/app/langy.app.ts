@@ -19,13 +19,13 @@ import {
   type LangyMessageRole,
   type LangyStreamEntry,
 } from "@langwatch/langy-contract";
-import type { LangyChatMessageInput } from "../services/langy-turn-shared.service";
+import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
-import { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter";
-import { LangyTurnAccessAdapter } from "../adapters/redis.langy-turn-access.adapter";
-import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules";
-import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service";
-import { SETTLEMENT_CONFIRM_POLLS, SETTLEMENT_POLL_MS } from "../services/langy-turn-tail.service";
+import { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter.ts";
+import { LangyTurnAccessAdapter } from "../adapters/redis.langy-turn-access.adapter.ts";
+import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
+import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
+import { SETTLEMENT_CONFIRM_POLLS, SETTLEMENT_POLL_MS } from "../services/langy-turn-tail.service.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -383,7 +383,7 @@ export class LangyApp {
    * answers with the terminal to synthesize once the turn has settled without one — or null if
    * it never does.
    */
-  async watchForMissedTerminal(input: {
+  async tryWatchForMissedTerminal(input: {
     projectId: string;
     conversationId: string;
     turnId: string;

@@ -7,11 +7,11 @@ import type {
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
-import { AnalyticsService } from "../../services/analytics.service";
-import { AnalyticsAdapter } from "../../index";
-import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository";
-import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository";
-import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper";
+import { AnalyticsService } from "../../services/analytics.service.ts";
+import { AnalyticsAdapter } from "../../index.ts";
+import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
+import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
+import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
 
 const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
   projectId: "project-1",

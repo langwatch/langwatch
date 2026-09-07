@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateInputToISO } from "../../../index";
+import { dateInputToISO } from "../../../index.ts";
 
 /**
  * Regression — CodeRabbit review on #3254 surfaced that

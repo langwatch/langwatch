@@ -2,22 +2,22 @@ import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { AnnotationByTrace } from "../../use-annotations-by-trace-ids";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
+import type { AnnotationByTrace } from "../../use-annotations-by-trace-ids.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
 import { compileAttributePattern } from "@langwatch/data-privacy-contract";
-import type { PinnedAttributeSource } from "../../../../behavior/pinned-attributes.store";
-import { sameAttributeValue, useCopyToClipboard } from "../../../../index";
-import { usePinnedAttributes } from "../hooks/use-pinned-attributes";
+import type { PinnedAttributeSource } from "../../../../behavior/pinned-attributes.store.ts";
+import { sameAttributeValue, useCopyToClipboard } from "../../../../index.ts";
+import { usePinnedAttributes } from "../hooks/use-pinned-attributes.ts";
 import {
   API_KEY_ATTRIBUTE_LABEL,
   API_KEY_ID_ATTRIBUTE,
   ApiKeyAttributeValue,
-} from "./api-key-attribute";
-import { AttributeValue } from "./attribute-value";
-import { AnchorCommentButton } from "./anchored-comments/anchor-comment-button";
-import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select";
-import { PinnedAwareJsonView } from "../../../elements/explorer/trace-drawer/json-highlight";
+} from "./api-key-attribute.tsx";
+import { AttributeValue } from "./attribute-value.tsx";
+import { AnchorCommentButton } from "./anchored-comments/anchor-comment-button.tsx";
+import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
+import { PinnedAwareJsonView } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 
 const EM_DASH = "\u2014";
 

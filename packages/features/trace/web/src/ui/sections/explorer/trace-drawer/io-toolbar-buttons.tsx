@@ -2,9 +2,9 @@ import { Button, Icon } from "@chakra-ui/react";
 import { forwardRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCheck, LuCopy, LuLanguages, LuLightbulb, LuPlay } from "react-icons/lu";
-import type { TraceAnchor } from "../hooks/use-anchored-annotations";
-import { useCopyToClipboard } from "../../../../index";
-import { AnnotationPopover } from "./conversation-view/annotation-popover";
+import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
+import { useCopyToClipboard } from "../../../../index.ts";
+import { AnnotationPopover } from "./conversation-view/annotation-popover.tsx";
 
 /**
  * The shape every toolbar action wears: icon, label, and the row's height.

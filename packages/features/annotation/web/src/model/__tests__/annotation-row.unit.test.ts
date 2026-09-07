@@ -10,8 +10,8 @@ import {
   queueItemsToRows,
   suggestionExportLine,
   toOccurredAtMsHint,
-} from "../annotation-row";
-import { readAnnotationScoreOptions } from "../../index";
+} from "../annotation-row.ts";
+import { readAnnotationScoreOptions } from "../../index.ts";
 
 const score = (scoreOptions: unknown) => ({ scoreOptions });
 

@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-drawer", () => ({
+vi.mock("../../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({
     currentDrawer: mocks.currentDrawer,
     openDrawer: mocks.openDrawer,
@@ -27,11 +27,11 @@ vi.mock("../../../../../behavior/use-drawer", () => ({
   useDrawerParams: () => mocks.drawerParams,
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       traceEditOverlay: {
@@ -50,14 +50,14 @@ vi.mock("../../../../../behavior/trace-api", () => ({
 }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
-vi.mock("../../../errors", () => ({ showErrorToast: vi.fn() }));
+vi.mock("../../../errors/index.ts", () => ({ showErrorToast: vi.fn() }));
 
-const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar");
-const { useDrawerStore } = await import("../../../../../index");
-const { useTraceEditStore } = await import("../../../../../index");
-const { guardTraceEditExit } = await import("../../utils/trace-edit-mode");
-const { useTraceDrawerNavigation } = await import("../use-trace-drawer-navigation");
-const { useTraceDrawerUrlHydrator } = await import("../use-trace-drawer-url-hydrator");
+const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar.tsx");
+const { useDrawerStore } = await import("../../../../../index.ts");
+const { useTraceEditStore } = await import("../../../../../index.ts");
+const { guardTraceEditExit } = await import("../../utils/trace-edit-mode.ts");
+const { useTraceDrawerNavigation } = await import("../use-trace-drawer-navigation.ts");
+const { useTraceDrawerUrlHydrator } = await import("../use-trace-drawer-url-hydrator.ts");
 
 const TRACE = "trace-1";
 const EARLIER_TRACE = "trace-0";

@@ -17,8 +17,8 @@ import { useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
-import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index";
-import { CodeBlockEditor } from "../../blocks/code-block-editor";
+import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
 import {
   CODE_OUTPUT_TYPES,
   type Output,
@@ -30,7 +30,7 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import type {
   HttpAuth,
   HttpComponentConfig,
@@ -41,25 +41,25 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "../../../../model/code-agent-config";
-import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer";
+} from "../../../../model/code-agent-config.ts";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import { api } from "../../../../model/workflow-api-client";
-import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { api } from "../../../../model/workflow-api-client.ts";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import type { AgentComponent, Field as DslField } from "@langwatch/workflow-contract";
 import {
   buildAgentNodeData,
   nodeMatchesAgent,
   readCodeSnapshot,
   readHttpSnapshot,
-} from "../../../../model/agent-node-data";
+} from "../../../../model/agent-node-data.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../../../model/edge-mapping";
-import { CodeEditorModal } from "../code/workflow-code-editor.transport";
-import { BasePropertiesPanel } from "./base-properties-panel";
+} from "../../../../model/edge-mapping.ts";
+import { CodeEditorModal } from "../code/workflow-code-editor.transport.tsx";
+import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
 /**
  * Checks whether the agent string uses the DB-backed format (`agents/<id>`).

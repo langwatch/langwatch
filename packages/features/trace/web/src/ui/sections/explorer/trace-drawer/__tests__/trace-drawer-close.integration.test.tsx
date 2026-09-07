@@ -36,7 +36,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-vi.mock("../../../../../behavior/trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
       tracesV2: {
@@ -47,11 +47,11 @@ vi.mock("../../../../../behavior/trace-api", () => ({
   },
 }));
 
-vi.mock("../../hooks/use-drawer-url-sync", () => ({
+vi.mock("../../hooks/use-drawer-url-sync.ts", () => ({
   useDrawerUrlSync: () => undefined,
 }));
 
-vi.mock("../../hooks/use-span-tree", () => ({
+vi.mock("../../hooks/use-span-tree.ts", () => ({
   useSpanTreeWithCaptured: () => ({
     captured: { data: [] },
     corrected: { data: [], isLoading: false },
@@ -59,23 +59,23 @@ vi.mock("../../hooks/use-span-tree", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-header", () => ({
+vi.mock("../../hooks/use-trace-header.ts", () => ({
   useTraceHeader: () => ({ data: null, error: null }),
 }));
 
-vi.mock("../../hooks/use-conversation-context", () => ({
+vi.mock("../../hooks/use-conversation-context.ts", () => ({
   useConversationContext: () => null,
 }));
 
-vi.mock("../../hooks/use-conversation-prefetch", () => ({
+vi.mock("../../hooks/use-conversation-prefetch.ts", () => ({
   useConversationPrefetch: () => undefined,
 }));
 
-vi.mock("../../hooks/use-prefetch-span-detail", () => ({
+vi.mock("../../hooks/use-prefetch-span-detail.ts", () => ({
   usePrefetchSpanDetail: () => vi.fn(),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation", () => ({
+vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
   useTraceDrawerNavigation: () => ({
     navigateToTrace: vi.fn(),
     goBack: vi.fn(),
@@ -83,18 +83,18 @@ vi.mock("../../hooks/use-trace-drawer-navigation", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-shortcuts", () => ({
+vi.mock("../../hooks/use-trace-drawer-shortcuts.ts", () => ({
   useTraceDrawerShortcuts: () => undefined,
 }));
 
-vi.mock("../../hooks/use-trace-refresh", () => ({
+vi.mock("../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn() }),
 }));
 
 const { clearDrawerStack, getDrawerStack, useDrawer } =
-  await import("../../../../../behavior/use-drawer");
-const { useDrawerStore } = await import("../../../../../index");
-const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold");
+  await import("../../../../../behavior/use-drawer.ts");
+const { useDrawerStore } = await import("../../../../../index.ts");
+const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold.ts");
 
 const TRACE = "trace-1";
 

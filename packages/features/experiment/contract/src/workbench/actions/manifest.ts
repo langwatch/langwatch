@@ -23,7 +23,7 @@ import {
   setTargetPromptResultSchema,
   updateTargetModelPayloadSchema,
   updateTargetModelResultSchema,
-} from "./schemas";
+} from "./schemas.ts";
 import {
   type AnyTransform,
   addColumn,
@@ -37,7 +37,7 @@ import {
   setTargetMapping,
   setTargetPrompt,
   updateTargetModel,
-} from "./transforms/index";
+} from "./transforms/index.ts";
 
 /**
  * Every action the evaluations workbench exposes, in one table.

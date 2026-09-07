@@ -2,7 +2,7 @@ import {
   ScenarioHttpPort,
   type ScenarioHttpResponse,
   SerializedHttpAgentAdapter,
-} from "../../index";
+} from "../../index.ts";
 import { vi } from "vitest";
 
 type ScenarioHttpRequest = Parameters<ScenarioHttpPort["fetch"]>[0];

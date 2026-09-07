@@ -19,13 +19,13 @@ const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } = v
   footerHolder: { content: null as ReactNode },
 }));
 
-vi.mock("../../../../../behavior/studio-host/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
   }),
 }));
 
-vi.mock("../../../../../model/workflow-api-client", () => ({
+vi.mock("../../../../../model/workflow-api-client.ts", () => ({
   api: {
     useUtils: () => ({
       agents: { getById: { setData: mockSetData } },
@@ -47,7 +47,7 @@ vi.mock("../../../../../model/workflow-api-client", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => ({
+vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
@@ -57,7 +57,7 @@ vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => 
       getWorkflow: () => ({ nodes: [], edges: [] }),
     }),
 }));
-vi.mock("../../../../elements/studio-drawer-footer", async (importOriginal) => ({
+vi.mock("../../../../elements/studio-drawer-footer.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRegisterDrawerFooter: (content: ReactNode) => {
     footerHolder.content = content;
@@ -68,17 +68,17 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-vi.mock("../../../blocks/code-block-editor", () => ({
+vi.mock("../../../blocks/code-block-editor.tsx", () => ({
   CodeBlockEditor: ({ code, onChange }: { code: string; onChange: (code: string) => void }) => (
     <textarea data-testid="code-textarea" value={code} onChange={(e) => onChange(e.target.value)} />
   ),
 }));
 
-vi.mock("../../code/workflow-code-editor.transport", () => ({
+vi.mock("../../code/workflow-code-editor.transport.tsx", () => ({
   CodeEditorModal: () => null,
 }));
 
-vi.mock("../../../../../behavior/agents/http/index", () => ({
+vi.mock("../../../../../behavior/agents/http/index.ts", () => ({
   HttpConfigEditor: () => null,
   useHttpTest: () => ({ handleTest: vi.fn() }),
 }));
@@ -92,13 +92,13 @@ vi.mock("@langwatch/prompt-web/surfaces/outputs-section", () => ({
   OutputsSection: () => null,
 }));
 
-vi.mock("../base-properties-panel", () => ({
+vi.mock("../base-properties-panel.tsx", () => ({
   BasePropertiesPanel: ({ children }: { children: ReactNode }) => (
     <div data-testid="base-properties-panel">{children}</div>
   ),
 }));
 
-const { AgentPropertiesPanel } = await import("../agent-properties-panel");
+const { AgentPropertiesPanel } = await import("../agent-properties-panel.tsx");
 
 import type { AgentComponent } from "@langwatch/workflow-contract";
 

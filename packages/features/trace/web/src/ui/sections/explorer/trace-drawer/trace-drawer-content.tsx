@@ -1,30 +1,30 @@
 import { Box, CodeBlock, Flex, Spinner } from "@chakra-ui/react";
 import { useRef } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { IsolatedErrorBoundary } from "../../isolated-error-boundary";
+import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { useLangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
 import {
   traceChipDisplayName,
   traceContextChip,
 } from "@langwatch/langy-web/surfaces/langy-context";
-import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay";
+import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay.tsx";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useTraceEditSession } from "../hooks/use-trace-edit-session";
-import { useTraceQueryArgs } from "../hooks/use-trace-query-args";
-import { useDrawerStore, useShikiAdapter } from "../../../../index";
-import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate";
-import { ConversationContext } from "./conversation-context";
-import { ConversationView } from "./conversation-view";
-import { DrawerHeader } from "./drawer-header";
-import { EditModeBar } from "./edit-mode/edit-mode-bar";
-import { PaneLayout } from "./panes/pane-layout";
-import { usePaneLayout } from "./panes/use-pane-layout";
-import { ScenarioRoleProvider } from "./scenario-roles";
-import { SessionTab } from "./session-view";
-import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton";
-import { TerminalTab } from "./terminal-view";
-import { TraceAccordions } from "./trace-accordions";
-import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay";
+import { useTraceEditSession } from "../hooks/use-trace-edit-session.ts";
+import { useTraceQueryArgs } from "../hooks/use-trace-query-args.ts";
+import { useDrawerStore, useShikiAdapter } from "../../../../index.ts";
+import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate.tsx";
+import { ConversationContext } from "./conversation-context.tsx";
+import { ConversationView } from "./conversation-view/index.ts";
+import { DrawerHeader } from "./drawer-header/index.ts";
+import { EditModeBar } from "./edit-mode/edit-mode-bar.tsx";
+import { PaneLayout } from "./panes/pane-layout.tsx";
+import { usePaneLayout } from "./panes/use-pane-layout.ts";
+import { ScenarioRoleProvider } from "./scenario-roles.tsx";
+import { SessionTab } from "./session-view/index.ts";
+import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";
+import { TerminalTab } from "./terminal-view/index.ts";
+import { TraceAccordions } from "./trace-accordions/index.ts";
+import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay.ts";
 
 export interface TraceDrawerContentProps {
   traceId: string | undefined;

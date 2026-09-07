@@ -75,8 +75,8 @@ const AJV_RUNTIME_IMPORTS: readonly {
   readonly specifier: string;
   readonly binding: string;
 }[] = [
-  { specifier: "ajv/dist/runtime/equal", binding: "ajvRuntimeEqual" },
-  { specifier: "ajv/dist/runtime/ucs2length", binding: "ajvRuntimeUcs2Length" },
+  { specifier: "ajv/dist/runtime/equal.js", binding: "ajvRuntimeEqual" },
+  { specifier: "ajv/dist/runtime/ucs2length.js", binding: "ajvRuntimeUcs2Length" },
 ];
 
 /** Reads the schema through the package's own `exports` map. */

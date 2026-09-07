@@ -26,21 +26,21 @@ import {
   usePresenceStore,
 } from "@langwatch/presence-web/surfaces/presence-state";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
-import type { VizTab } from "../../../../behavior/drawer.store";
-import { useDrawerStore } from "../../../../behavior/drawer.store";
-import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton";
-import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton";
-import { FlameView } from "../../flame/flame-view";
-import { spanTypeColor } from "../utils/span-type-color";
-import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
-import { WaterfallView } from "./waterfall-view";
+import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+import type { VizTab } from "../../../../behavior/drawer.store.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
+import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
+import { FlameView } from "../../flame/flame-view.tsx";
+import { spanTypeColor } from "../utils/span-type-color.ts";
+import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import { WaterfallView } from "./waterfall-view/index.ts";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
 // That's the only viz heavy enough to keep code-split — the others are
 // statically imported so tab switches stay synchronous.
 const SequenceView = lazy(() =>
-  import("../../../../index").then((m) => ({ default: m.SequenceView })),
+  import("../../../../index.ts").then((m) => ({ default: m.SequenceView })),
 );
 
 interface VizPlaceholderProps {

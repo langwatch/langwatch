@@ -7,13 +7,13 @@
 // project that owns the session is what keeps it safe.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { HostedMcpRedis } from "../../../index";
+import type { HostedMcpRedis } from "../../../index.ts";
 import {
   connectTestRedis,
   initializeBody,
   type ReplicaPair,
   startReplicaPair,
-} from "./support/sse-harness";
+} from "./support/sse-harness.ts";
 
 const VALID_API_KEY = "lw_reconnect_key_a";
 const OTHER_API_KEY = "lw_reconnect_key_b";

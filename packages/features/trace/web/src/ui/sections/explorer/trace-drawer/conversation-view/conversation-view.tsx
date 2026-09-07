@@ -12,42 +12,42 @@ import {
   useRef,
   useState,
 } from "react";
-import { PIIRedactionAlert } from "../../../../blocks/pii-redaction-notice";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
-import { useConversationAnnotations } from "../../hooks/use-conversation-annotations";
-import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-events";
-import { useConversationTurns } from "../../hooks/use-conversation-turns";
+import { PIIRedactionAlert } from "../../../../blocks/pii-redaction-notice.tsx";
+import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import { useConversationAnnotations } from "../../hooks/use-conversation-annotations.ts";
+import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-events.ts";
+import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
 import {
   isTurnRailDraft,
   RenderedMarkdown,
   useAnnotationDraftStore,
   useCopyToClipboard,
-} from "../../../../../index";
-import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation";
-import type { TraceListItem } from "../../types/trace";
-import { FormatSelect } from "../../../../blocks/explorer/trace-drawer/format-select";
-import { extractReadableText, extractReasoningText, extractSystemText } from "../transcript";
-import { AnnotatedTurnRow } from "./annotated-turn-row";
-import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context";
+} from "../../../../../index.ts";
+import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
+import type { TraceListItem } from "../../types/trace.ts";
+import { FormatSelect } from "../../../../blocks/explorer/trace-drawer/format-select.tsx";
+import { extractReadableText, extractReasoningText, extractSystemText } from "../transcript/index.ts";
+import { AnnotatedTurnRow } from "./annotated-turn-row.tsx";
+import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import {
   FOCUS_SCROLL_REST_MS,
   useFocusedTurnBlink,
   useScrollFocusedTurnIntoView,
-} from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn";
-import { SystemPromptBanner } from "./system-prompt-banner";
-import { EMPTY_TURNS, type Mode, type ParsedTurn, type TurnLayout } from "./types";
+} from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
+import { SystemPromptBanner } from "./system-prompt-banner.tsx";
+import { EMPTY_TURNS, type Mode, type ParsedTurn, type TurnLayout } from "./types.ts";
 import {
   type RailLayout,
   isRailActive as resolveIsRailActive,
   threadColumnMaxWidth,
   useRailLayout,
-} from "./use-rail-layout";
+} from "./use-rail-layout.ts";
 import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
   turnMediaForSide,
-} from "./utils";
+} from "./utils.ts";
 
 type AnnotationsByTrace = Map<string, AnnotationByTrace[]>;
 const EMPTY_ANNOTATION_ITEMS: AnnotationByTrace[] = [];

@@ -10,10 +10,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaScenarioAdapter } from "../../index";
-import { ScenarioClockPort } from "../scenario-clock.port";
-import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port";
-import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port";
+import { PrismaScenarioAdapter } from "../../index.ts";
+import { ScenarioClockPort } from "../scenario-clock.port.ts";
+import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port.ts";
+import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port.ts";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 
 class AllowTestQueries extends PrismaQueryGuard {

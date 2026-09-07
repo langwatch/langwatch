@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { OpsQueueGroup } from "../../../index";
+import type { OpsQueueGroup } from "../../../index.ts";
 import {
   classifyGroup,
   describeNextRun,
   matchesStatusFilter,
   sortGroupsBySeverity,
-} from "../../../index";
+} from "../../../index.ts";
 
 const NOW = 1_755_100_000_000;
 

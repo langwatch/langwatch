@@ -6,7 +6,7 @@
 // every `POST /messages?sessionId=…` is a fresh connection to any replica.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { HostedMcpRedis } from "../../../index";
+import type { HostedMcpRedis } from "../../../index.ts";
 import {
   connectTestRedis,
   handshake,
@@ -17,7 +17,7 @@ import {
   SSE_SESSION_PREFIX,
   sseSessionSetKey,
   startReplicaPair,
-} from "./support/sse-harness";
+} from "./support/sse-harness.ts";
 
 const VALID_API_KEY = "lw_relay_key_a";
 const OTHER_API_KEY = "lw_relay_key_b";

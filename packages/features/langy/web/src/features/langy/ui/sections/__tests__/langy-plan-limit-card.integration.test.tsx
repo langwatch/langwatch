@@ -12,14 +12,14 @@ const push = vi.fn();
 const trackEvent = vi.fn();
 let canManagePlan = true;
 
-vi.mock("../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
     hasOrgPermission: (permission: string) => permission === "organization:manage" && canManagePlan,
   }),
 }));
 
-vi.mock("../../../../../behavior/use-plan-management-url", () => ({
+vi.mock("../../../../../behavior/use-plan-management-url.ts", () => ({
   usePlanManagementUrl: () => ({
     url: "/settings/subscription",
     buttonLabel: "Upgrade plan",
@@ -32,12 +32,12 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push }),
 }));
 
-vi.mock("../../../../../model/tracking", () => ({
+vi.mock("../../../../../model/tracking.ts", () => ({
   trackEvent: (...args: unknown[]) => trackEvent(...args),
 }));
 
-const { LangyToolActivity } = await import("../langy-tool-activity");
-const { useLangyStore } = await import("../../../../../index");
+const { LangyToolActivity } = await import("../langy-tool-activity.tsx");
+const { useLangyStore } = await import("../../../../../index.ts");
 
 const limitFailure = JSON.stringify({
   ok: false,

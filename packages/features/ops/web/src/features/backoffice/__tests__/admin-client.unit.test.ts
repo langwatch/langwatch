@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { adminClient, impersonateUser } from "../../../index";
+import { adminClient, impersonateUser } from "../../../index.ts";
 
 /**
  * Pin the request-body shape the admin UI posts to `/api/admin/:resource`.

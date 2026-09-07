@@ -12,16 +12,16 @@ const mocks = vi.hoisted(() => ({
   storedPatch: null as TraceEditOverlayPatch | null,
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay", () => ({
+vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({
     data: mocks.storedPatch ? { patch: mocks.storedPatch } : undefined,
   }),
 }));
 
-const { useDrawerStore } = await import("../../../../../../index");
-const { useTraceEditStore } = await import("../../../../../../index");
-const { useCorrectionMarks } = await import("../use-correction-marks");
-const { useWaterfallEditing } = await import("../use-waterfall-editing");
+const { useDrawerStore } = await import("../../../../../../index.ts");
+const { useTraceEditStore } = await import("../../../../../../index.ts");
+const { useCorrectionMarks } = await import("../use-correction-marks.ts");
+const { useWaterfallEditing } = await import("../use-waterfall-editing.ts");
 
 const spans = [
   { spanId: "span-1", parentSpanId: null, name: "handler" },

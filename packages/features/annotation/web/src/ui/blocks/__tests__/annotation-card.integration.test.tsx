@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { AnnotationCard } from "../../../index";
+import { AnnotationCard } from "../../../index.ts";
 
 const SCORE_NAMES = new Map([
   ["score-1", "Helpfulness"],

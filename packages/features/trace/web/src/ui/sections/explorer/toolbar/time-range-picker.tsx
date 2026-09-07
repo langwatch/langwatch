@@ -16,15 +16,15 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TimeRange } from "../../../../behavior/filter.store";
-import type { TimeRangePreset } from "../../../../behavior/time-range-presets";
+import type { TimeRange } from "../../../../behavior/filter.store.ts";
+import type { TimeRangePreset } from "../../../../behavior/time-range-presets.ts";
 import {
   getPresetById,
   matchPreset,
   PRESET_GROUPS,
   useCopyToClipboard,
   useFilterStore,
-} from "../../../../index";
+} from "../../../../index.ts";
 
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const timeRange = useFilterStore((s) => s.timeRange);

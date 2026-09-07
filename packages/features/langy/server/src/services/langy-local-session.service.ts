@@ -15,8 +15,8 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import { LangyActorSessionService, type LangyActorUserReader } from "./langy-actor-session.service";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
+import { LangyActorSessionService, type LangyActorUserReader } from "./langy-actor-session.service.ts";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
 import {
   connectMessage,
@@ -24,18 +24,18 @@ import {
   conversationUrl,
   disconnectMessage,
   grantedPatterns,
-} from "../rules/langy-local-session-text.rules";
-import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service";
-import { workspaceNudgeSchema } from "./langy-local-call-dispatcher.service";
+} from "../rules/langy-local-session-text.rules.ts";
+import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
+import { workspaceNudgeSchema } from "./langy-local-call-dispatcher.service.ts";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
-import type { ControlRequestService } from "./langy-local-control-request.service";
+import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 import { LangyWaitExpiredError } from "@langwatch/langy-contract";
-import { workspaceChannel } from "../rules/langy-local-control-keys.rules";
+import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import type {
   ConnectedWorkspace,
   LangyLocalPresencePort,
   PresenceHeartbeat,
-} from "../ports/langy-local-presence.port";
+} from "../ports/langy-local-presence.port.ts";
 import {
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -47,7 +47,7 @@ import {
   type ResultFrame,
   type WorkspaceInfo,
 } from "@langwatch/langy-contract";
-import type { UserWaitService } from "./langy-local-user-wait.service";
+import type { UserWaitService } from "./langy-local-user-wait.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:session");
 
@@ -302,7 +302,7 @@ export class LocalControlSessionCoreService {
       };
     }
 
-    const binding = await this.requests.readKeyBinding(resolved.apiKeyId);
+    const binding = await this.requests.tryReadKeyBinding(resolved.apiKeyId);
     if (!binding || binding.projectId !== resolved.project.id) {
       return {
         ok: false,
@@ -489,7 +489,7 @@ export class LocalControlSessionCoreService {
 
   /** The command line started the call. */
   async ack(session: ControlSession, callId: string): Promise<void> {
-    const call = await this.dispatcher.read(callId);
+    const call = await this.dispatcher.tryRead(callId);
     if (call?.conversationId !== session.conversationId) {
       return;
     }
@@ -506,7 +506,7 @@ export class LocalControlSessionCoreService {
    * ended is a quiet no-op, not an error — a resend after a dropped socket.
    */
   async result(session: ControlSession, frame: ResultFrame): Promise<void> {
-    const call = await this.dispatcher.read(frame.callId);
+    const call = await this.dispatcher.tryRead(frame.callId);
     if (call?.conversationId !== session.conversationId) {
       return;
     }
@@ -526,7 +526,7 @@ export class LocalControlSessionCoreService {
 
   /** The command line needs the developer's answer before it runs the call. */
   async permissionRequired(session: ControlSession, frame: PermissionRequiredFrame): Promise<void> {
-    const call = await this.dispatcher.read(frame.callId);
+    const call = await this.dispatcher.tryRead(frame.callId);
     if (!call || call.conversationId !== session.conversationId) {
       return;
     }
@@ -548,7 +548,7 @@ export class LocalControlSessionCoreService {
       workspaceName: session.workspaceName,
       hostname: session.hostname,
     });
-    await this.dispatcher.awaitPermission({
+    await this.dispatcher.tryAwaitPermission({
       callId: call.callId,
       waitId: wait.waitId,
     });
@@ -560,7 +560,7 @@ export class LocalControlSessionCoreService {
    * answer wins; an already-settled wait ignores this frame.
    */
   async permissionAnswered(session: ControlSession, frame: PermissionAnsweredFrame): Promise<void> {
-    const call = await this.dispatcher.read(frame.callId);
+    const call = await this.dispatcher.tryRead(frame.callId);
     if (!call || call.conversationId !== session.conversationId) {
       return;
     }
@@ -645,7 +645,7 @@ export class LocalControlSessionCoreService {
     }
 
     for (const call of await this.dispatcher.listPendingForConversation(session.conversationId)) {
-      await this.dispatcher.cancel({
+      await this.dispatcher.tryCancel({
         callId: call.callId,
         code: "cancelled",
         message: "The shared folder disconnected, so the command did not finish.",
@@ -739,7 +739,7 @@ export class LocalControlSessionCoreService {
     }
 
     if ("call" in parsed) {
-      const call = await this.dispatcher.read(parsed.call);
+      const call = await this.dispatcher.tryRead(parsed.call);
       if (!call || call.conversationId !== session.conversationId) {
         return;
       }

@@ -8,20 +8,20 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
     hasPermission: () => true,
   }),
 }));
 
-vi.mock("../../../../use-field-redaction", () => ({
+vi.mock("../../../../use-field-redaction.ts", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
-const { RedactedField } = await import("../../../../redacted-field");
-const { useTraceEditStore } = await import("../../../../../../index");
-const { SpanEditableIO } = await import("../span-editable-io");
+const { RedactedField } = await import("../../../../redacted-field.tsx");
+const { useTraceEditStore } = await import("../../../../../../index.ts");
+const { SpanEditableIO } = await import("../span-editable-io.tsx");
 
 function renderInput({ redacted }: { redacted: boolean }) {
   return render(

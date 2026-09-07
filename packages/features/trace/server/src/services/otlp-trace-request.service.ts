@@ -1,11 +1,11 @@
 import { TraceState } from "@opentelemetry/core";
-import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
+import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types.js";
 import {
   ESpanKind,
   type EStatusCode,
-} from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+} from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 import { match } from "ts-pattern";
-import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.service";
+import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.service.ts";
 
 const { parseJsonStringValues, reconstructFlattenedArrays } = OtlpAttributeFlatteningService;
 import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";

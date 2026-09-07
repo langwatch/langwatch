@@ -34,7 +34,7 @@ import {
   AutomationEvaluationSubscriberService,
   AutomationEvaluationTriggerFilterService,
   AutomationTriggerMatchRecorderPort,
-} from "../../index";
+} from "../../index.ts";
 
 function trigger(): TriggerSummary {
   return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AXIS_INTERVALS, alignedMax, axisTicks, axisWidthFor, niceMax } from "../../../index";
+import { AXIS_INTERVALS, alignedMax, axisTicks, axisWidthFor, niceMax } from "../../../index.ts";
 
 const formatAxisValue = (value: number): string => {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;

@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import specification from "../openapi-document.json";
+import specification from "../openapi-document.json" with { type: "json" };
 
 type Schema = {
   $ref?: string;

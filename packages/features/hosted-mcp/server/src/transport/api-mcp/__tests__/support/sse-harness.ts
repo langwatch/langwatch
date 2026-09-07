@@ -15,7 +15,7 @@ import {
   McpSessionGrantPort,
   type HostedMcpRedis,
   type McpHandler,
-} from "../../../../index";
+} from "../../../../index.ts";
 
 export const SSE_SESSION_PREFIX = "mcp:sse:session:";
 export const SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";

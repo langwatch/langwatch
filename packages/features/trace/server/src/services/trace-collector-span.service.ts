@@ -1,4 +1,4 @@
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import type {
