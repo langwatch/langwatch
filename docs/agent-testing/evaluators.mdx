@@ -16,7 +16,7 @@ A test suite declares [fields](/agent-testing/test-suites#fields) for the values
 **Edit suite** on a test suite opens the suite editor. Under **Customize test suite**, **Add evaluators** shows the attached evaluators as chips and **Add evaluator** opens the evaluator list of the project. Picking one attaches it with its mappings inferred; when a required input is still unmapped, or when the evaluator reads an expected value, the evaluator drawer opens on the attachment so you confirm where each input reads from.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, and two evaluator chips, SQL Query Equivalence marked as required and a score judge" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
 </Frame>
 
 A chip with an amber alert has a required input with no mapping. Press it to open the drawer. **Run suite** does not start while an attachment is in that state: it opens the drawer on the offending evaluator instead.
@@ -38,7 +38,13 @@ An input named `expected_output`, `expected_contexts` or another `expected_*` re
 
 Two fields matching leaves the input unmapped, so you pick one in the drawer. With no match at all, a suite with a single field maps the input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
 
-The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
+For example, on a text-to-SQL agent the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/evaluator-drawer-mappings-required.png" alt="The SQL Query Equivalence drawer with output mapped to tool_calls.run_sql.input, expected_output to Scenario.fields.golden_sql, expected_contexts to Scenario.fields.table_schema, and Required to pass switched on" />
+</Frame>
+
+The drawer on that attachment: one mapping per input under **Variables**, and the **Required to pass** switch under them. The step by step is in [Grade runs with evaluators](/agent-testing/grade-runs-with-evaluators).
 
 ## Required evaluators and scores
 
@@ -50,10 +56,10 @@ After the conversation and the judge, the platform runs every attached evaluator
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. |
+| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. A required input the trace never delivered, no such tool call or no retrieved contexts, is recorded as `failed` with the reason naming it. |
 | `scored` | A score, for an evaluator with no pass or fail verdict. |
 | `skipped` | A field the mapping reads is blank on this scenario. The reason names the field. |
-| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+| `error` | The evaluator itself failed to run. The reason says why. |
 
 The run drawer lists the evaluators under the criteria, and the run header shows a pill per evaluator with its pass rate or its mean score. See [Results](/agent-testing/results#evaluator-results).
 
@@ -96,4 +102,4 @@ The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api
 
 A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict like a platform-run scenario's. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
 
-Also check: [Test suites](/agent-testing/test-suites), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces).
+Also check: [Grade runs with evaluators](/agent-testing/grade-runs-with-evaluators), [Test suites](/agent-testing/test-suites), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces).
