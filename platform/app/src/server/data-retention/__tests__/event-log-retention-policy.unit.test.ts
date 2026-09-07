@@ -16,13 +16,8 @@ describe("event log retention policy", () => {
     ["join_request", "lw.identity.join_requested"],
     ["scim_sync", "lw.identity.scim_token_issued"],
     ["governance_subject", "lw.governance.vk_lifecycle"],
-    ["gateway_request", "lw.gateway.spend.confirmed"],
-    ["pulled_usage", "lw.obs.pulled_usage.observed"],
-    ["ingestion_pull", "lw.obs.ingestion_pull.run_completed"],
-    ["trigger", "lw.automation.trigger.match_recorded"],
-    ["coding_agent_session", "lw.obs.coding_agent_session.span_facts_contributed"],
   ])("for %s", (aggregateType, eventType) => {
-    it("retains the durable event family indefinitely", () => {
+    it("retains the security event indefinitely", () => {
       expect(
         classifyEventLogRowRetention({
           AggregateType: aggregateType,
@@ -32,7 +27,7 @@ describe("event log retention policy", () => {
     });
   });
 
-  it("uses event prefixes as a safety net for legacy control-plane rows", () => {
+  it("uses security event types as a safety net for legacy aggregate rows", () => {
     expect(
       classifyEventLogRowRetention({
         AggregateType: "historical_identity_aggregate",
@@ -41,8 +36,14 @@ describe("event log retention policy", () => {
     ).toBe("indefinite");
     expect(
       classifyEventLogRowRetention({
+        AggregateType: "historical_authz_aggregate",
+        EventType: "lw.authz.historical_event",
+      }),
+    ).toBe("indefinite");
+    expect(
+      classifyEventLogRowRetention({
         AggregateType: "historical_governance_aggregate",
-        EventType: "lw.governance.historical_event",
+        EventType: "lw.governance.vk_lifecycle",
       }),
     ).toBe("indefinite");
   });
@@ -54,6 +55,12 @@ describe("event log retention policy", () => {
     ["evaluation", "lw.eval.evaluation.completed", "traces"],
     ["langy_conversation", "lw.langy_conversation.message_recorded", "traces"],
     ["topic_clustering", "lw.obs.topic_clustering.topics_recorded", "traces"],
+    ["gateway_request", "lw.gateway.spend.confirmed", "traces"],
+    ["pulled_usage", "lw.obs.pulled_usage.observed", "traces"],
+    ["ingestion_pull", "lw.obs.ingestion_pull.run_completed", "traces"],
+    ["trigger", "lw.automation.trigger.match_recorded", "traces"],
+    ["coding_agent_session", "lw.obs.coding_agent_session.span_facts_contributed", "traces"],
+    ["governance_subject", "lw.governance.budget_crossing", "traces"],
     ["billing_report", "lw.billing_report.historical_event", "traces"],
     ["global", "lw.maintenance.historical_event", "traces"],
     ["simulation_run", "lw.simulation_run.started", "scenarios"],
@@ -61,7 +68,7 @@ describe("event log retention policy", () => {
     ["suite_run", "lw.suite_run.started", "scenarios"],
     ["experiment_run", "lw.experiment_run.started", "experiments"],
   ])("for %s", (aggregateType, eventType, expectedCategory) => {
-    it("keeps payload-bearing rows on their customer retention category", () => {
+    it("keeps policy-bound rows on their customer retention category", () => {
       expect(
         classifyEventLogRowRetention({
           AggregateType: aggregateType,
@@ -84,19 +91,12 @@ describe("event log retention policy", () => {
   );
 
   it("derives the indefinite ClickHouse predicate from the same policy", () => {
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
-      "startsWith(EventType, 'lw.identity.')",
+    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toBe(
+      "(startsWith(EventType, 'lw.identity.') OR startsWith(EventType, 'lw.authz.') OR " +
+        "EventType IN ('lw.governance.vk_lifecycle') OR " +
+        "AggregateType IN ('authz_grant', 'authz_role', 'user_identity', 'sso_connection', " +
+        "'join_request', 'scim_sync'))",
     );
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
-      "startsWith(EventType, 'lw.authz.')",
-    );
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
-      "startsWith(EventType, 'lw.governance.')",
-    );
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain("'coding_agent_session'");
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain("'gateway_request'");
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).not.toContain("'langy_conversation'");
-    expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).not.toContain("'topic_clustering'");
   });
 
   it("derives disjoint ClickHouse predicates for finite categories", () => {

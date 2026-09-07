@@ -39,12 +39,12 @@ Feature: Retention stamping at ingestion time
     When an experiment run event is recorded for this project
     Then its event_log record has _retention_days = 91
 
-  Scenario: Explicitly durable event families are retained indefinitely
-    When identity, MFA, SSO, join-request, SCIM, authorization, governance, gateway-spend, pulled-usage, ingestion-pull, automation-trigger, or coding-agent-fact events are recorded
+  Scenario: Security events are retained indefinitely
+    When identity, MFA, SSO, join-request, SCIM, authorization, or virtual-key lifecycle events are recorded
     Then their event_log records have _retention_days = 0
 
-  Scenario: Payload-bearing event families remain policy-bound
-    When trace, log, metric, evaluation, Langy-conversation, or topic-model events are recorded
+  Scenario: Non-security event families remain policy-bound
+    When trace, log, metric, evaluation, Langy-conversation, topic-model, governance budget-crossing, gateway-spend, pulled-usage, ingestion-pull, automation-trigger, or coding-agent-fact events are recorded
     Then their event_log records use the traces retention category
 
   Scenario: No retention policy defaults to the platform default
