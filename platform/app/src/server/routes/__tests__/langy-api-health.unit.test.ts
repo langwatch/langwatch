@@ -14,6 +14,7 @@
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LangyIdentityDenialReason } from "~/server/app-layer/langy/langyApiKeyIdentity";
 
 // ─── Auth mocks (same seam as langy-api-refusal-chain.unit.test.ts) ───────────
 const mockResolve = vi.fn();
@@ -187,6 +188,27 @@ describe("GET /api/langy/health", () => {
       const res = await getHealth();
 
       expect(res.status).toBe(403);
+      expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a project API key owned by a user without Langy access", () => {
+    beforeEach(() => {
+      mockResolveLangyKeyIdentity.mockResolvedValue({
+        ok: false,
+        reason: "no-access" satisfies LangyIdentityDenialReason,
+        message: "no access",
+      });
+    });
+
+    /** @scenario "A key whose owner is outside the Langy cohort is refused" */
+    it("responds 403 with the cohort denial code and starts no turn", async () => {
+      const res = await getHealth();
+
+      expect(res.status).toBe(403);
+      expect(JSON.stringify(await res.json())).toContain(
+        "langy_api_key_no_langy_access",
+      );
       expect(mockRunLangyHealthCanary).not.toHaveBeenCalled();
     });
   });

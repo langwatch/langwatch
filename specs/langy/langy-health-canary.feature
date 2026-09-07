@@ -175,6 +175,13 @@ Feature: A Langy health check that sends a real greeting and says what broke
     And no turn is started
 
   @unit
+  Scenario: A key whose owner is outside the Langy cohort is refused
+    Given a project API key owned by a user without Langy access
+    When GET /api/langy/health is called
+    Then the response is 403 with code "langy_api_key_no_langy_access"
+    And no turn is started
+
+  @unit
   Scenario: A healthy run answers 200 with the turn's ids
     Given the canary reports healthy
     When GET /api/langy/health is called with a valid key
