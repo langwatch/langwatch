@@ -62,7 +62,11 @@ export type TalkState =
 export type TalkEvent =
   | { type: "START" }
   | { type: "MIC_DENIED" }
-  | { type: "MINT_FAILED"; code: "key_missing" | "mint_failed"; message: string }
+  | {
+      type: "MINT_FAILED";
+      code: "key_missing" | "mint_failed";
+      message: string;
+    }
   | { type: "CONNECTED"; conversationId: string }
   | { type: "TRANSCRIPT"; turn: VoiceTurn }
   | { type: "TICK"; elapsedMs: number }

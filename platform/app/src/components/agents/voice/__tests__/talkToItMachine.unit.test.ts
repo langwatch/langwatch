@@ -4,12 +4,12 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  initialTalkState,
   MIC_DENIED_MESSAGE,
   MINT_FAILED_PREFIX,
   NO_KEY_MESSAGE,
-  initialTalkState,
-  talkReducer,
   type TalkState,
+  talkReducer,
 } from "../talkToItMachine";
 
 function drive(events: Parameters<typeof talkReducer>[1][]): TalkState {
@@ -47,7 +47,10 @@ describe("talkReducer", () => {
         { type: "START" },
         { type: "MINT_FAILED", code: "key_missing", message: "ignored" },
       ]);
-      expect(state).toMatchObject({ code: "key_missing", message: NO_KEY_MESSAGE });
+      expect(state).toMatchObject({
+        code: "key_missing",
+        message: NO_KEY_MESSAGE,
+      });
     });
   });
 

@@ -54,7 +54,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the run shows caller "Simulated"
 
   # AC23, AC24
-  @e2e @unimplemented
+  @e2e
   Scenario: Call it myself against a scenario and be scored on its criteria
     Given the voice agent "Support line"
     And a scenario "Angry cancellation" with criteria
@@ -223,7 +223,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC25
-  @integration @unimplemented
+  @integration
   Scenario: Existing HTTP, Code and Workflow agent flows are unchanged
     Given an HTTP agent, a Code agent and a Workflow agent already registered
     When each is created, edited and run as before
@@ -231,7 +231,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And a scenario with an HTTP target runs with no Caller voice group and no "Call it myself" button
 
   # AC26
-  @integration @unimplemented
+  @integration
   Scenario: No ElevenLabs key leaves the server through any response or log
     Given a project with an ElevenLabs key configured
     When a session is minted, a call is completed and a simulated run is completed

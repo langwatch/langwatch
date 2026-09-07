@@ -4,23 +4,25 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { CallRecord } from "../call-record";
+import {
+  finishVoiceSession,
+  mintVoiceSession,
+  VoiceKeyMissingError,
+  type VoiceSessionPorts,
+} from "../voice-session.service";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
 } from "../voice-transport.registry";
-import {
-  VoiceKeyMissingError,
-  type VoiceSessionPorts,
-  finishVoiceSession,
-  mintVoiceSession,
-} from "../voice-session.service";
 
 const CREDENTIAL: VoiceTransportCredential = {
   apiKey: "sk-secret-123",
   baseUrl: "https://api.elevenlabs.io",
 };
 
-function fakeRunner(over: Partial<VoiceTransportRunner> = {}): VoiceTransportRunner {
+function fakeRunner(
+  over: Partial<VoiceTransportRunner> = {},
+): VoiceTransportRunner {
   return {
     missingKeyMessage: "No ElevenLabs key in this project",
     createAgentAdapter: () => ({}) as never,
@@ -39,7 +41,8 @@ function fakePorts(
     findExistingRun: vi.fn(async () => null),
     createVoiceAgent: vi.fn(async () => ({ id: "agent_created" })),
     writeCallRun: vi.fn(async () => {}),
-    audioProxyUrl: ({ conversationId }) => `/api/voice/session/${conversationId}/audio`,
+    audioProxyUrl: ({ conversationId }) =>
+      `/api/voice/session/${conversationId}/audio`,
     now: () => 1000,
     newSessionId: () => "sess_generated",
     registry: { elevenlabs_convai: runner },
@@ -167,6 +170,75 @@ describe("finishVoiceSession", () => {
         record: CallRecord;
       };
       expect(written.record.cutAtLimit).toBe(true);
+    });
+  });
+
+  describe("when the call is scored under a scenario", () => {
+    /** @scenario "Call it myself against a scenario and be scored on its criteria" */
+    it("writes the run under the scenario and its set so the scenario grades it", async () => {
+      const runner = fakeRunner();
+      const writeCallRun = vi.fn(async () => {});
+      const resolveScenarioSet = vi.fn(async () => ({
+        scenarioSetId: "set_x",
+      }));
+      const ports = fakePorts(runner, {
+        writeCallRun,
+        resolveScenarioSet,
+        createVoiceAgent: vi.fn(async () => ({ id: "agent_row" })),
+      });
+
+      const result = await finishVoiceSession(ports, {
+        ...FINISH_BASE,
+        agentRowId: "agent_row",
+        scenarioId: "scenario_1",
+      });
+
+      expect(resolveScenarioSet).toHaveBeenCalledWith({
+        projectId: "p1",
+        scenarioId: "scenario_1",
+      });
+      expect(writeCallRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+        }),
+      );
+      expect(result.scenarioSetId).toBe("set_x");
+    });
+
+    it("keeps a drawer call out of any scenario set when no scenario is named", async () => {
+      const runner = fakeRunner();
+      const writeCallRun = vi.fn(async () => {});
+      const resolveScenarioSet = vi.fn(async () => ({
+        scenarioSetId: "set_x",
+      }));
+      const ports = fakePorts(runner, { writeCallRun, resolveScenarioSet });
+
+      const result = await finishVoiceSession(ports, {
+        ...FINISH_BASE,
+        agentRowId: "agent_row",
+      });
+
+      expect(resolveScenarioSet).not.toHaveBeenCalled();
+      expect(writeCallRun.mock.calls[0]?.[0]).not.toHaveProperty("scenario");
+      expect(result.scenarioSetId).toBeUndefined();
+    });
+  });
+
+  describe("when a scenario call is finished", () => {
+    /** @scenario "No ElevenLabs key leaves the server through any response or log" */
+    it("returns no ElevenLabs key in the finish response", async () => {
+      const runner = fakeRunner();
+      const ports = fakePorts(runner, {
+        resolveScenarioSet: vi.fn(async () => ({ scenarioSetId: "set_x" })),
+      });
+
+      const result = await finishVoiceSession(ports, {
+        ...FINISH_BASE,
+        agentRowId: "agent_row",
+        scenarioId: "scenario_1",
+      });
+
+      expect(JSON.stringify(result)).not.toContain(CREDENTIAL.apiKey);
     });
   });
 

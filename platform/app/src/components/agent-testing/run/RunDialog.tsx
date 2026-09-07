@@ -15,8 +15,12 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
+import { Button, VStack } from "@chakra-ui/react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useState } from "react";
+import { TalkToItPanel } from "~/components/agents/voice/TalkToItPanel";
 import { Dialog } from "~/components/ui/dialog";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { OpenListContext } from "../shared/OpenListContext";
 import { RunDialogFields } from "./RunDialogFields";
 import { RunDialogFooter } from "./RunDialogFooter";
@@ -28,6 +32,7 @@ import {
   type RunDialogController,
   useRunDialogSubmit,
 } from "./useRunDialogSubmit";
+import { voiceCallTargetOf } from "./voice-call-target";
 
 export type {
   RunDialogProps,
@@ -211,6 +216,12 @@ function RunDialogContent({
   subject: RunDialogSubject;
   onClose: () => void;
 } & ReturnType<typeof useRunDialogState>) {
+  const { project } = useOrganizationTeamProject();
+  // The panel opens in place of the fields when the person calls the agent
+  // themselves; leaving the call returns to the dialog it was opened from.
+  const [calling, setCalling] = useState(false);
+  const voiceCall = voiceCallTargetOf({ form, subject });
+
   return (
     <Dialog.Root
       open={!!subject}
@@ -230,30 +241,64 @@ function RunDialogContent({
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
         <RunDialogHeader subject={subject} />
-        <Dialog.Body
-          paddingX={5}
-          paddingY={4}
-          maxHeight="58vh"
-          overflowY="auto"
-        >
-          <OpenListContext.Provider value={reportOpenList}>
-            <RunDialogFields
-              form={form}
-              isBusy={controller.isBusy}
-              onNameListOpenChange={setIsNameListOpen}
+        {calling && voiceCall ? (
+          <Dialog.Body
+            paddingX={5}
+            paddingY={4}
+            maxHeight="58vh"
+            overflowY="auto"
+          >
+            <VStack align="stretch" gap={3} data-testid="run-dialog-call">
+              <Button
+                variant="ghost"
+                size="sm"
+                alignSelf="flex-start"
+                onClick={() => setCalling(false)}
+                data-testid="run-dialog-call-back"
+              >
+                <ArrowLeft size={16} /> Back
+              </Button>
+              <TalkToItPanel
+                projectId={project?.id ?? ""}
+                projectSlug={project?.slug ?? ""}
+                transport={voiceCall.transport}
+                agentId={voiceCall.agentId}
+                agentRowId={voiceCall.agentRowId}
+                {...(voiceCall.scenarioId
+                  ? { scenarioId: voiceCall.scenarioId }
+                  : {})}
+              />
+            </VStack>
+          </Dialog.Body>
+        ) : (
+          <>
+            <Dialog.Body
+              paddingX={5}
+              paddingY={4}
+              maxHeight="58vh"
+              overflowY="auto"
+            >
+              <OpenListContext.Provider value={reportOpenList}>
+                <RunDialogFields
+                  form={form}
+                  isBusy={controller.isBusy}
+                  onNameListOpenChange={setIsNameListOpen}
+                />
+              </OpenListContext.Provider>
+            </Dialog.Body>
+            <RunDialogFooter
+              controller={controller}
+              isRunBlocked={isRunBlocked({ form, controller })}
+              blockedReason={runBlockedReason({ subject, form, controller })}
+              warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
+              onRun={onRun}
+              {...(voiceCall ? { onCallItMyself: () => setCalling(true) } : {})}
+              caseCount={form.caseCount}
+              targetCount={form.runTargets.length}
+              onClose={onClose}
             />
-          </OpenListContext.Provider>
-        </Dialog.Body>
-        <RunDialogFooter
-          controller={controller}
-          isRunBlocked={isRunBlocked({ form, controller })}
-          blockedReason={runBlockedReason({ subject, form, controller })}
-          warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
-          onRun={onRun}
-          caseCount={form.caseCount}
-          targetCount={form.runTargets.length}
-          onClose={onClose}
-        />
+          </>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );

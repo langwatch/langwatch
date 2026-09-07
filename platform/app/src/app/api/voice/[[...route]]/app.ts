@@ -32,6 +32,8 @@ import {
   findElevenLabsProviderForProject,
   getElevenLabsApiCredential,
 } from "~/server/gateway/elevenLabsCredential.service";
+import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
+import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
 import { voiceCallMaxSeconds } from "~/server/scenarios/voice/voice-limits";
 import { writeVoiceCallRun } from "~/server/scenarios/voice/voice-run-writer";
 import {
@@ -43,6 +45,7 @@ import {
   type VoiceSessionPorts,
 } from "~/server/scenarios/voice/voice-session.service";
 import type { VoiceTransportCredential } from "~/server/scenarios/voice/voice-transport.registry";
+import { getSuiteSetId } from "~/server/suites/suite-set-id";
 
 const logger = createLogger("langwatch:api:voice-session");
 
@@ -91,6 +94,21 @@ const ports: VoiceSessionPorts = {
     return { id: created.id };
   },
   writeCallRun: writeVoiceCallRun,
+  // A "Call it myself" run lands in the set the scenario's runs live in: the
+  // scenario's test-suite set when it is filed in one, else the project's
+  // on-platform set. This is the listing its simulated runs share.
+  async resolveScenarioSet({ projectId, scenarioId }) {
+    const scenario = await new ScenarioRepository(prisma).findById({
+      projectId,
+      id: scenarioId,
+    });
+    if (!scenario) return null;
+    return {
+      scenarioSetId: scenario.testSuiteId
+        ? getSuiteSetId(scenario.testSuiteId)
+        : getOnPlatformSetId(projectId),
+    };
+  },
   audioProxyUrl: ({ conversationId }) =>
     `/api/voice/session/${encodeURIComponent(conversationId)}/audio`,
   now: () => Date.now(),
@@ -193,6 +211,9 @@ secured
         startedAt: z.number(),
         endedAt: z.number(),
         cutAtLimit: z.boolean().default(false),
+        // Set for a "Call it myself" run: the scenario the call is written
+        // under and scored against (AC23). Absent for a drawer call.
+        scenarioId: z.string().trim().min(1).optional(),
       }),
     ),
     async (c) => {

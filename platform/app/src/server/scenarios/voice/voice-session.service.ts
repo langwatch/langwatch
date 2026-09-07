@@ -69,14 +69,24 @@ export interface VoiceSessionPorts {
     transport: VoiceTransport;
     agentId: string;
   }): Promise<{ id: string }>;
-  /** Write the call down as a run the results pages render. */
+  /** Write the call down as a run the results pages render. When `scenario`
+   *  is given the run lands under that scenario (a "Call it myself" run);
+   *  otherwise it lands in the voice-call set (a drawer call). */
   writeCallRun(input: {
     projectId: string;
     scenarioRunId: string;
     agentRowId: string;
     agentDisplayName: string;
     record: CallRecord;
+    scenario?: { scenarioId: string; scenarioSetId: string };
   }): Promise<void>;
+  /** The set a scenario's runs are listed under, so a "Call it myself" run
+   *  lands beside that scenario's simulated runs. Null when the scenario is
+   *  gone. Absent when the deployment never runs scenario calls. */
+  resolveScenarioSet?(input: {
+    projectId: string;
+    scenarioId: string;
+  }): Promise<{ scenarioSetId: string } | null>;
   /** Same-origin proxy path the browser plays the recording through. */
   audioProxyUrl(input: { conversationId: string }): string;
   now(): number;
@@ -150,6 +160,9 @@ export interface FinishResult {
    *  the panel shows the fetch-failed notice (AC15). */
   fetchFailed: boolean;
   hasAudio: boolean;
+  /** The set the run landed in, so the panel links to it. Set only for a
+   *  "Call it myself" run written under a scenario. */
+  scenarioSetId?: string;
 }
 
 /**
@@ -175,10 +188,26 @@ export async function finishVoiceSession(
     cutAtLimit: boolean;
     conversationId?: string;
     sessionId: string;
+    /** Set for a "Call it myself" run: the scenario the call is scored under
+     *  (AC23). Absent for a drawer call. */
+    scenarioId?: string;
   },
 ): Promise<FinishResult> {
   const conversationId = input.conversationId?.trim() || input.sessionId;
   const scenarioRunId = scenarioRunIdForConversation(conversationId);
+
+  // A scenario call resolves the set its scenario's runs live in, so the run
+  // lands beside that scenario's simulated runs and the panel can link to it.
+  const scenario = input.scenarioId
+    ? await ports.resolveScenarioSet?.({
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+      })
+    : null;
+  const scenarioContext =
+    input.scenarioId && scenario
+      ? { scenarioId: input.scenarioId, scenarioSetId: scenario.scenarioSetId }
+      : undefined;
 
   const existing = await ports.findExistingRun({
     projectId: input.projectId,
@@ -191,6 +220,9 @@ export async function finishVoiceSession(
       source: "provider",
       fetchFailed: false,
       hasAudio: false,
+      ...(scenarioContext
+        ? { scenarioSetId: scenarioContext.scenarioSetId }
+        : {}),
     };
   }
 
@@ -250,6 +282,7 @@ export async function finishVoiceSession(
     agentRowId,
     agentDisplayName,
     record,
+    ...(scenarioContext ? { scenario: scenarioContext } : {}),
   });
 
   return {
@@ -258,5 +291,8 @@ export async function finishVoiceSession(
     source: record.source,
     fetchFailed,
     hasAudio: Boolean(record.audioUrl),
+    ...(scenarioContext
+      ? { scenarioSetId: scenarioContext.scenarioSetId }
+      : {}),
   };
 }

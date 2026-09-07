@@ -12,12 +12,18 @@ describe("voice countdown", () => {
       const max = 90;
 
       // 60s or fewer before the limit → flagged.
-      const nearEnd = remainingSeconds({ elapsedMs: 45_000, maxCallSeconds: max });
+      const nearEnd = remainingSeconds({
+        elapsedMs: 45_000,
+        maxCallSeconds: max,
+      });
       expect(nearEnd).toBe(45);
       expect(isRedCountdown(nearEnd)).toBe(true);
 
       // More than 60s before the limit → not flagged.
-      const early = remainingSeconds({ elapsedMs: 10_000, maxCallSeconds: max });
+      const early = remainingSeconds({
+        elapsedMs: 10_000,
+        maxCallSeconds: max,
+      });
       expect(early).toBe(80);
       expect(isRedCountdown(early)).toBe(false);
     });
