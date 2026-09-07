@@ -50,45 +50,7 @@ export class PrismaPasskeyRemovalRepository implements PasskeyRemovalPort {
   }): Promise<PasskeyRemovalOutcome> {
     for (let attempt = 0; attempt < MAX_SERIALIZATION_ATTEMPTS; attempt++) {
       try {
-        return await this.deps.prisma.$transaction(
-          async (tx): Promise<PasskeyRemovalOutcome> => {
-            const target = await tx.passkey.findUnique({
-              where: { id: passkeyId },
-              select: { userId: true },
-            });
-            if (target === null) {
-              return "not_found";
-            }
-
-            const identityCredentials = await this.deps.routesToIdentity({
-              userId: target.userId,
-            });
-            const [otherPasskeys, credentials] = await Promise.all([
-              tx.passkey.count({
-                where: { userId: target.userId, id: { not: passkeyId } },
-              }),
-              identityCredentials
-                ? tx.accountCredential.findMany({
-                    where: { userId: target.userId },
-                    select: { provider: true, password: true },
-                  })
-                : tx.account.findMany({
-                    where: { userId: target.userId },
-                    select: { provider: true, password: true },
-                  }),
-            ]);
-
-            if (otherPasskeys === 0 && !credentials.some(isUsableCredential)) {
-              return "would_strand_user";
-            }
-
-            const deleted = await tx.passkey.deleteMany({
-              where: { id: passkeyId, userId: target.userId },
-            });
-            return deleted.count === 0 ? "not_found" : "deleted";
-          },
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        );
+        return await this.deleteOnce(passkeyId);
       } catch (error) {
         if (
           attempt + 1 < MAX_SERIALIZATION_ATTEMPTS &&
@@ -100,5 +62,52 @@ export class PrismaPasskeyRemovalRepository implements PasskeyRemovalPort {
       }
     }
     throw new Error("unreachable: passkey removal retries exhausted");
+  }
+
+  private async deleteOnce(passkeyId: string): Promise<PasskeyRemovalOutcome> {
+    return await this.deps.prisma.$transaction(
+      (tx) => this.deleteInTransaction({ tx, passkeyId }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  private async deleteInTransaction({
+    tx,
+    passkeyId,
+  }: {
+    tx: Prisma.TransactionClient;
+    passkeyId: string;
+  }): Promise<PasskeyRemovalOutcome> {
+    const target = await tx.passkey.findUnique({
+      where: { id: passkeyId },
+      select: { userId: true },
+    });
+    if (target === null) return "not_found";
+
+    const identityCredentials = await this.deps.routesToIdentity({
+      userId: target.userId,
+    });
+    const [otherPasskeys, credentials] = await Promise.all([
+      tx.passkey.count({
+        where: { userId: target.userId, id: { not: passkeyId } },
+      }),
+      identityCredentials
+        ? tx.accountCredential.findMany({
+            where: { userId: target.userId },
+            select: { provider: true, password: true },
+          })
+        : tx.account.findMany({
+            where: { userId: target.userId },
+            select: { provider: true, password: true },
+          }),
+    ]);
+    if (otherPasskeys === 0 && !credentials.some(isUsableCredential)) {
+      return "would_strand_user";
+    }
+
+    const deleted = await tx.passkey.deleteMany({
+      where: { id: passkeyId, userId: target.userId },
+    });
+    return deleted.count === 0 ? "not_found" : "deleted";
   }
 }
