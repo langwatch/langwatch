@@ -118,7 +118,7 @@ export function InsightsSetupDialog({
       <DialogContent>
         <DialogHeader>
           <HStack gap={3} align="baseline">
-            <Sparkles size={18} color="var(--chakra-colors-purple-500)" />
+            <Sparkles size={18} />
             <DialogTitle>Insights</DialogTitle>
             <Text fontSize="sm" color="fg.muted">
               schedule, session and skill
@@ -251,7 +251,7 @@ export function InsightsSetupDialog({
           <Button variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button colorPalette="purple" onClick={() => onSave(draft)}>
+          <Button colorPalette="orange" onClick={() => onSave(draft)}>
             Save
           </Button>
         </DialogFooter>

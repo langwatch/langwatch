@@ -50,7 +50,7 @@ function InsightsPage() {
           borderRadius="xl"
         >
           <Box
-            background="gray.900"
+            background="fg"
             borderRadius="xl"
             width="72px"
             height="72px"
@@ -68,7 +68,7 @@ function InsightsPage() {
             files a couple of high-signal insights: not fifteen a day.
           </Text>
           <HStack gap={3} paddingTop={2}>
-            <Button colorPalette="purple" onClick={() => setSetupOpen(true)}>
+            <Button colorPalette="orange" onClick={() => setSetupOpen(true)}>
               Set up data
             </Button>
             <Button
@@ -78,7 +78,7 @@ function InsightsPage() {
               Open Langy
             </Button>
           </HStack>
-          <Button variant="plain" size="sm" color="purple.600">
+          <Button variant="plain" size="sm" color="fg.muted">
             or preview a sample inbox
           </Button>
         </VStack>

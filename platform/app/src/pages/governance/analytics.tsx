@@ -125,7 +125,7 @@ function AnalyticsPage() {
                       key={template.label}
                       size="xs"
                       variant={active ? "subtle" : "outline"}
-                      colorPalette={active ? "purple" : "gray"}
+                      colorPalette={active ? "orange" : "gray"}
                       borderRadius="full"
                       fontWeight={active ? "medium" : "normal"}
                       onClick={() => setSelection(template.selection)}
@@ -216,8 +216,8 @@ function AnalyticsPage() {
               >
                 <HStack gap={3}>
                   <Badge
-                    background="gray.900"
-                    color="white"
+                    background="fg"
+                    color="bg"
                     fontFamily="mono"
                     fontSize="xs"
                   >

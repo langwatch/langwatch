@@ -33,7 +33,7 @@ function SignalsPage() {
               <BellPlus size={16} />
               New alert
             </Button>
-            <Button colorPalette="purple">
+            <Button colorPalette="orange">
               <Target size={16} />
               New signal
             </Button>
@@ -46,10 +46,7 @@ function SignalsPage() {
             <Text fontSize="sm" color="fg.muted">
               alerts notify, automations act: one registry of rules. Recent
               fires land in the{" "}
-              <Link href="/governance/insights" color="purple.600">
-                Insights inbox
-              </Link>
-              .
+              <Link href="/governance/insights">Insights inbox</Link>.
             </Text>
           </HStack>
           <VStack
@@ -69,10 +66,8 @@ function SignalsPage() {
 
         <Text fontSize="sm" color="fg.muted">
           Judges run on the org&apos;s{" "}
-          <Link href="/settings/model-providers" color="purple.600">
-            model providers
-          </Link>{" "}
-          (the same credentials the Gateway routes through).
+          <Link href="/settings/model-providers">model providers</Link> (the
+          same credentials the Gateway routes through).
         </Text>
       </VStack>
     </GovernanceLayout>

@@ -251,6 +251,9 @@ function SectionItemsNav({
   return (
     <>
       {ungrouped.map(renderLink)}
+      {/* The groups sit at the foot of the column, above the bottom block,
+          so the product's own pages stay in one place at the top. */}
+      {groups.size > 0 && <Box flex={1} width="full" />}
       {[...groups.entries()].map(([group, groupItems]) => (
         <SidebarSection
           key={group}
