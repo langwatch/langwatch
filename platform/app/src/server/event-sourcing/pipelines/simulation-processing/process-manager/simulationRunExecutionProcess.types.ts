@@ -202,7 +202,14 @@ export const simulationRunProcessEventViewSchema = z.object({
   name: z.string().nullable(),
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+      type: z.enum([
+        "prompt",
+        "http",
+        "code",
+        "workflow",
+        "connected",
+        "voice",
+      ]),
       referenceId: z.string(),
     })
     .nullable(),

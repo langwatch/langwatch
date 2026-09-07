@@ -898,11 +898,9 @@ export const buildCodeNodeFromAgent = (
       outputs,
       // The caller dispatched on `agent.type === "code"`, so the parameters
       // are the code node's own fields.
-      parameters: (
-        "sdk" in config || !("parameters" in config)
-          ? []
-          : (config.parameters ?? [])
-      ) as Field[],
+      parameters: ("sdk" in config || !("parameters" in config)
+        ? []
+        : (config.parameters ?? [])) as Field[],
       cls: "Code",
     },
   };
