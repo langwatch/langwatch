@@ -85,10 +85,10 @@ Feature: Signing up never strands an account
     Then exactly one creates and owns the pending account
     And the other is refused without adopting it
 
-  @unit
+  @integration
   Scenario: Client session flags cannot bypass address confirmation
     Given a new local account is awaiting address confirmation
-    When the canonical session gate receives a client-requested session mint
+    When a client requests passkey registration with createSession enabled
     Then session creation is refused until a valid emailed proof is consumed
 
   @integration
