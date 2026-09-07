@@ -1,8 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { BetterAuthPlugin } from "better-auth";
+import type { BetterAuthPlugin, GenericEndpointContext } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
-import type { Status } from "better-call";
 import { z } from "zod";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
 import type {
@@ -11,6 +10,7 @@ import type {
 } from "./session-minter";
 
 const logger = createLogger("langwatch:better-auth:sign-up-confirmation");
+type BetterAuthStatus = Parameters<GenericEndpointContext["setStatus"]>[0];
 
 /** The path the sign-up screen posts a spent link to. */
 export const SIGN_UP_CONFIRM_ADDRESS_PATH = "/sign-up/confirm-address";
@@ -45,10 +45,10 @@ export interface SignUpConfirmationDirectoryPort {
  */
 export interface ConfirmSignUpAddressContext extends SessionMintingContext {
   body: { token: string };
-  setStatus: (status: Status) => void;
+  setStatus: (status: BetterAuthStatus) => void;
   json: (
     body: Record<string, unknown> | null,
-    init?: { status?: Status },
+    init?: { status?: BetterAuthStatus },
   ) => unknown;
 }
 

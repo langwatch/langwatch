@@ -136,7 +136,7 @@ function buildHarness() {
     }),
     signInAfterPasswordReset: async () => {},
   });
-  const beforeHook = configuredHooks.before;
+  const beforeHook = configuredHooks?.before;
   if (!beforeHook) {
     throw new Error("the request hook did not configure a before handler");
   }
