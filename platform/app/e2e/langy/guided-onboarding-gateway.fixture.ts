@@ -36,9 +36,17 @@ export const KEY_NAME = "production-app";
 
 export const GATEWAY_CRITERIA = [
   `Langy says, word for word: "${GUIDED_LINES.gatewayLive}"`,
-  "Langy shows the environment snippet through the secret snippet card, and writes no value that starts with vk-lw- in any message.",
+  // The key's display prefix is a short vk-lw- value the product itself
+  // prints, on the masked card and in the keys list, and it reaches the
+  // transcript in the secret_snippet call. Only the secret is forbidden, so
+  // the criterion has to say which of the two it means.
+  "Langy shows the environment snippet through the secret snippet card, and writes no key secret in any message. A secret is a long vk-lw- value, around thirty characters; the key's short display prefix is not one, and neither is a reveal id.",
   `Langy ends with, word for word: "${GUIDED_LINES.gatewayClose}"`,
-  "Langy asks the user no question and hands over no step; the closing line's offer to help is the copy, not a question.",
+  // The two lines above are required word for word, and the first of them
+  // tells the user to point their app at the gateway. Without the carve-out
+  // the judge is handed two criteria that cannot both hold, and which one
+  // wins is a coin flip.
+  "Langy asks the user no question and hands over no step of its own; the closing line's offer to help is the copy, not a question, and a line Langy is required to say word for word does not count, whatever it tells the user to do.",
   ...GUIDED_TONE_CRITERIA,
 ];
 
