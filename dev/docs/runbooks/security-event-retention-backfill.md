@@ -7,6 +7,12 @@ run. Run it after the PR1 code is deployed and before the oldest affected rows
 reach their current TTL. A mutation cannot restore rows ClickHouse has already
 deleted.
 
+Identity, credential, SSO, SCIM, membership, and authorization projections
+are PostgreSQL state and are not part of tenant-retention sweeps. This runbook
+does not mutate them. Explicit product operations such as revocation,
+teardown, and privacy erasure remain authoritative; short-lived sessions and
+verification proofs continue to expire normally.
+
 Run this once against every ClickHouse database that stores `event_log`,
 including private data-plane databases. Do not run it against a `Distributed`
 view. In a sharded deployment, submit it once to the underlying table on each
