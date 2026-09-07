@@ -61353,6 +61353,137 @@ other part of your install is left as it was.
 
 ---
 
+# FILE: ./self-hosting/langy/uptime-monitoring.mdx
+
+---
+title: Langy Uptime Monitoring
+description: "Prove on a schedule that Langy still answers, with a Better Stack monitor that starts a real turn"
+sidebarTitle: Uptime monitoring
+---
+
+A pod being up does not mean the assistant answers. The check on this page
+starts a real Langy turn from outside the cluster every few minutes, waits for
+the reply, and pages when there is none. It runs on
+[Better Stack](https://betterstack.com/uptime) as a Playwright monitor and needs
+no platform code: it is a client of the same `POST /api/langy/conversations`
+route scripts and CI use.
+
+## What one check does
+
+```
+Better Stack (one region)
+   │  every 3 minutes
+   ▼
+mint a random idempotencyKey
+   │
+   ▼
+POST {LANGY_BASE_URL}/api/langy/conversations
+  X-Auth-Token: <Langy user API key>
+  Prefer: wait=30
+  { "messages": [{ "role": "user", "content": "Hi Langy." }],
+    "idempotencyKey": "<uuid>" }
+   │
+   ▼
+200 + reply.text  ──► healthy
+anything else     ──► unhealthy, with a reason (table below)
+```
+
+The turn is real: it shows up in the monitoring project's Langy history, it
+uses the project's configured model, and it costs one short completion per
+check.
+
+### Why it must be a scripted monitor
+
+Every turn request carries an `idempotencyKey`. The platform resolves a repeated
+key for the same project and user to the turn it already ran, and returns that
+turn's stored reply without running the assistant again. A plain HTTP monitor
+sends the same body every time, so from the second check on it would be reading
+a stored reply and stay green while Langy is down. The Playwright script mints a
+new key on every run.
+
+## Setup
+
+### 1. A project, a user, and a key
+
+Create these once, by hand, in the deployment you want to watch:
+
+1. **A dedicated project** for monitoring. Nothing else should live in it.
+2. **A dedicated user** who is a member of that project and has Langy access
+   (the Langy cohort). The check runs as this user; do not reuse a person's
+   account.
+3. **A project API key owned by that user** with the `langy:create`
+   permission. Keys are issued in the project's settings; the key must be
+   minted while signed in as the monitoring user, because the platform resolves
+   the key to its owner and judges access per user.
+4. **The feature flag** `release_langy_api_key_turns_enabled` on for the
+   monitoring project. While it is off the route answers 404 and the monitor
+   reports `surface_dark`.
+
+### 2. Provision the monitor
+
+The monitor is created and kept up to date by a script in the repository, so
+its definition lives in git rather than in a dashboard form.
+
+```bash
+cd platform/app
+BETTERSTACK_API_TOKEN=... \
+LANGY_BASE_URL=https://langwatch.example.com \
+LANGY_API_KEY=<the key from step 1> \
+npx tsx scripts/uptime/upsert-langy-greeting-monitor.ts --dry-run
+```
+
+The dry run prints the monitor definition with the key redacted and writes
+nothing. Drop `--dry-run` to create the monitor, or to update it in place if one
+with the same name already exists. Run it again after any change to the script
+in `scripts/uptime/langy-greeting.betterstack.js`.
+
+| Variable | Required | Default | Meaning |
+|---|---|---|---|
+| `BETTERSTACK_API_TOKEN` | yes | | Better Stack Uptime API token |
+| `LANGY_BASE_URL` | yes | | Deployment origin, no trailing path |
+| `LANGY_API_KEY` | yes | | The monitoring user's key. Stored as a monitor environment variable, never in the script |
+| `BETTERSTACK_MONITOR_NAME` | no | `Langy greeting` | Name the monitor is found by on later runs |
+| `BETTERSTACK_REGION` | no | `eu` | One of `us`, `eu`, `as`, `au`. One region only |
+| `BETTERSTACK_CHECK_FREQUENCY_SECONDS` | no | `180` | Must be at least 60, the monitor's timeout |
+| `BETTERSTACK_TEAM_NAME` | no | | Only with a global API token |
+
+The monitor runs from one region on purpose. Each check is a real turn, and a
+second region would double the load without adding signal.
+
+### 3. Wire the alert
+
+Attach the monitor to your escalation policy or status page in Better Stack as
+you would any other. The monitor's incident timeline carries one JSON line per
+check with the status, latency, idempotency key and turn ids, so a red check can
+be found in the platform's Langy history.
+
+## Reading a red check
+
+The script names why it failed. The reason appears in the failed assertion and
+in the logged line.
+
+| Reason | What happened | Where to look |
+|---|---|---|
+| `not_settled` | The turn was accepted but produced no reply within 30 seconds | Langy worker pod, model provider latency |
+| `turn_failed` | The turn ran and ended in an error; the error message is carried | Langy worker logs, model provider credentials and budget |
+| `empty_reply` | The turn ended with a reply that has no text | Model configuration for the monitoring project |
+| `surface_dark` | The route answered 404 | The `release_langy_api_key_turns_enabled` flag for the monitoring project, or the app not deployed |
+| `unauthorized` | The key was missing or invalid | The key was rotated or revoked; mint a new one and re-run the provisioning script |
+| `forbidden` | The key lacks `langy:create`, or its owner lost Langy access | The key's permissions, the monitoring user's cohort membership |
+| `unexpected_status` | Any other status, carried in the line (429, 5xx, redirects) | Ingress, app pods |
+| `malformed_body` | The response was not the turn envelope | A proxy or maintenance page answering in the app's place |
+| `unreachable` | The request never got an answer | DNS, ingress, network policy |
+
+## Limits
+
+- The check proves a reply exists. It does not judge whether the reply is a good
+  answer.
+- It exercises one turn with no tools, retrieval or session keys.
+- History and latency live in Better Stack. The platform keeps the turns
+  themselves in the monitoring project's Langy history.
+
+---
+
 # FILE: ./self-hosting/licensing.mdx
 
 ---
