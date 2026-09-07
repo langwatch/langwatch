@@ -1,3 +1,4 @@
+import type { IdentityUserGate } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { LastWayInRecordsPort } from "../last-way-in.service";
 
@@ -10,7 +11,10 @@ import type { LastWayInRecordsPort } from "../last-way-in.service";
  * model has one, and a sign-in method is not scoped to a project.
  */
 export class PrismaLastWayInRepository implements LastWayInRecordsPort {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly routesToIdentity: IdentityUserGate,
+  ) {}
 
   async countOtherPasskeys({
     userId,
@@ -24,17 +28,18 @@ export class PrismaLastWayInRepository implements LastWayInRecordsPort {
     });
   }
 
-  /**
-   * The legacy `Account` rows only. A user whose backfill has finalized keeps
-   * their credential on the identity branch instead — reading that branch here
-   * is the widening ADR-116 Phase 3 owns, and doing it early would change
-   * which removals this guard refuses.
-   */
   async findCredentials({
     userId,
   }: {
     userId: string;
   }): Promise<readonly { provider: string; password: string | null }[]> {
+    if (await this.routesToIdentity({ userId })) {
+      return await this.prisma.accountCredential.findMany({
+        where: { userId },
+        select: { provider: true, password: true },
+      });
+    }
+
     return await this.prisma.account.findMany({
       where: { userId },
       select: { provider: true, password: true },

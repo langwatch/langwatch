@@ -892,7 +892,7 @@ export function bornFinalizedOptIn(): BornFinalizedOptIn {
 /** Whether a removal would leave somebody unable to sign in (ADR-119). */
 export function lastWayIn(): LastWayInService {
   return new LastWayInService({
-    records: new PrismaLastWayInRepository(prisma),
+    records: new PrismaLastWayInRepository(prisma, routesToIdentityBranch),
   });
 }
 
