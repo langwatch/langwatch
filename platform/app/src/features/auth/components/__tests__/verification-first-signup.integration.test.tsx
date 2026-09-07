@@ -1,11 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Sign-up (D13, ADR-117 §6): the address is asked for, a password or passkey
- * is chosen, and the account exists — but no session does. The address is
- * confirmed BEFORE anybody gets in, so the screen becomes "check your email"
- * and the emailed link opens the first session. The address step itself sends
- * nothing.
+ * Sign-up (D13, ADR-117 §6): the address is asked for and confirmed before a
+ * password or passkey can be created. The emailed link returns the single-use
+ * proof that binds the eventual credential to that address.
  *
  * Spec: specs/identity/signin-signup-screens.feature
  */
@@ -197,8 +195,8 @@ describe("given the sign-up screen", () => {
   afterEach(() => cleanup());
 
   describe("when sign-up starts with a work address", () => {
-    /** @scenario Sign-up creates the account but does not let me in until I confirm */
-    it("asks for a password next, and sends nothing on the way", async () => {
+    /** @scenario Sign-up proves the address before asking for a credential */
+    it("sends a confirmation and draws no credential controls", async () => {
       const { container } = renderScreen();
 
       await userEvent.type(
@@ -207,33 +205,32 @@ describe("given the sign-up screen", () => {
       );
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-      // The password step, with the address named on it and a way back.
-      expect(await screen.findByTestId("signup-identifier")).toHaveTextContent(
+      expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
         /sam@acme\.com/,
       );
-      await waitFor(() => {
-        expect(
-          container.querySelector('input[type="password"]'),
-        ).not.toBeNull();
+      expect(requestVerificationMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
       });
-      // Nothing has been created and nothing sent: an address typed here
-      // costs nobody an email until they finish.
-      expect(requestVerificationMock).not.toHaveBeenCalled();
       expect(registerMock).not.toHaveBeenCalled();
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
 
-    /** @scenario Sign-up creates the account but does not let me in until I confirm */
-    it("registers, and stops at the confirmation instead of signing in", async () => {
+    /** @scenario A verified address can create its password account */
+    it("creates and signs in only after the proof returns", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
+      });
       registerMock.mockResolvedValue({ id: "user_1" });
+      signInMock.mockResolvedValue({ data: { user: { id: "user_1" } } });
 
       const { container } = renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
-      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-      await screen.findByTestId("signup-identifier");
+      await screen.findByTestId("verified-address");
 
       await fillPasswordPair(container, "a-good-password");
       await userEvent.click(
@@ -245,22 +242,16 @@ describe("given the sign-up screen", () => {
           expect.objectContaining({
             email: "sam@acme.com",
             password: "a-good-password",
+            addressProof: "proof_1",
           }),
         );
       });
       // No name is asked for: onboarding does that.
       expect(registerMock.mock.calls[0]?.[0]).not.toHaveProperty("name");
 
-      // THE point of the order. The account exists, and the person does not
-      // get in on it until the address is proved.
-      expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
-        /sam@acme\.com/,
-      );
-      expect(signInMock).not.toHaveBeenCalled();
-      // Nor does the screen send the link: the server sends it from the same
-      // call that created the account, because there is no session to send
-      // from here.
+      expect(signInMock).toHaveBeenCalled();
       expect(sendConfirmationMock).not.toHaveBeenCalled();
+      expect(requestVerificationMock).not.toHaveBeenCalled();
     });
   });
 
@@ -371,10 +362,7 @@ describe("given the sign-up screen", () => {
   describe("when the address already has an account", () => {
     /** @scenario Sign-up with an address that already has an account becomes a log-in */
     it("turns into the log-in step with the address already in it", async () => {
-      // The refusal now comes from registering, not from asking for a link:
-      // the address step sends nothing, so the address is only tested against
-      // the directory when the account is actually being made.
-      registerMock.mockRejectedValue({
+      requestVerificationMock.mockRejectedValue({
         data: {
           error: {
             code: "email_already_registered",
@@ -393,13 +381,6 @@ describe("given the sign-up screen", () => {
       await userEvent.click(
         screen.getByRole("button", { name: /^continue$/i }),
       );
-      await screen.findByTestId("signup-identifier");
-
-      await fillPasswordPair(container, "a-good-password");
-      await userEvent.click(
-        screen.getByRole("button", { name: "Create account" }),
-      );
-
       // The page quietly becomes the log-in step: same address, same methods,
       // and the door back into a half-created account beside it.
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
@@ -412,6 +393,7 @@ describe("given the sign-up screen", () => {
       ).toBeTruthy();
       expect(container.querySelector('input[type="email"]')).toBeNull();
       expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(registerMock).not.toHaveBeenCalled();
 
       // Nothing anywhere says an account exists, and nothing reads as a
       // refusal: no alert, no notice, no wording about the address.
@@ -601,15 +583,18 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when the deployment offers passkeys", () => {
-    /** Reaches the credential step with an address typed on the one before. */
+    /** Reaches the credential step through an address-confirmation link. */
     const reachCredentialStep = async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof_1",
+        signedIn: false,
+      });
       const rendered = renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
-      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-      await screen.findByTestId("signup-identifier");
+      await screen.findByTestId("verified-address");
       return rendered;
     };
 
@@ -638,11 +623,14 @@ describe("given the sign-up screen", () => {
         expect(addPasskeyMock).toHaveBeenCalledWith(
           expect.objectContaining({
             context: expect.stringContaining('"email":"sam@acme.com"'),
-            createSession: false,
+            createSession: true,
             name: "sam@acme.com",
           }),
         );
       });
+      expect(addPasskeyMock.mock.calls[0]?.[0]?.context).toContain(
+        '"addressProof":"proof_1"',
+      );
     });
 
     /** @scenario Declining the passkey leaves the password fields where they were */
@@ -664,8 +652,8 @@ describe("given the sign-up screen", () => {
       expect(container.querySelector('input[type="password"]')).not.toBeNull();
     });
 
-    /** @scenario Sign-up with an address that already has an account becomes a log-in */
-    it("turns into the log-in screen when the address already has an account", async () => {
+    /** @scenario A passkey is never registered against an address that already has an account */
+    it("returns to log-in when the verified proof has already been claimed", async () => {
       addPasskeyMock.mockResolvedValue({
         error: { code: "EMAIL_ALREADY_REGISTERED", status: 400 },
       });
@@ -673,10 +661,9 @@ describe("given the sign-up screen", () => {
 
       await userEvent.click(screen.getByTestId("passkey-sign-up"));
 
-      // Not a failed ceremony — the wrong door, answered by the right one with
-      // the address already in it.
-      expect(await screen.findByTestId("method-picker")).toBeTruthy();
-      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+      await waitFor(() => {
+        expect(hardRedirectMock).toHaveBeenCalledWith("/auth/signin");
+      });
     });
 
     /**
@@ -704,9 +691,8 @@ describe("given the sign-up screen", () => {
       await waitFor(() => expect(routeMock).toHaveBeenCalled());
       expect(screen.queryByTestId("passkey-sign-in")).toBeNull();
 
-      await userEvent.type(screen.getByLabelText(/email/i), "sam@acme.com");
-      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-      await screen.findByTestId("signup-identifier");
+      cleanup();
+      await reachCredentialStep();
 
       // And on the credential step the passkey CREATES one for the address
       // being registered, which is the only thing it can honestly do here.

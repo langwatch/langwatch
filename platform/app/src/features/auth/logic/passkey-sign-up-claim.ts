@@ -17,7 +17,10 @@ function newClaim(): string {
  * One unguessable claim per address and browser tab. A retry reuses it, while
  * another browser cannot adopt an unfinished account left by this ceremony.
  */
-export function passkeySignUpContext(email: string): string {
+export function passkeySignUpContext(
+  email: string,
+  addressProof?: string,
+): string {
   const normalized = normalizedEmail(email);
   const key = `${STORAGE_PREFIX}${normalized}`;
   let claim = sessionStorage.getItem(key);
@@ -25,5 +28,5 @@ export function passkeySignUpContext(email: string): string {
     claim = newClaim();
     sessionStorage.setItem(key, claim);
   }
-  return JSON.stringify({ email: normalized, claim });
+  return JSON.stringify({ email: normalized, claim, addressProof });
 }

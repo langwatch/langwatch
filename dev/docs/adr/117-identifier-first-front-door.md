@@ -402,51 +402,28 @@ and becomes a route.
 No new existence information is revealed by any of this beyond what the
 first revision already concedes.
 
-### Revision (2026-08-25) — sign-up creates the account, the link opens the session
+### Revision (2026-09-07) — verification precedes credential enrollment
 
-§6 says "sign-up is verification-first" and it still does. What needed
-writing down is HOW, because the mechanism changed underneath the sentence
-and for a while the code and this document disagreed.
-
-**The old mechanism.** The address step sent the link, and the account did not
-exist until the link came back. "Has an account" and "proved the address"
-were one fact, so nothing had to say which was which.
-
-**Why it could not stay.** A passkey cannot be enrolled against an account
-that does not exist. Sign-up with a passkey — the thing D07 and Passkey
-Central ask for — needs a row to attach the credential to, at the moment of
-the ceremony. So the account has to be created by the credential step.
-
-**What holds the guarantee instead.** The account is created; the SESSION is
-not. Sign-up opens no session at all, and the emailed link opens the first
-one. The invariant is therefore unchanged in the only form that matters:
-
-> An account whose address was never confirmed is an account nobody has
-> ever signed into.
+§6's verification-first rule applies to enrollment, not only admission. The
+screen sends a confirmation link before it draws password or passkey controls.
+Spending that link yields a single-use, address-bound proof; account creation
+must consume it together with the chosen credential.
 
 The order:
 
 ```
-address ─► password or passkey ─► account created, link sent ─► confirm ─► in
+address ─► link sent ─► proof returned ─► password or passkey ─► in
 ```
 
 **Three consequences worth naming.**
 
-- **The link is sent by the call that creates the account** (`user.register`,
-  and the passkey hook), not by the screen. The screen has no session to send
-  from — that is what the order costs — and the alternative is a public "send
-  a confirmation to this address" endpoint, which is a mailer pointed at
-  anything anybody types. Sending it from the write that just created the
-  account closes that completely: the only reachable address is the one just
-  registered.
-- **`completeVerification` mints a single-use address proof** for the one case
-  where a link confirms an address that has NO account behind it — a link from
-  the log-in door, where somebody typed an address nobody holds. The account is
-  created a screen later, and without the proof it would be born unconfirmed
-  and immediately mailed a second link, asking somebody to prove twice an
-  address they had just proved. The proof is server-minted, single-use and
-  bound to its address, because "this address is already confirmed" is exactly
-  the claim a caller must not be able to make.
+- **Requesting the link creates no account or credential.** The public send is
+  bounded by caller and normalized-address rate limits. A delivery failure
+  therefore leaves no half-created account.
+- **`completeVerification` mints a single-use address proof.** Password and
+  passkey registration both carry it, and their server boundaries bind and
+  consume it atomically with account creation. A replay or an email mismatch
+  is refused before credential enrollment begins.
 - **Sign-up asks the router before offering any credential.** It did not, and
   that was a hole: an address on a domain a customer routes through an
   identity provider could be given a password box, which is the one thing the

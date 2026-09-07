@@ -67,10 +67,11 @@ type Refusal =
 async function createAccountWithPasskey(
   email: string,
   addressIsConfirmed: boolean,
+  addressProof?: string,
 ): Promise<Refusal | "created"> {
   try {
     const result = await authClient.passkey.addPasskey({
-      context: passkeySignUpContext(email),
+      context: passkeySignUpContext(email, addressProof),
       name: email,
       // Only where the address has already been proved. Sign-up confirms the
       // address BEFORE anybody gets in (ADR-117 §6), so the ordinary path
@@ -124,37 +125,28 @@ function readRefusal(error: { status: number } & object): Refusal {
  * costs somebody nothing and leaves the other way of finishing exactly where
  * it was.
  */
+type PasskeySignUpButtonProps = {
+  /** The address typed on the step before. Becomes the account's. */
+  email: string;
+  callbackUrl: string;
+  /** A refused ceremony, sent to the card's one alert at the top. */
+  onError: (error: unknown) => void;
+  onAwaitingConfirmation?: (email: string, method: string) => void;
+  onAddressAlreadyRegistered?: () => void;
+} & (
+  | { addressIsConfirmed: true; addressProof: string }
+  | { addressIsConfirmed?: false; addressProof?: never }
+);
+
 export function PasskeySignUpButton({
   email,
   callbackUrl,
   addressIsConfirmed = false,
+  addressProof,
   onError,
   onAwaitingConfirmation,
   onAddressAlreadyRegistered,
-}: {
-  /** The address typed on the step before. Becomes the account's. */
-  email: string;
-  callbackUrl: string;
-  /**
-   * Whether an emailed link has already proved this address. False on the
-   * ordinary sign-up, where no session is opened and the screen becomes
-   * "check your email" instead of navigating.
-   */
-  addressIsConfirmed?: boolean;
-  /** A refused ceremony, sent to the card's one alert at the top. */
-  onError: (error: unknown) => void;
-  /**
-   * The account and its passkey exist, the confirmation link is on its way,
-   * and nobody has been signed in. Required whenever `addressIsConfirmed`
-   * is false.
-   */
-  onAwaitingConfirmation?: (email: string, method: string) => void;
-  /**
-   * The address turned out to have an account. Not a refusal — it is the
-   * wrong door, and the screen becomes the right one with the address in it.
-   */
-  onAddressAlreadyRegistered?: () => void;
-}) {
+}: PasskeySignUpButtonProps) {
   const [isBusy, setIsBusy] = useState(false);
   /** See the note on the sign-in button: cancelling cannot stop the browser's
    *  prompt, so what it does is make the screen stop acting on it. */
@@ -193,7 +185,11 @@ export function PasskeySignUpButton({
   };
 
   const run = async (current: { abandoned: boolean }) => {
-    const outcome = await createAccountWithPasskey(email, addressIsConfirmed);
+    const outcome = await createAccountWithPasskey(
+      email,
+      addressIsConfirmed,
+      addressProof,
+    );
     if (current.abandoned) return;
     if (outcome === "created") {
       settleCreated();

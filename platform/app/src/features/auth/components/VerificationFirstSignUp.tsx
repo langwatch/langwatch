@@ -33,6 +33,7 @@ import {
   PasskeyCeremonyPanel,
   passkeyCeremonyTitle,
 } from "./PasskeyCeremonyPanel";
+import { PasskeySignUpButton } from "./PasskeySignUpButton";
 import { SecondaryActionLink } from "./SecondaryActionLink";
 import {
   AlternativeMethods,
@@ -51,22 +52,12 @@ import {
  *
  * The same funnel as log-in, entered from the other side:
  *
- *   address ─► password or passkey ─► account, link sent ─► confirm ─► in
+ *   address ─► link sent ─► confirm ─► password or passkey ─► in
  *
- * The address is confirmed BEFORE anybody gets in. The account is created by
- * the credential step, because a passkey cannot be enrolled against an
- * account that does not exist yet — but no session is opened for it, and the
- * emailed link is what opens the first one. So an account whose address was
- * never confirmed is an account nobody has ever signed into.
- *
- * The link is sent by the same server call that creates the account, not by
- * this screen. That is what lets sign-up open no session and still send mail:
- * the address being mailed is provably the one just registered, where a public
- * "send a confirmation to this address" would be a mailer pointed at anything.
- *
- * An abandoned sign-up at the ADDRESS step still leaves nothing: that step
- * sends no mail and creates no account, so it costs whoever typed it exactly
- * nothing.
+ * The address is confirmed before a credential can be created. The emailed
+ * link returns a single-use proof, and password or passkey registration
+ * consumes it while creating the account. A typed address alone is therefore
+ * never enough to begin credential enrolment.
  *
  * An address that already has an account is not a wall (epic Q12 lets sign-up
  * acknowledge it). It is a person who came in the wrong door, so the screen
@@ -100,9 +91,6 @@ export function VerificationFirstSignUp() {
   const report = useAuthAnalytics(AUTH_SURFACE.signUp);
 
   const [sentTo, setSentTo] = useState<string | null>(null);
-  // The address typed on the first step, on its way to the password step.
-  // Nothing has been created or sent yet — this is somebody mid-sign-up.
-  const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
   // The address belongs to a domain its organization routes through an
   // identity provider, so there is no account for this screen to create: the
   // provider makes it. Held so the hand-off card can take the screen.
@@ -211,6 +199,7 @@ export function VerificationFirstSignUp() {
     try {
       await requestVerification.mutateAsync({ email });
       setSentTo(email);
+      return true;
     } catch (failure) {
       // Not a refusal, a wrong door: the address has an account, so the screen
       // turns into the way into it rather than telling somebody to start again
@@ -218,9 +207,10 @@ export function VerificationFirstSignUp() {
       if (readHandledError(failure)?.code === "email_already_registered") {
         setWelcomeBackEmail(email);
         await decide({ identifier: email });
-        return;
+        return false;
       }
       // Anything else renders from the mutation's error, through the registry.
+      return false;
     }
   };
 
@@ -239,7 +229,6 @@ export function VerificationFirstSignUp() {
       accountIsReady: accountIsReady || signedInAs !== null,
       welcomeBackEmail,
       sentTo,
-      signingUpEmail,
       routedEmail,
     }),
   });
@@ -256,7 +245,6 @@ export function VerificationFirstSignUp() {
       accountIsReady: accountIsReady || signedInAs !== null,
       welcomeBackEmail,
       sentTo,
-      signingUpEmail,
       routedEmail,
       linkIsDead: Boolean(verifyToken && linkError),
     }),
@@ -387,41 +375,6 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  // The credential step, which is the step that creates the account. It takes
-  // a passkey or a password — named for the choice rather than for one of its
-  // answers. It does NOT sign anybody in: the account is created, the server
-  // sends the confirmation link on the same call, and the screen becomes
-  // "check your email". The address is confirmed before anybody gets in.
-  if (signingUpEmail) {
-    return (
-      <AuthCard title="Choose how to sign in" finePrint={<AuthFinePrint />}>
-        <SignUpCredentialForm
-          email={signingUpEmail}
-          callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
-          onUseDifferentEmail={() => setSigningUpEmail(null)}
-          onAwaitingConfirmation={(email, method) => {
-            report.accountCreated(method);
-            report.linkSent("address_confirmation");
-            setSigningUpEmail(null);
-            setSentTo(email);
-          }}
-          onAddressAlreadyRegistered={() => {
-            report.refused("address", "email_already_registered");
-            setSigningUpEmail(null);
-            setWelcomeBackEmail(signingUpEmail);
-            void decide({ identifier: signingUpEmail });
-          }}
-        />
-        {/* The other door, on this stage as on every other. It matters most
-            HERE: this door deliberately offers no EXISTING passkey, so for
-            somebody who already has an account and came to the wrong page,
-            this link is the way on — rather than a ceremony that would have
-            signed them into that account by accident, mid-sign-up. */}
-        <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
-      </AuthCard>
-    );
-  }
-
   return (
     <AuthCard
       title="Create your LangWatch account"
@@ -462,8 +415,8 @@ export function VerificationFirstSignUp() {
         // address" in its table, so it says `redirect_to_connection` for an
         // address that has no account at all. Nothing here decides; it asks.
         //
-        // Nothing is sent from this step either way: the account is created on
-        // the next one, so an address typed here costs nobody an email.
+        // Once routing confirms that this address may hold a local credential,
+        // send its proof before drawing any credential controls.
         onSubmit={async ({ email }) => {
           report.submitted("address", {
             hadCarriedAddress: Boolean(carriedEmail),
@@ -481,7 +434,9 @@ export function VerificationFirstSignUp() {
           // the one thing the connection exists to prevent. The error is
           // rendered above; stopping here is what makes it mean something.
           if (!decision) return;
-          setSigningUpEmail(email);
+          if (await sendTo(email)) {
+            report.linkSent("address_confirmation");
+          }
         }}
         footer={
           <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
@@ -673,7 +628,6 @@ function signUpDepth({
   accountIsReady,
   welcomeBackEmail,
   sentTo,
-  signingUpEmail,
   routedEmail,
 }: {
   challenged: boolean;
@@ -681,7 +635,6 @@ function signUpDepth({
   accountIsReady: boolean;
   welcomeBackEmail: string | null;
   sentTo: string | null;
-  signingUpEmail: string | null;
   routedEmail: string | null;
 }): AuthDepth {
   if (challenged) return "challenge";
@@ -689,7 +642,6 @@ function signUpDepth({
   if (
     verifiedEmail !== null ||
     welcomeBackEmail !== null ||
-    signingUpEmail !== null ||
     // The hand-off is as far in as the credential step it replaces: the
     // address has been answered for, and what is on screen is the way through.
     routedEmail !== null
@@ -718,7 +670,6 @@ function signUpStep({
   accountIsReady,
   welcomeBackEmail,
   sentTo,
-  signingUpEmail,
   routedEmail,
   linkIsDead,
 }: {
@@ -728,7 +679,6 @@ function signUpStep({
   accountIsReady: boolean;
   welcomeBackEmail: string | null;
   sentTo: string | null;
-  signingUpEmail: string | null;
   routedEmail: string | null;
   linkIsDead: boolean;
 }): string {
@@ -741,7 +691,6 @@ function signUpStep({
   if (sentTo !== null) return SIGN_UP_STEP.checkEmail;
   if (linkIsDead) return SIGN_UP_STEP.linkDead;
   if (routedEmail !== null) return SIGN_UP_STEP.routedToConnection;
-  if (signingUpEmail !== null) return SIGN_UP_STEP.credential;
   return SIGN_UP_STEP.address;
 }
 
@@ -770,6 +719,8 @@ function MethodChoice({
   callbackUrl: string;
   onFederatedMethodChosen: (method: SignInMethod) => void;
 }) {
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
+
   return (
     <AuthCard title="Choose how to sign in">
       <HStack gap={3}>
@@ -778,12 +729,26 @@ function MethodChoice({
           {verifiedEmail} is confirmed.
         </Text>
       </HStack>
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not create a passkey"
+        className="lw-auth-alert"
+      />
+      {addressProof ? (
+        <PasskeySignUpButton
+          email={verifiedEmail}
+          addressProof={addressProof}
+          callbackUrl={callbackUrl}
+          addressIsConfirmed
+          onError={setPasskeyError}
+          onAddressAlreadyRegistered={() => hardRedirect("/auth/signin")}
+        />
+      ) : null}
       {decision ? (
         <SignInMethodPicker
-          // Every way in EXCEPT a passkey. This step belongs to an account
-          // being made: there is no credential on this device to find yet, so
-          // the ceremony would open a prompt with nothing in it. A passkey
-          // becomes an offer once there is one to enrol (D07).
+          // Existing passkeys are sign-in credentials and do not belong on an
+          // account-creation step. The dedicated button above creates a new
+          // credential bound to the verified address proof.
           methodSet={decision.methodSet.filter(
             (method) => method.kind !== "passkey",
           )}
@@ -814,6 +779,7 @@ function MethodChoice({
           }
         />
       ) : null}
+      <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
     </AuthCard>
   );
 }

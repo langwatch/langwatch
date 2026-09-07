@@ -175,21 +175,22 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
 
   # ── Sign-up ────────────────────────────────────────────────────────────
 
-  # The address is confirmed BEFORE anybody gets in (ADR-117 §6).
+  # The address is confirmed before the screen asks for a credential
+  # (ADR-117 §6).
   #
-  #   address -> password or passkey -> account, link sent -> confirm -> in
+  #   address -> link sent -> proof returned -> password or passkey -> in
   #
-  # The account is created by the credential step, because a passkey cannot be
-  # enrolled against an account that does not exist yet. What that step does
-  # NOT do is open a session: the emailed link opens the first one. So an
-  # account whose address was never confirmed is an account nobody has ever
-  # signed into, which is the property the whole order exists to hold.
+  # The link yields a single-use proof. Account creation consumes it together
+  # with the chosen credential, so naming somebody else's address can never
+  # reach a password or passkey registration ceremony for that address.
   @integration
-  Scenario: Sign-up creates the account but does not let me in until I confirm
-    When I sign up with my work email and choose a password
-    Then my account is created
-    But I am not signed in
-    And the screen tells me to open the link we sent to that address
+  Scenario: Sign-up proves the address before asking for a credential
+    When I start sign-up with my work email
+    Then a confirmation link is sent to that address
+    And no password or passkey control is shown yet
+    When I open the link
+    Then the screen confirms the address
+    And offers a password or a new passkey as the ways to create my account
 
   # Bug-bash finding: sign-up asks for no name (onboarding does, where the
   # question is worth a field — see `displayName.ts`'s own comment), so
@@ -203,30 +204,24 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then I am called by my email address
     And the word "null" appears nowhere in it
 
-  # The link IS the first sign-in. It is a single-use secret sent to the
-  # address, so spending it proves the address the way a magic link does, and
-  # the session it opens is the one the password would have opened. Asking for
-  # the password again on the screen it lands on was asking twice - and on a
-  # deployment whose identifier projection had not caught up with the account
-  # yet, the screen it landed on read the projection and said no account
-  # existed. One link is one way in: reopened inside its grace window it
-  # confirms again but opens no second session, and offers the way in instead.
+  # The link proves the address but does not choose or create a credential.
+  # Its proof is bound to the address and may be consumed only once by the
+  # account-creation boundary.
   @integration @e2e
-  Scenario: Opening the link is what signs me in for the first time
-    Given I signed up and have not opened the confirmation link
+  Scenario: Opening the link unlocks credential choice
+    Given I asked to sign up and have not opened the confirmation link
     When I open the link
     Then my address is confirmed
-    And I am signed in and taken into LangWatch without typing my password again
+    But I am not signed in yet
+    And I choose a password or create a passkey before entering LangWatch
 
-  # The link goes out from the call that CREATES the account, not from the
-  # screen. The screen has no session to send from - that is the point of the
-  # order above - and the only other way to send is a public "mail this
-  # address" endpoint, which is a mailer pointed at anything anybody types.
+  # Sending is rate-limited both by caller and normalized address. The proof,
+  # rather than possession of the typed string, authorizes account creation.
   @unit
-  Scenario: The confirmation link is sent by the call that creates the account
-    When my account is created
-    Then the confirmation link is sent to the address it was created for
-    And a mailer that is down does not cost me the account
+  Scenario: Asking for verification creates no account
+    When the confirmation link is requested
+    Then no account and no credential are created
+    And a mailer that is down leaves no half-created account
 
   # An address whose domain its organization routes through an identity
   # provider must never reach a password box on THIS screen: the account is
@@ -246,23 +241,23 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # is the better thing to leave with — beside them rather than in front of
   # them, so declining costs a glance and the other way on is already drawn.
   #
-  # Creating the account only once the ceremony succeeds is what keeps an
-  # abandoned attempt free: asking for options writes nothing down.
+  # The proof accompanies the registration context and is claimed atomically
+  # with the new account and passkey.
   @unit @e2e
-  Scenario: Signing up with a passkey creates a pending account until the address is confirmed
-    Given I have typed an address that has no account
+  Scenario: Signing up with a passkey consumes the verified address proof
+    Given I returned with a valid proof for an address that has no account
     When I create a passkey instead of choosing a password
     Then my account is created and the passkey belongs to it
-    And no session is opened before I consume the emailed proof
-    And a confirmation link is sent without my having to wait for it
+    And the proof is consumed with that registration
+    And I am signed in
 
   # THE one that matters. Registration without a session is what lets somebody
   # sign up with a passkey at all, and the same opening would otherwise let
   # anyone attach their own passkey to anybody's account by naming the address.
   @unit
   Scenario: A passkey is never registered against an address that already has an account
-    Given the address I named already has an account
-    When a passkey registration is started for it
+    Given the address proof has already been claimed by an account
+    When another passkey registration is started with it
     Then it is refused before any ceremony begins
     And no system prompt opens for it
 
@@ -272,31 +267,15 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then nothing is reported as having gone wrong
     And I can still finish by choosing a password
 
-  # ── A new account is asked for a credential before anything is mailed ──
-  #
-  # The order above — address, then credential, then the link — was built on
-  # the sign-up door and only there. The LOG-IN door kept the older order on
-  # both of its conversion paths: an address the router did not recognize, and
-  # a password typed for an address that turns out to hold no account. Both
-  # mailed a confirmation link straight from the address and asked for a
-  # credential afterwards, on the screen the link lands on.
-  #
-  # That is the wrong way round for two reasons. The mail goes out before
-  # anybody has committed to anything, so a mistyped address costs a stranger
-  # a message and costs us a send; and it puts somebody on a "check your email"
-  # screen as their first experience of the product, with the thing that would
-  # have finished the job — choosing a password — still one round trip away.
-  #
-  # `requestSignUpVerification` says as much in its own contract: it is the
-  # RESEND, for a link that expired or never arrived, and sign-up "no longer
-  # calls this". The two log-in paths were still calling it as a start.
+  # Both first-party doors converge on the same verification-first creation
+  # flow. The password typed into a log-in form is never banked for sign-up.
   @integration
-  Scenario: No confirmation link is sent until a credential has been chosen
+  Scenario: No credential is collected until the confirmation link is opened
     Given I enter an address nobody holds an account for
     When the screen offers to create an account with it
-    Then it asks for a password or a passkey before anything is sent
-    And no confirmation link has gone out while I am still choosing
-    And the account and the link are made by the same call, as on the sign-up door
+    Then it sends a confirmation link before showing credential controls
+    And no account exists while I am checking that inbox
+    And the returned proof is required by the account-creation call
 
   # The one thing the log-in door must NOT do on the way is bank the password
   # that was typed at it. That field is spelled `current-password`, is asked
@@ -305,9 +284,9 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   @integration
   Scenario: Converting at the log-in door still asks for the password properly
     Given I submitted a password for an address that holds no account
-    When the screen becomes the credential step
+    When the screen sends me through address verification
     Then the password I typed at the log-in door is not carried into it
-    And I choose one there, typed twice and held to a length
+    And after opening the link I choose one, typed twice and held to a length
 
   # A passkey ceremony started from a SIGN-UP screen is a discoverable-
   # credential request: the browser offers every passkey it holds for this
