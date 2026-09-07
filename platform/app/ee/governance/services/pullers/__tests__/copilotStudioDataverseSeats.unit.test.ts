@@ -220,6 +220,7 @@ async function runPull({
       environmentUrl: ENVIRONMENT_URL,
       botIds: [],
       readSeats,
+      readDirectory: false,
       ...(azureSubscriptionId === undefined ? {} : { azureSubscriptionId }),
     },
   );

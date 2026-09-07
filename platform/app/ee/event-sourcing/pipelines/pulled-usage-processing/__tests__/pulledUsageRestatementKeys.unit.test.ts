@@ -59,6 +59,8 @@ function observation({
     rateVersion: "registry@2026-08-01",
     costBasis: "computed",
     costStatus: "estimate",
+    rawActorId: "",
+    agentId: "",
     occurredAtMs: Date.parse("2026-08-01T00:00:00.000Z"),
     observedAtMs,
   };

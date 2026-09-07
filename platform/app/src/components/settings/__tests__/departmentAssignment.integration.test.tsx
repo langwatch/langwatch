@@ -73,6 +73,10 @@ vi.mock("~/utils/api", () => ({
         list: { invalidate: vi.fn() },
         assignments: { invalidate: vi.fn() },
       },
+      governancePeople: {
+        list: { invalidate: vi.fn() },
+        suggestions: { invalidate: vi.fn() },
+      },
     }),
     departments: {
       list: {
@@ -101,6 +105,18 @@ vi.mock("~/utils/api", () => ({
           mutateAsync: mutations.assignProject,
           isPending: false,
         }),
+      },
+    },
+    // The page now carries the discovered-people panel; an empty answer keeps
+    // these tests about what they were about — departments and their links.
+    governancePeople: {
+      list: { useQuery: () => ({ data: [], isLoading: false }) },
+      suggestions: { useQuery: () => ({ data: [], isLoading: false }) },
+      runMatch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      confirmSuggestion: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
   },

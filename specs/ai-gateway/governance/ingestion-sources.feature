@@ -386,6 +386,29 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Then the push source row shows a "Rotate secret" action
     And the pull source row does not show a "Rotate secret" action
 
+  Rule: The list and the source page name two different times differently
+
+    A source shows two timestamps and they are routinely hours apart, both
+    correct. The list shows when data last arrived. The source page shows the
+    time written on the newest event, which for a report covering a whole day
+    is that day's opening minute. Calling both of them "last event" left an
+    admin comparing two numbers that never agreed with no way to tell why.
+
+    @integration @source-list
+    Scenario: The list says when data last arrived
+      Given a source that delivered data on its last run
+      When the admin views the source list
+      Then the row says when data last arrived
+      And the row does not call that the last event
+
+    @integration @source-detail
+    Scenario: The source page names the newest event time
+      Given a source whose newest event is stamped at the start of its day
+      When the admin opens that source page
+      Then the tile is named for the newest event time
+      And it explains that the time is the one carried on the event, not the
+        time it was collected
+
   @integration @source-detail @pull-source
   Scenario: The rotate-secret button is hidden for non-push sources on the detail page
     Given a pull-mode source exists

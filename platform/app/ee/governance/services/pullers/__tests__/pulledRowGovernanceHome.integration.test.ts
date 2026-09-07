@@ -122,6 +122,7 @@ describe("a pulled usage record arriving from a provider source", () => {
           sourceType: "anthropic_admin",
           organizationId: organization.id,
           teamId: team.id,
+          createdAt: new Date("2026-07-01T00:00:00.000Z"),
         },
         governanceProjectId: home.id,
         observedAt: OBSERVED_AT,
