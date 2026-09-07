@@ -9,7 +9,7 @@ import {
   type IdempotentRunner,
   type RequestActor,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   OrganizationNotFoundError,
@@ -156,6 +156,7 @@ export class ApiOrganizationPermissionError extends HandledError {
       httpStatus: 403,
       fault: "customer",
       meta: { required_permission: permission },
+      ...remediation("insufficient_permissions"),
     });
     this.name = "ApiOrganizationPermissionError";
   }

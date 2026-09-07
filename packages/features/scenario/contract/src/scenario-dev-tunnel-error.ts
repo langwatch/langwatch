@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 /**
  * A scenario target still points at a local `langwatch agent dev` tunnel whose
@@ -17,10 +17,7 @@ export class AgentDevTunnelUnreachableError extends HandledError {
       {
         httpStatus: 502,
         fault: "customer",
-        tips: [
-          "Run `langwatch agent dev` again on the machine that started the tunnel; a new session repoints the agent automatically",
-          "If you are done developing locally, restore the agent's URL in its settings",
-        ],
+        ...remediation("agent_dev_tunnel_unreachable"),
       },
     );
     this.name = "AgentDevTunnelUnreachableError";

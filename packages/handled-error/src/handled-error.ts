@@ -245,8 +245,9 @@ function serializeReason(error: Error): SerializedReason {
       kind: error.code,
       fault: error.fault,
       retryable: error.retryable === true,
-      ...(error.traceId ? { traceId: error.traceId } : {}),
-      ...(error.spanId ? { spanId: error.spanId } : {}),
+      // No trace ids here. Every reason in one response was raised inside the
+      // same request, so each would repeat the pair the envelope already
+      // carries — one body, one correlation handle.
       ...(Object.keys(meta).length > 0 && { meta }),
       ...(error.tips.length > 0 && { tips: error.tips }),
       ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),

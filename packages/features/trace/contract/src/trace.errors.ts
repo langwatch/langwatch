@@ -26,9 +26,7 @@ export class FilterParseError extends HandledError {
         ...(position !== void 0 ? { position } : {}),
         expected: message,
       },
-      tips: [
-        "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
-      ],
+      ...remediation("filter_parse_error"),
     });
     this.name = "FilterParseError";
   }
@@ -41,7 +39,7 @@ export class FilterFieldUnknownError extends HandledError {
     super("filter_field_unknown", `Unknown field: @${field}`, {
       httpStatus: 422,
       meta: { field, knownFields },
-      tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+      ...remediation("filter_field_unknown"),
     });
     this.name = "FilterFieldUnknownError";
   }

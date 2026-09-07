@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 import { z } from "zod";
 import type { AuthzDenialReason, AuthzScopeRef } from "./authz.ts";
 
@@ -137,6 +137,7 @@ export class DuplicateGrantError extends HandledError {
     super("role_binding_already_exists", "An identical role binding already exists", {
       httpStatus: 409,
       meta,
+      ...remediation("role_binding_already_exists"),
     });
     this.name = "DuplicateGrantError";
   }

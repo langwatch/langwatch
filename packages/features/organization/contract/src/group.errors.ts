@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class GroupNotFoundError extends NotFoundError {
   declare readonly code: "group_not_found";
@@ -116,6 +116,7 @@ export class GroupBindingAlreadyExistsError extends HandledError {
   constructor() {
     super("role_binding_already_exists", "That role binding already exists", {
       httpStatus: 409,
+      ...remediation("role_binding_already_exists"),
     });
     this.name = "GroupBindingAlreadyExistsError";
   }

@@ -1,9 +1,12 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class RoleDuplicateNameError extends HandledError {
   declare readonly code: "custom_role_name_taken";
   constructor(message = "A role with this name already exists") {
-    super("custom_role_name_taken", message, { httpStatus: 409 });
+    super("custom_role_name_taken", message, {
+      httpStatus: 409,
+      ...remediation("custom_role_name_taken"),
+    });
     this.name = "RoleDuplicateNameError";
   }
 }
@@ -19,6 +22,7 @@ export class RoleInUseError extends HandledError {
       {
         httpStatus: 409,
         meta: { userCount, bindingCount },
+        ...remediation("custom_role_in_use"),
       },
     );
     this.userCount = userCount;

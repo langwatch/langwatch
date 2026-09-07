@@ -1,3 +1,4 @@
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -43,6 +44,37 @@ class RejectedFieldError extends HandledError {
       meta: { field },
     });
     this.name = "RejectedFieldError";
+  }
+}
+
+const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+const SPAN_ID = "00f067aa0ba902b7";
+
+/**
+ * A refusal and its reason both raised inside one traced request, so both
+ * carry the same pair. The response must still show it once.
+ */
+class TracedRefusal extends HandledError {
+  constructor(reasons: readonly Error[]) {
+    super("dataset_schema_rejected", "Some of the values aren't valid", {
+      httpStatus: 422,
+      reasons,
+      traceId: TRACE_ID,
+      spanId: SPAN_ID,
+    });
+    this.name = "TracedRefusal";
+  }
+}
+
+class TracedRejectedFieldError extends HandledError {
+  constructor(field: string) {
+    super("validation_error", `The ${field} field is not valid`, {
+      httpStatus: 422,
+      meta: { field },
+      traceId: TRACE_ID,
+      spanId: SPAN_ID,
+    });
+    this.name = "TracedRejectedFieldError";
   }
 }
 
@@ -203,6 +235,60 @@ describe("ApiRestObservabilityComposition.legacyErrorHandler", () => {
     });
   });
 
+  describe("given a caller names an API key id that does not exist", () => {
+    describe("when the refusal is rendered as the flat legacy body", () => {
+      /** @scenario "A missing API key names the two ways to find the right id" */
+      it("ships the tips for checking and listing the key ids", async () => {
+        const response = await routeThrowing(new ApiKeyNotFoundError("key-404")).request("/");
+
+        expect(response.status).toBe(404);
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(body.tips).toEqual([
+          "Check the API key id; the key may have been deleted or never created",
+          "List the keys on the organization to find the right id",
+        ]);
+      });
+
+      /** @scenario "A missing API key names the two ways to find the right id" */
+      it("ships the documentation link for API keys", async () => {
+        const response = await routeThrowing(new ApiKeyNotFoundError("key-404")).request("/");
+
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(body.docsUrl).toBe("https://docs.langwatch.ai/api-reference/api-keys/overview");
+      });
+
+      /** @scenario "A missing API key names the two ways to find the right id" */
+      it("ships exactly the keys the published clients read", async () => {
+        const response = await routeThrowing(new ApiKeyNotFoundError("key-404")).request("/");
+
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(Object.keys(body).sort()).toEqual([
+          "apiKeyId",
+          "docsUrl",
+          "error",
+          "fault",
+          "id",
+          "message",
+          "tips",
+        ]);
+      });
+    });
+  });
+
+  describe("given a route raises a refusal made of one reason per rejected field", () => {
+    describe("when the refusal is rendered as the flat legacy body", () => {
+      /** @scenario "A refusal made of several facts ships all of them" */
+      it("ships exactly the keys the published clients read", async () => {
+        const response = await routeThrowing(
+          new DatasetSchemaRejectedError([new RejectedFieldError("name")]),
+        ).request("/");
+
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(Object.keys(body).sort()).toEqual(["error", "fault", "message", "reasons"]);
+      });
+    });
+  });
+
   describe("given a route throws an unanticipated failure", () => {
     describe("when the client calls that route", () => {
       it("collapses it to a generic 500 that says nothing about the cause", async () => {
@@ -300,6 +386,111 @@ describe("given a route raises the HTTP framework's own refusal", () => {
       const body = (await response.json()) as Record<string, unknown>;
       expect(body.message).toBe("An unknown error occurred");
       expect(JSON.stringify(body)).not.toContain("postgres");
+    });
+  });
+});
+
+describe("ApiRestObservabilityComposition.canonicalErrorHandler", () => {
+  describe("given a route raises a handled refusal carrying remediation copy", () => {
+    describe("when the refusal is rendered", () => {
+      /** @scenario "A handled refusal ships its remediation channel in the envelope" */
+      it("ships the tips a caller with no presentation registry follows", async () => {
+        const response = await canonicalRouteThrowing(new DatasetQuotaReachedError()).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        expect(body.error.tips).toEqual([
+          "Archive a dataset you no longer need",
+          "Upgrade the project's plan",
+        ]);
+      });
+
+      /** @scenario "A handled refusal ships its remediation channel in the envelope" */
+      it("spells the documentation link the way the Go plane does", async () => {
+        const response = await canonicalRouteThrowing(new DatasetQuotaReachedError()).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        expect(body.error.docs_url).toBe("https://docs.langwatch.ai/datasets/limits");
+        expect(body.error).not.toHaveProperty("docsUrl");
+      });
+
+      /** @scenario "A handled refusal ships its remediation channel in the envelope" */
+      it("says who can act on it", async () => {
+        const response = await canonicalRouteThrowing(
+          new DatasetStorageUnavailableError(new Error("connection to postgres dropped")),
+        ).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        expect(body.error.fault).toBe("platform");
+      });
+    });
+  });
+
+  describe("given a route raises a refusal made of one reason per rejected field", () => {
+    describe("when the refusal is rendered", () => {
+      /** @scenario "A refusal made of several facts ships its reasons chain" */
+      it("ships a reason for each rejected field", async () => {
+        const response = await canonicalRouteThrowing(
+          new DatasetSchemaRejectedError([
+            new RejectedFieldError("name"),
+            new RejectedFieldError("columnTypes"),
+          ]),
+        ).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        const reasons = body.error.reasons as Array<Record<string, unknown>>;
+        expect(reasons.map((reason) => (reason.meta as { field: string }).field)).toEqual([
+          "name",
+          "columnTypes",
+        ]);
+      });
+
+      /** @scenario "A refusal made of several facts ships its reasons chain" */
+      it("ships exactly the envelope keys the published clients read", async () => {
+        const response = await canonicalRouteThrowing(
+          new DatasetSchemaRejectedError([new RejectedFieldError("name")]),
+        ).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        expect(Object.keys(body.error).sort()).toEqual([
+          "code",
+          "fault",
+          "message",
+          "reasons",
+          "retryable",
+          "type",
+        ]);
+      });
+    });
+  });
+
+  describe("given a traced refusal carrying a reason of its own", () => {
+    describe("when the refusal is rendered", () => {
+      /** @scenario "A response carries one trace-id pair" */
+      it("carries the trace and span ids once, on the envelope", async () => {
+        const response = await canonicalRouteThrowing(
+          new TracedRefusal([new TracedRejectedFieldError("name")]),
+        ).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        expect(body.error.trace_id).toBe(TRACE_ID);
+        expect(body.error.span_id).toBe(SPAN_ID);
+      });
+
+      /** @scenario "A response carries one trace-id pair" */
+      it("repeats neither spelling on any entry of the reasons chain", async () => {
+        const response = await canonicalRouteThrowing(
+          new TracedRefusal([new TracedRejectedFieldError("name")]),
+        ).request("/");
+
+        const body = (await response.json()) as { error: Record<string, unknown> };
+        const reasons = body.error.reasons as Array<Record<string, unknown>>;
+        for (const reason of reasons) {
+          expect(reason).not.toHaveProperty("traceId");
+          expect(reason).not.toHaveProperty("spanId");
+          expect(reason).not.toHaveProperty("trace_id");
+          expect(reason).not.toHaveProperty("span_id");
+        }
+      });
     });
   });
 });

@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 export class MonitorNotFoundError extends Error {
   readonly code = "monitor_not_found" as const;
@@ -16,7 +16,7 @@ export class MonitorEvaluatorRequiredError extends HandledError {
     super(
       "monitor_evaluator_required",
       "An evaluator is required to create an online evaluation.",
-      { httpStatus: 400, fault: "customer" },
+      { httpStatus: 400, fault: "customer", ...remediation("monitor_evaluator_required") },
     );
     this.name = "MonitorEvaluatorRequiredError";
   }

@@ -12,7 +12,7 @@ import {
   type TeamUserRole as AuthzTeamUserRole,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { AuthzGrantsCommandDispatcher } from "../ports/authz-grants-command-dispatcher.port.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -137,7 +137,10 @@ export class AuthzRoleDuplicateNameError extends HandledError {
   declare readonly code: "custom_role_name_taken";
 
   constructor(message = "A role with this name already exists") {
-    super("custom_role_name_taken", message, { httpStatus: 409 });
+    super("custom_role_name_taken", message, {
+      httpStatus: 409,
+      ...remediation("custom_role_name_taken"),
+    });
     this.name = "AuthzRoleDuplicateNameError";
   }
 }

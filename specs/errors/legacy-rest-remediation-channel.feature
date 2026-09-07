@@ -66,3 +66,16 @@ Feature: The legacy REST families keep the remediation channel
     When a caller reaches that route
     Then the cause is reported as unknown
     And the body names no internal detail of that cause
+
+  # Every `tips` / docs link an error class emits lives in one registry keyed
+  # by code (`@langwatch/handled-error`'s remediation registry), so the copy a
+  # customer reads is written once. A class that inlines its own copy — or
+  # spreads nothing at all — quietly answers a refusal with no next step, and
+  # nothing in the type system notices.
+
+  @unit
+  Scenario: A missing API key names the two ways to find the right id
+    Given a caller revokes an API key id that does not exist
+    When the refusal is rendered as the flat legacy body
+    Then the body carries the tips for checking and listing the key ids
+    And the body carries the documentation link for API keys

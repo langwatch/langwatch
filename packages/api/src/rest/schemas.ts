@@ -1,3 +1,4 @@
+import type { SerializedReason } from "@langwatch/handled-error";
 import { z } from "zod";
 
 /**
@@ -44,9 +45,9 @@ export const successSchema = z.object({ success: z.boolean() });
  *
  * Keys inside `meta` are lower_snake_case, matching the rest of the wire.
  *
- * The Go data plane emits the same envelope from `pkg/herr` and additionally
- * carries `tips`, `docs_url` and `fault` on its 402; a consumer that reads
- * only these four fields works against both planes.
+ * `tips`, `docs_url` and `fault` are the remediation channel, carried by both
+ * planes (`pkg/herr` on the Go side) whenever the handled error has them; a
+ * consumer that reads only the four fields above works against both planes.
  */
 export const apiErrorSchema = z.object({
   error: z.object({
@@ -62,6 +63,21 @@ export const apiErrorSchema = z.object({
      */
     trace_id: z.string().optional(),
     span_id: z.string().optional(),
+    /**
+     * The remediation channel: what to do about it, where it is documented,
+     * and whose mistake it was. An agent or a CLI with no presentation
+     * registry has nothing else to act on, and `readHandledError` already
+     * reads all three off this envelope under exactly these names.
+     */
+    tips: z.array(z.string()).optional(),
+    docs_url: z.string().optional(),
+    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    /**
+     * The cause chain a multi-fact refusal IS — one entry per offending
+     * field for a schema failure. Serialised by `HandledError.serialize()`,
+     * so the entries are camelCase while the envelope around them is not.
+     */
+    reasons: z.array(z.unknown()).optional(),
   }),
 });
 
@@ -102,6 +118,10 @@ export function apiErrorBody({
   retryable = false,
   traceId,
   spanId,
+  tips,
+  docsUrl,
+  fault,
+  reasons,
 }: {
   status: number;
   code: string;
@@ -110,6 +130,10 @@ export function apiErrorBody({
   retryable?: boolean;
   traceId?: string;
   spanId?: string;
+  tips?: readonly string[];
+  docsUrl?: string;
+  fault?: "customer" | "platform" | "provider";
+  reasons?: readonly SerializedReason[];
 }): ApiErrorBody {
   return {
     error: {
@@ -120,6 +144,10 @@ export function apiErrorBody({
       ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
       ...(traceId ? { trace_id: traceId } : {}),
       ...(spanId ? { span_id: spanId } : {}),
+      ...(tips && tips.length > 0 ? { tips: [...tips] } : {}),
+      ...(docsUrl ? { docs_url: docsUrl } : {}),
+      ...(fault ? { fault } : {}),
+      ...(reasons && reasons.length > 0 ? { reasons: [...reasons] } : {}),
     },
   };
 }

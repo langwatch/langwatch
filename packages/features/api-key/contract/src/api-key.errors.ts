@@ -1,13 +1,13 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-export class ApiKeyNotFoundError extends HandledError {
+export class ApiKeyNotFoundError extends NotFoundError {
   declare readonly code: "api_key_not_found";
 
   constructor(id: string, options: { reasons?: readonly Error[] } = {}) {
-    super("api_key_not_found", "API Key not found", {
+    super("api_key_not_found", "API Key", id, {
       meta: { apiKeyId: id },
-      httpStatus: 404,
       fault: "customer",
+      ...remediation("api_key_not_found"),
       reasons: options.reasons,
     });
     this.name = "ApiKeyNotFoundError";
@@ -49,6 +49,7 @@ export class ApiKeyNotOwnedError extends HandledError {
       meta: { apiKeyId: id },
       httpStatus: 403,
       fault: "customer",
+      ...remediation("api_key_not_owned"),
     });
     this.name = "ApiKeyNotOwnedError";
   }
@@ -62,6 +63,7 @@ export class ApiKeyAlreadyRevokedError extends HandledError {
       meta: { apiKeyId: id },
       httpStatus: 409,
       fault: "customer",
+      ...remediation("api_key_already_revoked"),
     });
     this.name = "ApiKeyAlreadyRevokedError";
   }
@@ -78,6 +80,7 @@ export class ApiKeyReservedNameError extends HandledError {
         meta: { name },
         httpStatus: 422,
         fault: "customer",
+        ...remediation("api_key_reserved_name"),
       },
     );
     this.name = "ApiKeyReservedNameError";
@@ -91,6 +94,7 @@ export class ApiKeyScopeViolationError extends HandledError {
     super("api_key_scope_violation", message, {
       httpStatus: 403,
       fault: "customer",
+      ...remediation("api_key_scope_violation"),
     });
     this.name = "ApiKeyScopeViolationError";
   }
@@ -107,8 +111,7 @@ export class ApiKeyPermissionDeniedError extends HandledError {
         meta: { permission, ...options.meta },
         httpStatus: 403,
         fault: "customer",
-        tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
-        docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
+        ...remediation("api_key_permission_denied"),
       },
     );
     this.name = "ApiKeyPermissionDeniedError";
@@ -126,10 +129,7 @@ export class ApiKeyPermissionNotDelegableError extends HandledError {
         meta: { permission, ...options.meta },
         httpStatus: 403,
         fault: "customer",
-        tips: [
-          "A wider key or a higher role does not change this — make the change in LangWatch instead",
-        ],
-        docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
+        ...remediation("api_key_permission_not_delegable"),
       },
     );
     this.name = "ApiKeyPermissionNotDelegableError";
@@ -144,6 +144,7 @@ export class ProjectVisibilityTooWideError extends HandledError {
       meta: options.meta,
       httpStatus: 507,
       fault: "platform",
+      ...remediation("project_visibility_too_wide"),
     });
     this.name = "ProjectVisibilityTooWideError";
   }

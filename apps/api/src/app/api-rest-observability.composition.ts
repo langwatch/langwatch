@@ -1,4 +1,8 @@
-import { HandledError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  type HandledErrorFault,
+  type SerializedReason,
+} from "@langwatch/handled-error";
 import {
   apiErrorBody,
   isFrameworkRefusal,
@@ -122,6 +126,7 @@ export function canonicalErrorFor(error: unknown): {
         retryable: error.retryable,
         ...(error.traceId ? { traceId: error.traceId } : {}),
         ...(error.spanId ? { spanId: error.spanId } : {}),
+        ...remediationOf(error),
       })
     : apiErrorBody({
         status,
@@ -132,6 +137,27 @@ export function canonicalErrorFor(error: unknown): {
         message: isFrameworkRefusal(error) && status < 500 ? error.message : UNKNOWN_ERROR_MESSAGE,
       });
   return { status, body };
+}
+
+/**
+ * The remediation channel a handled refusal carries: what to do about it,
+ * where it is documented, whose mistake it was, and the cause chain a
+ * multi-fact refusal IS. Read through `serialize()`, which is the one place
+ * that masks a non-handled cause, so nothing internal rides out.
+ */
+function remediationOf(error: HandledError): {
+  tips?: readonly string[];
+  docsUrl?: string;
+  fault: HandledErrorFault;
+  reasons?: readonly SerializedReason[];
+} {
+  const { tips, docsUrl, fault, reasons } = error.serialize();
+  return {
+    ...(tips?.length ? { tips } : {}),
+    ...(docsUrl ? { docsUrl } : {}),
+    fault,
+    ...(reasons.length > 0 ? { reasons } : {}),
+  };
 }
 
 /**
