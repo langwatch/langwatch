@@ -6,7 +6,10 @@ import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hook
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { identityEmail, joinRequestsService } from "~/server/app-layer/identity/runtime";
+import {
+  identityEmail,
+  joinRequestsService,
+} from "~/server/app-layer/identity/runtime";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
@@ -26,7 +29,11 @@ import { assertInviteSendAllowed } from "~/server/invites/invite-send-throttle";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { trackServerEvent } from "~/server/posthog";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS, isCustomRole } from "../enterprise";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+} from "../enterprise";
 import { teamRoleInputSchema } from "./schemas/team-role";
 
 export const inviteRouter = createTRPCRouter({
@@ -55,7 +62,9 @@ export const inviteRouter = createTRPCRouter({
     .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleInvite = input.invites.some((invite) =>
-        (invite.teams ?? []).some((t) => typeof t.role === "string" && isCustomRole(t.role)),
+        (invite.teams ?? []).some(
+          (t) => typeof t.role === "string" && isCustomRole(t.role),
+        ),
       );
       if (hasCustomRoleInvite) {
         await assertEnterprisePlan({
@@ -137,7 +146,8 @@ export const inviteRouter = createTRPCRouter({
           properties: { inviteCount: created.invites.length },
         });
 
-        const memberCount = created.organization.members.length + created.invites.length;
+        const memberCount =
+          created.organization.members.length + created.invites.length;
         for (const record of created.invites) {
           fireTeamMemberInvitedNurturing({
             userId: ctx.session.user.id,
@@ -258,13 +268,14 @@ export const inviteRouter = createTRPCRouter({
       // person invited by email who signed in with their Google account is
       // no longer a support ticket. A user not yet on identifiers answers
       // `null` and keeps the legacy session-email comparison byte-for-byte.
-      const { matches: inviteEmailMatches, viaIdentifierId } = matchInviteToAcceptor({
-        inviteEmail: invite.email,
-        sessionEmail: session.user.email,
-        matchable: await identityEmail().verifiedEmailsOf({
-          userId: session.user.id,
-        }),
-      });
+      const { matches: inviteEmailMatches, viaIdentifierId } =
+        matchInviteToAcceptor({
+          inviteEmail: invite.email,
+          sessionEmail: session.user.email,
+          matchable: await identityEmail().verifiedEmailsOf({
+            userId: session.user.id,
+          }),
+        });
       // Signed in as somebody else is a wrong turn, not a refusal: the screen
       // names which account is wanted and offers the way back. The hint is
       // masked because an invite code is a bearer token — the landing already
