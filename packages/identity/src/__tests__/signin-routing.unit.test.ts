@@ -81,6 +81,7 @@ function route({
 const PASSWORD_ACCOUNT: AccountSignInMethods = {
   hasPassword: true,
   hasPasskey: false,
+  providerIds: [],
   connectionIds: [],
 };
 
@@ -167,7 +168,12 @@ describe("the identifier-first sign-in router", () => {
     it("offers the account's own methods rather than the instance's", () => {
       const decision = route({
         raw: "sam@home.net",
-        account: { hasPassword: false, hasPasskey: true, connectionIds: [] },
+        account: {
+          hasPassword: false,
+          hasPasskey: true,
+          providerIds: [],
+          connectionIds: [],
+        },
         methodPolicy: policy({
           defaultMethods: [
             PASSWORD,
@@ -233,6 +239,7 @@ describe("the identifier-first sign-in router", () => {
         account: {
           hasPassword: true,
           hasPasskey: true,
+          providerIds: [],
           connectionIds: ["conn_acme"],
         },
         policy: policy({ defaultMethods: [PASSWORD, okta, passkey] }),
@@ -241,14 +248,52 @@ describe("the identifier-first sign-in router", () => {
       expect(ranked).toEqual([passkey, okta, PASSWORD]);
     });
 
+    it("keeps a configured legacy provider alongside a passkey", () => {
+      const auth0: SignInMethod = {
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      };
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: false,
+          hasPasskey: true,
+          providerIds: ["auth0"],
+          connectionIds: [],
+        },
+        policy: policy({ defaultMethods: [auth0, passkey] }),
+      });
+
+      expect(ranked).toEqual([passkey, auth0]);
+    });
+
     /** @scenario "The methods offered are the ones that account holds" */
     it("drops a connection the account has never signed in through", () => {
       const ranked = rankAccountMethods({
-        account: { hasPassword: true, hasPasskey: false, connectionIds: [] },
+        account: {
+          hasPassword: true,
+          hasPasskey: false,
+          providerIds: [],
+          connectionIds: [],
+        },
         policy: policy({ defaultMethods: [PASSWORD, okta] }),
       });
 
       expect(ranked).toEqual([PASSWORD]);
+    });
+
+    it("does not treat a legacy provider id as a held connection", () => {
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: ["okta"],
+          connectionIds: [],
+        },
+        policy: policy({ defaultMethods: [okta] }),
+      });
+
+      expect(ranked).toEqual([]);
     });
   });
 

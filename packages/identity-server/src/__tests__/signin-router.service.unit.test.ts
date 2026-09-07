@@ -41,6 +41,7 @@ const POLICY: SignInMethodPolicy = {
 const PASSWORD_ACCOUNT: AccountSignInMethods = {
   hasPassword: true,
   hasPasskey: false,
+  providerIds: [],
   connectionIds: [],
 };
 
