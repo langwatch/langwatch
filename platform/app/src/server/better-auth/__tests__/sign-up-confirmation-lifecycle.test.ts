@@ -132,7 +132,10 @@ function buildHarness({
   const endpoint = new SignUpConfirmationEndpoint({
     verification,
     users: {
-      findUserIdByEmail: async () => db.user[0]?.id ?? null,
+      findUserIdByEmail: async () => {
+        const id = db.user[0]?.id;
+        return typeof id === "string" ? id : null;
+      },
     },
     minter: new BetterAuthSessionMinter(),
   });
