@@ -213,6 +213,31 @@ describe("runLangyCanary", () => {
     });
   });
 
+  describe("given a turn that starts and a settlement wait that ignores its signal", () => {
+    /** @scenario "A settlement wait that ignores its signal is still timeout" */
+    it("reports timeout when the budget elapses instead of hanging", async () => {
+      let clock = 0;
+      const deps: LangyCanaryDeps = {
+        startTurn: async () => STARTED,
+        awaitSettlement: () => new Promise(() => {}),
+        now: () => clock,
+      };
+
+      const pending = runLangyCanary(deps);
+      clock = LANGY_CANARY_BUDGET_MS;
+      await vi.advanceTimersByTimeAsync(LANGY_CANARY_BUDGET_MS);
+      const outcome = await pending;
+
+      expect(outcome).toEqual({
+        healthy: false,
+        reason: "timeout",
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        durationMs: LANGY_CANARY_BUDGET_MS,
+      });
+    });
+  });
+
   describe("given the turn service throws when the turn is started", () => {
     /** @scenario "A turn that cannot even start is turn_failed" */
     it("reports turn_failed with no conversation id", async () => {
@@ -312,7 +337,12 @@ describe("createSingleFlightLangyCanary", () => {
   describe("given a canary run that has settled for one caller", () => {
     /** @scenario "The guard releases once the run settles" */
     it("runs a new check for the same caller", async () => {
-      const run = vi.fn(async () => ({ healthy: true, durationMs: 1 }));
+      const run = vi.fn(
+        async (): Promise<LangyCanaryOutcome> => ({
+          healthy: true,
+          durationMs: 1,
+        }),
+      );
       const guarded = createSingleFlightLangyCanary(run);
 
       await guarded({ key: "proj/user", deps });

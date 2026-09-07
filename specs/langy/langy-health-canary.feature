@@ -98,6 +98,12 @@ Feature: A Langy health check that sends a real greeting and says what broke
     And the settlement wait was aborted
 
   @unit
+  Scenario: A settlement wait that ignores its signal is still timeout
+    Given a turn that starts and a settlement wait that never resolves, aborted or not
+    When the budget elapses
+    Then the run is unhealthy with reason "timeout" inside the budget
+
+  @unit
   Scenario: A turn that cannot even start is turn_failed
     Given the turn service throws when the turn is started
     When the canary runs

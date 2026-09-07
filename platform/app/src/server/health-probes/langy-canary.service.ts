@@ -167,12 +167,16 @@ export async function runLangyCanary(
     }
     started = startResult;
 
-    const settlement = await deps.awaitSettlement({
-      ...started,
-      signal: budget.signal,
-    });
+    // Raced as well as signalled: the settlement wait reads the conversation
+    // fold, and a wedged read would otherwise hold the probe past its budget.
+    const settlement = await Promise.race([
+      deps.awaitSettlement({ ...started, signal: budget.signal }),
+      aborted,
+    ]);
     return {
-      ...classifyLangyCanaryOutcome(settlement),
+      ...classifyLangyCanaryOutcome(
+        settlement !== null && "aborted" in settlement ? null : settlement,
+      ),
       ...started,
       durationMs: deps.now() - startedAt,
     };
