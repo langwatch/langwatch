@@ -276,6 +276,49 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   experiment_run_items: "experiments",
 } as const satisfies Record<string, RetentionCategory>;
 
+/**
+ * Durable authentication and authorization state is not customer telemetry.
+ * These names cover the PostgreSQL projections/row-truth today and reserve
+ * their ClickHouse-style spellings against accidental future TTL enrollment.
+ */
+export const SECURITY_RETENTION_EXEMPT_TABLES = [
+  "identity_projection_cursor",
+  "identifier",
+  "identifier_reservation",
+  "sso_connection",
+  "join_request",
+  "scim_sync_state",
+  "scim_external_id",
+  "scim_token",
+  "authz_projection_cursor",
+  "role_binding",
+  "grant",
+  "grant_usage",
+  "role",
+  "account",
+  "account_credential",
+  "passkey",
+  "two_factor",
+  "mfa_enrollment",
+  "organization_user",
+  "team_user",
+  "group",
+  "group_membership",
+  "custom_role",
+] as const;
+
+const securityRetentionExemptTables = new Set<string>(
+  SECURITY_RETENTION_EXEMPT_TABLES,
+);
+
+for (const table of Object.keys(RETENTION_TABLE_CATEGORY_MAP)) {
+  if (securityRetentionExemptTables.has(table)) {
+    throw new Error(
+      `${table} is durable security state and cannot be enrolled in tenant retention`,
+    );
+  }
+}
+
 export type RetentionManagedTable = keyof typeof RETENTION_TABLE_CATEGORY_MAP;
 
 export const RETENTION_MANAGED_TABLES = Object.keys(
