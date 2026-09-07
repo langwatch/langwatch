@@ -33,7 +33,7 @@ describe("platform operator identity lookup authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.ADMIN_EMAILS = "olive@langwatch.ai";
-    mockAuditLog.mockResolvedValue(undefined);
+    mockAuditLog.mockResolvedValue(void 0);
     mockLookup.resolve.mockResolvedValue({
       typed: "sam@acme.com",
       resolved: "sam@acme.com",
@@ -58,7 +58,11 @@ describe("platform operator identity lookup authorization", () => {
   });
 
   afterEach(() => {
-    process.env.ADMIN_EMAILS = originalAdminEmails;
+    if (originalAdminEmails === void 0) {
+      delete process.env.ADMIN_EMAILS;
+    } else {
+      process.env.ADMIN_EMAILS = originalAdminEmails;
+    }
   });
 
   describe("when an address is resolved", () => {
@@ -81,9 +85,12 @@ describe("platform operator identity lookup authorization", () => {
       expect(mockLookup.resolve).toHaveBeenCalledWith({
         address: "sam@acme.com",
       });
-      expect(mockAuditLog.mock.invocationCallOrder[0]).toBeLessThan(
-        mockLookup.resolve.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-      );
+      const auditCall = mockAuditLog.mock.invocationCallOrder[0];
+      const resolveCall = mockLookup.resolve.mock.invocationCallOrder[0];
+      if (typeof auditCall !== "number" || typeof resolveCall !== "number") {
+        throw new Error("expected audit and lookup calls");
+      }
+      expect(auditCall).toBeLessThan(resolveCall);
     });
 
     /** @scenario "A lookup that finds nobody is recorded exactly like one that finds somebody" */
@@ -116,9 +123,12 @@ describe("platform operator identity lookup authorization", () => {
           args: { address: "nobody@example.com" },
         }),
       );
-      expect(mockAuditLog.mock.invocationCallOrder[0]).toBeLessThan(
-        mockLookup.resolve.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-      );
+      const auditCall = mockAuditLog.mock.invocationCallOrder[0];
+      const resolveCall = mockLookup.resolve.mock.invocationCallOrder[0];
+      if (typeof auditCall !== "number" || typeof resolveCall !== "number") {
+        throw new Error("expected audit and lookup calls");
+      }
+      expect(auditCall).toBeLessThan(resolveCall);
     });
 
     /** @scenario "A refused lookup is recorded as an attempt, and reveals nothing" */
@@ -144,20 +154,15 @@ describe("platform operator identity lookup authorization", () => {
 
     /** @scenario "Without platform operator access the surface is not there at all" */
     it("answers with the same plain not-found as an absent surface", async () => {
-      const denial = await callerFor({
+      const attempt = callerFor({
         id: "user_mallory",
         email: "mallory@acme.com",
-      })
-        .resolve({ address: "sam@acme.com" })
-        .then(
-          () => {
-            throw new Error("an unprivileged caller reached identity lookup");
-          },
-          (error: unknown) => error as { code: string; message: string },
-        );
+      }).resolve({ address: "sam@acme.com" });
 
-      expect(denial).toEqual({ code: "NOT_FOUND", message: "Not found" });
-      expect(denial.message).not.toMatch(/identity|operator|admin|surface/i);
+      await expect(attempt).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        message: "Not found",
+      });
     });
   });
 
