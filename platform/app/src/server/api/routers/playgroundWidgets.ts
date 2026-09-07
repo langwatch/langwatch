@@ -15,11 +15,13 @@
  * else.
  */
 
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import type { Prisma } from "~/generated/prisma/client";
 import { PLAYGROUND_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { PlaygroundWidgetService } from "~/server/analytics/playground-widgets/playgroundWidget.service";
 import {
   PLAYGROUND_WIDGET_DEFINITION_VERSION,
@@ -71,6 +73,20 @@ export const playgroundWidgetsRouter = createTRPCRouter({
     )
     .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {
+      if (
+        input.dashboardId &&
+        !(await dashboardBelongsToProject(
+          ctx.prisma,
+          input.dashboardId,
+          input.projectId,
+        ))
+      ) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Dashboard not found",
+        });
+      }
+
       // Next free row: one below the lowest playground widget in the project.
       const last = await ctx.prisma.customGraph.findFirst({
         where: {
@@ -186,6 +202,19 @@ export const playgroundWidgetsRouter = createTRPCRouter({
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
+      if (
+        !(await dashboardBelongsToProject(
+          ctx.prisma,
+          input.dashboardId,
+          input.projectId,
+        ))
+      ) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Dashboard not found",
+        });
+      }
+
       await PlaygroundWidgetService.create(ctx.prisma).assignToDashboard({
         id: input.id,
         projectId: input.projectId,
