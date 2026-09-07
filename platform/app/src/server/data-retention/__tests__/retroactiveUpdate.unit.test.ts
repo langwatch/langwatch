@@ -9,12 +9,10 @@ describe("RetroactiveUpdateService", () => {
   describe("triggerUpdate()", () => {
     describe("given the traces category is updated", () => {
       /** @scenario Retroactive retention update applies uniformly across all retention-managed tables */
-      it("issues a parametrized ALTER TABLE per traces table including event_log", async () => {
+      it("updates trace-class event rows without overwriting indefinite rows", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
-        const service = new RetroactiveUpdateService(
-          async () => ({ command, query }) as any,
-        );
+        const service = new RetroactiveUpdateService(async () => ({ command, query }) as any);
 
         await service.triggerUpdate({
           projectId: "project-1",
@@ -33,59 +31,43 @@ describe("RetroactiveUpdateService", () => {
           const call = issuedCalls.find((c) =>
             (c.query as string).includes(`ALTER TABLE ${table}`),
           );
-          expect(
-            call,
-            `expected uniform update for table: ${table}`,
-          ).toBeDefined();
-          expect(call!.query).toContain(
-            "UPDATE _retention_days = {retentionDays:UInt16}",
-          );
+          expect(call, `expected uniform update for table: ${table}`).toBeDefined();
+          expect(call!.query).toContain("UPDATE _retention_days = {retentionDays:UInt16}");
           expect(call!.query).toContain("WHERE TenantId = {tenantId:String}");
-          expect(call!.query).toContain(
-            "_retention_days != {retentionDays:UInt16}",
-          );
+          expect(call!.query).toContain("_retention_days != {retentionDays:UInt16}");
           expect(call!.query_params).toEqual({
             tenantId: "project-1",
             retentionDays: 91,
           });
         }
 
-        // event_log is in traces category and must NOT have a TraceId clause
-        expect(
-          issuedCalls.some(
-            (c) =>
-              (c.query as string).includes("ALTER TABLE event_log") &&
-              (c.query as string).includes("TraceId"),
-          ),
-        ).toBe(false);
+        const eventLogCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE event_log"),
+        );
+        expect(eventLogCall).toBeDefined();
+        expect(eventLogCall!.query).toContain("startsWith(EventType, 'lw.identity.')");
+        expect(eventLogCall!.query).toContain("'governance_subject'");
+        expect(eventLogCall!.query).toContain("'coding_agent_session'");
+        expect(eventLogCall!.query).toContain(
+          "AggregateType NOT IN ('experiment_run', 'simulation_run', 'simulation_set', 'suite_run')",
+        );
 
         expect(
           issuedCalls.some((call) =>
-            (call.query as string).includes(
-              "ALTER TABLE langy_analytics_events",
-            ),
+            (call.query as string).includes("ALTER TABLE langy_analytics_events"),
           ),
         ).toBe(true);
 
-        // No NOT IN clause anywhere — no pin exclusion
-        expect(
-          issuedCalls.some((c) => (c.query as string).includes("NOT IN")),
-        ).toBe(false);
-
         // No literal projectId interpolation anywhere
-        expect(
-          issuedCalls.some((c) => (c.query as string).includes("'project-1'")),
-        ).toBe(false);
+        expect(issuedCalls.some((c) => (c.query as string).includes("'project-1'"))).toBe(false);
       });
     });
 
     describe("given the scenarios category is updated", () => {
-      it("issues parametrized updates across simulation_runs and suite_runs", async () => {
+      it("updates scenario tables and only scenario-class event rows", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
-        const service = new RetroactiveUpdateService(
-          async () => ({ command, query }) as any,
-        );
+        const service = new RetroactiveUpdateService(async () => ({ command, query }) as any);
 
         await service.triggerUpdate({
           projectId: "project-1",
@@ -112,16 +94,23 @@ describe("RetroactiveUpdateService", () => {
           tenantId: "project-1",
           retentionDays: 63,
         });
+
+        const eventLogCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE event_log"),
+        );
+        expect(eventLogCall).toBeDefined();
+        expect(eventLogCall!.query).toContain(
+          "AggregateType IN ('simulation_run', 'simulation_set', 'suite_run')",
+        );
+        expect(eventLogCall!.query).toContain("startsWith(EventType, 'lw.identity.')");
       });
     });
 
     describe("given the experiments category is updated", () => {
-      it("issues parametrized updates across experiment_runs and experiment_run_items", async () => {
+      it("updates experiment tables and only experiment-class event rows", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
-        const service = new RetroactiveUpdateService(
-          async () => ({ command, query }) as any,
-        );
+        const service = new RetroactiveUpdateService(async () => ({ command, query }) as any);
 
         await service.triggerUpdate({
           projectId: "project-1",
@@ -148,6 +137,12 @@ describe("RetroactiveUpdateService", () => {
           tenantId: "project-1",
           retentionDays: 119,
         });
+
+        const eventLogCall = issuedCalls.find((c) =>
+          (c.query as string).includes("ALTER TABLE event_log"),
+        );
+        expect(eventLogCall).toBeDefined();
+        expect(eventLogCall!.query).toContain("AggregateType IN ('experiment_run')");
       });
     });
 
@@ -173,9 +168,7 @@ describe("RetroactiveUpdateService", () => {
             },
           ],
         });
-        const service = new RetroactiveUpdateService(
-          async () => ({ command, query }) as any,
-        );
+        const service = new RetroactiveUpdateService(async () => ({ command, query }) as any);
 
         await expect(
           service.triggerUpdate({
@@ -197,10 +190,7 @@ describe("RetroactiveUpdateService", () => {
           expect(e).toBeInstanceOf(RetroactiveMutationInProgressError);
           const err = e as RetroactiveMutationInProgressError;
           // Caller can now act on the IDs without scraping the message.
-          expect(err.blocked.map((b) => b.mutationId)).toEqual([
-            "mut-1",
-            "mut-2",
-          ]);
+          expect(err.blocked.map((b) => b.mutationId)).toEqual(["mut-1", "mut-2"]);
           expect(err.message).toContain("mut-1");
           expect(err.message).toContain("mut-2");
         }
@@ -241,9 +231,7 @@ describe("RetroactiveUpdateService", () => {
         const query = vi.fn().mockResolvedValue({
           json: async () => mockRows,
         });
-        const service = new RetroactiveUpdateService(
-          async () => ({ query }) as any,
-        );
+        const service = new RetroactiveUpdateService(async () => ({ query }) as any);
 
         const progress = await service.getMutationProgress({
           projectId: "project-1",
@@ -283,9 +271,7 @@ describe("RetroactiveUpdateService", () => {
       const query = vi.fn().mockResolvedValue({
         json: async () => [],
       });
-      const service = new RetroactiveUpdateService(
-        async () => ({ query }) as any,
-      );
+      const service = new RetroactiveUpdateService(async () => ({ query }) as any);
 
       await service.getMutationProgress({ projectId: "weird'\\id" });
 
@@ -300,9 +286,7 @@ describe("RetroactiveUpdateService", () => {
   describe("killMutation()", () => {
     it("parametrizes mutation_id and tenant filter", async () => {
       const command = vi.fn().mockResolvedValue(undefined);
-      const service = new RetroactiveUpdateService(
-        async () => ({ command }) as any,
-      );
+      const service = new RetroactiveUpdateService(async () => ({ command }) as any);
 
       await service.killMutation({
         projectId: "project-1",

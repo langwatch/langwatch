@@ -109,8 +109,11 @@ metadata-only on the local replica. `IF NOT EXISTS` makes reruns no-ops.
 Down migrations are commented out — rollback is manual.
 
 Tables map to three categories that cascade independently
-(`RETENTION_TABLE_CATEGORY_MAP`): `traces` (7 tables), `scenarios`
-(2 tables), `experiments` (2 tables).
+(`RETENTION_TABLE_CATEGORY_MAP`): `traces`, `scenarios`, and `experiments`.
+`event_log` is the exception to table-level classification: each row is
+classified by `event-log-retention-policy.ts`. Payload-bearing rows follow the
+matching customer category, while durable content-free and control-plane
+families use `_retention_days = 0` and never expire.
 
 PG carries `RetentionPolicy(scopeType, scopeId, category, retentionDays)`
 with a denormalized `organizationId` anchor for plan-gating and
@@ -155,19 +158,24 @@ when `CLICKHOUSE_COLD_STORAGE_ENABLED=true`.
 
 ### Ingestion stamping
 
-Every CH repository for the 11 managed tables takes a
-`RetentionPolicyResolver` and stamps `_retention_days` per row:
+Every CH repository for the retention-managed tables takes a
+`RetentionPolicyResolver` and stamps `_retention_days` per row. `event_log`
+uses one exhaustive aggregate map, with event-type prefix fallbacks for
+identity, authorization, and governance history. Security and other explicitly
+durable content-free families are stamped 0; payload-bearing families resolve
+their category:
 
 ```ts
-const retentionDays =
-  (await resolver?.getRetentionDays(tenantId, "traces"))
-  ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+const retentionClass = classifyEventLogRowRetention(record);
+const retentionDays = retentionClass === "indefinite"
+  ? INDEFINITE_RETENTION_DAYS
+  : policy[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 ```
 
 `_size_bytes` is `MATERIALIZED` — CH computes it server-side at insert
 from the payload columns; the app must never pass it (CH rejects the row).
-Floor is 49 in production; 0 is only acceptable in test fixtures for
-backdated rows that would otherwise age out during a test.
+Floor is 49 in production for policy-bound rows. Zero is reserved for the
+explicit indefinite families and controlled test fixtures.
 
 ### Retroactive (`retroactiveUpdate.service.ts`)
 
@@ -179,6 +187,14 @@ ALTER TABLE <t>
 UPDATE _retention_days = {retentionDays:UInt16}
 WHERE TenantId = {tenantId:String} AND _retention_days != {retentionDays:UInt16}
 ```
+
+Every category also mutates its matching `event_log` rows. The predicate is
+generated from the same exhaustive classification used at ingestion. It
+excludes all indefinite rows, selects simulation/suite aggregates for
+`scenarios`, experiment aggregates for `experiments`, and treats every other
+finite or unknown historical aggregate as `traces`. This prevents a customer
+retroactive change from shortening durable control-plane history or applying a
+trace policy to mixed scenario and experiment events.
 
 The `!= N` predicate skips parts already at target. Before issuing the
 ALTER, we query `system.mutations` with
