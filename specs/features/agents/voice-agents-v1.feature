@@ -203,6 +203,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When 4 voice runs are started at once
     Then 2 runs execute and 2 runs wait in the queue with status "Queued"
 
+  # AC22
+  @integration
+  Scenario: A voice run that fails before its call starts frees its concurrency slot
+    Given the project's voice run concurrency cap is reached
+    When a queued voice run fails before its call starts, such as a prefetch error or a cancellation
+    Then its concurrency slot is released
+    And the next queued voice run for the project starts
+
   # AC24
   @integration
   Scenario: The results table shows a Caller column for both simulated and panel runs

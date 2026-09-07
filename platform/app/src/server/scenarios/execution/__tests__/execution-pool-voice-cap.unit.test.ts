@@ -70,4 +70,105 @@ describe("ScenarioExecutionPool with a voice concurrency cap", () => {
       expect(started).not.toContain("run-2");
     });
   });
+
+  describe("when a voice job's executor exits without ever registering a child", () => {
+    /** @scenario A voice run that fails before its call starts frees its concurrency slot */
+    it("releases the voice slot and starts the next buffered voice job", async () => {
+      const pool = new ScenarioExecutionPool({
+        concurrency: 10,
+        voiceGate: new VoiceConcurrencyGate({ max: 1 }),
+      });
+      const started: string[] = [];
+      pool.setSpawnFunction((job) => {
+        started.push(job.scenarioRunId);
+        // Mirrors executeScenarioRun's early-return paths (prefetch failure,
+        // cancellation during prefetch): resolves without ever calling
+        // registerChild/deregisterChild on the pool.
+        if (job.scenarioRunId === "run-1") return Promise.resolve();
+        return new Promise<void>(() => {});
+      });
+
+      pool.submit(voiceJob(1)); // starts, resolves immediately without a child
+      pool.submit(voiceJob(2)); // buffered by the voice cap
+
+      expect(started).toEqual(["run-1"]);
+      expect(pool.pendingCount).toBe(1);
+
+      // Let the microtask queue settle the resolved spawn promise.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(started).toEqual(["run-1", "run-2"]);
+      expect(pool.pendingCount).toBe(0);
+    });
+  });
+
+  describe("when a voice job's executor rejects without ever registering a child", () => {
+    /** @scenario A voice run that fails before its call starts frees its concurrency slot */
+    it("releases the voice slot and starts the next buffered voice job", async () => {
+      const pool = new ScenarioExecutionPool({
+        concurrency: 10,
+        voiceGate: new VoiceConcurrencyGate({ max: 1 }),
+      });
+      const started: string[] = [];
+      pool.setSpawnFunction((job) => {
+        started.push(job.scenarioRunId);
+        if (job.scenarioRunId === "run-1") {
+          return Promise.reject(new Error("prefetch blew up"));
+        }
+        return new Promise<void>(() => {});
+      });
+
+      pool.submit(voiceJob(1));
+      pool.submit(voiceJob(2));
+
+      expect(started).toEqual(["run-1"]);
+      expect(pool.pendingCount).toBe(1);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(started).toEqual(["run-1", "run-2"]);
+      expect(pool.pendingCount).toBe(0);
+    });
+  });
+
+  describe("when a voice job's child was already deregistered normally", () => {
+    it("does not double-release the slot once the spawn promise settles", async () => {
+      const pool = new ScenarioExecutionPool({
+        concurrency: 10,
+        voiceGate: new VoiceConcurrencyGate({ max: 1 }),
+      });
+      const started: string[] = [];
+      let resolveRun1: () => void = () => {};
+      pool.setSpawnFunction((job) => {
+        started.push(job.scenarioRunId);
+        if (job.scenarioRunId === "run-1") {
+          return new Promise<void>((resolve) => {
+            resolveRun1 = resolve;
+          });
+        }
+        return new Promise<void>(() => {});
+      });
+
+      pool.submit(voiceJob(1));
+      pool.submit(voiceJob(2)); // buffered by the voice cap
+
+      // Simulate the normal lifecycle: the child exits, deregisterChild runs
+      // and releases the slot, admitting run-2 — *before* the spawn promise
+      // itself settles.
+      pool.deregisterChild("run-1");
+      expect(started).toEqual(["run-1", "run-2"]);
+
+      // Now the spawn promise for run-1 settles. Since `deregisterChild`
+      // already removed it from `_runningJobs`, this must be a no-op —
+      // otherwise run-2's freshly-acquired slot would be released too.
+      resolveRun1();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(pool.pendingCount).toBe(0);
+      expect(started).toEqual(["run-1", "run-2"]);
+    });
+  });
 });

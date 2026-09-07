@@ -242,20 +242,37 @@ export class ScenarioExecutionPool {
     );
 
     // Fire and forget — the spawn function handles the full lifecycle
-    void this._spawnFn(jobData).catch((error) => {
-      logger.error(
-        {
-          scenarioRunId: jobData.scenarioRunId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Scenario execution failed unexpectedly",
-      );
-      // Ensure we deregister even on unexpected errors
-      this._running.delete(jobData.scenarioRunId);
-      this.releaseVoiceSlot(jobData);
-      this._runningJobs.delete(jobData.scenarioRunId);
-      this.dequeueNext();
-    });
+    void this._spawnFn(jobData).then(
+      () => this.settleUnregisteredJob(jobData.scenarioRunId),
+      (error) => {
+        logger.error(
+          {
+            scenarioRunId: jobData.scenarioRunId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Scenario execution failed unexpectedly",
+        );
+        this.settleUnregisteredJob(jobData.scenarioRunId);
+      },
+    );
+  }
+
+  /**
+   * Release a job's slot when the spawn function settled (resolved or
+   * rejected) without ever calling `deregisterChild` — an early return before
+   * the child registers (e.g. a prefetch failure, or cancellation during
+   * prefetch) otherwise leaks a voice slot forever, since only
+   * `deregisterChild` releases it. Idempotent: `_runningJobs` no longer holds
+   * the entry once `deregisterChild` already ran, so a normal exit is a no-op
+   * here.
+   */
+  private settleUnregisteredJob(scenarioRunId: string): void {
+    const jobData = this._runningJobs.get(scenarioRunId);
+    if (!jobData) return;
+    this._running.delete(scenarioRunId);
+    this.releaseVoiceSlot(jobData);
+    this._runningJobs.delete(scenarioRunId);
+    this.dequeueNext();
   }
 
   /** Release a voice job's reserved slot; a no-op for text jobs or no gate. */
