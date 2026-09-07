@@ -10,15 +10,16 @@ import {
 import type { SignInMethodPolicy } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import type { LastWayInRequest, RequiringOrganizations } from "../last-way-in";
 import { isLastWayInPath } from "../last-way-in";
 import type { ResetEndpointContext } from "../password-reset-session";
-import type {
-  TwoStepCeremoniesPort,
-  TwoStepEndpointContext,
-} from "../two-step-ceremonies";
-import { runTwoStepCeremony, userIdIn } from "../two-step-ceremonies";
+import type { TwoStepCeremoniesPort } from "../two-step-ceremonies";
+import { runTwoStepCeremony } from "../two-step-ceremonies";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -169,6 +170,7 @@ export function requestHooks({
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
       const pathname = normalizedRequestPathname(url);
+      const endpointPath = ctx.path ?? pathname;
 
       // ADR-119, on the two removals that reach no ceremony: the passkey
       // plugin owns its own table so `account.delete.before` never sees a
@@ -177,10 +179,11 @@ export function requestHooks({
       // BEFORE the endpoint runs, which is the only place a refusal counts —
       // the ledger's own guard fires in the after hook, where the ceremony
       // catches it and the endpoint has already succeeded.
-      if (isLastWayInPath(pathname)) {
+      if (isLastWayInPath(endpointPath)) {
+        const session = await getSessionFromCtx(ctx);
         await refuseIfItClosesTheLastDoor({
-          pathname,
-          userId: userIdIn(ctx as TwoStepEndpointContext),
+          pathname: endpointPath,
+          userId: session?.user?.id ?? null,
           body: ctx.body,
           requiringOrganizations,
         });
