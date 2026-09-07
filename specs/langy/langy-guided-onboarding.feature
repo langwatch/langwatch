@@ -120,8 +120,8 @@ Feature: Langy guides the first setup after sign-up
     Scenario: Every gateway ending says the closing line after the card, inline
       When the compiled guided-onboarding skill is read
       Then the gateway section has no shared close subsection to jump to
-      And the ending that shows the card says the closing line right after it, then runs complete-path
-      And the ending that asked first says the closing line after either answer, then runs complete-path
+      And the ending that shows the card runs complete-path right after it, then says the closing line as the last line
+      And the ending that asked first runs complete-path after either answer, then says the closing line as the last line
 
     # A snippet with a placeholder where the key goes is one the person cannot
     # paste, and a value in angle brackets reads as the key itself to someone
@@ -549,7 +549,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: A folder with no remote still completes the path
       When the compiled guided-onboarding skill is read
       Then a missing remote or gh login is one line saying the branch holds the commit and no pull request was opened
-      And the step is done with that line, the proposal follows, and the closing line and complete-path close the path
+      And the step is done with that line, the proposal follows, and complete-path then the closing line close the path
 
     # A film said the chat line and added a sentence about the tracing edit in
     # the same turn, so the person's cursor never got the composer.
@@ -595,7 +595,7 @@ Feature: Langy guides the first setup after sign-up
       Then the commit, the push, the pull request and its sentence come before the proposal
       And the scenario is created and opened, the why-a-scenario line is said, the run happens
       And the two-things line, the suite, its run and the open run follow
-      And the closing line comes before complete-path, which is last
+      And complete-path runs before the closing line, which is last
 
     # The line is true whatever the verdict: the agent answered and the traces
     # flowed. Only a run that answers an error instead of a verdict skips it.
@@ -808,10 +808,15 @@ Feature: Langy guides the first setup after sign-up
       And the tour card for the gateway path renders in the same conversation
       And Langy opens the gateway path with its own opener
 
+    # A film said the two-things line and the closing line and never ran
+    # complete-path: a tool call after a sentence that reads as the end is
+    # what a model drops. So the call comes first, and the closing line is
+    # what follows it, on every path.
     @e2e
     Scenario: Every path ends by recording its completion
       When Langy reaches the end of any path
-      Then Langy runs "langwatch onboarding complete-path <path>"
+      Then Langy runs "langwatch onboarding complete-path <path>" before the closing line
+      And the closing line is the last thing said, right after the call returns
       And the organization's guided onboarding lists that path as done
 
   # ===========================================================================

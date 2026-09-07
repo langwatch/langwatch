@@ -40,7 +40,7 @@ Say nothing about the brief itself: the panel draws it as a card, and the user n
   langwatch onboarding complete-path <path>
   ```
 
-  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs last: in the same step as the closing line, right after it, with no other tool call beside it, and never before the path's work is done. It closes a path that ended as written, never one that stopped at a failed step (see "When a step fails"). When it returns, the turn is over: say nothing more, and never repeat the closing line. Whatever it printed is the panel's to show, not yours.
+  with `<path>` one of `llmops`, `coding`, `gateway`, `governance`. It is idempotent. It runs right before the closing line, in the same step, with no other tool call beside it, and never before the path's work is done. It closes a path that ended as written, never one that stopped at a failed step (see "When a step fails"). When it returns, say the closing line, verbatim, as the last line, and the turn is over: nothing after that line, and never the line twice. Whatever the command printed is the panel's to show, not yours.
 
 ## llmops: Evals & LLM Ops
 
@@ -129,7 +129,7 @@ On the create option, or on the scenario agreed after "Chat about this", before 
 7. Run the suite
 8. Open the suite run
 9. Commit and push, when a file changed since the pull request
-10. The closing line and complete-path
+10. Complete-path, then the closing line
 
 Mark each item done as you finish it, and read the list before you end a turn: **a turn never ends with an open item**, unless a command answered an error (see "When a step fails"). A missing remote, a missing `gh` login and a failed verdict are not errors: the step is done with its line, and the next one starts.
 
@@ -176,15 +176,15 @@ langwatch navigate open <the scenariorun_ id the suite run printed>
 
 Item 9: the commit and the pull request exist since step 2, so commit and push again only when a file changed since; the change lands on the same pull request, and with no remote it stays on the branch. Leave the branch checked out: the agent you started runs on it.
 
-Item 10, only once item 8 is done, so the suite ran and its run is open, and never before. Say, verbatim, as the last line:
-
-All ready! Let me know if there is anything I can help with.
-
-Then, in the same step, close the path and stop:
+Item 10, only once item 8 is done, so the suite ran and its run is open, and never before. Close the path first:
 
 ```bash
 langwatch onboarding complete-path llmops
 ```
+
+Then, in the same step, say, verbatim, as the last line, and stop:
+
+All ready! Let me know if there is anything I can help with.
 
 ### When a step fails
 
@@ -192,7 +192,7 @@ A step fails when a command answers an error, never when a judge answers a verdi
 
 ## coding: Coding agents
 
-Say, verbatim:
+Say, verbatim, with the command block as part of the copy:
 
 You're a developer, so this one is easy. Run this in any repo where you use Claude Code:
 
@@ -200,13 +200,15 @@ You're a developer, so this one is easy. Run this in any repo where you use Clau
 npx langwatch claude
 ```
 
-Then I can show you around once your first traces are flying through.
-
-The command block is part of the copy: print it between the two lines. Then, in the same step, close the path and stop:
+Then, in the same step, close the path:
 
 ```bash
 langwatch onboarding complete-path coding
 ```
+
+Then say, verbatim, as the last line, and stop:
+
+Then I can show you around once your first traces are flying through.
 
 ## gateway: Gateway
 
@@ -245,15 +247,15 @@ export OPENAI_API_KEY="{{secret}}"
 
 When the brief says no gateway is configured, skip the snippet and say in one line that the gateway is not set up on this instance yet.
 
-Then say, verbatim, as the last line:
-
-That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
-
-Then, in the same step, close the path and stop:
+Then, in the same step, close the path:
 
 ```bash
 langwatch onboarding complete-path gateway
 ```
+
+Then say, verbatim, as the last line, and stop:
+
+That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 
 ### No reveal id in hand: ask first
 
@@ -270,15 +272,15 @@ On "Create a new key": mint one with `--reveal-once` as above, using the next fr
 
 On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet. Say that the app needs two environment variables: `OPENAI_BASE_URL` set to the gateway address (write the address itself, from the brief), and `OPENAI_API_KEY` set to the production-app key they saved. Write the address in full and the key line in words; never put a value in angle brackets or a stand-in where the key goes.
 
-Either way, say, verbatim, as the last line:
-
-That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
-
-Then, in the same step, close the path and stop:
+Either way, in the same step, close the path:
 
 ```bash
 langwatch onboarding complete-path gateway
 ```
+
+Then say, verbatim, as the last line, and stop:
+
+That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 
 ## governance: Governance
 
@@ -297,8 +299,10 @@ Whichever they pick, open the sources page, where both connections start:
 langwatch navigate open governance-sources
 ```
 
-Say in one line which source to add first on that page, then, in the same step, close the path and stop:
+Then, in the same step, close the path:
 
 ```bash
 langwatch onboarding complete-path governance
 ```
+
+Then say in one line which source to add first on that page, as the last line, and stop.

@@ -137,6 +137,36 @@ describe("the guided-onboarding skill", () => {
       }
     });
 
+    /** @scenario "Every path ends by recording its completion" */
+    it("runs complete-path before the closing line on every path, so the line is what follows the call", () => {
+      expect(rendered).toContain(
+        "It runs right before the closing line, in the same step, with no other tool call beside it, and never before the path's work is done.",
+      );
+      expect(rendered).toContain(
+        "When it returns, say the closing line, verbatim, as the last line, and the turn is over: nothing after that line, and never the line twice.",
+      );
+      const endings: Array<[string, string]> = [
+        ["langwatch onboarding complete-path llmops", VERBATIM_LINES["the closing line"]],
+        ["langwatch onboarding complete-path coding", VERBATIM_LINES["the coding closer"]],
+        ["langwatch onboarding complete-path governance", "Then say in one line which source to add first on that page, as the last line, and stop."],
+      ];
+      for (const [command, line] of endings) {
+        const call = rendered.lastIndexOf(command);
+        const said = rendered.lastIndexOf(line);
+        expect(call, command).toBeGreaterThan(-1);
+        expect(said, line).toBeGreaterThan(call);
+      }
+      // The coding copy keeps its command block right after the opener, and
+      // the closer moves behind the call.
+      const codingOpener = rendered.indexOf(VERBATIM_LINES["the coding opener"]);
+      const codingCommand = rendered.indexOf(VERBATIM_LINES["the coding command"]);
+      const codingClose = rendered.indexOf("langwatch onboarding complete-path coding");
+      const codingCloser = rendered.indexOf(VERBATIM_LINES["the coding closer"]);
+      expect(codingCommand).toBeGreaterThan(codingOpener);
+      expect(codingClose).toBeGreaterThan(codingCommand);
+      expect(codingCloser).toBeGreaterThan(codingClose);
+    });
+
     /** @scenario "The gateway snippet points at the instance's own gateway" */
     it("takes the gateway address from the brief and never from a remembered host", () => {
       expect(rendered).not.toContain("gateway.langwatch.ai");
@@ -196,7 +226,7 @@ describe("the guided-onboarding skill", () => {
     });
 
     /** @scenario "Every gateway ending says the closing line after the card, inline" */
-    it("ends each gateway ending on the closing line and complete-path, written inline after the card", () => {
+    it("ends each gateway ending on complete-path then the closing line, written inline after the card", () => {
       const section = rendered.slice(
         rendered.indexOf("## gateway: Gateway"),
         rendered.indexOf("## governance: Governance"),
@@ -213,18 +243,20 @@ describe("the guided-onboarding skill", () => {
       );
       const card = showTheKey.indexOf("call `secret_snippet`");
       const showCloser = showTheKey.indexOf(closer);
+      const showClose = showTheKey.indexOf(closeCommand);
       expect(card).toBeGreaterThan(-1);
-      expect(showCloser).toBeGreaterThan(card);
-      expect(showTheKey.indexOf(closeCommand)).toBeGreaterThan(showCloser);
+      expect(showClose).toBeGreaterThan(card);
+      expect(showCloser).toBeGreaterThan(showClose);
 
       const askFirst = section.slice(section.indexOf("### No reveal id in hand: ask first"));
       const askCard = askFirst.indexOf("show the snippet through the `secret_snippet` card");
       const saved = askFirst.indexOf('On "I saved it"');
+      const askClose = askFirst.indexOf(closeCommand);
       const askCloser = askFirst.indexOf(closer);
       expect(askCard).toBeGreaterThan(-1);
-      expect(askCloser).toBeGreaterThan(askCard);
-      expect(askCloser).toBeGreaterThan(saved);
-      expect(askFirst.indexOf(closeCommand)).toBeGreaterThan(askCloser);
+      expect(askClose).toBeGreaterThan(askCard);
+      expect(askClose).toBeGreaterThan(saved);
+      expect(askCloser).toBeGreaterThan(askClose);
     });
 
     /** @scenario "A key that exists with no reveal gets a question, never a placeholder" */
@@ -342,7 +374,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The closing line waits for the suite run" */
     it("says the closing line only once the suite ran and its run is open", () => {
       expect(rendered).toContain(
-        "Item 10, only once item 8 is done, so the suite ran and its run is open, and never before. Say, verbatim, as the last line:",
+        "Item 10, only once item 8 is done, so the suite ran and its run is open, and never before. Close the path first:",
       );
       const suiteRun = rendered.indexOf("langwatch test-suite run <suite_id>");
       const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);
@@ -416,7 +448,7 @@ describe("the guided-onboarding skill", () => {
         "7. Run the suite",
         "8. Open the suite run",
         "9. Commit and push, when a file changed since the pull request",
-        "10. The closing line and complete-path",
+        "10. Complete-path, then the closing line",
       ];
       const positions = items.map((item) => rendered.indexOf(item));
       for (const [index, position] of positions.entries()) {
@@ -507,8 +539,8 @@ describe("the guided-onboarding skill", () => {
         'langwatch test-suite create "Full regression"',
         "langwatch test-suite run <suite_id>",
         "langwatch navigate open <the scenariorun_ id the suite run printed>",
-        VERBATIM_LINES["the closing line"],
         "langwatch onboarding complete-path llmops",
+        VERBATIM_LINES["the closing line"],
       ];
       const positions = order.map((line) => rendered.indexOf(line));
       for (const [index, position] of positions.entries()) {
