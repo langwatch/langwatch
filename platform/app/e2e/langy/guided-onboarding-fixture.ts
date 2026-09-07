@@ -110,7 +110,10 @@ function normalise(text: string): string {
 /** The judge criteria every guided conversation is held to. */
 export const GUIDED_TONE_CRITERIA = [
   "Langy never asks for an API key or a provider: the brief already names one.",
-  "Langy never describes the kickoff brief, the tour card or the onboarding state to the user; it simply starts the setup.",
+  // The skipped-tour opener names the tour, and the skill requires it word
+  // for word. Without the carve-out the judge is handed two criteria that
+  // cannot both hold, and which one wins is a coin flip.
+  "Langy never describes the kickoff brief, the tour card or the onboarding state to the user in its own words; it simply starts the setup. A line Langy is required to say word for word does not count, whatever it mentions.",
   "Langy stays warm and brief, in the voice of a guide who is doing the work, never a manual.",
 ];
 
