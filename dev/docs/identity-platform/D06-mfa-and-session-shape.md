@@ -1,6 +1,6 @@
 # D06 — MFA (TOTP) + session shape + Principal-aligned impersonation
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 · Flag: `MFA_ENROLLMENT_OPEN` · Specs: `specs/identity/mfa-and-session-shape.feature`
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 · Flag: `MFA_ENROLLMENT_OPEN` · Specs: `specs/identity/mfa-and-session-shape.feature`
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. BetterAuth config now
 > lives in `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts`

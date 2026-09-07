@@ -157,7 +157,7 @@ The legacy `make dev` / `make dev-nlp` / `make dev-scenarios` / `make dev-test` 
 
 Stateful services (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) share data across worktrees: sign up once, persist across worktree switches. Only one worktree can have postgres or clickhouse `up` at a time — `quickstart` detects collisions and points at the other compose project. Redis is a singleton on host `:6379`.
 
-For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.md` and `make boxd-help`.
+For per-PR / per-issue cloud environments via boxd, see `dev/docs/runbooks/boxd-makefile.md` and `make boxd-help`.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 

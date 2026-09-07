@@ -3,10 +3,10 @@
 Status: built (all three phases; alert routes remain infrastructure-owned)
 Date: 2026-08-13
 
-Behavioural contracts: [process-manager visibility](../../specs/ops/process-manager-visibility.feature)
-and [event-subscriber visibility](../../specs/ops/event-subscriber-visibility.feature).
-The shared process-manager rules are in [ADR-049](adr/049-langy-projection-independent-reactions.md);
-the page follows the layout conventions in [ops-dashboard.md](best_practices/ops-dashboard.md).
+Behavioural contracts: [process-manager visibility](../../../specs/ops/process-manager-visibility.feature)
+and [event-subscriber visibility](../../../specs/ops/event-subscriber-visibility.feature).
+The shared process-manager rules are in [ADR-049](../adr/049-langy-projection-independent-reactions.md);
+the page follows the layout conventions in [ops-dashboard.md](../best_practices/ops-dashboard.md).
 
 ## Current surface
 

@@ -1,6 +1,6 @@
 # D11 — Resilient invitations
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifiers) only · Invite changes additive
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifiers) only · Invite changes additive
 
 # Overview
 

@@ -122,7 +122,7 @@ write.
 - `specs/auth/phase-1-better-auth-config.feature`
 - `specs/auth/phase-2-cutover-migration.feature`
 - `specs/auth/phase-3-big-swap.feature`
-- `docs/better-auth-cutover.md` (deployment notes)
+- `dev/docs/research/better-auth-cutover.md` (deployment notes)
 - `e2e/auth-regression/better-auth-smoketest.ts` (37 end-to-end checks)
 - `e2e/auth-regression/better-auth-sso-smoketest.ts` (11 SSO checks)
 - `e2e/auth-regression/better-auth-compat-smoketest.ts` (20 compat layer checks)
@@ -720,7 +720,7 @@ migration because we would have to materialize `User.password` back out of
 3. Deploy new app version
 4. Users re-authenticate on next visit
 5. Watch `langwatch:better-auth` and `langwatch:auth` logs for errors
-6. Run the 10-step post-deploy verification in `docs/better-auth-cutover.md`
+6. Run the 10-step post-deploy verification in `dev/docs/research/better-auth-cutover.md`
 
 ## Known limitations (out of scope)
 
@@ -1108,7 +1108,7 @@ All 78 checks should pass. If any fails, do NOT merge.
 - [ ] This PR is reviewed and approved.
 - [ ] All CI checks green (unit tests, typecheck, lint, integration tests).
 - [ ] Staging deployed and **all of Parts A–D** manually verified.
-- [ ] `docs/better-auth-cutover.md` re-read by whoever is on deploy duty.
+- [ ] `dev/docs/research/better-auth-cutover.md` re-read by whoever is on deploy duty.
 - [ ] **Production DB snapshot scheduled** for the merge window. This is
       non-negotiable — see the [Rollback](#rollback) section.
 - [ ] Merge window chosen during a LOW-TRAFFIC period. Every currently

@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-**Program:** Identity platform redesign — epic `../identity-platform-redesign.md`,
+**Program:** Identity platform redesign — epic `../plans/identity-platform-redesign.md`,
 plan `../identity-platform/delivery-plan.md`. Touches every deliverable that
 reads a session, and D06 most of all (it is what puts claims on one).
 

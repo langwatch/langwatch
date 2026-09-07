@@ -1,4 +1,4 @@
-# Plan: dev/docs/ops-process-manager-visibility-plan.md. Phase 1 (read-only
+# Plan: dev/docs/plans/ops-process-manager-visibility-plan.md. Phase 1 (read-only
 # fleet + instance drawer) and the phase-2 safe actions are built; the
 # remaining @unimplemented scenarios are phase 3 (signals/alerting).
 

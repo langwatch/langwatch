@@ -1,6 +1,6 @@
 # D08 — SCIM per-connection + grants integration
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D05 (connection-scoped tokens) + **authz precondition checklist (hard)** · Flag: `SCIM_V2_GRANTS`
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D05 (connection-scoped tokens) + **authz precondition checklist (hard)** · Flag: `SCIM_V2_GRANTS`
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. SCIM now lives in
 > `packages/enterprise/features/scim/{contract,server,web}`; the service this

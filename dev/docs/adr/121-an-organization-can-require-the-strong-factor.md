@@ -4,7 +4,7 @@
 
 **Status:** Proposed — Wave 3, not built here
 
-**Program:** Identity platform redesign — epic `../identity-platform-redesign.md`,
+**Program:** Identity platform redesign — epic `../plans/identity-platform-redesign.md`,
 plan `../identity-platform/delivery-plan.md`, deliverables `D06-mfa-and-session-shape.md`
 (the membership-condition machinery this reuses) and `D07-passkeys.md` (which
 deferred exactly this).

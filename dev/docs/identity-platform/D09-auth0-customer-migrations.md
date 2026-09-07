@@ -1,6 +1,6 @@
 # D09 — Auth0 customer migrations
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 4 · Depends on: D05, D08 · Rollback is structural: both-connections-active grace · **customer-paced, per tenant — slow by design**
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 4 · Depends on: D05, D08 · Rollback is structural: both-connections-active grace · **customer-paced, per tenant — slow by design**
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. Auth0 password-change
 > handling now lives at

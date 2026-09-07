@@ -13,7 +13,7 @@ import type {
 /**
  * Fleet-level trouble counts for one process name — the row the operator
  * scans first. Everything is a count of a state the tables can be in; the
- * meanings are pinned in dev/docs/ops-process-manager-visibility-plan.md.
+ * meanings are pinned in dev/docs/plans/ops-process-manager-visibility-plan.md.
  */
 export interface ProcessNameCounts {
   processName: string;

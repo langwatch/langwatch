@@ -58,7 +58,7 @@ Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new 
 | Make targets                                                       | `dev/boxd.mk` (new), `Makefile` (include)                                                                   |
 | Pure shell helpers (slug, env discovery, hostname rewrite)         | `dev/scripts/boxd-fork.sh` (new)                                                                            |
 | Unit + integration tests for helpers                               | `dev/scripts/__tests__/boxd-fork.unit.bats` (new), `dev/scripts/__tests__/boxd-fork.integration.bats` (new) |
-| Docs (philosophy, target reference, troubleshooting, threat model) | `dev/docs/boxd-makefile.md` (new)                                                                           |
+| Docs (philosophy, target reference, troubleshooting, threat model) | `dev/docs/runbooks/boxd-makefile.md` (new)                                                                           |
 | BDD spec for verifiable behavior                                   | `specs/setup/boxd-fork-vm.feature` (new, `@unimplemented` per repo convention)                              |
 
 ### #3860 — quickstart rework (subset)
@@ -80,7 +80,7 @@ dev/boxd.mk                       # Make targets (orchestration only)
 dev/scripts/boxd-fork.sh          # Shell helpers (pure-ish: slug, env discovery, hostname rewrite, env-cp, port mapping)
 dev/scripts/__tests__/boxd-fork.unit.bats        # tests for slugifier, env discovery, hostname rewrite
 dev/scripts/__tests__/boxd-fork.integration.bats # tests with mocked boxd, gh, git
-dev/docs/boxd-makefile.md     # human-facing docs
+dev/docs/runbooks/boxd-makefile.md     # human-facing docs
 specs/setup/boxd-fork-vm.feature # behavior spec (unimplemented stub)
 ```
 
@@ -303,7 +303,7 @@ fi
 | 5 (golden VM pre-warmed)                                        | `boxd-golden` calls `make dev-full` inside the VM via `boxd exec`           |
 | 6 (golden-reset)                                                | `dev/boxd.mk`                                                               |
 | 7 (seed hook)                                                   | `dev/boxd.mk` defines empty `seed-golden:` target documented as override-me |
-| 8 (staleness ops doc)                                           | `dev/docs/boxd-makefile.md`                                                 |
+| 8 (staleness ops doc)                                           | `dev/docs/runbooks/boxd-makefile.md`                                                 |
 | 9 (naming convention)                                           | `dev/scripts/boxd-fork.sh`                                                  |
 | 10 (single fork primitive)                                      | `_boxd-fork-impl` make target shared across pr/branch/issue                 |
 | 11 (fork has branch checked out + ready)                        | impl                                                                        |
@@ -323,7 +323,7 @@ fi
 | 25 (same-key precedence: each .env separate)                    | impl: cp preserves paths                                                    |
 | 26 (hostname-rewrite allowlist)                                 | impl, tested                                                                |
 | 27 (ports 3000, 5563, others)                                   | impl                                                                        |
-| 28 (dev/docs/ entry)                                            | `dev/docs/boxd-makefile.md`                                                 |
+| 28 (dev/docs/ entry)                                            | `dev/docs/runbooks/boxd-makefile.md`                                                 |
 | 29 (make help grep-able)                                        | `dev/boxd.mk` `help` target                                                 |
 
 ### #3860 (quickstart) — 10 ACs
@@ -348,7 +348,7 @@ fi
 | Stable shared `db-data` volume conflicts with someone's existing per-worktree volume            | High (everyone has stale `lw-<hash>-db-data`) | Migration note in ADR-004 amendment + `make quickstart` prints warning if old volumes detected                                                                         |
 | `dev/boxd.mk` external-vs-internal CLI surface drift (issue calls out both)                     | Med                                           | Use only commands that exist in both: `info`, `list`, `new`, `fork`, `exec`, `cp`, `proxy`, `connect`, `pause`, `resume`, `destroy`. No `local` / `auto-suspend` calls |
 | Bats tests don't run in CI (no workflow runs them)                                              | Low                                           | They run locally for the slugifier + env helpers; integration via @unimplemented spec for parity tracking                                                              |
-| Fork pruning is out of scope but the user's quota fills up                                      | Low                                           | Documented in `dev/docs/boxd-makefile.md`; follow-up issue filed                                                                                                       |
+| Fork pruning is out of scope but the user's quota fills up                                      | Low                                           | Documented in `dev/docs/runbooks/boxd-makefile.md`; follow-up issue filed                                                                                                       |
 | `make dev` deprecation warning breaks someone's muscle-memory workflow                          | Med                                           | Warning is on stderr only; command still works for one release                                                                                                         |
 | Compose project name collision between worktrees with shared db-data                            | Med (this is the AC)                          | Detect via `docker ps` + clear error in `dev.sh`. Document in CLAUDE.md                                                                                                |
 | The `boxd-fork-issue` flow assumes the developer's laptop has `worktree.sh` and the repo cloned | Low                                           | This is the existing dev environment — same precondition as `make worktree` already imposes                                                                            |
@@ -375,7 +375,7 @@ fi
 8. `dev/scripts/dev.sh` help mode + per-mode hints + idempotency / fail-fast / collision detection
 9. `Makefile` deprecation wrappers
 10. `CLAUDE.md` + `ADR-004` updates
-11. `dev/docs/boxd-makefile.md`
+11. `dev/docs/runbooks/boxd-makefile.md`
 12. `specs/setup/boxd-fork-vm.feature` + `specs/setup/quickstart-entry-point.feature`
 13. `pnpm typecheck` + `pnpm test:unit` regression gate
 14. Open PR, request review from `rogeriochaves`

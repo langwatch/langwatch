@@ -1,6 +1,6 @@
 # D10 — Auth0 code + config deletion
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 4 · Depends on: D09 program exit (zero ACTIVE legacy connections) · **Program exit criterion — customer-paced, not a scheduled milestone**
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 4 · Depends on: D09 program exit (zero ACTIVE legacy connections) · **Program exit criterion — customer-paced, not a scheduled milestone**
 
 > **Amendment 2026-09-03:** `platform/app` itself has since been deleted
 > entirely (commit `faaa9ec333`). The Auth0 surfaces this deliverable targets

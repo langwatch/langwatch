@@ -78,6 +78,12 @@ docker compose -f infra/compose.yml up -d --wait --build
 
 Once running, LangWatch will be available at `http://localhost:5560`, where you can create your first project and API key.
 
+Working on LangWatch itself rather than running it? [`dev/docs/GETTING_STARTED.md`](dev/docs/GETTING_STARTED.md) is the contributor path from a fresh clone to a running stack:
+
+> LangWatch is an LLM ops platform: evaluation, observability and optimisation for AI agents and pipelines. This page is the shortest path from a fresh clone to a running stack, plus the handful of rules that save you a bad afternoon.
+>
+> Four Node applications, two Go services and a Python evaluator suite, all in one pnpm workspace with one lockfile at the root.
+
 ### Deployment options ⚓️
 
 Run LangWatch on your own infrastructure:

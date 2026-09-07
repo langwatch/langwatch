@@ -70,7 +70,7 @@ help:
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
-	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/runbooks/boxd-makefile.md"
 
 # The demo applications keep their own Makefile; this only forwards `lang`.
 dogfood-langy-local:

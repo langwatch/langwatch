@@ -1,6 +1,6 @@
 # D07 — Passkeys
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 (picker hook point) · Flag: `PASSKEYS_ENABLED` · Specs: `specs/identity/passkeys.feature`
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 (picker hook point) · Flag: `PASSKEYS_ENABLED` · Specs: `specs/identity/passkeys.feature`
 
 # Overview
 

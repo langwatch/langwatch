@@ -1,6 +1,6 @@
 # Identity Platform — Delivery Plan
 
-The final spec: how the thirteen deliverables (`D01`–`D13`, see `../identity-platform-redesign.md` for the epic) sequence, gate, and roll back. Each deliverable is a sealed goal: independently shippable, flag-gated, measurable exit, stated rollback.
+The final spec: how the thirteen deliverables (`D01`–`D13`, see `../plans/identity-platform-redesign.md` for the epic) sequence, gate, and roll back. Each deliverable is a sealed goal: independently shippable, flag-gated, measurable exit, stated rollback.
 
 # Precondition — authz program landed
 

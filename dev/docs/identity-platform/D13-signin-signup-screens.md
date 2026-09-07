@@ -1,6 +1,6 @@
 # D13 — Sign-in & sign-up screens (the first-party auth UI)
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); flips with D03 (same flag: `IDENTITY_ROUTER_V2`)
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); flips with D03 (same flag: `IDENTITY_ROUTER_V2`)
 
 # Overview
 

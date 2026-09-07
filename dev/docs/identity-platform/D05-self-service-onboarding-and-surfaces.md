@@ -1,6 +1,6 @@
 # D05 — Self-service SSO onboarding + identity surfaces
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
 
 # Overview
 

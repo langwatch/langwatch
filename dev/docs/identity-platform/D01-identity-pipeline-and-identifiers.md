@@ -1,6 +1,6 @@
 # D01 — Identity pipeline skeleton + identifiers
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 · Depends on: the landed authz program — ADR-110's migration state, `@langwatch/system-migrations`, and the shared `_shared/per-subject-cached-gate.ts` are all reused here (the authz _engine_ itself is never consulted on an identity write)
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 · Depends on: the landed authz program — ADR-110's migration state, `@langwatch/system-migrations`, and the shared `_shared/per-subject-cached-gate.ts` are all reused here (the authz _engine_ itself is never consulted on an identity write)
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. The event-sourcing
 > framework this deliverable targeted now lives in `packages/eventing`; the

@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-**Program:** Identity platform redesign — epic `../identity-platform-redesign.md`,
+**Program:** Identity platform redesign — epic `../plans/identity-platform-redesign.md`,
 plan `../identity-platform/delivery-plan.md`, deliverable
 `D07-passkeys.md`. Specs: `specs/identity/passkeys.feature`.
 

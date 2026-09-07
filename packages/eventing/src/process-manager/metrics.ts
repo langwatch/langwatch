@@ -2,7 +2,7 @@ import { observableGauge } from "@langwatch/observability/metrics";
 
 /**
  * Fleet-level process-manager gauges (phase 3 of
- * dev/docs/ops-process-manager-visibility-plan.md): the same trouble counts
+ * dev/docs/plans/ops-process-manager-visibility-plan.md): the same trouble counts
  * the /ops/processes page shows, exported so alerting can watch them without
  * a human on the page.
  *

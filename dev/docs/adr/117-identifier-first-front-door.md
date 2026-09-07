@@ -4,7 +4,7 @@
 
 **Status:** Proposed (spike for review — Wave 2 of the identity platform)
 
-**Program:** Identity platform redesign — epic `../identity-platform-redesign.md`,
+**Program:** Identity platform redesign — epic `../plans/identity-platform-redesign.md`,
 plan `../identity-platform/delivery-plan.md`, deliverables
 `D03-identifier-first-signin-router.md`, `D13-signin-signup-screens.md`,
 `D04-sso-connection-aggregate.md`. This is the "ADR-3" those documents refer
@@ -391,7 +391,7 @@ _why_ two paths disagreed.
 
 ## References
 
-- Epic: `dev/docs/identity-platform-redesign.md` (R3, R5, R8, Q5;
+- Epic: `dev/docs/plans/identity-platform-redesign.md` (R3, R5, R8, Q5;
   Open Q9/Q11/Q12 answered in §6/§4) · Plan:
   `dev/docs/identity-platform/delivery-plan.md` (Wave 2 PR breakdown) ·
   Deliverables: D03, D13, D04

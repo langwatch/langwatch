@@ -18,7 +18,7 @@ identity, the overlay env file, process supervision, and a daemon that reaps dea
 stacks. **`haven pr` is the missing front-half** — resolve a PR to a worktree —
 bolted onto haven's existing `up` back-half, plus a throwaway-teardown story.
 
-**vs boxd** (`dev/docs/boxd-makefile.md`): boxd forks a _cloud VM_ from a golden
+**vs boxd** (`dev/docs/runbooks/boxd-makefile.md`): boxd forks a _cloud VM_ from a golden
 image — durable, shareable, production-shaped, minutes to provision. `haven pr`
 is the opposite end: **local native processes, seconds to a hostname, disposable**
 — reuses your warm pnpm store, already-running shared Postgres/ClickHouse, and
@@ -159,7 +159,7 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
 - Depends on `haven-private-redis-plan.md` (Redis is always private here).
 - Extend `dev/docs/adr/004-docker-dev-environment.md` (worktree isolation,
   stateful volumes, in-process workers amendments).
-- Reference `dev/docs/boxd-makefile.md` (local-vs-cloud complementarity) and
+- Reference `dev/docs/runbooks/boxd-makefile.md` (local-vs-cloud complementarity) and
   `tools/thuishaven/README.md` "Forward ideas" (this ships two of them).
 - Ruled out: `specs/langy/langy-github-prs-plan.md` is the _Langy agent_ opening
   PRs on a user's behalf — unrelated to haven trying PRs locally.
