@@ -3,13 +3,19 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
-import { OrganizationUserRole } from "~/generated/prisma/client";
+import {
+  type Organization,
+  type OrganizationInvite,
+  OrganizationUserRole,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
   identityEmail,
   joinRequestsService,
 } from "~/server/app-layer/identity/runtime";
+import type { Session } from "~/server/auth";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
@@ -35,6 +41,181 @@ import {
   isCustomRole,
 } from "../enterprise";
 import { teamRoleInputSchema } from "./schemas/team-role";
+
+interface CreatedInviteBatch {
+  organization: { members: readonly unknown[] };
+  invites: readonly {
+    invite: {
+      id: string;
+      email: string;
+      organizationId: string;
+      role: OrganizationUserRole;
+    };
+  }[];
+}
+
+async function recordCreatedInvites({
+  prisma,
+  userId,
+  created,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  created: CreatedInviteBatch;
+}): Promise<void> {
+  if (created.invites.length === 0) return;
+
+  await Promise.all(
+    created.invites.map(async (record) => {
+      const invited = await prisma.user.findFirst({
+        where: { email: record.invite.email },
+        select: { id: true },
+      });
+      if (!invited) return;
+      try {
+        await joinRequestsService().resolveByInvitation({
+          userId: invited.id,
+          organizationId: record.invite.organizationId,
+          inviteId: record.invite.id,
+        });
+      } catch (error) {
+        captureException(toError(error), {
+          tags: { organizationId: record.invite.organizationId },
+        });
+      }
+    }),
+  );
+
+  trackServerEvent({
+    userId,
+    event: "team_member_invited",
+    properties: { inviteCount: created.invites.length },
+  });
+  const memberCount =
+    created.organization.members.length + created.invites.length;
+  for (const record of created.invites) {
+    fireTeamMemberInvitedNurturing({
+      userId,
+      teamMemberCount: memberCount,
+      role: record.invite.role,
+    });
+  }
+}
+
+type InviteWithOrganization = OrganizationInvite & {
+  organization: Organization;
+};
+
+function assertInviteExists(
+  invite: InviteWithOrganization | null,
+): asserts invite is InviteWithOrganization {
+  if (!invite || invite.status === "REVOKED") {
+    throw new InviteNotFoundError("Invitation not found");
+  }
+}
+
+function requireSessionEmail(session: Session | null): string {
+  if (session?.user.email) return session.user.email;
+
+  throw new TRPCError({
+    code: "UNAUTHORIZED",
+    message: "You must be signed in to accept the invite",
+  });
+}
+
+function assertInvitePending(invite: InviteWithOrganization): void {
+  if (invite.status === "ACCEPTED") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: INVITE_ALREADY_ACCEPTED_MESSAGE,
+    });
+  }
+  if (resolveInviteDisplayStatus(invite) === "EXPIRED") {
+    throw new InviteExpiredError();
+  }
+  if (invite.status !== "PENDING") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: INVITE_NOT_READY_MESSAGE,
+    });
+  }
+}
+
+async function matchInviteAcceptor({
+  invite,
+  session,
+  sessionEmail,
+}: {
+  invite: InviteWithOrganization;
+  session: Session;
+  sessionEmail: string;
+}): Promise<string | null> {
+  const { matches, viaIdentifierId } = matchInviteToAcceptor({
+    inviteEmail: invite.email,
+    sessionEmail,
+    matchable: await identityEmail().verifiedEmailsOf({
+      userId: session.user.id,
+    }),
+  });
+  if (!matches) {
+    throw new InviteWrongAccountError(maskInvitedAddress(invite.email));
+  }
+  return viaIdentifierId;
+}
+
+async function finishInviteAcceptance({
+  prisma,
+  session,
+  invite,
+}: {
+  prisma: PrismaClient;
+  session: Session;
+  invite: InviteWithOrganization;
+}): Promise<void> {
+  try {
+    await joinRequestsService().withdrawOnInvitationAccepted({
+      userId: session.user.id,
+      organizationId: invite.organizationId,
+    });
+  } catch (error) {
+    captureException(toError(error), {
+      tags: { organizationId: invite.organizationId },
+    });
+  }
+
+  try {
+    const personalWorkspaceService = new PersonalWorkspaceService(prisma);
+    await personalWorkspaceService.ensure({
+      userId: session.user.id,
+      organizationId: invite.organizationId,
+      displayName: session.user.name,
+      displayEmail: session.user.email,
+    });
+  } catch (error) {
+    captureException(toError(error), {
+      extra: {
+        origin: "governance.acceptInvite",
+        userId: session.user.id,
+        organizationId: invite.organizationId,
+      },
+    });
+  }
+
+  void getApp()
+    .notifications.sendSlackSignupEvent({
+      userName: session.user.name,
+      userEmail: session.user.email,
+      organizationName: invite.organization.name,
+    })
+    .catch(captureException);
+  fireInviteAcceptedNurturingCalls({
+    userId: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+    organizationId: invite.organization.id,
+    organizationName: invite.organization.name,
+  });
+}
 
 export const inviteRouter = createTRPCRouter({
   createInvites: protectedProcedure
@@ -112,50 +293,11 @@ export const inviteRouter = createTRPCRouter({
         throw error;
       }
 
-      if (created.invites.length > 0) {
-        // D11 x D12, invitation -> request: a formal invitation sent to
-        // somebody with an open request ANSWERS it. The invitation carries
-        // the role and the teams, which is the flow that owns them, so the
-        // request resolves as approved-by-invitation rather than staying
-        // open beside it. Silent when nothing is open, and never fatal — the
-        // invitation is the durable outcome here.
-        await Promise.all(
-          created.invites.map(async (record) => {
-            const invited = await ctx.prisma.user.findFirst({
-              where: { email: record.invite.email },
-              select: { id: true },
-            });
-            if (!invited) return;
-            try {
-              await joinRequestsService().resolveByInvitation({
-                userId: invited.id,
-                organizationId: record.invite.organizationId,
-                inviteId: record.invite.id,
-              });
-            } catch (error) {
-              captureException(toError(error), {
-                tags: { organizationId: record.invite.organizationId },
-              });
-            }
-          }),
-        );
-
-        trackServerEvent({
-          userId: ctx.session.user.id,
-          event: "team_member_invited",
-          properties: { inviteCount: created.invites.length },
-        });
-
-        const memberCount =
-          created.organization.members.length + created.invites.length;
-        for (const record of created.invites) {
-          fireTeamMemberInvitedNurturing({
-            userId: ctx.session.user.id,
-            teamMemberCount: memberCount,
-            role: record.invite.role,
-          });
-        }
-      }
+      await recordCreatedInvites({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        created,
+      });
 
       return created.invites;
     }),
@@ -228,39 +370,9 @@ export const inviteRouter = createTRPCRouter({
         where: { inviteCode: input.inviteCode },
         include: { organization: true },
       });
-
-      // A revoked invitation reads exactly like a missing one on purpose:
-      // the journey ends quietly, revealing nothing about the organization
-      // or the inviter. Expired is different — it is recoverable (the
-      // inviter resends in one click), so it gets its own named refusal.
-      if (!invite || invite.status === "REVOKED") {
-        throw new InviteNotFoundError("Invitation not found");
-      }
-
-      if (!session?.user?.email) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be signed in to accept the invite",
-        });
-      }
-
-      if (invite.status === "ACCEPTED") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: INVITE_ALREADY_ACCEPTED_MESSAGE,
-        });
-      }
-
-      if (resolveInviteDisplayStatus(invite) === "EXPIRED") {
-        throw new InviteExpiredError();
-      }
-
-      if (invite.status !== "PENDING") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: INVITE_NOT_READY_MESSAGE,
-        });
-      }
+      assertInviteExists(invite);
+      const sessionEmail = requireSessionEmail(session);
+      assertInvitePending(invite);
 
       // Identifier-aware acceptance (D11): an invitation targets an address,
       // and ANY of the signed-in user's VERIFIED identifiers holding that
@@ -268,22 +380,11 @@ export const inviteRouter = createTRPCRouter({
       // person invited by email who signed in with their Google account is
       // no longer a support ticket. A user not yet on identifiers answers
       // `null` and keeps the legacy session-email comparison byte-for-byte.
-      const { matches: inviteEmailMatches, viaIdentifierId } =
-        matchInviteToAcceptor({
-          inviteEmail: invite.email,
-          sessionEmail: session.user.email,
-          matchable: await identityEmail().verifiedEmailsOf({
-            userId: session.user.id,
-          }),
-        });
-      // Signed in as somebody else is a wrong turn, not a refusal: the screen
-      // names which account is wanted and offers the way back. The hint is
-      // masked because an invite code is a bearer token — the landing already
-      // declines to name the invited address, and a mismatch is not a hole to
-      // read it through.
-      if (!inviteEmailMatches) {
-        throw new InviteWrongAccountError(maskInvitedAddress(invite.email));
-      }
+      const viaIdentifierId = await matchInviteAcceptor({
+        invite,
+        session,
+        sessionEmail,
+      });
 
       // No transaction: the invite's grants are ledger commands, so the
       // membership row has to be committed before they are emitted, and the
@@ -295,66 +396,7 @@ export const inviteRouter = createTRPCRouter({
         viaIdentifierId,
       });
 
-      // D11 x D12, acceptance -> request: accepting an invitation withdraws
-      // the same person's open request for this organization, so the
-      // membership lands exactly once and the admins' panel empties itself.
-      // Never fatal — the membership is the durable outcome, and a request
-      // left open is answered by the next approval or by the expiry.
-      try {
-        await joinRequestsService().withdrawOnInvitationAccepted({
-          userId: session.user.id,
-          organizationId: invite.organizationId,
-        });
-      } catch (error) {
-        captureException(toError(error), {
-          tags: { organizationId: invite.organizationId },
-        });
-      }
-
-      // Provision the user's Personal Workspace (Team.isPersonal +
-      // Project.isPersonal) for this org. Idempotent — safe if a prior
-      // invite already triggered it. Runs outside the invite tx so an
-      // unexpected failure here doesn't roll the membership back; the
-      // next login will retry via the lazy backfill in
-      // `user.personalContext`.
-      try {
-        const personalWorkspaceService = new PersonalWorkspaceService(prisma);
-        await personalWorkspaceService.ensure({
-          userId: session.user.id,
-          organizationId: invite.organizationId,
-          displayName: session.user.name,
-          displayEmail: session.user.email,
-        });
-      } catch (err) {
-        // Non-fatal — capture and continue. Lazy backfill will recover
-        // on the user's next session resolution. PostHog signal lets
-        // operators catch systemic provisioning regressions (bad
-        // migration, schema drift, Prisma constraint violation) before
-        // users start complaining about missing personal workspaces.
-        captureException(toError(err), {
-          extra: {
-            origin: "governance.acceptInvite",
-            userId: session.user.id,
-            organizationId: invite.organizationId,
-          },
-        });
-      }
-
-      void getApp()
-        .notifications.sendSlackSignupEvent({
-          userName: session.user.name,
-          userEmail: session.user.email,
-          organizationName: invite.organization.name,
-        })
-        .catch(captureException);
-
-      fireInviteAcceptedNurturingCalls({
-        userId: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        organizationId: invite.organization.id,
-        organizationName: invite.organization.name,
-      });
+      await finishInviteAcceptance({ prisma, session, invite });
 
       const inviteService = InviteService.create(prisma);
       const projectSlug = await inviteService.findLandingProjectSlug(invite);

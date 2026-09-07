@@ -284,6 +284,48 @@ export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
     required: boolean;
     memberUserIds: readonly string[];
   }): Promise<void> {
+    const { organization, actor, memberships } =
+      await this.loadNotificationContext({
+        organizationId,
+        actorUserId,
+        memberUserIds,
+      });
+    const actorName = actor?.name ?? actor?.email ?? "An administrator";
+    const { destinations, failures } =
+      await this.resolveNotificationDestinations(memberships);
+    failures.push(
+      ...(await this.deliverRequirementChange({
+        destinations,
+        organizationName: organization.name,
+        actorName,
+        required,
+      })),
+    );
+    this.throwIfNotificationFailed({
+      failures,
+      organizationId,
+      actorUserId,
+      required,
+      attempted: destinations.size,
+    });
+  }
+
+  private async loadNotificationContext({
+    organizationId,
+    actorUserId,
+    memberUserIds,
+  }: {
+    organizationId: string;
+    actorUserId: string;
+    memberUserIds: readonly string[];
+  }): Promise<{
+    organization: { name: string };
+    actor: { name: string | null; email: string | null } | null;
+    memberships: {
+      userId: string;
+      user: { email: string | null };
+    }[];
+  }> {
     const [organization, actor, memberships] = await Promise.all([
       this.prisma.organization.findUnique({
         where: { id: organizationId },
@@ -307,8 +349,15 @@ export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
         `organization ${organizationId} was not found while notifying members`,
       );
     }
+    return { organization, actor, memberships };
+  }
 
-    const actorName = actor?.name ?? actor?.email ?? "An administrator";
+  private async resolveNotificationDestinations(
+    memberships: readonly {
+      userId: string;
+      user: { email: string | null };
+    }[],
+  ): Promise<{ destinations: Map<string, string>; failures: unknown[] }> {
     const destinations = new Map<string, string>();
     const failures: unknown[] = [];
     const resolutions = await Promise.allSettled(
@@ -339,35 +388,62 @@ export class EmailOrganizationMfaNotifier implements OrganizationMfaNotifier {
         destinations.set(normalized, member.email);
       }
     }
-    const deliveries = [...destinations.values()].map(async (to) => {
-      await sendOrganizationMfaRequirementEmail({
+    return { destinations, failures };
+  }
+
+  private async deliverRequirementChange({
+    destinations,
+    organizationName,
+    actorName,
+    required,
+  }: {
+    destinations: ReadonlyMap<string, string>;
+    organizationName: string;
+    actorName: string;
+    required: boolean;
+  }): Promise<unknown[]> {
+    const deliveries = [...destinations.values()].map((to) =>
+      sendOrganizationMfaRequirementEmail({
         to,
-        organizationName: organization.name,
+        organizationName,
         actorName,
         required,
-      });
-    });
-    const results = await Promise.allSettled(deliveries);
-    failures.push(
-      ...results.flatMap((result) =>
-        result.status === "rejected" ? [result.reason] : [],
-      ),
+      }),
     );
-    if (failures.length > 0) {
-      logger.error(
-        {
-          organizationId,
-          actorUserId,
-          required,
-          attempted: destinations.size,
-          failed: failures.length,
-        },
-        "organization MFA requirement notification delivery failed",
-      );
-      throw new AggregateError(
-        failures,
-        `failed to notify ${failures.length} organization member(s) about the MFA requirement change`,
-      );
-    }
+    const results = await Promise.allSettled(deliveries);
+    return results.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : [],
+    );
+  }
+
+  private throwIfNotificationFailed({
+    failures,
+    organizationId,
+    actorUserId,
+    required,
+    attempted,
+  }: {
+    failures: unknown[];
+    organizationId: string;
+    actorUserId: string;
+    required: boolean;
+    attempted: number;
+  }): void {
+    if (failures.length === 0) return;
+
+    logger.error(
+      {
+        organizationId,
+        actorUserId,
+        required,
+        attempted,
+        failed: failures.length,
+      },
+      "organization MFA requirement notification delivery failed",
+    );
+    throw new AggregateError(
+      failures,
+      `failed to notify ${failures.length} organization member(s) about the MFA requirement change`,
+    );
   }
 }
