@@ -13,6 +13,7 @@ import type {
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
+import { IdentityAccountWriter } from "./identity-account-writer";
 import {
   type AccountQuery,
   type AccountWhere,
@@ -253,6 +254,10 @@ function identityCustomAdapter({
      * route a newborn's account write to the legacy table.
      */
     const routesToIdentity = birthAwareGate(isUserOnIdentityWrites);
+    const accountWriter = IdentityAccountWriter.create({
+      accounts,
+      ceremonies,
+    });
 
     /** The same fork asked of the fleet, for a query that names nobody. */
     const anyoneRoutesToIdentity = async (): Promise<boolean> =>
@@ -519,10 +524,7 @@ function identityCustomAdapter({
       rows: readonly IdentityAccountRow[];
       secrets: IdentityAccountSecrets;
     }): Promise<void> => {
-      if (Object.keys(secrets).length === 0) return;
-      const accountIds = rows.map((row) => row.id);
-      await accounts.updateCredentials({ accountIds, secrets });
-      await accounts.mirrorSecretsOntoAccounts({ accountIds, secrets });
+      await accountWriter.applySecrets({ rows, secrets });
     };
 
     /**
@@ -547,38 +549,26 @@ function identityCustomAdapter({
       if (typeof userId !== "string" || typeof providerId !== "string") {
         return null;
       }
-      const pinned = await ceremonies.beforeAccountCreate({
-        id: canonical.id,
+      const written = await accountWriter.tryCreateCredential({
+        account: {
+          id: canonical.id,
+          userId,
+          providerId,
+          // The issuer better-auth resolved for this write, passed through so
+          // the fact states the account key the library itself decided. Drop
+          // it and the ceremony falls back to deriving one, which is wrong for
+          // every provider that brings a real issuer of its own.
+          issuer: canonical.issuer,
+          accountId: canonical.accountId,
+          createdAt: canonical.createdAt,
+        },
         userId,
         providerId,
-        // The issuer better-auth resolved for this write, passed through so
-        // the fact states the account key the library itself decided. Drop
-        // it and the ceremony falls back to deriving one, which is wrong for
-        // every provider that brings a real issuer of its own.
-        issuer: canonical.issuer,
-        accountId: canonical.accountId,
-        createdAt: canonical.createdAt,
-      });
-      const accountId = pinned?.data.id;
-      if (accountId === undefined) return null;
-
-      const secrets = secretsOf(canonical);
-      await accounts.createCredential({
-        accountId,
-        userId,
-        providerId,
-        secrets,
-      });
-      await accounts.mirrorSecretsOntoAccounts({
-        accountIds: [accountId],
-        secrets,
-      });
-      const [written] = await accounts.findByAccountIds({
-        accountIds: [accountId],
+        secrets: secretsOf(canonical),
       });
       if (!written) {
         logger.warn(
-          { userId, providerId, accountId },
+          { userId, providerId },
           "the attached identifier is not in the projection yet; the account row falls back to the legacy write",
         );
         return null;
@@ -1180,19 +1170,7 @@ function identityCustomAdapter({
       // An erase states itself, whole, through `beforeUserDelete`. Detaching
       // each row on the way would state the same removal twice and would ask
       // a guard about stranding a user who is being erased.
-      if (!erasingUser) {
-        for (const row of rows) {
-          await ceremonies.beforeAccountDelete({
-            id: row.id,
-            userId: row.userId,
-            providerId: row.providerId,
-          });
-        }
-      }
-      const accountIds = rows.map((row) => row.id);
-      await accounts.deleteCredentials({ accountIds });
-      await accounts.deleteBridgeAccounts({ accountIds });
-      return rows.length;
+      return accountWriter.detach({ rows, erasingUser });
     }
 
     // Every method, wrapped once, rather than ten try/catch blocks that a

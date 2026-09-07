@@ -78,6 +78,7 @@ export interface CredentialAccountRecordsPort {
     userId: string;
   }): Promise<CredentialAccountRow | null>;
   updateAccountPassword(args: {
+    userId: string;
     accountId: string;
     passwordHash: string;
   }): Promise<void>;
@@ -395,6 +396,7 @@ export class CredentialAccountService {
     const passwordHash = await this.deps.passwords.hash({ password });
     if (account) {
       await this.deps.records.updateAccountPassword({
+        userId,
         accountId: account.id,
         passwordHash,
       });
@@ -434,6 +436,7 @@ export class CredentialAccountService {
     if (!proven) return "wrong_password";
 
     await this.deps.records.updateAccountPassword({
+      userId,
       accountId: account.id,
       passwordHash: await this.deps.passwords.hash({ password: newPassword }),
     });
