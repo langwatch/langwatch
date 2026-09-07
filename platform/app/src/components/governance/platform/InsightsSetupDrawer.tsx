@@ -140,7 +140,12 @@ export function InsightsSetupDrawer({
 
   // Same two queries the Langy panel seeds its own picker from: the model
   // Langy's gate resolves for this project, and the models it may use.
-  const { project } = useOrganizationTeamProject();
+  // Governance is org-level and may have no project; like costs.tsx, never
+  // let this hook bounce the reader to onboarding on its own.
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const projectId = project?.id ?? "";
   const langyDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
     { projectId, featureKey: LANGY_CHAT_FEATURE_KEY },
