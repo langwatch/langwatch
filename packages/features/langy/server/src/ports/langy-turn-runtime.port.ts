@@ -61,6 +61,14 @@ export abstract class LangyWorkerMetricsPort {
   abstract recordDispatch(input: { outcome: LangyDispatchOutcome | "error" }): void;
 }
 
+/**
+ * Preserves the block-salvage series `LangyFinalPartsService.build` counts, without coupling the
+ * feature to app metrics. `blockCounter()` returns the per-reason counter callback.
+ */
+export abstract class LangyBlockMetricsPort {
+  abstract blockCounter(): (reason: string) => void;
+}
+
 /** Supplies feature-flag-derived worker-harness selection. */
 export abstract class LangyHarnessPort {
   /**

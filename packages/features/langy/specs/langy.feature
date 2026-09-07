@@ -25,6 +25,12 @@ Feature: Langy service capability
     Then it calls the corresponding LangyService method directly
     And it does not reach through a subordinate capability property
 
+  @unit
+  Scenario: a finalized turn's block salvage is counted on the published series
+    Given a process composed Langy with a block-metrics collector
+    When a finalized turn's derived card fails to salvage
+    Then the failure is counted on the block-salvage series under its reason
+
   Scenario: controlled browser behaviour and presentation are portable
     Given the application renders a Langy conversation surface
     When it derives card order, panel geometry, feedback directives, turn controls, or conversation status

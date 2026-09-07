@@ -1,14 +1,14 @@
 /**
- * The studio's per-project Lambda deployment, as one environment value.
+ * The studio's per-project Lambda deployment, as one already-parsed value.
  *
  * `LANGWATCH_NLP_LAMBDA_CONFIG` is a single JSON blob naming the account, the
- * image and the network every per-project engine function is created in. The
- * API's own configuration projects only the three credential fields its
- * cleanup cron needs, so the studio's execution half reads the whole shape
- * here rather than restating a second, narrower copy of the same variable.
+ * image and the network every per-project engine function is created in. Its
+ * classified fields (the account credentials) mean the blob itself is parsed
+ * in `apps/api/src/platform/config/api.config.ts`, the process's one boot seam
+ * for reading such environment variables — this module stays pure functions
+ * over the already-parsed fields, so it can be unit-tested with no environment
+ * at all.
  */
-import { z } from "zod";
-
 export const NLP_LAMBDA_CONFIG_ENV = "LANGWATCH_NLP_LAMBDA_CONFIG";
 
 /** Every per-project studio function is named for the project behind it. */
@@ -55,16 +55,11 @@ export type StudioLambdaConfig = Readonly<{
   stagingTtlSeconds: number;
 }>;
 
-const studioLambdaConfigSchema = z.object({
-  AWS_REGION: z.string().min(1),
-  AWS_ACCESS_KEY_ID: z.string().min(1),
-  AWS_SECRET_ACCESS_KEY: z.string().min(1),
-  role_arn: z.string().min(1),
-  image_uri: z.string().min(1),
-  cache_bucket: z.string().min(1),
-  subnet_ids: z.array(z.string().min(1)),
-  security_group_ids: z.array(z.string().min(1)),
-});
+/** The account, image and network fields, as `LANGWATCH_NLP_LAMBDA_CONFIG` decodes to JSON. */
+export type StudioLambdaFleetFields = Omit<
+  StudioLambdaConfig,
+  "langwatchEndpoint" | "codeBlockTimeoutSeconds" | "stagingThresholdBytes" | "stagingTtlSeconds"
+>;
 
 /**
  * The code-block ceiling a per-project function is given.
@@ -93,50 +88,37 @@ function positiveNumber(raw: unknown, fallback: number): number {
 }
 
 /**
- * The studio's Lambda deployment as this process was configured for it, or
- * nothing where it names none. An unparseable or incomplete value is an
- * absence rather than a boot failure: a deployment that fronts the engine with
- * a plain address is the supported shape every self-hosted install runs.
+ * Assembles the studio's Lambda deployment from its already-parsed fields.
+ * Pure: every raw string this needs is read once, at the process's own
+ * config boot seam, and handed in here already resolved.
  */
-export function resolveStudioLambdaConfig(
-  source: Readonly<Record<string, unknown>>,
-): StudioLambdaConfig | undefined {
-  const raw = source[NLP_LAMBDA_CONFIG_ENV];
-  if (typeof raw !== "string" || raw.trim() === "") return undefined;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-
-  const fields = studioLambdaConfigSchema.safeParse(parsed);
-  if (!fields.success) return undefined;
-
-  const endpoint = source.BASE_HOST;
+export function buildStudioLambdaConfig(input: {
+  fields: StudioLambdaFleetFields;
+  /** Where a running function reports its traces back to; blank if unnamed. */
+  langwatchEndpoint: string;
+  codeBlockTimeoutRawValue: string | undefined;
+  stagingThresholdBytesRawValue: unknown;
+  stagingTtlSecondsRawValue: unknown;
+}): StudioLambdaConfig {
+  const { fields } = input;
 
   return {
-    region: fields.data.AWS_REGION,
-    accessKeyId: fields.data.AWS_ACCESS_KEY_ID,
-    secretAccessKey: fields.data.AWS_SECRET_ACCESS_KEY,
-    roleArn: fields.data.role_arn,
-    imageUri: fields.data.image_uri,
-    cacheBucket: fields.data.cache_bucket,
-    subnetIds: fields.data.subnet_ids,
-    securityGroupIds: fields.data.security_group_ids,
-    langwatchEndpoint: typeof endpoint === "string" ? endpoint : "",
-    codeBlockTimeoutSeconds: clampCodeBlockTimeoutSeconds(
-      typeof source.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS === "string"
-        ? source.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
-        : undefined,
-    ),
+    region: fields.region,
+    accessKeyId: fields.accessKeyId,
+    secretAccessKey: fields.secretAccessKey,
+    roleArn: fields.roleArn,
+    imageUri: fields.imageUri,
+    cacheBucket: fields.cacheBucket,
+    subnetIds: fields.subnetIds,
+    securityGroupIds: fields.securityGroupIds,
+    langwatchEndpoint: input.langwatchEndpoint,
+    codeBlockTimeoutSeconds: clampCodeBlockTimeoutSeconds(input.codeBlockTimeoutRawValue),
     stagingThresholdBytes: positiveNumber(
-      source.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      input.stagingThresholdBytesRawValue,
       STUDIO_INVOKE_STAGING_THRESHOLD_BYTES,
     ),
     stagingTtlSeconds: positiveNumber(
-      source.LANGEVALS_STAGING_TTL_SECONDS,
+      input.stagingTtlSecondsRawValue,
       STUDIO_STAGING_TTL_SECONDS_DEFAULT,
     ),
   };

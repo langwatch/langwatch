@@ -4,8 +4,16 @@ import type {
   LangyEventingPorts,
   LangyTurnTechnicalPorts,
 } from "@langwatch/langy-server";
-import { LangyApp, PostgresLangyAdapter } from "@langwatch/langy-server";
+import {
+  LangyApp,
+  LangyBlockOtelMetricsAdapter,
+  PostgresLangyAdapter,
+} from "@langwatch/langy-server";
 import { LangyService } from "@langwatch/langy-contract";
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
 import { describe, expect, it, vi } from "vitest";
 
@@ -96,6 +104,35 @@ describe("PostgresLangyAdapter", () => {
 
     expect(second).toBe(first);
     expect(first).toBeDefined();
+  });
+
+  describe("given a deployment that composed a block-metrics collector", () => {
+    describe("when a finalized turn's derived card fails to salvage", () => {
+      /** @scenario "a finalized turn's block salvage is counted on the published series" */
+      it("counts the failed block under the reason the salvage answered with", async () => {
+        const metrics: RecordingMeterProvider = createRecordingMeterProvider();
+        metrics.install();
+        try {
+          const instance = PostgresLangyAdapter.create({ database: undefined! });
+          const service = instance.build({
+            ...compositionOptions(),
+            blockMetrics: LangyBlockOtelMetricsAdapter.create(),
+          });
+
+          await service.ingestAgentTurnResult({
+            projectId: "project-1",
+            conversationId: "conversation-1",
+            turnId: "turn-1",
+            status: "completed",
+            text: ["before", "```langy-card", "this is not json", "```", "after"].join("\n"),
+          });
+
+          expect(metrics.valueOf("langwatch_langy_blocks_total")).toBe(1);
+        } finally {
+          metrics.uninstall();
+        }
+      });
+    });
   });
 
   describe("given a process that built Langy once", () => {

@@ -9,19 +9,29 @@ import {
   HttpWorkflowStudioStreamAdapter,
   LambdaWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
+  buildStudioLambdaConfig,
+  type StudioLambdaFleetFields,
 } from "@langwatch/workflow-server";
 import { describe, expect, it } from "vitest";
 import { composeApiWorkflowStudioStream } from "../api-studio-host.composition.ts";
 
-const FLEET = JSON.stringify({
-  AWS_REGION: "eu-central-1",
-  AWS_ACCESS_KEY_ID: "key",
-  AWS_SECRET_ACCESS_KEY: "secret",
-  role_arn: "arn:aws:iam::123:role/nlp",
-  image_uri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
-  cache_bucket: "langwatch-nlp-cache",
-  subnet_ids: ["subnet-1"],
-  security_group_ids: ["sg-1"],
+const FIELDS: StudioLambdaFleetFields = {
+  region: "eu-central-1",
+  accessKeyId: "key",
+  secretAccessKey: "secret",
+  roleArn: "arn:aws:iam::123:role/nlp",
+  imageUri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
+  cacheBucket: "langwatch-nlp-cache",
+  subnetIds: ["subnet-1"],
+  securityGroupIds: ["sg-1"],
+};
+
+const FLEET = buildStudioLambdaConfig({
+  fields: FIELDS,
+  langwatchEndpoint: "https://app.test",
+  codeBlockTimeoutRawValue: undefined,
+  stagingThresholdBytesRawValue: undefined,
+  stagingTtlSecondsRawValue: undefined,
 });
 
 describe("given the API composes the optimization studio's dispatch", () => {
@@ -30,7 +40,8 @@ describe("given the API composes the optimization studio's dispatch", () => {
     it("runs studio graphs on the project's own function", () => {
       const stream = composeApiWorkflowStudioStream({
         nlpServiceUrl: "http://127.0.0.1:5561",
-        environment: { LANGWATCH_NLP_LAMBDA_CONFIG: FLEET, BASE_HOST: "https://app.test" },
+        nlpLambdaFleet: FLEET,
+        nlpLambdaFleetNamed: true,
       });
 
       expect(stream).toBeInstanceOf(LambdaWorkflowStudioStreamAdapter);
@@ -42,7 +53,6 @@ describe("given the API composes the optimization studio's dispatch", () => {
     it("runs studio graphs at that address", () => {
       const stream = composeApiWorkflowStudioStream({
         nlpServiceUrl: "http://127.0.0.1:5561",
-        environment: {},
       });
 
       expect(stream).toBeInstanceOf(HttpWorkflowStudioStreamAdapter);
@@ -52,7 +62,6 @@ describe("given the API composes the optimization studio's dispatch", () => {
     it("refuses by name where it names no engine at all", async () => {
       const stream = composeApiWorkflowStudioStream({
         nlpServiceUrl: undefined,
-        environment: {},
       });
 
       expect(stream).toBeInstanceOf(UnconfiguredWorkflowStudioStreamAdapter);
@@ -71,7 +80,8 @@ describe("given the API composes the optimization studio's dispatch", () => {
     it("refuses the run rather than serving it from the shared address", async () => {
       const stream = composeApiWorkflowStudioStream({
         nlpServiceUrl: "http://127.0.0.1:5561",
-        environment: { LANGWATCH_NLP_LAMBDA_CONFIG: '{"AWS_REGION":"eu-central-1"}' },
+        nlpLambdaFleet: undefined,
+        nlpLambdaFleetNamed: true,
       });
 
       expect(stream).not.toBeInstanceOf(HttpWorkflowStudioStreamAdapter);

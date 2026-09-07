@@ -22,6 +22,8 @@ import {
 import { LangyConversationService } from "../services/langy-conversation.service.ts";
 import { LangyMessageService } from "../services/langy-message.service.ts";
 import { LangyFinalPartsService } from "../services/langy-final-parts.service.ts";
+import { LangyBlockMetricsPort } from "../ports/langy-turn-runtime.port.ts";
+import { NullLangyBlockMetricsAdapter } from "./null-langy-block-metrics.adapter.ts";
 import { PrismaLangyConversationRepository } from "../repositories/prisma/prisma.langy-conversation.repository.ts";
 import { PrismaLangyMessageRepository } from "../repositories/prisma/prisma.langy-message.repository.ts";
 import { PrismaLangyCredentialRepository } from "../repositories/prisma/prisma.langy-credential.repository.ts";
@@ -93,6 +95,8 @@ export type LangyServiceCompositionOptions = {
   runtime?: LangyConversationRuntime;
   relay?: LangyRelayCompositionOptions;
   feedbackPromptRedis?: LangyFeedbackPromptRedis | null;
+  /** The block-salvage counter. Absent composes `NullLangyBlockMetricsAdapter`: nothing published. */
+  blockMetrics?: LangyBlockMetricsPort;
 };
 
 export interface PostgresLangyAdapterOptions {
@@ -178,7 +182,9 @@ export class PostgresLangyAdapter {
       this.repositories.conversations,
       this.repositories.messages,
       options.events,
-      LangyFinalPartsService.create(),
+      LangyFinalPartsService.create(
+        (options.blockMetrics ?? NullLangyBlockMetricsAdapter.create()).blockCounter(),
+      ),
       options.runtime,
     );
     const messages = LangyMessageService.create(

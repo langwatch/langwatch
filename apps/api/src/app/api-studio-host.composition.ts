@@ -18,7 +18,6 @@ import {
   HttpWorkflowStudioStreamAdapter,
   InMemoryNlpLambdaArnCacheAdapter,
   LambdaWorkflowStudioStreamAdapter,
-  NLP_LAMBDA_CONFIG_ENV,
   NlpLambdaArnCachePort,
   NlpLambdaFunctionPort,
   NlpLambdaRuntimeService,
@@ -26,7 +25,6 @@ import {
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
   WorkflowStudioStreamPort,
-  resolveStudioLambdaConfig,
   type StudioLambdaConfig,
 } from "@langwatch/workflow-server";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
@@ -61,12 +59,19 @@ export type ApiStudioHostOptions = Readonly<{
    */
   arnCache?: NlpLambdaArnCachePort | undefined;
   /**
-   * Where the studio's Lambda fleet is described. The API's own configuration
-   * projects only the three credential fields its cleanup cron reads, so the
-   * execution half reads the whole `LANGWATCH_NLP_LAMBDA_CONFIG` shape through
-   * the workflow feature's own sub-schema.
+   * The studio's Lambda fleet, already parsed at the process's own config
+   * boot seam (`apps/api/src/platform/config/api.config.ts`). Absent means
+   * either no fleet was named, or one was named but did not describe a usable
+   * fleet — `nlpLambdaFleetNamed` is what tells the two apart.
    */
-  environment?: Readonly<Record<string, unknown>> | undefined;
+  nlpLambdaFleet?: StudioLambdaConfig | undefined;
+  /**
+   * True when the deployment named `LANGWATCH_NLP_LAMBDA_CONFIG` at all,
+   * whether or not it parsed into `nlpLambdaFleet`. A fleet named but
+   * unusable refuses by name rather than quietly falling back to the shared
+   * engine address.
+   */
+  nlpLambdaFleetNamed?: boolean;
 }>;
 
 /** Composes the studio host over this process's engine address and queue. */
@@ -82,7 +87,8 @@ export function composeApiWorkflowStudioDispatch(options: {
   modelProviders: ModelProviderService;
   payloadStaging?: NlpPayloadStagingPort | undefined;
   arnCache?: NlpLambdaArnCachePort | undefined;
-  environment?: Readonly<Record<string, unknown>> | undefined;
+  nlpLambdaFleet?: StudioLambdaConfig | undefined;
+  nlpLambdaFleetNamed?: boolean;
 }): WorkflowStudioDispatchService {
   return WorkflowStudioDispatchService.create({
     stream: composeApiWorkflowStudioStream(options),
@@ -104,16 +110,15 @@ export function composeApiWorkflowStudioStream(options: {
   nlpServiceUrl: string | undefined;
   payloadStaging?: NlpPayloadStagingPort | undefined;
   arnCache?: NlpLambdaArnCachePort | undefined;
-  environment?: Readonly<Record<string, unknown>> | undefined;
+  nlpLambdaFleet?: StudioLambdaConfig | undefined;
+  nlpLambdaFleetNamed?: boolean;
 }): WorkflowStudioStreamPort {
-  const environment = options.environment ?? process.env;
-  const fleet = resolveStudioLambdaConfig(environment);
+  const { nlpLambdaFleet: fleet } = options;
   if (fleet) {
     return composeLambdaStudioStream({ fleet, ...options });
   }
 
-  const named = environment[NLP_LAMBDA_CONFIG_ENV];
-  if (typeof named === "string" && named.trim() !== "") {
+  if (options.nlpLambdaFleetNamed) {
     return MisconfiguredFleetStudioStreamAdapter.create();
   }
 
@@ -202,7 +207,8 @@ class ApiComposedStudioHost extends ApiStudioHostPort {
           modelProviders,
           payloadStaging: options.payloadStaging,
           arnCache: options.arnCache,
-          environment: options.environment,
+          nlpLambdaFleet: options.nlpLambdaFleet,
+          nlpLambdaFleetNamed: options.nlpLambdaFleetNamed,
         })
       : null;
   }

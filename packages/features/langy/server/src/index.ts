@@ -125,9 +125,11 @@ export type {
   LangyWorkerHttpConfig,
 } from "./adapters/langy-worker-http.adapter.ts";
 export { NullLangyWorkerMetricsAdapter } from "./adapters/null-langy-worker-metrics.adapter.ts";
+export { NullLangyBlockMetricsAdapter } from "./adapters/null-langy-block-metrics.adapter.ts";
 export { UnavailableLangyWorkerAdapter } from "./adapters/unavailable-langy-worker.adapter.ts";
 export {
   LANGY_UI_ACTIONS_FLAG,
+  LangyBlockMetricsPort,
   LangyGithubPermitPort,
   LangyUiActionSurfacePort,
   LangyWorkerMetricsPort,
@@ -300,7 +302,7 @@ export {
 } from "./adapters/otel.langy-worker-metrics.adapter.ts";
 export {
   LANGY_BLOCKS_METRIC_NAME,
-  OtelLangyBlockMetricsAdapter,
+  LangyBlockOtelMetricsAdapter,
 } from "./adapters/otel.langy-block-metrics.adapter.ts";
 
 // ADR-129 local control: the developer's own folder, and the cards that wait

@@ -1,35 +1,39 @@
 /**
- * The studio's Lambda deployment as one environment value, and the code-block
- * ceiling every per-project function is created with.
+ * The studio's Lambda deployment, assembled from its already-parsed fields,
+ * and the code-block ceiling every per-project function is created with.
  *
  * @see packages/features/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
 import {
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
+  buildStudioLambdaConfig,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
-  resolveStudioLambdaConfig,
+  type StudioLambdaFleetFields,
 } from "../nlp-lambda-config.rules.ts";
 
-const COMPLETE = JSON.stringify({
-  AWS_REGION: "eu-central-1",
-  AWS_ACCESS_KEY_ID: "key",
-  AWS_SECRET_ACCESS_KEY: "secret",
-  role_arn: "arn:aws:iam::123:role/nlp",
-  image_uri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
-  cache_bucket: "langwatch-nlp-cache",
-  subnet_ids: ["subnet-1"],
-  security_group_ids: ["sg-1"],
-});
+const FIELDS: StudioLambdaFleetFields = {
+  region: "eu-central-1",
+  accessKeyId: "key",
+  secretAccessKey: "secret",
+  roleArn: "arn:aws:iam::123:role/nlp",
+  imageUri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
+  cacheBucket: "langwatch-nlp-cache",
+  subnetIds: ["subnet-1"],
+  securityGroupIds: ["sg-1"],
+};
 
 describe("given a deployment that fronts the studio engine with a Lambda fleet", () => {
   describe("when the fleet is fully described", () => {
     /** @scenario "A complete Lambda fleet configuration composes the Lambda path" */
-    it("reads the account, the image and the network from one value", () => {
-      const config = resolveStudioLambdaConfig({
-        LANGWATCH_NLP_LAMBDA_CONFIG: COMPLETE,
-        BASE_HOST: "https://app.langwatch.test",
+    it("assembles the account, the image and the network from the parsed fields", () => {
+      const config = buildStudioLambdaConfig({
+        fields: FIELDS,
+        langwatchEndpoint: "https://app.langwatch.test",
+        codeBlockTimeoutRawValue: undefined,
+        stagingThresholdBytesRawValue: undefined,
+        stagingTtlSecondsRawValue: undefined,
       });
 
       expect(config).toMatchObject({
@@ -45,31 +49,21 @@ describe("given a deployment that fronts the studio engine with a Lambda fleet",
 
     /** @scenario "Every per-project function carries the same environment" */
     it("gives creation and reconciliation one environment to agree on", () => {
-      const config = resolveStudioLambdaConfig({
-        LANGWATCH_NLP_LAMBDA_CONFIG: COMPLETE,
-        BASE_HOST: "https://app.langwatch.test",
+      const config = buildStudioLambdaConfig({
+        fields: FIELDS,
+        langwatchEndpoint: "https://app.langwatch.test",
+        codeBlockTimeoutRawValue: undefined,
+        stagingThresholdBytesRawValue: undefined,
+        stagingTtlSecondsRawValue: undefined,
       });
 
-      expect(buildStudioLambdaEnvironment(config!)).toEqual({
+      expect(buildStudioLambdaEnvironment(config)).toEqual({
         LANGWATCH_ENDPOINT: "https://app.langwatch.test",
         STUDIO_RUNTIME: "async",
         AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
         CACHE_BUCKET: "langwatch-nlp-cache",
         NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "600",
       });
-    });
-  });
-
-  describe("when the fleet is named badly or not at all", () => {
-    /** @scenario "An absent or unusable fleet configuration leaves the HTTP path" */
-    it("reads as an absence rather than a boot failure", () => {
-      expect(resolveStudioLambdaConfig({})).toBeUndefined();
-      expect(resolveStudioLambdaConfig({ LANGWATCH_NLP_LAMBDA_CONFIG: "{" })).toBeUndefined();
-      expect(
-        resolveStudioLambdaConfig({
-          LANGWATCH_NLP_LAMBDA_CONFIG: JSON.stringify({ AWS_REGION: "eu-central-1" }),
-        }),
-      ).toBeUndefined();
     });
   });
 

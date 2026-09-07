@@ -49,6 +49,7 @@ import type {
   AzureBlobCredentialsConfig,
   AzureInjectedIdentity,
 } from "@langwatch/stored-object-server";
+import { buildStudioLambdaConfig, type StudioLambdaConfig } from "@langwatch/workflow-server";
 import { z } from "zod";
 
 const optionalEnvironmentString = z.string().optional();
@@ -577,26 +578,46 @@ export type ApiMailConfig = Readonly<{
   mailer: MailerConfiguration;
 }>;
 
-/** The credentials the NLP Lambda sweep reaches the account with. */
-export type ApiNlpLambdaFleetConfig = Readonly<{
-  region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-}>;
+/**
+ * The studio's per-project Lambda deployment: the account, the image and the
+ * network every per-project function is created in. The Lambda cleanup cron
+ * reads only its three credential fields; the studio's execution half (see
+ * `composeApiStudioHost`) reads the whole shape.
+ */
+export type ApiNlpLambdaFleetConfig = StudioLambdaConfig;
 
 /**
  * `LANGWATCH_NLP_LAMBDA_CONFIG` is one JSON blob describing the studio's Lambda
- * deployment; only the three fields the sweep needs are projected. A malformed
- * or absent value leaves the sweep uncomposed rather than failing boot.
+ * deployment. Classified (it carries the account's own AWS credentials), so it
+ * is parsed here, at this process's one boot seam for such variables — never
+ * in the workflow feature itself, which stays pure functions over the result.
  */
-const nlpLambdaFleetSchema = z.object({
+const studioLambdaConfigSchema = z.object({
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  role_arn: z.string().min(1),
+  image_uri: z.string().min(1),
+  cache_bucket: z.string().min(1),
+  subnet_ids: z.array(z.string().min(1)),
+  security_group_ids: z.array(z.string().min(1)),
 });
+
+/**
+ * Whether `LANGWATCH_NLP_LAMBDA_CONFIG` was named at all, regardless of
+ * whether it parsed. `composeApiStudioHost` refuses by name on a fleet that
+ * was named but not usable, rather than quietly falling back to the shared
+ * engine address — a distinct outcome from naming no fleet at all, which
+ * `fleet` alone cannot tell apart from a malformed one.
+ */
+function resolveApiNlpLambdaFleetNamed(source: Readonly<Record<string, unknown>>): boolean {
+  const raw = source.LANGWATCH_NLP_LAMBDA_CONFIG;
+  return typeof raw === "string" && raw.trim() !== "";
+}
 
 function resolveNlpLambdaFleetConfig(
   source: Readonly<Record<string, unknown>>,
+  langwatchEndpoint: string,
 ): ApiNlpLambdaFleetConfig | undefined {
   const raw = source.LANGWATCH_NLP_LAMBDA_CONFIG;
   if (typeof raw !== "string" || raw.trim() === "") return undefined;
@@ -607,23 +628,38 @@ function resolveNlpLambdaFleetConfig(
   } catch {
     configLogger().warn(
       { envVar: "LANGWATCH_NLP_LAMBDA_CONFIG" },
-      "Ignoring an unparseable NLP Lambda configuration; the Lambda cleanup cron is not composed",
+      "Ignoring an unparseable NLP Lambda configuration; the Lambda fleet is not composed",
     );
     return undefined;
   }
-  const fields = nlpLambdaFleetSchema.safeParse(parsed);
+  const fields = studioLambdaConfigSchema.safeParse(parsed);
   if (!fields.success) {
     configLogger().warn(
       { envVar: "LANGWATCH_NLP_LAMBDA_CONFIG" },
-      "NLP Lambda configuration names no region or credentials; the Lambda cleanup cron is not composed",
+      "NLP Lambda configuration is incomplete; the Lambda fleet is not composed",
     );
     return undefined;
   }
-  return {
-    region: fields.data.AWS_REGION,
-    accessKeyId: fields.data.AWS_ACCESS_KEY_ID,
-    secretAccessKey: fields.data.AWS_SECRET_ACCESS_KEY,
-  };
+
+  return buildStudioLambdaConfig({
+    fields: {
+      region: fields.data.AWS_REGION,
+      accessKeyId: fields.data.AWS_ACCESS_KEY_ID,
+      secretAccessKey: fields.data.AWS_SECRET_ACCESS_KEY,
+      roleArn: fields.data.role_arn,
+      imageUri: fields.data.image_uri,
+      cacheBucket: fields.data.cache_bucket,
+      subnetIds: fields.data.subnet_ids,
+      securityGroupIds: fields.data.security_group_ids,
+    },
+    langwatchEndpoint,
+    codeBlockTimeoutRawValue:
+      typeof source.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS === "string"
+        ? source.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+        : undefined,
+    stagingThresholdBytesRawValue: source.LANGEVALS_STAGING_THRESHOLD_BYTES,
+    stagingTtlSecondsRawValue: source.LANGEVALS_STAGING_TTL_SECONDS,
+  });
 }
 
 export type ApiConfig = Readonly<
@@ -674,9 +710,18 @@ export type ApiConfig = Readonly<
     platformDefaultRetentionDays: number;
     /**
      * The AWS account the studio's per-project NLP Lambda functions live in,
-     * or nothing where the deployment fronts the engine with none.
+     * or nothing where the deployment fronts the engine with none, or named
+     * one it did not describe (see `nlpLambdaFleetNamed`).
      */
     nlpLambdaFleet: ApiNlpLambdaFleetConfig | undefined;
+    /**
+     * True whenever the deployment named `LANGWATCH_NLP_LAMBDA_CONFIG` at all,
+     * whether or not it parsed. `composeApiStudioHost` refuses a named-but-
+     * unusable fleet by name rather than quietly falling back to the shared
+     * engine address, which `nlpLambdaFleet` alone cannot distinguish from a
+     * deployment that named no fleet.
+     */
+    nlpLambdaFleetNamed: boolean;
     shutdown: ApiShutdownConfig;
   }
 >;
@@ -718,7 +763,11 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       serviceName: value.serviceName,
     }),
     platformDefaultRetentionDays: resolvePlatformDefaultRetentionDays(environmentStrings(source)),
-    nlpLambdaFleet: resolveNlpLambdaFleetConfig(source),
+    nlpLambdaFleet: resolveNlpLambdaFleetConfig(
+      source,
+      value.infrastructure.execution.publicBaseUrl ?? "",
+    ),
+    nlpLambdaFleetNamed: resolveApiNlpLambdaFleetNamed(source),
     authz: {
       // The platform app's exact rule, so one variable means one thing across
       // the deployment rather than one thing per tier.

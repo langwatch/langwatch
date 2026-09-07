@@ -156,11 +156,14 @@ export {
   NLP_LAMBDA_CONFIG_ENV,
   NLP_LAMBDA_MEMORY_SIZE_MB,
   NLP_LAMBDA_NAME_PREFIX,
+  STUDIO_INVOKE_STAGING_THRESHOLD_BYTES,
   STUDIO_STAGING_PREFIX,
+  STUDIO_STAGING_TTL_SECONDS_DEFAULT,
+  buildStudioLambdaConfig,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
-  resolveStudioLambdaConfig,
   type StudioLambdaConfig,
+  type StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
 export {
   NlpLambdaStreamInvokePort,
@@ -169,6 +172,10 @@ export {
 export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
 export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
 export { InMemoryNlpLambdaArnCacheAdapter } from "./adapters/memory.nlp-lambda-arn-cache.adapter.ts";
+export {
+  RedisNlpLambdaArnCacheAdapter,
+  type NlpLambdaArnRedisConnection,
+} from "./adapters/redis.nlp-lambda-arn-cache.adapter.ts";
 export {
   LambdaWorkflowStudioStreamAdapter,
   type LambdaWorkflowStudioStreamOptions,

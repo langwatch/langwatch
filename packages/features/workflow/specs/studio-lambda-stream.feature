@@ -104,3 +104,10 @@ Feature: Optimization studio execution on a per-project Lambda
     When a studio run resolves where to execute
     Then the function's configuration is reconciled
     And anything an operator set outside this code is left alone
+
+  @unit
+  Scenario: A resolved function is shared across every pod through Redis
+    Given a deployment that composed a shared Redis-backed function cache
+    When one pod resolves a project's function
+    Then every other pod reads that same function from the shared cache
+    And a pod that composed no shared cache falls back to resolving on its own

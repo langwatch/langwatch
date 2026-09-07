@@ -84,7 +84,9 @@ const queueMocks = vi.hoisted(() => {
 
 vi.mock("../../platform/infrastructure/api-queue.infrastructure.ts", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../platform/infrastructure/api-queue.infrastructure.ts")>();
+    await importOriginal<
+      typeof import("../../platform/infrastructure/api-queue.infrastructure.ts")
+    >();
   return { ...actual, ApiQueueInfrastructure: { tryCreate: queueMocks.tryCreate } };
 });
 
@@ -207,6 +209,27 @@ const secret: Secret = {
   createdBy: { name: "Alex" },
   updatedBy: { name: "Alex" },
 };
+
+// The production composition serves the built browser bundle off
+// `globalThis.process.env` directly (`tryCreateApiStaticSurface`, called from
+// `ApiProductionComposition`), not through this file's `resolveApiConfig`
+// fixtures. When `apps/ui/dist/client/index.html` exists locally, that
+// surface resolves the UI's public bootstrap config and needs BASE_HOST — so
+// this file-wide fixture supplies it directly on `process.env`, independent
+// of whatever the invoking shell happens to export.
+const originalBaseHost = process.env.BASE_HOST;
+
+beforeEach(() => {
+  process.env.BASE_HOST = "https://langwatch.example.com";
+});
+
+afterEach(() => {
+  if (originalBaseHost === undefined) {
+    delete process.env.BASE_HOST;
+  } else {
+    process.env.BASE_HOST = originalBaseHost;
+  }
+});
 
 describe("ApiProductionComposition", () => {
   // `installConnectedAgentRedis` composes a process-wide singleton

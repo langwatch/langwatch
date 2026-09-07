@@ -14,6 +14,7 @@ import {
   LangyGithubPrQuotaService,
   LangyNavigateFallbackService,
   type LangyNavigateResourcePort,
+  LangyBlockOtelMetricsAdapter,
   LangyTokenBufferAdapter,
   LangyTurnAccessAdapter,
   LangyTurnHandoffAdapter,
@@ -262,6 +263,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     },
     commands: options.commands,
     events: null,
+    blockMetrics: LangyBlockOtelMetricsAdapter.create(),
     ...(redis ? { feedbackPromptRedis: redis } : {}),
     ...(relay ? { relay } : {}),
   });

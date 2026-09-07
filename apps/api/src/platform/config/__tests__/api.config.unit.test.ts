@@ -83,6 +83,7 @@ describe("API process configuration", () => {
       // `ADMIN_EMAILS`, unset here: nobody is instance staff on this deployment.
       deployment: { adminEmails: undefined },
       nlpLambdaFleet: undefined,
+      nlpLambdaFleetNamed: false,
       platformDefaultRetentionDays: 49,
       authz: {
         epochCacheEnabled: false,
@@ -716,6 +717,61 @@ describe("API process configuration", () => {
         });
 
         expect(config.mail?.mailer.ses.enabled).toBe(true);
+      });
+    });
+  });
+
+  describe("given the studio's per-project Lambda fleet", () => {
+    const COMPLETE_FLEET = JSON.stringify({
+      AWS_REGION: "eu-central-1",
+      AWS_ACCESS_KEY_ID: "key",
+      AWS_SECRET_ACCESS_KEY: "secret",
+      role_arn: "arn:aws:iam::123:role/nlp",
+      image_uri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
+      cache_bucket: "langwatch-nlp-cache",
+      subnet_ids: ["subnet-1"],
+      security_group_ids: ["sg-1"],
+    });
+
+    describe("when the deployment describes a complete fleet", () => {
+      it("resolves the whole shape the studio's execution half needs, not only the cleanup cron's three fields", () => {
+        const config = resolveApiConfig({
+          BASE_HOST: "https://app.langwatch.test",
+          LANGWATCH_NLP_LAMBDA_CONFIG: COMPLETE_FLEET,
+        });
+
+        expect(config.nlpLambdaFleetNamed).toBe(true);
+        expect(config.nlpLambdaFleet).toMatchObject({
+          region: "eu-central-1",
+          accessKeyId: "key",
+          secretAccessKey: "secret",
+          roleArn: "arn:aws:iam::123:role/nlp",
+          imageUri: "123.dkr.ecr.eu-central-1.amazonaws.com/nlp:v9",
+          cacheBucket: "langwatch-nlp-cache",
+          subnetIds: ["subnet-1"],
+          securityGroupIds: ["sg-1"],
+          langwatchEndpoint: "https://app.langwatch.test",
+        });
+      });
+    });
+
+    describe("when the deployment names no fleet at all", () => {
+      it("resolves an absent fleet that was never named", () => {
+        const config = resolveApiConfig({});
+
+        expect(config.nlpLambdaFleet).toBeUndefined();
+        expect(config.nlpLambdaFleetNamed).toBe(false);
+      });
+    });
+
+    describe("when the deployment names a fleet it does not fully describe", () => {
+      it("resolves an absent fleet the composition root can still tell was named", () => {
+        const config = resolveApiConfig({
+          LANGWATCH_NLP_LAMBDA_CONFIG: JSON.stringify({ AWS_REGION: "eu-central-1" }),
+        });
+
+        expect(config.nlpLambdaFleet).toBeUndefined();
+        expect(config.nlpLambdaFleetNamed).toBe(true);
       });
     });
   });

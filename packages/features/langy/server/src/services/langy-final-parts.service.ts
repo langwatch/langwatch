@@ -25,17 +25,24 @@ export type { LangyFinalToolCall } from "@langwatch/langy-contract";
  * parts on either side (ADR-060 §1).
  */
 export class LangyFinalPartsService {
-  private constructor(private readonly cliEnvelope: LangyCliEnvelopeService) {}
+  private constructor(
+    private readonly cliEnvelope: LangyCliEnvelopeService,
+    /**
+     * The composition root's block-metrics collector, applied to any `build()` call that names
+     * no `countBlock` of its own. Defaults to a no-op, same as `build`'s own default.
+     */
+    private readonly defaultCountBlock: LangyBlockCounter = () => undefined,
+  ) {}
 
-  static create(): LangyFinalPartsService {
-    return new LangyFinalPartsService(LangyCliEnvelopeService.create());
+  static create(defaultCountBlock?: LangyBlockCounter): LangyFinalPartsService {
+    return new LangyFinalPartsService(LangyCliEnvelopeService.create(), defaultCountBlock);
   }
 
   build({
     text,
     toolCalls = [],
     order,
-    countBlock = () => undefined,
+    countBlock = this.defaultCountBlock,
   }: {
     text: string;
     toolCalls?: LangyFinalToolCall[];
