@@ -77,98 +77,151 @@ export interface FrameBridge {
   dispose(): void;
 }
 
-export function createFrameBridge(
-  options: CreateFrameBridgeOptions,
-): FrameBridge {
-  const {
-    iframe,
-    executeQuery,
-    onLog,
-    onHeightChange,
-    onNavigate,
-    onTeardown,
-  } = options;
+/**
+ * The parent's `executeQuery` rejects with a ready-made payload; anything
+ * else (a bug in the mapping itself) degrades to a generic shape rather than
+ * leaking a raw message across the boundary.
+ */
+function toChartQueryErrorPayload(error: unknown): ChartQueryError {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    "title" in error &&
+    "message" in error
+  ) {
+    const shaped = error as { code: unknown; title: unknown; message: unknown };
+    return {
+      code: String(shaped.code),
+      title: String(shaped.title),
+      message: String(shaped.message),
+    };
+  }
+  return {
+    code: "unknown",
+    title: "Something went wrong",
+    message: "The query could not be run. Check the page's log panel.",
+  };
+}
 
-  let port: MessagePort | null = null;
-  let initialized = false;
-  let disposed = false;
-  let lastHeartbeatAt = 0;
-  let watchdog: ReturnType<typeof setInterval> | null = null;
+/**
+ * Owns the whole bridge lifecycle for one iframe. Split into methods (rather
+ * than the single large closure this used to be) purely to keep each unit of
+ * behavior — the handshake, the watchdog, per-query abort tracking, message
+ * dispatch — readable and independently sized; the mutable state below is
+ * still exactly one bridge's worth, never shared across instances.
+ */
+class FrameBridgeController implements FrameBridge {
+  private readonly options: CreateFrameBridgeOptions;
+  private port: MessagePort | null = null;
+  private initialized = false;
+  private disposed = false;
+  private lastHeartbeatAt = 0;
+  private watchdog: ReturnType<typeof setInterval> | null = null;
   // Keyed by requestId, not a single slot: a widget can have several
   // LW.query calls in flight at once (e.g. Promise.all of two queries), and
   // each needs its own abort lifecycle independent of the others.
-  const activeAborts = new Map<number, AbortController>();
+  private readonly activeAborts = new Map<number, AbortController>();
 
-  const abortAll = () => {
-    for (const abort of activeAborts.values()) abort.abort();
-    activeAborts.clear();
+  constructor(options: CreateFrameBridgeOptions) {
+    this.options = options;
+    const { iframe } = options;
+    if (
+      iframe.contentDocument?.readyState === "complete" &&
+      iframe.contentWindow
+    ) {
+      this.onFrameLoad();
+    } else {
+      iframe.addEventListener("load", this.onFrameLoad);
+    }
+  }
+
+  postParamsChange(params: ChartFrameParams): void {
+    if (this.disposed || !this.port) return;
+    this.port.postMessage({ type: "lw:params-change", params });
+  }
+
+  dispose = (): void => {
+    this.stop();
   };
 
-  const onVisibilityChange = () => {
+  private abortAll(): void {
+    for (const abort of this.activeAborts.values()) abort.abort();
+    this.activeAborts.clear();
+  }
+
+  private readonly onVisibilityChange = (): void => {
     if (document.visibilityState === "visible") {
       // Fresh grace period: a backlog of misses accrued while hidden/
       // throttled must not read as instant silence.
-      lastHeartbeatAt = Date.now();
+      this.lastHeartbeatAt = Date.now();
     }
   };
 
-  const stop = () => {
-    if (disposed) return;
-    disposed = true;
-    if (watchdog !== null) clearInterval(watchdog);
-    iframe.removeEventListener("load", onFrameLoad);
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    abortAll();
-    port?.close();
-    port = null;
-  };
+  private stop(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.watchdog !== null) clearInterval(this.watchdog);
+    this.options.iframe.removeEventListener("load", this.onFrameLoad);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.abortAll();
+    this.port?.close();
+    this.port = null;
+  }
 
-  const teardown = () => {
-    stop();
+  private teardown(): void {
+    this.stop();
     // Clearing srcdoc is what actually kills a busy-looping frame.
-    iframe.removeAttribute("srcdoc");
-    iframe.src = "about:blank";
-    onTeardown();
-  };
+    this.options.iframe.removeAttribute("srcdoc");
+    this.options.iframe.src = "about:blank";
+    this.options.onTeardown();
+  }
 
-  const handleQuery = (
+  private handleQuery(
     requestId: number,
     queryName: string,
     params: Readonly<Record<string, ChartQueryParamValue>>,
-  ) => {
+  ): void {
     // Each request gets its own abort controller, so concurrent queries
     // (e.g. Promise.all of two LW.query calls) don't cancel one another.
     const abort = new AbortController();
-    activeAborts.set(requestId, abort);
-    executeQuery(queryName, params, abort.signal).then(
+    this.activeAborts.set(requestId, abort);
+    this.options.executeQuery(queryName, params, abort.signal).then(
       (result) => {
         // A reply for a request we've already forgotten (torn down, or this
         // exact requestId already settled) is dropped.
-        if (disposed || !activeAborts.has(requestId) || !port) return;
-        activeAborts.delete(requestId);
-        port.postMessage({ type: "lw:query-result", requestId, result });
+        if (this.disposed || !this.activeAborts.has(requestId) || !this.port)
+          return;
+        this.activeAborts.delete(requestId);
+        this.port.postMessage({ type: "lw:query-result", requestId, result });
       },
       (error: unknown) => {
-        if (disposed || !activeAborts.has(requestId) || !port) return;
-        activeAborts.delete(requestId);
-        port.postMessage({
+        if (this.disposed || !this.activeAborts.has(requestId) || !this.port)
+          return;
+        this.activeAborts.delete(requestId);
+        this.port.postMessage({
           type: "lw:query-error",
           requestId,
           error: toChartQueryErrorPayload(error),
         });
       },
     );
-  };
+  }
 
-  const onPortMessage = (event: MessageEvent) => {
-    if (disposed) return;
+  private readonly onPortMessage = (event: MessageEvent): void => {
+    if (this.disposed) return;
     const message = event.data as FrameToParentMessage | undefined;
+    const { onHeightChange, onNavigate, onLog } = this.options;
     switch (message?.type) {
       case "lw:heartbeat":
-        lastHeartbeatAt = Date.now();
+        this.lastHeartbeatAt = Date.now();
         return;
       case "lw:query":
-        handleQuery(message.requestId, message.queryName, message.params ?? {});
+        this.handleQuery(
+          message.requestId,
+          message.queryName,
+          message.params ?? {},
+        );
         return;
       case "lw:set-height":
         onHeightChange(message.px);
@@ -195,79 +248,49 @@ export function createFrameBridge(
     }
   };
 
-  const onFrameLoad = () => {
-    if (disposed || initialized || !iframe.contentWindow) return;
-    initialized = true;
+  private readonly onFrameLoad = (): void => {
+    const { iframe, onLog } = this.options;
+    if (this.disposed || this.initialized || !iframe.contentWindow) return;
+    this.initialized = true;
     const channel = new MessageChannel();
-    port = channel.port1;
-    port.onmessage = onPortMessage;
+    this.port = channel.port1;
+    this.port.onmessage = this.onPortMessage;
     // Sandboxed srcdoc frames have the opaque origin "null" — "*" is the only
     // targetOrigin that reaches them. Nothing sensitive rides on init.
     iframe.contentWindow.postMessage(
-      { type: "lw:init", params: options.params, theme: options.theme },
+      {
+        type: "lw:init",
+        params: this.options.params,
+        theme: this.options.theme,
+      },
       "*",
       [channel.port2],
     );
-    lastHeartbeatAt = Date.now();
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    watchdog = setInterval(() => {
+    this.lastHeartbeatAt = Date.now();
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    this.watchdog = setInterval(() => {
       // Suspended while hidden: background-tab timer throttling hits both
       // sides of the bridge, so silence here is not evidence of a wedged
       // frame. onVisibilityChange resets lastHeartbeatAt on return, giving a
       // fresh window before the check below can fire again.
       if (document.visibilityState === "hidden") return;
-      if (Date.now() - lastHeartbeatAt > CHART_FRAME_HEARTBEAT_TIMEOUT_MS) {
+      if (
+        Date.now() - this.lastHeartbeatAt >
+        CHART_FRAME_HEARTBEAT_TIMEOUT_MS
+      ) {
         onLog({
           level: "error",
           source: "bridge",
           text: "No heartbeat for 10s — frame torn down.",
         });
-        teardown();
+        this.teardown();
       }
     }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5);
   };
-
-  if (
-    iframe.contentDocument?.readyState === "complete" &&
-    iframe.contentWindow
-  ) {
-    onFrameLoad();
-  } else {
-    iframe.addEventListener("load", onFrameLoad);
-  }
-
-  return {
-    postParamsChange(params: ChartFrameParams) {
-      if (disposed || !port) return;
-      port.postMessage({ type: "lw:params-change", params });
-    },
-    dispose: stop,
-  };
 }
 
-/**
- * The parent's `executeQuery` rejects with a ready-made payload; anything
- * else (a bug in the mapping itself) degrades to a generic shape rather than
- * leaking a raw message across the boundary.
- */
-function toChartQueryErrorPayload(error: unknown): ChartQueryError {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    "title" in error &&
-    "message" in error
-  ) {
-    const shaped = error as { code: unknown; title: unknown; message: unknown };
-    return {
-      code: String(shaped.code),
-      title: String(shaped.title),
-      message: String(shaped.message),
-    };
-  }
-  return {
-    code: "unknown",
-    title: "Something went wrong",
-    message: "The query could not be run. Check the page's log panel.",
-  };
+export function createFrameBridge(
+  options: CreateFrameBridgeOptions,
+): FrameBridge {
+  return new FrameBridgeController(options);
 }

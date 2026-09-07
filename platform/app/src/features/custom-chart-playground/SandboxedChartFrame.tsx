@@ -49,15 +49,29 @@ export interface SandboxedChartFrameProps {
   maxHeight?: number;
 }
 
-export function SandboxedChartFrame({
+/** Clamps the bridge-reported height between the protocol floor and the caller's ceiling. */
+function clampFrameHeight(maxHeight: number, height: number): number {
+  return Math.max(
+    CHART_FRAME_MIN_HEIGHT_PX,
+    Math.min(Math.min(CHART_FRAME_MAX_HEIGHT_PX, maxHeight), height),
+  );
+}
+
+/**
+ * Owns the frame's whole bridge lifecycle: building the srcdoc, standing up
+ * `createFrameBridge` against the live iframe, re-keying on a `generation`
+ * bump (used to restart after a teardown), pushing param updates into the
+ * already-mounted frame, and tracking the bridge's own reported height.
+ */
+function useSandboxedChartFrame({
   code,
   executeQuery,
   params,
   theme,
   onLog,
   onNavigate,
-  maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
-}: SandboxedChartFrameProps) {
+  maxHeight,
+}: SandboxedChartFrameProps & { maxHeight: number }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
   const [tornDown, setTornDown] = useState(false);
@@ -111,32 +125,43 @@ export function SandboxedChartFrame({
     bridgeRef.current?.postParamsChange(params);
   }, [params]);
 
+  const restart = () => {
+    setTornDown(false);
+    setGeneration((n) => n + 1);
+  };
+
+  return { iframeRef, srcdoc, generation, height, tornDown, restart };
+}
+
+function TornDownNotice({ onRestart }: { onRestart: () => void }) {
+  return (
+    <VStack
+      align="center"
+      justify="center"
+      minHeight="120px"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      gap={2}
+      padding={4}
+    >
+      <Text fontSize="13px" color="fg.muted">
+        The frame stopped responding and was torn down.
+      </Text>
+      <Button size="sm" onClick={onRestart}>
+        Restart
+      </Button>
+    </VStack>
+  );
+}
+
+export function SandboxedChartFrame(props: SandboxedChartFrameProps) {
+  const maxHeight = props.maxHeight ?? CHART_FRAME_MAX_HEIGHT_PX;
+  const { iframeRef, srcdoc, generation, height, tornDown, restart } =
+    useSandboxedChartFrame({ ...props, maxHeight });
+
   if (tornDown) {
-    return (
-      <VStack
-        align="center"
-        justify="center"
-        minHeight="120px"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        gap={2}
-        padding={4}
-      >
-        <Text fontSize="13px" color="fg.muted">
-          The frame stopped responding and was torn down.
-        </Text>
-        <Button
-          size="sm"
-          onClick={() => {
-            setTornDown(false);
-            setGeneration((n) => n + 1);
-          }}
-        >
-          Restart
-        </Button>
-      </VStack>
-    );
+    return <TornDownNotice onRestart={restart} />;
   }
 
   return (
@@ -156,10 +181,7 @@ export function SandboxedChartFrame({
           width: "100%",
           border: "none",
           display: "block",
-          height: `${Math.max(
-            CHART_FRAME_MIN_HEIGHT_PX,
-            Math.min(Math.min(CHART_FRAME_MAX_HEIGHT_PX, maxHeight), height),
-          )}px`,
+          height: `${clampFrameHeight(maxHeight, height)}px`,
         }}
       />
     </Box>

@@ -79,45 +79,8 @@ const RANGE_LABEL: Record<RangeKey, string> = {
   "30d": "Last 30d",
 };
 
-interface PlaygroundWidgetCardProps {
-  widget: PlaygroundWidget;
-  projectId: string;
-  projectSlug: string;
-  onDelete: () => void;
-  onSizeChange: (size: SizeOption) => void;
-  onSave: (
-    input: { id: string; code: string; queries: PlaygroundQuery[] },
-    options?: { onSuccess?: () => void },
-  ) => void;
-  isDeleting: boolean;
-  isSaving: boolean;
-}
-
-export function PlaygroundWidgetCard({
-  widget,
-  projectId,
-  projectSlug,
-  onDelete,
-  onSizeChange,
-  onSave,
-  isDeleting,
-  isSaving,
-}: PlaygroundWidgetCardProps) {
-  const { colorMode } = useColorMode();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: widget.id });
-
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
-  const [draftCode, setDraftCode] = useState(widget.code);
-  const [draftQueries, setDraftQueries] = useState(widget.queries);
-
+/** Session-only time-range chip: which window the executor's queries run over. */
+function useRangeFilter() {
   const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
   // Memo on rangeKey only — a fresh {start, end} identity every render would
   // loop the executor's refetch.
@@ -125,6 +88,52 @@ export function PlaygroundWidgetCard({
     const end = Date.now();
     return { start: end - RANGE_MS[rangeKey], end };
   }, [rangeKey]);
+  return { rangeKey, setRangeKey, timeWindow };
+}
+
+function TimeRangeMenu({
+  rangeKey,
+  onChange,
+}: {
+  rangeKey: RangeKey;
+  onChange: (key: RangeKey) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button variant="ghost" size="xs">
+          <Clock /> {RANGE_LABEL[rangeKey]}
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        {(Object.keys(RANGE_MS) as RangeKey[]).map((key) => (
+          <Menu.Item key={key} value={key} onClick={() => onChange(key)}>
+            {RANGE_LABEL[key]}
+            {key === rangeKey && " ✓"}
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+/**
+ * Owns the draft/preview lifecycle for one widget's editor: the live-edited
+ * draft, the debounced preview the chart actually renders from (see file
+ * header for why it can't just be the draft), dirtiness against the
+ * persisted widget, and the drawer's open/tab/close/save plumbing.
+ */
+function useWidgetDraft(
+  widget: PlaygroundWidget,
+  onSave: (
+    input: { id: string; code: string; queries: PlaygroundQuery[] },
+    options?: { onSuccess?: () => void },
+  ) => void,
+) {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
+  const [draftCode, setDraftCode] = useState(widget.code);
+  const [draftQueries, setDraftQueries] = useState(widget.queries);
 
   // Reseed the drafts whenever the persisted record changes underneath them:
   // a save from this card, or a refetch.
@@ -133,8 +142,7 @@ export function PlaygroundWidgetCard({
     setDraftQueries(widget.queries);
   }, [widget.code, widget.queries]);
 
-  // The chart's own view of the draft, updated only after typing settles —
-  // see the file header for why this can't just be draftCode/draftQueries.
+  // The chart's own view of the draft, updated only after typing settles.
   const [previewCode, setPreviewCode] = useState(widget.code);
   const [previewQueries, setPreviewQueries] = useState(widget.queries);
   useEffect(() => {
@@ -144,10 +152,6 @@ export function PlaygroundWidgetCard({
     }, PREVIEW_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [draftCode, draftQueries]);
-
-  const { executeQuery, runStandalone, params, lastRuns } =
-    usePlaygroundWidgetExecutor(projectId, previewQueries, { timeWindow });
-  const onNavigate = usePlaygroundChartNavigate(projectSlug);
 
   const isDirty =
     draftCode !== widget.code || !queriesEqual(draftQueries, widget.queries);
@@ -173,120 +177,246 @@ export function PlaygroundWidgetCard({
     setIsDrawerOpen(false);
   };
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+  return {
+    isDrawerOpen,
+    setIsDrawerOpen,
+    drawerTab,
+    setDrawerTab,
+    draftCode,
+    setDraftCode,
+    draftQueries,
+    setDraftQueries,
+    previewCode,
+    previewQueries,
+    isDirty,
+    handleSave,
+    openCodeTab,
+    handleClose,
+  };
+}
+
+/** A widget card's own drag-transform style, computed from `useSortable`'s output. */
+function dragStyle(
+  sortable: Pick<
+    ReturnType<typeof useSortable>,
+    "transform" | "transition" | "isDragging"
+  >,
+  widget: Pick<PlaygroundWidget, "colSpan" | "rowSpan">,
+): React.CSSProperties {
+  return {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0.5 : 1,
     gridColumn: `span ${widget.colSpan}`,
     gridRow: `span ${widget.rowSpan}`,
   };
+}
+
+/** The card's drag handle: title, time-range chip, and the size/edit/delete menu. */
+function PlaygroundWidgetCardHeader({
+  widget,
+  projectId,
+  projectSlug,
+  rangeKey,
+  onRangeChange,
+  onEdit,
+  onSizeChange,
+  onDelete,
+  isDeleting,
+  dragHandleProps,
+}: {
+  widget: PlaygroundWidget;
+  projectId: string;
+  projectSlug: string;
+  rangeKey: RangeKey;
+  onRangeChange: (key: RangeKey) => void;
+  onEdit: () => void;
+  onSizeChange: (size: SizeOption) => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+  dragHandleProps: Record<string, unknown>;
+}) {
+  return (
+    <HStack minWidth={0} cursor="grab" {...dragHandleProps}>
+      <Text fontSize="sm" fontWeight="bold" flex={1} minWidth={0} truncate>
+        {widget.name}
+      </Text>
+
+      <TimeRangeMenu rangeKey={rangeKey} onChange={onRangeChange} />
+
+      <GraphCardMenu
+        graphId={widget.id}
+        projectId={projectId}
+        projectSlug={projectSlug}
+        dashboardId={widget.dashboardId ?? undefined}
+        colSpan={widget.colSpan}
+        rowSpan={widget.rowSpan}
+        isPlaygroundWidget
+        showAddToDashboard
+        onEdit={onEdit}
+        onSizeChange={onSizeChange}
+        onDelete={onDelete}
+        isDeleting={isDeleting}
+      />
+    </HStack>
+  );
+}
+
+/**
+ * The card's persisted surface: drag handle/header plus the live chart —
+ * everything except the edit drawer, which sits alongside it as a sibling
+ * (see the file header for why the chart isn't rendered here while the
+ * drawer owns its own copy).
+ */
+function PlaygroundWidgetCardBody({
+  widget,
+  projectId,
+  projectSlug,
+  rangeKey,
+  onRangeChange,
+  onEdit,
+  onSizeChange,
+  onDelete,
+  isDeleting,
+  dragHandleProps,
+  isDrawerOpen,
+  renderChart,
+}: {
+  widget: PlaygroundWidget;
+  projectId: string;
+  projectSlug: string;
+  rangeKey: RangeKey;
+  onRangeChange: (key: RangeKey) => void;
+  onEdit: () => void;
+  onSizeChange: (size: SizeOption) => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+  dragHandleProps: Record<string, unknown>;
+  isDrawerOpen: boolean;
+  renderChart: (maxHeight: number) => React.ReactNode;
+}) {
+  return (
+    <Card.Root height="full" minWidth={0}>
+      <Card.Body
+        height="full"
+        display="flex"
+        flexDirection="column"
+        minWidth={0}
+        overflow="hidden"
+        gap={2}
+      >
+        <PlaygroundWidgetCardHeader
+          widget={widget}
+          projectId={projectId}
+          projectSlug={projectSlug}
+          rangeKey={rangeKey}
+          onRangeChange={onRangeChange}
+          onEdit={onEdit}
+          onSizeChange={onSizeChange}
+          onDelete={onDelete}
+          isDeleting={isDeleting}
+          dragHandleProps={dragHandleProps}
+        />
+
+        {/* Not rendered while the drawer is open — the drawer mounts its
+            own copy of this same frame instead, so there is never more
+            than one live iframe (and one LW.query dispatch) running the
+            same preview at once. */}
+        {!isDrawerOpen && (
+          <Box flex={1} minHeight={0}>
+            {renderChart(rowSpanHeight(widget.rowSpan))}
+          </Box>
+        )}
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+interface PlaygroundWidgetCardProps {
+  widget: PlaygroundWidget;
+  projectId: string;
+  projectSlug: string;
+  onDelete: () => void;
+  onSizeChange: (size: SizeOption) => void;
+  onSave: (
+    input: { id: string; code: string; queries: PlaygroundQuery[] },
+    options?: { onSuccess?: () => void },
+  ) => void;
+  isDeleting: boolean;
+  isSaving: boolean;
+}
+
+export function PlaygroundWidgetCard({
+  widget,
+  projectId,
+  projectSlug,
+  onDelete,
+  onSizeChange,
+  onSave,
+  isDeleting,
+  isSaving,
+}: PlaygroundWidgetCardProps) {
+  const { colorMode } = useColorMode();
+  const sortable = useSortable({ id: widget.id });
+  const { attributes, listeners, setNodeRef } = sortable;
+
+  const { rangeKey, setRangeKey, timeWindow } = useRangeFilter();
+  const draft = useWidgetDraft(widget, onSave);
+
+  const { executeQuery, runStandalone, params, lastRuns } =
+    usePlaygroundWidgetExecutor(projectId, draft.previewQueries, {
+      timeWindow,
+    });
+  const onNavigate = usePlaygroundChartNavigate(projectSlug);
+
+  const style = dragStyle(sortable, widget);
+
+  const renderChart = (maxHeight: number) => (
+    <SandboxedChartFrame
+      key={`${draft.previewCode} ${JSON.stringify(draft.previewQueries)}`}
+      code={draft.previewCode}
+      executeQuery={executeQuery}
+      params={params}
+      theme={colorMode === "dark" ? "dark" : "light"}
+      onLog={noopLog}
+      onNavigate={onNavigate}
+      maxHeight={maxHeight}
+    />
+  );
 
   return (
     <Box ref={setNodeRef} style={style} minWidth={0}>
-      <Card.Root height="full" minWidth={0}>
-        <Card.Body
-          height="full"
-          display="flex"
-          flexDirection="column"
-          minWidth={0}
-          overflow="hidden"
-          gap={2}
-        >
-          <HStack minWidth={0} cursor="grab" {...attributes} {...listeners}>
-            <Text
-              fontSize="sm"
-              fontWeight="bold"
-              flex={1}
-              minWidth={0}
-              truncate
-            >
-              {widget.name}
-            </Text>
-
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="ghost" size="xs">
-                  <Clock /> {RANGE_LABEL[rangeKey]}
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                {(Object.keys(RANGE_MS) as RangeKey[]).map((key) => (
-                  <Menu.Item
-                    key={key}
-                    value={key}
-                    onClick={() => setRangeKey(key)}
-                  >
-                    {RANGE_LABEL[key]}
-                    {key === rangeKey && " ✓"}
-                  </Menu.Item>
-                ))}
-              </Menu.Content>
-            </Menu.Root>
-
-            <GraphCardMenu
-              graphId={widget.id}
-              projectId={projectId}
-              projectSlug={projectSlug}
-              dashboardId={widget.dashboardId ?? undefined}
-              colSpan={widget.colSpan}
-              rowSpan={widget.rowSpan}
-              isPlaygroundWidget
-              showAddToDashboard
-              onEdit={openCodeTab}
-              onSizeChange={onSizeChange}
-              onDelete={onDelete}
-              isDeleting={isDeleting}
-            />
-          </HStack>
-
-          {/* Not rendered while the drawer is open — the drawer mounts its
-              own copy of this same frame instead, so there is never more
-              than one live iframe (and one LW.query dispatch) running the
-              same preview at once. */}
-          {!isDrawerOpen && (
-            <Box flex={1} minHeight={0}>
-              <SandboxedChartFrame
-                key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
-                code={previewCode}
-                executeQuery={executeQuery}
-                params={params}
-                theme={colorMode === "dark" ? "dark" : "light"}
-                onLog={noopLog}
-                onNavigate={onNavigate}
-                maxHeight={rowSpanHeight(widget.rowSpan)}
-              />
-            </Box>
-          )}
-        </Card.Body>
-      </Card.Root>
+      <PlaygroundWidgetCardBody
+        widget={widget}
+        projectId={projectId}
+        projectSlug={projectSlug}
+        rangeKey={rangeKey}
+        onRangeChange={setRangeKey}
+        onEdit={draft.openCodeTab}
+        onSizeChange={onSizeChange}
+        onDelete={onDelete}
+        isDeleting={isDeleting}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        isDrawerOpen={draft.isDrawerOpen}
+        renderChart={renderChart}
+      />
 
       <PlaygroundWidgetEditDrawer
-        open={isDrawerOpen}
-        code={draftCode}
-        queries={draftQueries}
-        onCodeChange={setDraftCode}
-        onQueriesChange={setDraftQueries}
+        open={draft.isDrawerOpen}
+        code={draft.draftCode}
+        queries={draft.draftQueries}
+        onCodeChange={draft.setDraftCode}
+        onQueriesChange={draft.setDraftQueries}
         lastRuns={lastRuns}
         onRun={runStandalone}
-        isDirty={isDirty}
+        isDirty={draft.isDirty}
         isSaving={isSaving}
-        onClose={handleClose}
-        onSave={handleSave}
-        activeTab={drawerTab}
-        onTabChange={setDrawerTab}
+        onClose={draft.handleClose}
+        onSave={draft.handleSave}
+        activeTab={draft.drawerTab}
+        onTabChange={draft.setDrawerTab}
         chart={
-          isDrawerOpen ? (
-            <SandboxedChartFrame
-              key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
-              code={previewCode}
-              executeQuery={executeQuery}
-              params={params}
-              theme={colorMode === "dark" ? "dark" : "light"}
-              onLog={noopLog}
-              onNavigate={onNavigate}
-              maxHeight={DRAWER_PREVIEW_HEIGHT_PX}
-            />
-          ) : null
+          draft.isDrawerOpen ? renderChart(DRAWER_PREVIEW_HEIGHT_PX) : null
         }
       />
     </Box>

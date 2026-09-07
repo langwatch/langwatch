@@ -112,6 +112,34 @@ function buildClause(field: string, value: string | string[]): string | null {
 }
 
 /**
+ * Resolves one author param entry to its liqe clause, or `null` when the
+ * entry is a reserved key (`projectId`/`startDate`/`endDate`, handled
+ * separately), an unmapped field, or a non-string value — each of the
+ * latter two warn-and-drop rather than guessing.
+ */
+function resolveEntryClause(key: string, value: unknown): string | null {
+  if (key === "projectId" || key === "startDate" || key === "endDate") {
+    return null;
+  }
+
+  const field = resolveLiqeField(key);
+  if (!field) {
+    console.warn("[playground] dropped unmapped filter key: " + key);
+    return null;
+  }
+
+  const isStringOrStringArray =
+    typeof value === "string" ||
+    (Array.isArray(value) && value.every((v) => typeof v === "string"));
+  if (!isStringOrStringArray) {
+    console.warn("[playground] dropped non-string filter value: " + key);
+    return null;
+  }
+
+  return buildClause(field, value as string | string[]);
+}
+
+/**
  * Builds the liqe `q` expression from author params, dropping `projectId`,
  * `startDate`/`endDate` (handled separately for `from`/`to`), and anything
  * unresolvable to a known liqe field (warn-and-drop).
@@ -119,25 +147,7 @@ function buildClause(field: string, value: string | string[]): string | null {
 function buildLiqeQuery(params: Readonly<Record<string, unknown>>): string {
   const clauses: string[] = [];
   for (const [key, value] of Object.entries(params)) {
-    if (key === "projectId" || key === "startDate" || key === "endDate") {
-      continue;
-    }
-
-    const field = resolveLiqeField(key);
-    if (!field) {
-      console.warn("[playground] dropped unmapped filter key: " + key);
-      continue;
-    }
-
-    if (
-      typeof value !== "string" &&
-      !(Array.isArray(value) && value.every((v) => typeof v === "string"))
-    ) {
-      console.warn("[playground] dropped non-string filter value: " + key);
-      continue;
-    }
-
-    const clause = buildClause(field, value as string | string[]);
+    const clause = resolveEntryClause(key, value);
     if (clause) clauses.push(clause);
   }
   return clauses.join(" AND ");

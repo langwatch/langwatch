@@ -407,26 +407,16 @@ export interface AreaTimeseriesProps {
   height?: number;
 }
 
-export function AreaTimeseries({
-  data,
-  x,
-  series,
-  stacked,
-  projectionFrom,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: AreaTimeseriesProps) {
-  const R = recharts();
-  const c = chrome();
-  const palette = paletteFor(colors);
-  const keys = Array.isArray(series) ? series : [series];
-  const splitAt = projectionIndex(data, x, projectionFrom);
-
-  // Two Area layers per series (actual, projected) sharing a stackId so a
-  // stacked chart still composes correctly; only one of the pair is
-  // non-null at any given x, so the "seam" at the split point is the only
-  // row where both carry a value (continuity across the boundary).
-  const rows = data.map((row, index) => {
+// Two Area layers per series (actual, projected) sharing a stackId so a
+// stacked chart still composes correctly; only one of the pair is non-null
+// at any given x, so the "seam" at the split point is the only row where
+// both carry a value (continuity across the boundary).
+function buildProjectedRows(
+  data: Row[],
+  keys: string[],
+  splitAt: number,
+): Row[] {
+  return data.map((row, index) => {
     const out: Row = { ...row };
     keys.forEach((key) => {
       const isProjected = splitAt !== -1 && index >= splitAt;
@@ -436,8 +426,16 @@ export function AreaTimeseries({
     });
     return out;
   });
+}
 
-  const areas = keys.flatMap((key, index) => {
+function buildProjectedAreaLayers(args: {
+  R: any;
+  keys: string[];
+  palette: string[];
+  stacked: boolean | undefined;
+}) {
+  const { R, keys, palette, stacked } = args;
+  return keys.flatMap((key, index) => {
     const color = colorAt(palette, index);
     const stackId = stacked ? "stack" : undefined;
     const commonProps = {
@@ -469,6 +467,24 @@ export function AreaTimeseries({
       }),
     ];
   });
+}
+
+export function AreaTimeseries({
+  data,
+  x,
+  series,
+  stacked,
+  projectionFrom,
+  colors,
+  height = DEFAULT_HEIGHT,
+}: AreaTimeseriesProps) {
+  const R = recharts();
+  const c = chrome();
+  const palette = paletteFor(colors);
+  const keys = Array.isArray(series) ? series : [series];
+  const splitAt = projectionIndex(data, x, projectionFrom);
+  const rows = buildProjectedRows(data, keys, splitAt);
+  const areas = buildProjectedAreaLayers({ R, keys, palette, stacked });
 
   return h(
     "div",
@@ -1151,6 +1167,32 @@ interface InferredShape {
   y: string[];
 }
 
+function resolveExplicitY(
+  data: Row[],
+  explicitX: string | undefined,
+  y?: string | string[],
+): string[] {
+  if (!y) return numericColumns(data, explicitX ? [explicitX] : []);
+  return Array.isArray(y) ? y : [y];
+}
+
+/**
+ * The "name+value" shape: exactly one non-numeric column (the name) and one
+ * numeric column (the value), regardless of declared order. `null` when the
+ * data doesn't have that shape.
+ */
+function inferNameValueShape(data: Row[]): InferredShape | null {
+  const cols = columnsOf(data);
+  const numeric = numericColumns(data, []);
+  if (cols.length !== 2 || numeric.length !== 1) return null;
+  const nameKey = cols.find((col) => col !== numeric[0]) as string;
+  return {
+    kind: data.length <= 8 ? "donut" : "leaderboard",
+    x: nameKey,
+    y: numeric,
+  };
+}
+
 function inferShape(
   data: Row[],
   x?: string,
@@ -1158,11 +1200,7 @@ function inferShape(
 ): InferredShape {
   const cols = columnsOf(data);
   const explicitX = x ?? cols[0];
-  const explicitY = y
-    ? Array.isArray(y)
-      ? y
-      : [y]
-    : numericColumns(data, explicitX ? [explicitX] : []);
+  const explicitY = resolveExplicitY(data, explicitX, y);
 
   if (explicitX && isTimeLikeColumn(data, explicitX)) {
     return {
@@ -1172,20 +1210,51 @@ function inferShape(
     };
   }
 
-  // name+value shape: exactly one non-numeric column (the name) and one
-  // numeric column (the value), regardless of declared order.
-  const numeric = numericColumns(data, []);
-  if (cols.length === 2 && numeric.length === 1) {
-    const nameKey = cols.find((col) => col !== numeric[0]) as string;
-    return {
-      kind: data.length <= 8 ? "donut" : "leaderboard",
-      x: nameKey,
-      y: numeric,
-    };
-  }
+  const nameValueShape = inferNameValueShape(data);
+  if (nameValueShape) return nameValueShape;
 
   return { kind: "table", x: explicitX ?? cols[0] ?? "", y: explicitY };
 }
+
+interface ResolvedLwqlShape {
+  data: Row[];
+  x: string;
+  y: string[];
+  series?: string;
+  colors?: string[];
+  height?: number;
+}
+
+/**
+ * One render function per `LwqlChartKind`, keyed by kind so picking one is a
+ * lookup rather than a branch — see the file header and the per-kind rules
+ * in the module docstring at the top of this file.
+ */
+const LWQL_CHART_RENDERERS: Record<
+  LwqlChartKind,
+  (shape: ResolvedLwqlShape) => any
+> = {
+  area: ({ data, x, y, series, colors, height }) =>
+    h(AreaTimeseries, { data, x, series: series ?? y, colors, height }),
+  bars: ({ data, x, y, series, colors, height }) =>
+    h(StackedBars, { data, x, series: series ? [series] : y, colors, height }),
+  donut: ({ data, x, y, colors, height }) =>
+    h(Donut, {
+      data,
+      nameKey: x,
+      valueKey: (y[0] as string) ?? "",
+      colors,
+      height,
+    }),
+  leaderboard: ({ data, x, y, height }) =>
+    h(Leaderboard, {
+      data,
+      labelKey: x,
+      valueKey: (y[0] as string) ?? "",
+      height,
+    }),
+  table: ({ data, height }) => h(Table, { data, height }),
+};
 
 /**
  * Picks a concrete component from `data`'s shape (or the caller's explicit
@@ -1206,40 +1275,7 @@ export function LwqlChart({
   const resolvedX = x ?? inferred.x;
   const resolvedY = y ? (Array.isArray(y) ? y : [y]) : inferred.y;
 
-  switch (resolvedKind) {
-    case "area":
-      return h(AreaTimeseries, {
-        data,
-        x: resolvedX,
-        series: series ?? resolvedY,
-        colors,
-        height,
-      });
-    case "bars":
-      return h(StackedBars, {
-        data,
-        x: resolvedX,
-        series: series ? [series] : resolvedY,
-        colors,
-        height,
-      });
-    case "donut":
-      return h(Donut, {
-        data,
-        nameKey: resolvedX,
-        valueKey: (resolvedY[0] as string) ?? "",
-        colors,
-        height,
-      });
-    case "leaderboard":
-      return h(Leaderboard, {
-        data,
-        labelKey: resolvedX,
-        valueKey: (resolvedY[0] as string) ?? "",
-        height,
-      });
-    case "table":
-    default:
-      return h(Table, { data, height });
-  }
+  const render =
+    LWQL_CHART_RENDERERS[resolvedKind] ?? LWQL_CHART_RENDERERS.table;
+  return render({ data, x: resolvedX, y: resolvedY, series, colors, height });
 }

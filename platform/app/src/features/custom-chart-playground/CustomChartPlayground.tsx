@@ -60,70 +60,53 @@ function toWidget(row: {
 const showError = (title: string) =>
   toaster.create({ title, type: "error", duration: 3000 });
 
-export function CustomChartPlayground({
-  projectId,
-  projectSlug,
-  warning,
-}: {
-  projectId: string;
-  projectSlug: string;
-  warning?: string | undefined;
-}) {
-  // Every widget hangs off the project's first dashboard (grid rows are a
-  // dashboard fact), but the playground's kind keeps them off every other
-  // dashboard's builder-only reads.
+/** Every widget hangs off the project's first dashboard (grid rows are a
+ * dashboard fact), but the playground's kind keeps them off every other
+ * dashboard's builder-only reads. */
+function usePlaygroundDashboardId(projectId: string): string | undefined {
   const dashboard = api.dashboards.getOrCreateFirst.useQuery(
     { projectId },
     { enabled: projectId.length > 0 },
   );
-  const dashboardId = dashboard.data?.id;
+  return dashboard.data?.id;
+}
 
-  const widgetsQuery = api.playgroundWidgets.list.useQuery(
-    { projectId },
-    { enabled: projectId.length > 0 },
-  );
-
-  const createWidget = api.playgroundWidgets.create.useMutation();
-  const updateWidget = api.playgroundWidgets.update.useMutation();
-  const deleteWidget = api.playgroundWidgets.delete.useMutation();
-  const updateLayout = api.playgroundWidgets.updateLayout.useMutation();
-  const batchUpdateLayouts =
-    api.playgroundWidgets.batchUpdateLayouts.useMutation();
-
-  const widgets = (widgetsQuery.data ?? []).map(toWidget);
-
-  const handleNewWidget = () => {
-    createWidget.mutate(
-      {
-        projectId,
-        ...(dashboardId ? { dashboardId } : {}),
-        name: "New widget",
-        code: STARTER_WIDGET_CODE,
-        queries: STARTER_WIDGET_QUERIES,
-      },
-      {
-        onSuccess: () => void widgetsQuery.refetch(),
-        onError: () => showError("Error creating widget"),
-      },
-    );
+function usePlaygroundWidgetMutations() {
+  return {
+    createWidget: api.playgroundWidgets.create.useMutation(),
+    updateWidget: api.playgroundWidgets.update.useMutation(),
+    deleteWidget: api.playgroundWidgets.delete.useMutation(),
+    updateLayout: api.playgroundWidgets.updateLayout.useMutation(),
+    batchUpdateLayouts: api.playgroundWidgets.batchUpdateLayouts.useMutation(),
   };
+}
 
-  const handleDelete = (id: string) => {
-    deleteWidget.mutate(
-      { projectId, id },
-      {
-        onSuccess: () => void widgetsQuery.refetch(),
-        onError: () => showError("Error deleting widget"),
-      },
-    );
-  };
+type PlaygroundWidgetMutations = ReturnType<
+  typeof usePlaygroundWidgetMutations
+>;
 
-  const handleSizeChange = (id: string, size: SizeOption) => {
+/**
+ * The size-change flow alone: resolve the target widget/size, persist the new
+ * span, then re-derive and persist every widget's grid position against the
+ * resized layout. Its own function purely because it is the one handler with
+ * a nested mutation.
+ */
+function makeSizeChangeHandler(args: {
+  projectId: string;
+  widgets: PlaygroundWidget[];
+  mutations: Pick<
+    PlaygroundWidgetMutations,
+    "updateLayout" | "batchUpdateLayouts"
+  >;
+  refetch: () => void;
+}) {
+  const { projectId, widgets, mutations, refetch } = args;
+  return (id: string, size: SizeOption) => {
     const sizeConfig = sizeOptions.find((s) => s.value === size);
     const widget = widgets.find((w) => w.id === id);
     if (!sizeConfig || !widget) return;
 
-    updateLayout.mutate(
+    mutations.updateLayout.mutate(
       {
         projectId,
         graphId: id,
@@ -143,21 +126,54 @@ export function CustomChartPlayground({
                 }
               : w,
           );
-          batchUpdateLayouts.mutate(
+          mutations.batchUpdateLayouts.mutate(
             { projectId, layouts: calculateGridPositions(updated) },
-            { onSuccess: () => void widgetsQuery.refetch() },
+            { onSuccess: refetch },
           );
         },
         onError: () => showError("Error updating widget size"),
       },
     );
   };
+}
+
+/**
+ * The rest of the playground's mutation handlers — new/delete/reorder/save —
+ * each a thin `mutate` call with its own toast-on-error and refetch-on-success.
+ */
+function makePlaygroundHandlers(args: {
+  projectId: string;
+  dashboardId: string | undefined;
+  mutations: PlaygroundWidgetMutations;
+  refetch: () => void;
+}) {
+  const { projectId, dashboardId, mutations, refetch } = args;
+
+  const handleNewWidget = () => {
+    mutations.createWidget.mutate(
+      {
+        projectId,
+        ...(dashboardId ? { dashboardId } : {}),
+        name: "New widget",
+        code: STARTER_WIDGET_CODE,
+        queries: STARTER_WIDGET_QUERIES,
+      },
+      { onSuccess: refetch, onError: () => showError("Error creating widget") },
+    );
+  };
+
+  const handleDelete = (id: string) => {
+    mutations.deleteWidget.mutate(
+      { projectId, id },
+      { onSuccess: refetch, onError: () => showError("Error deleting widget") },
+    );
+  };
 
   const handleReorder = (layouts: GridLayout[]) => {
-    batchUpdateLayouts.mutate(
+    mutations.batchUpdateLayouts.mutate(
       { projectId, layouts },
       {
-        onSuccess: () => void widgetsQuery.refetch(),
+        onSuccess: refetch,
         onError: () => showError("Error reordering widgets"),
       },
     );
@@ -170,11 +186,11 @@ export function CustomChartPlayground({
     input: { id: string; code: string; queries: PlaygroundWidget["queries"] },
     options?: { onSuccess?: () => void },
   ) => {
-    updateWidget.mutate(
+    mutations.updateWidget.mutate(
       { projectId, ...input },
       {
         onSuccess: () => {
-          void widgetsQuery.refetch();
+          refetch();
           options?.onSuccess?.();
         },
         onError: () => showError("Error saving widget"),
@@ -182,21 +198,98 @@ export function CustomChartPlayground({
     );
   };
 
-  const hasNoWidgets = widgets.length === 0 && !widgetsQuery.isLoading;
+  return { handleNewWidget, handleDelete, handleReorder, handleSave };
+}
+
+/**
+ * Owns every mutation the playground page fires: create/delete/resize/
+ * reorder/save, each with its own toast-on-error and its own refetch. Split
+ * out of the page component so the component itself is just query + render.
+ */
+function usePlaygroundWidgetsController(projectId: string) {
+  const dashboardId = usePlaygroundDashboardId(projectId);
+
+  const widgetsQuery = api.playgroundWidgets.list.useQuery(
+    { projectId },
+    { enabled: projectId.length > 0 },
+  );
+  const widgets = (widgetsQuery.data ?? []).map(toWidget);
+  const refetch = () => void widgetsQuery.refetch();
+
+  const mutations = usePlaygroundWidgetMutations();
+  const handleSizeChange = makeSizeChangeHandler({
+    projectId,
+    widgets,
+    mutations,
+    refetch,
+  });
+  const { handleNewWidget, handleDelete, handleReorder, handleSave } =
+    makePlaygroundHandlers({ projectId, dashboardId, mutations, refetch });
+
+  return {
+    widgets,
+    isLoading: widgetsQuery.isLoading,
+    createWidget: mutations.createWidget,
+    deletingWidgetId: mutations.deleteWidget.isPending
+      ? (mutations.deleteWidget.variables?.id ?? null)
+      : null,
+    savingWidgetId: mutations.updateWidget.isPending
+      ? (mutations.updateWidget.variables?.id ?? null)
+      : null,
+    handleNewWidget,
+    handleDelete,
+    handleSizeChange,
+    handleReorder,
+    handleSave,
+  };
+}
+
+function PlaygroundWarningBanner({ warning }: { warning: string }) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="orange.400"
+      background="orange.subtle"
+      borderRadius="md"
+      padding={3}
+    >
+      <Text fontSize="13px">{warning}</Text>
+    </Box>
+  );
+}
+
+function PlaygroundEmptyState() {
+  return (
+    <Box
+      borderWidth="1px"
+      borderStyle="dashed"
+      borderColor="border"
+      borderRadius="md"
+      padding={8}
+      textAlign="center"
+      color="fg.muted"
+    >
+      <Text>No widgets yet. Click “New widget” to add one.</Text>
+    </Box>
+  );
+}
+
+export function CustomChartPlayground({
+  projectId,
+  projectSlug,
+  warning,
+}: {
+  projectId: string;
+  projectSlug: string;
+  warning?: string | undefined;
+}) {
+  const playground = usePlaygroundWidgetsController(projectId);
+  const { widgets } = playground;
+  const hasNoWidgets = widgets.length === 0 && !playground.isLoading;
 
   return (
     <VStack align="stretch" gap={4} width="full" paddingBottom={8}>
-      {warning !== undefined && (
-        <Box
-          borderWidth="1px"
-          borderColor="orange.400"
-          background="orange.subtle"
-          borderRadius="md"
-          padding={3}
-        >
-          <Text fontSize="13px">{warning}</Text>
-        </Box>
-      )}
+      {warning !== undefined && <PlaygroundWarningBanner warning={warning} />}
 
       <HStack justify="space-between">
         <Text fontSize="sm" color="fg.muted">
@@ -205,42 +298,28 @@ export function CustomChartPlayground({
         <Button
           colorPalette="orange"
           size="sm"
-          onClick={handleNewWidget}
-          loading={createWidget.isPending}
+          onClick={playground.handleNewWidget}
+          loading={playground.createWidget.isPending}
         >
           <Plus /> New widget
         </Button>
       </HStack>
 
-      {widgetsQuery.isLoading ? (
+      {playground.isLoading ? (
         <Skeleton height="300px" />
       ) : hasNoWidgets ? (
-        <Box
-          borderWidth="1px"
-          borderStyle="dashed"
-          borderColor="border"
-          borderRadius="md"
-          padding={8}
-          textAlign="center"
-          color="fg.muted"
-        >
-          <Text>No widgets yet. Click “New widget” to add one.</Text>
-        </Box>
+        <PlaygroundEmptyState />
       ) : (
         <PlaygroundWidgetGrid
           widgets={widgets}
           projectId={projectId}
           projectSlug={projectSlug}
-          onWidgetDelete={handleDelete}
-          onWidgetSizeChange={handleSizeChange}
-          onWidgetSave={handleSave}
-          onWidgetsReorder={handleReorder}
-          deletingWidgetId={
-            deleteWidget.isPending ? (deleteWidget.variables?.id ?? null) : null
-          }
-          savingWidgetId={
-            updateWidget.isPending ? (updateWidget.variables?.id ?? null) : null
-          }
+          onWidgetDelete={playground.handleDelete}
+          onWidgetSizeChange={playground.handleSizeChange}
+          onWidgetSave={playground.handleSave}
+          onWidgetsReorder={playground.handleReorder}
+          deletingWidgetId={playground.deletingWidgetId}
+          savingWidgetId={playground.savingWidgetId}
         />
       )}
     </VStack>

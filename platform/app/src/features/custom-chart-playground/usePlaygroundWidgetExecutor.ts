@@ -67,12 +67,8 @@ export interface PlaygroundWidgetExecutorOverrides {
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
-export function usePlaygroundWidgetExecutor(
-  projectId: string,
-  queries: PlaygroundQuery[],
-  overrides?: PlaygroundWidgetExecutorOverrides,
-) {
-  const utils = api.useUtils();
+/** The window/step every query in this widget runs against. */
+function useExecutorWindow(overrides?: PlaygroundWidgetExecutorOverrides) {
   // The playground editor has no period control, so it defaults to a fixed
   // window computed once at mount; a dashboard card passes its own via
   // `overrides.timeWindow` instead, tracking the grid's period control.
@@ -83,17 +79,30 @@ export function usePlaygroundWidgetExecutor(
   const pageWindow = overrides?.timeWindow ?? mountWindow;
   const granularitySeconds =
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  return { pageWindow, granularitySeconds };
+}
+
+/** Keyed-by-query-name record of the most recent run, live or standalone. */
+function useLastRuns() {
+  const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
+  const recordRun = useCallback((name: string, run: QueryLastRun) => {
+    setLastRuns((prev) => ({ ...prev, [name]: run }));
+  }, []);
+  return { lastRuns, recordRun };
+}
+
+/** The one underlying execute call both entry points fall through to. */
+function useRunValidated(
+  projectId: string,
+  pageWindow: { start: number; end: number },
+  granularitySeconds: LangWatchQLGranularityStep,
+) {
+  const utils = api.useUtils();
   const execute = useMemo(
     () => createLangWatchQLExecute({ utils, projectId }),
     [utils, projectId],
   );
-  const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
-
-  const recordRun = useCallback((name: string, run: QueryLastRun) => {
-    setLastRuns((prev) => ({ ...prev, [name]: run }));
-  }, []);
-
-  const runValidated = useCallback(
+  return useCallback(
     async (
       query: Pick<PlaygroundQuery, "sql">,
       params: Readonly<Record<string, PlaygroundQueryParamValue>>,
@@ -116,8 +125,18 @@ export function usePlaygroundWidgetExecutor(
     },
     [execute, pageWindow, granularitySeconds],
   );
+}
 
-  const executeQuery: ChartFrameExecuteQuery = useCallback(
+type RunValidated = ReturnType<typeof useRunValidated>;
+
+/** The bridge-facing entry point: resolves `queryName` against the widget's live `queries`. */
+function useExecuteQuery(args: {
+  queries: PlaygroundQuery[];
+  recordRun: (name: string, run: QueryLastRun) => void;
+  runValidated: RunValidated;
+}): ChartFrameExecuteQuery {
+  const { queries, recordRun, runValidated } = args;
+  return useCallback(
     async (queryName, params, signal) => {
       const query = queries.find((q) => q.name === queryName);
       if (!query) {
@@ -146,15 +165,22 @@ export function usePlaygroundWidgetExecutor(
     },
     [queries, recordRun, runValidated],
   );
+}
 
-  /**
-   * Fills every declared parameter from its default (there is no other
-   * source of a value here), so a required parameter with no default simply
-   * fails validation — the same "cannot run standalone without one" outcome
-   * a disabled button would express, reached through the one validation path
-   * instead of a second rule to keep in sync with it.
-   */
-  const runStandalone = useCallback(
+/**
+ * The drawer's Queries-tab "Run" entry point. Fills every declared parameter
+ * from its default (there is no other source of a value here), so a required
+ * parameter with no default simply fails validation — the same "cannot run
+ * standalone without one" outcome a disabled button would express, reached
+ * through the one validation path instead of a second rule to keep in sync
+ * with it.
+ */
+function useRunStandalone(args: {
+  recordRun: (name: string, run: QueryLastRun) => void;
+  runValidated: RunValidated;
+}) {
+  const { recordRun, runValidated } = args;
+  return useCallback(
     async (query: PlaygroundQuery) => {
       const validation = validatePlaygroundQueryParams(query, {});
       if (!validation.ok) {
@@ -173,6 +199,22 @@ export function usePlaygroundWidgetExecutor(
     },
     [recordRun, runValidated],
   );
+}
+
+export function usePlaygroundWidgetExecutor(
+  projectId: string,
+  queries: PlaygroundQuery[],
+  overrides?: PlaygroundWidgetExecutorOverrides,
+) {
+  const { pageWindow, granularitySeconds } = useExecutorWindow(overrides);
+  const { lastRuns, recordRun } = useLastRuns();
+  const runValidated = useRunValidated(
+    projectId,
+    pageWindow,
+    granularitySeconds,
+  );
+  const executeQuery = useExecuteQuery({ queries, recordRun, runValidated });
+  const runStandalone = useRunStandalone({ recordRun, runValidated });
 
   const params: ChartFrameParams = useMemo(
     () => ({

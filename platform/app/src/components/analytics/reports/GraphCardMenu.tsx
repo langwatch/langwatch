@@ -46,6 +46,172 @@ const getCurrentSize = (colSpan: number, rowSpan: number): SizeOption => {
   return "1x1";
 };
 
+/**
+ * Where Edit navigates when the card doesn't hand us an in-place `onEdit`.
+ *
+ * A workbench chart is edited in the workbench that wrote it, and a
+ * playground widget in the playground that wrote it — neither the builder
+ * nor the other surface can read the other's payload shape.
+ *
+ * Neither surface opens through a deep-link parameter naming the card, so
+ * this lands on the surface rather than on the chart. Passing a parameter
+ * neither reads would be worse than not passing one: the member would
+ * arrive at an empty surface with a URL claiming otherwise. Opening the
+ * named chart/widget directly waits on either surface accepting an id.
+ */
+const getEditUrl = (args: {
+  projectSlug: string;
+  graphId: string;
+  dashboardId?: string;
+  isWorkbenchChart: boolean;
+  isPlaygroundWidget: boolean;
+}): string => {
+  const {
+    projectSlug,
+    graphId,
+    dashboardId,
+    isWorkbenchChart,
+    isPlaygroundWidget,
+  } = args;
+  if (isWorkbenchChart) return `/${projectSlug}/analytics/query`;
+  if (isPlaygroundWidget) return `/${projectSlug}/dev/custom-chart-playground`;
+  return `/${projectSlug}/analytics/custom/${graphId}${
+    dashboardId ? `?dashboard=${dashboardId}` : ""
+  }`;
+};
+
+const getEditLabel = (args: {
+  hasOnEdit: boolean;
+  isWorkbenchChart: boolean;
+  isPlaygroundWidget: boolean;
+}): string => {
+  const { hasOnEdit, isWorkbenchChart, isPlaygroundWidget } = args;
+  if (hasOnEdit) return "Edit";
+  if (isWorkbenchChart) return "Open in workbench";
+  if (isPlaygroundWidget) return "Open in playground";
+  return "Edit Graph";
+};
+
+/**
+ * Owns the "add a playground widget to the project's single dashboard"
+ * flow: the lazy lookup of that dashboard, the assignment mutation, and the
+ * derived already-on-dashboard state. Split out of `GraphCardMenu` so the
+ * menu component itself stays a plain render.
+ */
+function useAddToDashboard(args: {
+  projectId: string;
+  graphId: string;
+  dashboardId?: string;
+  enabled: boolean;
+}) {
+  const { projectId, graphId, dashboardId, enabled } = args;
+  const utils = api.useUtils();
+
+  // Resolved lazily (only when the item can actually be shown) — the same
+  // "every project has exactly one dashboard" lookup the playground page
+  // itself uses to pre-assign new widgets.
+  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
+    { projectId },
+    { enabled },
+  );
+  const assignDashboard = api.playgroundWidgets.assignDashboard.useMutation();
+  const alreadyOnDashboard =
+    !!dashboard.data && dashboardId === dashboard.data.id;
+
+  const handleAddToDashboard = () => {
+    if (!dashboard.data) return;
+    if (alreadyOnDashboard) {
+      toaster.create({
+        title: "Already on the dashboard",
+        type: "info",
+        duration: 3000,
+      });
+      return;
+    }
+    assignDashboard.mutate(
+      { projectId, id: graphId, dashboardId: dashboard.data.id },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: `Added to ${dashboard.data!.name}`,
+            type: "success",
+            duration: 3000,
+          });
+          void utils.playgroundWidgets.list.invalidate({ projectId });
+          void utils.graphs.getAll.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Error adding to dashboard",
+            type: "error",
+            duration: 3000,
+          });
+        },
+      },
+    );
+  };
+
+  return { dashboard, assignDashboard, handleAddToDashboard };
+}
+
+function GraphCardSizeMenu({
+  currentSize,
+  onSizeChange,
+}: {
+  currentSize: SizeOption;
+  onSizeChange: (size: SizeOption) => void;
+}) {
+  return (
+    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+      <Menu.TriggerItem value="size">
+        <Grid /> Size ({currentSize})
+      </Menu.TriggerItem>
+      <Menu.Content>
+        {sizeOptions.map((option) => (
+          <Menu.Item
+            key={option.value}
+            value={option.value}
+            onClick={() => onSizeChange(option.value)}
+          >
+            {option.label}
+            {option.value === currentSize && " ✓"}
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+function GraphCardGranularityMenu({
+  granularitySeconds,
+  onGranularityChange,
+}: {
+  granularitySeconds?: number;
+  onGranularityChange: (granularitySeconds: number) => void;
+}) {
+  const currentStep =
+    granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS;
+  return (
+    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+      <Menu.TriggerItem value="granularity">
+        <Clock /> Datapoints ({granularityLabel(currentStep)})
+      </Menu.TriggerItem>
+      <Menu.Content>
+        {LWQL_GRANULARITY_STEPS.map((step) => (
+          <Menu.Item
+            key={step}
+            value={String(step)}
+            onClick={() => onGranularityChange(step)}
+          >
+            {granularityLabel(step)}
+            {step === currentStep && " ✓"}
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 interface GraphCardMenuProps {
   graphId: string;
   projectId: string;
@@ -103,66 +269,27 @@ export function GraphCardMenu({
 }: GraphCardMenuProps) {
   const router = useRouter();
   const currentSize = getCurrentSize(colSpan, rowSpan);
-  const utils = api.useUtils();
 
-  // Resolved lazily (only when the item can actually be shown) — the same
-  // "every project has exactly one dashboard" lookup the playground page
-  // itself uses to pre-assign new widgets.
-  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
-    { projectId },
-    { enabled: showAddToDashboard && isPlaygroundWidget },
-  );
-  const assignDashboard = api.playgroundWidgets.assignDashboard.useMutation();
-  const alreadyOnDashboard =
-    !!dashboard.data && dashboardId === dashboard.data.id;
+  const { dashboard, assignDashboard, handleAddToDashboard } =
+    useAddToDashboard({
+      projectId,
+      graphId,
+      dashboardId,
+      enabled: showAddToDashboard && isPlaygroundWidget,
+    });
 
-  const handleAddToDashboard = () => {
-    if (!dashboard.data) return;
-    if (alreadyOnDashboard) {
-      toaster.create({
-        title: "Already on the dashboard",
-        type: "info",
-        duration: 3000,
-      });
-      return;
-    }
-    assignDashboard.mutate(
-      { projectId, id: graphId, dashboardId: dashboard.data.id },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: `Added to ${dashboard.data!.name}`,
-            type: "success",
-            duration: 3000,
-          });
-          void utils.playgroundWidgets.list.invalidate({ projectId });
-          void utils.graphs.getAll.invalidate();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Error adding to dashboard",
-            type: "error",
-            duration: 3000,
-          });
-        },
-      },
-    );
-  };
-
-  // A workbench chart is edited in the workbench that wrote it, and a
-  // playground widget in the playground that wrote it — neither the builder
-  // nor the other surface can read the other's payload shape.
-  //
-  // Neither surface opens through a deep-link parameter naming the card, so
-  // this lands on the surface rather than on the chart. Passing a parameter
-  // neither reads would be worse than not passing one: the member would
-  // arrive at an empty surface with a URL claiming otherwise. Opening the
-  // named chart/widget directly waits on either surface accepting an id.
-  const editUrl = isWorkbenchChart
-    ? `/${projectSlug}/analytics/query`
-    : isPlaygroundWidget
-      ? `/${projectSlug}/dev/custom-chart-playground`
-      : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
+  const editUrl = getEditUrl({
+    projectSlug,
+    graphId,
+    dashboardId,
+    isWorkbenchChart,
+    isPlaygroundWidget,
+  });
+  const editLabel = getEditLabel({
+    hasOnEdit: !!onEdit,
+    isWorkbenchChart,
+    isPlaygroundWidget,
+  });
 
   return (
     <Menu.Root>
@@ -182,58 +309,19 @@ export function GraphCardMenu({
             void router.push(editUrl);
           }}
         >
-          <Edit />{" "}
-          {onEdit
-            ? "Edit"
-            : isWorkbenchChart
-              ? "Open in workbench"
-              : isPlaygroundWidget
-                ? "Open in playground"
-                : "Edit Graph"}
+          <Edit /> {editLabel}
         </Menu.Item>
 
-        <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-          <Menu.TriggerItem value="size">
-            <Grid /> Size ({currentSize})
-          </Menu.TriggerItem>
-          <Menu.Content>
-            {sizeOptions.map((option) => (
-              <Menu.Item
-                key={option.value}
-                value={option.value}
-                onClick={() => onSizeChange(option.value)}
-              >
-                {option.label}
-                {option.value === currentSize && " ✓"}
-              </Menu.Item>
-            ))}
-          </Menu.Content>
-        </Menu.Root>
+        <GraphCardSizeMenu
+          currentSize={currentSize}
+          onSizeChange={onSizeChange}
+        />
 
         {isWorkbenchChart && onGranularityChange && (
-          <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-            <Menu.TriggerItem value="granularity">
-              <Clock /> Datapoints (
-              {granularityLabel(
-                granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
-              )}
-              )
-            </Menu.TriggerItem>
-            <Menu.Content>
-              {LWQL_GRANULARITY_STEPS.map((step) => (
-                <Menu.Item
-                  key={step}
-                  value={String(step)}
-                  onClick={() => onGranularityChange(step)}
-                >
-                  {granularityLabel(step)}
-                  {step ===
-                    (granularitySeconds ??
-                      LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS) && " ✓"}
-                </Menu.Item>
-              ))}
-            </Menu.Content>
-          </Menu.Root>
+          <GraphCardGranularityMenu
+            granularitySeconds={granularitySeconds}
+            onGranularityChange={onGranularityChange}
+          />
         )}
 
         {isPlaygroundWidget && showAddToDashboard && (
