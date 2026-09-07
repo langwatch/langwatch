@@ -5,6 +5,7 @@ import { env } from "~/env.mjs";
 import {
   BACKUP_CODE_COUNT,
   betterAuthInstance,
+  clearSignUpConfirmationPending,
   databaseHooks as composeDatabaseHooks,
   secondaryStorage as composeSecondaryStorage,
   deploymentIsFederationCapable,
@@ -134,6 +135,7 @@ export const auth = betterAuth({
     hashRounds: PASSWORD_HASH_ROUNDS,
     revokeAllSessions: ({ userId }) =>
       sessionRevocation().revokeAll({ userId }),
+    clearSignUpConfirmationPending,
     recordPasswordReset: ({ userId }) =>
       passwordResetSessionBridge().recordPasswordReset({ userId }),
   }),

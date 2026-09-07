@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SsoArrivalService } from "~/server/app-layer/identity/sso-arrival.service";
 import type { SignInConnection } from "~/server/app-layer/identity/sso-assertion.service";
+import { databaseHooks } from "../config/database-hooks";
 import {
   BetterAuthDatabaseHooks,
   type DatabaseHookUser,
@@ -629,6 +630,47 @@ describe("afterAccountCreate", () => {
 });
 
 describe("beforeSessionCreate", () => {
+  it("forwards the callback path through the composed database hook", async () => {
+    const { hooks, ssoMigration } = hooksOver({
+      user: userRow(),
+      authenticationDecision: {
+        action: "reject",
+        code: "SSO_LEGACY_AUTH_RETIRED",
+      },
+    });
+    const configured = databaseHooks({
+      hooks: () => hooks,
+      userErasure: () => ({ beforeUserDelete: vi.fn() }),
+      accountCeremonies: () => ({
+        beforeAccountCreate: vi.fn(),
+        beforeAccountDelete: vi.fn(),
+      }),
+      sessionClaims: () => ({
+        claimsForMint: vi.fn().mockResolvedValue({ identifierId: null, amr: [] }),
+      }),
+      providerAssertions: () => ({
+        recordVerifiedCallbackToken: vi.fn(),
+        recordAuthenticatedCallbackAccount: vi.fn(),
+      }),
+    });
+    const before = configured?.session?.create?.before;
+    if (before === undefined) {
+      throw new Error("session create hook is not configured");
+    }
+
+    await expect(
+      Reflect.apply(before, null, [
+        { userId: "user_1" },
+        { path: "/callback/auth0" },
+      ]),
+    ).rejects.toThrow("SSO_LEGACY_AUTH_RETIRED");
+    expect(
+      ssoMigration.authorizeAndRecordAuthentication,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/callback/auth0" }),
+    );
+  });
+
   describe("when sign-up confirmation is pending", () => {
     /** @scenario Client session flags cannot bypass address confirmation */
     it("blocks every session mint", async () => {

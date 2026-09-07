@@ -224,6 +224,7 @@ function sessionDatabaseHooks({
       before: async (session, context) => {
         const refusal = await hooks().beforeSessionCreate({
           session: { userId: session.userId },
+          path: hookPath(context),
         });
         if (refusal === false) return false;
 

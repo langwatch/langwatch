@@ -25,6 +25,7 @@ import {
 import { plaintextProviderConfigCipher } from "../../sso-provider-config-cipher";
 import type {
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
@@ -147,6 +148,8 @@ export interface IdentityStack {
    *  restates facts the store already holds and they are absorbed, so
    *  this is also the count of what a retry did NOT duplicate. */
   events: InMemoryIdentityEventStore;
+  /** Registers a connection, the way its setup journey would have. */
+  registerConnection: (args: { providerId: string; issuer: string }) => void;
 }
 
 /**
@@ -314,6 +317,19 @@ export function identityStack({
     ? inertIdentityPorts.resolution
     : storage;
 
+  const connectionIssuers: IdentityConnectionIssuersPort = {
+    providerIdForIssuer: async ({ issuer }) => {
+      const row = (db.ssoProvider ?? []).find((held) => held.issuer === issuer);
+      return typeof row?.providerId === "string" ? row.providerId : null;
+    },
+    registeredIssuerFor: async ({ providerId }) => {
+      const row = (db.ssoProvider ?? []).find(
+        (held) => held.providerId === providerId,
+      );
+      return typeof row?.issuer === "string" ? row.issuer : null;
+    },
+  };
+
   const bridge = bridgeAccountCeremonies({
     ceremonies,
     routesToIdentity: birthAwareGate(isUserOnIdentityWrites),
@@ -336,10 +352,12 @@ export function identityStack({
       },
       accounts,
       resolution,
+      connectionIssuers,
       ceremonies,
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
       birth,
+      providerConfig: plaintextProviderConfigCipher,
     }),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.
@@ -364,6 +382,10 @@ export function identityStack({
     migrationState,
     engine,
     events,
+    registerConnection: ({ providerId, issuer }) => {
+      db.ssoProvider ??= [];
+      db.ssoProvider.push({ id: providerId, providerId, issuer, domain: "" });
+    },
   };
 }
 
