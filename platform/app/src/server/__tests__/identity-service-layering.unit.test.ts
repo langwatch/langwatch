@@ -1,5 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import {
+  createScanner,
+  LanguageVariant,
+  SyntaxKind,
+} from "typescript/unstable/ast";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -74,70 +79,199 @@ const isRepositoryTier = (file: string) =>
 const QUERY =
   /\b(?:prisma|tx)\.(?:\$transaction|\$queryRaw|\$executeRaw|[a-z][A-Za-z]*\.(?:find|count|create|update|upsert|delete|aggregate|group))/;
 
+interface SourceRange {
+  start: number;
+  end: number;
+}
+
 const linesMatching = (
   source: string,
   pattern: RegExp,
-  ignoredLines = new Set<number>(),
-) =>
-  source
-    .split("\n")
-    .map((line, index) => ({ line, index }))
-    .filter(({ line, index }) => pattern.test(line) && !ignoredLines.has(index))
-    .map(({ line, index }) => `L${index + 1} ${line.trim()}`);
+  ignoredRanges: readonly SourceRange[] = [],
+) => {
+  const lineMatches: string[] = [];
+  let lineStart = 0;
+  const globalPattern = new RegExp(
+    pattern.source,
+    pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`,
+  );
+
+  for (const [index, line] of source.split("\n").entries()) {
+    const matches = [...line.matchAll(globalPattern)];
+    const hasUnignoredMatch = matches.some(({ index: matchIndex }) => {
+      const start = lineStart + (matchIndex ?? 0);
+      return !ignoredRanges.some(
+        (range) => start >= range.start && start < range.end,
+      );
+    });
+    if (hasUnignoredMatch) {
+      lineMatches.push(`L${index + 1} ${line.trim()}`);
+    }
+    lineStart += line.length + 1;
+  }
+  return lineMatches;
+};
 
 /**
  * A repository may expose a private constructor through its own static
  * factory. That is composition, not a satellite construction: the class owns
- * the factory and the factory constructs only that class. Keep this exception
- * structural and local rather than adding a file to the ratchet.
+ * the factory and the factory constructs only that class. Parse the syntax so
+ * comments, strings and another construction on the same line cannot widen
+ * this exception.
  */
-function ownStaticFactoryLines(source: string): Set<number> {
-  const lines = source.split("\n");
-  const ignored = new Set<number>();
-  const braceDelta = (line: string): number =>
-    [...line.matchAll(/[{}]/g)].reduce(
-      (delta, match) => delta + (match[0] === "{" ? 1 : -1),
-      0,
-    );
+function ownStaticFactoryRanges(source: string): SourceRange[] {
+  interface SyntaxToken {
+    kind: SyntaxKind;
+    text: string;
+    start: number;
+    end: number;
+  }
 
-  for (let classLine = 0; classLine < lines.length; classLine++) {
-    const className = lines[classLine]?.match(/\bclass\s+([A-Z]\w*)\b/)?.[1];
-    if (!className) {
+  const scanner = createScanner(
+    true,
+    LanguageVariant.Standard,
+    source,
+    0,
+    source.length,
+  );
+  const tokens: SyntaxToken[] = [];
+  let previousEnd = 0;
+  for (;;) {
+    const kind = scanner.scan();
+    const start = scanner.getTokenStart();
+    const end = scanner.getTokenEnd();
+    if (end <= previousEnd) {
+      if (previousEnd >= source.length) break;
+      scanner.resetTokenState(Math.min(source.length, previousEnd + 1));
       continue;
     }
+    previousEnd = end;
+    if (kind === SyntaxKind.EndOfFile) break;
+    tokens.push({
+      kind,
+      text: scanner.getTokenText(),
+      start,
+      end,
+    });
+  }
 
+  const matchingToken = (
+    openIndex: number,
+    openKind: SyntaxKind,
+    closeKind: SyntaxKind,
+  ): number => {
     let depth = 0;
-    let factoryDepth: number | undefined;
-    let factoryPending = false;
-    for (let lineIndex = classLine; lineIndex < lines.length; lineIndex++) {
-      const line = lines[lineIndex] ?? "";
-      const before = depth;
-      const delta = braceDelta(line);
+    for (let index = openIndex; index < tokens.length; index += 1) {
+      const kind = tokens[index]?.kind;
+      if (kind === openKind) depth += 1;
+      if (kind === closeKind) {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+    return -1;
+  };
 
-      if (/\bstatic\s+create\s*\(/.test(line)) {
-        factoryPending = true;
-      }
-      if (factoryPending && factoryDepth === undefined && delta > 0) {
-        factoryDepth = before + delta;
-        factoryPending = false;
-      }
-      if (
-        factoryDepth !== undefined &&
-        new RegExp(`\\bnew\\s+${className}\\s*\\(`).test(line)
-      ) {
-        ignored.add(lineIndex);
-      }
+  const findNext = (
+    start: number,
+    end: number,
+    kind: SyntaxKind,
+  ): number => {
+    for (let index = start; index < end; index += 1) {
+      if (tokens[index]?.kind === kind) return index;
+    }
+    return -1;
+  };
 
-      depth += delta;
-      if (factoryDepth !== undefined && depth < factoryDepth) {
-        factoryDepth = undefined;
+  const ranges: SourceRange[] = [];
+
+  for (let classIndex = 0; classIndex < tokens.length; classIndex += 1) {
+    if (tokens[classIndex]?.kind !== SyntaxKind.ClassKeyword) continue;
+    const classNameToken = tokens[classIndex + 1];
+    if (classNameToken?.kind !== SyntaxKind.Identifier) continue;
+
+    const classOpen = findNext(
+      classIndex + 2,
+      tokens.length,
+      SyntaxKind.OpenBraceToken,
+    );
+    if (classOpen < 0) continue;
+    const classClose = matchingToken(
+      classOpen,
+      SyntaxKind.OpenBraceToken,
+      SyntaxKind.CloseBraceToken,
+    );
+    if (classClose < 0) continue;
+
+    let memberDepth = 0;
+    let hasPrivateConstructor = false;
+    const factoryBodies: Array<{ start: number; end: number }> = [];
+    for (let index = classOpen + 1; index < classClose; index += 1) {
+      const token = tokens[index];
+      if (memberDepth === 0) {
+        if (
+          token?.kind === SyntaxKind.PrivateKeyword &&
+          tokens[index + 1]?.kind === SyntaxKind.ConstructorKeyword
+        ) {
+          hasPrivateConstructor = true;
+        }
+        if (
+          token?.kind === SyntaxKind.StaticKeyword &&
+          tokens[index + 1]?.text === "create"
+        ) {
+          const bodyOpen = findNext(
+            index + 2,
+            classClose,
+            SyntaxKind.OpenBraceToken,
+          );
+          if (bodyOpen >= 0) {
+            const bodyClose = matchingToken(
+              bodyOpen,
+              SyntaxKind.OpenBraceToken,
+              SyntaxKind.CloseBraceToken,
+            );
+            if (bodyClose >= 0 && bodyClose <= classClose) {
+              factoryBodies.push({ start: bodyOpen, end: bodyClose });
+              index = bodyClose;
+              continue;
+            }
+          }
+        }
       }
-      if (lineIndex > classLine && depth <= 0) {
-        break;
+      if (token?.kind === SyntaxKind.OpenBraceToken) memberDepth += 1;
+      if (token?.kind === SyntaxKind.CloseBraceToken) memberDepth -= 1;
+    }
+
+    if (!hasPrivateConstructor) continue;
+    for (const body of factoryBodies) {
+      for (let index = body.start + 1; index < body.end; index += 1) {
+        const token = tokens[index];
+        if (
+          token?.kind !== SyntaxKind.NewKeyword ||
+          tokens[index + 1]?.kind !== SyntaxKind.Identifier ||
+          tokens[index + 1]?.text !== classNameToken.text
+        ) {
+          continue;
+        }
+        const openParen = index + 2;
+        const closeParen =
+          tokens[openParen]?.kind === SyntaxKind.OpenParenToken
+            ? matchingToken(
+                openParen,
+                SyntaxKind.OpenParenToken,
+                SyntaxKind.CloseParenToken,
+              )
+            : -1;
+        ranges.push({
+          start: token.start,
+          end:
+            tokens[closeParen >= 0 ? closeParen : index + 1]?.end ?? token.end,
+        });
       }
     }
   }
-  return ignored;
+
+  return ranges;
 }
 
 /** `{ file: [why, why] }` for every file with at least one finding. */
@@ -265,9 +399,56 @@ describe("identity service layering", () => {
       const offenders = offendersOf(files, (file, source) =>
         file === RUNTIME
           ? []
-          : linesMatching(source, CONSTRUCTION, ownStaticFactoryLines(source)),
+          : linesMatching(source, CONSTRUCTION, ownStaticFactoryRanges(source)),
       );
       expect(ratchet(offenders, [])).toEqual(CLEAN);
+    });
+
+    it("only exempts an own private static factory construction", () => {
+      const CONSTRUCTION = /\bnew\s+(?:\w+Service)\(/;
+      const fixtures = [
+        {
+          name: "own private static factory",
+          source:
+            "class FixtureService { private constructor() {} static create() { return new FixtureService(); } }",
+          expected: 0,
+        },
+        {
+          name: "outside the factory",
+          source:
+            "class FixtureService { private constructor() {} static create() { return new FixtureService(); } method() { return new FixtureService(); } }",
+          expected: 1,
+        },
+        {
+          name: "another class in the factory",
+          source:
+            "class FixtureService { private constructor() {} static create() { return new OtherService(); } }",
+          expected: 1,
+        },
+        {
+          name: "a non-private constructor",
+          source:
+            "class FixtureService { constructor() {} static create() { return new FixtureService(); } }",
+          expected: 1,
+        },
+        {
+          name: "another construction on the same line",
+          source:
+            "class FixtureService { private constructor() {} static create() { return new FixtureService(), new OtherService(); } }",
+          expected: 1,
+        },
+      ];
+
+      for (const fixture of fixtures) {
+        expect(
+          linesMatching(
+            fixture.source,
+            CONSTRUCTION,
+            ownStaticFactoryRanges(fixture.source),
+          ),
+          fixture.name,
+        ).toHaveLength(fixture.expected);
+      }
     });
 
     /** @scenario "The identity services are composed in one file" */
