@@ -228,6 +228,21 @@ Feature: Langy works in a folder shared from the developer's machine
       And each takes the same parameters as the built-in it mirrors
       And each says in its description that it runs on the developer's machine
 
+    # A model offered both sets picks the sandbox one often enough: in one
+    # run it read the folder through local_read and then edited with the
+    # sandbox edit, got ENOENT twice, read that as the share being broken and
+    # stopped the whole path before the branch. While a folder is connected
+    # the sandbox file tools are not a wrong choice because they are not
+    # offered; bash stays for the langwatch CLI.
+    @unit
+    Scenario: The sandbox file tools are withdrawn while a folder is connected
+      Given a folder is connected to the conversation
+      When a turn starts
+      Then the worker's tool set has no sandbox read, edit, write, grep, find or ls
+      And it keeps bash, the local tools and every other tool
+      And a turn that starts with no folder connected has the sandbox file tools back
+      And a turn that starts while the app cannot say keeps them
+
     @integration
     Scenario: A local call travels to the CLI and its result comes back
       Given a connected folder

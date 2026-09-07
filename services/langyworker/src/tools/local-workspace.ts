@@ -30,6 +30,43 @@ export const LOCAL_TOOL_NAMES = [
 ] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 
+/**
+ * pi's own file tools, the ones that read and write the worker's sandbox.
+ *
+ * While the developer's folder is connected these are withdrawn from the
+ * turn's tool set: the folder is the one place the user's project exists, and
+ * a model offered both sets picks the sandbox one often enough. A sandbox
+ * `edit` on a file it had just read through `local_read` answers ENOENT, and
+ * a model reads that as the share being broken and stops the whole path.
+ * `bash` stays: it runs the `langwatch` CLI.
+ */
+export const SANDBOX_FILE_TOOL_NAMES = [
+  "read",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+] as const;
+
+/**
+ * The turn's tool set, given the folder's state: the sandbox file tools are
+ * out while a folder is connected and back when none is. Every other tool,
+ * `bash` and the `local_*` mirrors included, is kept as it stands.
+ */
+export function activeToolsFor({
+  connected,
+  active,
+}: {
+  connected: boolean;
+  active: readonly string[];
+}): string[] {
+  const sandbox = new Set<string>(SANDBOX_FILE_TOOL_NAMES);
+  if (connected) return active.filter((name) => !sandbox.has(name));
+  const present = new Set(active);
+  return [...active, ...SANDBOX_FILE_TOOL_NAMES.filter((name) => !present.has(name))];
+}
+
 /** How long one long poll may take. The app holds each poll up to 20 s. */
 const POLL_REQUEST_TIMEOUT_MS = 40_000;
 
@@ -653,6 +690,16 @@ export function createLocalWorkspaceExtension({
   return {
     name: "langy-local-workspace",
     factory: (pi: ExtensionAPI) => {
+      // The folder's state is read at the start of every turn, and the turn's
+      // tool set follows it. A turn that starts because the folder connected
+      // is a new prompt, so it already runs without the sandbox file tools;
+      // a folder that goes away mid-turn is answered by the local tools' own
+      // pushback until the next turn puts the sandbox tools back.
+      pi.on("before_agent_start", async () => {
+        const connected = await isWorkspaceConnected({});
+        pi.setActiveTools(activeToolsFor({ connected, active: pi.getActiveTools() }));
+      });
+
       pi.registerTool({
         name: CODE_ACCESS_TOOL_NAME,
         label: "Code access",

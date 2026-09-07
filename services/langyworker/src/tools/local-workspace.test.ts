@@ -5,6 +5,8 @@ import {
   LOCAL_TOOL_NAMES,
   CALL_LOST_PUSHBACK,
   OFFLINE_PUSHBACK,
+  SANDBOX_FILE_TOOL_NAMES,
+  activeToolsFor,
   createLocalWorkspaceExtension,
   readCodeAccess,
 } from "./local-workspace.js";
@@ -87,6 +89,107 @@ process.env.LANGY_CONVERSATION_ID = "langyconv_1";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+/** A fake pi that records the turn-start handler and holds the active tool set. */
+function piWithActiveTools(active: string[]) {
+  let onTurnStart: (() => Promise<void>) | undefined;
+  const pi = {
+    registerTool: () => undefined,
+    on: (event: string, handler: () => Promise<void>) => {
+      if (event === "before_agent_start") onTurnStart = handler;
+    },
+    getActiveTools: () => [...active],
+    setActiveTools: (names: string[]) => {
+      active.splice(0, active.length, ...names);
+    },
+  };
+  const extension = createLocalWorkspaceExtension({ turnContext: turnInFlight() }) as {
+    factory: (pi: ExtensionAPI) => void;
+  };
+  extension.factory(pi as unknown as ExtensionAPI);
+  if (!onTurnStart) throw new Error("the extension did not register a turn-start handler");
+  return { active, startTurn: onTurnStart };
+}
+
+const EVERY_TOOL = [
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+  "todowrite",
+  "question",
+  "say",
+  CODE_ACCESS_TOOL_NAME,
+  ...LOCAL_TOOL_NAMES,
+];
+
+describe("the sandbox file tools while a folder is connected", () => {
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("withdraws read, edit, write, grep, find and ls at the start of a turn, and keeps bash and the local tools", async () => {
+    fakeApp({
+      "/api/langy/local/workspace": [
+        { connected: true, workspace: { root: "/home/dev/acme", name: "acme" } },
+      ],
+    });
+    const { active, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+
+    await startTurn();
+
+    for (const name of SANDBOX_FILE_TOOL_NAMES) expect(active).not.toContain(name);
+    expect(active).toContain("bash");
+    for (const name of LOCAL_TOOL_NAMES) expect(active).toContain(name);
+    expect(active).toContain("question");
+    expect(active).toContain(CODE_ACCESS_TOOL_NAME);
+  });
+
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("puts them back at the start of a turn once no folder is connected", async () => {
+    fakeApp({ "/api/langy/local/workspace": [{ connected: false }] });
+    const { active, startTurn } = piWithActiveTools(
+      EVERY_TOOL.filter((name) => !(SANDBOX_FILE_TOOL_NAMES as readonly string[]).includes(name)),
+    );
+
+    await startTurn();
+
+    for (const name of SANDBOX_FILE_TOOL_NAMES) expect(active).toContain(name);
+    expect(new Set(active)).toEqual(new Set(EVERY_TOOL));
+  });
+
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("keeps the sandbox tools when the app cannot say whether a folder is connected", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("connection refused");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { active, startTurn } = piWithActiveTools([...EVERY_TOOL]);
+
+    await startTurn();
+
+    expect(new Set(active)).toEqual(new Set(EVERY_TOOL));
+  });
+
+  /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
+  it("changes only the sandbox file tools, whatever else the set holds", () => {
+    expect(activeToolsFor({ connected: true, active: ["read", "bash", "local_read", "skill"] })).toEqual([
+      "bash",
+      "local_read",
+      "skill",
+    ]);
+    expect(activeToolsFor({ connected: false, active: ["bash", "local_read", "ls"] })).toEqual([
+      "bash",
+      "local_read",
+      "ls",
+      "read",
+      "edit",
+      "write",
+      "grep",
+      "find",
+    ]);
+  });
 });
 
 describe("the local workspace tools", () => {
