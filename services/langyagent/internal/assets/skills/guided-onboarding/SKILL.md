@@ -242,7 +242,15 @@ export OPENAI_API_KEY="{{secret}}"
 
 When the brief says no gateway is configured, skip the snippet and say in one line that the gateway is not set up on this instance yet.
 
-Then go to "Close the path".
+Then say, verbatim, as the last line:
+
+That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
+
+Then, in the same step, close the path and stop:
+
+```bash
+langwatch onboarding complete-path gateway
+```
 
 ### No reveal id in hand: ask first
 
@@ -259,11 +267,7 @@ On "Create a new key": mint one with `--reveal-once` as above, using the next fr
 
 On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet. Say that the app needs two environment variables: `OPENAI_BASE_URL` set to the gateway address (write the address itself, from the brief), and `OPENAI_API_KEY` set to the production-app key they saved. Write the address in full and the key line in words; never put a value in angle brackets or a stand-in where the key goes.
 
-Then go to "Close the path".
-
-### Close the path
-
-Say, verbatim, as the last line:
+Either way, say, verbatim, as the last line:
 
 That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.
 

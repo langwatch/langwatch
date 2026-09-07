@@ -112,6 +112,17 @@ Feature: Langy guides the first setup after sign-up
       And the list, the question and the create all come after case one
       And no section title reads as "the key exists" alone
 
+    # The endings pointed at a shared "Close the path" subsection, and on the
+    # mint path the jump was dropped: the card was shown, complete-path ran,
+    # and the closing line was never said. A line in front of the model is
+    # followed; a pointer is not, so each ending carries the close itself.
+    @unit
+    Scenario: Every gateway ending says the closing line after the card, inline
+      When the compiled guided-onboarding skill is read
+      Then the gateway section has no shared close subsection to jump to
+      And the ending that shows the card says the closing line right after it, then runs complete-path
+      And the ending that asked first says the closing line after either answer, then runs complete-path
+
     # A snippet with a placeholder where the key goes is one the person cannot
     # paste, and a value in angle brackets reads as the key itself to someone
     # skimming. When the key exists but its secret cannot be shown again, the

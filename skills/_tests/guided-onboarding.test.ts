@@ -172,6 +172,38 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).not.toContain("When the key exists but the brief carries no reveal id");
     });
 
+    /** @scenario "Every gateway ending says the closing line after the card, inline" */
+    it("ends each gateway ending on the closing line and complete-path, written inline after the card", () => {
+      const section = rendered.slice(
+        rendered.indexOf("## gateway: Gateway"),
+        rendered.indexOf("## governance: Governance"),
+      );
+      const closer = VERBATIM_LINES["the gateway closer"];
+      const closeCommand = "langwatch onboarding complete-path gateway";
+      expect(section).not.toContain("Close the path");
+      expect(section.split(closer).length - 1).toBe(2);
+      expect(section.split(closeCommand).length - 1).toBe(2);
+
+      const showTheKey = section.slice(
+        section.indexOf("### Show the key"),
+        section.indexOf("### No reveal id in hand: ask first"),
+      );
+      const card = showTheKey.indexOf("call `secret_snippet`");
+      const showCloser = showTheKey.indexOf(closer);
+      expect(card).toBeGreaterThan(-1);
+      expect(showCloser).toBeGreaterThan(card);
+      expect(showTheKey.indexOf(closeCommand)).toBeGreaterThan(showCloser);
+
+      const askFirst = section.slice(section.indexOf("### No reveal id in hand: ask first"));
+      const askCard = askFirst.indexOf("show the snippet through the `secret_snippet` card");
+      const saved = askFirst.indexOf('On "I saved it"');
+      const askCloser = askFirst.indexOf(closer);
+      expect(askCard).toBeGreaterThan(-1);
+      expect(askCloser).toBeGreaterThan(askCard);
+      expect(askCloser).toBeGreaterThan(saved);
+      expect(askFirst.indexOf(closeCommand)).toBeGreaterThan(askCloser);
+    });
+
     /** @scenario "A key that exists with no reveal gets a question, never a placeholder" */
     it("asks when the brief carries no reveal id and the key exists, and never writes a placeholder", () => {
       expect(rendered).toContain(
