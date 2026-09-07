@@ -1,6 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "../../../data-retention/retentionPolicy.schema";
+import {
+  INDEFINITE_RETENTION_DAYS,
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+} from "../../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
 import { createTenantId } from "../../domain/tenantId";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
@@ -20,6 +23,23 @@ describe("EventStoreClickHouse retention stamping", () => {
   const tenantId = createTenantId("project_abc");
   const aggregateId = "trace_123";
   const aggregateType = "trace" as const;
+
+  const authEventCases = [
+    ["identity", "user_identity", "lw.identity.identifier_attached"],
+    ["MFA", "user_identity", "lw.identity.mfa_enrolled"],
+    ["SSO", "sso_connection", "lw.identity.connection_registered"],
+    ["join request", "join_request", "lw.identity.join_requested"],
+    ["SCIM", "scim_sync", "lw.identity.scim_token_issued"],
+    ["authorization", "authz_grant", "lw.authz.grant.attached"],
+    ["authorization role", "authz_role", "lw.authz.role.defined"],
+  ] as const;
+
+  const categoryEventCases = [
+    ["simulation run", "simulation_run", "lw.simulation_run.started", 63],
+    ["simulation set", "simulation_set", "lw.simulation_set.archived", 63],
+    ["suite run", "suite_run", "lw.suite_run.started", 63],
+    ["experiment run", "experiment_run", "lw.experiment_run.started", 91],
+  ] as const;
 
   let mockClient: ClickHouseClient;
   let insertSpy: ReturnType<typeof vi.fn>;
@@ -43,6 +63,71 @@ describe("EventStoreClickHouse retention stamping", () => {
     version: "2026-01-01",
     data: { foo: "bar" },
   });
+
+  describe.each(authEventCases)(
+    "when storing a %s auth event",
+    (_name, authAggregateType, authEventType) => {
+      it("stamps indefinite retention without consulting tenant policy", async () => {
+        const resolver: RetentionPolicyResolver = {
+          resolve: vi.fn().mockResolvedValue({
+            traces: 30,
+            scenarios: null,
+            experiments: null,
+          }),
+        };
+        const store = new EventStoreClickHouse(
+          new EventRepositoryClickHouse(async () => mockClient),
+          resolver,
+        );
+        const event = {
+          ...makeEvent(),
+          aggregateId: "auth_123",
+          aggregateType: authAggregateType,
+          type: authEventType,
+        };
+
+        await store.storeEvents([event], { tenantId }, authAggregateType);
+
+        expect(resolver.resolve).not.toHaveBeenCalled();
+        const values = insertSpy.mock.calls[0]![0]!.values as Array<{
+          _retention_days: number;
+        }>;
+        expect(values[0]!._retention_days).toBe(INDEFINITE_RETENTION_DAYS);
+      });
+    },
+  );
+
+  describe.each(categoryEventCases)(
+    "when storing a %s event",
+    (_name, eventAggregateType, eventType, expectedRetentionDays) => {
+      it("stamps retention from the aggregate's category", async () => {
+        const resolver: RetentionPolicyResolver = {
+          resolve: vi.fn().mockResolvedValue({
+            traces: 49,
+            scenarios: 63,
+            experiments: 91,
+          }),
+        };
+        const store = new EventStoreClickHouse(
+          new EventRepositoryClickHouse(async () => mockClient),
+          resolver,
+        );
+        const event = {
+          ...makeEvent(),
+          aggregateId: "workload_123",
+          aggregateType: eventAggregateType,
+          type: eventType,
+        };
+
+        await store.storeEvents([event], { tenantId }, eventAggregateType);
+
+        const values = insertSpy.mock.calls[0]![0]!.values as Array<{
+          _retention_days: number;
+        }>;
+        expect(values[0]!._retention_days).toBe(expectedRetentionDays);
+      });
+    },
+  );
 
   describe("when retention resolver returns a policy with traces=30", () => {
     it("stamps every event_log record with _retention_days = 30", async () => {
@@ -77,9 +162,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   describe("when no resolver is wired (e.g. tests)", () => {
     it("falls back to the platform default", async () => {
-      const store = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(async () => mockClient),
-      );
+      const store = new EventStoreClickHouse(new EventRepositoryClickHouse(async () => mockClient));
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
