@@ -42,6 +42,13 @@ describe("given the tracing skill", () => {
         "check that the key is visible to it the way the project reads it",
       );
       expect(rendered).toContain("print only whether `LANGWATCH_API_KEY` is set, never its value");
+      expect(rendered).toContain(
+        `python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`,
+      );
+      expect(rendered).toContain(
+        `node -e "require('dotenv').config(); console.log(Boolean(process.env.LANGWATCH_API_KEY))"`,
+      );
+      expect(rendered).toContain("never retry the check with another path");
     });
   });
 

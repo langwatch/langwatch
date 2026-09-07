@@ -160,7 +160,7 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "say in one line of your own words that the tracing and the connect call are on branch `langy/<slug>` for them to review",
       );
-      expect(rendered).toContain("The commit exists since step 2; commit again only when a file changed since.");
+      expect(rendered).toContain("the commit exists since step 2, so commit again only when a file changed since");
     });
 
     /** @scenario "The first scenario is the golden path" */
@@ -180,7 +180,7 @@ describe("the guided-onboarding skill", () => {
       expect(line).toBeGreaterThan(-1);
       expect(run).toBeGreaterThan(line);
       expect(rendered).toContain(
-        "call the run in the same step you say the line in, and never end the turn on the line",
+        "Never end the turn on the running line: a turn that ends there ran nothing.",
       );
     });
 
@@ -194,7 +194,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The credentials are written after the tracing edit" */
     it("has the command line write the credentials after the tracing edit", () => {
       const tracing = rendered.indexOf("`tracing` for the detected framework");
-      const credentials = rendered.indexOf("call `local_langwatch_env` once");
+      const credentials = rendered.indexOf("Call `local_langwatch_env` once");
       const start = rendered.indexOf("Start the agent from that branch");
       expect(tracing).toBeGreaterThan(-1);
       expect(credentials).toBeGreaterThan(tracing);
@@ -215,11 +215,60 @@ describe("the guided-onboarding skill", () => {
       );
     });
 
+    /** @scenario "The path is a checklist Langy keeps" */
+    it("writes the end of the path into the plan tool as a fixed checklist and never ends a turn with an open item", () => {
+      const items = [
+        "1. Create the first scenario",
+        "2. Open it beside the panel",
+        "3. Why a scenario, and run it",
+        "4. The two-things line",
+        "5. The remaining scenarios",
+        "6. The suite",
+        "7. Run the suite",
+        "8. Open the suite run",
+        "9. Commit, when a file changed",
+        "10. Push and pull request, or the no-remote line",
+        "11. The closing line and complete-path",
+      ];
+      const positions = items.map((item) => rendered.indexOf(item));
+      for (const [index, position] of positions.entries()) {
+        expect(position, items[index]).toBeGreaterThan(index === 0 ? -1 : positions[index - 1]!);
+      }
+      expect(rendered).toContain("before any command, write this list into `todowrite`, in this order and these words, every item pending");
+      expect(rendered).toContain("**a turn never ends with an open item**, unless a command answered an error");
+      expect(rendered).toContain("Mark each item done as you finish it, and read the list before you end a turn");
+    });
+
+    /** @scenario "A folder with no remote still completes the path" */
+    it("treats a missing remote or gh login as the pull request item done, not as a failed step", () => {
+      expect(rendered).toContain(
+        "A missing remote, a missing `gh` login and a failed verdict are not errors: the item is done with its line, and the next one starts.",
+      );
+      expect(rendered).toContain(
+        "No remote, or no `gh` login: say in one line that branch `langy/<slug>` holds the commit and no pull request was opened, and item 10 is done.",
+      );
+      const noRemote = rendered.indexOf("No remote, or no `gh` login:");
+      const closing = rendered.indexOf(VERBATIM_LINES["the closing line"]);
+      expect(closing).toBeGreaterThan(noRemote);
+    });
+
+    /** @scenario "Chat about this ends the turn on the line alone" */
+    it("answers Chat about this with the line alone and ends the turn", () => {
+      expect(rendered).toContain(
+        "the reply is this line alone, verbatim, and the turn ends on it so the composer takes the cursor. Nothing before it, nothing after it, no tool call:",
+      );
+    });
+
+    /** @scenario "The connect endpoint comes from the connect-agent skill" */
+    it("never searches the docs for a connect-agent page and reads one framework page only", () => {
+      expect(rendered).toContain(
+        "The skill carries the whole pattern and there is no docs page for it: never search `langwatch docs` for one.",
+      );
+      expect(rendered).toContain("and no other. Keep the order the tracing skill pins");
+    });
+
     /** @scenario "The path ends in a fixed order" */
     it("states the end of the path as one fixed order", () => {
-      expect(rendered).toContain(
-        "create the scenario, open it, the why-a-scenario line, run it, the two-things line, the suite with its scenarios, the suite run, open the run, the push and the pull request, the closing line, and `complete-path` last",
-      );
       const order = [
         'langwatch scenario create "<title>"',
         "langwatch navigate open <scenario_id>",
@@ -242,13 +291,13 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A failed first run still gets the two-things line" */
     it("says the two-things line after a failed verdict, and only an error skips it", () => {
       expect(rendered).toContain(
-        "A run that answers a verdict, passed or failed, gets the two-things line.",
+        "a run that answers a verdict, passed or failed, gets the two-things line.",
       );
       expect(rendered).toContain(
         "**If the run failed**, the explanation comes first: say in plain words what the judge saw and why the agent did not meet the criteria, and point at the run so they can replay the conversation.",
       );
       expect(rendered).toContain(
-        "the run still proved what the line says: the agent answered, and the traces flowed.",
+        "the agent answered and the traces flowed, which is what the line says.",
       );
       expect(rendered).not.toContain("**If the run passed**");
       const explanation = rendered.indexOf("**If the run failed**");
@@ -298,11 +347,12 @@ describe("the guided-onboarding skill", () => {
         "`langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file",
       );
       const check = rendered.indexOf(
-        "run the tracing skill's check that the key is visible to the process the way the project reads it",
+        "Run the tracing skill's key check once, with its one-liner for the language",
       );
       const start = rendered.indexOf("Start the agent from that branch");
       expect(check).toBeGreaterThan(-1);
       expect(start).toBeGreaterThan(check);
+      expect(rendered).toContain("One run: never a second try with another path or another loader.");
     });
 
     /** @scenario "The instrumentation that cannot be applied stops the path" */

@@ -384,6 +384,41 @@ Feature: Langy guides the first setup after sign-up
       Then the run command is called in the same step as the running line
       And the turn never ends on the running line
 
+    # Every film so far dropped a different step of the back half: the run,
+    # the suite, the closing line. The order is a list the model keeps in its
+    # plan tool and reads before it ends a turn, not a sentence it remembers.
+    @unit
+    Scenario: The path is a checklist Langy keeps
+      When the compiled guided-onboarding skill is read
+      Then on "Sure, go ahead!" the fixed order goes into the plan tool as eleven pending items, before any command
+      And each item is marked done as it finishes
+      And a turn never ends with an open item unless a command answered an error
+
+    # A film said the no-pull-request line and ended the turn there: no closing
+    # line, no complete-path. A missing remote is an item done, not a failure.
+    @unit
+    Scenario: A folder with no remote still completes the path
+      When the compiled guided-onboarding skill is read
+      Then a missing remote or gh login is one line saying the branch holds the commit and no pull request was opened
+      And the pull request item is done with that line and the closing line and complete-path follow
+
+    # A film said the chat line and added a sentence about the tracing edit in
+    # the same turn, so the person's cursor never got the composer.
+    @unit
+    Scenario: Chat about this ends the turn on the line alone
+      When the compiled guided-onboarding skill is read
+      Then the reply to "Chat about this" is the chat line alone, nothing before or after it, no tool call
+      And the turn ends on it
+
+    # A film ran seven docs lookups hunting for a connect-agent page that does
+    # not exist, and the key check twice with two loaders.
+    @unit
+    Scenario: The connect endpoint comes from the connect-agent skill
+      When the compiled guided-onboarding skill is read
+      Then the connect call is written from the connect-agent skill and never searched for in the docs
+      And the tracing step reads one framework docs page and no other
+      And the key check runs once, with the tracing skill's one-liner for the language
+
     @unit
     Scenario: The path ends in a fixed order
       When the compiled guided-onboarding skill is read
