@@ -1,8 +1,8 @@
 import {
   type AccountSignInMethods,
+  type IdentityCommand,
   type IdentityFact,
   type IdentityFactInput,
-  type IdentityCommand,
   type IdentityHeads,
   reduceIdentity,
 } from "@langwatch/identity";
@@ -14,24 +14,26 @@ import {
   SignInRouterService,
   type IdentityHeadsRepository,
   type IdentityLedger,
+  type IdentityReservationRepository,
   type IdentityUsersRepository,
   type LinkProposalReadsRepository,
   type LinkProposalRecord,
-  type IdentityReservationRepository,
 } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
-import type {
-  IdentityHistoryReadsRepository,
-} from "../repositories/identity-event-log.repository";
+import { IdentityLookupService } from "../identity-lookup.service";
+import type { IdentityHistoryReadsRepository } from "../repositories/identity-event-log.repository";
 import type {
   IdentityLookupReadsRepository,
   LookupIdentifierRow,
 } from "../repositories/identity-lookup.prisma.repository";
-import { IdentityLookupService } from "../identity-lookup.service";
 
 const USER_ID = "user_sam";
 const OPERATOR_ID = "user_olive";
 const NOW = 1_700_000_000_000;
+
+function occurred(fact: IdentityFactInput, occurredAt: number): IdentityFact {
+  return { ...fact, occurredAt };
+}
 
 class Heads implements IdentityHeadsRepository {
   constructor(
@@ -68,15 +70,10 @@ class Heads implements IdentityHeadsRepository {
 
   fold(facts: readonly IdentityFactInput[], occurredAt: number): void {
     this.current = facts.reduce(
-      (heads, fact, index) =>
+      (heads, fact) =>
         reduceIdentity({
           heads,
-          fact: {
-            ...fact,
-            id: `fact_${index}`,
-            aggregateId: heads.userId,
-            occurredAt,
-          } as IdentityFact,
+          fact: occurred(fact, occurredAt),
         }),
       this.current,
     );
@@ -126,15 +123,7 @@ function ledgerThatRecords(
     commit: async ({ command, facts }) => {
       committed.push({ command, facts });
       afterCommit?.(facts, command.data.occurredAtMs);
-      return facts.map(
-        (fact, index) =>
-          ({
-            ...fact,
-            id: `fact_${index}`,
-            aggregateId: command.data.userId,
-            occurredAt: command.data.occurredAtMs,
-          }) as IdentityFact,
-      );
+      return facts.map((fact) => occurred(fact, command.data.occurredAtMs));
     },
   };
   return ledger;
@@ -151,26 +140,26 @@ function identityServiceFor(
   projected?: { current: IdentityHeads },
   account?: AccountState,
 ) {
-  const heads = new Heads(
-    { userId: USER_ID, identifiers },
-    projected,
-  );
-  const guards = new IdentityGuards(
-    heads,
-    new Users(),
-    new Reservations(),
-  );
+  const heads = new Heads({ userId: USER_ID, identifiers }, projected);
+  const guards = new IdentityGuards(heads, new Users(), new Reservations());
   return new IdentityService(
     guards,
     ledgerThatRecords(committed, (facts, occurredAt) => {
       heads.fold(facts, occurredAt);
       if (!account) return;
-      const active = Object.values(projected?.current.identifiers ?? identifiers).filter(
-        (identifier) => identifier.state === "VERIFIED" || identifier.state === "PRIMARY",
+      const active = Object.values(
+        projected?.current.identifiers ?? identifiers,
+      ).filter(
+        (identifier) =>
+          identifier.state === "VERIFIED" || identifier.state === "PRIMARY",
       );
       account.current = {
-        hasPassword: active.some((identifier) => identifier.provider === "email"),
-        hasPasskey: active.some((identifier) => identifier.provider === "passkey"),
+        hasPassword: active.some(
+          (identifier) => identifier.provider === "email",
+        ),
+        hasPasskey: active.some(
+          (identifier) => identifier.provider === "passkey",
+        ),
         providerIds: active.flatMap((identifier) =>
           identifier.provider === "email" || identifier.provider === "passkey"
             ? []
@@ -189,10 +178,12 @@ function identityServiceFor(
         allIdentifiers.flatMap((identifier) =>
           identifier.value === null
             ? []
-            : [[
-                identifier.value,
-                active.includes(identifier) ? methods : null,
-              ] as const],
+            : [
+                [
+                  identifier.value,
+                  active.includes(identifier) ? methods : null,
+                ] as const,
+              ],
         ),
       );
     }),
@@ -262,9 +253,7 @@ interface AccountState {
   byAddress?: Map<string, AccountSignInMethods | null>;
 }
 
-function router(
-  account: AccountState = { current: null },
-) {
+function router(account: AccountState = { current: null }) {
   return new SignInRouterService({
     domains: {
       findConnectionForDomain: async () => null,
@@ -365,8 +354,14 @@ describe("platform operator identity lookup service", () => {
         router: () => router(account),
         identity: () => identityServiceFor({}, committed),
         links: () => linksFor(proposal(), committed, linked, account),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -418,12 +413,21 @@ describe("platform operator identity lookup service", () => {
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => pending, findProposals: async () => [pending] },
+        proposals: {
+          findProposal: async () => pending,
+          findProposals: async () => [pending],
+        },
         router,
         identity: () => identityServiceFor({}, committed),
         links: () => linksFor(pending, committed, linked),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -458,12 +462,21 @@ describe("platform operator identity lookup service", () => {
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => decided, findProposals: async () => [decided] },
+        proposals: {
+          findProposal: async () => decided,
+          findProposals: async () => [decided],
+        },
         router,
         identity: () => identityServiceFor({}, committed),
         links: () => linksFor(decided, committed, { calls: [] }),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -475,8 +488,11 @@ describe("platform operator identity lookup service", () => {
         }),
       ).rejects.toMatchObject({
         code: "identity_link_proposal_resolved",
-        message: expect.stringContaining("already confirmed"),
-        meta: { byActorId: "user_ash" },
+        message: "identity_link_proposal_resolved",
+        meta: {
+          decidedByActorId: "user_ash",
+          decidedOutcome: "confirmed",
+        },
       });
       expect(committed).toEqual([]);
     });
@@ -489,7 +505,10 @@ describe("platform operator identity lookup service", () => {
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => null, findProposals: async () => [] },
+        proposals: {
+          findProposal: async () => null,
+          findProposals: async () => [],
+        },
         router,
         identity: () =>
           identityServiceFor(
@@ -515,8 +534,14 @@ describe("platform operator identity lookup service", () => {
             committed,
           ),
         links: () => linksFor(proposal(), committed, { calls: [] }),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -528,7 +553,7 @@ describe("platform operator identity lookup service", () => {
         }),
       ).rejects.toMatchObject({
         code: "identity_detach_strands_user",
-        message: expect.stringContaining("last verified identifier"),
+        message: "identity_detach_strands_user",
       });
       expect(committed).toEqual([]);
     });
@@ -579,13 +604,22 @@ describe("platform operator identity lookup service", () => {
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => null, findProposals: async () => [] },
+        proposals: {
+          findProposal: async () => null,
+          findProposals: async () => [],
+        },
         router: () => router(account),
         identity: () =>
           identityServiceFor(identifiers, committed, projected, account),
         links: () => linksFor(proposal(), committed, { calls: [] }),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -607,7 +641,9 @@ describe("platform operator identity lookup service", () => {
         type: "lw.identity.identifier_detached",
         data: { identifierId: "idf_personal" },
       });
-      expect(projected.current.identifiers.idf_personal?.state).toBe("DETACHED");
+      expect(projected.current.identifiers.idf_personal?.state).toBe(
+        "DETACHED",
+      );
       expect(projected.current.identifiers.idf_work?.state).toBe("VERIFIED");
 
       const nextSignIn = await router(account).route({
@@ -617,7 +653,9 @@ describe("platform operator identity lookup service", () => {
         outcome: "method_picker",
         reasonCode: "account_methods",
       });
-      expect(nextSignIn.methodSet.map((method) => method.id)).toEqual(["password"]);
+      expect(nextSignIn.methodSet.map((method) => method.id)).toEqual([
+        "password",
+      ]);
 
       const detachedSignIn = await router(account).route({
         identifier: "sam@example.com",
@@ -636,12 +674,18 @@ describe("platform operator identity lookup service", () => {
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => null, findProposals: async () => [] },
+        proposals: {
+          findProposal: async () => null,
+          findProposals: async () => [],
+        },
         router,
         identity: () => identityServiceFor({}, []),
         links: () => linksFor(proposal(), [], { calls: [] }),
         sessions: { endAllForUser, endForIdentifier },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -689,12 +733,21 @@ describe("platform operator identity lookup service", () => {
           invitations: [invitation],
         }),
         history,
-        proposals: { findProposal: async () => null, findProposals: async () => [] },
+        proposals: {
+          findProposal: async () => null,
+          findProposals: async () => [],
+        },
         router,
         identity: () => identityServiceFor({}, []),
         links: () => linksFor(proposal(), [], { calls: [] }),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
-        invitations: { resend: async () => ({ expiresAtMs: null }), extend: async () => ({ expiresAtMs: null }) },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
+        invitations: {
+          resend: async () => ({ expiresAtMs: null }),
+          extend: async () => ({ expiresAtMs: null }),
+        },
         now: () => NOW,
       });
 
@@ -715,21 +768,32 @@ describe("platform operator identity lookup service", () => {
 
     /** @scenario "Resending an invitation from here does what resending does anywhere" */
     it("delegates resend and returns the fresh expiry", async () => {
-      const resend = vi.fn(async () => ({ expiresAtMs: NOW + 14 * 24 * 60 * 60 * 1000 }));
+      const resend = vi.fn(async () => ({
+        expiresAtMs: NOW + 14 * 24 * 60 * 60 * 1000,
+      }));
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => null, findProposals: async () => [] },
+        proposals: {
+          findProposal: async () => null,
+          findProposals: async () => [],
+        },
         router,
         identity: () => identityServiceFor({}, []),
         links: () => linksFor(proposal(), [], { calls: [] }),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
         invitations: { resend, extend: async () => ({ expiresAtMs: null }) },
         now: () => NOW,
       });
 
       await expect(
-        service.resendInvitation({ organizationId: "org_acme", inviteId: "invite_1" }),
+        service.resendInvitation({
+          organizationId: "org_acme",
+          inviteId: "invite_1",
+        }),
       ).resolves.toEqual({ expiresAtMs: NOW + 14 * 24 * 60 * 60 * 1000 });
       expect(resend).toHaveBeenCalledWith({
         organizationId: "org_acme",
@@ -739,21 +803,32 @@ describe("platform operator identity lookup service", () => {
 
     /** @scenario "Extending an invitation moves its expiry and says by how much" */
     it("delegates extension and returns the new date", async () => {
-      const extend = vi.fn(async () => ({ expiresAtMs: NOW + 7 * 24 * 60 * 60 * 1000 }));
+      const extend = vi.fn(async () => ({
+        expiresAtMs: NOW + 7 * 24 * 60 * 60 * 1000,
+      }));
       const service = new IdentityLookupService({
         reads: readsFor(),
         history,
-        proposals: { findProposal: async () => null, findProposals: async () => [] },
+        proposals: {
+          findProposal: async () => null,
+          findProposals: async () => [],
+        },
         router,
         identity: () => identityServiceFor({}, []),
         links: () => linksFor(proposal(), [], { calls: [] }),
-        sessions: { endAllForUser: async () => {}, endForIdentifier: async () => {} },
+        sessions: {
+          endAllForUser: async () => {},
+          endForIdentifier: async () => {},
+        },
         invitations: { resend: async () => ({ expiresAtMs: null }), extend },
         now: () => NOW,
       });
 
       await expect(
-        service.extendInvitation({ organizationId: "org_acme", inviteId: "invite_1" }),
+        service.extendInvitation({
+          organizationId: "org_acme",
+          inviteId: "invite_1",
+        }),
       ).resolves.toEqual({ expiresAtMs: NOW + 7 * 24 * 60 * 60 * 1000 });
       expect(extend).toHaveBeenCalledWith({
         organizationId: "org_acme",
