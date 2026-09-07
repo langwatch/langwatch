@@ -193,16 +193,35 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
   describe("given the grandfathered connection is still serving its own directory", () => {
     it("allows an own-resource mutation during active grace", async () => {
       await clearTokenUse(first.legacyConnectionId);
+      const otherOrganizationBefore = await authoritySnapshot(
+        second.organizationId,
+      );
       const response = await requestWithToken({
         token: legacyToken,
         path: `/api/scim/v2/Users/${legacyUserId}`,
         method: "PATCH",
         body: patch([
-          { op: "replace", path: "name.givenName", value: "Still" },
+          {
+            op: "replace",
+            value: { name: { givenName: "Still", familyName: "Serving" } },
+          },
         ]),
       });
 
       expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        id: legacyUserId,
+        name: { givenName: "Still", familyName: "Serving" },
+      });
+      await expect(
+        prisma.user.findUniqueOrThrow({
+          where: { id: legacyUserId },
+          select: { name: true },
+        }),
+      ).resolves.toEqual({ name: "Still Serving" });
+      expect(await authoritySnapshot(second.organizationId)).toEqual(
+        otherOrganizationBefore,
+      );
       expect(await tokenLastUsedAt(first.legacyConnectionId)).not.toBeNull();
     });
   });
