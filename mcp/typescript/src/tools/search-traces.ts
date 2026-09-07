@@ -185,7 +185,7 @@ export async function handleSearchTraces(params: {
   }
 
   lines.push(
-    '\n> Tip: Use `get_trace` with a trace_id for full details. Use `search_traces` with `format: "json"` for raw data. Use `discover_schema` to see available filter fields.',
+    '\n> Tip: Use `get_trace` with a traceId for full details. Use `search_traces` with `format: "json"` for raw data. Use `discover_schema` to see available filter fields.',
   );
 
   return lines.join("\n");
