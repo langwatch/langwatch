@@ -23,6 +23,7 @@ import { codingAgentApi as api, type CodingAgentApiMap } from "./coding-agent-ap
 import { useCodingAgentActivityHost } from "./coding-agent-activity-host.ts";
 import { useCodingAgentRouter } from "./coding-agent-router.ts";
 import { CostBreakdownTooltipContent } from "./cost-breakdown-tooltip.tsx";
+import { nowInstant } from "@langwatch/time";
 import { formatLastUpdate } from "./last-update.ts";
 import { NoDataInfoBlock } from "./no-data-info-block.tsx";
 import { computeRelativeWindow, PeriodSelector } from "./period-selector.tsx";
@@ -402,7 +403,8 @@ const PullRequestsToolbar: React.FC<{
     />
     <PeriodSelector
       period={
-        periodSelection?.period ?? computeRelativeWindow(PLACEHOLDER_PERIOD_PRESET, new Date())
+        periodSelection?.period ??
+        computeRelativeWindow(PLACEHOLDER_PERIOD_PRESET, nowInstant().epochMilliseconds)
       }
       mode={periodSelection?.mode ?? "relative"}
       label={periodSelection ? undefined : "All time"}
@@ -411,7 +413,7 @@ const PullRequestsToolbar: React.FC<{
       }
       setRelativePeriod={(presetKey) =>
         onPeriodChange({
-          period: computeRelativeWindow(presetKey, new Date()),
+          period: computeRelativeWindow(presetKey, nowInstant().epochMilliseconds),
           mode: "relative",
         })
       }

@@ -16,11 +16,14 @@ import {
   type CodingAgentSessionListReadOutcome,
 } from "../../adapters/coding-agent-read-metrics.adapter.ts";
 import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
+import { nowInstant } from "@langwatch/time";
 import {
+  clickHouseMomentOf,
   groupTenantsByClient,
   asNumber,
   asStringArray,
   parseClickHouseDateTimeMs,
+  type ClickHouseMoment,
 } from "../coding-agent-clickhouse/clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
@@ -70,9 +73,9 @@ interface ClickHouseWriteRecord {
   SessionId: string;
   SessionKeySource: string;
   Version: string;
-  StartedAt: Date;
-  CreatedAt: Date;
-  UpdatedAt: Date;
+  StartedAt: ClickHouseMoment;
+  CreatedAt: ClickHouseMoment;
+  UpdatedAt: ClickHouseMoment;
 
   Agent: string;
   AgentVersion: string;
@@ -174,7 +177,7 @@ interface ClickHouseWriteRecord {
   PreviousCallContextTokens: string;
   // Array(Tuple(SeriesId, MetricName, Type, Decision, Language, Value)).
   MetricSeries: [string, string, string, string, string, number][];
-  LastEventOccurredAt: Date;
+  LastEventOccurredAt: ClickHouseMoment;
 
   // ── Durable dedup watermark (ADR-066, migration 00054) ─────────────────
   // The applied-event-id set the executor checks a redelivery against. Not fold
@@ -219,18 +222,18 @@ function toRecord({
   appliedEventIds?: readonly string[];
   versionStampMs: number;
 }): ClickHouseWriteRecord {
-  const now = new Date();
+  const now = clickHouseMomentOf(nowInstant().epochMilliseconds);
   return {
     TenantId: row.tenantId,
     SessionId: row.sessionId,
     SessionKeySource: row.sessionKeySource,
     Version: row.version,
-    StartedAt: new Date(row.startedAtMs),
+    StartedAt: clickHouseMomentOf(row.startedAtMs),
     // Preserve first-seen creation across re-folds; UpdatedAt is the RMT
     // version and must be strictly greater than the version it supersedes —
     // see nextVersionStamp for why write time alone is not enough.
-    CreatedAt: row.createdAt > 0 ? new Date(row.createdAt) : now,
-    UpdatedAt: new Date(versionStampMs),
+    CreatedAt: row.createdAt > 0 ? clickHouseMomentOf(row.createdAt) : now,
+    UpdatedAt: clickHouseMomentOf(versionStampMs),
 
     Agent: row.agent,
     AgentVersion: row.agentVersion,
@@ -338,7 +341,7 @@ function toRecord({
       unit.language,
       unit.value,
     ]),
-    LastEventOccurredAt: new Date(row.lastEventOccurredAt),
+    LastEventOccurredAt: clickHouseMomentOf(row.lastEventOccurredAt),
 
     AppliedEventIds: [...appliedEventIds],
 

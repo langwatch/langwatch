@@ -5,6 +5,7 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Which half of the run the timeout landed in, for the message the user reads. */
 const evaluationTimeoutStage = (timeoutOnStatus: "waiting" | "running") =>
@@ -68,7 +69,7 @@ export const useEvaluationExecution = () => {
         setEvaluationStateRef.current({
           status: "error",
           error: "Timeout",
-          timestamps: { finished_at: Date.now() },
+          timestamps: { finished_at: nowInstant().epochMilliseconds },
         });
         toaster.create({
           title: `Timeout ${evaluationTimeoutStage(timeout_on_status)} evaluation execution`,

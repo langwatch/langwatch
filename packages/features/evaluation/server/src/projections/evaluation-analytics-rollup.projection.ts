@@ -6,6 +6,15 @@ import {
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
 } from "@langwatch/evaluation-contract";
+import { Temporal, toDate } from "@langwatch/time";
+
+/** A moment as a ClickHouse statement carries it. The client serialises this into
+ *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */
+type ClickHouseMoment = ReturnType<typeof toDate>;
+
+/** The moment `epochMilliseconds` names, as ClickHouse wants it. */
+const clickHouseMomentOf = (epochMilliseconds: number): ClickHouseMoment =>
+  toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds));
 
 /**
  * One row emitted to `evaluation_analytics_rollup` per terminal evaluation
@@ -49,7 +58,7 @@ export interface EvaluationAnalyticsRollupRow {
   /** Project id; multitenancy boundary. Always required. */
   tenantId: string;
   /** Minute bucket of the evaluation's completion (toStartOfMinute). */
-  bucketStart: Date;
+  bucketStart: ClickHouseMoment;
   /**
    * Evaluator slug (e.g. `langevals/llm_answer_match`). `''` when not on the
    * event payload (the two-event completed-only path; see class doc above).
@@ -90,8 +99,8 @@ const evaluationRollupEvents = [
 ] as const;
 
 /** Floor a unix-ms timestamp to the minute boundary (toStartOfMinute equivalent). */
-function toStartOfMinute(unixMs: number): Date {
-  return new Date(Math.floor(unixMs / 60_000) * 60_000);
+function toStartOfMinute(unixMs: number): ClickHouseMoment {
+  return clickHouseMomentOf(Math.floor(unixMs / 60_000) * 60_000);
 }
 
 /**

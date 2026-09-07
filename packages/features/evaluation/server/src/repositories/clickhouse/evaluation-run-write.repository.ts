@@ -1,9 +1,18 @@
 import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createHash } from "node:crypto";
 import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
+
+/** A moment as a ClickHouse statement carries it. The client serialises this into
+ *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */
+type ClickHouseMoment = ReturnType<typeof toDate>;
+
+/** The moment `epochMilliseconds` names, as ClickHouse wants it. */
+const clickHouseMomentOf = (epochMilliseconds: number): ClickHouseMoment =>
+  toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds));
 
 const TABLE_NAME = "evaluation_runs" as const;
 const PROJECTION_VERSION = "2025-01-14" as const;
@@ -51,13 +60,13 @@ type ClickHouseWriteRecord = Omit<
   | "CompletedAt"
   | "LastEventOccurredAt"
 > & {
-  CreatedAt: Date;
-  UpdatedAt: Date;
-  ArchivedAt: Date | null;
-  ScheduledAt: Date;
-  StartedAt: Date | null;
-  CompletedAt: Date | null;
-  LastEventOccurredAt: Date;
+  CreatedAt: ClickHouseMoment;
+  UpdatedAt: ClickHouseMoment;
+  ArchivedAt: ClickHouseMoment | null;
+  ScheduledAt: ClickHouseMoment;
+  StartedAt: ClickHouseMoment | null;
+  CompletedAt: ClickHouseMoment | null;
+  LastEventOccurredAt: ClickHouseMoment;
 };
 
 type BoundedText = {
@@ -239,15 +248,15 @@ export class EvaluationRunClickHouseWriteRepository {
       Inputs: inputs.value,
       Error: error.value,
       ErrorDetails: errorDetails.value,
-      CreatedAt: new Date(data.createdAt),
-      UpdatedAt: new Date(data.updatedAt),
-      ArchivedAt: data.archivedAt === null ? null : new Date(data.archivedAt),
-      ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
-      StartedAt: data.startedAt === null ? null : new Date(data.startedAt),
-      CompletedAt: data.completedAt === null ? null : new Date(data.completedAt),
+      CreatedAt: clickHouseMomentOf(data.createdAt),
+      UpdatedAt: clickHouseMomentOf(data.updatedAt),
+      ArchivedAt: data.archivedAt === null ? null : clickHouseMomentOf(data.archivedAt),
+      ScheduledAt: clickHouseMomentOf(data.scheduledAt ?? data.createdAt),
+      StartedAt: data.startedAt === null ? null : clickHouseMomentOf(data.startedAt),
+      CompletedAt: data.completedAt === null ? null : clickHouseMomentOf(data.completedAt),
       CostId: data.costId,
       LastProcessedEventId: projectionId,
-      LastEventOccurredAt: new Date(data.LastEventOccurredAt || 0),
+      LastEventOccurredAt: clickHouseMomentOf(data.LastEventOccurredAt || 0),
       _retention_days: retentionDays ?? DEFAULT_RETENTION_DAYS,
     };
   }

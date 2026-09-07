@@ -7,6 +7,7 @@ import type {
   ConnectedAgentIdentity,
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
+import type { Instant } from "@langwatch/time";
 
 export type AgentCopyRecord = {
   id: string;
@@ -92,7 +93,7 @@ export abstract class AgentRepository {
     config: AgentConfig;
   }): Promise<Agent>;
   /** Writes the presence projection of one agent. */
-  abstract touchLastSeenAt(input: { id: string; projectId: string; at: Date }): Promise<void>;
+  abstract touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
   /** The display names of a set of users, for a connected agent's owner. */
   abstract findUserNamesByIds(ids: readonly string[]): Promise<Map<string, string | null>>;
 }

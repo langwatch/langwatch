@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port.ts";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 
@@ -57,7 +58,10 @@ export class CodingAgentSessionSeenService {
   private async touchProject(projectId: string, at: number): Promise<void> {
     const holdSetTo = at + CODING_AGENT_SESSION_SEEN_WINDOW_MS;
     try {
-      await this.projects.touchCodingAgentSessionSeen({ projectId, at: new Date(at) });
+      await this.projects.touchCodingAgentSessionSeen({
+        projectId,
+        at: toDate(Temporal.Instant.fromEpochMilliseconds(at)),
+      });
     } catch (error) {
       if (this.heldUntil.get(projectId) === holdSetTo) {
         this.heldUntil.delete(projectId);

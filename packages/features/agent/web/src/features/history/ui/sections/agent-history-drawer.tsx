@@ -21,7 +21,7 @@ export type AgentHistoryDrawerProps = {
   projectId: string;
   agents: AgentBrowserPort;
   onClose: () => void;
-  formatCreatedAt: (createdAt: Date) => string;
+  formatCreatedAt: (createdAt: AgentHistoryEntry["createdAt"]) => string;
 };
 
 export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {

@@ -1,4 +1,5 @@
 import { HStack } from "@chakra-ui/react";
+import { nowInstant } from "@langwatch/time";
 import type { PeriodSelection } from "./session-filters.ts";
 import type React from "react";
 
@@ -33,7 +34,8 @@ export const SessionsToolbar: React.FC<{
     />
     <PeriodSelector
       period={
-        periodSelection?.period ?? computeRelativeWindow(PLACEHOLDER_PERIOD_PRESET, new Date())
+        periodSelection?.period ??
+        computeRelativeWindow(PLACEHOLDER_PERIOD_PRESET, nowInstant().epochMilliseconds)
       }
       mode={periodSelection?.mode ?? "relative"}
       label={periodSelection ? undefined : "All time"}
@@ -42,7 +44,7 @@ export const SessionsToolbar: React.FC<{
       }
       setRelativePeriod={(presetKey) =>
         onPeriodChange({
-          period: computeRelativeWindow(presetKey, new Date()),
+          period: computeRelativeWindow(presetKey, nowInstant().epochMilliseconds),
           mode: "relative",
         })
       }

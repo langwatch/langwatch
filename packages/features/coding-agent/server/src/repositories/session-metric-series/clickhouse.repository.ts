@@ -1,7 +1,12 @@
 import type { CodingAgentSessionMetricSeriesRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import {
+  clickHouseMomentOf,
+  type ClickHouseMoment,
+} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
 import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
 
 const TABLE_NAME = "session_metric_series" as const;
@@ -27,8 +32,8 @@ interface ClickHouseWriteRecord {
   Attributes: Record<string, string>;
   Value: number;
   DataPointCount: number;
-  AsOf: Date;
-  UpdatedAt: Date;
+  AsOf: ClickHouseMoment;
+  UpdatedAt: ClickHouseMoment;
   _retention_days: number;
 }
 
@@ -70,7 +75,7 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
       }
     }
 
-    const now = new Date();
+    const now = clickHouseMomentOf(nowInstant().epochMilliseconds);
     const values: ClickHouseWriteRecord[] = records.map((record) => ({
       TenantId: record.tenantId,
       SessionId: record.sessionId,
@@ -81,7 +86,7 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
       Attributes: record.attributes,
       Value: record.value,
       DataPointCount: record.dataPointCount,
-      AsOf: new Date(record.asOfUnixMs),
+      AsOf: clickHouseMomentOf(record.asOfUnixMs),
       UpdatedAt: now,
       _retention_days: retentionDays ?? this.defaultTraceRetentionDays,
     }));

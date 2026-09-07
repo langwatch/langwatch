@@ -1,7 +1,13 @@
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
+import {
+  clickHouseMomentOf,
+  parseClickHouseDateTimeMs,
+  type ClickHouseMoment,
+} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
 import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
@@ -12,8 +18,8 @@ interface ClickHouseWriteRecord {
   TenantId: string;
   TraceId: string;
   SessionId: string;
-  OccurredAt: Date;
-  UpdatedAt: Date;
+  OccurredAt: ClickHouseMoment;
+  UpdatedAt: ClickHouseMoment;
   _retention_days: number;
 }
 
@@ -52,12 +58,12 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       }
     }
 
-    const now = new Date();
+    const now = clickHouseMomentOf(nowInstant().epochMilliseconds);
     const values: ClickHouseWriteRecord[] = records.map((record) => ({
       TenantId: record.tenantId,
       TraceId: record.traceId,
       SessionId: record.sessionId,
-      OccurredAt: new Date(record.occurredAtMs),
+      OccurredAt: clickHouseMomentOf(record.occurredAtMs),
       UpdatedAt: now,
       _retention_days: retentionDays ?? this.defaultTraceRetentionDays,
     }));
@@ -127,7 +133,7 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       tenantId,
       traceId: first.TraceId,
       sessionId: first.SessionId,
-      occurredAtMs: new Date(first.OccurredAt).getTime(),
+      occurredAtMs: toEpochMs(first.OccurredAt),
     };
   }
 }

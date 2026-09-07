@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
+import { toEpochMs } from "@langwatch/time";
 
 import { workflowApi, type WorkflowListRow } from "../../model/workflow-api.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
@@ -151,9 +152,7 @@ export function WorkflowListCard({
         name={name}
         icon={icon}
         {...(description ? { description } : {})}
-        updatedAtLabel={formatTimeAgo(
-          workflow?.updatedAt ? new Date(workflow.updatedAt).getTime() : 0,
-        )}
+        updatedAtLabel={formatTimeAgo(workflow?.updatedAt ? toEpochMs(workflow.updatedAt) : 0)}
         action={
           workflowId ? (
             <WorkflowCardActions

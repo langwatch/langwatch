@@ -151,7 +151,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                   <EvaluatorListItem
                     key={evaluator.id}
                     evaluator={evaluator}
-                    updatedAtLabel={formatDistanceToNow(new Date(evaluator.updatedAt), {
+                    updatedAtLabel={formatDistanceToNow(evaluator.updatedAt, {
                       addSuffix: true,
                     })}
                     onClick={() => onSelect?.(evaluator)}

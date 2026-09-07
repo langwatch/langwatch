@@ -36,6 +36,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:evaluations");
 
@@ -303,7 +304,7 @@ export class EvaluationTrpcApi {
                           ? (result.details ?? undefined)
                           : undefined,
                     error: result.status === "error" ? result.details : undefined,
-                    occurredAt: Date.now(),
+                    occurredAt: nowInstant().epochMilliseconds,
                   });
                 } catch (error) {
                   logger.warn(

@@ -14,6 +14,7 @@ import { usePostEvent } from "./use-post-event.tsx";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:studio:evaluation");
 
@@ -89,7 +90,7 @@ export const useRunEvalution = () => {
       setEvaluationState({
         status: "error",
         error: "Timeout",
-        timestamps: { finished_at: Date.now() },
+        timestamps: { finished_at: nowInstant().epochMilliseconds },
       });
       toaster.create({
         title: `Timeout ${

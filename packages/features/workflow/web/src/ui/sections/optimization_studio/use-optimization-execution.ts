@@ -6,6 +6,7 @@ import type { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** The timer this hook arms, naming the run and the state it timed out on. */
 type OptimizationTimeoutTrigger = {
@@ -35,7 +36,7 @@ function applyOptimizationTimeout({
   setOptimizationState({
     status: "error",
     error: "Timeout",
-    timestamps: { finished_at: Date.now() },
+    timestamps: { finished_at: nowInstant().epochMilliseconds },
   });
   const stage = trigger.timeout_on_status === "waiting" ? "starting" : "stopping";
   toaster.create({

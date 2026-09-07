@@ -12,6 +12,7 @@ import {
   upsertEvaluationRunCommandSchema,
   type EvaluationExecutionResult,
   type EvaluationRunData,
+  type EvaluationRunLookup,
   type EvaluationSummary,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
@@ -87,12 +88,7 @@ export class EvaluationService extends EvaluationServiceContract {
     );
   }
 
-  async getRunByEvaluationId(input: {
-    tenantId: string;
-    evaluationId: string;
-    scheduledAt?: Date;
-    scheduledAtSlackMs?: number;
-  }): Promise<EvaluationRunData> {
+  async getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
     const query = evaluationRunLookupSchema.parse(input);
     const result = await this.options.repository.tryFindByEvaluationId(query);
     if (!result) {
@@ -102,12 +98,7 @@ export class EvaluationService extends EvaluationServiceContract {
     return result;
   }
 
-  tryGetRunByEvaluationId(input: {
-    tenantId: string;
-    evaluationId: string;
-    scheduledAt?: Date;
-    scheduledAtSlackMs?: number;
-  }): Promise<EvaluationRunData | null> {
+  tryGetRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
     return this.options.repository.tryFindByEvaluationId(evaluationRunLookupSchema.parse(input));
   }
 

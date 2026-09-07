@@ -52,6 +52,7 @@ import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
 import { buildEvaluatorCatalogue } from "../../rules/evaluator-catalogue.rules.ts";
+import { nowInstant } from "@langwatch/time";
 import {
   acknowledgementSchema,
   datasetEvaluateRequestSchema,
@@ -1391,7 +1392,7 @@ async function handleEvaluatorCall(
         ...gatedVerdictFields(result!),
         details: "details" in result! ? result!.details : undefined,
         costId: costId ?? null,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
         error:
           result!.status === "error"
             ? "details" in result!
@@ -1506,9 +1507,9 @@ const processBatchEvaluation = async (
     evaluations: param.evaluations ?? [],
     timestamps: {
       ...param.timestamps,
-      created_at: param.timestamps?.created_at ?? new Date().getTime(),
-      inserted_at: new Date().getTime(),
-      updated_at: new Date().getTime(),
+      created_at: param.timestamps?.created_at ?? nowInstant().epochMilliseconds,
+      inserted_at: nowInstant().epochMilliseconds,
+      updated_at: nowInstant().epochMilliseconds,
     },
   };
 
@@ -1534,7 +1535,7 @@ const dispatchToClickHouse = async (
       experimentId,
       total: batchEvaluation.total || batchEvaluation.dataset.length,
       targets,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
   } catch (error) {
     logger.error(
@@ -1561,7 +1562,7 @@ const dispatchToClickHouse = async (
           error: entry.error ?? undefined,
           traceId: entry.trace_id ?? undefined,
           targets,
-          occurredAt: Date.now(),
+          occurredAt: nowInstant().epochMilliseconds,
         })
         .catch((err) => {
           logger.warn(
@@ -1594,7 +1595,7 @@ const dispatchToClickHouse = async (
           cost: evaluation.cost ?? undefined,
           inputs: evaluation.inputs ?? undefined,
           duration: typeof evaluation.duration === "number" ? evaluation.duration : undefined,
-          occurredAt: Date.now(),
+          occurredAt: nowInstant().epochMilliseconds,
         })
         .catch((err) => {
           logger.warn(
@@ -1619,7 +1620,7 @@ const dispatchToClickHouse = async (
         experimentId,
         finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
         stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
-        occurredAt: Date.now(),
+        occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
       logger.warn(
@@ -1643,7 +1644,7 @@ const dispatchToClickHouse = async (
           status: evaluation.status,
           ...gatedVerdictFields(evaluation),
           details: evaluation.details ?? undefined,
-          occurredAt: Date.now(),
+          occurredAt: nowInstant().epochMilliseconds,
         })
         .catch((err) => {
           logger.warn(

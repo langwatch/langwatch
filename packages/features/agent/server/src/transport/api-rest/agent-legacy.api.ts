@@ -1,3 +1,4 @@
+import { nextAgentId } from "#rules/agent-id.rules";
 import {
   agentIdPathSchema,
   agentListViewSchema,
@@ -8,6 +9,7 @@ import {
   InvalidAgentConfigError,
   listAgentsQuerySchema,
   updateAgentRequestSchema,
+  type Agent,
 } from "@langwatch/agent-contract";
 import { requires } from "@langwatch/api";
 import {
@@ -110,8 +112,8 @@ export function createAgentLegacyRestApp(options: {
       name: string;
       type: string;
       config: unknown;
-      createdAt: Date;
-      updatedAt: Date;
+      createdAt: Agent["createdAt"];
+      updatedAt: Agent["updatedAt"];
     },
     projectSlug: string,
   ) => ({
@@ -152,7 +154,7 @@ export function createAgentLegacyRestApp(options: {
     const project = projectOf(c);
     const agent = await agents().create({
       ...input,
-      id: AgentApp.nextAgentId(),
+      id: nextAgentId(),
       projectId: project.id,
     });
     return agentView(agent, project.slug);

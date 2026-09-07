@@ -1,4 +1,5 @@
 import { Box, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import { toEpochMs } from "@langwatch/time";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -752,7 +753,7 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
               <WorkflowCardDisplay
                 name={workflowCard.workflowName ?? "Workflow"}
                 icon={workflowCard.workflowIcon}
-                updatedAtLabel={formatTimeAgo(new Date(workflowCard.updatedAt).getTime())}
+                updatedAtLabel={formatTimeAgo(toEpochMs(workflowCard.updatedAt))}
                 action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />

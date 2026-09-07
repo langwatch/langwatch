@@ -3,6 +3,12 @@
  * is the application's generated client and a browser package may not reach it.
  */
 
+import type { toDate } from "@langwatch/time";
+
+/** A moment as these rows carry it. They mirror the generated Prisma shapes,
+ *  which speak `Date`; a conversion belongs at the boundary, not here. */
+type PrismaMoment = ReturnType<typeof toDate>;
+
 /** How an evaluator runs: on every trace, on a sample, or only when called. */
 export const EvaluationExecutionMode = {
   ON_MESSAGE: "ON_MESSAGE",
@@ -30,8 +36,8 @@ export type Project = {
   framework: string;
   firstMessage: boolean;
   integrated: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: PrismaMoment;
+  updatedAt: PrismaMoment;
   piiRedactionLevel?: string;
   s3Endpoint?: string | null;
   capturedInputVisibility?: string;
@@ -50,8 +56,8 @@ export type Experiment = {
   slug: string;
   type: string;
   workflowId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: PrismaMoment;
+  updatedAt: PrismaMoment;
 };
 
 /** Prisma's own JSON array type, restated so no runtime package is named. */

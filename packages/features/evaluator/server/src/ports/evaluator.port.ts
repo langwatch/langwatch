@@ -23,7 +23,7 @@ export abstract class EvaluatorAuditLogPort {
     Array<{
       id: string;
       action: string;
-      createdAt: Date;
+      createdAt: EvaluatorHistoryEntry["createdAt"];
       args: unknown;
       userId: string | null;
     }>

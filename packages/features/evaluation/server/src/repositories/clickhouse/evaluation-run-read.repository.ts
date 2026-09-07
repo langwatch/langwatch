@@ -15,6 +15,7 @@ import type {
   EvaluationRetentionFloorPort,
 } from "../../ports/evaluation.port.ts";
 import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
@@ -411,7 +412,7 @@ export class EvaluationRunClickHouseReadRepository {
     const recent = await this.queryScheduledAtMs({
       tenantId: input.tenantId,
       evaluationId: input.evaluationId,
-      sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
+      sinceMs: nowInstant().epochMilliseconds - RESOLVER_RECENT_WINDOW_MS,
     });
     if (recent !== undefined) {
       return { scheduledAtFrom: recent - slackMs, scheduledAtTo: recent + slackMs };

@@ -3,6 +3,7 @@
  */
 
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import { toEpochMs } from "@langwatch/time";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
 import { useState } from "react";
 
@@ -23,7 +24,7 @@ export function EvaluatorGridCard({ evaluator, ...props }: EvaluatorGridCardProp
       <EvaluatorCard
         {...props}
         evaluator={evaluator}
-        updatedAtLabel={formatTimeAgo(new Date(evaluator.updatedAt).getTime()) ?? ""}
+        updatedAtLabel={formatTimeAgo(toEpochMs(evaluator.updatedAt)) ?? ""}
         onUseFromApi={() => setShowApiDialog(true)}
       />
       <EvaluatorApiUsageDialog

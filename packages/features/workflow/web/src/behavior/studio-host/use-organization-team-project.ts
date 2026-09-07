@@ -3,6 +3,7 @@
  */
 
 import { useMemo } from "react";
+import { Temporal, toDate } from "@langwatch/time";
 
 import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host.ts";
 import type { Project } from "@langwatch/workflow-contract";
@@ -75,8 +76,8 @@ export function useOrganizationTeamProject(
           framework: "",
           firstMessage: false,
           integrated: false,
-          createdAt: new Date(0),
-          updatedAt: new Date(0),
+          createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+          updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
         }
       : void 0;
 

@@ -12,6 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { readableDate } from "../../../model/display-formatters.ts";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
@@ -411,15 +412,21 @@ export function TryItOut({
                               })
                             }
                           >
-                            {new Date(trace.timestamps.started_at).toLocaleDateString(undefined, {
-                              month: "numeric",
-                              day: "numeric",
-                            }) +
+                            {readableDate(trace.timestamps.started_at).toLocaleDateString(
+                              undefined,
+                              {
+                                month: "numeric",
+                                day: "numeric",
+                              },
+                            ) +
                               ", " +
-                              new Date(trace.timestamps.started_at).toLocaleTimeString(undefined, {
-                                hour: "numeric",
-                                minute: "numeric",
-                              })}
+                              readableDate(trace.timestamps.started_at).toLocaleTimeString(
+                                undefined,
+                                {
+                                  hour: "numeric",
+                                  minute: "numeric",
+                                },
+                              )}
                           </Table.Cell>
                           <Table.Cell
                             maxWidth="225px"

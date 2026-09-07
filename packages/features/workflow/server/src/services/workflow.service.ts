@@ -21,6 +21,7 @@ import {
   type WorkflowWithVersion,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type {
   WorkflowDslMigrationPort,
@@ -352,7 +353,7 @@ export class WorkflowService extends WorkflowServiceContract {
     return this.options.repository.updateWorkflow({
       id: command.id,
       projectId: command.projectId,
-      data: { archivedAt: command.unarchive ? null : new Date() },
+      data: { archivedAt: command.unarchive ? null : toDate(nowInstant()) },
     });
   }
 

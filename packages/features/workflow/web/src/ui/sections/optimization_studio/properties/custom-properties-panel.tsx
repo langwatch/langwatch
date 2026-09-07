@@ -1,4 +1,5 @@
 import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { toEpochMs } from "@langwatch/time";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { ExternalLink } from "react-feather";
@@ -93,8 +94,7 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             ·
           </Text>
           <Text fontSize="12px" flexShrink={0}>
-            {currentVersion?.updatedAt &&
-              formatTimeAgo(new Date(currentVersion.updatedAt).getTime())}
+            {currentVersion?.updatedAt && formatTimeAgo(toEpochMs(currentVersion.updatedAt))}
           </Text>
         </HStack>
       </VStack>

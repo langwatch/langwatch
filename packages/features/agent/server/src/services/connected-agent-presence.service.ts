@@ -5,9 +5,11 @@
 
 import {
   connectedAgentSelectability,
+  type Agent,
   type ConnectedAgentSelectability,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 import type { ConnectedAgentRuntime, LiveInstance } from "../ports/connected-agent-runtime.port.ts";
 
 const logger = createLogger("langwatch:connected-agents:presence");
@@ -22,7 +24,7 @@ export interface AgentInstanceView {
   pid: number;
   label: string | null;
   sdk: { name: string; version: string; language: string };
-  connectedAt: Date;
+  connectedAt: Agent["createdAt"];
   inflight: number;
   maxConcurrency: number;
 }
@@ -136,7 +138,7 @@ function toView(instance: LiveInstance): AgentInstanceView {
     pid: instance.pid,
     label: instance.label,
     sdk: instance.sdk,
-    connectedAt: new Date(instance.connectedAt),
+    connectedAt: toDate(Temporal.Instant.fromEpochMilliseconds(instance.connectedAt)),
     inflight: instance.inflight,
     maxConcurrency: instance.maxConcurrency,
   };

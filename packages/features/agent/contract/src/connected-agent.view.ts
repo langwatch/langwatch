@@ -17,6 +17,10 @@ import type { AgentWithFields } from "./agent.ts";
 import type { ConnectedAgentConfig } from "./config/connected.ts";
 import type { ConnectedAgentSelectability } from "./connected-agent.selectable.ts";
 
+/** A moment as this contract carries it: a stored value on the server, and the
+ *  ISO string tRPC hands the browser for the same field. */
+type WireMoment = AgentWithFields["createdAt"];
+
 /** The SDK that registered an agent, as the card prints it. */
 export interface ConnectedAgentSdk {
   name: string;
@@ -32,7 +36,7 @@ export interface ConnectedAgentInstance {
   pid: number;
   label: string | null;
   sdk: ConnectedAgentSdk;
-  connectedAt: Date | string;
+  connectedAt: WireMoment | string;
   inflight: number;
   maxConcurrency: number;
 }
@@ -49,7 +53,7 @@ export interface ConnectedAgentView extends ConnectedAgentSelectability {
   name: string;
   environment: string | null;
   hostLabel: string | null;
-  lastSeenAt: Date | string | null;
+  lastSeenAt: WireMoment | string | null;
   status: "online" | "offline";
   instances: ConnectedAgentInstance[];
   owner: ConnectedAgentOwner | null;

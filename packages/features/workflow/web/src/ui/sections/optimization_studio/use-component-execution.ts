@@ -9,6 +9,7 @@ import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { useAlertOnComponent } from "./use-alert-on-component.ts";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:studio:componentExecution");
 
@@ -54,7 +55,7 @@ function applyComponentTimeout({
   const execution_state: BaseComponent["execution_state"] = {
     status: "error",
     error: "Timeout",
-    timestamps: { finished_at: Date.now() },
+    timestamps: { finished_at: nowInstant().epochMilliseconds },
   };
   setComponentExecutionState(node.id, execution_state);
   alertOnComponent({ componentId: node.id, execution_state });

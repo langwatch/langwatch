@@ -19,10 +19,10 @@ export type AgentListRow = {
   environment: string | null;
   ownerUserId: string | null;
   hostLabel: string | null;
-  lastSeenAt: Date | null;
+  lastSeenAt: NonNullable<Agent["lastSeenAt"]> | null;
   parameters: ScenarioParameterDefinition[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Agent["createdAt"];
+  updatedAt: Agent["updatedAt"];
 };
 
 /**

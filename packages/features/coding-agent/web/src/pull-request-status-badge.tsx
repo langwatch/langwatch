@@ -1,4 +1,5 @@
 import { Badge } from "@chakra-ui/react";
+import { readableDate } from "./short-date.ts";
 import type { IconType } from "react-icons";
 import {
   LuGitMerge,
@@ -47,7 +48,7 @@ export function PullRequestStatusBadge({
   const label = PULL_REQUEST_STATUS_LABELS[status];
 
   if (source === "snapshot") {
-    const asOf = mappedAt ? new Date(mappedAt).toLocaleDateString() : null;
+    const asOf = mappedAt ? readableDate(mappedAt).toLocaleDateString() : null;
     return (
       <Tooltip
         content={

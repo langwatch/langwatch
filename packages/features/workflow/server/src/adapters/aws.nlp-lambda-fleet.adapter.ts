@@ -9,6 +9,7 @@ import {
   DescribeLogGroupsCommand,
   DescribeLogStreamsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import { Temporal, type Instant } from "@langwatch/time";
 import {
   DeleteFunctionCommand,
   GetFunctionCommand,
@@ -56,14 +57,14 @@ export class AwsNlpLambdaFleetAdapter extends NlpLambdaFleetPort {
     return found;
   }
 
-  async tryReadLastActivityAt({ functionName }: { functionName: string }): Promise<Date | null> {
+  async tryReadLastActivityAt({ functionName }: { functionName: string }): Promise<Instant | null> {
     const logGroupName = `${LOG_GROUP_ROOT}${functionName}`;
     try {
       const response = await this.logs.send(
         new DescribeLogStreamsCommand({ logGroupName, orderBy: "LastEventTime", limit: 1 }),
       );
       const timestamp = response.logStreams?.[0]?.lastEventTimestamp;
-      return timestamp ? new Date(timestamp) : null;
+      return timestamp ? Temporal.Instant.fromEpochMilliseconds(timestamp) : null;
     } catch (error) {
       if (!isNotFound(error)) throw error;
       this.logger?.warn({ logGroupName }, "no log group for an NLP Lambda");

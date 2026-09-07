@@ -33,7 +33,7 @@ export type WorkflowVersionHistoryRecord = {
   version: string;
   autoSaved: boolean;
   commitMessage: string;
-  updatedAt: Date;
+  updatedAt: WorkflowVersion["updatedAt"];
   dsl?: WorkflowDsl;
   parent: {
     id: string;

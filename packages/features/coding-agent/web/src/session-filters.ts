@@ -1,6 +1,7 @@
 import type { SessionListRow } from "./session-list-row.ts";
+import type { ReadableDate } from "./short-date.ts";
 
-export type Period = { startDate: Date; endDate: Date };
+export type Period = { startDate: ReadableDate; endDate: ReadableDate };
 export type PeriodMode = "relative" | "absolute";
 
 /** A period the reader picked, and which way they picked it. */

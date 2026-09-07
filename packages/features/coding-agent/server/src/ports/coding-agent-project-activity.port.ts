@@ -1,3 +1,9 @@
+import type { toDate } from "@langwatch/time";
+
+/** The moment this seam carries. The project feature stamps the column through
+ *  Prisma, which takes a `Date`, so the caller converts before it crosses. */
+type ProjectActivityMoment = ReturnType<typeof toDate>;
+
 /**
  * The one project write a folded session performs.
  *
@@ -21,5 +27,8 @@ export abstract class CodingAgentProjectActivityPort {
    * implementation, not the caller: both graphs must skip the same writes, and
    * a caller that named its own would make that a coincidence.
    */
-  abstract touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void>;
+  abstract touchCodingAgentSessionSeen(input: {
+    projectId: string;
+    at: ProjectActivityMoment;
+  }): Promise<void>;
 }

@@ -1,11 +1,20 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port.ts";
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository.ts";
+
+/** A moment as a ClickHouse statement carries it. The client serialises this into
+ *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */
+type ClickHouseMoment = ReturnType<typeof toDate>;
+
+/** The moment `epochMilliseconds` names, as ClickHouse wants it. */
+const clickHouseMomentOf = (epochMilliseconds: number): ClickHouseMoment =>
+  toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds));
 
 const logger = createLogger("langwatch:evaluation:clickhouse.monitor-performance.repository");
 
@@ -114,9 +123,9 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
         query_params: {
           tenantId: input.tenantId,
           evaluatorIds: input.evaluatorIds,
-          previousStart: new Date(input.previousStartMs),
-          currentStart: new Date(input.currentStartMs),
-          end: new Date(input.endMs),
+          previousStart: clickHouseMomentOf(input.previousStartMs),
+          currentStart: clickHouseMomentOf(input.currentStartMs),
+          end: clickHouseMomentOf(input.endMs),
         },
         format: "JSONEachRow",
         clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,

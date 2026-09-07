@@ -40,6 +40,7 @@ import {
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { useVersionState } from "./history.tsx";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
+import { nowInstant } from "@langwatch/time";
 
 // Type with dataset property
 interface NodeDataWithDataset {
@@ -52,8 +53,8 @@ interface NodeDataWithDataset {
  * Strips the " - Workflow" suffix and converts to a filesystem-safe slug.
  */
 const generateWorkflowExportFilename = (workflowName: string): string => {
-  const today = new Date();
-  const formattedDate = today.toISOString().split("T")[0];
+  const today = nowInstant();
+  const formattedDate = today.toString({ fractionalSecondDigits: 3 }).split("T")[0];
   const nameWithoutSuffix = workflowName.replace(/\s*-?\s*Workflow\s*$/i, "");
   const slugifiedName = nameWithoutSuffix
     .toLowerCase()

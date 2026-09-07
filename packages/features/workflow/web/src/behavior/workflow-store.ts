@@ -41,6 +41,7 @@ export type CodedExecutionFailure = {
   error?: string;
 };
 import { findLowestAvailableName, nameToId } from "@langwatch/workflow-contract";
+import { nowInstant } from "@langwatch/time";
 
 const logger = {
   warn: (...args: unknown[]) => console.warn(...args),
@@ -1015,14 +1016,14 @@ export const store = (
     get().setWorkflowExecutionState({
       status: "error",
       ...cause,
-      timestamps: { finished_at: Date.now() },
+      timestamps: { finished_at: nowInstant().epochMilliseconds },
     });
     for (const node of get().nodes) {
       if (node.data.execution_state?.status === "running") {
         get().setComponentExecutionState(node.id, {
           status: "error",
           ...cause,
-          timestamps: { finished_at: Date.now() },
+          timestamps: { finished_at: nowInstant().epochMilliseconds },
         });
       }
     }

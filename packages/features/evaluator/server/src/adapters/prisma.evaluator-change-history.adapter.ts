@@ -7,6 +7,7 @@
  * a run, and `newEvaluatorId` on a copy, so dropping any of them silently
  * shortens a customer's history rather than failing.
  */
+import type { EvaluatorHistoryEntry } from "@langwatch/evaluator-contract";
 import { EvaluatorAuditLogPort } from "../ports/evaluator.port.ts";
 
 /** The two tables this adapter reads, named structurally. */
@@ -24,7 +25,7 @@ export type EvaluatorAuditLogDatabase = {
       Array<{
         id: string;
         action: string;
-        createdAt: Date;
+        createdAt: EvaluatorHistoryEntry["createdAt"];
         args: unknown;
         userId: string | null;
       }>

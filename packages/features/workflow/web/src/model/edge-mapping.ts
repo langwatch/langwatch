@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { Component, ComponentType, Field } from "@langwatch/workflow-contract";
+import { nowInstant } from "@langwatch/time";
 
 export type StudioMappingField = {
   name: string;
@@ -112,7 +113,7 @@ export function applyMappingChangeToEdges({
 
   if (mapping && mapping.type === "source") {
     const newEdge: Edge = {
-      id: `edge-${identifier}-${Date.now()}`,
+      id: `edge-${identifier}-${nowInstant().epochMilliseconds}`,
       source: mapping.sourceId,
       target: nodeId,
       sourceHandle: `outputs.${mapping.path.join(".")}`,
@@ -205,7 +206,7 @@ export function applyMappingChange({
 
   if (mapping?.type === "source") {
     const newEdge: Edge = {
-      id: `edge-${identifier}-${Date.now()}`,
+      id: `edge-${identifier}-${nowInstant().epochMilliseconds}`,
       source: mapping.sourceId,
       target: nodeId,
       sourceHandle: `outputs.${mapping.path.join(".")}`,

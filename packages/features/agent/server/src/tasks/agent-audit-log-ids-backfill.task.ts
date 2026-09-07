@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { fromDate, type Instant } from "@langwatch/time";
 import type {
   AgentAuditLogArgs,
   AgentAuditLogArgsInput,
@@ -55,10 +56,12 @@ export async function backfillAgentAuditLogIds({
   return { mode: execute ? "execute" : "dry-run", actions: [create, copy] };
 }
 
-function windowOf(log: AgentAuditLogRow): { gte: Date; lte: Date } {
+function windowOf(log: AgentAuditLogRow): { gte: Instant; lte: Instant } {
+  const createdAt = fromDate(log.createdAt);
+
   return {
-    gte: new Date(log.createdAt.getTime() - WINDOW_MS),
-    lte: new Date(log.createdAt.getTime() + WINDOW_MS),
+    gte: createdAt.subtract({ milliseconds: WINDOW_MS }),
+    lte: createdAt.add({ milliseconds: WINDOW_MS }),
   };
 }
 
@@ -80,7 +83,7 @@ async function backfillAction({
   missingKey: string;
   candidates: (input: { log: AgentAuditLogRow; args: AgentAuditLogArgs }) => {
     projectId: string;
-    window: { gte: Date; lte: Date };
+    window: { gte: Instant; lte: Instant };
     copiedFromAgentId?: string;
   } | null;
 }): Promise<{ action: string; missing: number; patched: number; skipped: number }> {

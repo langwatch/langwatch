@@ -4,6 +4,7 @@
  * year with it; one whose activity cannot be READ is left alone.
  */
 import type { Logger } from "@langwatch/observability";
+import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 import { NlpLambdaFleetPort } from "../ports/nlp-lambda-fleet.port.ts";
 import { NLP_LAMBDA_NAME_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
 
@@ -22,25 +23,21 @@ export class NlpLambdaCleanupService {
     fleet: NlpLambdaFleetPort;
     logger?: Pick<Logger, "info" | "warn">;
     /** Injected so the cutoffs are testable without waiting a year. */
-    now?: () => Date;
+    now?: () => Instant;
   }): NlpLambdaCleanupService {
-    return new NlpLambdaCleanupService(
-      options.fleet,
-      options.logger,
-      options.now ?? (() => new Date()),
-    );
+    return new NlpLambdaCleanupService(options.fleet, options.logger, options.now ?? nowInstant);
   }
 
   private constructor(
     private readonly fleet: NlpLambdaFleetPort,
     private readonly logger: Pick<Logger, "info" | "warn"> | undefined,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
   async sweep(): Promise<NlpLambdaCleanupReport> {
-    const at = this.now().getTime();
-    const functionCutoff = new Date(at - FUNCTION_IDLE_DAYS * DAY_MS);
-    const logGroupCutoff = new Date(at - LOG_GROUP_IDLE_DAYS * DAY_MS);
+    const at = this.now();
+    const functionCutoff = at.subtract({ milliseconds: FUNCTION_IDLE_DAYS * DAY_MS });
+    const logGroupCutoff = at.subtract({ milliseconds: LOG_GROUP_IDLE_DAYS * DAY_MS });
     const report = { functionsDeleted: 0, logGroupsDeleted: 0, skippedUnknownActivity: 0 };
 
     for (const fn of await this.fleet.listFunctions({ namePrefix: NLP_LAMBDA_NAME_PREFIX })) {
@@ -54,12 +51,12 @@ export class NlpLambdaCleanupService {
         continue;
       }
 
-      if (lastActivityAt < functionCutoff) {
+      if (Temporal.Instant.compare(lastActivityAt, functionCutoff) < 0) {
         await this.fleet.deleteFunction({ functionName: fn.name });
         report.functionsDeleted++;
       }
 
-      if (lastActivityAt < logGroupCutoff) {
+      if (Temporal.Instant.compare(lastActivityAt, logGroupCutoff) < 0) {
         await this.fleet.deleteLogGroup({ functionName: fn.name });
         report.logGroupsDeleted++;
       }
@@ -81,7 +78,7 @@ export class NlpLambdaCleanupService {
         continue;
       }
 
-      if (lastActivityAt < logGroupCutoff) {
+      if (Temporal.Instant.compare(lastActivityAt, logGroupCutoff) < 0) {
         await this.fleet.deleteLogGroup({ functionName });
         report.logGroupsDeleted++;
       }

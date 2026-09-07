@@ -173,6 +173,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@chakra-ui/react": "^3.36.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",

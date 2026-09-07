@@ -1,4 +1,5 @@
 import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
+import { toEpochMs } from "@langwatch/time";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
@@ -122,7 +123,7 @@ export function EvaluatorEditorContent({
               <WorkflowCardDisplay
                 name={workflow.name}
                 icon={workflow.icon}
-                updatedAtLabel={formatTimeAgo(new Date(workflow.updatedAt).getTime())}
+                updatedAtLabel={formatTimeAgo(toEpochMs(workflow.updatedAt))}
                 action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />

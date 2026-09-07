@@ -4,6 +4,7 @@
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { toEpochMs } from "@langwatch/time";
 import {
   ArrowUp,
   CheckSquare,
@@ -104,7 +105,7 @@ export function EvaluatorHistoryPanel({
                       </Text>
                       <Text color="fg.muted" fontSize="xs">
                         {entry.user?.name ?? entry.user?.email ?? "Unknown user"} ·{" "}
-                        {formatTimeAgo(new Date(entry.createdAt).getTime())}
+                        {formatTimeAgo(toEpochMs(entry.createdAt))}
                       </Text>
                     </VStack>
                   </HStack>

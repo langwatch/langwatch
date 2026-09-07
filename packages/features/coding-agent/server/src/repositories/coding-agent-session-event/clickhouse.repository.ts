@@ -9,7 +9,12 @@ import type {
   CodingAgentClickHousePort,
 } from "../../ports/coding-agent-clickhouse.port.ts";
 import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
-import { groupTenantsByClient } from "../coding-agent-clickhouse/clickhouse.mapper.ts";
+import { nowInstant } from "@langwatch/time";
+import {
+  clickHouseMomentOf,
+  groupTenantsByClient,
+  type ClickHouseMoment,
+} from "../coding-agent-clickhouse/clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 
@@ -53,7 +58,7 @@ export type CodingAgentSessionEventRow = CodingAgentSessionEvent;
 interface ClickHouseWriteRecord {
   TenantId: string;
   SessionId: string;
-  TimeUnixMs: Date;
+  TimeUnixMs: ClickHouseMoment;
   RecordId: string;
   EventKind: string;
   Agent: string;
@@ -96,7 +101,7 @@ interface ClickHouseWriteRecord {
   RepositoryOwner: string;
   RepositoryName: string;
   Branch: string;
-  UpdatedAt: Date;
+  UpdatedAt: ClickHouseMoment;
   _retention_days: number;
 }
 
@@ -196,7 +201,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       }
     }
 
-    const now = new Date();
+    const now = clickHouseMomentOf(nowInstant().epochMilliseconds);
     const values: ClickHouseWriteRecord[] = records.map((record) =>
       CodingAgentSessionEventsClickHouseRepository.toWriteRecord(
         record,
@@ -419,13 +424,13 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
   /** One row's columns, written verbatim: the table carries typed scalars only. */
   private static toWriteRecord(
     record: CodingAgentSessionEventRecord,
-    writtenAt: Date,
+    writtenAt: ClickHouseMoment,
     retentionDays: number,
   ): ClickHouseWriteRecord {
     return {
       TenantId: record.tenantId,
       SessionId: record.sessionId,
-      TimeUnixMs: new Date(record.timeUnixMs),
+      TimeUnixMs: clickHouseMomentOf(record.timeUnixMs),
       RecordId: record.recordId,
       EventKind: record.eventKind,
       Agent: record.agent,

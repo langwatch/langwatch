@@ -1,11 +1,20 @@
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { differenceInCalendarDays, format, startOfDay, subDays } from "@langwatch/time";
+import {
+  differenceInCalendarDays,
+  format,
+  nowInstant,
+  startOfDay,
+  subDays,
+  toEpochMs,
+  type TimeInput,
+} from "@langwatch/time";
 import { ChevronDown } from "lucide-react";
 import { LuCalendar } from "react-icons/lu";
 import { Popover } from "@langwatch/design-system/popover";
 
 import type { Period, PeriodMode } from "./session-filters.ts";
+import { readableDate, type ReadableDate } from "./short-date.ts";
 
 /**
  * The date-range control the activity tables narrow by. A copy of the old
@@ -37,7 +46,7 @@ export type RelativePresetKey = (typeof RELATIVE_PRESETS)[number]["key"];
 
 const RELATIVE_PRESETS_BY_KEY = new Map(RELATIVE_PRESETS.map((preset) => [preset.key, preset]));
 
-const getDaysDifference = (startDate: Date, endDate: Date) =>
+const getDaysDifference = (startDate: TimeInput, endDate: TimeInput) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 
 /**
@@ -45,25 +54,25 @@ const getDaysDifference = (startDate: Date, endDate: Date) =>
  * Day-based presets snap the start to start-of-day, matching the day quick
  * selectors elsewhere in the product.
  */
-export const computeRelativeWindow = (presetKey: RelativePresetKey, now: Date): Period => {
+export const computeRelativeWindow = (presetKey: RelativePresetKey, now: TimeInput): Period => {
   const preset = RELATIVE_PRESETS_BY_KEY.get(presetKey);
   if (!preset) {
-    return { startDate: startOfDay(subDays(now, 29)), endDate: now };
+    return { startDate: startOfDay(subDays(now, 29)), endDate: readableDate(now) };
   }
 
   if (preset.minutes !== null) {
-    const startDate = new Date(now.getTime() - preset.minutes * 60 * 1000);
-    return { startDate, endDate: now };
+    const startDate = readableDate(toEpochMs(now) - preset.minutes * 60 * 1000);
+    return { startDate, endDate: readableDate(now) };
   }
 
   const startDate = startOfDay(subDays(now, preset.days - 1));
-  return { startDate, endDate: now };
+  return { startDate, endDate: readableDate(now) };
 };
 
 const getPresetForRange = (
-  startDate: Date,
-  endDate: Date,
-  now: Date,
+  startDate: TimeInput,
+  endDate: TimeInput,
+  now: TimeInput,
 ): (typeof RELATIVE_PRESETS)[number] | undefined => {
   const daysDifference = getDaysDifference(startDate, endDate);
   const daysFromToday = getDaysDifference(endDate, now);
@@ -98,7 +107,7 @@ export function PeriodSelector({
    * applying.
    */
   label?: string;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: ReadableDate, endDate: ReadableDate) => void;
   setRelativePeriod: (presetKey: RelativePresetKey) => void;
   /**
    * Takes the range back off, offered as "All time". Only surfaces that show
@@ -122,7 +131,7 @@ export function PeriodSelector({
 
   const getDateRangeLabel = () => {
     if (mode === "relative") {
-      const matchedByDays = getPresetForRange(startDate, endDate, new Date());
+      const matchedByDays = getPresetForRange(startDate, endDate, nowInstant().epochMilliseconds);
       if (matchedByDays) return matchedByDays.label;
 
       const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
@@ -163,7 +172,7 @@ export function PeriodSelector({
                 <Input
                   type="datetime-local"
                   value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(new Date(e.target.value), endDate)}
+                  onChange={(e) => setPeriod(readableDate(e.target.value), endDate)}
                 />
               </Field.Root>
               <Field.Root>
@@ -171,7 +180,7 @@ export function PeriodSelector({
                 <Input
                   type="datetime-local"
                   value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(startDate, new Date(e.target.value))}
+                  onChange={(e) => setPeriod(startDate, readableDate(e.target.value))}
                 />
               </Field.Root>
             </VStack>

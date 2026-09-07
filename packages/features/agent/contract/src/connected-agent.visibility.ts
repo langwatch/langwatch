@@ -14,14 +14,16 @@
  * @see specs/agents/connected-agents.feature
  */
 
+import { nowInstant, toEpochMs, type Instant, type TimeInput } from "@langwatch/time";
+
 /** A connected agent unseen this long is treated as gone. */
 export const CONNECTED_AGENT_UNSEEN_DAYS = 30;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The oldest `lastSeenAt` that still counts as present. */
-export function connectedAgentSeenCutoff(now: Date = new Date()): Date {
-  return new Date(now.getTime() - CONNECTED_AGENT_UNSEEN_DAYS * DAY_MS);
+export function connectedAgentSeenCutoff(now: Instant = nowInstant()): Instant {
+  return now.subtract({ milliseconds: CONNECTED_AGENT_UNSEEN_DAYS * DAY_MS });
 }
 
 /**
@@ -32,11 +34,11 @@ export function connectedAgentSeenCutoff(now: Date = new Date()): Date {
  */
 export function isConnectedAgentStale({
   lastSeenAt,
-  now = new Date(),
+  now = nowInstant(),
 }: {
-  lastSeenAt: Date | string | null | undefined;
-  now?: Date;
+  lastSeenAt: TimeInput | null | undefined;
+  now?: Instant;
 }): boolean {
   if (!lastSeenAt) return false;
-  return new Date(lastSeenAt).getTime() < connectedAgentSeenCutoff(now).getTime();
+  return toEpochMs(lastSeenAt) < connectedAgentSeenCutoff(now).epochMilliseconds;
 }

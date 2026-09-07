@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { readableDate } from "../short-date.ts";
 import {
   Fragment,
   memo,
@@ -1092,7 +1093,7 @@ function RuleLine({ label }: { label: string }) {
 
 /** Local wall-clock time, the way a terminal stamps its own output. */
 function clockTime(atMs: number): string {
-  const at = new Date(atMs);
+  const at = readableDate(atMs);
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`;
 }

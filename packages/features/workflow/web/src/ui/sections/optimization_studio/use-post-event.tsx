@@ -15,6 +15,7 @@ import {
 } from "./execution-state-error.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { type WorkflowStore } from "../../../behavior/workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
@@ -119,7 +120,7 @@ export const usePostEvent = () => {
               error,
               fallbackTitle: "Couldn't run this workflow",
             }),
-            timestamps: { finished_at: Date.now() },
+            timestamps: { finished_at: nowInstant().epochMilliseconds },
           });
         }
 
@@ -130,7 +131,7 @@ export const usePostEvent = () => {
               error,
               fallbackTitle: "Couldn't run this workflow",
             }),
-            timestamps: { finished_at: Date.now() },
+            timestamps: { finished_at: nowInstant().epochMilliseconds },
           });
         }
       };
@@ -154,7 +155,7 @@ export const usePostEvent = () => {
               status: "error",
               run_id: undefined,
               error: serverEvent.payload.message,
-              timestamps: { finished_at: Date.now() },
+              timestamps: { finished_at: nowInstant().epochMilliseconds },
             });
           }
         },

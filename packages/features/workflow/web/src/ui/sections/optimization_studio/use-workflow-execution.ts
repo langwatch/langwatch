@@ -6,6 +6,7 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:studio:execution");
 
@@ -44,7 +45,7 @@ function applyWorkflowTimeout({
   setWorkflowExecutionState({
     status: "error",
     error: "Timeout",
-    timestamps: { finished_at: Date.now() },
+    timestamps: { finished_at: nowInstant().epochMilliseconds },
   });
   const stage = trigger.timeout_on_status === "waiting" ? "starting" : "stopping";
   toaster.create({

@@ -161,13 +161,13 @@ export type WorkflowListRow = Readonly<{
   name: string;
   icon: string | null;
   description: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Workflow["createdAt"];
+  updatedAt: Workflow["updatedAt"];
   latestVersionId: string | null;
   currentVersionId: string | null;
   publishedId: string | null;
   publishedById: string | null;
-  archivedAt: Date | null;
+  archivedAt: Workflow["archivedAt"];
   isEvaluator: boolean;
   isComponent: boolean;
   copiedFromWorkflowId: string | null;

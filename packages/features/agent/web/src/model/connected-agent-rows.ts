@@ -3,7 +3,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { formatDistanceStrict } from "@langwatch/time";
+import { formatDistanceStrict, nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
 import type { ConnectedAgentView } from "@langwatch/agent-contract";
 
 /** The scope a development card belongs to: a person, or a machine. */
@@ -46,18 +46,18 @@ export function presenceLabel({
 }: {
   status: "online" | "offline";
   instanceCount: number;
-  lastSeenAt: Date | string | null;
+  lastSeenAt: TimeInput | null;
   /** The moment the label is read against; the current time by default. */
-  now?: Date;
+  now?: TimeInput;
 }): string {
   if (status === "online") {
     const count = Math.max(instanceCount, 1);
     return `Online · ${count} ${count === 1 ? "instance" : "instances"}`;
   }
   if (!lastSeenAt) return "Offline";
-  const seen = new Date(lastSeenAt);
-  if (Number.isNaN(seen.getTime())) return "Offline";
-  const ago = formatDistanceStrict(seen, now ?? new Date(), {
+  const seen = toEpochMs(lastSeenAt);
+  if (Number.isNaN(seen)) return "Offline";
+  const ago = formatDistanceStrict(seen, now ?? nowInstant().epochMilliseconds, {
     addSuffix: true,
   });
   return `Offline · last seen ${ago}`;

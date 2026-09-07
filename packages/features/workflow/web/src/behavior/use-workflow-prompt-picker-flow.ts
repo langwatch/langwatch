@@ -4,6 +4,7 @@ import type { Component, NodeWithOptionalPosition } from "@langwatch/workflow-co
 import { fieldSchema } from "@langwatch/workflow-contract";
 
 import { useWorkflowStore } from "./use-workflow-store.ts";
+import { nowInstant } from "@langwatch/time";
 
 export type PromptSelection = {
   id: string;
@@ -59,7 +60,7 @@ export function useWorkflowPromptPickerFlow(port: PromptPickerPort) {
                 ? {
                     versionId: prompt.versionId,
                     versionNumber: prompt.version ?? 0,
-                    versionCreatedAt: new Date().toISOString(),
+                    versionCreatedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
                   }
                 : void 0,
               inputs: (prompt.inputs ?? []).map((input) =>

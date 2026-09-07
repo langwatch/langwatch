@@ -4,6 +4,8 @@
  * decision, the account they are applied to is the deployment's.
  */
 
+import type { Instant } from "@langwatch/time";
+
 /** One deployed function, reduced to what the policy actually reads. */
 export type NlpLambdaFunction = Readonly<{ name: string }>;
 
@@ -16,7 +18,7 @@ export abstract class NlpLambdaFleetPort {
    * "never used": a missing log group is also unknown, and the policy declines
    * to delete on an unknown rather than guessing.
    */
-  abstract tryReadLastActivityAt(input: { functionName: string }): Promise<Date | null>;
+  abstract tryReadLastActivityAt(input: { functionName: string }): Promise<Instant | null>;
 
   /** True when the function still exists in the account. */
   abstract functionExists(input: { functionName: string }): Promise<boolean>;

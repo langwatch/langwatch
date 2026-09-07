@@ -9398,54 +9398,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/agent/contract/src/connected-agent.view.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/contract/src/connected-agent.visibility.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/projections/connected-agent-presence.projection.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/repositories/agent.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/rules/agent-view.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/services/connected-agent-presence.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/tasks/agent-audit-log-ids-backfill.task.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/testing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/server/src/transport/api-rest/agent-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/web/src/features/history/ui/sections/agent-history-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/web/src/model/connected-agent-rows.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/agent/web/src/screens/agent-management/agent-management.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/analytics/contract/src/analytics.lwql-time-window.ts",
       "measured": "2026-09-06"
     },
@@ -9818,70 +9770,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/coding-agent/contract/src/testing.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/ports/coding-agent-project-activity.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-clickhouse/clickhouse.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-session/clickhouse.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/coding-agent-trace-session/clickhouse.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/repositories/session-metric-series/clickhouse.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/server/src/services/coding-agent-session-seen.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/period-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/pull-request-sessions-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/pull-request-status-badge.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/pull-requests-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/session-filters.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/sessions-toolbar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/short-date.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/coding-agent/web/src/trace/terminal-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/dashboard/server/src/ports/dashboard.port.ts",
       "measured": "2026-09-06"
     },
@@ -9939,66 +9827,6 @@
     },
     {
       "key": "temporal-only|packages/features/entitlement/server/src/transport/api-trpc/limits.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/projections/evaluation-analytics-rollup.projection.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-write.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/repositories/clickhouse/monitor-performance.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/services/evaluation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/server/src/adapters/prisma.evaluator-change-history.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/server/src/ports/evaluator.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/web/src/ui/blocks/evaluator-grid-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/checks/try-it-out.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluator-history-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluator-list-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -11219,86 +11047,6 @@
     },
     {
       "key": "temporal-only|packages/features/user/web/src/ui/sections/passkeys-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/contract/src/prisma-types.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/adapters/aws.nlp-lambda-fleet.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/ports/nlp-lambda-fleet.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/repositories/workflow.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/services/nlp-lambda-cleanup.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/services/workflow.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/server/src/transport/api-trpc/workflow.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/behavior/studio-host/use-organization-team-project.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/behavior/use-workflow-prompt-picker-flow.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/behavior/workflow-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/model/edge-mapping.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/properties/custom-properties-panel.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/publish.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-component-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-optimization-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-post-event.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/optimization_studio/use-workflow-execution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/workflow/web/src/ui/sections/workflow-list-card.tsx",
       "measured": "2026-09-06"
     },
     {

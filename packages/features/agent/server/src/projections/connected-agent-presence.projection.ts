@@ -4,7 +4,7 @@
 
 import { LAST_SEEN_WRITE_INTERVAL_MS } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { Temporal, nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 
@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:connected-agents:presence");
  * `AgentRepository` type.
  */
 export interface AgentLastSeenWriter {
-  touchLastSeenAt(input: { id: string; projectId: string; at: Date }): Promise<void>;
+  touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
 }
 
 /** When each agent's row was last written by this process. */
@@ -49,7 +49,7 @@ export class ConnectedAgentPresenceProjection {
       await repository.touchLastSeenAt({
         id: agentId,
         projectId,
-        at: new Date(now),
+        at: Temporal.Instant.fromEpochMilliseconds(now),
       });
       return true;
     } catch (error) {

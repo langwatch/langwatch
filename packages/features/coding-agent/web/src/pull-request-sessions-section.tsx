@@ -2,6 +2,7 @@ import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import { AgentLabel } from "./agent-label.tsx";
 import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
 import { formatShortDate } from "./short-date.ts";
+import { readableDate } from "./short-date.ts";
 import type React from "react";
 
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -131,7 +132,7 @@ const SessionRow: React.FC<{
     </Table.Cell>
     <Table.Cell fontSize="sm" whiteSpace="nowrap">
       {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
-      {new Date(session.startedAtMs).toLocaleTimeString(undefined, {
+      {readableDate(session.startedAtMs).toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
       })}

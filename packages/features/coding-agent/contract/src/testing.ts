@@ -1,6 +1,9 @@
+import { Temporal } from "@langwatch/time";
 import { codingAgentSessionSchema, type CodingAgentSession } from "./coding-agent.ts";
 
-export const CODING_AGENT_TEST_NOW_MS = Date.parse("2026-08-20T12:00:00.000Z");
+export const CODING_AGENT_TEST_NOW_MS = Temporal.Instant.from(
+  "2026-08-20T12:00:00.000Z",
+).epochMilliseconds;
 
 export function codingAgentSessionFixture(
   overrides: Partial<CodingAgentSession> = {},
