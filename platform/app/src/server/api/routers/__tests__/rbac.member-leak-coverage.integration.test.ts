@@ -68,7 +68,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
     // Wire the App singleton — procedures that touch
     // `getApp().organizations.*` (getOrganizationWithMembersAndTheirTeams)
     // or `assertEnterprisePlan` (the group router) require a live App.
-    // Same pattern as organization.invites.integration.test.ts (#3240
+    // Same pattern as invite.integration.test.ts (#3240
     // workaround) — bypass initializeDefaultApp() which has a require()
     // chain that fails under vitest, and instead build a test App with
     // (a) a real Prisma org repo so picker procedures resolve fixtures,
