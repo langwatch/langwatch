@@ -73,24 +73,24 @@ describe("given the API process start path", () => {
       const { calls, status } = runScript({ script: "start" });
 
       expect(status).toBe(0);
+      // One invocation, three names: one process resolves the secrets and
+      // parses the config for all three steps. See specs/setup/
+      // boot-sequence.feature.
       const tasks = calls.filter((call) => call.includes(" task "));
-      expect(tasks.map((call) => call.split(" task ")[1])).toEqual([
-        "prisma-migrate",
-        "clickhouse-migrate",
-        "lwql-provision",
-      ]);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]!.split(" task ")[1]).toBe("prisma-migrate clickhouse-migrate lwql-provision");
 
       const entryPoint = calls.findIndex((call) => call.includes("api.entrypoint.ts"));
       expect(entryPoint, "the entry point must run").toBeGreaterThan(-1);
       expect(calls.indexOf(tasks.at(-1)!)).toBeLessThan(entryPoint);
     });
 
-    /** @scenario "The API process applies pending schema migrations before it serves" */
-    it("runs the same step from the development start path", () => {
+    /** @scenario "The development start path leaves preparation to the stack" */
+    it("does not migrate from the development start path", () => {
       const { calls, status } = runScript({ script: "dev" });
 
       expect(status).toBe(0);
-      expect(calls.filter((call) => call.includes(" task ")).length).toBe(3);
+      expect(calls.filter((call) => call.includes(" task "))).toEqual([]);
       expect(calls.some((call) => call.includes("api.entrypoint.ts"))).toBe(true);
     });
   });

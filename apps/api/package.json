@@ -32,10 +32,10 @@
     }
   },
   "scripts": {
-    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate && pnpm -s task clickhouse-migrate && pnpm -s task lwql-provision",
+    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision",
     "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",
     "predev": "node ../../dev/scripts/ensure-built.mjs",
-    "dev": "pnpm -s run start:prepare:db && node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",
+    "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",
     "task": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/tasks/tasks.entrypoint.ts",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",

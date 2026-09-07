@@ -550,15 +550,16 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	return nil
 }
 
-// prepareDBShell migrates both datastores before any service boots.
+// prepareDBShell prepares both datastores before any service boots.
 //
-// It names one script per store rather than a single `start:prepare:db`: that
-// script was the platform application's own composite and went with it, and
-// the two stores are migrated by two different applications now — Prisma from
-// the schema package, ClickHouse by the API process's own task. Chained with
-// `&&` so a failed Prisma migration never lets the ClickHouse one report
-// success on a half-migrated stack.
-const prepareDBShell = "pnpm -s run prisma:migrate && pnpm -s run clickhouse:migrate"
+// One script, and one process behind it: `start:prepare:db` hands apps/tasks
+// all three task names at once, so the Prisma migration, the ClickHouse
+// migration and LangWatchQL provisioning resolve secrets and parse config
+// once between them, run in that order, and stop at the first failure. The
+// same script is what dev/scripts/dev-stack.sh runs, and the lanes this
+// orchestrator supervises no longer migrate on their own — a restarted lane
+// would otherwise migrate again on every crash.
+const prepareDBShell = "pnpm -s run start:prepare:db"
 
 // runSeed always seeds. The seed is idempotent (a no-op once the stable local
 // project + API key exist), so every `up` guarantees the same migrations AND

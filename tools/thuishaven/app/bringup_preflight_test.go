@@ -33,7 +33,7 @@ func TestPreparePlaySandboxStopsWhenTheMigrationsFail(t *testing.T) {
 	}
 
 	// Only the migration fails, so a passing prep would have been free to continue.
-	sup := &fakeSupervisor{err: errors.New("migrate exploded"), errOn: "prisma:migrate"}
+	sup := &fakeSupervisor{err: errors.New("migrate exploded"), errOn: "start:prepare:db"}
 	o := &Orchestrator{sup: sup, log: zap.NewNop()}
 
 	err := o.preparePlaySandbox(context.Background(), PlaySandbox{Checkout: root}, domain.Stack{})

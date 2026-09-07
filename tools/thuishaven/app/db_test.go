@@ -118,8 +118,8 @@ func TestDBReset(t *testing.T) {
 			if len(sup.shells) != 2 {
 				t.Fatalf("shells = %v, want prepare then seed", sup.shells)
 			}
-			if !strings.Contains(sup.shells[0], "prisma:migrate") || !strings.Contains(sup.shells[0], "clickhouse:migrate") {
-				t.Errorf("shells[0] = %q, want both stores' migrations", sup.shells[0])
+			if !strings.Contains(sup.shells[0], "start:prepare:db") {
+				t.Errorf("shells[0] = %q, want the one preparation script", sup.shells[0])
 			}
 			if !strings.Contains(sup.shells[1], "prisma:seed") {
 				t.Errorf("shells[1] = %q, want the seed", sup.shells[1])
@@ -179,7 +179,7 @@ func TestDBReset(t *testing.T) {
 	})
 
 	t.Run("given migrations fail on the fresh database", func(t *testing.T) {
-		sup := &fakeSupervisor{err: errors.New("migrate boom"), errOn: "prisma:migrate"}
+		sup := &fakeSupervisor{err: errors.New("migrate boom"), errOn: "start:prepare:db"}
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, the error propagates and the seed never runs", func(t *testing.T) {

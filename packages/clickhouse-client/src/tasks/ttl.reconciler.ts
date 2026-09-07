@@ -362,7 +362,10 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
       const tableInfo = tableInfoByName.get(tableConfig.table);
       if (!tableInfo) {
         if (options.verbose) {
-          logger.info({ table: tableConfig.table }, "Table not found, skipping TTL reconciliation");
+          logger.debug(
+            { table: tableConfig.table },
+            "Table not found, skipping TTL reconciliation",
+          );
         }
         continue;
       }
@@ -395,7 +398,7 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
           updatedCount++;
         } else {
           if (options.verbose) {
-            logger.info(
+            logger.debug(
               { table: tableConfig.table, policy: tableInfo.storage_policy },
               `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping cold-storage TTL`,
             );

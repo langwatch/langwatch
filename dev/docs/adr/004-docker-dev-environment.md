@@ -416,3 +416,40 @@ is started.
 - The lanes are still not selectable. `haven up ±workers`, `±api` and `±backend`
   are refused by name; `+gateway` / `-nlp` still choose which services the `go`
   lane hosts, and a `go` lane hosting neither is not started at all.
+
+## Amendment: the boot sequence — prepare once, quietly, under a lock (2026-09-07)
+
+A haven stack printed its boot three times over. `haven up` migrated both
+datastores itself and then the api lane's own `dev` script migrated them again,
+as three separate Node processes — three secret resolutions, three config
+parses, three announcements — and because the lane is supervised, every crash
+and every file change replayed all three.
+
+The boot has one order: **validate the secrets and the configuration, prove the
+process boots, migrate, then report healthy.**
+
+- **Preparation is one invocation.** `apps/tasks` takes several task names in
+  one go: `pnpm -s task prisma-migrate clickhouse-migrate lwql-provision` is
+  one process that resolves secrets once, runs the three in order, and stops at
+  the first failure. `start:prepare:db` is that line, in the workspace root and
+  in `apps/api`.
+- **It runs once per stack start, not once per lane.** `dev/scripts/dev-stack.sh`
+  runs it before the first lane, and haven's `prepare` step runs the same
+  script. No lane's `dev` command prepares, so a reload and a crash restart
+  bring the process back and migrate nothing. A deployed process is unchanged:
+  `apps/api`'s `start` still prepares and only then serves, which is what keeps
+  the API from listening on a schema it was not built for.
+- **A second runner waits.** The three migration tasks run under a Postgres
+  session-level advisory lock on a key derived from a fixed string, taken on a
+  connection of the lock's own. A runner that cannot take it says once that it
+  is waiting, blocks, and then finds nothing pending. Rolling deploys and two
+  developers starting stacks at the same moment serialise instead of rebuilding
+  a schema underneath one another.
+- **An idle preparation is quiet.** The goose bootstrap statements, the
+  connection string, the migrations directory, the storage-policy notice and
+  the per-table TTL notes describe how the run works rather than what it did;
+  they are debug now. What stays at info is one line per store, and every
+  migration that actually applied.
+
+Spec: `specs/setup/boot-sequence.feature`. See also
+`specs/setup/schema-migrations-on-start.feature` for the deployed start path.

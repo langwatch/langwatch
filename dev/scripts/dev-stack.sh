@@ -11,9 +11,9 @@
 #   backend  tools/dev-runtime — the API application AND the worker application
 #                                in ONE Node process: tRPC + REST + SSE on
 #                                PORT + 1000, worker metrics on PORT - 2561.
-#                                It migrates both schemas first (apps/api's
-#                                start:prepare:db), so a stack has exactly one
-#                                migrator. Restart-on-change, debounced.
+#                                Restart-on-change, debounced. It does not
+#                                migrate — this script does, once, before any
+#                                lane starts.
 #   go       cmd/service       — aigateway AND nlpgo in ONE Go process, on the
 #                                same two ports they bind on their own.
 #   langy    services/langyagent (Go) — its own lane: it owns per-conversation
@@ -221,6 +221,19 @@ if [ "$LANGY_LANE_DECISION" = "start" ]; then
   START_LANGY_COMMAND="$(langy_lane_command "$REPO_ROOT" "$LANGY_LANE_PORT")"
 fi
 
+# --- migrate, once ---------------------------------------------------------
+
+# The stack has exactly one migrator and it is this line. The lanes below
+# reload on every file change and are restarted when they crash, so a
+# migration inside one of them runs again on each of those — which is how a
+# crashlooping api lane came to re-run three migration processes every second.
+# `haven up` owns the same step for a haven stack (its `prepare` step) and
+# reaches the same script; apps/tasks runs the three tasks in one process,
+# under an advisory lock, so two stacks starting at once serialise rather than
+# rebuilding a schema underneath one another.
+echo "  → preparing the databases (once for this stack)"
+pnpm -s -C "$REPO_ROOT" run start:prepare:db
+
 # --- the lanes -------------------------------------------------------------
 
 COMMANDS=()
@@ -256,8 +269,8 @@ fi
 
 # Last, and one lane: the API application and the worker application share this
 # process. It boots the worker first, so the queue consumers are attached
-# before anything can enqueue, and it migrates both schemas before either
-# starts.
+# before anything can enqueue. It does not migrate: the step above did, once,
+# and this lane restarts.
 add_lane backend "$RUNTIME_ENV pnpm -s --filter @langwatch/dev-runtime dev"
 
 NAMES_STR=$(

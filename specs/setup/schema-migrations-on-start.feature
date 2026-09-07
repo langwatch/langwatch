@@ -7,9 +7,11 @@
 # have. A developer's database silently fell behind and sign-up answered 500
 # on a missing column.
 #
-# The step belongs to the API process, because the API is the one process that
-# owns the schema: the worker and the browser application never migrate, so a
-# stack has exactly one migrator however many copies of it run.
+# The step belongs to the API process when a process is DEPLOYED, because the
+# API is the one process that owns the schema: the worker and the browser
+# application never migrate, so a deployment has exactly one migrator. Locally
+# it belongs to whoever starts the stack, once, because a lane that reloads and
+# restarts would otherwise migrate again every time it came back.
 #
 # See dev/docs/adr/004-docker-dev-environment.md and specs/setup/
 # dev-process-topology.feature.
@@ -19,17 +21,21 @@ Feature: Schema migrations run before the API serves
   I want both schemas migrated before the API accepts a request
   So that no process ever serves against a schema it was not built for
 
-  # The step is one script, `start:prepare:db` in apps/api, and every entry
-  # point reaches it through the API's own start path:
+  # The step is one script, `start:prepare:db`, and who runs it depends on
+  # whether a process is being deployed or a stack is being started:
   #
-  #   pnpm dev            dev/scripts/dev-stack.sh -> the api lane's `dev`
-  #   pnpm dev:api        the api lane's `dev`
-  #   make haven up       the api lane's `dev`, same script
-  #   the image           CMD -> apps/api `start`
+  #   the image           CMD -> apps/api `start` -> prepare, then serve
+  #   pnpm dev            dev/scripts/dev-stack.sh, once, before the lanes
+  #   make haven up       haven's own `prepare` step, once, before the lanes
   #
-  # It runs three tasks from apps/tasks in this order, sequenced so a failure
-  # stops the boot: prisma-migrate, clickhouse-migrate, lwql-provision.
-  # LangWatchQL provisioning reads both schemas, so it cannot run before either.
+  # A supervised lane is restarted on a code change and on a crash, so it does
+  # not prepare: that is what made a crashlooping api lane migrate every
+  # second. See specs/setup/boot-sequence.feature.
+  #
+  # It runs three tasks from apps/tasks in ONE process, in this order,
+  # sequenced so a failure stops the boot: prisma-migrate, clickhouse-migrate,
+  # lwql-provision. LangWatchQL provisioning reads both schemas, so it cannot
+  # run before either.
 
   @unit
   Scenario: The API process applies pending schema migrations before it serves
@@ -37,6 +43,12 @@ Feature: Schema migrations run before the API serves
     When the API process is started
     Then the Postgres migrations are applied, then the ClickHouse ones, then LangWatchQL is provisioned
     And only then does the API entry point run
+
+  @unit
+  Scenario: The development start path leaves preparation to the stack
+    Given a lane that is restarted on a code change and on a crash
+    When the lane's development command runs
+    Then it starts the process it supervises and migrates nothing
 
   @unit
   Scenario: A failed migration stops the boot instead of serving

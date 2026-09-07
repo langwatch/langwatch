@@ -180,7 +180,7 @@ function checkGooseBinary(): void {
 }
 
 async function preflight(config: ClickHouseConfig): Promise<void> {
-  logger.info("Running pre-flight checks...");
+  logger.debug("Running pre-flight checks...");
 
   // Check goose binary exists
   checkGooseBinary();
@@ -198,7 +198,7 @@ async function preflight(config: ClickHouseConfig): Promise<void> {
     );
   }
 
-  logger.info("Pre-flight checks passed");
+  logger.debug("Pre-flight checks passed");
 }
 
 interface DatabaseInfo {
@@ -247,14 +247,14 @@ async function executeBootstrapSQL(
   verbose?: boolean,
 ): Promise<void> {
   if (verbose) {
-    logger.info({ sql }, "Executing bootstrap SQL");
+    logger.debug({ sql }, "Executing bootstrap SQL");
   }
   await client.command({ query: sql });
 }
 
 // Must run BEFORE goose so goose_db_version is created with correct engine for replication
 async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): Promise<void> {
-  logger.info(
+  logger.debug(
     { database: config.database, clusterName: config.clusterName },
     "Bootstrapping ClickHouse database",
   );
@@ -339,7 +339,7 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
     const rows = await result.json();
     config.hasLocalPrimaryPolicy = rows.length > 0;
     if (!config.hasLocalPrimaryPolicy) {
-      logger.info(
+      logger.debug(
         "Storage policy 'local_primary' not found — migrations will use 'default' policy",
       );
     }
@@ -361,7 +361,7 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
     config.requiresDimensionCompat = (await result.json()).length > 0;
   });
 
-  logger.info("Bootstrap completed");
+  logger.debug("Bootstrap completed");
 }
 
 function buildMigrationEnvVars({
@@ -428,13 +428,24 @@ function buildMigrationEnvVars({
 }
 
 function logConfig(config: ClickHouseConfig): void {
-  logger.info(
+  logger.debug(
     {
       database: config.database,
       clusterName: config.clusterName,
     },
     "ClickHouse migration configuration",
   );
+}
+
+/**
+ * The migration versions goose reports as applied, read from its own output.
+ *
+ * Goose prints one `OK   00042_name.sql` line per migration it ran and nothing
+ * at all when there is nothing to run, so an empty answer here is the idle
+ * boot: the run happened, it changed nothing, and it has nothing to say.
+ */
+export function appliedMigrationVersions(output: string): readonly string[] {
+  return [...output.matchAll(/^OK\s+(\d+)[^\n]*$/gm)].map((match) => match[1]!);
 }
 
 function executeGoose({
@@ -457,10 +468,10 @@ function executeGoose({
 
   if (options.verbose) {
     logConfig(config);
-    logger.info({ migrationsDir }, "Goose migrations directory");
+    logger.debug({ migrationsDir }, "Goose migrations directory");
     // Log connection string with password masked
     const maskedConnStr = config.gooseConnectionString.replace(/:([^:@]+)@/, ":***@");
-    logger.info({ connectionString: maskedConnStr }, "Goose connection string");
+    logger.debug({ connectionString: maskedConnStr }, "Goose connection string");
   }
 
   const args = [
@@ -493,9 +504,13 @@ function executeGoose({
 
   const output = [result.stderr, result.stdout].filter(Boolean).join("\n");
 
-  // In verbose mode, print the output
-  if (options.verbose) {
-    logger.info({ gooseOutput: output, exitCode: result.status }, "Goose output");
+  // A run that changed the schema is news; the plumbing behind an idle one is
+  // not, and printing it on every boot is what buried the line that mattered.
+  const applied = appliedMigrationVersions(output);
+  if (applied.length > 0) {
+    logger.info({ applied: applied.length, versions: applied }, "Applied ClickHouse migrations");
+  } else {
+    logger.debug({ gooseOutput: output, exitCode: result.status }, "Goose output");
   }
 
   if (result.status !== 0) {
@@ -514,7 +529,7 @@ function executeGoose({
 export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   const config = parseConnectionUrl(options.connectionUrl, options.database);
 
-  logger.info("Running ClickHouse migrations...");
+  logger.debug("Running ClickHouse migrations...");
 
   // Pre-flight checks
   await preflight(config);
@@ -527,7 +542,7 @@ export async function migrateUp(options: GooseOptions = {}): Promise<string> {
   // setting, then everything from 00087 on runs without it. On every other
   // server this is a single pass, exactly as before.
   if (config.requiresDimensionCompat) {
-    logger.info(
+    logger.debug(
       { throughVersion: LAST_MIGRATION_NEEDING_DIMENSION_COMPAT },
       `This ClickHouse enforces ${AGGREGATING_DIMENSION_SETTING}; replaying the migrations that predate 00087 with it relaxed`,
     );
