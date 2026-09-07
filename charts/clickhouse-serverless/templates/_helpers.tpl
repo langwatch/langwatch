@@ -32,6 +32,36 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end -}}
 {{- end -}}
 
+{{/* LWQL secret name: the operator-configured lwql.existingSecret, else the
+     ClickHouse auth Secret (which is where an autogen install keeps its keys). */}}
+{{- define "clickhouse-serverless.lwqlSecretName" -}}
+  {{- if .Values.lwqlAccessModel.existingSecret -}}
+    {{- tpl .Values.lwqlAccessModel.existingSecret . -}}
+  {{- else -}}
+    {{- include "clickhouse-serverless.secretName" . -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* Effective host for the lwql_postgres bridge (ClickHouse -> PostgreSQL).
+     Empty means the bridge is disabled: this subchart cannot tell an external
+     PostgreSQL from a chart-managed one (its .Values is only its own subtree
+     plus global — verified), so it never guesses a host. The langwatch parent
+     chart's OWN values.yaml supplies '{{ .Release.Name }}-postgresql' as ITS
+     default for clickhouse.lwqlAccessModel.postgres.host — a tpl string this
+     helper evaluates below — so a default chart-managed-PostgreSQL install
+     still gets a working bridge without this helper ever needing to see
+     postgresql.chartManaged. Every external-PostgreSQL example/profile resets
+     that key back to "" to cancel the parent default, which is what actually
+     disables the bridge (see examples/overlays/postgres-external.yaml). A
+     standalone subchart install (no parent langwatch chart) sees this
+     subchart's own default of "" and the bridge stays disabled unless you set
+     a host yourself. */}}
+{{- define "clickhouse-serverless.lwqlPgHost" -}}
+  {{- if .Values.lwqlAccessModel.postgres.host -}}
+    {{- tpl .Values.lwqlAccessModel.postgres.host . -}}
+  {{- end -}}
+{{- end -}}
+
 {{/* ServiceAccount name */}}
 {{- define "clickhouse-serverless.serviceAccountName" -}}
   {{- if .Values.serviceAccount.name -}}
@@ -87,6 +117,57 @@ app.kubernetes.io/component: keeper
   {{- end }}
   {{- if and (gt (int .Values.replicas) 1) (eq (mod (int .Values.replicas) 2) 0) }}
     {{- fail "replicas must be odd when greater than 1 (required for Keeper raft quorum)" }}
+  {{- end }}
+  {{- include "clickhouse-serverless.validateTransition" . }}
+{{- end -}}
+
+{{/* Transition guard: refuse to scale an EXISTING single-node release into a
+     replicated topology.
+
+     Measured on kind against langwatch/clickhouse-serverless (issue #1168,
+     P1.7), upgrading a release from replicas=1 to replicas=3 leaves the
+     existing tables as plain MergeTree on pod-0 only. The new replicas come up
+     with empty data directories: per-pod `SELECT count()` returned the full
+     count on pod-0 and `Code: 81 ... Database up does not exist
+     (UNKNOWN_DATABASE)` on pods 1 and 2, and five identical distributed
+     `SELECT count()` calls returned the full count four times and
+     UNKNOWN_DATABASE once. A user issuing the same query twice gets different
+     answers, with no error to tell them the topology changed underneath. The
+     five SQL-defined access-entity classes are likewise not migrated. There is
+     no migration code on this path, so the chart refuses it rather than letting
+     it half-succeed.
+
+     LOOKUP SOURCE. The current replica count is read from the live
+     StatefulSet's spec.replicas, not from the release's recorded values: Helm
+     does not expose the previous release's values to templates, and
+     spec.replicas is the topology that actually exists — it stays correct even
+     if someone scaled the StatefulSet outside Helm.
+
+     WHEN THE GUARD IS INERT, DECLARED. `lookup` returns nil whenever the
+     renderer has no cluster access. Under ArgoCD the repo-server renders
+     without a cluster connection (see secret.yaml's HISTORY note — the same
+     nil-lookup behaviour caused the credential-rotation postmortem), and
+     `helm template` behaves the same way. In those contexts this guard is
+     SILENTLY INERT and a 1 -> 3 transition will not be blocked. That is
+     accepted deliberately: a lookup-based guard cannot do better, and failing
+     closed on nil would break every ArgoCD sync and every `helm template`,
+     including legitimate ones. The guard is a safety net for the interactive
+     `helm upgrade` path, not a security boundary.
+
+     It is also scoped to upgrades only (.Release.IsUpgrade), so a fresh
+     install at any replica count is never blocked — including a fresh install
+     into a namespace where an unrelated StatefulSet of the same name lingers. */}}
+{{- define "clickhouse-serverless.validateTransition" -}}
+  {{- if .Release.IsUpgrade }}
+    {{- $desired := int .Values.replicas }}
+    {{- if gt $desired 1 }}
+      {{- $sts := lookup "apps/v1" "StatefulSet" .Release.Namespace (include "clickhouse-serverless.fullname" .) }}
+      {{- if $sts }}
+        {{- if eq (int $sts.spec.replicas) 1 }}
+          {{- fail (printf "unsupported transition: this release is running replicas=1 and this upgrade requests replicas=%d. Scaling an existing single-node ClickHouse release into a replicated topology is not supported: existing tables stay plain MergeTree on pod-0, so the new replicas start with empty data directories and identical distributed queries return different answers depending on which replica they land on. SQL-defined access entities (users, grants, row policies, settings profiles, named collections) are not migrated either. To run replicated, install a NEW release at replicas=%d and migrate data explicitly; or set replicas=1 to leave this release unchanged." $desired $desired) }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
   {{- end }}
 {{- end -}}
 

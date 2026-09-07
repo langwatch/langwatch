@@ -56256,7 +56256,7 @@ Langy sets these up with `langwatch monitor create` and `langwatch trigger creat
 
 ---
 title: Local development
-description: "Share a folder on your machine with Langy: it edits your code there, runs your own toolchain, and opens the pull request from your git identity, with every command checked in the chat."
+description: "Share a folder on your machine with Langy: it edits your code there, runs your own tests, and opens the pull request for you"
 sidebarTitle: Local development
 keywords:
   - langy share control
@@ -56270,34 +56270,40 @@ Langy asks which way to use the first time a request needs a code change. Reques
 
 <Info>**Also check:** [Pull requests](/langy/pull-requests) (the GitHub path), [The sandbox](/langy/security/sandbox) (where Langy itself runs), [CLI](/integration/cli) (the `langwatch` command).</Info>
 
-## How a shared folder works
+## How does sharing a folder work
 
 <Steps>
   <Step title="Ask for a change">
-    Ask Langy for something that lives in your code: "instrument my traces", "fix the agent behind this failing scenario", "add a plan parameter to my connected agent". Langy explains what it will change and shows the code access card with two options: share your local folder, or use GitHub.
+    Ask Langy for something in your code: "instrument my traces", "fix the agent behind this failing scenario", "add a plan parameter to my connected agent". Langy explains what it will change and shows the code access card with two options.
+
+    ![The code access card in the Langy chat, with the options Share my local folder and Use GitHub](/images/langy/local-development/code-access-card.png)
   </Step>
   <Step title="Run the command in the folder">
-    Pick "Share my local folder". The card shows one command. Run it in the folder you want Langy to work in:
+    Pick **Share my local folder**. The card shows one command. Run it in the folder you want Langy to work in:
 
     ```bash
     npx langwatch@latest langy --share-control
     ```
 
-    The command signs you in when you are not signed in yet, then shows the request from your conversation and asks you to approve it in the terminal. The request expires after 15 minutes.
+    This signs you in if you are not signed in yet, then shows the request from your conversation. Press Enter to approve it. The request expires after 15 minutes.
   </Step>
   <Step title="Langy works in the folder">
-    Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When it is not, Langy reports the branch name instead.
+    Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When `gh` is not signed in, Langy reports the branch name instead.
   </Step>
   <Step title="Disconnect">
-    Press Ctrl-C in the terminal to disconnect. The chat shows the folder as disconnected. The next request that needs code access asks again.
+    Press Ctrl-C in the terminal to disconnect. The chat shows the folder as disconnected, and the next request that needs code access asks again.
   </Step>
 </Steps>
 
-The connection belongs to one conversation. A second code change in the same conversation uses the folder that is already connected. A new conversation asks again.
+The connection belongs to one conversation. Later code changes in the same conversation use the connected folder, and each new conversation asks again.
 
-{/* TODO screenshot: the code access card in the waiting state next to the terminal approve prompt */}
+The video below is one full run, the chat on the left and the terminal on the right: the code access card, the approval in the terminal, Langy reading the project, each command approved in the terminal or on the card, and the pull request link at the end.
 
-## What Langy can do in the folder
+<video controls autoPlay muted playsInline width="100%">
+  <source src="/media/videos/langy-local-development.webm" type="video/webm" />
+</video>
+
+## What can Langy do in the folder
 
 Every action runs on your machine, inside the shared folder, through the CLI. Langy cannot see or touch anything outside it.
 
@@ -56307,12 +56313,12 @@ Every action runs on your machine, inside the shared folder, through the CLI. La
 | Edit a file, write a new file | No |
 | Run a read-only command (`ls`, `cat`, `git status`, `git diff`, `git log`, `node -v`, and similar) | No |
 | Run any other command (`pnpm test`, `git push`, `rm`) | Yes |
-| Read a secret file (`.env`, `*.pem`, `*.key`, `id_rsa`, `.netrc`) | Yes, even to read |
+| Read a secret file (`.env`, `.envrc`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `.netrc`, `.npmrc`, `.git-credentials`, and similar) | Yes, even to read |
 | Reach a path outside the folder, or use `sudo` | Refused in every mode |
 
 Edits inside the folder run without a question because Langy works on its own branch: your working state and your default branch stay untouched, and the pull request is where you review the change.
 
-A refused action is not silent. The CLI tells Langy why it was refused, and Langy finds another way inside the folder or says what it could not do.
+When the CLI refuses an action, it tells Langy why, so Langy finds another way inside the folder or says what it could not do.
 
 ## Permissions
 
@@ -56322,33 +56328,40 @@ When a command needs approval, you can answer in the terminal or in the chat. Th
 - **Allow once** runs this command.
 - **Deny** refuses it. Langy does not run it again in that turn. In the terminal you can add one line saying what to do instead.
 
-The first answer wins. Answer in the terminal and the card settles and says so, for example "Answered in the terminal: allowed "uv" for this session". Answer on the card and the terminal closes its selector and prints the answer.
+The first answer wins. Answer in the terminal and the card settles with the answer, for example `Answered in the terminal: allowed "uv" for this session`. Answer on the card and the terminal closes its selector and prints the answer.
 
-When the command line is not running in a terminal, in a pipe or in CI, it shows no selector and the card is the only way to answer.
+When the CLI runs without a terminal, for example in a pipe or in CI, it shows no selector and the card is the only way to answer.
 
-A card that gets no answer within 10 minutes expires, and Langy ends its turn and says what it still needs.
+The card expires after 10 minutes without an answer. Langy then ends its turn and says what it still needs.
 
 ### Skip permission checks
 
-The permission card carries a switch to skip all permission checks for the rest of the connection. It is on the card only, because the model gate behind it lives on the server. Refusals for paths outside the folder and for `sudo` still apply.
+The permission card has a switch, **Skip all permission checks this session (I accept the risk)**, that turns approvals off for the rest of the connection. The switch is on the card only, not in the terminal selector. Refusals for paths outside the folder and for `sudo` still apply.
 
-The switch is enabled only for models your provider settings allow. Open the provider in **Settings > Model providers**, section **Advanced**, field **Models allowed to skip permission checks**: one pattern per line. The defaults allow the frontier OpenAI and Anthropic models and no others. When the conversation's model is not on the list, the switch is disabled and says so.
+The switch is enabled only for models your provider settings allow. Open the provider in **Settings > Model providers**, section **Advanced**, field **Models allowed to skip Langy permission checks**, and enter one pattern per line. Each pattern is a regular expression matched against the model name without the provider prefix. When the conversation's model matches none of them, the switch is disabled and says so.
 
-## Remembering GitHub
+The defaults:
 
-The code access card has a "Remember this choice" option for GitHub. With it on, later requests skip the card and show a status line, "Using GitHub", with a **Change** link that clears the choice and asks again.
+- OpenAI: `^gpt-5\.6-(terra|sol)$`, `^gpt-5\.([7-9]|\d{2,})(?!.*-(luna|mini|nano))` and `^gpt-([6-9]|\d{2,})(?!.*-(luna|mini|nano))`
+- Anthropic: `^claude-(opus|fable)-([5-9]|\d{2,})`
+- Every other provider: none, so the switch stays disabled until you add patterns
 
-The same choice is visible in **Settings > Integrations**, next to the GitHub connection. A shared local folder is never remembered: it is one command away and belongs to one conversation.
+## Remember the GitHub choice
 
-## What the CLI does and does not do
+The code access card has a **Remember this choice** option for GitHub. With it on, later requests skip the card and show a status line, **Using GitHub (remembered)**, with a **Change** link that clears the choice and asks again.
+
+The same choice is visible in **Settings > Integrations**, next to the GitHub connection. The local folder choice is never remembered, because the connection belongs to one conversation and is one command away.
+
+## What does the CLI do on your machine
 
 - The connection is outbound only, from your machine to LangWatch. The CLI opens no listening port and accepts no inbound connection.
 - The CLI receives a key scoped to the one conversation. Ctrl-C ends it. You can also disconnect from the chat.
+- A command stops after 5 minutes unless Langy asks for a longer limit, up to 15 minutes.
 - Command output returns to Langy when the command ends, capped at 64 KiB. Longer output is kept in a log file under `.langwatch/langy-logs/` in the folder, and Langy gets the path.
-- A server Langy starts in the background keeps running after the CLI exits. Langy reports its process id and log path.
-- The CLI is not installed on your machine. `npx langwatch@latest` runs it from the registry.
+- Processes Langy starts in the background, such as a development server, keep running after the CLI exits. Langy reports the process id and the log path.
+- You do not install the CLI globally: `npx langwatch@latest` runs it through npm.
 
-Self-hosting? The CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.
+On a self-hosted instance the CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.
 
 ---
 

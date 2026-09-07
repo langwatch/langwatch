@@ -122,4 +122,48 @@ describe("given the PostgreSQL reader role statements", () => {
       ).toThrow(/at least one approved view/);
     });
   });
+
+  // The password is the one caller-supplied value that reaches the SQL as a
+  // literal rather than a quoted identifier. A random-generated chart password
+  // can contain a single quote; without doubling it, the quote closes the
+  // literal early and the ALTER ROLE either errors or, worse, parses into a
+  // different statement.
+  describe("when the password contains a single quote", () => {
+    it("doubles the quote so the literal stays closed", () => {
+      const statements = postgresReaderRoleStatements({
+        reader: readerRole({ password: "pa'ss'word" }),
+      });
+      const alter = statements.find((statement) =>
+        statement.includes("WITH LOGIN PASSWORD"),
+      );
+
+      expect(alter).toContain("PASSWORD 'pa''ss''word'");
+      expect(alter).not.toContain("PASSWORD 'pa'ss'word'");
+    });
+  });
+
+  // Re-provisioning an already-provisioned server must be a no-op on the role's
+  // existence: the create is guarded by a pg_roles probe, and every property is
+  // converged with ALTER. The probe compares against the unquoted spelling on
+  // purpose (see postgresReaderRoleStatements).
+  describe("when the role may already exist", () => {
+    it("guards CREATE ROLE behind a pg_roles existence probe", () => {
+      const statements = postgresReaderRoleStatements({
+        reader: readerRole({ role: "lwql_ro" }),
+      });
+      const create = statements[0];
+
+      expect(create).toContain(
+        "IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lwql_ro')",
+      );
+      expect(create).toContain('CREATE ROLE "lwql_ro" LOGIN');
+      // Password and limits are converged unconditionally, so an existing role
+      // still lands on the intended state.
+      expect(
+        statements.some((statement) =>
+          statement.includes('ALTER ROLE "lwql_ro" WITH LOGIN PASSWORD'),
+        ),
+      ).toBe(true);
+    });
+  });
 });

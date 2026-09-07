@@ -281,8 +281,46 @@ test_replicated() {
   assert_eq "Row replicated to pod-1" \
     "$(ch_query "$pod1" 'SELECT count() FROM e2e.events')" "1"
 
+  test_replicated_no_keeper_access_stores
+
   helm_uninstall
   pass "helm uninstall (3-node)"
+}
+
+# Design C (issue langwatch-saas#1168): a chart-managed server writes NO
+# keeper-backed access or named-collection store. The whole AC8 defect class —
+# a merged `<user_directories>` whose `replace` did or did not take, entities
+# stranded node-local, a startup-fatal keeper-backed named-collection store — is
+# deleted rather than mitigated. The preprocessed config is what the server
+# actually merged, so asserting on it proves neither store reaches any replica.
+#
+# @scenario "No replica carries a keeper-backed access or named-collection store"
+test_replicated_no_keeper_access_stores() {
+  local pod="${RELEASE}-clickhouse-0"
+  local pod1="${RELEASE}-clickhouse-1"
+  local pod2="${RELEASE}-clickhouse-2"
+
+  local merged_pod merged_config
+  for merged_pod in "$pod" "$pod1" "$pod2"; do
+    wait_ch_ready "$merged_pod"
+    merged_config=$(kc exec "$merged_pod" -- \
+      cat /var/lib/clickhouse/preprocessed_configs/config.xml)
+
+    # No chart-written user_directories override at all: no `replace`, and no
+    # keeper access path. The server keeps its default local_directory.
+    if grep -qE '<user_directories[^>]+replace=' <<< "$merged_config"; then
+      fail "$merged_pod: merged config still carries a replace-mode <user_directories>"
+    fi
+    if grep -q '<zookeeper_path>/clickhouse/langwatch/access/</zookeeper_path>' <<< "$merged_config"; then
+      fail "$merged_pod: merged config still points a user directory at the keeper access path"
+    fi
+    # No keeper-backed named-collections store — the measured startup-fatal
+    # dependency Design C deletes.
+    if grep -q '<named_collections_storage>' <<< "$merged_config"; then
+      fail "$merged_pod: merged config still declares a keeper-backed <named_collections_storage>"
+    fi
+    pass "$merged_pod carries no keeper-backed access or named-collection store"
+  done
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

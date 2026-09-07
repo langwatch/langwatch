@@ -25,7 +25,7 @@
  * much of it is handed back — and never about relaxing what the database will
  * do.
  *
- * @see ./provisioning.ts — the identity, the profile, and the key map
+ * @see ./provisioning/accessModel.ts — the identity, the profile, and the key map
  * @see ./capability.ts — the value sent as the tenant setting
  * @see specs/analytics/lwql-api.feature
  */
@@ -40,12 +40,15 @@ import {
   unknownIdentifierFromError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
-
+import {
+  type LangWatchQLConnection,
+  lwqlDerivedConnectionFromEnv,
+} from "./connection";
 import {
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "./errors";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./limits";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -132,19 +135,6 @@ export interface LangWatchQLExecutor {
    * same server for the lifetime of the process.
    */
   close?(): Promise<void>;
-}
-
-/** How to reach the LangWatchQL schema as the restricted identity. */
-export interface LangWatchQLConnection {
-  /** ClickHouse HTTP endpoint. */
-  readonly url: string;
-  /** The restricted identity — never an administrative account. */
-  readonly username: string;
-  readonly password: string;
-  /** Database an unqualified table name resolves to, i.e. the LangWatchQL one. */
-  readonly database: string;
-  /** Custom setting carrying the tenant capability, per the settings profile. */
-  readonly tenantSetting: string;
 }
 
 /**
@@ -333,6 +323,18 @@ export function createLangWatchQLExecutor(
  * required would refuse to boot every deployment that does not run this API.
  */
 export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
+  // Self-provisioning (issue #6635) owns the target: `provisionLwql` creates
+  // the access model on the connection derived from the admin `CLICKHOUSE_URL`,
+  // so resolving a *different* connection here would query a server where none
+  // of it exists. Checked before `absent` rather than after: a deployment that
+  // sets all five explicitly *and* `LWQL_SELF_PROVISION` would otherwise fall
+  // through to the explicit values and split provisioning from querying.
+  // `lwqlDerivedConnectionFromEnv` treats the per-field `LWQL_*` as overrides
+  // and refuses outright on one that cannot be honoured.
+  if (process.env.LWQL_SELF_PROVISION === "true") {
+    return lwqlDerivedConnectionFromEnv();
+  }
+
   const url = process.env.LWQL_CLICKHOUSE_URL;
   const username = process.env.LWQL_CLICKHOUSE_USER;
   const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
