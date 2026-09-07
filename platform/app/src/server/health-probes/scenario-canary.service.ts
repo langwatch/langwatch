@@ -371,7 +371,8 @@ export function parseRunPlanConfig(
 /**
  * Resolves `runPlanId` (id or slug) to a non-archived `run_plan` suite in
  * `projectId`, or `null`. Tries the id first: ids are globally unique, so a
- * hit needs no second read; a miss falls back to the per-project slug.
+ * `run_plan` hit needs no second read; a miss, or a hit of another kind, falls
+ * back to the per-project slug.
  */
 async function findRunPlan({
   projectId,
@@ -381,10 +382,13 @@ async function findRunPlan({
   runPlanId: string;
 }): Promise<SimulationSuite | null> {
   const suites = new SuiteRepository(prisma);
-  const suite =
-    (await suites.findById({ id: runPlanId, projectId })) ??
-    (await suites.findBySlug({ slug: runPlanId, projectId }));
-  return suite?.kind === "run_plan" ? suite : null;
+  const byId = await suites.findById({ id: runPlanId, projectId });
+  if (byId?.kind === "run_plan") return byId;
+  // An id hit of the wrong kind is not the plan: ids and per-project slugs are
+  // enforced unique separately, so a `test_suite` id may coincide with a real
+  // run plan's slug — fall through to the slug rather than stop here.
+  const bySlug = await suites.findBySlug({ slug: runPlanId, projectId });
+  return bySlug?.kind === "run_plan" ? bySlug : null;
 }
 
 /**

@@ -960,6 +960,59 @@ describe("runScenarioHealthCanary", () => {
     });
   });
 
+  describe("given a runPlanId that is both a test_suite's id and a run plan's slug", () => {
+    /** @scenario "A run plan may be named by its slug" */
+    it("falls through the wrong-kind id hit to the slug and launches the run plan", async () => {
+      fakeSuiteTable([
+        {
+          id: "shared-token",
+          slug: "some-test-suite",
+          projectId: "collide-project",
+          scenarioIds: ["suite-scenario"],
+          targets: [{ type: "prompt", referenceId: "suite-prompt" }],
+          kind: "test_suite",
+          archivedAt: null,
+        },
+        {
+          id: "real-plan-id",
+          slug: "shared-token",
+          projectId: "collide-project",
+          scenarioIds: ["plan-scenario"],
+          targets: [{ type: "prompt", referenceId: "plan-prompt" }],
+          kind: "run_plan",
+          archivedAt: null,
+        },
+      ]);
+      vi.mocked(launchScenarioRun).mockResolvedValue({
+        scenarioRunId: "canary-run-4",
+      } as Awaited<ReturnType<typeof launchScenarioRun>>);
+      vi.mocked(getApp).mockReturnValue({
+        simulations: {
+          runs: {
+            getScenarioRunData: async () => ({
+              status: ScenarioRunStatus.SUCCESS,
+              results: verdictResults(Verdict.SUCCESS),
+            }),
+          },
+        },
+      } as unknown as ReturnType<typeof getApp>);
+
+      const result = await runScenarioHealthCanary({
+        projectId: "collide-project",
+        runPlanId: "shared-token",
+      });
+
+      expect(result).toMatchObject({
+        healthy: true,
+        scenarioRunId: "canary-run-4",
+      });
+      expect(launchScenarioRun).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(launchScenarioRun).mock.calls[0]![0]).toMatchObject({
+        scenarioId: "plan-scenario",
+      });
+    });
+  });
+
   describe("given concurrent requests naming the same plan by id and by slug", () => {
     /** @scenario "A concurrent canary while one is in flight starts no second run" */
     it("keys single flight by the resolved plan id, so the slug request sees busy and launches nothing", async () => {
