@@ -76,6 +76,9 @@ const ROUTE_PATTERNS = [
   "/governance/people",
   "/governance/costs",
   "/governance/billed",
+  "/governance/insights",
+  "/governance/analytics",
+  "/governance/signals",
   // Retired addresses — kept so each redirect route resolves to a known
   // pattern while it forwards to its new home (inventory / people).
   "/governance/catalog/:id",
