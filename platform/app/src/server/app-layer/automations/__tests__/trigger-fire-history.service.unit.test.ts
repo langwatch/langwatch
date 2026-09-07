@@ -125,6 +125,7 @@ describe("TriggerFireHistoryService", () => {
         expect(result).toEqual(fires[0]);
       });
 
+      /** @scenario "A trigger that never fired reads as nothing" */
       it("returns null when the trigger never fired", async () => {
         vi.mocked(repo.findLatestByTriggerId).mockResolvedValueOnce(null);
 

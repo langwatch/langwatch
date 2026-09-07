@@ -63,6 +63,7 @@ describe("PrismaTriggerFireHistoryRepository", () => {
 
   describe("findLatestByTriggerId", () => {
     describe("when reading a trigger's newest fire", () => {
+      /** @scenario "The newest fire is asked for by project and trigger, newest first, one row" */
       it("asks for exactly one row, newest first, scoped to project and trigger", async () => {
         const { repo, findFirst } = makeRepo();
 
@@ -83,6 +84,7 @@ describe("PrismaTriggerFireHistoryRepository", () => {
         );
       });
 
+      /** @scenario "The newest fire carries metadata only" */
       it("selects fire metadata only, never traceId or captured trace content", async () => {
         const { repo, findFirst } = makeRepo();
 
