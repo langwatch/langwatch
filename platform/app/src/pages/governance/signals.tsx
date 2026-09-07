@@ -52,7 +52,7 @@ function SignalsPage() {
           <VStack
             data-testid="signals-empty-registry"
             borderWidth="1px"
-            borderColor="border.subtle"
+            borderColor="border.muted"
             borderRadius="lg"
             paddingY={14}
             paddingX={6}

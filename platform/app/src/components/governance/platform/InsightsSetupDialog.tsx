@@ -181,8 +181,13 @@ export function InsightsSetupDialog({
               label="Model"
               hint="The model the eternal session runs on"
             >
-              <NativeSelect.Root>
-                <NativeSelect.Field aria-label="Model" value={draft.model}>
+              {/* One option and nothing to write it to: read-only, not a
+                  controlled field pretending to accept a change. */}
+              <NativeSelect.Root disabled>
+                <NativeSelect.Field
+                  aria-label="Model"
+                  defaultValue={draft.model}
+                >
                   <option value="langy-default">
                     claude-sonnet-4.5 · Langy default
                   </option>

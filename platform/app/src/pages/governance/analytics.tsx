@@ -5,7 +5,6 @@ import {
   Heading,
   HStack,
   NativeSelect,
-  SegmentGroup,
   Tabs,
   Text,
   VStack,
@@ -31,6 +30,7 @@ import {
   exploreQueryLine,
   matchesTemplate,
 } from "~/components/governance/platform/exploreQuery";
+import { SegmentedControl } from "~/components/ui/segmented-control";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -49,7 +49,9 @@ function AnalyticsPage() {
     redirectToProjectOnboarding: false,
   });
   const orgName = organization?.name ?? "your organization";
-  const [window, setWindow] = useState<ExploreWindow>(DEFAULT_EXPLORE_WINDOW);
+  const [timeWindow, setTimeWindow] = useState<ExploreWindow>(
+    DEFAULT_EXPLORE_WINDOW,
+  );
   const [selection, setSelection] = useState<ExploreSelection>(
     DEFAULT_EXPLORE_SELECTION,
   );
@@ -67,22 +69,15 @@ function AnalyticsPage() {
               every chart, dashboard, signal and alert.
             </Text>
           </VStack>
-          <SegmentGroup.Root
+          <SegmentedControl
             size="sm"
-            value={window}
+            value={timeWindow}
             onValueChange={({ value }) => {
-              if (value) setWindow(value as ExploreWindow);
+              if (value) setTimeWindow(value as ExploreWindow);
             }}
+            items={[...EXPLORE_WINDOWS]}
             flexShrink={0}
-          >
-            <SegmentGroup.Indicator />
-            {EXPLORE_WINDOWS.map((option) => (
-              <SegmentGroup.Item key={option} value={option}>
-                <SegmentGroup.ItemText>{option}</SegmentGroup.ItemText>
-                <SegmentGroup.ItemHiddenInput />
-              </SegmentGroup.Item>
-            ))}
-          </SegmentGroup.Root>
+          />
         </HStack>
 
         <Tabs.Root defaultValue="explore" variant="line">
@@ -140,7 +135,7 @@ function AnalyticsPage() {
                 gap={4}
                 flexWrap="wrap"
                 borderWidth="1px"
-                borderColor="border.subtle"
+                borderColor="border.muted"
                 borderRadius="lg"
                 paddingX={4}
                 paddingY={3}
@@ -184,7 +179,7 @@ function AnalyticsPage() {
                 align="stretch"
                 gap={1}
                 borderWidth="1px"
-                borderColor="border.subtle"
+                borderColor="border.muted"
                 borderRadius="lg"
                 padding={5}
                 minHeight="440px"
@@ -193,7 +188,7 @@ function AnalyticsPage() {
                   {exploreChartTitle(selection)}
                 </Text>
                 <Text fontSize="sm" color="fg.muted">
-                  {orgName} · last {window}
+                  {orgName} · last {timeWindow}
                 </Text>
                 <Box
                   flex={1}

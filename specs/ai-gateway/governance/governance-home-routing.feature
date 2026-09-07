@@ -3,8 +3,10 @@ Feature: Governance home — route, nav promotion, persona detection
   daily-use org-scoped home), NOT under Settings. The whole family
   lives there: `/governance/inventory*`, `/governance/anomaly-rules`,
   `/governance/people`, and — behind the
-  `release_ui_governance_billed_cost_enabled` flag — `/governance/costs`
-  and `/governance/billed`. Routing policies are gateway behavior and
+  `release_ui_governance_billed_cost_enabled` flag — `/governance/costs`,
+  `/governance/billed` and the Platform placeholders
+  `/governance/insights`, `/governance/analytics` and
+  `/governance/signals`. Routing policies are gateway behavior and
   live at `/gateway/routing-policies` instead. The legacy
   `/settings/governance*` and `/settings/routing-policies` addresses
   redirect permanently to the new ones

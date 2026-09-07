@@ -8,8 +8,18 @@ import {
 } from "~/components/governance/platform/InsightsSetupDialog";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { LangyMark } from "~/features/langy/components/LangyMark";
+import {
+  LangyMark,
+  LangyMarkGradientDefs,
+} from "~/features/langy/components/LangyMark";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+
+/**
+ * Own paint server. The Langy sidecar mounts the shared one, but a viewer
+ * without Langy never has it, and a mark filled from a missing gradient
+ * paints nothing.
+ */
+const INSIGHTS_MARK_GRADIENT_ID = "governance-insights-mark-grad";
 
 /**
  * The Insights inbox before there is anything in it.
@@ -24,6 +34,7 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
 function InsightsPage() {
   const [setupOpen, setSetupOpen] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_INSIGHTS_SETTINGS);
+  const openLangy = useLangyStore((state) => state.openPanel);
 
   return (
     <GovernanceLayout pageTitle="Insights · AI Governance · LangWatch">
@@ -46,7 +57,7 @@ function InsightsPage() {
           paddingX={8}
           borderWidth="2px"
           borderStyle="dashed"
-          borderColor="border.subtle"
+          borderColor="border.muted"
           borderRadius="xl"
         >
           <Box
@@ -58,7 +69,8 @@ function InsightsPage() {
             alignItems="center"
             justifyContent="center"
           >
-            <LangyMark size={36} />
+            <LangyMarkGradientDefs id={INSIGHTS_MARK_GRADIENT_ID} />
+            <LangyMark size={36} gradientId={INSIGHTS_MARK_GRADIENT_ID} />
           </Box>
           <Heading size="lg" textAlign="center">
             Langy writes your brief here
@@ -71,10 +83,7 @@ function InsightsPage() {
             <Button colorPalette="orange" onClick={() => setSetupOpen(true)}>
               Set up data
             </Button>
-            <Button
-              variant="subtle"
-              onClick={() => useLangyStore.getState().openPanel()}
-            >
+            <Button variant="subtle" onClick={openLangy}>
               Open Langy
             </Button>
           </HStack>

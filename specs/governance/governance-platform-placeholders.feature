@@ -4,8 +4,9 @@ Feature: Platform placeholders — Insights, Analytics, Signals & Alerts
   any of them has a backend: the brief Langy will write, the explore
   surface every chart is meant to compile through, and the registry of
   rules that fire alerts. The query line under the explore chart is a
-  sketch of that future language; nothing in the platform parses it yet. They exist so the whole flow can be walked and judged in
-  one sitting. Nothing on them stores anything, and nothing on them may
+  sketch of that future language; nothing in the platform parses it yet.
+  They exist so the whole flow can be walked and judged in one sitting.
+  Nothing on them stores anything, and nothing on them may
   claim to. A control with no backing does nothing; it never reports
   success. The three sit in a "Platform" group of the governance
   sidebar, behind the same release flag as Costs and Billed, and behind
