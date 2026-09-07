@@ -33,6 +33,16 @@ Feature: Retention stamping at ingestion time
     Then the experiment_runs record has _retention_days = 91
     And the experiment_run_items record has _retention_days = 91
 
+  Scenario: Event log rows use the workload's retention category
+    When simulation and suite run events are recorded for this project
+    Then their event_log records have _retention_days = 63
+    When an experiment run event is recorded for this project
+    Then its event_log record has _retention_days = 91
+
+  Scenario: Security control-plane events are retained indefinitely
+    When identity, MFA, SSO, join-request, SCIM, or authorization events are recorded
+    Then their event_log records have _retention_days = 0
+
   Scenario: No retention policy defaults to the platform default
     Given the project has no retention policy
     And the organization has no default retention policy
