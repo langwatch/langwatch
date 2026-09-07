@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files.ts";
+import { hasCanonicalAppFactory, hasPrivateAppConstructor } from "./feature-app-factory.ts";
 import type { WorkspaceModuleResolver } from "./module-graph.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
 
@@ -743,9 +744,6 @@ function validDefinedConcreteSurface(
   resolver: WorkspaceModuleResolver,
   canonicalFeatureFiles: ReadonlyMap<string, string>,
 ): boolean {
-  if (app.name?.text === "TraceApp") {
-    console.error("TRACEDEBUG", [...operations], publicMembers(app).map((member) => member.name?.getText()));
-  }
   if (hasTypeScriptPrivateImplementation(app)) return false;
 
   const provided = new Set<string>();
@@ -863,6 +861,35 @@ function implementsContract(
     return importedInterface(file, type.expression.text, resolver)?.file === contractFile;
   });
 }
+function factoryViolations(
+  app: ts.ClassDeclaration,
+  file: string,
+  resolver: WorkspaceModuleResolver,
+): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  if (!hasPrivateAppConstructor(app)) {
+    violations.push(
+      appViolation(
+        file,
+        "A feature App must have an explicit private constructor.",
+        "Construct the App only through its static create factory; make every constructor declaration private.",
+      ),
+    );
+  }
+
+  if (!hasCanonicalAppFactory(app, file, resolver)) {
+    violations.push(
+      appViolation(
+        file,
+        "A feature App factory accepts a noncanonical construction path.",
+        "Use one required FeatureSetup parameter from @langwatch/runtime-composition, or no parameters when the App needs no setup. Remove legacy dependency bags, union inputs and compatibility overloads.",
+      ),
+    );
+  }
+
+  return violations;
+}
+
 function concreteAppViolations(
   serverRoot: string,
   contractRoot: string,
@@ -894,6 +921,8 @@ function concreteAppViolations(
       }
 
       if (!usesContract(statement, file, contractFile, resolver)) continue;
+
+      violations.push(...factoryViolations(statement, file, resolver));
 
       const valid = validConcreteClass(
         statement,

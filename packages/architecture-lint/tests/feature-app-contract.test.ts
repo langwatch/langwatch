@@ -92,6 +92,170 @@ describe("feature API contract lint", () => {
     install("defined");
     expect(findings()).toEqual([]);
   });
+  it.each(["constructor", "public constructor", "protected constructor"])(
+    "rejects externally accessible construction through %s",
+    (constructor) => {
+      install("defined");
+      const file = `${server}/src/widget.server.ts`;
+      write(
+        file,
+        readFileSync(join(root, file), "utf8").replace("private constructor", constructor),
+      );
+
+      expect(findings().some((item) => item.message.includes("explicit private constructor"))).toBe(
+        true,
+      );
+    },
+  );
+  it("rejects an implicit public constructor", () => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      readFileSync(join(root, file), "utf8").replace(
+        "private constructor(service: WidgetService) { this.#service = service; }",
+        "",
+      ),
+    );
+
+    expect(findings().some((item) => item.message.includes("explicit private constructor"))).toBe(
+      true,
+    );
+  });
+  it.each([
+    "setup: FeatureSetup<{}, {}, undefined> | LegacyDependencies",
+    "setup: FeatureSetup<{}, {}, undefined> & LegacyDependencies",
+    "setup: LegacyDependencies",
+    "setup: any",
+    "setup: unknown",
+    "setup?: FeatureSetup<{}, {}, undefined>",
+    "setup: FeatureSetup<{}, {}, undefined> = fallback",
+    "...setup: FeatureSetup<{}, {}, undefined>[]",
+    "setup: FeatureSetup<{}, {}, undefined>, legacy: LegacyDependencies",
+  ])("rejects the alternate factory input %s", (parameter) => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      `import type { FeatureSetup } from "@langwatch/runtime-composition"; ${readFileSync(join(root, file), "utf8").replace("static create()", `static create(${parameter})`)}`,
+    );
+
+    expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
+      true,
+    );
+  });
+  it.each([
+    [
+      "import type { FeatureSetup } from '@langwatch/runtime-composition';",
+      "{ infrastructure }: FeatureSetup<{}, {}, undefined>",
+    ],
+    [
+      "import type { FeatureSetup as Setup } from '@langwatch/runtime-composition'; type Input = Setup<{}, {}, undefined>;",
+      "setup: Input",
+    ],
+    [
+      "import type * as Runtime from '@langwatch/runtime-composition';",
+      "setup: Runtime.FeatureSetup<{}, {}, undefined>",
+    ],
+  ])("accepts canonical factory input through %s", (prefix, parameter) => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", `static create(${parameter})`)}`,
+    );
+
+    expect(findings()).toEqual([]);
+  });
+  it("rejects legacy union inputs hidden behind a type alias", () => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    const prefix =
+      "import type { FeatureSetup } from '@langwatch/runtime-composition'; type Input = FeatureSetup<{}, {}, undefined> | LegacyDependencies;";
+    write(
+      file,
+      `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", "static create(setup: Input)")}`,
+    );
+
+    expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
+      true,
+    );
+  });
+  it.each([
+    ["FeatureSetup<{}, {}, undefined>", false],
+    ["FeatureSetup<{}, {}, undefined> | LegacyDependencies", true],
+  ])("resolves imported factory type aliases with body %s", (body, rejected) => {
+    install("defined");
+    write(
+      `${server}/src/setup.ts`,
+      `import type { FeatureSetup } from '@langwatch/runtime-composition'; export type Setup = ${body};`,
+    );
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      `import type { Setup as Input } from './setup.ts'; ${readFileSync(join(root, file), "utf8").replace("static create()", "static create(setup: Input)")}`,
+    );
+
+    expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
+      rejected,
+    );
+  });
+  it("rejects a public constructor overload even with a private implementation", () => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      readFileSync(join(root, file), "utf8").replace(
+        "private constructor",
+        "constructor(service: WidgetService); private constructor",
+      ),
+    );
+
+    expect(findings().some((item) => item.message.includes("explicit private constructor"))).toBe(
+      true,
+    );
+  });
+  it("rejects a locally named imitation of FeatureSetup", () => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      `type FeatureSetup = { infrastructure: object }; ${readFileSync(join(root, file), "utf8").replace("static create()", "static create(setup: FeatureSetup)")}`,
+    );
+
+    expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
+      true,
+    );
+  });
+  it.each([
+    ["type Input<FeatureSetup> = FeatureSetup;", "static create(setup: Input<{ legacy: string }>)"],
+    ["", "static create<FeatureSetup>(setup: FeatureSetup)"],
+  ])("rejects type parameters shadowing the canonical setup import %s", (alias, factory) => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    const prefix = `import type { FeatureSetup } from '@langwatch/runtime-composition'; ${alias}`;
+    write(
+      file,
+      `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", factory)}`,
+    );
+
+    expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
+      true,
+    );
+  });
+  it("checks legacy overloads even when the implementation uses canonical setup", () => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    const prefix = "import type { FeatureSetup } from '@langwatch/runtime-composition';";
+    write(
+      file,
+      `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", "static create(setup: LegacyDependencies): ComposedWidgetApp; static create(setup: FeatureSetup<{}, {}, undefined>)")}`,
+    );
+
+    expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
+      true,
+    );
+  });
   it.each(["readonly service: unknown;", "get?: () => string;", "[key: string]: string;"])(
     "rejects non-callable API member %s",
     (member) => {
