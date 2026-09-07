@@ -87,7 +87,6 @@ const fixture = ({
 
 describe("OrganizationMfaService requirement lifecycle", () => {
   /** @scenario "Turning the requirement on ends no session" */
-  /** @scenario "Turning the requirement on is recorded with who did it" */
   it("records the actor and members without changing any live session", async () => {
     const subject = fixture();
     const before = structuredClone([...subject.sessions]);

@@ -13,7 +13,6 @@ describe("LoggingOrganizationMfaNotifier", () => {
     vi.clearAllMocks();
   });
 
-  /** @scenario "Turning the requirement on is recorded with who did it" */
   it("records the actor and affected member count without claiming delivery", async () => {
     const notifier = new LoggingOrganizationMfaNotifier();
 
