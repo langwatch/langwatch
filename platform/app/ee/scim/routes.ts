@@ -280,6 +280,19 @@ const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
     return scimError(c, 403, ENTERPRISE_FEATURE_ERRORS.SCIM);
   }
 
+  if (result.status === "connection_not_writable") {
+    const detail =
+      "This directory token can no longer write through its single sign-on connection";
+    await record({
+      organizationId: result.organizationId,
+      connectionId: result.connectionId,
+      status: 403,
+      reason: "forbidden",
+      detail,
+    });
+    return scimError(c, 403, detail);
+  }
+
   c.set("scimOrganizationId", result.organizationId);
   c.set("scimConnectionId", result.connectionId);
   c.set("scimRefusalReason", null);

@@ -491,6 +491,53 @@ describe("how many identity providers an organization may register", () => {
       expect(registered.connectionId).toEqual(expect.any(String));
     });
   });
+
+  describe("when the append after reservation is interrupted", () => {
+    it("retries the same actor's attempt without adopting another actor's identity", async () => {
+      const attempts: Array<{
+        connectionId: string;
+        commandId: string;
+      }> = [];
+      registeredConnections = {
+        registerConnection: async (data: unknown) => {
+          const attempt = data as { connectionId: string; commandId: string };
+          attempts.push(attempt);
+          if (attempts.length === 1) throw new Error("append interrupted");
+          return [];
+        },
+      };
+      const service = serviceHolding(null);
+      const registration = {
+        organizationId: ORG,
+        providerId: "okta",
+        idp: {
+          protocol: "oidc" as const,
+          issuer: "https://login.acme.okta.com",
+          clientId: "client",
+          clientSecret: "secret",
+        },
+      };
+
+      await expect(
+        service.registerConnection({ ...registration, actor: { userId: "usr_ana" } }),
+      ).rejects.toThrow("append interrupted");
+      const retried = await service.registerConnection({
+        ...registration,
+        actor: { userId: "usr_ana" },
+      });
+
+      expect(attempts[1]?.connectionId).toBe(attempts[0]?.connectionId);
+      expect(attempts[1]?.commandId).toBe(attempts[0]?.commandId);
+      expect(retried.connectionId).toBe(attempts[0]?.connectionId);
+
+      registeredConnections = { registerConnection: async () => [] };
+      const otherActor = await service.registerConnection({
+        ...registration,
+        actor: { userId: "usr_other" },
+      });
+      expect(otherActor.connectionId).not.toBe(retried.connectionId);
+    });
+  });
 });
 
 describe("the engine's provider row", () => {

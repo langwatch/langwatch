@@ -149,6 +149,7 @@ export const auth = betterAuth({
     confirmSignUpAddress: (ctx) =>
       signUpConfirmationEndpoint().confirmSignUpAddress(ctx),
     ssoAssertion,
+    ssoCallbackEvidence: sessionCallbackEvidence,
   }),
 
   databaseHooks: databaseHooks({

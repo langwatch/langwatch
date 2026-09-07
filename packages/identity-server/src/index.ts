@@ -176,6 +176,8 @@ export {
   newSsoConnectionCommandId,
   looksLikeSsoConnectionId,
   newSsoConnectionId,
+  selfServeRegistrationCommandId,
+  selfServeRegistrationConnectionId,
 } from "./sso-connection-id";
 export type { SsoConnectionLedger } from "./sso-connection-ledger";
 export {

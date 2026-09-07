@@ -66,6 +66,11 @@ const MINIMUM_TOKEN_LENGTH = 32;
 export type ScimTokenEntitlement =
   | { status: "invalid_token" }
   | {
+      status: "connection_not_writable";
+      organizationId: string;
+      connectionId: string;
+    }
+  | {
       status: "plan_not_entitled";
       organizationId: string;
       /**
@@ -386,9 +391,65 @@ export class ScimTokenService {
       return { status: "plan_not_entitled", organizationId, connectionId };
     }
 
+    if (
+      connectionId &&
+      !(await this.connectionAcceptsDirectoryWrites({
+        organizationId,
+        connectionId,
+      }))
+    ) {
+      return {
+        status: "connection_not_writable",
+        organizationId,
+        connectionId,
+      };
+    }
+
     await this.recordUse(id);
 
     return { status: "ok", organizationId, connectionId };
+  }
+
+  /**
+   * Whether a connection-scoped credential may still mutate directory state.
+   *
+   * The legacy connection remains usable throughout both grace routes, but
+   * FINALIZING is the durable point at which its authentication and directory
+   * writes are retired. Checking only the token row left a still-present
+   * credential live until teardown happened to delete it. The connection's
+   * own teardown state is checked independently so an interrupted revocation
+   * cannot reopen the same window.
+   */
+  private async connectionAcceptsDirectoryWrites({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<boolean> {
+    const connection = await this.prisma.ssoConnection.findFirst({
+      where: { id: connectionId, organizationId },
+      select: { state: true },
+    });
+    if (
+      !connection ||
+      connection.state === "DISCARDED" ||
+      connection.state === "TEARDOWN_PENDING" ||
+      connection.state === "TORN_DOWN"
+    ) {
+      return false;
+    }
+
+    const retiringReplacement = await this.prisma.ssoConnection.findFirst({
+      where: {
+        organizationId,
+        replacesConnectionId: connectionId,
+        migrationPhase: { in: ["FINALIZING", "FINALIZED"] },
+      },
+      select: { id: true },
+    });
+
+    return retiringReplacement === null;
   }
 
   /**

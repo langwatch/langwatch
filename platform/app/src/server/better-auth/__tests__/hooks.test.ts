@@ -570,7 +570,11 @@ describe("afterAccountCreate", () => {
         providerId: "local_ssoc_replacement",
         accountId: "direct-subject",
       };
-      const rows = [{ ...legacy }];
+      const otherOrganization = {
+        providerId: "auth0",
+        accountId: "waad|other-organization|same-user",
+      };
+      const rows = [{ ...legacy }, { ...otherOrganization }];
       const { hooks, accounts } = hooksOver({
         user: userRow({ email: "existing@acme.com" }),
         migrationDecision: {
@@ -588,14 +592,9 @@ describe("afterAccountCreate", () => {
             accountId: string;
           }[];
         }) => {
-          const kept = rows.filter((row) =>
-            keepAccounts.some(
-              (account) =>
-                account.providerId === row.providerId &&
-                account.accountId === row.accountId,
-            ),
-          );
-          rows.splice(0, rows.length, ...kept);
+          // Reconciliation may recognize the exact migration pair but cannot
+          // infer that another subject from the shared Auth0 broker is stale.
+          void keepAccounts;
         },
       );
 
@@ -619,7 +618,7 @@ describe("afterAccountCreate", () => {
         account: { userId: "user_1", ...legacy },
       });
 
-      expect(rows).toEqual([legacy, direct]);
+      expect(rows).toEqual([legacy, otherOrganization, direct]);
       expect(accounts.reconcileOAuthAccounts).toHaveBeenCalledTimes(3);
       expect(accounts.reconcileOAuthAccounts).toHaveBeenLastCalledWith({
         userId: "user_1",

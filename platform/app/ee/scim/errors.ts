@@ -186,7 +186,7 @@ export class ScimWriteOutsideConnectionError extends HandledError {
   constructor(meta: { userId?: string } = {}) {
     super(
       "scim_write_outside_connection",
-      "This directory token cannot change people provisioned by another connection",
+      "This directory token cannot change resources provisioned by another connection",
       { httpStatus: 403, fault: "customer", meta },
     );
     this.name = "ScimWriteOutsideConnectionError";

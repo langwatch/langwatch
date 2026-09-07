@@ -19,6 +19,46 @@ export function newSsoConnectionId(): string {
 }
 
 /**
+ * The resumable identity of one administrator's ordinary registration.
+ *
+ * The registration slot is written before the event append. A random id on
+ * every HTTP retry therefore strands a successful reservation when that
+ * append is interrupted. The actor is part of the seed so a different
+ * administrator cannot accidentally resume or adopt somebody else's attempt.
+ */
+export function selfServeRegistrationConnectionId({
+  organizationId,
+  actorUserId,
+  previousTerminal,
+}: {
+  organizationId: string;
+  actorUserId: string;
+  previousTerminal?: { connectionId: string; updatedAtMs: number };
+}): string {
+  const attemptSeed = previousTerminal
+    ? `${previousTerminal.connectionId}\0${previousTerminal.updatedAtMs}`
+    : "initial";
+  const digest = createHash("sha256")
+    .update(`${organizationId}\0${actorUserId}\0${attemptSeed}`)
+    .digest("hex")
+    .slice(0, 24);
+  return `ssoc_selfserve_${digest}`;
+}
+
+/** The idempotency key shared by retries of an ordinary registration. */
+export function selfServeRegistrationCommandId({
+  organizationId,
+  connectionId,
+  actorUserId,
+}: {
+  organizationId: string;
+  connectionId: string;
+  actorUserId: string;
+}): string {
+  return `self-serve:register:${organizationId}:${actorUserId}:${connectionId}`;
+}
+
+/**
  * Whether a string is SHAPED like a connection id.
  *
  * A pre-filter and never the decision: what settles it is the row. better-auth

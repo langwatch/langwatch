@@ -10,6 +10,87 @@ import type { DatabaseHookSsoMigrationPort } from "~/server/better-auth/hooks";
 
 const DIRECT_CALLBACK_MARKERS = ["/sso/callback/", "/sso/saml2/sp/acs/"];
 
+interface AuthenticationPair {
+  replacement: {
+    id: string;
+    organizationId: string;
+    migrationPhase: string | null;
+  };
+  legacy: { id: string; organizationId: string; providerId: string };
+}
+
+export function migrationAuthenticationDecision({
+  callback,
+  account,
+  pairs,
+}: {
+  callback: { kind: "direct" | "legacy"; providerId: string };
+  account: { provider: string; providerAccountId: string };
+  pairs: readonly AuthenticationPair[];
+}):
+  | { action: "continue" }
+  | { action: "reject"; code: string }
+  | {
+      action: "record";
+      connection: { id: string; organizationId: string };
+    } {
+  const matches: Array<{
+    connection: { id: string; organizationId: string };
+    replacementPhase: string | null;
+    legacy: boolean;
+  }> = [];
+  let directMigrationNamedWithoutBinding = false;
+  for (const pair of pairs) {
+    if (callback.kind === "direct") {
+      const exactAccount = account.provider === pair.replacement.id;
+      if (callback.providerId === pair.replacement.id && exactAccount) {
+        matches.push({
+          connection: {
+            id: pair.replacement.id,
+            organizationId: pair.replacement.organizationId,
+          },
+          replacementPhase: pair.replacement.migrationPhase,
+          legacy: false,
+        });
+      } else if (callback.providerId === pair.replacement.id) {
+        directMigrationNamedWithoutBinding = true;
+      }
+      continue;
+    }
+    const legacyAccount = legacyCallbackMatches({
+      callbackProviderId: callback.providerId,
+      legacyProviderId: pair.legacy.providerId,
+      account,
+    });
+    if (legacyAccount) {
+      matches.push({
+        connection: {
+          id: pair.legacy.id,
+          organizationId: pair.legacy.organizationId,
+        },
+        replacementPhase: pair.replacement.migrationPhase,
+        legacy: true,
+      });
+    }
+  }
+  if (matches.length > 1) {
+    return { action: "reject", code: "SSO_MIGRATION_AUTH_AMBIGUOUS" };
+  }
+  const match = matches[0];
+  if (!match) {
+    return directMigrationNamedWithoutBinding
+      ? { action: "reject", code: "SSO_MIGRATION_AUTH_NOT_ALLOWED" }
+      : { action: "continue" };
+  }
+  if (
+    match.legacy &&
+    legacyAuthenticationIsRetired(match.replacementPhase)
+  ) {
+    return { action: "reject", code: "SSO_LEGACY_AUTH_RETIRED" };
+  }
+  return { action: "record", connection: match.connection };
+}
+
 /** Better Auth's migration callback policy, backed only by persisted facts. */
 export class PrismaSsoMigrationCallbackPolicy
   implements DatabaseHookSsoMigrationPort
@@ -17,6 +98,11 @@ export class PrismaSsoMigrationCallbackPolicy
   constructor(
     private readonly prisma: PrismaClient,
     private readonly newActivityId: () => string,
+    private readonly assertions: {
+      authenticatedAccountFor(args: { providerId: string }): Promise<{
+        providerAccountId: string;
+      } | null>;
+    },
   ) {}
 
   async decideAccountLink(args: {
@@ -117,89 +203,33 @@ export class PrismaSsoMigrationCallbackPolicy
           return { action: "continue" } as const;
         }
 
-        const accounts = await tx.account.findMany({
-          where: { userId, provider: { not: "credential" } },
-          select: { provider: true, providerAccountId: true },
+        const accepted = await this.assertions.authenticatedAccountFor({
+          providerId: callback.providerId,
         });
-        if (context.kind !== "ready") {
-          const applicable = context.pairs.some((pair) =>
-            this.callbackMatchesPair({ callback, accounts, pair }),
-          );
-          return applicable
-            ? ({
-                action: "reject",
-                code: "SSO_MIGRATION_AUTH_NOT_ALLOWED",
-              } as const)
-            : ({ action: "continue" } as const);
-        }
-        const matches: Array<{
-          connection: { id: string; organizationId: string };
-          legacy: boolean;
-        }> = [];
-        for (const pair of context.pairs) {
-          if (callback.kind === "direct") {
-            if (callback.providerId === pair.replacement.id) {
-              matches.push({ connection: pair.replacement, legacy: false });
-            }
-            continue;
-          }
-          const legacyAccount = accounts.some((account) =>
-            legacyCallbackMatches({
-              callbackProviderId: callback.providerId,
-              legacyProviderId: pair.legacy.providerId,
-              account,
-            }),
-          );
-          if (legacyAccount) {
-            matches.push({ connection: pair.legacy, legacy: true });
-          }
-        }
-        const namesLegacyMigration = context.pairs.some(
-          ({ legacy }) =>
-            callback.kind === "legacy" &&
-            accounts.some((account) =>
-              legacyCallbackMatches({
-                callbackProviderId: callback.providerId,
-                legacyProviderId: legacy.providerId,
-                account,
-              }),
-            ),
-        );
-        if (matches.length > 1) {
+        if (!accepted) {
           return {
             action: "reject",
-            code: "SSO_MIGRATION_AUTH_AMBIGUOUS",
+            code: "SSO_MIGRATION_AUTH_NOT_ALLOWED",
           } as const;
         }
-        if (matches.length === 0) {
-          return namesLegacyMigration
-            ? ({
-                action: "reject",
-                code: "SSO_MIGRATION_AUTH_NOT_ALLOWED",
-              } as const)
-            : ({ action: "continue" } as const);
-        }
-
-        const match = matches[0];
-        if (!match) return { action: "continue" } as const;
-        const pair = context.pairs.find(
-          ({ legacy, replacement }) =>
-            legacy.id === match.connection.id ||
-            replacement.id === match.connection.id,
-        );
-        if (!pair) return { action: "continue" } as const;
-        if (
-          match.legacy &&
-          legacyAuthenticationIsRetired(pair.replacement.migrationPhase)
-        ) {
-          return { action: "reject", code: "SSO_LEGACY_AUTH_RETIRED" } as const;
-        }
+        const decision = migrationAuthenticationDecision({
+          callback,
+          account: {
+            provider: callback.providerId,
+            providerAccountId: accepted.providerAccountId,
+          },
+          pairs:
+            "authenticationPairs" in context
+              ? context.authenticationPairs
+              : context.pairs,
+        });
+        if (decision.action !== "record") return decision;
 
         await tx.ssoAuthenticationActivity.create({
           data: {
             id: this.newActivityId(),
-            organizationId: match.connection.organizationId,
-            connectionId: match.connection.id,
+            organizationId: decision.connection.organizationId,
+            connectionId: decision.connection.id,
             userId,
             authenticatedAt,
           },
@@ -339,7 +369,11 @@ export class PrismaSsoMigrationCallbackPolicy
         } as const,
       } as const;
     }
-    return { kind: "ready", pairs: qualifiedPairs } as const;
+    return {
+      kind: "ready",
+      pairs: qualifiedPairs,
+      authenticationPairs: pairs,
+    } as const;
   }
 
   private async decideStandaloneLegacyConnection(args: {
@@ -424,29 +458,6 @@ export class PrismaSsoMigrationCallbackPolicy
     );
   }
 
-  private callbackMatchesPair({
-    callback,
-    accounts,
-    pair,
-  }: {
-    callback: { kind: "direct" | "legacy"; providerId: string };
-    accounts: readonly { provider: string; providerAccountId: string }[];
-    pair: {
-      replacement: { id: string };
-      legacy: { providerId: string };
-    };
-  }): boolean {
-    if (callback.kind === "direct") {
-      return callback.providerId === pair.replacement.id;
-    }
-    return accounts.some((account) =>
-      legacyCallbackMatches({
-        callbackProviderId: callback.providerId,
-        legacyProviderId: pair.legacy.providerId,
-        account,
-      }),
-    );
-  }
 }
 
 const toHookAccount = (account: {

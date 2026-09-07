@@ -16,6 +16,7 @@ import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { PlanTypes } from "@ee/billing/planTypes";
 import { ScimDeprovisionService } from "@ee/scim/scim-deprovision.service";
 import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
+import { ScimTokenService } from "@ee/scim/scim-token.service";
 import { scimSyncLifecycle } from "@ee/scim/scim-sync.runtime";
 import type { ScimSyncLifecycle } from "@ee/scim/scim-sync.service";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
@@ -793,6 +794,7 @@ export function ssoSelfServe(): SsoSelfServeService {
         prisma,
         identity: identityService(),
         accounts: identityCeremonies(),
+        directories: ScimTokenService.create(prisma),
         now: Date.now,
         newCommandId: newIdentityCommandId,
       }),
@@ -1444,6 +1446,7 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
     ssoMigration: new PrismaSsoMigrationCallbackPolicy(
       prisma,
       newIdentityCommandId,
+      verifiedCallbackProviderAssertions,
     ),
     federationAllowed: () => platformSSOAllowed(),
     analytics: {

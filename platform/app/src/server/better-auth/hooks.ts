@@ -34,8 +34,8 @@ export interface DatabaseHookOrganizationsPort {
 
 export interface DatabaseHookAccountsPort {
   countForUser(args: { userId: string }): Promise<number>;
-  /** Keeps exactly the named OAuth accounts, and clears the
-   * `pendingSsoSetup` flag with the same write. */
+  /** Clears `pendingSsoSetup` while preserving identities outside the exact
+   * authenticated set; only a scoped retirement ceremony may delete them. */
   reconcileOAuthAccounts(args: {
     userId: string;
     keepAccounts: readonly {
@@ -446,7 +446,7 @@ export class BetterAuthDatabaseHooks {
 
       logger.info(
         { userId: user.id, providerId: account.providerId },
-        "Cleared pendingSsoSetup and removed stale accounts after sign-in via correct SSO provider",
+        "Cleared pendingSsoSetup after sign-in via the configured SSO provider",
       );
     } catch (err) {
       logger.error(

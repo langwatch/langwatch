@@ -70,7 +70,13 @@ export class PrismaSsoMigrationFinalizationRepository
 
     const replacementState = rowToConnection(replacement);
     const activeDomains = qualifiedDomains(replacementState);
-    const [qualifiedProofs, liveLegacyIdentifiers, legacyAccounts, recovery] =
+    const [
+      qualifiedProofs,
+      liveLegacyIdentifiers,
+      legacyAccounts,
+      legacyDirectoryTokens,
+      recovery,
+    ] =
       await this.readOperationalEvidence({
         organizationId,
         replacementConnectionId,
@@ -91,7 +97,9 @@ export class PrismaSsoMigrationFinalizationRepository
       phase: view.phase,
       blockers,
       legacyAccessRetired:
-        liveLegacyIdentifiers === 0 && legacyAccounts.remaining === 0,
+        liveLegacyIdentifiers === 0 &&
+        legacyAccounts.remaining === 0 &&
+        legacyDirectoryTokens === 0,
     };
   }
 
@@ -107,7 +115,7 @@ export class PrismaSsoMigrationFinalizationRepository
     legacyConnectionId: string;
     legacyProviderId: string;
     activeDomains: string[];
-  }): Promise<[number, number, LegacyAccountEvidence, boolean]> {
+  }): Promise<[number, number, LegacyAccountEvidence, number, boolean]> {
     return await Promise.all([
       this.qualifiedProofCount({
         organizationId,
@@ -125,6 +133,9 @@ export class PrismaSsoMigrationFinalizationRepository
         legacyConnectionId,
         legacyProviderId,
         replacementConnectionId,
+      }),
+      this.prisma.scimToken.count({
+        where: { organizationId, connectionId: legacyConnectionId },
       }),
       this.recovery.hasLiveBinding({ organizationId }),
     ]);

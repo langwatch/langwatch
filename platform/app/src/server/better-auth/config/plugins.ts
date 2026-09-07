@@ -14,8 +14,16 @@ import { signUpConfirmation } from "../sign-up-confirmation";
 export interface SsoAssertionPort {
   decide(args: {
     providerId: string;
+    accountId: string;
     email: string | null | undefined;
   }): Promise<{ action: "continue" } | { action: "reject"; code: string }>;
+}
+
+export interface SsoCallbackEvidencePort {
+  recordAuthenticatedSsoAccount(args: {
+    providerId: string;
+    providerAccountId: string;
+  }): void;
 }
 
 export interface PluginsDeps {
@@ -35,6 +43,7 @@ export interface PluginsDeps {
   confirmSignUpAddress: (ctx: ConfirmSignUpAddressContext) => Promise<unknown>;
   /** Whether an assertion may become a session, and may link to an account. */
   ssoAssertion: () => SsoAssertionPort;
+  ssoCallbackEvidence: () => SsoCallbackEvidencePort;
 }
 
 /**
@@ -67,6 +76,7 @@ export function plugins({
   passkeySignUp,
   confirmSignUpAddress,
   ssoAssertion,
+  ssoCallbackEvidence,
 }: PluginsDeps) {
   const genericOAuthConfigs = buildGenericOAuthConfigs(env);
   const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
@@ -194,11 +204,20 @@ export function plugins({
        * The only pre-link callback the plugin offers, which is why the check
        * lives here and not in a database hook.
        */
-      resolveUser: async (input) =>
-        ssoAssertion().decide({
+      resolveUser: async (input) => {
+        const decision = await ssoAssertion().decide({
           providerId: input.providerId,
+          accountId: input.accountKey.accountId,
           email: input.providerUser.email,
-        }),
+        });
+        if (decision.action === "continue") {
+          ssoCallbackEvidence().recordAuthenticatedSsoAccount({
+            providerId: input.providerId,
+            providerAccountId: input.accountKey.accountId,
+          });
+        }
+        return decision;
+      },
     }),
   ];
 }

@@ -316,6 +316,32 @@ describe("ScimTokenService", () => {
           organizationId: "org-1",
         });
       });
+
+      it("refuses a token whose connection is discarded", async () => {
+        (
+          prisma.scimToken.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([
+          {
+            id: "token-1",
+            organizationId: "org-1",
+            connectionId: "conn-discarded",
+            hashedToken,
+          },
+        ]);
+        (
+          prisma.ssoConnection.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ state: "DISCARDED" });
+        getActivePlan.mockResolvedValue({ type: "ENTERPRISE" });
+
+        await expect(
+          service.verifyEntitled({ token: "valid-token" }),
+        ).resolves.toEqual({
+          status: "connection_not_writable",
+          organizationId: "org-1",
+          connectionId: "conn-discarded",
+        });
+        expect(prisma.scimToken.updateMany).not.toHaveBeenCalled();
+      });
     });
 
     describe("when the token is valid but the plan has lapsed", () => {

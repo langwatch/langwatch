@@ -20,6 +20,7 @@ import type {
   ScimReplaceGroupRequest,
 } from "./scim.types";
 import { reconcileScimGrants } from "./scim-grants.reconciler";
+import { ScimWriteOutsideConnectionError } from "./errors";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -211,7 +212,7 @@ export class ScimGroupService {
     connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({
+    const group = await this.findWritableGroup({
       scimResourceId,
       organizationId,
       connectionId,
@@ -275,7 +276,7 @@ export class ScimGroupService {
     connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({
+    const group = await this.findWritableGroup({
       scimResourceId,
       organizationId,
       connectionId,
@@ -307,7 +308,7 @@ export class ScimGroupService {
     organizationId: string;
     connectionId?: string | null;
   }): Promise<ScimError | null> {
-    const group = await this.findGroup({
+    const group = await this.findWritableGroup({
       scimResourceId,
       organizationId,
       connectionId,
@@ -424,6 +425,36 @@ export class ScimGroupService {
         OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
       },
     });
+  }
+
+  /**
+   * Resolve a mutation target without turning a sibling connection's resource
+   * into a misleading retryable not-found. Reads keep hiding sibling groups,
+   * while writes acknowledge that the submitted service-provider id exists
+   * and refuse the token's authority with the same stable 403 used for users.
+   */
+  private async findWritableGroup({
+    scimResourceId,
+    organizationId,
+    connectionId,
+  }: {
+    scimResourceId: string;
+    organizationId: string;
+    connectionId: string | null;
+  }): Promise<Group | null> {
+    const group = await this.prisma.group.findFirst({
+      where: { id: scimResourceId, organizationId },
+    });
+    if (!group) return null;
+    if (
+      connectionId === null ||
+      group.scimConnectionId === null ||
+      group.scimConnectionId === connectionId
+    ) {
+      return group;
+    }
+
+    throw new ScimWriteOutsideConnectionError();
   }
 
   private async addMembers({

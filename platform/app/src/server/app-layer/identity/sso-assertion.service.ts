@@ -45,6 +45,14 @@ export interface SsoRegistrantMembershipPort {
     userId: string;
     email: string;
   }): Promise<boolean>;
+  /** Whether this exact connection subject was already bound to a current
+   * member at the asserted address before ownership evidence lapsed. */
+  findBoundMemberIdentity(args: {
+    organizationId: string;
+    connectionId: string;
+    accountId: string;
+    email: string;
+  }): Promise<boolean>;
 }
 
 /**
@@ -131,9 +139,11 @@ export class SsoAssertionService {
    */
   async decide({
     providerId,
+    accountId,
     email,
   }: {
     providerId: string;
+    accountId?: string;
     email: string | null | undefined;
   }): Promise<{ action: "continue" } | { action: "reject"; code: string }> {
     // A code the client registry already has words for; the words are the
@@ -170,7 +180,16 @@ export class SsoAssertionService {
           providerId: connection.providerId,
         }) &&
         connection.verifiedDomains.includes(domain);
-      return standing.proved || legacyCompatibility ? carryOn : refuse;
+      if (standing.proved || legacyCompatibility) return carryOn;
+      if (!standing.lapsed || !accountId) return refuse;
+
+      const alreadyBound = await this.deps.memberships.findBoundMemberIdentity({
+        organizationId: connection.organizationId,
+        connectionId: providerId,
+        accountId,
+        email: email ?? "",
+      });
+      return alreadyBound ? carryOn : refuse;
     }
 
     // A connection nobody is recorded as having registered has no setup

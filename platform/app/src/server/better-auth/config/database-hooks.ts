@@ -6,10 +6,10 @@ import { sessionClaimsData } from "../session-claims-hook";
 
 const hookContextSchema = z.object({ path: z.string().optional() });
 
-function hookPath(context: unknown): string | null {
+const hookPath = (context: unknown): string | undefined => {
   const parsed = hookContextSchema.safeParse(context);
-  return parsed.success ? (parsed.data.path ?? null) : null;
-}
+  return parsed.success ? parsed.data.path : void 0;
+};
 
 /** ADR-101 §2's erasure, taken before the user row goes. */
 export interface UserErasureCeremonyPort {
@@ -131,6 +131,11 @@ function accountCreateHooks({
         verifiedIdToken:
           typeof account.idToken === "string" ? account.idToken : undefined,
       });
+      providerAssertions().recordAuthenticatedCallbackAccount({
+        providerId: account.providerId,
+        providerAccountId: account.accountId,
+        path: hookPath(context),
+      });
       return accountCeremonies().beforeAccountCreate(account);
     },
     after: async (account, context) => {
@@ -166,6 +171,13 @@ function accountUpdateHooks({
         verifiedIdToken:
           typeof account.idToken === "string" ? account.idToken : undefined,
       });
+      if (typeof account.accountId === "string") {
+        providerAssertions().recordAuthenticatedCallbackAccount({
+          providerId: account.providerId,
+          providerAccountId: account.accountId,
+          path: hookPath(context),
+        });
+      }
     },
     after: async (account, context) => {
       if (

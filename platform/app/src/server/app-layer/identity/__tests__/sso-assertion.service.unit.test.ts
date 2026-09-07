@@ -62,9 +62,11 @@ const connection = (
 const serviceOver = ({
   row,
   members = [],
+  boundIdentities = [],
 }: {
   row: SignInConnection | null;
   members?: { userId: string; address: string }[];
+  boundIdentities?: { connectionId: string; accountId: string; address: string }[];
 }) => {
   const findConnectionForSignIn = vi.fn().mockResolvedValue(row);
   const findRegistrantAtAddress = vi.fn(
@@ -75,13 +77,31 @@ const serviceOver = ({
           candidate.address === email.trim().toLowerCase(),
       ),
   );
+  const findBoundMemberIdentity = vi.fn(
+    async ({
+      connectionId,
+      accountId,
+      email,
+    }: {
+      connectionId: string;
+      accountId: string;
+      email: string;
+    }) =>
+      boundIdentities.some(
+        (candidate) =>
+          candidate.connectionId === connectionId &&
+          candidate.accountId === accountId &&
+          candidate.address === email.trim().toLowerCase(),
+      ),
+  );
   return {
     service: new SsoAssertionService({
       connections: { findConnectionForSignIn },
-      memberships: { findRegistrantAtAddress },
+      memberships: { findRegistrantAtAddress, findBoundMemberIdentity },
     }),
     findConnectionForSignIn,
     findRegistrantAtAddress,
+    findBoundMemberIdentity,
   };
 };
 
@@ -109,7 +129,32 @@ describe("given a live connection", () => {
       ).toEqual({ action: "continue" });
     });
 
-    it("refuses direct trust when the ownership proof has lapsed", async () => {
+    it("keeps an exact previously bound member signing in after ownership proof lapses", async () => {
+      const { service } = serviceOver({
+        row: connection({
+          lapsedDomains: ["acme.com"],
+          domainVerifications: [
+            { ...DOMAIN_PROOF, proofState: "LAPSED" as const },
+          ],
+        }),
+        boundIdentities: [
+          {
+            connectionId: CONNECTION_ID,
+            accountId: "subject-ana",
+            address: "ana@acme.com",
+          },
+        ],
+      });
+      expect(
+        await service.decide({
+          providerId: CONNECTION_ID,
+          accountId: "subject-ana",
+          email: "ana@acme.com",
+        }),
+      ).toEqual({ action: "continue" });
+    });
+
+    it("refuses an unknown subject after ownership proof lapses", async () => {
       const { service } = serviceOver({
         row: connection({
           lapsedDomains: ["acme.com"],
@@ -121,6 +166,7 @@ describe("given a live connection", () => {
       expect(
         await service.decide({
           providerId: CONNECTION_ID,
+          accountId: "subject-attacker",
           email: "ana@acme.com",
         }),
       ).toMatchObject({ action: "reject" });

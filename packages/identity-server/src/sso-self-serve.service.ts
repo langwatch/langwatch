@@ -56,7 +56,8 @@ import {
   legacyReplacementCommandId,
   legacyReplacementConnectionId,
   newSsoConnectionCommandId,
-  newSsoConnectionId,
+  selfServeRegistrationCommandId,
+  selfServeRegistrationConnectionId,
 } from "./sso-connection-id";
 import type { SsoConnectionReadRepository } from "./sso-connection.repository";
 import type { SsoConnectionService } from "./sso-connection.service";
@@ -971,7 +972,10 @@ export class SsoSelfServeService {
         `organization ${organizationId} already holds connection ${held.connectionId} in ${held.state}`,
       );
     }
-    const connectionId = newSsoConnectionId();
+    const connectionId = await this.nextSelfServeRegistrationAttempt({
+      organizationId,
+      actorUserId: actor.userId,
+    });
     const registration = await this.prepareRegistration({
       organizationId,
       connectionId,
@@ -979,11 +983,57 @@ export class SsoSelfServeService {
       idp,
     });
     await this.deps.connections().registerConnection({
-      ...this.command({ organizationId, connectionId, actor }),
+      ...this.command({
+        organizationId,
+        connectionId,
+        actor,
+        commandId: selfServeRegistrationCommandId({
+          organizationId,
+          connectionId,
+          actorUserId: actor.userId,
+        }),
+      }),
       ...registration,
       arrivalPolicy: DEFAULT_SSO_ARRIVAL_POLICY,
     });
     return { connectionId };
+  }
+
+  private async nextSelfServeRegistrationAttempt({
+    organizationId,
+    actorUserId,
+  }: {
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<string> {
+    let previousTerminal:
+      | { connectionId: string; updatedAtMs: number }
+      | undefined;
+    while (true) {
+      const connectionId = selfServeRegistrationConnectionId({
+        organizationId,
+        actorUserId,
+        previousTerminal,
+      });
+      const existing = await this.deps.reads.findConnection({ connectionId });
+      if (existing === null) return connectionId;
+      if (
+        existing.organizationId !== organizationId ||
+        existing.source !== "self-serve" ||
+        existing.replacesConnectionId !== null
+      ) {
+        throw new SsoConnectionAlreadyRegisteredError(
+          `registration id ${connectionId} is held by another connection`,
+        );
+      }
+      if (existing.state !== "DISCARDED" && existing.state !== "TORN_DOWN") {
+        return connectionId;
+      }
+      previousTerminal = {
+        connectionId,
+        updatedAtMs: existing.updatedAtMs,
+      };
+    }
   }
 
   /**

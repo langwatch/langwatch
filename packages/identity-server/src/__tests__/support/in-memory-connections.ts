@@ -37,19 +37,40 @@ export class InMemoryConnections
   ): Promise<SsoConnectionRegistrationSlot> {
     const key = `${candidate.organizationId}:${candidate.kind}`;
     const held = this.registrationSlots.get(key);
+    if (held !== undefined && held.connectionId !== candidate.connectionId) {
+      const heldState = this.states.get(held.connectionId);
+      if (
+        heldState?.state !== "DISCARDED" &&
+        heldState?.state !== "TORN_DOWN"
+      ) {
+        return held;
+      }
+      if (heldState === undefined) return held;
+    }
+
+    const oppositeKind = candidate.kind === "legacy" ? "direct" : "legacy";
+    const opposite = this.registrationSlots.get(
+      `${candidate.organizationId}:${oppositeKind}`,
+    );
+    if (opposite !== undefined) {
+      const oppositeState = this.states.get(opposite.connectionId);
+      const oppositeIsLive =
+        oppositeState === undefined ||
+        (oppositeState.state !== "DISCARDED" &&
+          oppositeState.state !== "TORN_DOWN");
+      const exactPair =
+        candidate.kind === "direct"
+          ? candidate.replacesConnectionId === opposite.connectionId
+          : opposite.replacesConnectionId === candidate.connectionId;
+      if (oppositeIsLive && !exactPair) return opposite;
+    }
+
     if (held === undefined || held.connectionId === candidate.connectionId) {
       this.registrationSlots.set(key, candidate);
       return candidate;
     }
-    const heldState = this.states.get(held.connectionId);
-    if (
-      heldState?.state === "DISCARDED" ||
-      heldState?.state === "TORN_DOWN"
-    ) {
-      this.registrationSlots.set(key, candidate);
-      return candidate;
-    }
-    return held;
+    this.registrationSlots.set(key, candidate);
+    return candidate;
   }
 
   async findConnection({

@@ -16,6 +16,12 @@ export class PrismaSsoLegacyIdentityRetirement
       prisma: PrismaClient;
       identity: IdentityService;
       accounts: IdentityAccountCeremonies;
+      directories: {
+        revokeForConnection(args: {
+          organizationId: string;
+          connectionId: string;
+        }): Promise<{ revoked: number }>;
+      };
       now: () => number;
       newCommandId: () => string;
     },
@@ -63,6 +69,10 @@ export class PrismaSsoLegacyIdentityRetirement
         identifier,
       });
     }
+    await this.deps.directories.revokeForConnection({
+      organizationId,
+      connectionId: legacyConnectionId,
+    });
   }
 
   private async retireIdentifier({

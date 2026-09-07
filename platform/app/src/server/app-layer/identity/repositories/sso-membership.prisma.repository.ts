@@ -76,6 +76,44 @@ export class PrismaSsoMembershipRepository {
     return membership !== null;
   }
 
+  async findBoundMemberIdentity({
+    organizationId,
+    connectionId,
+    accountId,
+    email,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    accountId: string;
+    email: string;
+  }): Promise<boolean> {
+    const address = email.trim().toLowerCase();
+    if (!address || !accountId) return false;
+    const account = await this.prisma.account.findFirst({
+      where: {
+        provider: connectionId,
+        providerAccountId: accountId,
+        user: {
+          orgMemberships: { some: { organizationId, disabledAt: null } },
+          OR: [
+            { email: { equals: address, mode: "insensitive" } },
+            {
+              identifiers: {
+                some: {
+                  value: address,
+                  verifiedAt: { not: null },
+                  state: { in: ["VERIFIED", "PRIMARY"] },
+                },
+              },
+            },
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    return account !== null;
+  }
+
   /**
    * Makes somebody a MEMBER of an organization.
    *

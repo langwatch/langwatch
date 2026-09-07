@@ -17,7 +17,7 @@ export interface SsoMigrationFinalizationEvidence {
   legacyState: SsoConnectionLifecycleState;
   phase: SsoMigrationPhase;
   blockers: readonly SsoMigrationFinalizationBlocker[];
-  /** No live legacy Identifier and no legacy Account row remain. */
+  /** No live legacy Identifier, Account, or directory token remains. */
   legacyAccessRetired: boolean;
 }
 
@@ -153,7 +153,7 @@ export class SsoMigrationFinalizationService {
         {
           code: "legacy-access-remains",
           message:
-            "Legacy accounts or identifiers remain after the retirement pass.",
+            "Legacy accounts, identifiers, or directory tokens remain after the retirement pass.",
         },
       ]);
     }

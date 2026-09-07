@@ -4,10 +4,11 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * The `Account` rows a sign-in through the organization's configured SSO
  * provider leaves behind, and the flag that says they are there.
  *
- * Ordinarily one exact SSO account is kept. During a brokered-to-direct
- * migration the caller names two exact accounts: the grandfathered legacy
- * account and its explicitly linked direct replacement. Credential accounts
- * are preserved for on-prem / email-mode deployments.
+ * Account removal is deliberately not part of this repository. Auth0 is a
+ * shared broker provider, so a same-provider subject can belong to another
+ * organization and cannot be identified as stale from `provider` alone.
+ * Exact legacy retirement is handled by the migration finalizer, which has
+ * the predecessor connection and identity evidence needed to scope it.
  */
 export class PrismaSsoAccountReconciliationRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -18,13 +19,9 @@ export class PrismaSsoAccountReconciliationRepository {
   }
 
   /**
-   * Deletes every OAuth account row for this person EXCEPT the one being
-   * linked or refreshed, and clears `pendingSsoSetup` in the same
-   * transaction.
-   *
-   * One transaction because the flag is what says the stale rows exist:
-   * clearing it separately would leave a window in which somebody is told
-   * their SSO is set up while the rows that contradict it are still there.
+   * Completes setup without guessing which other OAuth identities are stale.
+   * `keepAccounts` documents the exact accounts authenticated for this
+   * callback; it is not authority to delete any account outside that set.
    */
   async reconcileOAuthAccounts({
     userId,
@@ -33,26 +30,10 @@ export class PrismaSsoAccountReconciliationRepository {
     userId: string;
     keepAccounts: readonly { providerId: string; accountId: string }[];
   }): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.account.deleteMany({
-        where: {
-          userId,
-          // A user can belong to several organizations. Only rotate subjects
-          // for providers this callback explicitly proved; unrelated OAuth
-          // accounts may be another organization's valid way in.
-          provider: {
-            in: [...new Set(keepAccounts.map(({ providerId }) => providerId))],
-          },
-          NOT: keepAccounts.map(({ providerId, accountId }) => ({
-            provider: providerId,
-            providerAccountId: accountId,
-          })),
-        },
-      }),
-      this.prisma.user.update({
-        where: { id: userId },
-        data: { pendingSsoSetup: false },
-      }),
-    ]);
+    void keepAccounts;
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pendingSsoSetup: false },
+    });
   }
 }

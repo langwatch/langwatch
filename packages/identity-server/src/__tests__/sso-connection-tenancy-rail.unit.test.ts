@@ -92,10 +92,10 @@ describe("given the self-serve service", () => {
 
   describe("when a verb resolves the connection it is about to change", () => {
     it("keeps every connection read behind an organization check", () => {
-      // The guarded resolver plus the deterministic replacement lookup and
-      // its post-commit projection check. The latter two both compare the
-      // loaded row with the caller's organization before accepting it.
-      expect(occurrences(source, "reads.findConnection(")).toBe(3);
+      // The guarded resolver, both deterministic attempt lookups, and the
+      // replacement's post-commit projection check. Each direct lookup
+      // compares the loaded row with the caller's organization.
+      expect(occurrences(source, "reads.findConnection(")).toBe(4);
       expect(
         methodBody(source, "  private async requireOrganizationConnection("),
       ).toContain("reads.findConnection(");
