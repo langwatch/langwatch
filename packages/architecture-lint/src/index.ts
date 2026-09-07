@@ -47,6 +47,7 @@ export type {
 export { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
 export {
   apiTransportFrameworkFindings,
+  featureServerTransportFindings,
   lintApiTransportFramework,
   readApiTransportFrameworkAllowlist,
 } from "./api-transport-framework.ts";

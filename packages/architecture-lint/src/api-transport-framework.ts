@@ -50,6 +50,146 @@ type Surface = "rest" | "trpc";
 
 type Finding = { file: string; line: number; message: string; allowed: string };
 
+const ALLOWED_HANDLER_FIELDS = new Set(["input", "app", "actor", "scope", "signal"]);
+const RAW_CONTEXT_FIELDS = new Set([
+  "ctx",
+  "context",
+  "req",
+  "request",
+  "session",
+  "headers",
+  "res",
+  "response",
+]);
+
+function isOutputBypass(
+  node: ts.CallExpression,
+  enabled: boolean,
+): node is ts.CallExpression & { expression: ts.PropertyAccessExpression } {
+  return (
+    enabled &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    (node.expression.name.text === "withoutOutput" ||
+      node.expression.name.text === "validateOutput")
+  );
+}
+
+function isRawAppConstruction(
+  node: ts.Node,
+  rawAppNames: ReadonlySet<string>,
+): node is ts.NewExpression & { expression: ts.Identifier } {
+  return (
+    ts.isNewExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    rawAppNames.has(node.expression.text)
+  );
+}
+
+function dynamicCompositionImports(source: ts.SourceFile): ts.CallExpression[] {
+  const imports: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments.length === 1 &&
+      node.arguments[0] !== undefined &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      node.arguments[0].text === "@langwatch/api/composition"
+    ) {
+      imports.push(node);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(source, visit);
+
+  return imports;
+}
+
+function isApiModuleSpecifier(specifier: string): boolean {
+  return specifier === "@langwatch/api" || specifier.startsWith("@langwatch/api/");
+}
+
+type FeatureBindingAnalysis = {
+  readonly bindingNames: Set<string>;
+  readonly apiBuilderNames: Set<string>;
+  readonly apiNamespaceNames: Set<string>;
+  readonly rawAppNames: Set<string>;
+  readonly rawTrpcNames: Set<string>;
+};
+
+function featureBindingAnalysis(
+  source: ts.SourceFile,
+  report: (node: ts.Node, message: string, allowed: string) => void,
+): FeatureBindingAnalysis {
+  const bindingNames = new Set<string>();
+  const apiBuilderNames = new Set<string>();
+  const apiNamespaceNames = new Set<string>();
+  const rawAppNames = new Set<string>();
+  const rawTrpcNames = new Set<string>();
+
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
+
+    const moduleSpecifier = statement.moduleSpecifier;
+    if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier)) continue;
+
+    const specifier = moduleSpecifier.text;
+    const bindings = ts.isImportDeclaration(statement)
+      ? statement.importClause?.namedBindings
+      : undefined;
+    if (specifier === "@langwatch/api/composition") {
+      report(
+        statement,
+        `Feature server imports the process-only composition module "${specifier}" (ADR-133).`,
+        "Keep @langwatch/api/composition imports in process/framework roots; feature transports use the standard API declaration helpers required by ADR-133.",
+      );
+    }
+
+    if (bindings && ts.isNamedImports(bindings)) {
+      for (const element of bindings.elements) {
+        const imported = element.propertyName?.text ?? element.name.text;
+        if (imported === "createTrpcHandlerBinding") bindingNames.add(element.name.text);
+
+        if (
+          [
+            "createRestService",
+            "createTrpcService",
+            "createRestRouter",
+            "createTrpcRouter",
+          ].includes(imported)
+        ) {
+          apiBuilderNames.add(element.name.text);
+        }
+
+        if (specifier === "hono" && RAW_APP_CONSTRUCTORS.has(imported)) {
+          rawAppNames.add(element.name.text);
+        }
+
+        if (specifier === "@trpc/server" && imported === "initTRPC") {
+          rawTrpcNames.add(element.name.text);
+        }
+      }
+    }
+
+    if (bindings && ts.isNamespaceImport(bindings) && isApiModuleSpecifier(specifier)) {
+      apiNamespaceNames.add(bindings.name.text);
+      bindingNames.add(`${bindings.name.text}.createTrpcHandlerBinding`);
+      for (const builder of [
+        "createRestService",
+        "createTrpcService",
+        "createRestRouter",
+        "createTrpcRouter",
+      ]) {
+        apiBuilderNames.add(`${bindings.name.text}.${builder}`);
+      }
+    }
+  }
+
+  return { bindingNames, apiBuilderNames, apiNamespaceNames, rawAppNames, rawTrpcNames };
+}
+
 function isProductionSource(file: string): boolean {
   return (
     file.endsWith(".api.ts") &&
@@ -75,6 +215,290 @@ function transportFiles(
   }
 
   return found.sort((left, right) => left.file.localeCompare(right.file));
+}
+
+function featureServerFiles(packages: readonly ClassifiedPackage[]): string[] {
+  return packages.flatMap((pkg) => {
+    if (pkg.kind !== "server") return [];
+
+    return walkFiles(join(pkg.root, "src"), (file) => {
+      const production = file.endsWith(".ts") || file.endsWith(".tsx");
+      const test = file.includes(`${sep}__tests__${sep}`) || /\.(?:test|spec)\.tsx?$/.test(file);
+
+      return production && !test;
+    });
+  });
+}
+
+export function featureServerTransportFindings(file: string, contents: string): Finding[] {
+  const source = ts.createSourceFile(
+    file,
+    contents,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const findings: Finding[] = [];
+  const lineOf = (node: ts.Node): number =>
+    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  const report = (node: ts.Node, message: string, allowed: string): void => {
+    findings.push({ file, line: lineOf(node), message, allowed });
+  };
+  const isTransport = file.includes(`${sep}transport${sep}api-`);
+  const { bindingNames, apiBuilderNames, apiNamespaceNames, rawAppNames, rawTrpcNames } =
+    featureBindingAnalysis(source, report);
+  const hasApiImport = source.statements.some(
+    (statement) =>
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      isApiModuleSpecifier(statement.moduleSpecifier.text),
+  );
+  const isApiTransport =
+    isTransport || apiBuilderNames.size > 0 || apiNamespaceNames.size > 0 || hasApiImport;
+
+  const dynamicCompositionImport = dynamicCompositionImports(source);
+  for (const node of dynamicCompositionImport) {
+    report(
+      node,
+      'Feature server dynamically imports the process-only composition module "@langwatch/api/composition" (ADR-133).',
+      "Keep @langwatch/api/composition imports in process/framework roots; feature transports use the standard API declaration helpers required by ADR-133.",
+    );
+  }
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const calleeText = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? `${callee.expression.getText(source)}.${callee.name.text}`
+          : "";
+      if (bindingNames.has(calleeText) || calleeText.endsWith(".createTrpcHandlerBinding")) {
+        report(
+          node,
+          "Feature server calls createTrpcHandlerBinding (ADR-133).",
+          "Create the process/framework handler binding in the application composition root; feature transports expose router declarations.",
+        );
+      }
+
+      if (ts.isIdentifier(callee) && rawTrpcNames.has(callee.text)) {
+        report(
+          node,
+          "Feature server calls initTRPC outside the process/framework root (ADR-133).",
+          "Create the tRPC root in the process/framework composition root and provide the configured procedures to the feature transport.",
+        );
+      }
+
+      if (
+        ts.isPropertyAccessExpression(callee) &&
+        callee.name.text === "context" &&
+        ts.isIdentifier(callee.expression) &&
+        rawTrpcNames.has(callee.expression.text)
+      ) {
+        report(
+          node,
+          "Feature server calls initTRPC.context() outside the process/framework root (ADR-133).",
+          "Create the tRPC root in the process/framework composition root and provide the configured procedures to the feature transport.",
+        );
+      }
+
+      if (isOutputBypass(node, isApiTransport)) {
+        report(
+          node,
+          `Feature transport bypasses output validation with .${node.expression.name.text}() (ADR-133).`,
+          "Declare the mandatory output schema and keep runtime validation enabled through @langwatch/api.",
+        );
+      }
+
+      if (
+        isApiTransport &&
+        ts.isPropertyAccessExpression(callee) &&
+        callee.name.text === "handle"
+      ) {
+        inspectHandler(node, report, source);
+      }
+    }
+
+    if (isRawAppConstruction(node, rawAppNames)) {
+      report(
+        node,
+        `Feature server constructs ${node.expression.text} outside the process/framework root (ADR-133).`,
+        "Construct the process HTTP application in the composition root; feature servers expose transport declarations.",
+      );
+    }
+
+    if (
+      isApiTransport &&
+      ts.isPropertyAssignment(node) &&
+      node.name.getText(source) === "validateOutput" &&
+      node.initializer.kind === ts.SyntaxKind.FalseKeyword
+    ) {
+      report(
+        node,
+        "Feature transport disables output validation with validateOutput: false (ADR-133).",
+        "Declare the mandatory output schema and keep runtime validation enabled through @langwatch/api.",
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(source, visit);
+
+  return findings.sort((left, right) => left.line - right.line);
+}
+
+function inspectHandler(
+  call: ts.CallExpression,
+  report: (node: ts.Node, message: string, allowed: string) => void,
+  source: ts.SourceFile,
+): void {
+  const argument = call.arguments[0];
+  const callback =
+    argument && ts.isParenthesizedExpression(argument) ? argument.expression : argument;
+  const resolved =
+    callback && ts.isIdentifier(callback)
+      ? source.statements.find(
+          (statement) =>
+            (ts.isFunctionDeclaration(statement) && statement.name?.text === callback.text) ||
+            (ts.isVariableStatement(statement) &&
+              statement.declarationList.declarations.some(
+                (declaration) =>
+                  ts.isIdentifier(declaration.name) &&
+                  declaration.name.text === callback.text &&
+                  declaration.initializer &&
+                  (ts.isArrowFunction(declaration.initializer) ||
+                    ts.isFunctionExpression(declaration.initializer)),
+              )),
+        )
+      : callback;
+  const resolvedHandler =
+    resolved && ts.isVariableStatement(resolved)
+      ? resolved.declarationList.declarations.find(
+          (declaration) =>
+            ts.isIdentifier(declaration.name) &&
+            declaration.name.text === callback?.getText(source),
+        )?.initializer
+      : resolved;
+  if (
+    !resolvedHandler ||
+    (!ts.isArrowFunction(resolvedHandler) &&
+      !ts.isFunctionExpression(resolvedHandler) &&
+      !ts.isFunctionDeclaration(resolvedHandler))
+  )
+    return;
+
+  const first = resolvedHandler.parameters[0];
+  if (!first) return;
+
+  if (ts.isObjectBindingPattern(first.name)) {
+    const rawNames = new Set<string>();
+    for (const element of first.name.elements) {
+      if (element.dotDotDotToken) {
+        report(
+          first,
+          "Handler receives a spread raw context object (ADR-133).",
+          "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
+        );
+        continue;
+      }
+
+      const property = element.propertyName ?? element.name;
+      if (ts.isIdentifier(property) && !ALLOWED_HANDLER_FIELDS.has(property.text)) {
+        report(
+          first,
+          `Handler receives raw context field "${property.text}" (ADR-133).`,
+          "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
+        );
+        if (ts.isIdentifier(element.name)) rawNames.add(element.name.text);
+      }
+    }
+
+    if (resolvedHandler.body) {
+      for (const rawName of rawNames) inspectRawContextBody(resolvedHandler.body, rawName, report);
+    }
+
+    return;
+  }
+
+  if (!ts.isIdentifier(first.name)) return;
+
+  if (resolvedHandler.body) {
+    for (const name of handlerAliases(resolvedHandler.body, first.name.text, report)) {
+      inspectRawContextBody(resolvedHandler.body, name, report);
+    }
+  }
+}
+
+function handlerAliases(
+  body: ts.ConciseBody,
+  root: string,
+  report: (node: ts.Node, message: string, allowed: string) => void,
+): Set<string> {
+  const names = new Set([root]);
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      ts.isIdentifier(node.initializer) &&
+      names.has(node.initializer.text)
+    ) {
+      if (ts.isIdentifier(node.name)) names.add(node.name.text);
+
+      if (ts.isObjectBindingPattern(node.name)) {
+        for (const element of node.name.elements) {
+          const property = element.propertyName ?? element.name;
+          if (
+            ts.isIdentifier(property) &&
+            !ALLOWED_HANDLER_FIELDS.has(property.text) &&
+            ts.isIdentifier(element.name)
+          ) {
+            report(
+              element,
+              `Handler receives raw context field "${property.text}" (ADR-133).`,
+              "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
+            );
+            names.add(element.name.text);
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
+
+  return names;
+}
+
+function inspectRawContextBody(
+  body: ts.ConciseBody,
+  name: string,
+  report: (node: ts.Node, message: string, allowed: string) => void,
+): void {
+  const visit = (node: ts.Node): void => {
+    const property = ts.isPropertyAccessExpression(node)
+      ? node.name.text
+      : ts.isElementAccessExpression(node) &&
+          node.argumentExpression &&
+          ts.isStringLiteral(node.argumentExpression)
+        ? node.argumentExpression.text
+        : undefined;
+    const receiver =
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+      ts.isIdentifier(node.expression)
+        ? node.expression.text
+        : undefined;
+    if (receiver === name && property && RAW_CONTEXT_FIELDS.has(property)) {
+      report(
+        node,
+        `Handler reaches raw request context through ${name}.${property} (ADR-133).`,
+        "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
 }
 
 function importedBindings(statement: ts.ImportDeclaration): string[] {
@@ -327,6 +751,18 @@ export function lintApiTransportFramework(
     if (allowed.has(workspaceFile)) continue;
 
     for (const finding of findings) {
+      violations.push({
+        policy: POLICY,
+        file: finding.file,
+        line: finding.line,
+        message: finding.message,
+        allowed: finding.allowed,
+      });
+    }
+  }
+
+  for (const file of featureServerFiles(packages)) {
+    for (const finding of featureServerTransportFindings(file, readFileSync(file, "utf8"))) {
       violations.push({
         policy: POLICY,
         file: finding.file,
