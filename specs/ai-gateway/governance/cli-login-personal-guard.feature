@@ -90,10 +90,19 @@ Feature: CLI login never lands a user on a personal project
       Then the response is 200 and returns that project's API key
 
     @integration @project-picker @rbac
-    Scenario: project-login approval denies a project the caller cannot write
+    Scenario: project-login approval denies a project the caller cannot manage
       Given a pending device code with credential_type "project_api_key"
-      And the caller lacks write access to the picked shared project
+      And the caller lacks permission to manage the picked shared project
       When the user approves with that project's id
+      Then the response is 403 with error "forbidden"
+      And the project's API key is NOT returned
+
+    @integration @project-picker @rbac
+    Scenario: owning a personal project does not replace project administration
+      Given a pending device code with credential_type "project_api_key"
+      And the caller owns the picked personal project
+      But the caller lacks permission to manage it
+      When the user approves with that personal project's id
       Then the response is 403 with error "forbidden"
       And the project's API key is NOT returned
 
@@ -112,6 +121,22 @@ Feature: CLI login never lands a user on a personal project
       When the CLI exchanges that device code
       Then the response is the fatal 410 "access_denied" and the project's API key is NOT returned
       And the device code is consumed, so a further exchange reports it expired
+
+    @integration @project-picker @rbac
+    Scenario: project-login exchange rechecks administration after approval
+      Given a device code approved while the caller could manage the project
+      And the caller has since lost permission to manage it
+      When the CLI exchanges that device code
+      Then the response is the fatal 410 "access_denied" and the project's API key is NOT returned
+      And the device code is consumed, so a further exchange reports it expired
+
+    @integration @project-picker @rbac
+    Scenario: project-login exchange returns a key rotated after approval
+      Given a device code approved while the caller could manage the project
+      And the project's base API key is rotated after approval
+      When the CLI exchanges that device code
+      Then the response contains the current base API key
+      And the approval-time base API key is NOT returned
 
     @unit @project-picker
     Scenario: the project picker lists the caller's personal project explicitly and omits internal-governance projects

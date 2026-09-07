@@ -18,6 +18,7 @@ import {
 } from "~/server/app-layer/identity/runtime";
 import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   AuthRateLimitedError,
   DirectRegistrationUnavailableError,
@@ -870,8 +871,21 @@ export const userRouter = createTRPCRouter({
         personalTeamId: workspace.team.id,
       });
 
+      const canManageProject = await probeProjectPermission(
+        ctx,
+        workspace.project.id,
+        "project:manage",
+      );
+      const safeWorkspace = {
+        ...workspace,
+        project: {
+          ...workspace.project,
+          apiKey: canManageProject ? workspace.project.apiKey : "",
+        },
+      };
+
       return {
-        workspace,
+        workspace: safeWorkspace,
         routingPolicy: defaultPolicy
           ? { id: defaultPolicy.id, name: defaultPolicy.name }
           : null,
