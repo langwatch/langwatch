@@ -1,7 +1,7 @@
 import {
-  IDENTIFIER_ATTACHED_EVENT_TYPE,
   type AttachIdentifierCommandData,
   type DetachIdentifierCommandData,
+  IDENTIFIER_ATTACHED_EVENT_TYPE,
   type IdentifierFact,
   type IdentityFact,
   type MarkPrimaryCommandData,
@@ -15,8 +15,8 @@ import {
 } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  type AccountIdentifierWrites,
   AccountIdentifiersService,
+  type AccountIdentifierWrites,
 } from "../account-identifiers.service";
 
 const USER_ID = "ana";
