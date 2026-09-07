@@ -27,6 +27,13 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     Given an organization "acme" with an admin "ana"
     And "ana" invited "sam@acme.com" with role MEMBER
 
+  @unit
+  Scenario: Invitation RPCs have one dedicated namespace
+    When a client discovers the invitation procedures
+    Then create, revoke, resend, list, and accept are available under "invite"
+    And those procedures are not available under "organization"
+    And the retired approval-request procedures are not restored
+
   # ── Identifier-aware acceptance ────────────────────────────────────────
 
   @integration

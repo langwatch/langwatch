@@ -16,7 +16,7 @@ import type { RouterOutputs } from "~/utils/api";
 import { orgRoleOptions } from "../settings/OrganizationUserRoleField";
 
 type OrganizationInvite =
-  RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
+  RouterOutputs["invite"]["getOrganizationPendingInvites"][number];
 
 interface InvitesTableProps {
   invites: OrganizationInvite[];

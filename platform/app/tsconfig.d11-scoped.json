@@ -10,6 +10,8 @@
     "src/server/invites/**/*.ts",
     "src/server/api/trpc.ts",
     "src/server/api/routers/organization.ts",
+    "src/server/api/routers/invite.ts",
+    "src/server/api/routers/schemas/team-role.ts",
     "src/server/api/routers/__tests__/organization.acceptInvite.unit.test.ts",
     "src/server/api/routers/__tests__/organization.invites.integration.test.ts",
     "src/server/license-enforcement/license-enforcement.repository.ts",
