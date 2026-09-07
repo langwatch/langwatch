@@ -3,8 +3,9 @@
  *
  * @see specs/scenarios/scenario-canary-healthcheck.feature
  *
- * Route-level proof for `GET /api/health/scenarios`: auth runs and can reject
- * BEFORE any run is queued, a busy probe answers 429, and a healthy/unhealthy
+ * Route-level proof for `GET /api/health/scenarios`: project API key auth
+ * (identical to the sibling health probes) runs and can reject BEFORE any run
+ * is queued, a busy probe answers 429, and a healthy/unhealthy
  * outcome from the service maps onto the documented response shape. The
  * service's own retry/budget/single-flight logic is unit-tested against an
  * injected queue/poll boundary in
@@ -13,39 +14,44 @@
  * (`runScenarioHealthCanary`) as the one boundary this route crosses, so a
  * queued-run assertion here is "was the entrypoint invoked", never a real
  * queue call.
- *
- * This file is expected to fail until GET /api/health/scenarios exists on
- * src/server/routes/health-checks.ts and
- * src/server/health-probes/scenario-canary.service.ts exports
- * `runScenarioHealthCanary`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { runScenarioHealthCanary } = vi.hoisted(() => ({
+const { runScenarioHealthCanary, projectFindUnique } = vi.hoisted(() => ({
   runScenarioHealthCanary: vi.fn(),
+  projectFindUnique: vi.fn(),
 }));
 
 vi.mock("~/server/health-probes/scenario-canary.service", () => ({
   runScenarioHealthCanary,
 }));
 
-const SECRET = "scenario-canary-integration-secret";
+// The route authenticates exactly like its siblings: the project API key in
+// `X-Auth-Token` is resolved through `prisma.project.findUnique`. That lookup
+// is the second (and only other) boundary this route crosses.
+vi.mock("~/server/db", () => ({
+  prisma: { project: { findUnique: projectFindUnique } },
+}));
+
+const API_KEY = "scenario-canary-project-api-key";
+const PROJECT = { id: "proj-1", apiKey: API_KEY, team: { id: "team-1" } };
+const AUTHED = { headers: { "x-auth-token": API_KEY } };
 
 describe("GET /api/health/scenarios", () => {
-  let original: string | undefined;
-
-  beforeEach(async () => {
-    original = process.env.CRON_API_KEY;
-    process.env.CRON_API_KEY = SECRET;
+  beforeEach(() => {
     runScenarioHealthCanary.mockReset();
+    projectFindUnique.mockReset();
+    projectFindUnique.mockImplementation(
+      async ({ where }: { where: { apiKey: string } }) =>
+        where.apiKey === API_KEY ? PROJECT : null,
+    );
     // Fresh module registry per test so the route's own module-scope state
     // (if any) does not leak between auth/busy/healthy cases.
     vi.resetModules();
   });
 
   afterEach(() => {
-    if (original === undefined) delete process.env.CRON_API_KEY;
-    else process.env.CRON_API_KEY = original;
+    vi.clearAllMocks();
   });
 
   async function getApp() {
@@ -54,69 +60,79 @@ describe("GET /api/health/scenarios", () => {
   }
 
   describe("given the route is registered", () => {
-    /** @scenario "The scenario canary route is declared internal-secret, never public" */
-    it("declares the scenario canary route as internalSecret so the OpenAPI spec never advertises this LLM-spend endpoint as unauthenticated", async () => {
-      // The handler gates in-handler on validateInternalSecret, so its declared
-      // access policy must be `internal`. A `public` declaration would document
-      // a real-run, LLM-spend endpoint as needing no auth. Registering the app
-      // populates the process-wide route registry as a side effect.
+    /** @scenario "The scenario canary route is declared public like its sibling health probes" */
+    it("declares the scenario canary route as a public endpoint that authenticates the project in-handler, like its siblings", async () => {
       await import("../health-checks");
       const { getRoutePolicy } = await import(
         "~/server/api/security/route-registry"
       );
 
       const registered = getRoutePolicy("GET", "/api/health/scenarios");
+      const sibling = getRoutePolicy("GET", "/api/health/triggers");
 
-      expect(registered?.policy.kind).toBe("internal");
-      expect(registered?.policy.kind).not.toBe("public");
+      expect(registered?.policy.kind).toBe("public");
+      expect(registered?.policy.kind).toBe(sibling?.policy.kind);
     });
   });
 
-  describe("given the request carries no Authorization header", () => {
-    /** @scenario "A request with no auth secret is refused before any run is queued" */
-    it("responds 401", async () => {
+  describe("given the request carries no project API key", () => {
+    /** @scenario "A request with no project API key is refused before any run is queued" */
+    it("responds 401 and queues no scenario run", async () => {
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios");
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1");
 
       expect(res.status).toBe(401);
-    });
-
-    /** @scenario "A request with no auth secret is refused before any run is queued" */
-    it("queues no scenario run", async () => {
-      const app = await getApp();
-
-      await app.request("/api/health/scenarios");
-
       expect(runScenarioHealthCanary).not.toHaveBeenCalled();
+      expect(projectFindUnique).not.toHaveBeenCalled();
     });
   });
 
-  describe("given the request carries a bearer token that does not match the configured secret", () => {
-    /** @scenario "A request with the wrong auth secret is refused before any run is queued" */
-    it("responds 403", async () => {
+  describe("given the request carries a project API key that matches no project", () => {
+    // Typed on the rows, not as `it.each<T>(`: the parity checker only binds
+    // `@scenario` to a bare `it.each(` call.
+    const wrongKeyRows: { label: string; headers: Record<string, string> }[] = [
+      { label: "X-Auth-Token", headers: { "x-auth-token": "wrong-key" } },
+      {
+        label: "Authorization: Bearer",
+        headers: { authorization: "Bearer wrong-key" },
+      },
+    ];
+
+    /** @scenario "A request with an unknown project API key is refused before any run is queued" */
+    it.each(
+      wrongKeyRows,
+    )("responds 401 via $label and queues no scenario run", async ({
+      headers,
+    }) => {
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios", {
-        headers: { authorization: "Bearer wrong-secret" },
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
+        headers,
       });
 
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(401);
+      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A request with the wrong auth secret is refused before any run is queued" */
-    it("queues no scenario run", async () => {
+    it("refuses with the same status and message a sibling health probe gives", async () => {
       const app = await getApp();
 
-      await app.request("/api/health/scenarios", {
-        headers: { authorization: "Bearer wrong-secret" },
-      });
+      const [canary, sibling] = await Promise.all([
+        app.request("/api/health/scenarios?runPlanId=plan-1", {
+          headers: { "x-auth-token": "wrong-key" },
+        }),
+        app.request("/api/health/triggers?triggerId=t-1", {
+          headers: { "x-auth-token": "wrong-key" },
+        }),
+      ]);
 
-      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
+      expect(canary.status).toBe(sibling.status);
+      expect(await canary.json()).toEqual(await sibling.json());
     });
   });
 
-  describe("given a request carrying the correct internal secret", () => {
+  describe("given a request carrying a valid project API key", () => {
     /** @scenario "An authenticated request triggers a real run through the shared queue path" */
     it("returns 200 with the queued scenarioRunId when the run is healthy", async () => {
       runScenarioHealthCanary.mockResolvedValue({
@@ -127,8 +143,8 @@ describe("GET /api/health/scenarios", () => {
       const app = await getApp();
 
       const res = await app.request(
-        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
-        { headers: { authorization: `Bearer ${SECRET}` } },
+        "/api/health/scenarios?runPlanId=plan-1",
+        AUTHED,
       );
       const body = (await res.json()) as Record<string, unknown>;
 
@@ -158,8 +174,8 @@ describe("GET /api/health/scenarios", () => {
       const app = await getApp();
 
       const res = await app.request(
-        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
-        { headers: { authorization: `Bearer ${SECRET}` } },
+        "/api/health/scenarios?runPlanId=plan-1",
+        AUTHED,
       );
       const body = (await res.json()) as Record<string, unknown>;
 
@@ -173,8 +189,8 @@ describe("GET /api/health/scenarios", () => {
       const app = await getApp();
 
       const res = await app.request(
-        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
-        { headers: { authorization: `Bearer ${SECRET}` } },
+        "/api/health/scenarios?runPlanId=plan-1",
+        AUTHED,
       );
       const body = (await res.json()) as Record<string, unknown>;
 
@@ -186,9 +202,7 @@ describe("GET /api/health/scenarios", () => {
     it("responds 400 and queues no run when runPlanId is absent", async () => {
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios?projectId=proj-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request("/api/health/scenarios", AUTHED);
 
       expect(res.status).toBe(400);
       // A missing pointer is a bad request, distinct from the 503 a plan that
@@ -198,60 +212,66 @@ describe("GET /api/health/scenarios", () => {
 
     /** @scenario "A blank runPlanId is a bad request" */
     it.each([
-      ["empty", "?projectId=proj-1&runPlanId="],
-      ["whitespace-only", "?projectId=proj-1&runPlanId=%20%20"],
-    ])("responds 400 and queues no run when runPlanId is %s", async (_label, query) => {
+      { label: "empty", query: "?runPlanId=" },
+      { label: "whitespace-only", query: "?runPlanId=%20%20" },
+    ])("responds 400 and queues no run when runPlanId is $label", async ({
+      query,
+    }) => {
       const app = await getApp();
 
-      const res = await app.request(`/api/health/scenarios${query}`, {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request(`/api/health/scenarios${query}`, AUTHED);
 
       expect(res.status).toBe(400);
-      // A blank/whitespace pointer never reaches the DB — it is rejected
-      // exactly like an absent one, not passed through to a run plan lookup.
       expect(runScenarioHealthCanary).not.toHaveBeenCalled();
     });
 
     /** @scenario "Canary responses are never cacheable" */
-    it("sets Cache-Control no-store on a healthy 200", async () => {
-      runScenarioHealthCanary.mockResolvedValue({
-        healthy: true,
-        scenarioRunId: "canary-run-abc",
-        durationMs: 1000,
-      });
+    it.each([
+      {
+        status: 200,
+        result: {
+          healthy: true,
+          scenarioRunId: "canary-run-abc",
+          durationMs: 1000,
+        },
+      },
+      {
+        status: 503,
+        result: {
+          healthy: false,
+          reason: "run_failed",
+          scenarioRunId: "canary-run-abc",
+          durationMs: 9000,
+        },
+      },
+    ])("sets Cache-Control no-store on a $status", async ({
+      status,
+      result,
+    }) => {
+      runScenarioHealthCanary.mockResolvedValue(result);
       const app = await getApp();
 
       const res = await app.request(
-        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
-        { headers: { authorization: `Bearer ${SECRET}` } },
+        "/api/health/scenarios?runPlanId=plan-1",
+        AUTHED,
       );
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(status);
       expect(res.headers.get("cache-control")).toBe("no-store");
     });
 
     /** @scenario "Canary responses are never cacheable" */
-    it("sets Cache-Control no-store on an unhealthy 503", async () => {
-      runScenarioHealthCanary.mockResolvedValue({
-        healthy: false,
-        reason: "run_failed",
-        scenarioRunId: "canary-run-abc",
-        durationMs: 9000,
-      });
+    it("sets Cache-Control no-store on an auth refusal too", async () => {
       const app = await getApp();
 
-      const res = await app.request(
-        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
-        { headers: { authorization: `Bearer ${SECRET}` } },
-      );
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1");
 
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(401);
       expect(res.headers.get("cache-control")).toBe("no-store");
     });
 
-    /** @scenario "Canary runs are confined to the run plan's own project regardless of caller input" */
-    it("passes the projectId and runPlanId query params through to the entrypoint", async () => {
+    /** @scenario "Canary runs are confined to the API key's own project regardless of caller input" */
+    it("scopes the run plan lookup to the key's project, ignoring any projectId on the query string", async () => {
       runScenarioHealthCanary.mockResolvedValue({
         healthy: true,
         scenarioRunId: "canary-run-abc",
@@ -260,32 +280,18 @@ describe("GET /api/health/scenarios", () => {
       const app = await getApp();
 
       await app.request(
-        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
-        { headers: { authorization: `Bearer ${SECRET}` } },
+        "/api/health/scenarios?runPlanId=plan-1&projectId=someone-elses-project",
+        AUTHED,
       );
 
-      // The route forwards exactly the two query params. Confinement is enforced
-      // one layer down: the run plan is looked up scoped to `projectId`, and the
-      // launched run's project comes from the resolved plan's own row — so a
-      // runPlanId that does not belong to `projectId` resolves to nothing and no
-      // run is launched (proven in the service unit test), and no request value
-      // can redirect a canary run into a project the plan does not own.
+      // The project is the one the API key resolved to. Confinement is enforced
+      // one layer down: the plan is looked up scoped to that project, so a
+      // runPlanId owned by another project resolves to nothing and no run is
+      // launched (proven in the service unit test).
       expect(runScenarioHealthCanary).toHaveBeenCalledWith({
         projectId: "proj-1",
         runPlanId: "plan-1",
       });
-    });
-
-    /** @scenario "A request with no projectId is a bad request" */
-    it("responds 400 and queues no run when projectId is absent", async () => {
-      const app = await getApp();
-
-      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
-
-      expect(res.status).toBe(400);
-      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
     });
 
     /** @scenario "An implausibly long query parameter is a bad request" */
@@ -294,8 +300,8 @@ describe("GET /api/health/scenarios", () => {
       const tooLong = "p".repeat(129);
 
       const res = await app.request(
-        `/api/health/scenarios?projectId=proj-1&runPlanId=${tooLong}`,
-        { headers: { authorization: `Bearer ${SECRET}` } },
+        `/api/health/scenarios?runPlanId=${tooLong}`,
+        AUTHED,
       );
       const body = (await res.json()) as Record<string, unknown>;
 
@@ -303,7 +309,6 @@ describe("GET /api/health/scenarios", () => {
       expect(body).toMatchObject({
         message: "runPlanId query parameter is invalid.",
       });
-      // Rejected before any run plan lookup — the entrypoint is never called.
       expect(runScenarioHealthCanary).not.toHaveBeenCalled();
     });
   });
