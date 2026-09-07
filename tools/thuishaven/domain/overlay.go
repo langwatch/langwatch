@@ -140,7 +140,7 @@ func (s Stack) OverlayEnv() []string {
 		// as admin@haven.localhost gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
-	// langyagent (the OpenCode manager): the control plane dials it at its loopback
+	// langyagent (the worker manager): the control plane dials it at its loopback
 	// port with the shared internal secret both sides require. Emitted whenever the
 	// service has a port (local or a baseline fallback). The isolation posture
 	// (LANGY_UNSAFE_DEV_DISABLE_ISOLATION) is NOT set here — it is a langyagent-only
@@ -148,7 +148,7 @@ func (s Stack) OverlayEnv() []string {
 	// control plane never reads it.
 	if langy.Port != 0 {
 		env = append(env,
-			fmt.Sprintf("OPENCODE_AGENT_URL=http://127.0.0.1:%d", langy.Port),
+			fmt.Sprintf("LANGY_AGENT_URL=http://127.0.0.1:%d", langy.Port),
 			"LANGY_INTERNAL_SECRET="+DefaultLangyInternalSecret,
 		)
 		// When the worker runs inside colima (the sandboxed / container-unsafe

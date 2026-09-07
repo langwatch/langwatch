@@ -154,7 +154,7 @@ spec:
                    one is looking — the app pod, which HAS the pair, never makes
                    that call. Same Secret and same Service as the app block. */}}
             {{- if (index .Values "langyagent").chartManaged }}
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:

@@ -26,7 +26,7 @@
  *
  * TRANSPORT: Langy calls the `langwatch` CLI, so a live tool call arrives as
  * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
- * of the `bash` call opencode actually made. `resolveCliCapability` (below)
+ * of the `bash` call the worker actually made. `resolveCliCapability` (below)
  * resolves EVERY such name to a card: the capability catalog
  * (`capabilityCatalog.ts`) binds the view (surface, noun, body widget) for the
  * resources it lists, and anything it has never heard of — a command the
@@ -741,11 +741,35 @@ export function isProposalOutput(output: unknown): boolean {
   );
 }
 
+/**
+ * A line of a serialised document rather than prose.
+ *
+ * `extractToolText` stringifies a structured payload so a RAW view always has
+ * something to show. A summary line must not repeat that: the reader gets `{`
+ * and `"id": "scenario_0002Yw…",` where a sentence belongs. Both shapes occur —
+ * a whole document on one line when the tool returned JSON as a string, and the
+ * pretty-printed structure when it returned an object.
+ */
+export function isSerializedDocumentLine(line: string): boolean {
+  if (/^[[{]/.test(line) && /[\]}]$/.test(line)) return true;
+  if (/^[[\]{},]+$/.test(line)) return true;
+  if (/^"[^"]*"\s*:/.test(line)) return true;
+  // One element of a pretty-printed array: `"refunds",`. A quoted word with
+  // nothing around it is a value out of its document, never a sentence.
+  return /^"[^"]*"[,;]?$/.test(line);
+}
+
 /** First N non-empty, non-heading lines of a tool's textual result. */
 export function summaryLines(output: unknown, max = 3): string[] {
   return extractToolText(output)
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith(">") && !l.startsWith("#"))
+    .filter(
+      (l) =>
+        l.length > 0 &&
+        !l.startsWith(">") &&
+        !l.startsWith("#") &&
+        !isSerializedDocumentLine(l),
+    )
     .slice(0, max);
 }

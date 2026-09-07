@@ -29,6 +29,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -76,6 +77,7 @@ import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
+import { app as langyLocalApp } from "./routes/langy-local";
 import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as langyUiActionsApp } from "./routes/langy-ui-actions";
 import { app as miscApp } from "./routes/misc";
@@ -197,6 +199,8 @@ export function createApiRouter() {
   api.route("/", playgroundApp);
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
+  api.route("/", langyLocalApp); // /api/langy/local, /api/langy/waits — the worker's door onto the developer's folder
+  api.route("/", langyControlApp); // /api/v1/langy/control — control requests and the long-poll transport
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId

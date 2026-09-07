@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.13.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.1...typescript-sdk@v1.13.0) (2026-09-06)
+
+
+### Features
+
+* **agent-testing:** suite fields and evaluators on scenario runs ([#7867](https://github.com/langwatch/langwatch/issues/7867)) ([0bcf01e](https://github.com/langwatch/langwatch/commit/0bcf01edb3d8cc36aa62cd48e6ee147a7b01b45b))
+* **langy:** langy works on the developer's code through a shared local folder or GitHub ([#7879](https://github.com/langwatch/langwatch/issues/7879)) ([ad87487](https://github.com/langwatch/langwatch/commit/ad874879284ee71416fa8a538a58f76e39a03bcd))
+
+
+### Bug Fixes
+
+* **agents:** a key waits for its grants, and a listing shows who holds each agent ([#7907](https://github.com/langwatch/langwatch/issues/7907)) ([654e82a](https://github.com/langwatch/langwatch/commit/654e82ae9f53c98c0cc710dc9c0c520a87e2c6cb))
+* **api-keys:** per-device personal ingest keys and hook self-heal on a revoked key ([#7859](https://github.com/langwatch/langwatch/issues/7859)) ([d6d1dda](https://github.com/langwatch/langwatch/commit/d6d1dda3ca126d39da8a64180e2e66bb6d068e30))
+* **sdks:** one HTTP client per SDK, redirects followed only for an http to https upgrade ([#7906](https://github.com/langwatch/langwatch/issues/7906)) ([5301cb0](https://github.com/langwatch/langwatch/commit/5301cb0a60f2ea4f1726673ef92c521a2e4d67e1))
+
+
+### Documentation
+
+* **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
+* **improve-your-agent:** the agent improvement loop and the optimization guides ([#7868](https://github.com/langwatch/langwatch/issues/7868)) ([c96d20f](https://github.com/langwatch/langwatch/commit/c96d20f35b9644a84e2345a4e98e8e810b87e936))
+
+## [1.12.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.0...typescript-sdk@v1.12.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **sdk-ts:** annotations methods return what their signatures promise ([#7865](https://github.com/langwatch/langwatch/issues/7865)) ([0730c99](https://github.com/langwatch/langwatch/commit/0730c99bde6763e1e22a0aa4c8f0471c3e9627b0))
+
 ## [1.12.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.11.0...typescript-sdk@v1.12.0) (2026-09-01)
 
 

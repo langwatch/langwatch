@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
+import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
 import type { CompareRow } from "./compare-rows";
 import type { RunScope } from "./run-configuration";
 import type { RunDialogSubject } from "./run-dialog-types";
@@ -37,6 +38,14 @@ export function picksScope(subject: RunDialogSubject | null): boolean {
   return subject?.kind === "plan";
 }
 
+/** The plan's own evaluators the subject opens on. */
+function initialEvaluatorsOf(
+  subject: RunDialogSubject | null,
+): EvaluatorAttachment[] {
+  if (subject?.kind !== "suite") return [];
+  return subject.evaluators ?? [];
+}
+
 export function useRunPlanFields({
   subject,
   subjectKey,
@@ -53,6 +62,13 @@ export function useRunPlanFields({
   const [judgeModel, setJudgeModel] = useState<string | null>(null);
   const [showRepeat, setShowRepeat] = useState(false);
   const [repeatCount, setRepeatCount] = useState(1);
+  // The plan's own evaluators, beside the ones the suites in scope attach.
+  const [evaluators, setEvaluators] = useState<EvaluatorAttachment[]>(() =>
+    initialEvaluatorsOf(subject),
+  );
+  const [showEvaluators, setShowEvaluators] = useState(
+    () => initialEvaluatorsOf(subject).length > 0,
+  );
 
   useEffect(() => {
     setScope(initialScopeOf(subject));
@@ -62,6 +78,9 @@ export function useRunPlanFields({
     setJudgeModel(null);
     setShowRepeat(false);
     setRepeatCount(1);
+    const initialEvaluators = initialEvaluatorsOf(subject);
+    setEvaluators(initialEvaluators);
+    setShowEvaluators(initialEvaluators.length > 0);
     // Reset exactly once per subject, as the rest of the dialog does.
   }, [subjectKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -82,6 +101,10 @@ export function useRunPlanFields({
     setShowRepeat,
     repeatCount,
     setRepeatCount,
+    evaluators,
+    setEvaluators,
+    showEvaluators,
+    setShowEvaluators,
   };
 }
 

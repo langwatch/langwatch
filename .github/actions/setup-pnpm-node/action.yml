@@ -12,6 +12,9 @@
 #     with:
 #       # optional: what to install. Omit to skip installing entirely.
 #       install: "@langwatch/web..."
+#       # optional: npm registry for a publish job. Writes the .npmrc that
+#       # `pnpm publish` authenticates through. Omit everywhere else.
+#       registry-url: "https://registry.npmjs.org"
 name: setup-pnpm-node
 description: Set up pnpm + Node 24 with pnpm-store caching.
 inputs:
@@ -37,6 +40,14 @@ inputs:
       or `@langwatch/web... @langwatch/langyworker...` for two roots).
     required: false
     default: ""
+  registry-url:
+    description: >
+      npm registry to authenticate against, for publish jobs only. Passed
+      through to actions/setup-node, which writes a project .npmrc pointing at
+      it with an auth token read from NODE_AUTH_TOKEN. Empty (the default)
+      leaves .npmrc untouched.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -59,6 +70,7 @@ runs:
         node-version: 24
         cache: "pnpm"
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
+        registry-url: ${{ inputs.registry-url }}
 
     # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback

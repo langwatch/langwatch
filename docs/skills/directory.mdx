@@ -73,6 +73,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -119,12 +121,15 @@ LangWatch.
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -165,8 +170,9 @@ Do NOT consider the work complete without verifying. In order:
 
 1. Confirm dependencies installed cleanly.
 2. Run the agent with a test input that produces at least one trace (study how the framework starts; only give up if it requires infrastructure you cannot spin up).
-3. Check traces arrived: `langwatch trace search --limit 5 --format json`.
-4. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
+3. Check traces arrived: `langwatch trace search --limit 5 --format json`. A trace is not searchable the moment the run ends: the export leaves the process first and ingestion adds a few seconds more, so an empty first answer means "not yet", not "not working". Wait and ask again, up to three times, about twenty seconds apart, and stop there. Do not change the command between tries: the search already covers the last twenty four hours, so a trace that is in is in.
+4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
+5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
 ## Common Mistakes
 
@@ -761,7 +767,7 @@ For a guardrail:
         </span>
         <div className="lw-prompt-source">
 
-`````text
+````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -782,23 +788,7 @@ Classify the user's intent:
 
 If the request remains ambiguous after inspecting context (a bare "make me an eval" that names neither a dataset nor live traffic), do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
 
-Where `langy-card` blocks render, ask it as a `choices` block (the only sanctioned question format) last in the reply:
-
-````markdown
-```langy-card
-{
-  "kind": "choices",
-  "blockId": "eval-kind",
-  "question": "What should this evaluate?",
-  "options": [
-    { "id": "experiment", "label": "A dataset, before deployment" },
-    { "id": "online", "label": "Live production traffic" }
-  ]
-}
-```
-````
-
-Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+In Langy, ask it with the `question` tool and stop; the options are the concrete alternatives, for example "A dataset, before deployment" and "Live production traffic". Elsewhere, ask the same question as one short line of prose.
 
 A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. Never turn a fixable slug into a question for the user.
 
@@ -819,7 +809,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-`````
+````
 
         </div>
       </div>
@@ -934,6 +924,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -1634,7 +1626,7 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 | Noun | What it is | Commands |
 | --- | --- | --- |
 | **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
+| **test suite** | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
@@ -1664,6 +1656,7 @@ langwatch scenario create "Angry refund request" \
 - `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+- `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -1794,6 +1787,57 @@ Hand over the link instead of narrating what the run is doing. Every run answer 
 
 If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
+### Fields and evaluators on a test suite
+
+A test suite reads like a dataset. It declares **fields** (typed columns beyond the situation and the criteria) and every scenario in it carries one value per field. **Evaluators** attach to the suite with **mappings** from each evaluator input to a source: the conversation, the scenario (situation, criteria, a field) or the trace (a tool call's input or output, the retrieved contexts). After a scenario run finishes, the platform runs the evaluators and stores one result per evaluator on the run. A **required** pass/fail evaluator that fails fails the scenario. A score-only evaluator reports beside the verdict and never gates.
+
+Use this when a criterion is really a comparison against a known answer (a golden SQL query, a reference reply, the tables an answer had to be written against) or a check an existing evaluator already does well (PII, toxicity, faithfulness). Keep the judge criteria for behavior.
+
+```bash
+# The suite declares the fields, then the evaluators that read them
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required \
+  --evaluator answer-quality-judge --not-required --format json
+
+# Every scenario carries a value per field
+langwatch scenario create "Chargebacks by quarter" \
+  --situation "A fraud analyst asks for chargebacks per quarter for merchant ACME Travel" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT quarter, SUM(amount) FROM chargebacks WHERE merchant = 'ACME Travel' GROUP BY quarter" \
+  --field table_schema="CREATE TABLE chargebacks (merchant TEXT, quarter TEXT, amount NUMERIC)" \
+  --format json
+
+# Later: replace the field list or the evaluator list. Each list is the whole of what the suite declares.
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --evaluator pii-leak-scanner --not-required
+```
+
+- `--field identifier:type` on the suite. Types: `text`, `number`, `boolean`. An identifier is lowercase letters, digits and underscores, starting with a letter; `situation`, `criteria`, `name`, `input` and `output` are reserved. A field an attached evaluator still reads cannot be removed.
+- `--evaluator <id|slug>` names a saved evaluator (`langwatch evaluator list --format json`; create one with `langwatch evaluator create`). Its mappings are **inferred** the way the suite editor infers them: `input`-like inputs read the first user message, `output`-like ones the last agent message, `contexts` the retrieved contexts of the trace, and `expected_*` inputs a field of the suite by name (`expected_output` matches `golden_sql`, `expected_contexts` matches `table_schema`). `--required` / `--not-required` apply to the `--evaluator` written just before them; the default is required for an evaluator that produces a pass/fail verdict and reports-only for a score.
+- A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
+
+```json
+[{
+  "evaluatorId": "<id from evaluator list>",
+  "required": true,
+  "mappings": {
+    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
+
+- A required input with no mapping is accepted on the suite and reported on stderr; the platform refuses a **run** until it is set. `langwatch test-suite get <suite> --format json` shows every attachment and its mappings.
+- A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason.
+- `run-plan run --evaluator <id|slug>` adds a plan-level evaluator beside the suite's, for checks that read only the conversation or the trace (a PII scanner across every suite). A plan evaluator never maps to a scenario field.
+- Results: `langwatch simulation-run get <scenarioRunId> --format json` carries `results.evaluations`, one entry per evaluator with `status` (`passed`, `failed`, `scored`, `skipped`, `error`), `required`, `score`, `passed` and `details` (the reason). The verdict of a run with a failed required evaluator is `failed`, and the reasoning names it.
+
+Through MCP the same surface is `platform_create_test_suite` and `platform_update_test_suite` (`fields`, `evaluators`), `platform_create_scenario` and `platform_update_scenario` (`fields`), `platform_run_plan` (`evaluators`) and `platform_get_simulation_run` (`results.evaluations`); `discover_schema({ category: "scenarios" })` lists the field rules and the mapping paths.
+
 ### Iterating
 
 Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
@@ -1860,7 +1904,10 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
+- Do NOT guess a tool call mapping. `--evaluator` never infers one; write it with `--evaluators-json` and the tool's real name from the agent's traces
+- Do NOT pass `--field` a name the test suite does not declare, or a value that does not read as the field's type. Both are refused before anything is written; declare the field on the suite first
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
@@ -1933,6 +1980,8 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 Connect the agent in this codebase to LangWatch, so test suites run from the platform against the real agent process. The SDK opens an outbound connection to LangWatch from the process that already runs the agent, registers the agent with its environment and its run parameters, and receives one call per conversation turn. The simulation exercises the real code, dependencies, secrets and traces.
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
+
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
@@ -2152,10 +2201,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -2167,8 +2216,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -2184,6 +2233,16 @@ Report to the user:
 - The parameters the platform registered, as `langwatch agent get` lists them, so the user knows which levers the run dialog offers. The `scenarios` skill reads the same list when it proposes scenarios; its prompt is "Add scenario tests for my agent".
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
+
+### When the change goes into a pull request
+
+A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
+
+1. Restart the service that holds the connect call, on the same port.
+2. Run `langwatch agent get <name>` and read the parameter list back.
+3. Put that list in the pull request body, as the command printed it.
+
+When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
 
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
@@ -2264,7 +2323,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -2320,6 +2379,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 - Do NOT stop the agent process while a run is executing. Every turn of the run calls it.
 - Do NOT reach for the HTTP fallback because the decorator looks like more work. It is fewer steps: no public URL, no body template, no credential in the agent configuration, no middleware.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+- Do NOT write a registration into a pull request body without the `langwatch agent get` output that shows it. A body that states what no command in the conversation printed is a false report.
 ````
 
         </div>
@@ -2393,6 +2453,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -3415,6 +3477,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -3461,12 +3525,15 @@ LangWatch.
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -3507,8 +3574,9 @@ Do NOT consider the work complete without verifying. In order:
 
 1. Confirm dependencies installed cleanly.
 2. Run the agent with a test input that produces at least one trace (study how the framework starts; only give up if it requires infrastructure you cannot spin up).
-3. Check traces arrived: `langwatch trace search --limit 5 --format json`.
-4. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
+3. Check traces arrived: `langwatch trace search --limit 5 --format json`. A trace is not searchable the moment the run ends: the export leaves the process first and ingestion adds a few seconds more, so an empty first answer means "not yet", not "not working". Wait and ask again, up to three times, about twenty seconds apart, and stop there. Do not change the command between tries: the search already covers the last twenty four hours, so a trace that is in is in.
+4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
+5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
 ## Common Mistakes
 
@@ -3534,6 +3602,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -4078,6 +4148,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -4734,7 +4806,7 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 | Noun | What it is | Commands |
 | --- | --- | --- |
 | **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
+| **test suite** | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
@@ -4764,6 +4836,7 @@ langwatch scenario create "Angry refund request" \
 - `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+- `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -4894,6 +4967,57 @@ Hand over the link instead of narrating what the run is doing. Every run answer 
 
 If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
+### Fields and evaluators on a test suite
+
+A test suite reads like a dataset. It declares **fields** (typed columns beyond the situation and the criteria) and every scenario in it carries one value per field. **Evaluators** attach to the suite with **mappings** from each evaluator input to a source: the conversation, the scenario (situation, criteria, a field) or the trace (a tool call's input or output, the retrieved contexts). After a scenario run finishes, the platform runs the evaluators and stores one result per evaluator on the run. A **required** pass/fail evaluator that fails fails the scenario. A score-only evaluator reports beside the verdict and never gates.
+
+Use this when a criterion is really a comparison against a known answer (a golden SQL query, a reference reply, the tables an answer had to be written against) or a check an existing evaluator already does well (PII, toxicity, faithfulness). Keep the judge criteria for behavior.
+
+```bash
+# The suite declares the fields, then the evaluators that read them
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required \
+  --evaluator answer-quality-judge --not-required --format json
+
+# Every scenario carries a value per field
+langwatch scenario create "Chargebacks by quarter" \
+  --situation "A fraud analyst asks for chargebacks per quarter for merchant ACME Travel" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT quarter, SUM(amount) FROM chargebacks WHERE merchant = 'ACME Travel' GROUP BY quarter" \
+  --field table_schema="CREATE TABLE chargebacks (merchant TEXT, quarter TEXT, amount NUMERIC)" \
+  --format json
+
+# Later: replace the field list or the evaluator list. Each list is the whole of what the suite declares.
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --evaluator pii-leak-scanner --not-required
+```
+
+- `--field identifier:type` on the suite. Types: `text`, `number`, `boolean`. An identifier is lowercase letters, digits and underscores, starting with a letter; `situation`, `criteria`, `name`, `input` and `output` are reserved. A field an attached evaluator still reads cannot be removed.
+- `--evaluator <id|slug>` names a saved evaluator (`langwatch evaluator list --format json`; create one with `langwatch evaluator create`). Its mappings are **inferred** the way the suite editor infers them: `input`-like inputs read the first user message, `output`-like ones the last agent message, `contexts` the retrieved contexts of the trace, and `expected_*` inputs a field of the suite by name (`expected_output` matches `golden_sql`, `expected_contexts` matches `table_schema`). `--required` / `--not-required` apply to the `--evaluator` written just before them; the default is required for an evaluator that produces a pass/fail verdict and reports-only for a score.
+- A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
+
+```json
+[{
+  "evaluatorId": "<id from evaluator list>",
+  "required": true,
+  "mappings": {
+    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
+
+- A required input with no mapping is accepted on the suite and reported on stderr; the platform refuses a **run** until it is set. `langwatch test-suite get <suite> --format json` shows every attachment and its mappings.
+- A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason.
+- `run-plan run --evaluator <id|slug>` adds a plan-level evaluator beside the suite's, for checks that read only the conversation or the trace (a PII scanner across every suite). A plan evaluator never maps to a scenario field.
+- Results: `langwatch simulation-run get <scenarioRunId> --format json` carries `results.evaluations`, one entry per evaluator with `status` (`passed`, `failed`, `scored`, `skipped`, `error`), `required`, `score`, `passed` and `details` (the reason). The verdict of a run with a failed required evaluator is `failed`, and the reasoning names it.
+
+Through MCP the same surface is `platform_create_test_suite` and `platform_update_test_suite` (`fields`, `evaluators`), `platform_create_scenario` and `platform_update_scenario` (`fields`), `platform_run_plan` (`evaluators`) and `platform_get_simulation_run` (`results.evaluations`); `discover_schema({ category: "scenarios" })` lists the field rules and the mapping paths.
+
 ### Iterating
 
 Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
@@ -4952,7 +5076,10 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
+- Do NOT guess a tool call mapping. `--evaluator` never infers one; write it with `--evaluators-json` and the tool's real name from the agent's traces
+- Do NOT pass `--field` a name the test suite does not declare, or a value that does not read as the field's type. Both are refused before anything is written; declare the field on the suite first
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first

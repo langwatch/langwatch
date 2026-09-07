@@ -7,6 +7,7 @@ from typing import List, Optional, Sequence, ClassVar
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
+from langwatch.http_client import create_async_client, create_client
 from langwatch.state import DEFAULT_ENDPOINT, get_instance, normalize_endpoint
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
@@ -772,14 +773,27 @@ class Client(LangWatchClientProtocol):
         """
         Sets up the REST API client for the client.
         """
-        Client._rest_api_client = LangWatchApiClient(
+        headers = build_auth_headers(
+            api_key=Client._api_key,
+            project_id=Client._project_id,
+        )
+        rest_api_client = LangWatchApiClient(
             base_url=Client._endpoint_url,
-            headers=build_auth_headers(
-                api_key=Client._api_key,
-                project_id=Client._project_id,
-            ),
+            headers=headers,
             raise_on_unexpected_status=True,
         )
+        # The generated client would build plain httpx clients on first use;
+        # these carry the shared redirect rule instead. Timeout stays unset,
+        # the way the generated client leaves it.
+        rest_api_client.set_httpx_client(
+            create_client(base_url=Client._endpoint_url, headers=headers, timeout=None)
+        )
+        rest_api_client.set_async_httpx_client(
+            create_async_client(
+                base_url=Client._endpoint_url, headers=headers, timeout=None
+            )
+        )
+        Client._rest_api_client = rest_api_client
 
         return Client._rest_api_client
 

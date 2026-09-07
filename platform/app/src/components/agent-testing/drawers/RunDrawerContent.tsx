@@ -295,6 +295,7 @@ function ResultsSection({
           declaredCriteria={detail.scenarioData?.criteria ?? []}
           reasoning={scenarioState.results?.reasoning}
           error={scenarioState.results?.error}
+          evaluations={scenarioState.results?.evaluations ?? []}
         />
       )}
     </Box>

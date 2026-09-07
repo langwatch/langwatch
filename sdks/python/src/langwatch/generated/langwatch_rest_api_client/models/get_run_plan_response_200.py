@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
+    from ..models.get_run_plan_response_200_evaluators_item import GetRunPlanResponse200EvaluatorsItem
     from ..models.get_run_plan_response_200_scope_type_0 import GetRunPlanResponse200ScopeType0
     from ..models.get_run_plan_response_200_scope_type_1 import GetRunPlanResponse200ScopeType1
     from ..models.get_run_plan_response_200_scope_type_2 import GetRunPlanResponse200ScopeType2
@@ -40,6 +43,8 @@ class GetRunPlanResponse200:
         created_at (str): When the plan was created.
         updated_at (str): When the plan was last written.
         platform_url (str): Where to open this run plan in the LangWatch platform.
+        evaluators (list[GetRunPlanResponse200EvaluatorsItem] | Unset): The plan's own evaluators. Absent on servers
+            that predate evaluators on this family.
     """
 
     id: str
@@ -61,6 +66,7 @@ class GetRunPlanResponse200:
     created_at: str
     updated_at: str
     platform_url: str
+    evaluators: list[GetRunPlanResponse200EvaluatorsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -110,6 +116,13 @@ class GetRunPlanResponse200:
 
         platform_url = self.platform_url
 
+        evaluators: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.evaluators, Unset):
+            evaluators = []
+            for evaluators_item_data in self.evaluators:
+                evaluators_item = evaluators_item_data.to_dict()
+                evaluators.append(evaluators_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -130,11 +143,14 @@ class GetRunPlanResponse200:
                 "platformUrl": platform_url,
             }
         )
+        if evaluators is not UNSET:
+            field_dict["evaluators"] = evaluators
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_run_plan_response_200_evaluators_item import GetRunPlanResponse200EvaluatorsItem
         from ..models.get_run_plan_response_200_scope_type_0 import GetRunPlanResponse200ScopeType0
         from ..models.get_run_plan_response_200_scope_type_1 import GetRunPlanResponse200ScopeType1
         from ..models.get_run_plan_response_200_scope_type_2 import GetRunPlanResponse200ScopeType2
@@ -228,6 +244,15 @@ class GetRunPlanResponse200:
 
         platform_url = d.pop("platformUrl")
 
+        _evaluators = d.pop("evaluators", UNSET)
+        evaluators: list[GetRunPlanResponse200EvaluatorsItem] | Unset = UNSET
+        if _evaluators is not UNSET:
+            evaluators = []
+            for evaluators_item_data in _evaluators:
+                evaluators_item = GetRunPlanResponse200EvaluatorsItem.from_dict(evaluators_item_data)
+
+                evaluators.append(evaluators_item)
+
         get_run_plan_response_200 = cls(
             id=id,
             name=name,
@@ -243,6 +268,7 @@ class GetRunPlanResponse200:
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            evaluators=evaluators,
         )
 
         get_run_plan_response_200.additional_properties = d

@@ -25,9 +25,6 @@ import {
 } from "./batchRunProgress";
 import { createSpinner } from "./spinner";
 
-/** How long the poll waits before giving up. */
-const TIMEOUT_MS = 10 * 60 * 1000;
-
 /** How long the poll sleeps between reads. */
 const POLL_INTERVAL_MS = 3000;
 
@@ -78,7 +75,15 @@ export interface WaitForBatchRunParams {
    * final document. Follow-up prose is left out.
    */
   machine: boolean;
+  /** How long the poll runs before it gives up, from `--wait [minutes]`. */
+  timeoutMs: number;
 }
+
+/** "45 minutes", "1 minute", "0.5 minutes": the limit as the failure line says it. */
+const describeMinutes = (timeoutMs: number): string => {
+  const minutes = timeoutMs / 60000;
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+};
 
 /** The per-run rows of the final document, from the last successful poll. */
 const toRunResults = (runs: BatchRun[]): BatchRunResultRow[] =>
@@ -103,6 +108,7 @@ export async function waitForBatchRun({
   jobCount,
   subject,
   machine,
+  timeoutMs,
 }: WaitForBatchRunParams): Promise<WaitForBatchRunResult> {
   if (!machine) console.log();
   const pollSpinner = createSpinner(
@@ -129,12 +135,12 @@ export async function waitForBatchRun({
   let latestRuns: BatchRun[] = [];
 
   while (!completed) {
-    if (Date.now() - startTime > TIMEOUT_MS) {
+    if (Date.now() - startTime > timeoutMs) {
       outcome = "timeout";
       process.exitCode = 1;
       pollSpinner.fail(
         chalk.red(
-          `The ${subject} timed out after ${TIMEOUT_MS / 60000} minutes`,
+          `The ${subject} timed out after ${describeMinutes(timeoutMs)}`,
         ),
       );
       if (!machine) {

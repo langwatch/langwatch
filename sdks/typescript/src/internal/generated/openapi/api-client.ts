@@ -48,7 +48,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -99,7 +101,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -129,8 +133,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -142,7 +146,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Invalid input */
@@ -188,7 +194,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -256,8 +264,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -270,8 +278,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            status?: string;
-                            message?: string;
+                            data: components["schemas"]["Annotation"];
                         };
                     };
                 };
@@ -764,14 +771,14 @@ export interface paths {
         };
         /** @description Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found. */
         get: operations["getAgent"];
-        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only. */
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
         put: operations["replaceAgent"];
         post?: never;
         /** @description Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row. */
         delete: operations["archiveAgent"];
         options?: never;
         head?: never;
-        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only. */
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
         patch: operations["updateAgent"];
         trace?: never;
     };
@@ -1031,9 +1038,29 @@ export interface paths {
         };
         /**
          * Get pull request coding agent usage
-         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price. Prefer `GET /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API key alone and needs no X-Project-Id header.
          */
         get: operations["getApiCodingAgentPullRequestUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coding-agent/pull-request-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get pull request usage
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with an organization API key and nothing else: no project id is sent anywhere. A key created for you reads with your own access; an organization service key, such as one a continuous integration job holds, reads with the access its bindings grant. Rows appear only for projects the key may view, and cost only for those it may price.
+         */
+        get: operations["getPullRequestUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2305,6 +2332,108 @@ export interface paths {
         patch: operations["patchApiGraphsById"];
         trace?: never;
     };
+    "/api/v1/langy/control/connect/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Share a folder over HTTP, for a network that blocks WebSockets. The body is the register frame of the control protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerLangyControlSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Wait for the next frames of a shared folder, then answer with what is waiting or with an empty list. Each poll is also the folder's heartbeat, so a command line that polls reads connected. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollLangyControlSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the frames the command line has for the platform: the acknowledgement of a call, its result, a permission the developer has to answer first, and the deregister that ends the share. */
+        post: operations["postLangyControlFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
+        get: operations["listLangyControlRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused. */
+        post: operations["approveLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again. */
+        post: operations["cancelLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/usage": {
         parameters: {
             query?: never;
@@ -3529,7 +3658,7 @@ export interface paths {
         /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
         get: operations["listTestSuites"];
         put?: never;
-        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        /** @description Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start. */
         post: operations["createTestSuite"];
         delete?: never;
         options?: never;
@@ -3555,8 +3684,8 @@ export interface paths {
         delete: operations["archiveTestSuite"];
         options?: never;
         head?: never;
-        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
-        patch: operations["renameTestSuite"];
+        /** @description Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are. */
+        patch: operations["updateTestSuite"];
         trace?: never;
     };
     "/api/v1/test-suites/{id}/run": {
@@ -4214,23 +4343,23 @@ export interface components {
     schemas: {
         Annotation: {
             /** @description The ID of the annotation */
-            id?: string;
+            id: string;
             /** @description The ID of the project */
-            projectId?: string;
+            projectId: string;
             /** @description The ID of the trace */
-            traceId?: string;
+            traceId: string;
             /** @description The comment of the annotation */
-            comment?: string;
+            comment: string | null;
             /** @description The thumbs up status of the annotation */
-            isThumbsUp?: boolean;
+            isThumbsUp: boolean | null;
             /** @description The ID of the user */
-            userId?: string;
+            userId: string | null;
             /** @description The created at of the annotation */
-            createdAt?: string;
+            createdAt: string;
             /** @description The updated at of the annotation */
-            updatedAt?: string;
+            updatedAt: string;
             /** @description The email of the user */
-            email?: string;
+            email: string | null;
         };
         Error: {
             /** Format: int32 */
@@ -5053,7 +5182,6 @@ export interface operations {
                     agents: {
                         name: string;
                         environment: string;
-                        description?: string;
                         /** @default {} */
                         parameters?: {
                             [key: string]: unknown;
@@ -5364,6 +5492,13 @@ export interface operations {
                                 inflight: number;
                                 maxConcurrency: number;
                             }[];
+                            /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                            selectable: boolean;
+                            /**
+                             * @description Why the agent cannot be run by this credential. Null when it can.
+                             * @enum {string|null}
+                             */
+                            notSelectableReason: "owned_by_another_person" | null;
                             createdAt: string;
                             updatedAt: string;
                             /** Format: uri */
@@ -5466,6 +5601,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5549,6 +5691,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5647,6 +5796,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -5774,6 +5930,13 @@ export interface operations {
                             inflight: number;
                             maxConcurrency: number;
                         }[];
+                        /** @description Whether the credential making this request can run simulations against the agent. False for a personal development agent that belongs to somebody else, which is listed all the same so it can be told apart from the other agents of the same name. */
+                        selectable: boolean;
+                        /**
+                         * @description Why the agent cannot be run by this credential. Null when it can.
+                         * @enum {string|null}
+                         */
+                        notSelectableReason: "owned_by_another_person" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -8283,6 +8446,85 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getPullRequestUsage: {
+        parameters: {
+            query: {
+                /** @description The repository as "owner/name". */
+                repository: string;
+                /** @description The pull request number. */
+                pullRequest: number;
+                /** @description The GitHub host. Defaults to this instance's configured GitHub host, which is github.com unless an operator named a GitHub Enterprise Server. */
+                host?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        pullRequest: {
+                            repositoryHost: string;
+                            repositoryFullName: string;
+                            prNumber: number;
+                            headBranch: string;
+                            htmlUrl: string;
+                            state: string;
+                            isDraft: boolean;
+                            authorLogin: string | null;
+                            prCreatedAtMs: number;
+                            prClosedAtMs: number | null;
+                            prMergedAtMs: number | null;
+                        };
+                        rows: {
+                            projectId: string;
+                            projectSlug: string;
+                            contributorLabel: string;
+                            contributorIsProject: boolean;
+                            agent: string;
+                            models: string[];
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        }[];
+                        totals: {
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        };
+                        modelBreakdown: {
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            tokensKnown: boolean;
+                        }[];
                     };
                 };
             };
@@ -17588,6 +17830,501 @@ export interface operations {
             };
         };
     };
+    registerLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    cli: {
+                        name: string;
+                        version: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                    };
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The folder is shared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The session key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key is not a Langy session key, or it controls no conversation: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the folder, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The frames waiting for the folder; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            call: {
+                                callId: string;
+                                conversationId: string;
+                                turnId: string;
+                                deadlineAt: number;
+                            } & ({
+                                /** @constant */
+                                tool: "local_read";
+                                params: {
+                                    path: string;
+                                    offset?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_write";
+                                params: {
+                                    path: string;
+                                    content: string;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_edit";
+                                params: {
+                                    path: string;
+                                    edits: {
+                                        oldText: string;
+                                        newText: string;
+                                    }[];
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_bash";
+                                params: {
+                                    command: string;
+                                    timeout?: number;
+                                    background?: boolean;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_grep";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    glob?: string;
+                                    ignoreCase?: boolean;
+                                    literal?: boolean;
+                                    context?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_find";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_ls";
+                                params: {
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            });
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "permission";
+                            callId: string;
+                            /** @enum {string} */
+                            decision: "allow_once" | "allow_pattern" | "deny" | "expired";
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "policy";
+                            skipPermissions: boolean;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "disconnect";
+                            reason: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postLangyControlFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result, permission_required and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "register";
+                        cli: {
+                            name: string;
+                            version: string;
+                        };
+                        instance: {
+                            id: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            startedAt: string;
+                            /** @default [] */
+                            inFlightCallIds?: string[];
+                        };
+                        workspace: {
+                            root: string;
+                            name: string;
+                            gitBranch?: string;
+                            gitRemote?: string;
+                            gitDirty?: boolean;
+                            os: string;
+                            nodeVersion?: string;
+                            pythonVersion?: string;
+                            ghAuthenticated?: boolean;
+                            packageManager?: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        ok: boolean;
+                        text?: string;
+                        output?: {
+                            exitCode: number | null;
+                            stdout: string;
+                            stderr: string;
+                            truncated: boolean;
+                            logPath?: string;
+                            pid?: number;
+                            durationMs: number;
+                        };
+                        error?: {
+                            /** @enum {string} */
+                            code: "path_refused" | "command_refused" | "permission_denied" | "permission_expired" | "cancelled" | "timeout" | "exec_failed" | "not_found";
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_required";
+                        callId: string;
+                        summary: string;
+                        pattern: string;
+                        reason: string;
+                        skipOffered: boolean;
+                        segments?: {
+                            command: string;
+                            pattern: string;
+                            readOnly: boolean;
+                        }[];
+                        timeoutSeconds?: number;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_answered";
+                        callId: string;
+                        /** @enum {string} */
+                        decision: "allow_once" | "allow_pattern" | "deny";
+                        patterns?: string[];
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a list of frames */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listLangyControlRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        requests: {
+                            id: string;
+                            conversationId: string;
+                            conversationTitle: string;
+                            conversationUrl: string;
+                            projectId: string;
+                            projectName: string;
+                            createdAt: string;
+                            expiresAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    approveLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sessionKey: string;
+                        endpoint: string;
+                        conversation: {
+                            id: string;
+                            title: string;
+                            url: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    cancelLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The request that was cancelled. */
+                        id: string;
+                        /**
+                         * @description Always true once the request is gone.
+                         * @constant
+                         */
+                        cancelled: true;
+                    };
+                };
+            };
+        };
+    };
     getApiMeUsage: {
         parameters: {
             query?: {
@@ -23312,6 +24049,24 @@ export interface operations {
                         metCriteria: string[];
                         unmetCriteria: string[];
                         error?: string;
+                        evaluations?: {
+                            evaluatorId: string;
+                            name: string;
+                            /** @enum {string} */
+                            status: "passed" | "failed" | "scored" | "skipped" | "error";
+                            required: boolean;
+                            passed?: boolean;
+                            score?: number;
+                            label?: string;
+                            details?: string;
+                            cost?: {
+                                currency: string;
+                                amount: number;
+                            };
+                            inputs?: {
+                                [key: string]: string;
+                            };
+                        }[];
                     } | null;
                 } | {
                     /** @constant */
@@ -23451,6 +24206,35 @@ export interface operations {
                         content: string;
                         encryptedValue?: string;
                     }) | {
+                        role?: string;
+                        content: ({
+                            /** @constant */
+                            type: "text";
+                            text: string;
+                            citations?: unknown[] | null;
+                        } | {
+                            /** @constant */
+                            type: "tool_use";
+                            id: string;
+                            name: string;
+                            input?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "tool_result";
+                            tool_use_id: string;
+                            content?: string | unknown[];
+                            is_error?: boolean;
+                        } | {
+                            /** @constant */
+                            type: "thinking";
+                            thinking: string;
+                            signature?: string;
+                        } | {
+                            /** @constant */
+                            type: "redacted_thinking";
+                            data: string;
+                        })[];
+                    } | {
                         role?: "system" | "developer" | "user" | "assistant" | "function" | "tool" | "unknown";
                         content?: string | ({
                             /** @constant */
@@ -23993,6 +24777,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -24085,6 +24873,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -24121,6 +24913,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24219,6 +25015,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24323,6 +25123,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -24359,6 +25163,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24548,6 +25356,10 @@ export interface operations {
                     minTurns?: number | null;
                     /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
                     testSuiteId?: string | null;
+                    /** @description The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value. */
+                    fields?: {
+                        [key: string]: string | number | boolean;
+                    };
                 };
             };
         };
@@ -24584,6 +25396,10 @@ export interface operations {
                         minTurns?: number | null;
                         /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
                         testSuiteId?: string | null;
+                        /** @description The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields. */
+                        fields?: {
+                            [key: string]: string | number | boolean;
+                        };
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -24809,6 +25625,10 @@ export interface operations {
                             judgeModel: string | null;
                             maxTurns: number | null;
                             minTurns: number | null;
+                            /** @description The field values as this version saved them. Absent on servers that predate suite fields. */
+                            fields?: {
+                                [key: string]: string | number | boolean;
+                            };
                         };
                     };
                 };
@@ -25701,6 +26521,25 @@ export interface operations {
                                 metCriteria?: string[];
                                 unmetCriteria?: string[];
                                 error?: string | null;
+                                /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                                evaluations?: {
+                                    evaluatorId: string;
+                                    name: string;
+                                    /** @enum {string} */
+                                    status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                    required: boolean;
+                                    passed?: boolean;
+                                    score?: number;
+                                    label?: string;
+                                    details?: string;
+                                    cost?: {
+                                        currency: string;
+                                        amount: number;
+                                    };
+                                    inputs?: {
+                                        [key: string]: string;
+                                    };
+                                }[];
                             } | null;
                             messages: {
                                 role: string;
@@ -25804,6 +26643,25 @@ export interface operations {
                             metCriteria?: string[];
                             unmetCriteria?: string[];
                             error?: string | null;
+                            /** @description One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators. */
+                            evaluations?: {
+                                evaluatorId: string;
+                                name: string;
+                                /** @enum {string} */
+                                status: "passed" | "failed" | "scored" | "skipped" | "error";
+                                required: boolean;
+                                passed?: boolean;
+                                score?: number;
+                                label?: string;
+                                details?: string;
+                                cost?: {
+                                    currency: string;
+                                    amount: number;
+                                };
+                                inputs?: {
+                                    [key: string]: string;
+                                };
+                            }[];
                         } | null;
                         messages: {
                             role: string;
@@ -27090,6 +27948,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -27158,6 +28039,29 @@ export interface operations {
                         judgeModel?: string | null;
                         /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
+                        /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                     };
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
                     idempotencyKey?: string;
@@ -27297,6 +28201,29 @@ export interface operations {
                         judgeModel: string | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
+                        /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the plan was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the plan was created. */
@@ -27459,6 +28386,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27487,6 +28447,39 @@ export interface operations {
                 "application/json": {
                     /** @description The test suite name, as it reads in the platform. */
                     name: string;
+                    /** @description The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -27508,6 +28501,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27553,6 +28579,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */
@@ -27607,7 +28666,7 @@ export interface operations {
             };
         };
     };
-    renameTestSuite: {
+    updateTestSuite: {
         parameters: {
             query?: never;
             header?: never;
@@ -27620,8 +28679,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The test suite name, as it reads in the platform. */
-                    name: string;
+                    /** @description The new name. The slug is kept. */
+                    name?: string;
+                    /** @description The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use. */
+                    fields?: {
+                        /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                        identifier: string;
+                        /**
+                         * @description The value type every scenario carries for this field.
+                         * @enum {string}
+                         */
+                        type: "text" | "number" | "boolean";
+                    }[];
+                    /** @description The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid. */
+                    evaluators?: {
+                        /** @description The attachment id. Stable across edits of the attachment. */
+                        id: string;
+                        /** @description The id of the saved evaluator this attachment runs. */
+                        evaluatorId: string;
+                        /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                        required: boolean;
+                        /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                        mappings: {
+                            [key: string]: {
+                                /** @constant */
+                                type: "source";
+                                /** @enum {string} */
+                                sourceId: "conversation" | "scenario" | "trace";
+                                path: string[];
+                            } | {
+                                /** @constant */
+                                type: "value";
+                                value: string;
+                            };
+                        };
+                    }[];
                 };
             };
         };
@@ -27643,6 +28735,39 @@ export interface operations {
                         scenarioIds: string[];
                         /** @description How many scenarios are filed in it. */
                         scenarioCount: number;
+                        /** @description The fields the test suite declares. Absent on servers that predate fields on this family. */
+                        fields?: {
+                            /** @description The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter. */
+                            identifier: string;
+                            /**
+                             * @description The value type every scenario carries for this field.
+                             * @enum {string}
+                             */
+                            type: "text" | "number" | "boolean";
+                        }[];
+                        /** @description The evaluators attached to the test suite. Absent on servers that predate evaluators on this family. */
+                        evaluators?: {
+                            /** @description The attachment id. Stable across edits of the attachment. */
+                            id: string;
+                            /** @description The id of the saved evaluator this attachment runs. */
+                            evaluatorId: string;
+                            /** @description Whether a failing result fails the scenario. A score-only evaluator reports and never gates. */
+                            required: boolean;
+                            /** @description Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run. */
+                            mappings: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "source";
+                                    /** @enum {string} */
+                                    sourceId: "conversation" | "scenario" | "trace";
+                                    path: string[];
+                                } | {
+                                    /** @constant */
+                                    type: "value";
+                                    value: string;
+                                };
+                            };
+                        }[];
                         /** @description When the suite was archived, or null while it is active. */
                         archivedAt: string | null;
                         /** @description When the suite was created. */

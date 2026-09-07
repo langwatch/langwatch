@@ -432,7 +432,9 @@ export default function CliAuthPage() {
         organizationId: selectedOrgId,
         bindings: myBindings.data,
         sharedTeamIds: sharedTeams.map((team) => team.id),
-        personalProjectId: personalProject?.id ?? null,
+        personalProject: personalProject
+          ? { id: personalProject.id, teamId: personalProject.teamId }
+          : null,
       }),
     );
     setScopeDefaultsOrgId(selectedOrgId);
@@ -474,7 +476,9 @@ export default function CliAuthPage() {
         organizationId: selectedOrgId,
         bindings: myBindings.data,
         sharedTeamIds: sharedTeams.map((team) => team.id),
-        personalProjectId: personalProject?.id ?? null,
+        personalProject: personalProject
+          ? { id: personalProject.id, teamId: personalProject.teamId }
+          : null,
       }).length > 0
     );
   }, [selectedOrgId, myBindings.data, sharedTeams, personalProject]);

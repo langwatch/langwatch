@@ -376,6 +376,30 @@ export class AgentRepository {
   }
 
   /**
+   * Finds connected agents by name across every environment, archived ones
+   * and ones unseen for too long excluded.
+   *
+   * A target that names an agent without an environment is settled from
+   * these rows: which environments it is registered in, and which of them
+   * has a process connected.
+   */
+  async findConnectedByName(input: {
+    projectId: string;
+    name: string;
+  }): Promise<TypedAgent[]> {
+    const agents = await this.prisma.agent.findMany({
+      where: {
+        projectId: input.projectId,
+        type: "connected",
+        name: input.name,
+        archivedAt: null,
+        ...connectedAgentVisibleWhere(),
+      },
+    });
+    return agents.map(parseAgent);
+  }
+
+  /**
    * Re-registers a connected agent on its existing row: the name and the
    * config the SDK sent now, and the presence projection fresh. A row unseen
    * for too long is listed again because `lastSeenAt` moved. A row archived

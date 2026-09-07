@@ -133,6 +133,10 @@ const DEFAULT_SHELL_TEST_ROOTS: string[] = [
   // workflow, because that job is what the gateway chart's path filter
   // already triggers.
   "charts/gateway/tests",
+  // ClickHouse serverless Helm sub-chart rendering tests, verifying that
+  // keeper-backed access storage configuration is correctly rendered at all
+  // replica counts through template assertions in e2e.sh and e2e-overlays.sh.
+  "charts/clickhouse-serverless/tests",
 ];
 
 /**
@@ -175,6 +179,11 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
+  // ClickHouse serverless chart configuration rendering. Scenarios describing
+  // keeper-backed replicated access storage binding through unit tests in
+  // internal/render/render_test.go that verify the XML config is generated
+  // correctly across topology transitions.
+  "infra/clickhouse-serverless",
 ];
 
 /**
@@ -267,7 +276,6 @@ const LEGACY_UNBOUND: string[] = [
 const LEGACY_INERT: string[] = [
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
-  "specs/ai-gateway/azure-endpoint-from-api-base.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
   "specs/ai-gateway/cache-control-rules.feature",
   "specs/ai-gateway/caching-passthrough.feature",
@@ -455,10 +463,8 @@ const LEGACY_INERT: string[] = [
   "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
-  "specs/langy/langy-card-taxonomy.feature",
   "specs/langy/langy-command-bar-activation.feature",
   "specs/langy/langy-context-awareness.feature",
-  "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-panel-fold-motion.feature",

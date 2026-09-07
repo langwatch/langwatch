@@ -6,6 +6,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { LangyMessageDto } from "../data/langy.dtos";
 import type { createLangyChatTransport } from "../logic/langyChatTransport";
+import { isLangyTranscriptMessage } from "../logic/langyTranscript";
 
 /**
  * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus
@@ -69,7 +70,7 @@ export function useLangyChatEngine({
 
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
     const uiMessages = history
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter(isLangyTranscriptMessage)
       // `recorded` marks a message that came from the durable fold rather than
       // from this browser's own stream. The relay stamped its card fences into
       // typed parts already, so a fence still sitting in its TEXT is one the

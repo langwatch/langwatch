@@ -271,3 +271,48 @@ regexes = ['''^ik-lw-fresh1234567890_secret$''']
 description = "Documented `your-api-key` placeholder in the docs curl examples, not a credential"
 targetRules = ["curl-auth-header"]
 regexes = ['''^your-api-key$''']
+
+# The two synthetic credentials the code-agent adapter's "engine echoed a
+# credential back" tests hand it (lw#3439). Each test's whole point is that a
+# credential the NLP engine's error text quotes back at us is scrubbed before
+# it reaches the customer — a defence-in-depth check pattern-based redaction
+# alone cannot make, since it requires knowing the actual configured value, not
+# just its shape. Proving that requires a fixture shaped exactly like the thing
+# a real leak would be, so gitleaks flags it, correctly, on shape alone.
+#
+# Naming the values, as this file requires:
+#   sk-live-abcdef0123456789   stands in for the project's own API key, fed
+#                              back inside a mocked 401 "rejected api key ..."
+#                              error body.
+#   shh-9f3a2b7c4e             stands in for a user-configured secret (a
+#                              `config.secrets` entry), fed back inside a
+#                              mocked engine ValueError message/traceback.
+# No provider issued either value, neither has ever authenticated anything, and
+# there is nothing to revoke.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real token that merely starts with
+# one of these.
+[[allowlists]]
+description = "Synthetic credentials the code-agent adapter's echoed-secret redaction tests plant (lw#3439)"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^sk-live-abcdef0123456789$''',
+  '''^shh-9f3a2b7c4e$''',
+]
+
+# `vk-lw-YOUR_VIRTUAL_KEY`, the placeholder an earlier commit on the AI Gateway
+# docs branch put in the `Authorization: Bearer` header of the DNS and TLS
+# verification example. The tip spells it `$LANGWATCH_VIRTUAL_KEY`, an env var
+# reference no rule fires on, but gitleaks scans the whole commit range on a
+# pull request, so the earlier commit still needs naming here. The same
+# placeholder reaches `docs/llms-full.txt`, which is generated from the pages.
+#
+# It is issued by nobody, authenticates against nothing, and there is nothing to
+# revoke. Scoped by VALUE and ANCHORED, for the reason given above the block
+# before it: a substring allowlist would also permit a real virtual key that
+# merely starts with this prefix.
+[[allowlists]]
+description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway docs, not a credential"
+targetRules = ["curl-auth-header"]
+regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']

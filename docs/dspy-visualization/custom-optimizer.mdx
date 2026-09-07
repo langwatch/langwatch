@@ -4,7 +4,7 @@ sidebarTitle: Custom Optimizer Tracking
 description: Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 ---
 
-LangWatch does not track a custom DSPy optimizer out of the box. The three steps below add tracking to any custom optimizer.
+`langwatch.dspy.init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA` out of the box. The three steps below add tracking to any other optimizer.
 
 ## 1. Initialize LangWatch DSPy with optimizer=None
 
