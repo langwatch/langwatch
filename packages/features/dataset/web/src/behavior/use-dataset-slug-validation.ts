@@ -99,11 +99,9 @@ export function useDatasetSlugValidation({
 
   useEffect(() => cancel, [cancel]);
 
-  const displaySlug = datasetId
-    ? dbSlug && slugInfo?.slug === undefined
-      ? dbSlug
-      : slugInfo?.slug
-    : slugInfo?.slug;
+  const keepsStoredSlug = Boolean(dbSlug) && slugInfo?.slug === undefined;
+  const editedSlug = keepsStoredSlug ? dbSlug : slugInfo?.slug;
+  const displaySlug = datasetId ? editedSlug : slugInfo?.slug;
 
   const slugWillChange = !!datasetId && !!dbSlug && !!slugInfo?.slug && dbSlug !== slugInfo.slug;
 

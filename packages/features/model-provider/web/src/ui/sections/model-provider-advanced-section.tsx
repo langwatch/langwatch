@@ -180,7 +180,9 @@ export function ModelProviderAdvancedSection({
   const formatDate = (d: Date | string | null | undefined): string => {
     if (!d) return "—";
     const date = typeof d === "string" ? new Date(d) : d;
-    return Number.isFinite(date.getTime()) ? date.toLocaleString() : String(d);
+    const isRealDate = Number.isFinite(date.getTime());
+
+    return isRealDate ? date.toLocaleString() : String(d);
   };
 
   return (

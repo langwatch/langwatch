@@ -98,6 +98,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     }
   }, [topicCountsQuery.data]);
 
+  const topicData = topicCountsQuery.data;
+  const topicCounts = topicData?.topicCounts ?? [];
+  const subtopicCounts = topicData?.subtopicCounts ?? [];
+  const isLoadingTopics = topicCountsQuery.isLoading;
+
   return (
     <VStack
       align="start"
@@ -112,15 +117,16 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         </Heading>
       )}
       <VStack width="full" gap={4} align="start">
-        {topicCountsQuery.isLoading ? (
+        {isLoadingTopics && (
           <Delayed>
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </Delayed>
-        ) : topicCountsQuery.data ? (
-          topicCountsQuery.data.topicCounts.length > 0 ? (
-            [...topicCountsQuery.data.topicCounts]
+        )}
+        {!isLoadingTopics && topicData && topicCounts.length > 0 && (
+          <>
+            {[...topicCounts]
               .sort((a, b) => (a.name > b.name ? 1 : -1))
               .sort((a, b) => (a.count > b.count ? -1 : 1))
               .map((topic) => (
@@ -153,7 +159,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                     </Text>
                   </HStack>
                   {selectedTopics.includes(topic.id) &&
-                    [...topicCountsQuery.data.subtopicCounts]
+                    [...subtopicCounts]
                       .sort((a, b) => (a.name > b.name ? 1 : -1))
                       .sort((a, b) => (a.count > b.count ? -1 : 1))
                       .filter((subtopic) => subtopic.parentId === topic.id)
@@ -188,20 +194,22 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                         </HStack>
                       ))}
                 </React.Fragment>
-              ))
-          ) : (
-            <EmptyState.Root size="sm">
-              <EmptyState.Content>
-                <VStack textAlign="center">
-                  <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
-                  <EmptyState.Description textStyle="xs">
-                    Topics are assigned automatically after enough messages are collected.{" "}
-                  </EmptyState.Description>
-                </VStack>
-              </EmptyState.Content>
-            </EmptyState.Root>
-          )
-        ) : (
+              ))}
+          </>
+        )}
+        {!isLoadingTopics && topicData && topicCounts.length === 0 && (
+          <EmptyState.Root size="sm">
+            <EmptyState.Content>
+              <VStack textAlign="center">
+                <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+                <EmptyState.Description textStyle="xs">
+                  Topics are assigned automatically after enough messages are collected.{" "}
+                </EmptyState.Description>
+              </VStack>
+            </EmptyState.Content>
+          </EmptyState.Root>
+        )}
+        {!isLoadingTopics && !topicData && (
           <EmptyState.Root size="sm">
             <EmptyState.Content>
               <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>

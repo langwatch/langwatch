@@ -99,17 +99,13 @@ export const SearchBar: React.FC = () => {
   // Spec: specs/traces-v2/search.feature ("The search bar's ask
   // affordance belongs to Langy when Langy is available").
   const { langyRoutesAsk, askLangyFromSearch } = useAskLangyFromSearch();
-  const askLabel = langyRoutesAsk ? "Ask Langy" : "Ask AI";
   // Which Langy surface takes the question. With the panel already open, it does — the
   // search rides over as attached context, no second composer.
   const langyPanelOpen = useLangyStore((s) => s.isOpen);
   const [langyAskMode, setLangyAskMode] = useState(false);
   const openLangyAsk = useCallback(() => {
-    if (useLangyStore.getState().isOpen) {
-      askLangyFromSearch();
-      return;
-    }
-    setLangyAskMode(true);
+    if (!useLangyStore.getState().isOpen) return setLangyAskMode(true);
+    askLangyFromSearch();
   }, [askLangyFromSearch]);
   // The floating ask bar exists because the panel is closed; if the panel
   // opens some other way (its own toggle, a home banner) the bar has lost
@@ -125,12 +121,14 @@ export const SearchBar: React.FC = () => {
   const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
     projectId: project?.id,
   });
-  const askAiNeedsProviderPrimer = !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders;
   // Both routes work on the user's real traces.
   const isSamplePreview = usePreviewTracesActive();
-  const askAiSampleDisabledReason = isSamplePreview
-    ? `${askLabel} works on your real traces — not on the sample data.`
-    : undefined;
+  const { askAiNeedsProviderPrimer, askAiSampleDisabledReason, askLabel } = askAffordance({
+    hasEnabledProviders,
+    isLoadingProviders,
+    isSamplePreview,
+    langyRoutesAsk,
+  });
 
   // Defer TipTap mount until the user actually focuses the search bar — the
   // ProseMirror init reflow used to dominate LCP.
@@ -148,11 +146,11 @@ export const SearchBar: React.FC = () => {
   const [aiAutoSubmitSeed, setAiAutoSubmitSeed] = useState<string | null>(null);
   // Re-show the last natural-language prompt when it belongs to this project
   // and produced exactly the query on screen; otherwise start from the query.
-  const lastTranslationMatchesQuery =
-    !!lastAiTranslation &&
-    lastAiTranslation.projectId === project?.id &&
-    lastAiTranslation.query === queryText;
-  const composerSeedPrompt = lastTranslationMatchesQuery ? lastAiTranslation.prompt : queryText;
+  const composerSeedPrompt = seedPromptFor({
+    lastAiTranslation,
+    projectId: project?.id,
+    queryText,
+  });
   // Anchor info for the click-a-chip-to-edit-value popover. Lifted to
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
@@ -181,57 +179,24 @@ export const SearchBar: React.FC = () => {
   // decoration-injected chips broadcast hover into the global
   // `facetHoverStore`. The sidebar listens to that store and
   // cross-highlights the matching row.
-  useEffect(() => {
-    // When the chip layer disappears (AI/Langy ask mode swap, unmount) no
-    // DOM mouseout fires for the removed chip nodes — clear up front so a
-    // mid-hover transition can't leave the sidebar latched on a chip
-    // that no longer exists.
-    if (aiMode || langyAskMode) {
-      useFacetHoverStore.getState().clearHover();
-      return;
-    }
-    const root = placeholderRef.current;
-    if (!root) return;
-    const enter = (e: Event) => {
-      const target = (e.target as HTMLElement | null)?.closest(
-        "[data-filter-chip-field][data-filter-chip-value]",
-      ) as HTMLElement | null;
-      if (!target) return;
-      const field = target.dataset.filterChipField ?? "";
-      const value = target.dataset.filterChipValue ?? "";
-      if (!field || !value) return;
-      // Highlight the matching sidebar row for this single (field,
-      // value) pair.
-      useFacetHoverStore.getState().setHoveredFacet({ field, value });
-    };
-    const leave = (e: Event) => {
-      const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
-      // Don't clear if we're moving between two chips — the next chip's
-      // mouseenter will overwrite and we'd otherwise flicker the
-      // highlight off-then-on.
-      if (related?.closest("[data-filter-chip-field]")) return;
-      useFacetHoverStore.getState().clearHover();
-    };
-    root.addEventListener("mouseover", enter, true);
-    root.addEventListener("mouseout", leave, true);
-    return () => {
-      root.removeEventListener("mouseover", enter, true);
-      root.removeEventListener("mouseout", leave, true);
-      useFacetHoverStore.getState().clearHover();
-    };
-  }, [aiMode, langyAskMode]);
+  useEffect(
+    () => broadcastChipHover(aiMode || langyAskMode ? null : placeholderRef.current),
+    [aiMode, langyAskMode],
+  );
 
   // ⌘I / Ctrl+I fires the ask affordance, gated through the same provider-primer popover as the
   // button, so the shortcut can't dump the user into a composer they can't submit from.
-  const handleAiShortcut = useCallback(() => {
-    if (isSamplePreview) return;
-    if (langyRoutesAsk) {
-      openLangyAsk();
-      return;
-    }
-    if (askAiNeedsProviderPrimer) return;
-    setAiMode(true);
-  }, [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, openLangyAsk]);
+  const handleAiShortcut = useCallback(
+    () =>
+      askViaShortcut({
+        askAiNeedsProviderPrimer,
+        isSamplePreview,
+        langyRoutesAsk,
+        openLangyAsk,
+        setAiMode,
+      }),
+    [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, openLangyAsk],
+  );
   useGlobalAiShortcut(handleAiShortcut);
 
   // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text to the ask
@@ -239,27 +204,17 @@ export const SearchBar: React.FC = () => {
   // mode. Lets the operator triage "is this filter syntax or free text
   // I want interpreted?" without taking their hands off the keyboard.
   const handleEditorAiShortcut = useCallback(
-    (currentText: string) => {
-      if (isSamplePreview) return;
-      if (langyRoutesAsk) {
-        // Typed text is already the question — hand it straight off (the
-        // applied search rides along as attached context on the panel).
-        // Nothing typed yet falls back to a place to type: the floating
-        // ask bar, or the panel when it is already open.
-        if (currentText.trim()) {
-          askLangyFromSearch(currentText);
-        } else {
-          openLangyAsk();
-        }
-        return;
-      }
-      if (askAiNeedsProviderPrimer) return;
-      const trimmed = currentText.trim();
-      // Empty input still opens the composer (parity with the button),
-      // it just doesn't auto-submit a blank prompt.
-      setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
-      setAiMode(true);
-    },
+    (currentText: string) =>
+      askFromEditor({
+        askLangyFromSearch,
+        askAiNeedsProviderPrimer,
+        currentText,
+        isSamplePreview,
+        langyRoutesAsk,
+        openLangyAsk,
+        setAiAutoSubmitSeed,
+        setAiMode,
+      }),
     [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, askLangyFromSearch, openLangyAsk],
   );
 
@@ -273,38 +228,14 @@ export const SearchBar: React.FC = () => {
   // etc. No extra fetch, and the resolver is called inline by the editor's
   // refreshSuggestion so each keystroke produces one render, not two.
   const { data: facets } = useTraceFacets();
-  const valueSourceByField = useMemo(() => {
-    const map = new Map<string, readonly { value: string; count: number; label?: string }[]>();
-    for (const facet of facets) {
-      if (facet.kind === "categorical") {
-        map.set(facet.key, facet.topValues);
-      }
-    }
-    return map;
-  }, [facets]);
+  const valueSourceByField = useMemo(() => categoricalTopValues(facets), [facets]);
 
   // Publish the (field → value → label) lookup the chip overlay reads from.
   useEffect(() => {
-    const map: Record<string, Record<string, string>> = {};
-    for (const facet of facets) {
-      if (facet.kind !== "categorical") continue;
-      const fieldMap: Record<string, string> = {};
-      for (const v of facet.topValues) {
-        if (v.label && v.label !== v.value) fieldMap[v.value] = v.label;
-      }
-      if (Object.keys(fieldMap).length > 0) map[facet.key] = fieldMap;
-    }
-    setFilterChipLabels(map);
+    setFilterChipLabels(chipLabelsByField(facets));
   }, [facets]);
   const valueResolver = useCallback<ValueResolver>(
-    (field, query) => {
-      const meta = SEARCH_FIELDS[field];
-      const facetField = meta?.facetField;
-      if (!facetField) return null;
-      const source = valueSourceByField.get(facetField);
-      if (!source) return null;
-      return rankAndSlice({ values: source, query: query.replace(/\*+$/, "") });
-    },
+    (field, query) => resolveFacetValues({ field, query, valueSourceByField }),
     [valueSourceByField],
   );
 
@@ -352,89 +283,36 @@ export const SearchBar: React.FC = () => {
         )}
       </AnimatePresence>
       {!aiMode && !langyAskMode && (
-        <>
-          <Flex
-            align="center"
-            width="full"
-            gap={2}
-            paddingX={3}
-            paddingY={1.5}
-            borderBottomWidth={status.kind === "error" ? "0" : "1px"}
-            borderColor={statusBorderColor(status)}
-            minHeight="38px"
-            bg={statusBackgroundColor(status)}
-            transition="background 120ms ease, border-color 120ms ease"
-            position="relative"
-            zIndex={1}
-          >
-            <AskAiButton
-              label={askLabel}
-              ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
-              tooltip={langyRoutesAsk ? "Ask Langy about these traces" : undefined}
-              onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
-              needsProviderPrimer={askAiNeedsProviderPrimer}
-              disabledReason={askAiSampleDisabledReason}
-            />
-            {/* The standalone search glyph is only an at-rest hint — the
-                placeholder ("Search filters, free text, or Ask AI…") already
-                says what the field is. Once focused or non-empty it reads as
-                clutter wedged between the ask button and the text, so it drops
-                out and the editor sits directly beside the ask button. */}
-            {!editorFocused && !hasContent && (
-              <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
-                <Search />
-              </Icon>
-            )}
-
-            <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
-              {editorMounted ? (
-                <ActiveSearchEditor
-                  queryText={queryText}
-                  applyQueryText={applyQueryText}
-                  autoFocus
-                  onHasContentChange={setEditorHasContent}
-                  valueResolver={valueResolver}
-                  onTokenClick={setTokenAnchor}
-                  onAiShortcut={handleEditorAiShortcut}
-                  onSuggestionOpenChange={setSuggestionOpen}
-                  onCursorAnchorChange={setCursorAnchorX}
-                  onFocusChange={setEditorFocused}
-                  placeholder={searchBarPlaceholder(askLabel)}
-                />
-              ) : (
-                <PlaceholderEditor
-                  queryText={queryText}
-                  onActivate={requestEditor}
-                  onApplyQueryText={applyQueryText}
-                  onTokenClick={setTokenAnchor}
-                  placeholderText={searchBarPlaceholder(askLabel)}
-                />
-              )}
-              {hasContent && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
-                <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
-              )}
-            </Box>
-
-            {/* Only render the badge for non-error statuses — parse errors
-                get the full inline banner below, which is far more visible
-                and positioned right under the input where the user is
-                looking. Showing the badge *and* the banner would be
-                redundant and noisy. */}
-            {status.kind !== "error" && <StatusBadge status={status} />}
-            {hasContent ? <ClearButton onClear={handleClear} /> : <Kbd>{"/"}</Kbd>}
-            <TokenValuePicker anchor={tokenAnchor} onClose={() => setTokenAnchor(null)} />
-          </Flex>
-          {/* Unified error banner — handles both parse errors and AI errors.
-              AI error takes priority when both are present (AI mode is the
-              active flow). Rendered outside the Flex row so it spans the
-              full bar width without fighting the row's gap/padding. */}
-          <UnifiedErrorBanner
-            parseError={parseError}
-            aiError={aiError}
-            onDismissAiError={() => setAiError(null)}
-            onDismissParseError={dismissParseError}
-          />
-        </>
+        <StructuredSearchBar
+          applyQueryText={applyQueryText}
+          aiError={aiError}
+          askAiNeedsProviderPrimer={askAiNeedsProviderPrimer}
+          askAiSampleDisabledReason={askAiSampleDisabledReason}
+          askLabel={askLabel}
+          cursorAnchorX={cursorAnchorX}
+          dismissParseError={dismissParseError}
+          editorFocused={editorFocused}
+          editorMounted={editorMounted}
+          handleClear={handleClear}
+          handleEditorAiShortcut={handleEditorAiShortcut}
+          hasContent={hasContent}
+          langyRoutesAsk={langyRoutesAsk}
+          onOpenLangyAsk={openLangyAsk}
+          onStartAiMode={() => setAiMode(true)}
+          parseError={parseError}
+          queryText={queryText}
+          requestEditor={requestEditor}
+          setAiError={setAiError}
+          setCursorAnchorX={setCursorAnchorX}
+          setEditorFocused={setEditorFocused}
+          setEditorHasContent={setEditorHasContent}
+          setSuggestionOpen={setSuggestionOpen}
+          setTokenAnchor={setTokenAnchor}
+          status={status}
+          suggestionOpen={suggestionOpen}
+          tokenAnchor={tokenAnchor}
+          valueResolver={valueResolver}
+        />
       )}
     </Box>
   );
@@ -571,3 +449,349 @@ const SearchSubmitHint: React.FC<{ anchorX: number; askLabel: string }> = ({
     {`Press ${MOD_KEY_SYMBOL} + Enter to ${askLabel}`}
   </chakra.span>
 );
+
+/**
+ * Chip hover is delegated on the search bar so both the cold-load
+ * PlaceholderEditor and the live editor's decoration-injected chips broadcast
+ * into `facetHoverStore`; the sidebar listens there and cross-highlights the
+ * matching row.
+ */
+function broadcastChipHover(root: HTMLDivElement | null): (() => void) | undefined {
+  // When the chip layer disappears (an AI/Langy ask-mode swap, an unmount) no
+  // DOM mouseout fires for the removed chip nodes, so the hover is cleared up
+  // front: a mid-hover transition must not leave the sidebar latched onto a
+  // chip that no longer exists.
+  if (!root) {
+    useFacetHoverStore.getState().clearHover();
+    return undefined;
+  }
+  const enter = (e: Event) => {
+    const target = (e.target as HTMLElement | null)?.closest(
+      "[data-filter-chip-field][data-filter-chip-value]",
+    ) as HTMLElement | null;
+    if (!target) return;
+    const field = target.dataset.filterChipField ?? "";
+    const value = target.dataset.filterChipValue ?? "";
+    if (!field || !value) return;
+    useFacetHoverStore.getState().setHoveredFacet({ field, value });
+  };
+  const leave = (e: Event) => {
+    const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
+    // Moving between two chips doesn't clear: the next chip's mouseenter
+    // overwrites it, and clearing here would flicker the highlight off then on.
+    if (related?.closest("[data-filter-chip-field]")) return;
+    useFacetHoverStore.getState().clearHover();
+  };
+  root.addEventListener("mouseover", enter, true);
+  root.addEventListener("mouseout", leave, true);
+  return () => {
+    root.removeEventListener("mouseover", enter, true);
+    root.removeEventListener("mouseout", leave, true);
+    useFacetHoverStore.getState().clearHover();
+  };
+}
+
+/**
+ * ⌘+⏎ from inside the editor: the typed text goes to the ask affordance —
+ * asked of Langy outright, or auto-submitted into AI mode. Empty input still
+ * opens the composer, matching the button; it just submits no blank prompt.
+ */
+function askFromEditor({
+  askAiNeedsProviderPrimer,
+  askLangyFromSearch,
+  currentText,
+  isSamplePreview,
+  langyRoutesAsk,
+  openLangyAsk,
+  setAiAutoSubmitSeed,
+  setAiMode,
+}: {
+  askAiNeedsProviderPrimer: boolean;
+  askLangyFromSearch: (text?: string) => void;
+  currentText: string;
+  isSamplePreview: boolean;
+  langyRoutesAsk: boolean;
+  openLangyAsk: () => void;
+  setAiAutoSubmitSeed: (seed: string | null) => void;
+  setAiMode: (on: boolean) => void;
+}): void {
+  if (isSamplePreview) return;
+  const trimmed = currentText.trim();
+  if (langyRoutesAsk) {
+    // Typed text is already the question, so it is handed straight off and the
+    // applied search rides along as attached context. Nothing typed yet falls
+    // back to a place to type: the floating ask bar, or the panel if it is open.
+    if (trimmed) askLangyFromSearch(currentText);
+    else openLangyAsk();
+    return;
+  }
+  if (askAiNeedsProviderPrimer) return;
+  setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
+  setAiMode(true);
+}
+
+/**
+ * The discover payload that already powers the facets sidebar is exactly the
+ * autocomplete pool for `model:`, `service:` and the rest — no extra fetch.
+ */
+function categoricalTopValues(
+  facets: ReturnType<typeof useTraceFacets>["data"],
+): Map<string, readonly { value: string; count: number; label?: string }[]> {
+  const map = new Map<string, readonly { value: string; count: number; label?: string }[]>();
+  for (const facet of facets) {
+    if (facet.kind === "categorical") map.set(facet.key, facet.topValues);
+  }
+  return map;
+}
+
+/** The (field → value → label) lookup the chip overlay reads from. */
+function chipLabelsByField(
+  facets: ReturnType<typeof useTraceFacets>["data"],
+): Record<string, Record<string, string>> {
+  const map: Record<string, Record<string, string>> = {};
+  for (const facet of facets) {
+    if (facet.kind !== "categorical") continue;
+    const fieldMap: Record<string, string> = {};
+    for (const v of facet.topValues) {
+      if (v.label && v.label !== v.value) fieldMap[v.value] = v.label;
+    }
+    if (Object.keys(fieldMap).length > 0) map[facet.key] = fieldMap;
+  }
+  return map;
+}
+
+/** The autocomplete rows one field offers for what has been typed so far. */
+function resolveFacetValues({
+  field,
+  query,
+  valueSourceByField,
+}: {
+  field: string;
+  query: string;
+  valueSourceByField: ReturnType<typeof categoricalTopValues>;
+}) {
+  const facetField = SEARCH_FIELDS[field]?.facetField;
+  if (!facetField) return null;
+  const source = valueSourceByField.get(facetField);
+  if (!source) return null;
+  return rankAndSlice({ values: source, query: query.replace(/\*+$/, "") });
+}
+
+/** The search bar proper: the ask button, the editor, its status and its errors. */
+function StructuredSearchBar({
+  aiError,
+  applyQueryText,
+  askAiNeedsProviderPrimer,
+  askAiSampleDisabledReason,
+  askLabel,
+  cursorAnchorX,
+  dismissParseError,
+  editorFocused,
+  editorMounted,
+  handleClear,
+  handleEditorAiShortcut,
+  hasContent,
+  langyRoutesAsk,
+  onOpenLangyAsk,
+  onStartAiMode,
+  parseError,
+  queryText,
+  requestEditor,
+  setAiError,
+  setCursorAnchorX,
+  setEditorFocused,
+  setEditorHasContent,
+  setSuggestionOpen,
+  setTokenAnchor,
+  status,
+  suggestionOpen,
+  tokenAnchor,
+  valueResolver,
+}: {
+  aiError: AiActionError | null;
+  applyQueryText: (text: string) => void;
+  askAiNeedsProviderPrimer: boolean;
+  askAiSampleDisabledReason: string | undefined;
+  askLabel: string;
+  cursorAnchorX: number;
+  dismissParseError: () => void;
+  editorFocused: boolean;
+  editorMounted: boolean;
+  handleClear: (event: React.MouseEvent) => void;
+  handleEditorAiShortcut: (currentText: string) => void;
+  hasContent: boolean;
+  langyRoutesAsk: boolean;
+  onOpenLangyAsk: () => void;
+  onStartAiMode: () => void;
+  parseError: string | null;
+  queryText: string;
+  requestEditor: () => void;
+  setAiError: (error: AiActionError | null) => void;
+  setCursorAnchorX: (x: number) => void;
+  setEditorFocused: (focused: boolean) => void;
+  setEditorHasContent: (hasContent: boolean) => void;
+  setSuggestionOpen: (open: boolean) => void;
+  setTokenAnchor: (anchor: TokenValuePickerAnchor | null) => void;
+  status: SearchBarStatus;
+  suggestionOpen: boolean;
+  tokenAnchor: TokenValuePickerAnchor | null;
+  valueResolver: ValueResolver;
+}) {
+  return (
+    <>
+      <Flex
+        align="center"
+        width="full"
+        gap={2}
+        paddingX={3}
+        paddingY={1.5}
+        borderBottomWidth={status.kind === "error" ? "0" : "1px"}
+        borderColor={statusBorderColor(status)}
+        minHeight="38px"
+        bg={statusBackgroundColor(status)}
+        transition="background 120ms ease, border-color 120ms ease"
+        position="relative"
+        zIndex={1}
+      >
+        <AskAiButton
+          label={askLabel}
+          ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
+          tooltip={langyRoutesAsk ? "Ask Langy about these traces" : undefined}
+          onClick={langyRoutesAsk ? onOpenLangyAsk : onStartAiMode}
+          needsProviderPrimer={askAiNeedsProviderPrimer}
+          disabledReason={askAiSampleDisabledReason}
+        />
+        {/* The standalone search glyph is only an at-rest hint — the
+            placeholder ("Search filters, free text, or Ask AI…") already
+            says what the field is. Once focused or non-empty it reads as
+            clutter wedged between the ask button and the text, so it drops
+            out and the editor sits directly beside the ask button. */}
+        {!editorFocused && !hasContent && (
+          <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
+            <Search />
+          </Icon>
+        )}
+
+        <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
+          {editorMounted ? (
+            <ActiveSearchEditor
+              queryText={queryText}
+              applyQueryText={applyQueryText}
+              autoFocus
+              onHasContentChange={setEditorHasContent}
+              valueResolver={valueResolver}
+              onTokenClick={setTokenAnchor}
+              onAiShortcut={handleEditorAiShortcut}
+              onSuggestionOpenChange={setSuggestionOpen}
+              onCursorAnchorChange={setCursorAnchorX}
+              onFocusChange={setEditorFocused}
+              placeholder={searchBarPlaceholder(askLabel)}
+            />
+          ) : (
+            <PlaceholderEditor
+              queryText={queryText}
+              onActivate={requestEditor}
+              onApplyQueryText={applyQueryText}
+              onTokenClick={setTokenAnchor}
+              placeholderText={searchBarPlaceholder(askLabel)}
+            />
+          )}
+          {hasContent && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
+            <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
+          )}
+        </Box>
+
+        {/* Only render the badge for non-error statuses — parse errors
+            get the full inline banner below, which is far more visible
+            and positioned right under the input where the user is
+            looking. Showing the badge *and* the banner would be
+            redundant and noisy. */}
+        {status.kind !== "error" && <StatusBadge status={status} />}
+        {hasContent ? <ClearButton onClear={handleClear} /> : <Kbd>{"/"}</Kbd>}
+        <TokenValuePicker anchor={tokenAnchor} onClose={() => setTokenAnchor(null)} />
+      </Flex>
+      {/* Unified error banner — handles both parse errors and AI errors.
+          AI error takes priority when both are present (AI mode is the
+          active flow). Rendered outside the Flex row so it spans the
+          full bar width without fighting the row's gap/padding. */}
+      <UnifiedErrorBanner
+        parseError={parseError}
+        aiError={aiError}
+        onDismissAiError={() => setAiError(null)}
+        onDismissParseError={dismissParseError}
+      />
+    </>
+  );
+}
+
+/**
+ * The last natural-language prompt is shown again when it belongs to this
+ * project and produced exactly the query on screen; otherwise the query itself
+ * is the starting point.
+ */
+function seedPromptFor({
+  lastAiTranslation,
+  projectId,
+  queryText,
+}: {
+  lastAiTranslation: ReturnType<typeof useFilterStore.getState>["lastAiTranslation"];
+  projectId: string | undefined;
+  queryText: string;
+}): string {
+  if (!lastAiTranslation) return queryText;
+  if (lastAiTranslation.projectId !== projectId) return queryText;
+  return lastAiTranslation.query === queryText ? lastAiTranslation.prompt : queryText;
+}
+
+/**
+ * ⌘I fires the ask affordance through the same provider primer the button uses,
+ * so the shortcut cannot drop the reader into a composer they can't submit from.
+ */
+function askViaShortcut({
+  askAiNeedsProviderPrimer,
+  isSamplePreview,
+  langyRoutesAsk,
+  openLangyAsk,
+  setAiMode,
+}: {
+  askAiNeedsProviderPrimer: boolean;
+  isSamplePreview: boolean;
+  langyRoutesAsk: boolean;
+  openLangyAsk: () => void;
+  setAiMode: (on: boolean) => void;
+}): void {
+  if (isSamplePreview) return;
+  if (langyRoutesAsk) return openLangyAsk();
+  if (askAiNeedsProviderPrimer) return;
+  setAiMode(true);
+}
+
+/**
+ * What the ask affordance is called, and what stops it. The inline Ask AI
+ * composer needs at least one model provider configured, since it submits
+ * against the reader's own keys; with none enabled the request would 4xx.
+ */
+function askAffordance({
+  hasEnabledProviders,
+  isLoadingProviders,
+  isSamplePreview,
+  langyRoutesAsk,
+}: {
+  hasEnabledProviders: boolean;
+  isLoadingProviders: boolean;
+  isSamplePreview: boolean;
+  langyRoutesAsk: boolean;
+}): {
+  askAiNeedsProviderPrimer: boolean;
+  askAiSampleDisabledReason: string | undefined;
+  askLabel: string;
+} {
+  const askLabel = langyRoutesAsk ? "Ask Langy" : "Ask AI";
+  return {
+    askAiNeedsProviderPrimer: !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders,
+    askAiSampleDisabledReason: isSamplePreview
+      ? `${askLabel} works on your real traces — not on the sample data.`
+      : undefined,
+    askLabel,
+  };
+}

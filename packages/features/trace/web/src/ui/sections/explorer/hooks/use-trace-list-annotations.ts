@@ -47,16 +47,10 @@ export function useTraceListAnnotations({
     anchor: "all",
   });
 
-  const byTrace = useMemo(() => {
-    const grouped = new Map<string, AnnotationByTrace[]>();
-    if (!enabled) return grouped;
-    for (const annotation of query.data) {
-      const list = grouped.get(annotation.traceId);
-      if (list) list.push(annotation);
-      else grouped.set(annotation.traceId, [annotation]);
-    }
-    return grouped;
-  }, [enabled, query.data]);
+  const byTrace = useMemo(
+    () => (enabled ? groupByTraceId(query.data) : new Map<string, AnnotationByTrace[]>()),
+    [enabled, query.data],
+  );
 
   const isLoading = enabled && query.isLoading;
   // A reader who may not see annotations is in the same position as a failed
@@ -73,4 +67,15 @@ export function useTraceListAnnotations({
       annotationsUnavailable: isUnavailable,
     }));
   }, [asked, rows, byTrace, isLoading, isUnavailable]);
+}
+
+/** The reviews on the page, bucketed by the trace they were left on. */
+function groupByTraceId(annotations: AnnotationByTrace[]): Map<string, AnnotationByTrace[]> {
+  const grouped = new Map<string, AnnotationByTrace[]>();
+  for (const annotation of annotations) {
+    const list = grouped.get(annotation.traceId);
+    if (list) list.push(annotation);
+    else grouped.set(annotation.traceId, [annotation]);
+  }
+  return grouped;
 }

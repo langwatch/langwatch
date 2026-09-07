@@ -57,28 +57,51 @@ export function useConversationContext(
     },
   );
 
-  return useMemo<ConversationContextResult>(() => {
-    if (shared) {
-      return { ...NULL_RESULT, conversationId: conversationId ?? null };
-    }
-    if (!projectId || !conversationId) return NULL_RESULT;
-    if (!query.data) {
-      return {
-        ...NULL_RESULT,
+  return useMemo<ConversationContextResult>(
+    () =>
+      conversationContextResult({
         conversationId: conversationId ?? null,
+        data: query.data,
         isLoading: query.isLoading,
-      };
-    }
-    const turns = query.data.turns;
-    const idx = traceId ? turns.findIndex((t) => t.traceId === traceId) : -1;
-    return {
-      conversationId: query.data.conversationId,
-      turns,
-      total: query.data.total,
-      position: idx === -1 ? 0 : idx + 1,
-      previous: idx > 0 ? (turns[idx - 1] ?? null) : null,
-      next: idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
-      isLoading: false,
-    };
-  }, [projectId, query.data, query.isLoading, conversationId, traceId, shared]);
+        projectId,
+        shared: !!shared,
+        traceId: traceId ?? null,
+      }),
+    [projectId, query.data, query.isLoading, conversationId, traceId, shared],
+  );
+}
+
+type ConversationContextData = { conversationId: string; total: number; turns: ConversationTurn[] };
+
+/** The conversation result for one render: no data, no context, or the located turn. */
+function conversationContextResult({
+  conversationId,
+  data,
+  isLoading,
+  projectId,
+  shared,
+  traceId,
+}: {
+  conversationId: string | null;
+  data: ConversationContextData | undefined;
+  isLoading: boolean;
+  projectId: string;
+  shared: boolean;
+  traceId: string | null;
+}): ConversationContextResult {
+  if (shared) return { ...NULL_RESULT, conversationId };
+  if (!projectId || !conversationId) return NULL_RESULT;
+  if (!data) return { ...NULL_RESULT, conversationId, isLoading };
+
+  const turns = data.turns;
+  const idx = traceId ? turns.findIndex((t) => t.traceId === traceId) : -1;
+  return {
+    conversationId: data.conversationId,
+    turns,
+    total: data.total,
+    position: idx === -1 ? 0 : idx + 1,
+    previous: idx > 0 ? (turns[idx - 1] ?? null) : null,
+    next: idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
+    isLoading: false,
+  };
 }

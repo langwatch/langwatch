@@ -317,9 +317,11 @@ function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filter
         // ES sends "true"/"false"; map to HasError boolean.
         const vals = collectStringValues(rawValue);
         if (vals.length === 0) break;
-        if (vals.includes("true") && !vals.includes("false")) {
+        const wantsErrors = vals.includes("true");
+        const wantsClean = vals.includes("false");
+        if (wantsErrors && !wantsClean) {
           clauses.push(`${ta}.HasError = true`);
-        } else if (vals.includes("false") && !vals.includes("true")) {
+        } else if (wantsClean && !wantsErrors) {
           clauses.push(`${ta}.HasError = false`);
         }
         break;

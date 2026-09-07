@@ -223,7 +223,8 @@ export function duplicateLangWatchQLColumnNames(columns: readonly LangWatchQLCol
   const seen = new Set<string>();
   const duplicates: string[] = [];
   for (const column of columns) {
-    if ((counts.get(column.name) ?? 0) > 1 && !seen.has(column.name)) {
+    const isNewDuplicate = (counts.get(column.name) ?? 0) > 1 && !seen.has(column.name);
+    if (isNewDuplicate) {
       seen.add(column.name);
       duplicates.push(column.name);
     }

@@ -28,9 +28,8 @@ export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayo
   const isAreaFree = (col: number, row: number, colSpan: number, rowSpan: number) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
-        if (c >= 2 || occupied.has(cellKey(c, r))) {
-          return false;
-        }
+        const isTaken = c >= 2 || occupied.has(cellKey(c, r));
+        if (isTaken) return false;
       }
     }
     return true;

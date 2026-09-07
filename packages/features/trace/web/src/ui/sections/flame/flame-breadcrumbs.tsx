@@ -41,12 +41,7 @@ export function FlameBreadcrumbs({
         </Text>
         {breadcrumbs.map((node, i) => {
           const isLast = i === breadcrumbs.length - 1;
-          const crumbDur = node.span.endTimeMs - node.span.startTimeMs;
-          const parentDur = node.parent
-            ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
-            : null;
-          const pctOfParent =
-            parentDur !== null && parentDur > 0 ? (crumbDur / parentDur) * 100 : null;
+          const { crumbDur, pctOfParent } = crumbTiming(node);
           return (
             <HStack key={node.span.spanId} gap={0} minWidth={0}>
               <Icon boxSize={3} color="fg.subtle">
@@ -112,4 +107,12 @@ export function FlameBreadcrumbs({
       )}
     </Flex>
   );
+}
+
+/** One crumb's own duration, and its share of its parent's when there is one. */
+function crumbTiming(node: FlameNode): { crumbDur: number; pctOfParent: number | null } {
+  const crumbDur = node.span.endTimeMs - node.span.startTimeMs;
+  const parentDur = node.parent ? node.parent.span.endTimeMs - node.parent.span.startTimeMs : null;
+  const pctOfParent = parentDur !== null && parentDur > 0 ? (crumbDur / parentDur) * 100 : null;
+  return { crumbDur, pctOfParent };
 }

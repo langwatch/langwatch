@@ -49,6 +49,10 @@ export function VegaLiteSpecEditor({
   onSpecTextChange,
   errors,
 }: VegaLiteSpecEditorProps) {
+  const problemCountLabel =
+    errors.length === 1 ? "1 problem to fix" : `${errors.length} problems to fix`;
+  const problemsLabel = errors.length > 0 ? problemCountLabel : "";
+
   return (
     <VStack align="stretch" gap={0} height="full" minHeight="240px" data-testid="vega-spec-editor">
       <Box flex="1" minHeight="200px">
@@ -78,11 +82,7 @@ export function VegaLiteSpecEditor({
         borderTopWidth={errors.length > 0 ? "1px" : "0"}
         borderColor="border"
       >
-        {errors.length > 0
-          ? errors.length === 1
-            ? "1 problem to fix"
-            : `${errors.length} problems to fix`
-          : ""}
+        {problemsLabel}
       </Text>
     </VStack>
   );

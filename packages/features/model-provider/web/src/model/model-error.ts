@@ -111,32 +111,28 @@ export interface ProviderDisabledExtracted {
 export function extractProviderDisabledInfo(error: unknown): ProviderDisabledExtracted | null {
   const cause = causeOf(error);
   if (cause?.code !== "MODEL_PROVIDER_DISABLED") return null;
-  if (
-    !cause.featureKey ||
-    !cause.projectId ||
-    !cause.resolvedScope ||
-    !cause.resolvedModel ||
-    !cause.providerKey
-  ) {
-    return null;
-  }
+
+  const { featureKey, projectId, providerKey, resolvedModel } = cause;
+  const hasEveryField =
+    !!featureKey && !!projectId && !!cause.resolvedScope && !!resolvedModel && !!providerKey;
+  if (!hasEveryField) return null;
 
   const role = readRole(cause.role);
   if (!role) return null;
 
   const resolvedScope = cause.resolvedScope as ProviderDisabledExtracted["resolvedScope"];
-  if (resolvedScope !== "project" && resolvedScope !== "team" && resolvedScope !== "organization") {
-    return null;
-  }
+  const isKnownScope =
+    resolvedScope === "project" || resolvedScope === "team" || resolvedScope === "organization";
+  if (!isKnownScope) return null;
 
   return {
-    featureKey: cause.featureKey,
-    featureDisplayName: cause.featureDisplayName ?? cause.featureKey,
+    featureKey,
+    featureDisplayName: cause.featureDisplayName ?? featureKey,
     role,
-    projectId: cause.projectId,
+    projectId,
     resolvedScope,
-    resolvedModel: cause.resolvedModel,
-    providerKey: cause.providerKey,
+    resolvedModel,
+    providerKey,
     alternate: cause.alternate ?? null,
   };
 }

@@ -128,7 +128,8 @@ function rememberAlias(
   alias: string | undefined,
 ): void {
   if (!table || !alias) return;
-  if (NOT_AN_ALIAS.has(alias.toUpperCase())) return;
+  const isKeyword = NOT_AN_ALIAS.has(alias.toUpperCase());
+  if (isKeyword) return;
   aliasToTable.set(alias, table);
 }
 

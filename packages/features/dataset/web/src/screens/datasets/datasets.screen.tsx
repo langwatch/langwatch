@@ -48,6 +48,7 @@ import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block.tsx";
 import { AddOrEditDatasetDrawer } from "../../ui/sections/add-or-edit-dataset-drawer.tsx";
 import { BulkUploadDrawer } from "../../ui/sections/bulk-upload-drawer.tsx";
 import { CopyDatasetDialog } from "../../ui/sections/copy-dataset-dialog.tsx";
+import { readableDate } from "../../model/readable-date.ts";
 
 /** How long the undoable delete notice stands before it goes. */
 const DELETE_NOTICE_MS = 10_000;
@@ -79,6 +80,161 @@ function UploadOrCreateDatasetMenu({
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>
+  );
+}
+
+type DatasetRow = WireOf<DatasetSummary>;
+
+function DatasetTableBody({
+  columnsOf,
+  datasets,
+  goToDataset,
+  isLiteMember,
+  isLoading,
+  onCopy,
+  onDelete,
+  onEdit,
+  search,
+}: {
+  columnsOf: (dataset: DatasetRow) => DatasetColumns;
+  datasets: DatasetRow[] | undefined;
+  goToDataset: (datasetId: string) => void;
+  isLiteMember: boolean;
+  isLoading: boolean;
+  onCopy: (target: { datasetId: string; datasetName: string }) => void;
+  onDelete: (target: { id: string; name: string }) => void;
+  onEdit: (dataset: DatasetRow) => void;
+  search: string;
+}) {
+  if (isLoading) {
+    return (
+      <>
+        {Array.from({ length: 3 }).map((_, row) => (
+          <Table.Row key={row}>
+            {Array.from({ length: 4 }).map((__, cell) => (
+              <Table.Cell key={cell}>
+                <Skeleton height="20px" />
+              </Table.Cell>
+            ))}
+          </Table.Row>
+        ))}
+      </>
+    );
+  }
+  if (!datasets) return null;
+  if (datasets.length === 0) {
+    return (
+      <Table.Row>
+        <Table.Cell colSpan={5}>
+          <Text paddingY={4} color="fg.muted">
+            No datasets match &quot;{search}&quot;
+          </Text>
+        </Table.Cell>
+      </Table.Row>
+    );
+  }
+
+  return (
+    <>
+      {datasets.map((dataset) => (
+        <Table.Row key={dataset.id} cursor="pointer" onClick={() => goToDataset(dataset.id)}>
+          <Table.Cell>
+            <HStack gap={2}>
+              <Text>{dataset.name}</Text>
+              <DatasetStatusBadge status={dataset.status} />
+            </HStack>
+          </Table.Cell>
+          <Table.Cell maxWidth="250px">
+            <HStack wrap="wrap">
+              {columnsOf(dataset).map(({ name }) => (
+                <Badge size="sm" key={name}>
+                  {name}
+                </Badge>
+              ))}
+            </HStack>
+          </Table.Cell>
+          <Table.Cell>{datasetDisplayRecordCount(dataset)}</Table.Cell>
+          <Table.Cell>
+            {readableDate(dataset.updatedAt ?? dataset.createdAt).toLocaleString()}
+          </Table.Cell>
+          <Table.Cell>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button
+                  variant="ghost"
+                  aria-label={`Actions for ${dataset.name}`}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <EllipsisVertical />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
+                {/* Replicate and Edit operate on dataset CONTENT, which
+                      only exists once `ready` — copy and column edits
+                      refuse on a processing or failed row. Gate them on
+                      ready (a null status = legacy = ready). Delete stays
+                      available so a stuck or failed dataset can always be
+                      cleaned up. */}
+                {(dataset.status === "ready" || dataset.status == null) && (
+                  <Menu.Item
+                    value="copy"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCopy({ datasetId: dataset.id, datasetName: dataset.name });
+                    }}
+                  >
+                    <Copy size={16} /> Replicate to another project
+                  </Menu.Item>
+                )}
+                {!isLiteMember && (
+                  <>
+                    {(dataset.status === "ready" || dataset.status == null) && (
+                      <Menu.Item
+                        value="edit"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit(dataset);
+                        }}
+                      >
+                        <Pencil size={16} /> Edit dataset
+                      </Menu.Item>
+                    )}
+                    <Menu.Item
+                      value="delete"
+                      color="red.600"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete({ id: dataset.id, name: dataset.name });
+                      }}
+                    >
+                      <Trash2 size={16} /> Delete dataset
+                    </Menu.Item>
+                  </>
+                )}
+              </Menu.Content>
+            </Menu.Root>
+          </Table.Cell>
+        </Table.Row>
+      ))}
+    </>
+  );
+}
+
+function DatasetStatusBadge({ status }: { status: string | null | undefined }) {
+  const isPreparing = status === "processing" || status === "uploading";
+  if (isPreparing) {
+    return (
+      <Badge size="sm" colorPalette="blue">
+        Processing
+      </Badge>
+    );
+  }
+  if (status !== "failed") return null;
+
+  return (
+    <Badge size="sm" colorPalette="red">
+      Failed
+    </Badge>
   );
 }
 
@@ -246,126 +402,24 @@ export default function DatasetsScreen() {
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {datasets.isLoading ? (
-                Array.from({ length: 3 }).map((_, row) => (
-                  <Table.Row key={row}>
-                    {Array.from({ length: 4 }).map((__, cell) => (
-                      <Table.Cell key={cell}>
-                        <Skeleton height="20px" />
-                      </Table.Cell>
-                    ))}
-                  </Table.Row>
-                ))
-              ) : filteredDatasets && filteredDatasets.length === 0 ? (
-                <Table.Row>
-                  <Table.Cell colSpan={5}>
-                    <Text paddingY={4} color="fg.muted">
-                      No datasets match &quot;{search}&quot;
-                    </Text>
-                  </Table.Cell>
-                </Table.Row>
-              ) : filteredDatasets ? (
-                filteredDatasets.map((dataset) => (
-                  <Table.Row
-                    key={dataset.id}
-                    cursor="pointer"
-                    onClick={() => goToDataset(dataset.id)}
-                  >
-                    <Table.Cell>
-                      <HStack gap={2}>
-                        <Text>{dataset.name}</Text>
-                        {dataset.status === "processing" || dataset.status === "uploading" ? (
-                          <Badge size="sm" colorPalette="blue">
-                            Processing
-                          </Badge>
-                        ) : dataset.status === "failed" ? (
-                          <Badge size="sm" colorPalette="red">
-                            Failed
-                          </Badge>
-                        ) : null}
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell maxWidth="250px">
-                      <HStack wrap="wrap">
-                        {columnsOf(dataset).map(({ name }) => (
-                          <Badge size="sm" key={name}>
-                            {name}
-                          </Badge>
-                        ))}
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>{datasetDisplayRecordCount(dataset)}</Table.Cell>
-                    <Table.Cell>
-                      {new Date(dataset.updatedAt ?? dataset.createdAt).toLocaleString()}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button
-                            variant="ghost"
-                            aria-label={`Actions for ${dataset.name}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <EllipsisVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          {/* Replicate and Edit operate on dataset CONTENT, which
-                              only exists once `ready` — copy and column edits
-                              refuse on a processing or failed row. Gate them on
-                              ready (a null status = legacy = ready). Delete stays
-                              available so a stuck or failed dataset can always be
-                              cleaned up. */}
-                          {(dataset.status === "ready" || dataset.status == null) && (
-                            <Menu.Item
-                              value="copy"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setCopyDataset({
-                                  datasetId: dataset.id,
-                                  datasetName: dataset.name,
-                                });
-                              }}
-                            >
-                              <Copy size={16} /> Replicate to another project
-                            </Menu.Item>
-                          )}
-                          {!isLiteMember && (
-                            <>
-                              {(dataset.status === "ready" || dataset.status == null) && (
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setEditDataset({
-                                      datasetId: dataset.id,
-                                      name: dataset.name,
-                                      columnTypes: columnsOf(dataset),
-                                    });
-                                    addEditDatasetDrawer.onOpen();
-                                  }}
-                                >
-                                  <Pencil size={16} /> Edit dataset
-                                </Menu.Item>
-                              )}
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setDatasetToDelete({ id: dataset.id, name: dataset.name });
-                                }}
-                              >
-                                <Trash2 size={16} /> Delete dataset
-                              </Menu.Item>
-                            </>
-                          )}
-                        </Menu.Content>
-                      </Menu.Root>
-                    </Table.Cell>
-                  </Table.Row>
-                ))
-              ) : null}
+              <DatasetTableBody
+                columnsOf={columnsOf}
+                datasets={filteredDatasets}
+                goToDataset={goToDataset}
+                isLiteMember={isLiteMember}
+                isLoading={datasets.isLoading}
+                onCopy={setCopyDataset}
+                onDelete={setDatasetToDelete}
+                onEdit={(dataset) => {
+                  setEditDataset({
+                    datasetId: dataset.id,
+                    name: dataset.name,
+                    columnTypes: columnsOf(dataset),
+                  });
+                  addEditDatasetDrawer.onOpen();
+                }}
+                search={search}
+              />
             </Table.Body>
           </ListTable>
         )}

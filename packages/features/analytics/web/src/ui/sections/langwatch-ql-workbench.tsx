@@ -348,11 +348,10 @@ function useDraftInsert(query: LangWatchQLWorkbenchQuery, exampleSql: string | u
   const insert = useCallback(
     (text: string) => {
       if (insertRef.current) return insertRef.current(text);
-      query.setSql(
-        query.state.draft.sql.length === 0
-          ? text
-          : `${query.state.draft.sql}${query.state.draft.sql.endsWith("\n") ? "" : "\n"}${text}`,
-      );
+
+      const sql = query.state.draft.sql;
+      const separator = sql.endsWith("\n") ? "" : "\n";
+      query.setSql(sql.length === 0 ? text : `${sql}${separator}${text}`);
     },
     [query],
   );
@@ -431,17 +430,17 @@ export function LangWatchQLWorkbench({
     },
     [query],
   );
-  const followsTimeWindow =
-    query.state.outcome?.kind === "result" && !isLangWatchQLResultStale(query.state)
-      ? query.state.outcome.result.followsTimeWindow
-      : void 0;
+  const outcome = query.state.outcome;
+  const hasFreshResult = outcome?.kind === "result" && !isLangWatchQLResultStale(query.state);
+  const followsTimeWindow = hasFreshResult ? outcome.result.followsTimeWindow : void 0;
   const vegaLiteSpec = parseSpecText(shownSpecText);
   const draft = {
     sql: query.state.draft.sql,
     parameters: query.state.draft.parameters,
     ...(vegaLiteSpec ? { vegaLiteSpec } : {}),
   };
-  const result = query.state.outcome?.kind === "result" ? query.state.outcome : void 0;
+  const hasResult = outcome?.kind === "result";
+  const result = hasResult ? outcome : void 0;
 
   return (
     <HStack

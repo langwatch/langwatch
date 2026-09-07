@@ -55,7 +55,9 @@ function valueOf(row: ParameterRow): LangWatchQLParameterValue | undefined {
     case "text":
       return row.text;
     case "number": {
-      if (row.text.trim().length === 0) return void 0;
+      const isBlank = row.text.trim().length === 0;
+      if (isBlank) return void 0;
+
       const parsed = Number(row.text);
       return Number.isFinite(parsed) ? parsed : void 0;
     }
@@ -107,7 +109,8 @@ function rowProblem({
   if (name.length === 0) {
     return valueTyped(row) ? "Name this parameter." : void 0;
   }
-  if (rows.filter((other) => other.name.trim() === name).length > 1) {
+  const isReused = rows.filter((other) => other.name.trim() === name).length > 1;
+  if (isReused) {
     return "Use this name once.";
   }
   return valueOf(row) === void 0 ? "Enter a number." : void 0;

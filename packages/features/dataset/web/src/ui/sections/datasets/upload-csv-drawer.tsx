@@ -52,8 +52,61 @@ import {
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
 } from "../../elements/dataset-dropzone-styles.tsx";
+import { readableDate } from "../../../model/readable-date.ts";
 
 const logger = createLogger("UploadCSVDrawer");
+
+function PreparingRowAction({
+  isFailed,
+  isReady,
+  isRetrying,
+  onRetry,
+  onViewDataset,
+}: {
+  isFailed: boolean;
+  isReady: boolean;
+  isRetrying: boolean;
+  onRetry: () => void;
+  onViewDataset: () => void;
+}) {
+  if (isFailed) {
+    return (
+      <Button size="sm" colorPalette="red" variant="outline" loading={isRetrying} onClick={onRetry}>
+        Retry
+      </Button>
+    );
+  }
+  if (!isReady) return null;
+
+  return (
+    <Button size="sm" colorPalette="blue" onClick={onViewDataset}>
+      View dataset
+    </Button>
+  );
+}
+
+/** Cancel aborts the upload AND clears the file, so the dropzone expands back in. */
+function SelectedFileAction({
+  isUploading,
+  onCancel,
+  onClearFile,
+}: {
+  isUploading: boolean;
+  onCancel?: () => void;
+  onClearFile: () => void;
+}) {
+  if (!isUploading) return <RemoveFileButton onRemove={onClearFile} />;
+  if (!onCancel) return null;
+
+  return (
+    <CancelUploadButton
+      onCancel={() => {
+        onCancel();
+        onClearFile();
+      }}
+    />
+  );
+}
 
 export function UploadCSVDrawer({
   isOpen: isOpen_,
@@ -225,10 +278,12 @@ export function DatasetUploadProcessing({
       // normalize runs, so "ready" is only ever reached once normalize has
       // finished; we don't second-guess it (a degenerate columnless dataset is
       // still terminally ready, not an endless spinner).
-      refetchInterval: (query) =>
-        query.state.data?.status === "processing" || query.state.data?.status === "uploading"
-          ? 3000
-          : false,
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        const isPreparing = status === "processing" || status === "uploading";
+
+        return isPreparing ? 3000 : false;
+      },
     },
   );
 
@@ -264,8 +319,16 @@ export function DatasetUploadProcessing({
     }
   };
 
-  const rowStatus: DatasetFileStatus =
-    isFailed || datasetGone ? "error" : isReady ? "ready" : "uploading";
+  const hasFailed = isFailed || datasetGone;
+  const readyStatus: DatasetFileStatus = isReady ? "ready" : "uploading";
+  const rowStatus: DatasetFileStatus = hasFailed ? "error" : readyStatus;
+
+  const preparingLabel = isProcessing
+    ? "Preparing your dataset, this can take a few minutes"
+    : undefined;
+  const failureMessage = isFailed
+    ? (data?.statusError ?? "Something went wrong while processing your file. You can retry.")
+    : undefined;
 
   // Same row treatment as the dropzone, so the upload → prepare → ready flow
   // reads as one continuous file row rather than swapping to a banner.
@@ -274,37 +337,16 @@ export function DatasetUploadProcessing({
       <DatasetFileRow
         name={data?.name ?? "Your dataset"}
         status={rowStatus}
-        metaLabel={
-          isReady
-            ? "Ready"
-            : isProcessing
-              ? "Preparing your dataset, this can take a few minutes"
-              : undefined
-        }
-        message={
-          datasetGone
-            ? "This dataset is no longer available."
-            : isFailed
-              ? (data?.statusError ??
-                "Something went wrong while processing your file. You can retry.")
-              : undefined
-        }
+        metaLabel={isReady ? "Ready" : preparingLabel}
+        message={datasetGone ? "This dataset is no longer available." : failureMessage}
         action={
-          isFailed ? (
-            <Button
-              size="sm"
-              colorPalette="red"
-              variant="outline"
-              loading={isRetrying}
-              onClick={() => void handleRetry()}
-            >
-              Retry
-            </Button>
-          ) : isReady ? (
-            <Button size="sm" colorPalette="blue" onClick={onViewDataset}>
-              View dataset
-            </Button>
-          ) : undefined
+          <PreparingRowAction
+            isFailed={isFailed}
+            isReady={isReady}
+            isRetrying={isRetrying}
+            onRetry={() => void handleRetry()}
+            onViewDataset={onViewDataset}
+          />
         }
       />
     </VStack>
@@ -456,7 +498,8 @@ export function UploadCSVForm({
    * `DirectUploadUnavailableError` is the only trigger for the fallback below.
    */
   const handleUpload = async (confirmed?: { name: string; columnTypes: DatasetColumns }) => {
-    if (!enableDirectUpload || !rawFile || !projectId || !project) {
+    const canUploadDirectly = enableDirectUpload && rawFile && projectId && project;
+    if (!canUploadDirectly) {
       uploadCSVData();
       return;
     }
@@ -640,7 +683,9 @@ export function UploadCSVForm({
    * `handleUpload`. Otherwise upload straight away.
    */
   const handleUploadClick = () => {
-    if (enableDirectUpload && rawFile && parsedColumns && requestColumnConfirm) {
+    const confirmsColumnsFirst =
+      enableDirectUpload && rawFile && parsedColumns && requestColumnConfirm;
+    if (confirmsColumnsFirst) {
       requestColumnConfirm({
         columns: parsedColumns,
         proposedName,
@@ -858,7 +903,8 @@ function ParsingCSVReader({
         skipEmptyLines: "greedy",
       }}
       onUploadAccepted={async (results: { data: string[][] }, file: File) => {
-        if (file.name.endsWith(".jsonl") || file.name.endsWith(".json")) {
+        const isJsonUpload = file.name.endsWith(".jsonl") || file.name.endsWith(".json");
+        if (isJsonUpload) {
           try {
             readString(jsonFileTextToCSV(await file.text()), {
               skipEmptyLines: "greedy",
@@ -1244,7 +1290,8 @@ function RawFileDropzone({
   };
 
   const isUploading = uploadStatus === "uploading";
-  const rowStatus: DatasetFileStatus = fileError ? "error" : isUploading ? "uploading" : "selected";
+  const uploadingStatus: DatasetFileStatus = isUploading ? "uploading" : "selected";
+  const rowStatus: DatasetFileStatus = fileError ? "error" : uploadingStatus;
 
   return (
     <VStack width="full" gap={0} align="stretch">
@@ -1301,24 +1348,15 @@ function RawFileDropzone({
         <DatasetFileRow
           name={acceptedFile.name}
           sizeLabel={formatFileSize(acceptedFile.size)}
-          metaLabel={new Date(acceptedFile.lastModified).toLocaleDateString()}
+          metaLabel={readableDate(acceptedFile.lastModified).toLocaleDateString()}
           status={rowStatus}
           message={fileError}
           action={
-            isUploading ? (
-              onCancel ? (
-                <CancelUploadButton
-                  onCancel={() => {
-                    // Cancel aborts the upload AND clears the file, so the
-                    // drag-and-drop container expands back in.
-                    onCancel();
-                    setFile(null);
-                  }}
-                />
-              ) : undefined
-            ) : (
-              <RemoveFileButton onRemove={() => setFile(null)} />
-            )
+            <SelectedFileAction
+              isUploading={isUploading}
+              onCancel={onCancel}
+              onClearFile={() => setFile(null)}
+            />
           }
         />
       )}

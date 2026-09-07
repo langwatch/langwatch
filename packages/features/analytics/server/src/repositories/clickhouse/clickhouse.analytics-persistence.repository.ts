@@ -45,6 +45,19 @@ export type EvaluationAnalyticsClickHouseClient = {
   }>;
 };
 
+/** A windowed read distinguishes a miss from an unwindowed read that cannot miss. */
+function readOutcome({
+  hasRecord,
+  isWindowed,
+}: {
+  hasRecord: boolean;
+  isWindowed: boolean;
+}): "hit" | "unwindowed" | "windowed_empty" {
+  if (!isWindowed) return "unwindowed";
+
+  return hasRecord ? "hit" : "windowed_empty";
+}
+
 export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluationRepository {
   static create(options: {
     resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
@@ -174,7 +187,7 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
       const record = rows[0];
       this.readMetrics?.record({
         table: "evaluation_analytics",
-        outcome: parsed.window ? (record ? "hit" : "windowed_empty") : "unwindowed",
+        outcome: readOutcome({ hasRecord: Boolean(record), isWindowed: Boolean(parsed.window) }),
       });
       return record ? fromSlimRecord(record) : null;
     } catch (error) {

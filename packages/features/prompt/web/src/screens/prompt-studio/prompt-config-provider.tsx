@@ -47,7 +47,8 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
         } catch (error) {
           onError?.(error as Error);
           // Don't close the dialog if a global handler will show a modal
-          if (!isLimitExceeded(error) && !isLiteMemberRestriction(error)) {
+          const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
+          if (!isHandledGlobally) {
             setSaveVersionDialogProps(null);
           }
         }
@@ -81,7 +82,8 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
         } catch (error) {
           onError?.(error as Error);
           // Don't close the dialog if a global handler will show a modal
-          if (!isLimitExceeded(error) && !isLiteMemberRestriction(error)) {
+          const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
+          if (!isHandledGlobally) {
             setCreatePromptDialogProps(null);
           }
         }
@@ -118,7 +120,8 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
             } catch (error) {
               onError?.(error as Error);
               // Don't close the dialog if a global handler will show a modal
-              if (!isLimitExceeded(error) && !isLiteMemberRestriction(error)) {
+              const isHandledGlobally = isLimitExceeded(error) || isLiteMemberRestriction(error);
+              if (!isHandledGlobally) {
                 setChangeHandleDialogProps(null);
               }
             }

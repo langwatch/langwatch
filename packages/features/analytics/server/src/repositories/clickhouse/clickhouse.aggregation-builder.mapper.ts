@@ -28,6 +28,30 @@ import {
 } from "./clickhouse.metric-translator.mapper.ts";
 
 /**
+ * The `group_key` projection, or null when the query has no grouping. A column
+ * that already answers for its own nulls keeps its own expression.
+ */
+function groupKeyExpression({
+  groupByColumn,
+  groupByHandlesUnknown,
+}: {
+  groupByColumn: string | null | undefined;
+  groupByHandlesUnknown: boolean;
+}): string | null {
+  if (!groupByColumn) return null;
+  if (groupByHandlesUnknown) return `${groupByColumn} AS group_key`;
+
+  return `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`;
+}
+
+/** `uniq(TraceId)` and `uniqExact(TraceId)` both count one row per trace. */
+function isUniqOverTraceId(selectExpression: string): boolean {
+  const isUniq = /\buniq\s*\(/.test(selectExpression) || /\buniqExact\s*\(/.test(selectExpression);
+
+  return isUniq && selectExpression.includes("TraceId");
+}
+
+/**
  * Resolve which columns a joined table needs based on the SQL expressions that
  * reference it.
  */
@@ -697,7 +721,8 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // to avoid trace duplication affecting counts. The CTE deduplicates
   // (TraceId, group_key) pairs and preserves metrics per trace for accurate aggregation.
   // Without this, joining stored_spans causes each trace to be counted once per span.
-  if ((usesArrayJoin || groupByRequiresSpans || spanModelPartitioned) && groupByColumn) {
+  const needsSpanDedupCte = usesArrayJoin || groupByRequiresSpans || spanModelPartitioned;
+  if (needsSpanDedupCte && groupByColumn) {
     return buildArrayJoinTimeseriesQuery({
       input,
       groupByColumn,
@@ -892,11 +917,7 @@ function buildMixedEvalTimeseriesQuery({
   const dateTrunc =
     typeof input.timeScale === "number" ? getDateTruncFunction(input.timeScale, timeZone) : null;
 
-  const groupKeyExpr = groupByColumn
-    ? groupByHandlesUnknown
-      ? `${groupByColumn} AS group_key`
-      : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
-    : null;
+  const groupKeyExpr = groupKeyExpression({ groupByColumn, groupByHandlesUnknown });
 
   // Inner CTE: per-trace granularity. Trace-level columns are collapsed with
   // `any()` since they're constant per TraceId. Eval metrics keep their full
@@ -949,10 +970,8 @@ function buildMixedEvalTimeseriesQuery({
     }
 
     // uniq/uniqExact of TraceId — same as count: 1 per trace row.
-    if (
-      (/\buniq\s*\(/.test(exprWithoutAlias) || /\buniqExact\s*\(/.test(exprWithoutAlias)) &&
-      exprWithoutAlias.includes("TraceId")
-    ) {
+    const isUniqueTraceCount = isUniqOverTraceId(exprWithoutAlias);
+    if (isUniqueTraceCount) {
       innerSelectExprs.push(`1 AS ${perTraceAlias}`);
       outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
       continue;
@@ -1298,9 +1317,8 @@ function buildArrayJoinTimeseriesQuery({
   // cache-token hoist below exists to avoid.
   for (const { attributeKey, cteColumn } of TRACE_ATTRIBUTE_METRIC_COLUMNS) {
     const source = traceAttributeSource(attributeKey);
-    if (!simpleMetrics.some((m) => m.selectExpression.includes(source))) {
-      continue;
-    }
+    const isRead = simpleMetrics.some((m) => m.selectExpression.includes(source));
+    if (!isRead) continue;
     cteSelectExprs.push(`${traceColumnWrapper(source)} AS ${cteColumn}`);
   }
   if (needsCacheTokenColumns) {
@@ -1625,11 +1643,7 @@ function buildSubqueryTimeseriesQuery(
 
   // Build group_key expression when groupBy is active, matching the pattern used in
   // buildArrayJoinTimeseriesQuery and the standard query path.
-  const groupKeyExpr = groupByColumn
-    ? groupByHandlesUnknown
-      ? `${groupByColumn} AS group_key`
-      : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
-    : null;
+  const groupKeyExpr = groupKeyExpression({ groupByColumn, groupByHandlesUnknown });
 
   // Build CTEs for each subquery metric, one for current and one for previous period
   // Use 'cte_' prefix to ensure CTE names don't start with a digit (which is invalid SQL)
@@ -1904,11 +1918,7 @@ function buildDateBucketedPipelineQuery({
       WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END`;
 
-  const groupKeyExpr = groupByColumn
-    ? groupByHandlesUnknown
-      ? `${groupByColumn} AS group_key`
-      : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
-    : null;
+  const groupKeyExpr = groupKeyExpression({ groupByColumn, groupByHandlesUnknown });
 
   const fullFilterWhere = filterWhere;
 
@@ -2317,10 +2327,7 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
   }
 
   // Handle uniq/uniqExact of TraceId -> uniqExact(trace_id)
-  if (
-    (/\buniq\s*\(/.test(selectExpression) || /\buniqExact\s*\(/.test(selectExpression)) &&
-    selectExpression.includes("TraceId")
-  ) {
+  if (isUniqOverTraceId(selectExpression)) {
     return `uniqExact(trace_id) AS ${alias}`;
   }
 

@@ -167,21 +167,36 @@ export function useLangWatchQLVegaView({
     if (state.status !== "ready" || container === null) return;
     if (typeof ResizeObserver === "undefined") return;
 
-    const observer = new ResizeObserver(() => {
-      const result = resultRef.current;
-      if (result === null) return;
-      void result.view
-        .resize()
-        .runAsync()
-        .catch((error: unknown) => {
-          finalizeInto({ result, resultRef, setState, error });
-        });
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
+    return observeContainerResize({ container, resultRef, setState });
   }, [state.status]);
 
   return { containerRef, state };
+}
+
+/** A resized container re-runs the view; a failure there ends it like any other. */
+function observeContainerResize({
+  container,
+  resultRef,
+  setState,
+}: {
+  container: HTMLDivElement;
+  resultRef: RefObject<Result | null>;
+  setState: (state: LangWatchQLVegaViewState) => void;
+}): () => void {
+  const observer = new ResizeObserver(() => {
+    const result = resultRef.current;
+    if (result === null) return;
+
+    void result.view
+      .resize()
+      .runAsync()
+      .catch((error: unknown) => {
+        finalizeInto({ result, resultRef, setState, error });
+      });
+  });
+  observer.observe(container);
+
+  return () => observer.disconnect();
 }
 
 /** The mutable handles the effects share: one running view, and what it holds. */

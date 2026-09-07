@@ -27,6 +27,8 @@ export class PreconditionTraceDataService {
     events?: DerivedTraceEvent[] | null;
   }): PreconditionTraceData {
     const attrs = input.foldState.attributes ?? {};
+    const models = input.foldState.models;
+    const spanModels = models.length > 0 ? models : null;
 
     return {
       input: input.foldState.computedInput ?? null,
@@ -40,7 +42,7 @@ export class PreconditionTraceDataService {
       promptIds: parseJsonArray(attrs["langwatch.prompt_ids"]),
       topicId: input.foldState.topicId ?? null,
       subTopicId: input.foldState.subTopicId ?? null,
-      spanModels: input.foldState.models.length > 0 ? input.foldState.models : null,
+      spanModels,
       customMetadata: extractCustomMetadata(attrs),
       annotationIds: input.foldState.annotationIds,
       events: buildPreconditionEvents(input.events),
@@ -144,7 +146,8 @@ function resolveCustomMetadataKey(key: string): {
       return null;
     }
 
-    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) {
+    const isReservedPrefix = RESERVED_PREFIXES.some((p) => key.startsWith(p));
+    if (isReservedPrefix) {
       return null;
     }
 
@@ -161,11 +164,13 @@ function resolveCustomMetadataKey(key: string): {
   }
 
   // Skip all other known prefixes
-  if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) {
+  const isReservedPrefix = RESERVED_PREFIXES.some((p) => key.startsWith(p));
+  if (isReservedPrefix) {
     return null;
   }
 
-  if (BARE_KEY_EXCLUDED_PREFIXES.some((p) => key.startsWith(p))) {
+  const isExcludedBareKey = BARE_KEY_EXCLUDED_PREFIXES.some((p) => key.startsWith(p));
+  if (isExcludedBareKey) {
     return null;
   }
 

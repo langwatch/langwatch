@@ -85,12 +85,8 @@ export function useSliderControl({
   // Calculate effective max - use model override for dynamic params or provider constraints
   // For dynamic max params (like max_tokens), always use the override
   // For other params, use override if it's more restrictive than config.max
-  const rawMax =
-    config.dynamicMax && maxOverride
-      ? maxOverride
-      : maxOverride !== undefined
-        ? Math.min(maxOverride, config.max)
-        : config.max;
+  const restrictedMax = maxOverride !== undefined ? Math.min(maxOverride, config.max) : config.max;
+  const rawMax = config.dynamicMax && maxOverride ? maxOverride : restrictedMax;
 
   const effectiveMax = alignMaxToStep(rawMax, effectiveMin, config.step);
 

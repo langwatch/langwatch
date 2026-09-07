@@ -193,8 +193,9 @@ export function buildCustomKeyState(
   const isUsingEnvVars = options?.providerEnabledWithEnvVars && !hasStoredKeys;
 
   Object.keys(displayKeyMap ?? {}).forEach((key) => {
-    if (previousKeys && Object.prototype.hasOwnProperty.call(previousKeys, key)) {
-      const previousValue = previousKeys[key];
+    const wasPreviouslySet = previousKeys ? Object.hasOwn(previousKeys, key) : false;
+    if (wasPreviouslySet) {
+      const previousValue = previousKeys?.[key];
       if (typeof previousValue === "string") {
         result[key] = previousValue;
         return;

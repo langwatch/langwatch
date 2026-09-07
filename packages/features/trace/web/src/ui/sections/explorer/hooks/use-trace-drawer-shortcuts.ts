@@ -45,18 +45,8 @@ export function useTraceDrawerShortcuts({
   useEffect(() => {
     if (!trace) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
-      // Don't hijack OS chords (Cmd+C / Ctrl+T / Alt+...).
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-      const entry = TRACE_DRAWER_SHORTCUTS.find((s) => s.matchKeys.includes(e.key));
-      if (!entry) return;
-
-      const store = useDrawerStore.getState();
-      const ctx: ShortcutContext = {
-        event: e,
-        store,
+    const handleKeyDown = (e: KeyboardEvent) =>
+      runDrawerShortcut(e, {
         trace,
         spanTree,
         nextTraceId,
@@ -68,12 +58,7 @@ export function useTraceDrawerShortcuts({
         canGoBack,
         refreshActiveTrace,
         onClose,
-      };
-
-      if (entry.guard && !entry.guard(ctx)) return;
-      e.preventDefault();
-      entry.run(ctx);
-    };
+      });
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -90,4 +75,25 @@ export function useTraceDrawerShortcuts({
     refreshActiveTrace,
     onClose,
   ]);
+}
+
+/**
+ * Runs the shortcut the key names, unless the reader is typing, the chord
+ * belongs to the operating system, or the shortcut's own guard declines it.
+ */
+function runDrawerShortcut(
+  e: KeyboardEvent,
+  params: Omit<ShortcutContext, "event" | "store">,
+): void {
+  if (isTypingTarget(e.target)) return;
+  // Don't hijack OS chords (Cmd+C / Ctrl+T / Alt+...).
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  const entry = TRACE_DRAWER_SHORTCUTS.find((s) => s.matchKeys.includes(e.key));
+  if (!entry) return;
+
+  const ctx: ShortcutContext = { ...params, event: e, store: useDrawerStore.getState() };
+  if (entry.guard && !entry.guard(ctx)) return;
+  e.preventDefault();
+  entry.run(ctx);
 }

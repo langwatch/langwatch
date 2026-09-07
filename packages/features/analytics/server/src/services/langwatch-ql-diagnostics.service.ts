@@ -51,7 +51,8 @@ function unboundedTimeRangeDiagnostics({
       views,
     })) {
       const { timeColumn } = reference.view;
-      if (filtered.has(timeColumn.toLowerCase())) {
+      const isFiltered = filtered.has(timeColumn.toLowerCase());
+      if (isFiltered) {
         continue;
       }
 

@@ -37,26 +37,36 @@ export type ModelProviderToast = {
 
 export type ModelProviderToaster = { create: (toast: ModelProviderToast) => void };
 
+/** A warning is a failure, not a quieter success: both leave through `failed`. */
+function emitToast({
+  host,
+  toast,
+}: {
+  host: ReturnType<typeof useModelProviderHost>;
+  toast: ModelProviderToast;
+}): void {
+  const isFailure = toast.type === "error" || toast.type === "warning";
+  if (isFailure) {
+    host.failed({
+      error: void 0,
+      fallbackTitle: toast.description ? `${toast.title}. ${toast.description}` : toast.title,
+      ...(toast.id ? { id: toast.id } : {}),
+    });
+    return;
+  }
+
+  host.succeeded({
+    title: toast.title,
+    ...(toast.description ? { description: toast.description } : {}),
+    ...(toast.id ? { id: toast.id } : {}),
+  });
+}
+
 export function useModelProviderToaster(): ModelProviderToaster {
   const host = useModelProviderHost();
+
   return useMemo(
-    () => ({
-      create: (toast: ModelProviderToast) => {
-        if (toast.type === "error" || toast.type === "warning") {
-          host.failed({
-            error: void 0,
-            fallbackTitle: toast.description ? `${toast.title}. ${toast.description}` : toast.title,
-            ...(toast.id ? { id: toast.id } : {}),
-          });
-          return;
-        }
-        host.succeeded({
-          title: toast.title,
-          ...(toast.description ? { description: toast.description } : {}),
-          ...(toast.id ? { id: toast.id } : {}),
-        });
-      },
-    }),
+    () => ({ create: (toast: ModelProviderToast) => emitToast({ host, toast }) }),
     [host],
   );
 }

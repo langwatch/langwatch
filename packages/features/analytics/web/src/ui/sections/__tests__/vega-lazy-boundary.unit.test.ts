@@ -113,11 +113,8 @@ function resolveLocal({
   specifier: string;
   fromFile: string;
 }): string | null {
-  const base = specifier.startsWith("~/")
-    ? join(SRC_DIR, specifier.slice(2))
-    : specifier.startsWith(".")
-      ? resolve(dirname(fromFile), specifier)
-      : null;
+  const relativeBase = specifier.startsWith(".") ? resolve(dirname(fromFile), specifier) : null;
+  const base = specifier.startsWith("~/") ? join(SRC_DIR, specifier.slice(2)) : relativeBase;
   if (base === null) return null;
 
   const candidates = [
@@ -174,7 +171,9 @@ const featureSourceFiles = (directory: string): string[] =>
     // A declaration file is erased too, so it is never in a chunk.
     if (entry.name.endsWith(".d.ts")) return [];
     if (path === join(PACKAGE_SRC_DIR, "model", "visualization", "validation.ts")) return [];
-    return EXTENSIONS.some((extension) => entry.name.endsWith(extension)) ? [path] : [];
+    const isSourceFile = EXTENSIONS.some((extension) => entry.name.endsWith(extension));
+
+    return isSourceFile ? [path] : [];
   });
 
 describe("where the Vega runtime can be reached from", () => {

@@ -11,7 +11,8 @@ export type MessageRoleLabelProps = Omit<TextProps, "children"> & {
  * Used in prompt playground and HTTP agent test panel.
  */
 export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
-  const label = role === "system" ? "System prompt" : role === "user" ? "User" : "Assistant";
+  const nonSystemLabel = role === "user" ? "User" : "Assistant";
+  const label = role === "system" ? "System prompt" : nonSystemLabel;
 
   return (
     <Text

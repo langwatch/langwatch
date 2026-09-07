@@ -98,23 +98,15 @@ export function useAiTraceAction({
   const aiAction = api.tracesV2.aiAction.useMutation({
     onSuccess: (result) => {
       if (cancelledRef.current) return;
-      // Apply the query first so the resulting view is filtered (also so
-      // that lens creation captures the right snapshot).
-      applyQueryText(result.query);
-      // Pin the user's natural-language prompt against the produced query.
-      if (lastSubmittedProjectIdRef.current && lastSubmittedPromptRef.current) {
-        recordAiTranslation({
-          projectId: lastSubmittedProjectIdRef.current,
-          prompt: lastSubmittedPromptRef.current,
-          query: result.query,
-        });
-      }
-      const shouldCreateLens =
-        mode === "lens" || (mode === "auto" && result.kind === "create_lens");
-      if (shouldCreateLens) {
-        const lensName = result.kind === "create_lens" ? result.name : "Untitled lens";
-        createLens(lensName);
-      }
+      applyAiActionResult({
+        applyQueryText,
+        createLens,
+        mode,
+        projectId: lastSubmittedProjectIdRef.current,
+        prompt: lastSubmittedPromptRef.current,
+        recordAiTranslation,
+        result,
+      });
       onDone?.();
     },
     onError: (e) => {
@@ -150,4 +142,34 @@ export function useAiTraceAction({
     error,
     clearError: () => setError(null),
   };
+}
+
+/** What the model asked for, applied to the filter and lens stores. */
+function applyAiActionResult({
+  applyQueryText,
+  createLens,
+  mode,
+  projectId,
+  prompt,
+  recordAiTranslation,
+  result,
+}: {
+  applyQueryText: (query: string) => void;
+  createLens: (name: string) => void;
+  mode: AiTraceActionMode;
+  projectId: string | null;
+  prompt: string;
+  recordAiTranslation: (translation: { projectId: string; prompt: string; query: string }) => void;
+  result: { kind: string; name?: string; query: string };
+}): void {
+  // Apply the query first so the resulting view is filtered (also so
+  // that lens creation captures the right snapshot).
+  applyQueryText(result.query);
+  // Pin the user's natural-language prompt against the produced query.
+  if (projectId && prompt) {
+    recordAiTranslation({ projectId, prompt, query: result.query });
+  }
+  const shouldCreateLens = mode === "lens" || (mode === "auto" && result.kind === "create_lens");
+  if (!shouldCreateLens) return;
+  createLens(result.kind === "create_lens" ? (result.name ?? "Untitled lens") : "Untitled lens");
 }

@@ -53,16 +53,13 @@ export function SidebarResizeHandle({
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (startXRef.current == null) return;
       const delta = event.clientX - startXRef.current;
-      const next = Math.min(max, startWidthRef.current + delta);
-      if (next < collapseBelow) {
-        if (!collapsedRef.current) {
-          collapsedRef.current = true;
-          onCollapse();
-        }
-        return;
-      }
-      collapsedRef.current = false;
-      onResize(next);
+      applyDragWidth({
+        collapseBelow,
+        collapsedRef,
+        onCollapse,
+        onResize,
+        width: Math.min(max, startWidthRef.current + delta),
+      });
     },
     [collapseBelow, max, onCollapse, onResize],
   );
@@ -126,4 +123,28 @@ export function SidebarResizeHandle({
       }}
     />
   );
+}
+
+/** One drag frame: a collapse below the threshold, otherwise a resize. */
+function applyDragWidth({
+  collapseBelow,
+  collapsedRef,
+  onCollapse,
+  onResize,
+  width,
+}: {
+  collapseBelow: number;
+  collapsedRef: React.RefObject<boolean>;
+  onCollapse: () => void;
+  onResize: (width: number) => void;
+  width: number;
+}): void {
+  if (width >= collapseBelow) {
+    collapsedRef.current = false;
+    onResize(width);
+    return;
+  }
+  if (collapsedRef.current) return;
+  collapsedRef.current = true;
+  onCollapse();
 }

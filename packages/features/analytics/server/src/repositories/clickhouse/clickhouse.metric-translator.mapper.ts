@@ -329,45 +329,68 @@ export function translateMetric(
   const requiredJoins: CHTable[] = [];
 
   // Handle specific metric categories
-  if (metric.startsWith("metadata.") && isMetadataMetricKey(metric)) {
+  const isMetadataMetric = metric.startsWith("metadata.") && isMetadataMetricKey(metric);
+  if (isMetadataMetric) {
     return translateMetadataMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  if (metric.startsWith("performance.") && isPerformanceMetricKey(metric)) {
+  const isPerformanceMetric = metric.startsWith("performance.") && isPerformanceMetricKey(metric);
+  if (isPerformanceMetric) {
     return translatePerformanceMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  if (metric.startsWith("evaluations.") && isEvaluationMetricKey(metric)) {
+  const isEvaluationMetric = metric.startsWith("evaluations.") && isEvaluationMetricKey(metric);
+  if (isEvaluationMetric) {
     return translateEvaluationMetric(metric, aggregation, alias, requiredJoins, key);
   }
 
-  if (metric.startsWith("events.") && isEventMetricKey(metric)) {
+  const isEventMetric = metric.startsWith("events.") && isEventMetricKey(metric);
+  if (isEventMetric) {
     return translateEventMetric(metric, aggregation, alias, requiredJoins, key, subkey);
   }
 
-  if (metric.startsWith("sentiment.") && isSentimentMetricKey(metric)) {
+  const isSentimentMetric = metric.startsWith("sentiment.") && isSentimentMetricKey(metric);
+  if (isSentimentMetric) {
     return translateSentimentMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  if (metric.startsWith("threads.") && isThreadsMetricKey(metric)) {
+  const isThreadsMetric = metric.startsWith("threads.") && isThreadsMetricKey(metric);
+  if (isThreadsMetric) {
     return translateThreadsMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  const mapping = getFieldMapping(metric);
-  if (mapping) {
-    const column = qualifiedColumn(metric);
-    if (mapping.table !== "trace_summaries") {
-      requiredJoins.push(mapping.table);
-    }
-    return {
-      selectExpression: translateSimpleAggregation(column, aggregation, alias),
-      alias,
-      requiredJoins,
-      params: {},
-    };
-  }
+  const mapped = translateMappedMetric({ aggregation, alias, metric, requiredJoins });
+  if (mapped) return mapped;
 
   throw unknownMetricError(index);
+}
+
+/** The generic path: a metric the field-mapping table already knows a column for. */
+function translateMappedMetric({
+  aggregation,
+  alias,
+  metric,
+  requiredJoins,
+}: {
+  aggregation: AggregationTypes;
+  alias: string;
+  metric: string;
+  requiredJoins: CHTable[];
+}): MetricTranslation | null {
+  const mapping = getFieldMapping(metric);
+  if (!mapping) return null;
+
+  const column = qualifiedColumn(metric);
+  if (mapping.table !== "trace_summaries") {
+    requiredJoins.push(mapping.table);
+  }
+
+  return {
+    selectExpression: translateSimpleAggregation(column, aggregation, alias),
+    alias,
+    requiredJoins,
+    params: {},
+  };
 }
 
 /**

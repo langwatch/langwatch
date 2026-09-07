@@ -39,26 +39,16 @@ export function useTraceLensKeyboard({ traces }: { traces: TraceListItem[] }): T
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setFocusedIndex((i) => Math.min(i + 1, traces.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setFocusedIndex((i) => Math.max(i - 1, 0));
-        return;
-      }
-      if (e.key === "Escape") {
-        closeDrawer();
-        return;
-      }
-      const focused = traces[focusedIndex];
-      if (!focused) return;
-      if (e.key === "Enter") toggleTrace(focused);
-      else if (e.key === "p") togglePeek(focused.traceId);
-    },
+    (e: React.KeyboardEvent) =>
+      applyTraceLensKey({
+        closeDrawer,
+        e,
+        focusedIndex,
+        setFocusedIndex,
+        toggleTrace,
+        togglePeek,
+        traces,
+      }),
     [traces, focusedIndex, toggleTrace, togglePeek, closeDrawer],
   );
 
@@ -70,4 +60,42 @@ export function useTraceLensKeyboard({ traces }: { traces: TraceListItem[] }): T
     togglePeek,
     handleKeyDown,
   };
+}
+
+/** Arrow keys move the focus, Escape closes, Enter opens and `p` peeks. */
+function applyTraceLensKey({
+  closeDrawer,
+  e,
+  focusedIndex,
+  setFocusedIndex,
+  toggleTrace,
+  togglePeek,
+  traces,
+}: {
+  closeDrawer: () => void;
+  e: React.KeyboardEvent;
+  focusedIndex: number;
+  setFocusedIndex: (update: (index: number) => number) => void;
+  toggleTrace: (trace: TraceListItem) => void;
+  togglePeek: (traceId: string) => void;
+  traces: TraceListItem[];
+}): void {
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    setFocusedIndex((i) => Math.min(i + 1, traces.length - 1));
+    return;
+  }
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    setFocusedIndex((i) => Math.max(i - 1, 0));
+    return;
+  }
+  if (e.key === "Escape") {
+    closeDrawer();
+    return;
+  }
+  const focused = traces[focusedIndex];
+  if (!focused) return;
+  if (e.key === "Enter") toggleTrace(focused);
+  else if (e.key === "p") togglePeek(focused.traceId);
 }

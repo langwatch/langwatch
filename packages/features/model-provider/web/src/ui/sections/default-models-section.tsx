@@ -475,9 +475,21 @@ function ChipWithEdit({
   );
 }
 
+const SCOPE_CHIP_PALETTES: Record<ModelProviderScopeType, string> = {
+  ORGANIZATION: "blue",
+  TEAM: "purple",
+  PROJECT: "gray",
+};
+
+const SCOPE_CHIP_ICONS: Record<ModelProviderScopeType, typeof Folder> = {
+  ORGANIZATION: Building2,
+  TEAM: Users,
+  PROJECT: Folder,
+};
+
 function ScopeChip({ type, name }: { type: ModelProviderScopeType; name: string }) {
-  const palette = type === "ORGANIZATION" ? "blue" : type === "TEAM" ? "purple" : "gray";
-  const Icon = type === "ORGANIZATION" ? Building2 : type === "TEAM" ? Users : Folder;
+  const palette = SCOPE_CHIP_PALETTES[type] ?? "gray";
+  const Icon = SCOPE_CHIP_ICONS[type] ?? Folder;
   return (
     <Badge colorPalette={palette} variant="subtle">
       <HStack gap={1}>

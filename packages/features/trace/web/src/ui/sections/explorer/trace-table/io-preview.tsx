@@ -282,24 +282,31 @@ export function collectRowMedia(raw: string | null): RowMedia {
   const parts = collectMediaParts(raw);
   if (parts.length === 0) return NO_ROW_MEDIA;
   const summary: RowMedia = { ...NO_ROW_MEDIA };
-  for (const part of parts) {
-    if (part.type === "binary") {
-      const mime = part.mimeType.toLowerCase();
-      if (mime.startsWith("audio/")) summary.hasAudio = true;
-      else if (mime.startsWith("video/")) summary.hasVideo = true;
-      else if (mime.startsWith("image/")) {
-        summary.imageSrc ??=
-          part.url ?? (part.data ? `data:${part.mimeType};base64,${part.data}` : null);
-      } else summary.hasAttachment = true;
-    } else if (part.type === "image") {
-      summary.imageSrc ??= mediaSrc(part);
-    } else if (part.type === "audio") {
-      summary.hasAudio = true;
-    } else {
-      summary.hasVideo = true;
-    }
-  }
+  for (const part of parts) addMediaPart(summary, part);
   return summary;
+}
+
+/** Folds one parsed media part into the row's media summary. */
+function addMediaPart(summary: RowMedia, part: MediaPartData): void {
+  if (part.type === "image") {
+    summary.imageSrc ??= mediaSrc(part);
+    return;
+  }
+  if (part.type === "audio") {
+    summary.hasAudio = true;
+    return;
+  }
+  if (part.type !== "binary") {
+    summary.hasVideo = true;
+    return;
+  }
+  const mime = part.mimeType.toLowerCase();
+  if (mime.startsWith("audio/")) summary.hasAudio = true;
+  else if (mime.startsWith("video/")) summary.hasVideo = true;
+  else if (mime.startsWith("image/")) {
+    summary.imageSrc ??=
+      part.url ?? (part.data ? `data:${part.mimeType};base64,${part.data}` : null);
+  } else summary.hasAttachment = true;
 }
 
 /**

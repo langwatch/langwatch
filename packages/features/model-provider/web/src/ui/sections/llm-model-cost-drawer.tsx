@@ -6,7 +6,7 @@
 
 import { Button, Field, Heading, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { useDebounce } from "use-debounce";
 
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -25,6 +25,98 @@ import {
   LLMModelCostMatchingSpans,
   type MatchingSpansPreviewInput,
 } from "./llm-model-cost-matching-spans.tsx";
+
+interface LLMModelCostFormValues {
+  model: string;
+  inputCostPerToken: number;
+  outputCostPerToken: number;
+  cacheReadCostPerToken?: number;
+  cacheCreationCostPerToken?: number;
+  cacheCreation1hCostPerToken?: number;
+  regex: string;
+}
+
+/** The row being edited, or the row a clone starts from; neither when adding. */
+function findEditedCost({
+  cloneModel,
+  id,
+  llmModelCosts,
+}: {
+  cloneModel?: string;
+  id?: string;
+  llmModelCosts: LLMModelCostRow[];
+}): LLMModelCostRow | undefined {
+  if (id) return llmModelCosts.find((llmModelCost) => llmModelCost.id === id);
+  if (!cloneModel) return undefined;
+
+  return llmModelCosts.find(
+    (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel,
+  );
+}
+
+/**
+ * Editing keeps the row's scope; new and cloned rows default to the current
+ * project. The org/team rows let an admin push one cost policy down the
+ * cascade (PROJECT -> TEAM -> ORGANIZATION) instead of every project
+ * re-entering it.
+ */
+function initialScope({
+  editedCost,
+  projectId,
+}: {
+  editedCost: LLMModelCostRow | undefined;
+  projectId: string | undefined;
+}): ScopeTriadEntry[] {
+  if (editedCost?.scopeType && editedCost?.scopeId) {
+    return [{ scopeType: editedCost.scopeType, scopeId: editedCost.scopeId }];
+  }
+
+  return projectId ? [{ scopeType: "PROJECT", scopeId: projectId }] : [];
+}
+
+/**
+ * Rates pass through a finite-number gate because react-hook-form yields NaN
+ * or an empty string while a numeric field is being edited.
+ */
+function finiteOrUndefined(value: unknown): number | undefined {
+  const num = typeof value === "string" ? Number(value) : (value as number);
+  const usable = typeof num === "number" && Number.isFinite(num) && num >= 0;
+
+  return usable ? num : undefined;
+}
+
+function optionalRate(value: number | undefined): number | undefined {
+  return value == null || isNaN(value) ? undefined : value;
+}
+
+function optionalNumberValue(value: unknown): number | undefined {
+  return value === "" || value == null ? undefined : Number(value);
+}
+
+/**
+ * The refusal goes on the field the server named where it named one, and only
+ * falls back to a notice when it named none. Reporting the same rejection
+ * twice reads as two failures.
+ */
+function reportCostFailure({
+  error,
+  form,
+  host,
+  id,
+}: {
+  error: unknown;
+  form: UseFormReturn<LLMModelCostFormValues>;
+  host: ReturnType<typeof useModelProviderHost>;
+  id?: string;
+}): void {
+  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  if (host.isReportedGlobally(error)) return;
+
+  host.failed({
+    error,
+    fallbackTitle: id ? "Couldn't update model cost" : "Couldn't create model cost",
+  });
+}
 
 export function LLMModelCostDrawer({
   id,
@@ -101,39 +193,14 @@ function LLMModelCostForm({
     { enabled: !!projectId },
   );
 
-  const currentLLMModelCost = id
-    ? llmModelCosts.find((llmModelCost) => llmModelCost.id === id)
-    : cloneModel
-      ? llmModelCosts.find((llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel)
-      : undefined;
+  const currentLLMModelCost = findEditedCost({ cloneModel, id, llmModelCosts });
 
-  type LLMModelCostForm = {
-    model: string;
-    inputCostPerToken: number;
-    outputCostPerToken: number;
-    cacheReadCostPerToken?: number;
-    cacheCreationCostPerToken?: number;
-    cacheCreation1hCostPerToken?: number;
-    regex: string;
-  };
+  // Single-organization scope this cost applies to (ADR-021).
+  const [scope, setScope] = useState<ScopeTriadEntry[]>(() =>
+    initialScope({ editedCost: currentLLMModelCost, projectId }),
+  );
 
-  // Single-organization scope this cost applies to (ADR-021). Editing keeps
-  // the row's scope; new/cloned rows default to the current project. The
-  // org/team rows let an admin push one cost policy down the cascade
-  // (PROJECT -> TEAM -> ORGANIZATION) instead of every project re-entering it.
-  const [scope, setScope] = useState<ScopeTriadEntry[]>(() => {
-    if (currentLLMModelCost?.scopeType && currentLLMModelCost?.scopeId) {
-      return [
-        {
-          scopeType: currentLLMModelCost.scopeType,
-          scopeId: currentLLMModelCost.scopeId,
-        },
-      ];
-    }
-    return projectId ? [{ scopeType: "PROJECT", scopeId: projectId }] : [];
-  });
-
-  const form = useForm<LLMModelCostForm>({
+  const form = useForm<LLMModelCostFormValues>({
     defaultValues: {
       model: currentLLMModelCost?.model ?? prefillModel,
       inputCostPerToken: currentLLMModelCost?.inputCostPerToken,
@@ -154,15 +221,9 @@ function LLMModelCostForm({
   } = form;
 
   // Live values feeding the matching-spans preview. Debounced so the
-  // ClickHouse-backed preview doesn't fire on every keystroke; rates pass
-  // through a finite-number gate because react-hook-form yields NaN /
-  // empty-string while a numeric field is being edited.
+  // ClickHouse-backed preview doesn't fire on every keystroke.
   const liveValues = useWatch({ control });
   const [debouncedValues] = useDebounce(liveValues, 400);
-  const finiteOrUndefined = (value: unknown): number | undefined => {
-    const num = typeof value === "string" ? Number(value) : (value as number);
-    return typeof num === "number" && Number.isFinite(num) && num >= 0 ? num : undefined;
-  };
   const previewInput: MatchingSpansPreviewInput = {
     regex: debouncedValues.regex ?? "",
     model: debouncedValues.model || undefined,
@@ -173,11 +234,10 @@ function LLMModelCostForm({
     cacheCreation1hCostPerToken: finiteOrUndefined(debouncedValues.cacheCreation1hCostPerToken),
   };
 
-  const onSubmit = (data: LLMModelCostForm) => {
-    if (!projectId) return;
+  const savedVerb = id ? "updated" : "created";
 
-    const optionalRate = (value: number | undefined) =>
-      value == null || isNaN(value) ? undefined : value;
+  const onSubmit = (data: LLMModelCostFormValues) => {
+    if (!projectId) return;
 
     const selectedScope = scope[0];
 
@@ -199,22 +259,12 @@ function LLMModelCostForm({
         onSuccess: () => {
           host.succeeded({
             title: "Success",
-            description: `LLM model cost ${id ? "updated" : "created"} successfully`,
+            description: `LLM model cost ${savedVerb} successfully`,
           });
           closeDrawer();
           void llmModelCostsQuery.refetch();
         },
-        onError: (error) => {
-          // The refusal goes on the field the server named where it named one,
-          // and only falls back to a notice when it named none. Reporting the
-          // same rejection twice reads as two failures.
-          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
-          if (host.isReportedGlobally(error)) return;
-          host.failed({
-            error,
-            fallbackTitle: id ? "Couldn't update model cost" : "Couldn't create model cost",
-          });
-        },
+        onError: (error) => reportCostFailure({ error, form, host, id }),
       },
     );
   };
@@ -333,7 +383,7 @@ function LLMModelCostForm({
             <Input
               placeholder="0.00"
               {...register("cacheReadCostPerToken", {
-                setValueAs: (value) => (value === "" || value == null ? undefined : Number(value)),
+                setValueAs: optionalNumberValue,
               })}
             />
           </InputGroup>
@@ -348,7 +398,7 @@ function LLMModelCostForm({
             <Input
               placeholder="0.00"
               {...register("cacheCreationCostPerToken", {
-                setValueAs: (value) => (value === "" || value == null ? undefined : Number(value)),
+                setValueAs: optionalNumberValue,
               })}
             />
           </InputGroup>
@@ -363,7 +413,7 @@ function LLMModelCostForm({
             <Input
               placeholder="0.00"
               {...register("cacheCreation1hCostPerToken", {
-                setValueAs: (value) => (value === "" || value == null ? undefined : Number(value)),
+                setValueAs: optionalNumberValue,
               })}
             />
           </InputGroup>

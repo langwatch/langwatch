@@ -40,6 +40,12 @@ export type ModelOption = {
   isCustom?: boolean;
 };
 
+const SKELETON_WIDTHS: Record<"sm" | "md" | "full", string> = {
+  full: "full",
+  sm: "180px",
+  md: "240px",
+};
+
 export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
   ([key, value]) => ({
     label: key,
@@ -370,6 +376,9 @@ export const ModelSelector = React.memo(function ModelSelector({
   const isProviderMissing =
     !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
 
+  const unknownColor = isUnknown ? "gray.500" : undefined;
+  const selectedColor = isProviderMissing ? "red.600" : unknownColor;
+
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
@@ -383,7 +392,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
-        color={isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined}
+        color={selectedColor}
         textDecoration={isProviderMissing ? "line-through" : undefined}
       >
         {selectedItem?.label ?? model}
@@ -428,7 +437,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   if (isLoading) {
     return (
       <Skeleton
-        width={size === "full" ? "full" : size === "sm" ? "180px" : "240px"}
+        width={SKELETON_WIDTHS[size]}
         height={size === "sm" ? "28px" : "40px"}
         borderRadius="md"
       />

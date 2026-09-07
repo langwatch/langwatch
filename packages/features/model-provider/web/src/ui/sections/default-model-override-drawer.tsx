@@ -85,6 +85,268 @@ export function featureRowModelOptions({
   return options.filter((model) => isModelAllowedForFeature({ modelId: model, featureKey }));
 }
 
+type ConfigRow = Payload["configs"][number];
+/** Only what the pickers read off a provider row. */
+type ProviderRow = {
+  provider: string;
+  enabled?: boolean | null;
+  customModels?: ({ modelId?: string | null } | null)[] | null;
+  customEmbeddingsModels?: ({ modelId?: string | null } | null)[] | null;
+};
+
+function groupFeaturesByRole(
+  features: FeatureProjection[],
+): Record<ModelRoleKey, FeatureProjection[]> {
+  const byRole: Record<ModelRoleKey, FeatureProjection[]> = {
+    DEFAULT: [],
+    FAST: [],
+    LANGY: [],
+    EMBEDDINGS: [],
+  };
+  for (const f of features) byRole[f.role as ModelRoleKey]?.push(f);
+
+  return byRole;
+}
+
+/**
+ * The inherit sentinel, null and the empty string all mean "clear the key
+ * from the in-progress JSON": absence is inherit on the wire, so no sentinel
+ * is ever stored.
+ */
+function withOverride(
+  config: Record<string, string>,
+  key: string,
+  model: string | null,
+): Record<string, string> {
+  const next = { ...config };
+  const clears = model === null || model === "" || model === INHERIT_SENTINEL;
+  if (clears) {
+    delete next[key];
+    return next;
+  }
+
+  next[key] = model;
+
+  return next;
+}
+
+/**
+ * Hydrate once per target, and re-hydrate when the target changes. Keying on
+ * the `editing` object identity wiped in-progress edits whenever a background
+ * refetch replaced the query data; a plain "hydrated once" latch keeps the
+ * previous target's values, and the drawer is non-modal, so the pencil behind
+ * it can retarget without ever unmounting.
+ */
+function nextHydration({
+  editing,
+  editingId,
+  hydratedFor,
+}: {
+  editing: ConfigRow | undefined;
+  editingId: string | undefined;
+  hydratedFor: string | null;
+}): { config: Record<string, string>; scopes: ScopeTriadEntry[]; target: string } | null {
+  if (!editingId) {
+    if (hydratedFor === CREATE_TARGET) return null;
+
+    return { config: {}, scopes: [], target: CREATE_TARGET };
+  }
+  if (!editing || hydratedFor === editing.id) return null;
+
+  return {
+    config: { ...(editing.config as Record<string, string>) },
+    scopes: editing.scopes.map((s) => ({ scopeType: s.type as ScopeType, scopeId: s.id })),
+    target: editing.id,
+  };
+}
+
+/**
+ * Creating: at least one key must be pinned, since an all-inherit new config
+ * is a no-op the server refuses. Editing: an empty config is a valid save (it
+ * deletes the config), but the target row must have loaded so the save carries
+ * its id — deriving the id from an unsettled query turned edits into creates.
+ */
+function canSaveConfig({
+  busy,
+  editing,
+  editingId,
+  hasAnyKey,
+  scopes,
+}: {
+  busy: boolean;
+  editing: ConfigRow | undefined;
+  editingId: string | undefined;
+  hasAnyKey: boolean;
+  scopes: ScopeTriadEntry[];
+}): boolean {
+  if (scopes.length === 0 || busy) return false;
+
+  return editingId ? !!editing : hasAnyKey;
+}
+
+/**
+ * Aliases sit at the top of the chat lists so the reader lands on "Latest" /
+ * "Latest smaller" without scrolling — pinning a specific model is the
+ * exceptional case. Embeddings get none: the latest embedding model is not a
+ * moving target the way a chat flagship is.
+ */
+function aliasChatOptionsFor(enabledKeys: Set<string>): string[] {
+  const aliases: string[] = [];
+  for (const provider of LATEST_ALIAS_PROVIDERS) {
+    if (!enabledKeys.has(provider)) continue;
+
+    aliases.push(`${provider}/latest`);
+    aliases.push(`${provider}/latest-mini`);
+  }
+
+  return aliases;
+}
+
+/** User-defined entries on each enabled provider, custom ids first. */
+function customModelIdsFor({
+  enabledEntries,
+  mode,
+}: {
+  enabledEntries: Array<[string, ProviderRow]>;
+  mode: "chat" | "embedding";
+}): string[] {
+  const customModels: string[] = [];
+  for (const [providerKey, providerData] of enabledEntries) {
+    if (!providerData) continue;
+
+    const customList =
+      mode === "embedding"
+        ? (providerData.customEmbeddingsModels ?? [])
+        : (providerData.customModels ?? []);
+    for (const m of customList) {
+      if (m?.modelId) customModels.push(`${providerKey}/${m.modelId}`);
+    }
+  }
+
+  return customModels;
+}
+
+/**
+ * Still loading: the full registry, so the dropdown is not visually broken on
+ * first paint. Once the data lands, a project with no enabled providers (or a
+ * failed query) gets an empty list rather than a picker that lies about what
+ * is available.
+ */
+function modelOptionsForMode({
+  enabledEntries,
+  hasProviderLoadError,
+  isLoading,
+  mode,
+}: {
+  enabledEntries: Array<[string, ProviderRow]>;
+  hasProviderLoadError: boolean;
+  isLoading: boolean;
+  mode: "chat" | "embedding";
+}): string[] {
+  if (isLoading) {
+    return modelSelectorOptions.filter((o) => o.mode === mode).map((o) => o.value);
+  }
+  if (hasProviderLoadError || enabledEntries.length === 0) return [];
+
+  const enabledKeys = new Set(enabledEntries.map(([key]) => key));
+  // The registry is the broad pool; provider toggles narrow it, the same way
+  // ModelProviderDefaultSection reads it.
+  const registryModels = modelSelectorOptions
+    .filter((o) => o.mode === mode && enabledKeys.has(o.value.split("/")[0] ?? ""))
+    .map((o) => o.value);
+
+  return Array.from(new Set([...customModelIdsFor({ enabledEntries, mode }), ...registryModels]));
+}
+
+function modelOptionsByRoleFor({
+  hasProviderLoadError,
+  isLoading,
+  providers,
+}: {
+  hasProviderLoadError: boolean;
+  isLoading: boolean;
+  providers: ProviderRow[];
+}): Record<ModelRoleKey, string[]> {
+  const enabledEntries: Array<[string, ProviderRow]> = providers
+    .filter((p) => p.enabled === true)
+    .map((p) => [p.provider, p]);
+  const aliasChatOptions = aliasChatOptionsFor(new Set(enabledEntries.map(([key]) => key)));
+  const chatOptions = modelOptionsForMode({
+    enabledEntries,
+    hasProviderLoadError,
+    isLoading,
+    mode: "chat",
+  });
+
+  return {
+    DEFAULT: [...aliasChatOptions, ...chatOptions],
+    FAST: [...aliasChatOptions, ...chatOptions],
+    LANGY: [...aliasChatOptions, ...chatOptions],
+    EMBEDDINGS: modelOptionsForMode({
+      enabledEntries,
+      hasProviderLoadError,
+      isLoading,
+      mode: "embedding",
+    }),
+  };
+}
+
+/**
+ * The write, and the refusal it becomes. The cache refresh is isolated in its
+ * own try: the write already committed, so a failed refresh must not turn a
+ * successful save into a reported failure. Invalidating `modelProvider`
+ * reaches every mounted reader keyed on that prefix, including the Langy
+ * pill's `getResolvedDefault` — but not Langy's own store.
+ */
+async function persistConfig({
+  config,
+  copy,
+  editingId,
+  host,
+  onSaved,
+  saveMutation,
+  scopes,
+  utils,
+}: {
+  config: Record<string, string>;
+  copy: { failureTitle: string; successTitle: string };
+  editingId: string | undefined;
+  host: ReturnType<typeof useModelProviderHost>;
+  onSaved: () => void;
+  saveMutation: {
+    mutateAsync(input: {
+      id?: string;
+      config: Record<string, string>;
+      scopes: Array<{ scopeType: ScopeType; scopeId: string }>;
+    }): Promise<unknown>;
+  };
+  scopes: ScopeTriadEntry[];
+  utils: { modelProvider: { invalidate: () => Promise<void> } };
+}): Promise<boolean> {
+  try {
+    await saveMutation.mutateAsync({
+      id: editingId,
+      config,
+      scopes: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })),
+    });
+    try {
+      await utils.modelProvider.invalidate();
+    } catch {
+      // Best-effort refresh; the save itself already succeeded.
+    }
+    host.succeeded({ title: copy.successTitle });
+    onSaved();
+
+    return true;
+  } catch (err) {
+    if (!host.isReportedGlobally(err)) {
+      host.failed({ error: err, fallbackTitle: copy.failureTitle });
+    }
+
+    return false;
+  }
+}
+
 interface Props {
   /** Config id when editing an existing policy; absent = create. The
    *  drawer fetches the full ConfigRow + available / features / effective
@@ -151,32 +413,14 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   });
   const [busy, setBusy] = useState(false);
 
-  // Hydrate edit state once per target, and re-hydrate when the target
-  // changes. Both halves matter: keying on the `editing` object identity
-  // wiped in-progress edits whenever a background refetch replaced the
-  // query data, while a plain "hydrated once" latch goes the other way
-  // and keeps the previous target's values. The drawer is non-modal, so
-  // the pencil and "+ Add config" behind it can retarget it without ever
-  // unmounting, and stale values would then be saved onto another row.
   const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!editingId) {
-      // Create mode has nothing to load, it starts empty.
-      if (hydratedForRef.current === CREATE_TARGET) return;
-      hydratedForRef.current = CREATE_TARGET;
-      setScopes([]);
-      setConfig({});
-      return;
-    }
-    if (!editing || hydratedForRef.current === editing.id) return;
-    hydratedForRef.current = editing.id;
-    setScopes(
-      editing.scopes.map((s) => ({
-        scopeType: s.type as ScopeType,
-        scopeId: s.id,
-      })),
-    );
-    setConfig({ ...(editing.config as Record<string, string>) });
+    const next = nextHydration({ editing, editingId, hydratedFor: hydratedForRef.current });
+    if (!next) return;
+
+    hydratedForRef.current = next.target;
+    setScopes(next.scopes);
+    setConfig(next.config);
   }, [editingId, editing]);
 
   const inheritedQuery = modelProviderApi.modelProvider.getInheritedValuesForScopes.useQuery(
@@ -195,16 +439,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   );
   const inherited = inheritedQuery.data?.inherited ?? {};
 
-  const featuresByRole = useMemo(() => {
-    const m: Record<ModelRoleKey, FeatureProjection[]> = {
-      DEFAULT: [],
-      FAST: [],
-      LANGY: [],
-      EMBEDDINGS: [],
-    };
-    for (const f of features) m[f.role as ModelRoleKey]?.push(f);
-    return m;
-  }, [features]);
+  const featuresByRole = useMemo(() => groupFeaturesByRole(features), [features]);
 
   // Narrow the picker to explicitly configured providers only. The legacy
   // `getAllForProject` Record merges in env-fed defaults, surfacing unrelated
@@ -215,73 +450,16 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { enabled: !!projectId && open, refetchOnMount: false },
   );
 
-  const modelOptionsByRole = useMemo(() => {
-    const isLoading = projectProviders.isLoading;
-    const hasProviderLoadError = projectProviders.isError;
-    const providers = projectProviders.data ?? [];
-    const enabledEntries: Array<[string, (typeof providers)[number]]> = providers
-      .filter((p) => p.enabled === true)
-      .map((p) => [p.provider, p]);
-    const enabledKeys = new Set(enabledEntries.map(([k]) => k));
-    // Build the alias entries for enabled providers that support them.
-    // Aliases sit at the TOP of the chat list (DEFAULT + FAST) so the
-    // user lands on "Latest" / "Latest smaller" without scrolling - the
-    // expectation is that pinning a specific model is the exceptional
-    // case, not the default. EMBEDDINGS doesn't get aliases (the latest
-    // embedding model isn't a moving target the way chat flagships are).
-    const aliasChatOptions: string[] = [];
-    for (const provider of LATEST_ALIAS_PROVIDERS) {
-      if (!enabledKeys.has(provider)) continue;
-      aliasChatOptions.push(`${provider}/latest`);
-      aliasChatOptions.push(`${provider}/latest-mini`);
-    }
-    const filterByMode = (mode: "chat" | "embedding") => {
-      // Still loading: show the full registry so the dropdown isn't
-      // visually broken during first paint. Once data lands we either
-      // fall through to the enabled-filter path or - if the project
-      // has zero enabled providers (or the query errored) - return an
-      // empty list so the picker doesn't lie about what's available.
-      if (isLoading) {
-        return modelSelectorOptions.filter((o) => o.mode === mode).map((o) => o.value);
-      }
-      if (hasProviderLoadError || enabledEntries.length === 0) return [];
-      // Registry chat/embedding models from any enabled provider. This
-      // mirrors the ModelProviderDefaultSection logic - the registry is
-      // the broad pool; provider toggles narrow it.
-      const registryModels = modelSelectorOptions
-        .filter((o) => {
-          if (o.mode !== mode) return false;
-          const providerKey = o.value.split("/")[0] ?? "";
-          return enabledKeys.has(providerKey);
-        })
-        .map((o) => o.value);
-      // User-defined custom entries on each enabled provider. Custom
-      // models live in `customModels` / `customEmbeddingsModels`; bare
-      // string lists in `models` / `embeddingsModels` are registry
-      // enablement subsets and already covered above.
-      const customModels: string[] = [];
-      for (const [providerKey, providerData] of enabledEntries) {
-        if (!providerData) continue;
-        const customList =
-          mode === "embedding"
-            ? (providerData.customEmbeddingsModels ?? [])
-            : (providerData.customModels ?? []);
-        for (const m of customList) {
-          if (m?.modelId) customModels.push(`${providerKey}/${m.modelId}`);
-        }
-      }
-      // Custom entries first so user-added models are easy to spot.
-      return Array.from(new Set([...customModels, ...registryModels]));
-    };
-    const chatOptions = filterByMode("chat");
-    return {
-      // Aliases at the top of chat lists; concrete models below.
-      DEFAULT: [...aliasChatOptions, ...chatOptions],
-      FAST: [...aliasChatOptions, ...chatOptions],
-      LANGY: [...aliasChatOptions, ...chatOptions],
-      EMBEDDINGS: filterByMode("embedding"),
-    } satisfies Record<ModelRoleKey, string[]>;
-  }, [projectProviders.data]);
+  const modelOptionsByRole = useMemo(
+    () =>
+      modelOptionsByRoleFor({
+        hasProviderLoadError: projectProviders.isError,
+        isLoading: projectProviders.isLoading,
+        providers: projectProviders.data ?? [],
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectProviders.data],
+  );
 
   // Configured custom-model display names for every provider row this
   // project can see, keyed by `<provider>/<modelId>`.
@@ -291,59 +469,29 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   );
 
   const setOverride = useCallback((key: string, model: string | null) => {
-    setConfig((prev) => {
-      const next = { ...prev };
-      // Inherit sentinel + null + empty string all map to "clear the
-      // key from in-progress JSON" - the cascade walks up at save time
-      // since absent keys mean inherit (no sentinel in storage).
-      if (model === null || model === "" || model === INHERIT_SENTINEL) {
-        delete next[key];
-      } else {
-        next[key] = model;
-      }
-      return next;
-    });
+    setConfig((prev) => withOverride(prev, key, model));
   }, []);
 
-  // Creating: at least one key must be pinned, an all-inherit new
-  // config is a no-op the backend refuses. Editing: an empty config is
-  // a valid save (it deletes the config, absence = pure inherit), but
-  // the target row must have loaded so the save carries its id;
-  // deriving the id from an unsettled query silently turned edits
-  // into creates.
   const hasAnyKey = Object.keys(config).length > 0;
-  const canSave = scopes.length > 0 && !busy && (editingId ? !!editing : hasAnyKey);
+  const canSave = canSaveConfig({ busy, editing, editingId, hasAnyKey, scopes });
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
+
     const copy = saveOutcomeCopy({ editingId, hasAnyKey });
     setBusy(true);
     try {
-      await saveMutation.mutateAsync({
-        id: editingId,
+      const saved = await persistConfig({
         config,
-        scopes: scopes.map((s) => ({
-          scopeType: s.scopeType,
-          scopeId: s.scopeId,
-        })),
+        copy,
+        editingId,
+        host,
+        onSaved,
+        saveMutation,
+        scopes,
+        utils,
       });
-      // Invalidating `modelProvider` reaches every mounted reader keyed on that
-      // procedure prefix, including the Langy pill's `getResolvedDefault` —
-      // but not Langy's own store (see the module docblock).
-      // Isolated in its own try: the write already committed, so a failed
-      // refresh here must not turn a successful save into a reported failure.
-      try {
-        await utils.modelProvider.invalidate();
-      } catch {
-        // Best-effort refresh; the save itself already succeeded.
-      }
-      host.succeeded({ title: copy.successTitle });
-      onSaved();
-      onClose();
-    } catch (err) {
-      if (!host.isReportedGlobally(err)) {
-        host.failed({ error: err, fallbackTitle: copy.failureTitle });
-      }
+      if (saved) onClose();
     } finally {
       setBusy(false);
     }

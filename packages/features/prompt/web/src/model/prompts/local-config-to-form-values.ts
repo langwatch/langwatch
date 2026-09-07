@@ -11,12 +11,12 @@ type ConfigData = PromptConfigFormValues["version"]["configData"];
  */
 const normalizeOutputs = (outputs: LocalPromptConfig["outputs"]): ConfigData["outputs"] =>
   outputs.map(({ json_schema, ...rest }) => {
-    if (
-      json_schema &&
-      typeof json_schema === "object" &&
-      "type" in json_schema &&
-      typeof (json_schema as { type: unknown }).type === "string"
-    ) {
+    const schemaType =
+      json_schema && typeof json_schema === "object"
+        ? (json_schema as { type?: unknown }).type
+        : undefined;
+    const isTypedSchema = typeof schemaType === "string";
+    if (isTypedSchema) {
       return {
         ...rest,
         json_schema: json_schema as ConfigData["outputs"][number]["json_schema"],

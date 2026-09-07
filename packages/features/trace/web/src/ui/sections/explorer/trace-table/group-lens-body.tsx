@@ -73,13 +73,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
   if (!groupBy) return <NoTracesToGroupMessage />;
   if (!isLoading && groups.length === 0) return <NoTracesToGroupMessage />;
 
-  const toggleExpanded = (key: string) =>
-    setOpenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const toggleExpanded = (key: string) => setOpenKeys((prev) => withKeyToggled(prev, key));
 
   return (
     <TraceTableShell table={table} minWidth={GROUP_MIN_WIDTH} stickyFirstColumn>
@@ -107,6 +101,14 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     </TraceTableShell>
   );
 };
+
+/** The open-group keys with one key flipped. */
+function withKeyToggled(keys: Set<string>, key: string): Set<string> {
+  const next = new Set(keys);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  return next;
+}
 
 const NoTracesToGroupMessage: React.FC = () => (
   <Flex align="center" justify="center" padding={8} direction="column" gap={2}>

@@ -11,6 +11,33 @@
  * renders the picture imports it rather than owning it.
  */
 
+/** Image hosts that serve pictures without a file extension. */
+function isGoogleImageHost(host: string): boolean {
+  return (
+    host === "gstatic.com" ||
+    host.endsWith(".gstatic.com") ||
+    host === "googleusercontent.com" ||
+    host.endsWith(".googleusercontent.com")
+  );
+}
+
+/** A long opaque last segment is usually encoded image data. */
+function hasOpaqueImageSegment(pathname: string): boolean {
+  if (pathname.length <= 30) return false;
+  if (/image|img|photo|pic|picture|media|content|upload/i.test(pathname)) return true;
+
+  const lastSegment = pathname.split("/").at(-1);
+
+  return Boolean(lastSegment && lastSegment.length > 50 && /^[A-Za-z0-9+/=]+$/.test(lastSegment));
+}
+
+function looksLikeImageUrl({ text, url }: { text: string; url: URL }): boolean {
+  if (/\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(text)) return true;
+  if (isGoogleImageHost(url.hostname)) return true;
+
+  return hasOpaqueImageSegment(url.pathname);
+}
+
 /** The image URL a cell value names, or `null` when it names none. */
 export const datasetImageUrl = (value: unknown): string | null => {
   if (!value) return null;
@@ -26,31 +53,7 @@ export const datasetImageUrl = (value: unknown): string | null => {
   }
 
   try {
-    const url = new URL(text);
-
-    if (/\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i.test(text)) return text;
-
-    // Image hosts that serve pictures without a file extension.
-    const host = url.hostname;
-    const isGoogleImageHost =
-      host === "gstatic.com" ||
-      host.endsWith(".gstatic.com") ||
-      host === "googleusercontent.com" ||
-      host.endsWith(".googleusercontent.com");
-    if (isGoogleImageHost) return text;
-
-    const { pathname } = url;
-    if (pathname && pathname.length > 30) {
-      if (/image|img|photo|pic|picture|media|content|upload/i.test(pathname)) return text;
-
-      // A long opaque last segment is usually encoded image data.
-      const lastSegment = pathname.split("/").at(-1);
-      if (lastSegment && lastSegment.length > 50 && /^[A-Za-z0-9+/=]+$/.test(lastSegment)) {
-        return text;
-      }
-    }
-
-    return null;
+    return looksLikeImageUrl({ text, url: new URL(text) }) ? text : null;
   } catch {
     return null;
   }

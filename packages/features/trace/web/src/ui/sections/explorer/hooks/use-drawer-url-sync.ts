@@ -103,22 +103,18 @@ export function useDrawerUrlSync() {
 
   useEffect(() => {
     if (!drawerOpenInUrl) return;
-    const updates: Record<string, string | undefined> = {};
-    if (viewMode !== urlMode) updates.mode = viewMode;
-    if (vizTab !== urlViz) updates.viz = vizTab;
-    if (selectedSpanId !== urlSpan) {
-      updates.span = selectedSpanId ?? undefined;
-    }
-    if (storePinnedRaw !== urlPinnedRaw) {
-      // `undefined` removes the param when the store has zero pins —
-      // keeps the URL clean instead of trailing an empty `drawer.pinnedSpans=`.
-      updates.pinnedSpans = storePinnedRaw || undefined;
-    }
-    if (isEditing !== isEditingInUrl) {
-      // Absent rather than `drawer.edit=0` when reading: the URL only names
-      // the mode when it is on.
-      updates.edit = isEditing ? "1" : undefined;
-    }
+    const updates = drawerParamUpdates({
+      isEditing,
+      isEditingInUrl,
+      selectedSpanId,
+      storePinnedRaw,
+      urlMode,
+      urlPinnedRaw,
+      urlSpan,
+      urlViz,
+      viewMode,
+      vizTab,
+    });
     if (Object.keys(updates).length === 0) return;
     // Replace, don't push: mode / viz / span / pinned are view-state WITHIN an
     // already-open drawer, not separate destinations.
@@ -145,4 +141,47 @@ export function useDrawerUrlSync() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+}
+
+/** The drawer params the URL disagrees with, keyed the way `useUpdateDrawerParams` takes them. */
+function drawerParamUpdates({
+  isEditing,
+  isEditingInUrl,
+  selectedSpanId,
+  storePinnedRaw,
+  urlMode,
+  urlPinnedRaw,
+  urlSpan,
+  urlViz,
+  viewMode,
+  vizTab,
+}: {
+  isEditing: boolean;
+  isEditingInUrl: boolean;
+  selectedSpanId: string | null;
+  storePinnedRaw: string;
+  urlMode: DrawerViewMode;
+  urlPinnedRaw: string;
+  urlSpan: string | null;
+  urlViz: VizTab;
+  viewMode: DrawerViewMode;
+  vizTab: VizTab;
+}): Record<string, string | undefined> {
+  const updates: Record<string, string | undefined> = {};
+  if (viewMode !== urlMode) updates.mode = viewMode;
+  if (vizTab !== urlViz) updates.viz = vizTab;
+  if (selectedSpanId !== urlSpan) {
+    updates.span = selectedSpanId ?? undefined;
+  }
+  if (storePinnedRaw !== urlPinnedRaw) {
+    // `undefined` removes the param when the store has zero pins —
+    // keeps the URL clean instead of trailing an empty `drawer.pinnedSpans=`.
+    updates.pinnedSpans = storePinnedRaw || undefined;
+  }
+  if (isEditing !== isEditingInUrl) {
+    // Absent rather than `drawer.edit=0` when reading: the URL only names
+    // the mode when it is on.
+    updates.edit = isEditing ? "1" : undefined;
+  }
+  return updates;
 }

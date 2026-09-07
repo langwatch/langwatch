@@ -84,13 +84,13 @@ export const FormOutputsSection = ({
         for (let i = 0; i < newOutputs.length; i++) {
           const newOutput = newOutputs[i];
           const currentField = currentFields[i];
-          if (
+          const hasChanged =
             newOutput &&
             currentField &&
             (newOutput.identifier !== currentField.identifier ||
               newOutput.type !== currentField.type ||
-              JSON.stringify(newOutput.json_schema) !== JSON.stringify(currentField.json_schema))
-          ) {
+              JSON.stringify(newOutput.json_schema) !== JSON.stringify(currentField.json_schema));
+          if (hasChanged) {
             update(i, {
               identifier: newOutput.identifier,
               type: newOutput.type as LlmConfigOutputType,

@@ -137,6 +137,158 @@ export type UseModelProviderFormActions = {
   submit: () => Promise<void>;
 };
 
+/**
+ * A brand-new provider opens at the widest scope the user can manage
+ * (organization > team > project), so an admin lands on the most useful
+ * default instead of flipping from PROJECT every time.
+ */
+function widestManageableScope({
+  canManageOrganization,
+  canManageTeam,
+  organizationId,
+  projectId,
+  teamId,
+}: {
+  canManageOrganization?: boolean;
+  canManageTeam?: boolean;
+  organizationId?: string;
+  projectId?: string;
+  teamId?: string;
+}): { scopeType: ModelProviderScopeType; scopeId: string | undefined } {
+  if (canManageOrganization && organizationId) {
+    return { scopeType: "ORGANIZATION", scopeId: organizationId };
+  }
+  if (canManageTeam && teamId) return { scopeType: "TEAM", scopeId: teamId };
+
+  return { scopeType: "PROJECT", scopeId: projectId };
+}
+
+function scopeIdForTier(
+  tier: ModelProviderScopeType,
+  handles: { organizationId?: string; projectId?: string; teamId?: string },
+): string | undefined {
+  if (tier === "ORGANIZATION") return handles.organizationId;
+  if (tier === "TEAM") return handles.teamId;
+
+  return handles.projectId;
+}
+
+/** The scopes stored on the provider, in the array shape iter 109 made canonical. */
+function storedScopesOf(provider: MaybeStoredModelProvider): ScopeSelection[] {
+  const stored = provider.scopes;
+  if (stored && stored.length > 0) {
+    return stored.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId }));
+  }
+
+  const { scopeId, scopeType } = provider;
+  if (scopeType && scopeId) return [{ scopeType, scopeId }];
+
+  return [];
+}
+
+function initialScopesFor({
+  defaultScope,
+  provider,
+}: {
+  defaultScope: { scopeType: ModelProviderScopeType; scopeId: string | undefined };
+  provider: MaybeStoredModelProvider;
+}): ScopeSelection[] {
+  const stored = storedScopesOf(provider);
+  if (stored.length > 0) return stored;
+  if (!defaultScope.scopeId) return [];
+
+  return [{ scopeType: defaultScope.scopeType, scopeId: defaultScope.scopeId }];
+}
+
+/**
+ * Narrowest tier (PROJECT > TEAM > ORGANIZATION): legacy consumers that
+ * expected a single `scopeType` pick the most specific one.
+ */
+function narrowestScopeType(
+  scopes: ScopeSelection[],
+  fallback: ModelProviderScopeType,
+): ModelProviderScopeType {
+  const tiers: ModelProviderScopeType[] = ["PROJECT", "TEAM"];
+  const found = tiers.find((tier) => scopes.some((s) => s.scopeType === tier));
+
+  return found ?? scopes[0]?.scopeType ?? fallback;
+}
+
+/** Order-insensitive: two scopes added in a different order are not a change. */
+function scopeSignature(scopes: { scopeType: string; scopeId: string }[]): string {
+  return scopes
+    .map((s) => `${s.scopeType}|${s.scopeId}`)
+    .sort()
+    .join(",");
+}
+
+function jsonSignature(value: unknown): string {
+  return JSON.stringify(value ?? []);
+}
+
+/**
+ * Dirty detection drives the Save button. Compared per-field so the helpers
+ * that already know about MASKED_KEY_PLACEHOLDER are reused — a naive
+ * JSON.stringify of customKeys would always look dirty, because the form
+ * shows the masked sentinel while the stored value is the real key. Headers
+ * compare on key and value only: the form carries a `concealed` flag the
+ * stored header knows nothing about.
+ */
+function hasUnsavedChanges({
+  customEmbeddingsModels,
+  customKeys,
+  customModels,
+  extraHeaders,
+  initialKeys,
+  name,
+  provider,
+  routingHandle,
+  scopes,
+  useApiGateway,
+}: {
+  customEmbeddingsModels: CustomModelEntry[];
+  customKeys: Record<string, string>;
+  customModels: CustomModelEntry[];
+  extraHeaders: ExtraHeader[];
+  initialKeys: Record<string, unknown>;
+  name: string;
+  provider: MaybeStoredModelProvider;
+  routingHandle: string;
+  scopes: ScopeSelection[];
+  useApiGateway: boolean;
+}): boolean {
+  const storedName =
+    (provider as { name?: string }).name ?? humanizeProviderName(provider.provider);
+  const nameChanged = name.trim() !== storedName.trim();
+  if (nameChanged) return true;
+
+  const storedHandle = (provider as { routingHandle?: string | null }).routingHandle ?? "";
+  const handleChanged = routingHandle.trim().toLowerCase() !== storedHandle;
+  if (handleChanged) return true;
+
+  // The same helper the submit path uses to decide whether to send
+  // credentials at all, so the button and the payload cannot disagree.
+  // Emptying a key field is a change too: reading only "a new api key was
+  // typed" left removing a credential impossible.
+  const credentialsEdited = hasUserModifiedAnyCredential({ customKeys, initialKeys });
+  if (credentialsEdited) return true;
+  if (useApiGateway !== computeInitialUseApiGateway(provider)) return true;
+
+  const scopesChanged = scopeSignature(scopes) !== scopeSignature(storedScopesOf(provider));
+  if (scopesChanged) return true;
+
+  // Headers and models: order-sensitive compare. Reordering a list counts as
+  // dirty, which matches user intent — the user dragged them on purpose.
+  const headersChanged = headerSignature(extraHeaders) !== headerSignature(provider.extraHeaders);
+  if (headersChanged) return true;
+
+  const stored = provider as { customModels?: unknown; customEmbeddingsModels?: unknown };
+  const modelsChanged = jsonSignature(customModels) !== jsonSignature(stored.customModels);
+  if (modelsChanged) return true;
+
+  return jsonSignature(customEmbeddingsModels) !== jsonSignature(stored.customEmbeddingsModels);
+}
+
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
@@ -166,52 +318,27 @@ export function useModelProviderForm(
   const initialRoutingHandle = (provider as { routingHandle?: string | null }).routingHandle ?? "";
   const [routingHandle, setRoutingHandle] = useState<string>(initialRoutingHandle);
 
-  // Scope state — defaults to the stored provider's scope set when
-  // editing. For brand-new providers we open at the widest scope the
-  // user can manage (org > team > project) so an admin lands on the
-  // most useful default instead of having to flip from PROJECT every
-  // time. Iter 109 made this an array; existing callers that only
-  // expect a single tier still work via the derived `scopeType`.
-  const defaultNewScope: ModelProviderScopeType =
-    canManageOrganization && organizationId
-      ? "ORGANIZATION"
-      : canManageTeam && teamId
-        ? "TEAM"
-        : "PROJECT";
-  const defaultScopeId =
-    defaultNewScope === "ORGANIZATION"
-      ? organizationId
-      : defaultNewScope === "TEAM"
-        ? teamId
-        : projectId;
+  // Scope state — defaults to the stored provider's scope set when editing.
+  // Iter 109 made this an array; callers that expect a single tier still work
+  // through the derived `scopeType`.
+  const defaultScope = widestManageableScope({
+    canManageOrganization,
+    canManageTeam,
+    organizationId,
+    projectId,
+    teamId,
+  });
 
-  const initialScopes: ScopeSelection[] =
-    provider.scopes && provider.scopes.length > 0
-      ? provider.scopes.map((s) => ({
-          scopeType: s.scopeType,
-          scopeId: s.scopeId,
-        }))
-      : provider.scopeType && provider.scopeId
-        ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId }]
-        : defaultScopeId
-          ? [{ scopeType: defaultNewScope, scopeId: defaultScopeId }]
-          : [];
-  const [scopes, setScopes] = useState<ScopeSelection[]>(initialScopes);
+  const [scopes, setScopes] = useState<ScopeSelection[]>(() =>
+    initialScopesFor({ defaultScope, provider }),
+  );
 
-  // Narrowest tier (PROJECT > TEAM > ORGANIZATION) — legacy consumers
-  // that expected a single `scopeType` pick the most specific one.
-  const scopeType: ModelProviderScopeType = scopes.some((s) => s.scopeType === "PROJECT")
-    ? "PROJECT"
-    : scopes.some((s) => s.scopeType === "TEAM")
-      ? "TEAM"
-      : (scopes[0]?.scopeType ?? defaultNewScope);
-
+  const scopeType = narrowestScopeType(scopes, defaultScope.scopeType);
   const scopeId = scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
 
   const setScopeType = useCallback(
     (next: ModelProviderScopeType) => {
-      const nextId =
-        next === "ORGANIZATION" ? organizationId : next === "TEAM" ? teamId : projectId;
+      const nextId = scopeIdForTier(next, { organizationId, projectId, teamId });
       if (!nextId) return;
       setScopes([{ scopeType: next, scopeId: nextId }]);
     },
@@ -280,100 +407,39 @@ export function useModelProviderForm(
     onError,
   });
 
-  // Dirty detection drives the Save button. Compared per-field so the
-  // helpers that already know about MASKED_KEY_PLACEHOLDER (api keys) are
-  // reused — a naive JSON.stringify of customKeys would always look dirty
-  // because the form shows the masked sentinel while the stored value is
-  // the real key.
-  const isDirty = useMemo(() => {
-    const initialName =
-      (provider as { name?: string }).name ?? humanizeProviderName(provider.provider);
-    if (name.trim() !== initialName.trim()) return true;
-
-    const storedHandle = (provider as { routingHandle?: string | null }).routingHandle ?? "";
-    if (routingHandle.trim().toLowerCase() !== storedHandle) return true;
-
-    // The same helper the submit path uses to decide whether to send
-    // credentials at all, so the button and the payload cannot disagree.
-    // Reading only "a new api key was typed" plus "a non-key field changed"
-    // left one edit invisible: emptying a key field is a change, and with
-    // Save disabled there was no way to remove a credential at all.
-    if (
-      hasUserModifiedAnyCredential({
+  const isDirty = useMemo(
+    () =>
+      hasUnsavedChanges({
+        customEmbeddingsModels: customModelsHook.customEmbeddingsModels,
         customKeys: credentialKeysHook.customKeys,
+        customModels: customModelsHook.customModels,
+        extraHeaders: extraHeadersHook.extraHeaders,
         initialKeys: credentialKeysHook.originalStoredKeysRef.current as Record<string, unknown>,
-      })
-    ) {
-      return true;
-    }
-
-    if (credentialKeysHook.useApiGateway !== computeInitialUseApiGateway(provider)) {
-      return true;
-    }
-
-    // Scope set: order-insensitive — two scopes added in different order
-    // shouldn't read as dirty.
-    const storedScopes: { scopeType: string; scopeId: string }[] =
-      provider.scopes && provider.scopes.length > 0
-        ? provider.scopes
-        : provider.scopeType && provider.scopeId
-          ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId }]
-          : [];
-    const scopeSig = (xs: { scopeType: string; scopeId: string }[]) =>
-      xs
-        .map((s) => `${s.scopeType}|${s.scopeId}`)
-        .sort()
-        .join(",");
-    if (scopeSig(scopes) !== scopeSig(storedScopes)) return true;
-
-    // Headers and models: order-sensitive JSON compare. Reordering a list
-    // counts as dirty here, which matches user intent (the user dragged
-    // them on purpose).
-    //
-    // Headers are compared on key and value only. The form carries a
-    // `concealed` flag the stored header has no idea about, so comparing the
-    // objects whole made every provider that holds a header read as dirty the
-    // moment its drawer opened, with Save enabled over an untouched form.
-    if (headerSignature(extraHeadersHook.extraHeaders) !== headerSignature(provider.extraHeaders)) {
-      return true;
-    }
-    const providerWithModels = provider as {
-      customModels?: unknown;
-      customEmbeddingsModels?: unknown;
-    };
-    if (
-      JSON.stringify(customModelsHook.customModels) !==
-      JSON.stringify(providerWithModels.customModels ?? [])
-    ) {
-      return true;
-    }
-    if (
-      JSON.stringify(customModelsHook.customEmbeddingsModels) !==
-      JSON.stringify(providerWithModels.customEmbeddingsModels ?? [])
-    ) {
-      return true;
-    }
-
-    return false;
-  }, [
-    provider,
-    name,
-    routingHandle,
-    credentialKeysHook.customKeys,
-    credentialKeysHook.originalStoredKeysRef,
-    credentialKeysHook.useApiGateway,
-    scopes,
-    extraHeadersHook.extraHeaders,
-    customModelsHook.customModels,
-    customModelsHook.customEmbeddingsModels,
-  ]);
+        name,
+        provider,
+        routingHandle,
+        scopes,
+        useApiGateway: credentialKeysHook.useApiGateway,
+      }),
+    [
+      provider,
+      name,
+      routingHandle,
+      credentialKeysHook.customKeys,
+      credentialKeysHook.originalStoredKeysRef,
+      credentialKeysHook.useApiGateway,
+      scopes,
+      extraHeadersHook.extraHeaders,
+      customModelsHook.customModels,
+      customModelsHook.customEmbeddingsModels,
+    ],
+  );
 
   // --- Cross-hook coordination: gateway toggle wires credential keys → extra headers ---
   const handleGatewayToggle = useCallback(
     (useGateway: boolean) => {
-      if (provider.provider === "azure" && useGateway) {
-        extraHeadersHook.ensureApiKeyHeader();
-      }
+      const needsApiKeyHeader = provider.provider === "azure" && useGateway;
+      if (needsApiKeyHeader) extraHeadersHook.ensureApiKeyHeader();
     },
     [provider.provider, extraHeadersHook.ensureApiKeyHeader],
   );

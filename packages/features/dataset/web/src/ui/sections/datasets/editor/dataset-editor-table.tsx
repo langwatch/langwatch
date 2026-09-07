@@ -129,6 +129,21 @@ const toEditorRecords = (
     ),
   }));
 
+function EditorTableHeading({
+  datasetName,
+  title,
+}: {
+  datasetName?: string;
+  title?: React.ReactNode;
+}) {
+  if (title === undefined && datasetName) {
+    return <Heading data-testid="dataset-title">{datasetName}</Heading>;
+  }
+  if (typeof title === "string") return <Heading size="md">{title}</Heading>;
+
+  return <>{title}</>;
+}
+
 export function DatasetEditorTable({
   datasetId,
   inMemoryDataset,
@@ -617,13 +632,7 @@ export function DatasetEditorTable({
       data-testid="dataset-editor-table"
     >
       <HStack gap={3} align="center" width="full">
-        {title === undefined && datasetName ? (
-          <Heading data-testid="dataset-title">{datasetName}</Heading>
-        ) : typeof title === "string" ? (
-          <Heading size="md">{title}</Heading>
-        ) : (
-          title
-        )}
+        <EditorTableHeading datasetName={datasetName} title={title} />
         <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
           {formatRecordCount(totalRecordCount)} {totalRecordCount === 1 ? "record" : "records"}
         </Text>

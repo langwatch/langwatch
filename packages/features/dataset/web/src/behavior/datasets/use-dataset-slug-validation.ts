@@ -24,6 +24,26 @@ export type SlugValidationResult = {
   conflictsWith?: string;
 } | null;
 
+/** The backend's verdict, or nothing at all when the query answered nothing. */
+async function refreshSlugInfo({
+  refetch,
+  setSlugInfo,
+}: {
+  refetch: () => Promise<{
+    data?: { slug: string; available: boolean; conflictsWith?: string } | undefined;
+  }>;
+  setSlugInfo: (info: SlugValidationResult) => void;
+}): Promise<void> {
+  const result = await refetch();
+  if (!result.data) return;
+
+  setSlugInfo({
+    slug: result.data.slug,
+    hasConflict: !result.data.available,
+    conflictsWith: result.data.conflictsWith,
+  });
+}
+
 /**
  * @param name - Current dataset name being validated
  * @param datasetId - Current dataset ID (for edit mode, fetches slug from DB)
@@ -62,17 +82,10 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
   // Debounced validation check (500ms)
   const debouncedSlugCheck = useDebouncedCallback(
     () => {
-      if (name && name.trim() !== "" && projectId) {
-        validateDatasetName.refetch().then((result) => {
-          if (result.data) {
-            setSlugInfo({
-              slug: result.data.slug,
-              hasConflict: !result.data.available,
-              conflictsWith: result.data.conflictsWith,
-            });
-          }
-        });
-      }
+      const canValidate = Boolean(name && name.trim() !== "" && projectId);
+      if (!canValidate) return;
+
+      void refreshSlugInfo({ refetch: () => validateDatasetName.refetch(), setSlugInfo });
     },
     DEBOUNCE_TIME,
     {
@@ -84,7 +97,8 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
 
   // Trigger validation when name changes
   useEffect(() => {
-    if (name && name.trim() !== "") {
+    const hasName = Boolean(name && name.trim() !== "");
+    if (hasName) {
       debouncedSlugCheck();
     } else {
       setSlugInfo(null);
@@ -97,13 +111,12 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
   }, [name, debouncedSlugCheck]);
 
   // Computed display values
-  const displaySlug = datasetId
-    ? dbSlug && slugInfo?.slug === undefined
-      ? dbSlug
-      : slugInfo?.slug
-    : slugInfo?.slug;
+  const keepsStoredSlug = Boolean(dbSlug) && slugInfo?.slug === undefined;
+  const editedSlug = keepsStoredSlug ? dbSlug : slugInfo?.slug;
+  const displaySlug = datasetId ? editedSlug : slugInfo?.slug;
 
-  const slugWillChange = !!datasetId && !!dbSlug && !!slugInfo?.slug && dbSlug !== slugInfo.slug;
+  const hasBothSlugs = Boolean(datasetId) && Boolean(dbSlug) && Boolean(slugInfo?.slug);
+  const slugWillChange = hasBothSlugs && dbSlug !== slugInfo?.slug;
 
   return {
     /**

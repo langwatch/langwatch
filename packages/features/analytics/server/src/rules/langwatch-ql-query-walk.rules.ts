@@ -119,7 +119,8 @@ export function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
 
   const here: Frame = { ...frame, nodeDepth: frame.nodeDepth + 1 };
-  if (here.nodeDepth > ctx.policy.limits.maxNodeDepth) {
+  const isTooDeep = here.nodeDepth > ctx.policy.limits.maxNodeDepth;
+  if (isTooDeep) {
     report({
       ctx,
       frame,
@@ -245,7 +246,8 @@ function gateColumnReference({
   node: SqlAstNode;
 }): void {
   const leaf = name.split(".").at(-1)?.trim().toLowerCase() ?? "";
-  if (!ctx.policy.gatedColumns.has(leaf)) return;
+  const isGated = ctx.policy.gatedColumns.has(leaf);
+  if (!isGated) return;
   report({
     ctx,
     frame,
@@ -270,7 +272,9 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
       refuseUnrecognised({ node, frame: projection, ctx });
       continue;
     }
-    if (ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.includes(element.type)) {
+    const isUngatableWildcard =
+      ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.includes(element.type);
+    if (isUngatableWildcard) {
       report({
         ctx,
         frame: projection,
@@ -357,7 +361,8 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
 /** Descends one query level, or refuses when that would pass the ceiling. */
 function enterSubquery({ node, frame, ctx }: NodeArgs): Frame | null {
   const subqueryDepth = frame.subqueryDepth + 1;
-  if (subqueryDepth > ctx.policy.limits.maxSubqueryDepth) {
+  const isTooDeep = subqueryDepth > ctx.policy.limits.maxSubqueryDepth;
+  if (isTooDeep) {
     report({
       ctx,
       frame,
@@ -408,7 +413,8 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   }
 
   const database = reference.database?.trim().toLowerCase();
-  if (database !== undefined && ctx.policy.reservedDatabases.has(database)) {
+  const isReservedDatabase = database !== undefined && ctx.policy.reservedDatabases.has(database);
+  if (isReservedDatabase) {
     report({
       ctx,
       frame,
@@ -422,7 +428,8 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 
   // A `WITH` name resolves to its own subquery, which is validated on its own
   // terms; it is not a table reference and never was.
-  if (database === undefined && frame.ctes.includes(reference.name.trim().toLowerCase())) {
+  const isCteName = frame.ctes.includes(reference.name.trim().toLowerCase());
+  if (database === undefined && isCteName) {
     return frame;
   }
 
@@ -431,7 +438,8 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     database: reference.database,
     defaultDatabase: ctx.policy.defaultDatabase,
   });
-  if (!ctx.policy.allowedTables.has(qualified)) {
+  const isAllowedTable = ctx.policy.allowedTables.has(qualified);
+  if (!isAllowedTable) {
     const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
     report({
       ctx,
@@ -548,7 +556,8 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     reportRefusedFunction({ name, node, frame, ctx });
     return frame;
   }
-  if (frame.block && isLangWatchQLAggregateFunction(name) && !isWindowCall(node)) {
+  const collapsesRows = isLangWatchQLAggregateFunction(name) && !isWindowCall(node);
+  if (frame.block && collapsesRows) {
     frame.block.isAggregated = true;
   }
   return frame;
@@ -608,10 +617,10 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   // Compound names hold their segments here, and a segment may be a bound
   // parameter in identifier position rather than a string — which would let a
   // caller name a field the gate never sees.
-  if (
-    nameParts !== undefined &&
-    (!Array.isArray(nameParts) || nameParts.some((part) => typeof part !== "string"))
-  ) {
+  const isNonStringName =
+    !Array.isArray(nameParts) || nameParts.some((part) => typeof part !== "string");
+  const namesAnIdentifier = nameParts !== undefined && isNonStringName;
+  if (namesAnIdentifier) {
     report({
       ctx,
       frame,
@@ -651,7 +660,8 @@ function enterQueryParameter({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
-  if (paramType.trim().toLowerCase() === "identifier") {
+  const bindsIdentifier = paramType.trim().toLowerCase() === "identifier";
+  if (bindsIdentifier) {
     report({
       ctx,
       frame,

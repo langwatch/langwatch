@@ -173,9 +173,8 @@ export class AnalyticsService extends AnalyticsServiceContract {
       return analyticsTimeseriesResultSchema.parse(await this.repository.runTimeseries(query));
     }
 
-    const legacyTable = parsed.series[0]?.metric.startsWith("evaluations.")
-      ? "evaluation_runs"
-      : "trace_summaries";
+    const isEvaluationSeries = Boolean(parsed.series[0]?.metric.startsWith("evaluations."));
+    const legacyTable = isEvaluationSeries ? "evaluation_runs" : "trace_summaries";
     const [result, legacy] = await Promise.all([
       this.repository.runTimeseries(query),
       this.repository.runTimeseries({ ...query, table: legacyTable }),

@@ -14,7 +14,8 @@ function constructDefaultsFromShape(
 ): Record<string, unknown> | undefined {
   const constructedDefaults: Record<string, unknown> = {};
   for (const nestedKey of Object.keys(objectSchema.shape)) {
-    if (!Object.prototype.hasOwnProperty.call(objectSchema.shape, nestedKey)) {
+    const isOwnKey = Object.hasOwn(objectSchema.shape, nestedKey);
+    if (!isOwnKey) {
       continue;
     }
     const nestedFieldSchema = objectSchema.shape[nestedKey];

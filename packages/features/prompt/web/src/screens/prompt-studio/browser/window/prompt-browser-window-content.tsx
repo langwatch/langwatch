@@ -200,11 +200,10 @@ function PromptBrowserWindowInner(props: {
   }, [isPromptExpanded]);
 
   // Calculate the actual max-height for the messages area
-  const messagesMaxHeight = isCollapsed
-    ? 0
-    : userMaxHeight !== null
-      ? userMaxHeight
-      : getMaxAllowedHeight();
+  const openMaxHeight = userMaxHeight !== null ? userMaxHeight : getMaxAllowedHeight();
+  const messagesMaxHeight = isCollapsed ? 0 : openMaxHeight;
+  const openHeightStyle = messagesMaxHeight ? `${messagesMaxHeight}px` : undefined;
+  const collapsibleMaxHeight = isCollapsed ? 0 : openHeightStyle;
 
   // Horizontal layout: side-by-side (single window mode)
   if (props.layoutMode === "horizontal") {
@@ -291,7 +290,7 @@ function PromptBrowserWindowInner(props: {
           {/* Prompt messages area - collapsible, auto-grows with content */}
           <Box
             ref={messagesWrapperRef}
-            maxHeight={isCollapsed ? 0 : messagesMaxHeight ? `${messagesMaxHeight}px` : undefined}
+            maxHeight={collapsibleMaxHeight}
             overflow="hidden"
             position="relative"
             flexShrink={0}

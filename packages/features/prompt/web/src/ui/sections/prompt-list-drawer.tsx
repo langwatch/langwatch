@@ -191,13 +191,13 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
               paddingX={6}
               paddingBottom={4}
             >
-              {isLoading ? (
+              {isLoading && (
                 <HStack justify="center" paddingY={8}>
                   <Spinner size="md" />
                 </HStack>
-              ) : !hasPrompts ? (
-                <EmptyState onCreateNew={onCreateNew} />
-              ) : filteredCount === 0 ? (
+              )}
+              {!isLoading && !hasPrompts && <EmptyState onCreateNew={onCreateNew} />}
+              {!isLoading && hasPrompts && filteredCount === 0 && (
                 <VStack paddingY={8} gap={2} textAlign="center">
                   <Text color="fg.muted" data-testid="no-search-results">
                     No prompts match "{searchQuery}"
@@ -206,7 +206,10 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
                     Clear search
                   </Button>
                 </VStack>
-              ) : (
+              )}
+              {!isLoading &&
+                hasPrompts &&
+                filteredCount > 0 &&
                 groupedPrompts.map(([folder, folderPrompts]) => (
                   <PromptFolder
                     key={folder}
@@ -214,8 +217,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
                     prompts={folderPrompts}
                     onSelect={handleSelectPrompt}
                   />
-                ))
-              )}
+                ))}
             </VStack>
           </VStack>
         </Drawer.Body>

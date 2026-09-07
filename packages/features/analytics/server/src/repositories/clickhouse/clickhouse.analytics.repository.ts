@@ -148,7 +148,10 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       input.filters,
     );
     const parts = built.sql.split(";");
-    if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
+    const [topDocsSql, totalSql] = parts;
+    const isTwoStatements =
+      parts.length === 2 && Boolean(topDocsSql?.trim()) && Boolean(totalSql?.trim());
+    if (!isTwoStatements || !topDocsSql || !totalSql) {
       throw new Error(
         `Expected topDocuments query to have exactly 2 non-empty statements separated by semicolon, got ${parts.length} parts`,
       );
@@ -156,13 +159,13 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     try {
       const [topDocsResult, totalResult] = await Promise.all([
         client.query({
-          query: parts[0],
+          query: topDocsSql,
           query_params: built.params,
           format: "JSONEachRow",
           clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
         }),
         client.query({
-          query: parts[1],
+          query: totalSql,
           query_params: built.params,
           format: "JSONEachRow",
           clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,

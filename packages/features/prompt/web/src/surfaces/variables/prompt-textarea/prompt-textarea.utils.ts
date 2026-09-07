@@ -30,7 +30,8 @@ export const findUnclosedBraces = (
   query = query.replace(/\}+$/, "");
 
   // Don't trigger if query has spaces (likely not a variable)
-  if (query.includes(" ") || query.includes("\n")) return null;
+  const hasWhitespace = query.includes(" ") || query.includes("\n");
+  if (hasWhitespace) return null;
 
   // Don't trigger if query contains } in the middle (malformed)
   if (query.includes("}")) return null;

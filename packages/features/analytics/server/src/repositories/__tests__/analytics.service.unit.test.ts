@@ -261,31 +261,31 @@ describe("AnalyticsService", () => {
           query: async (options: Record<string, unknown>) => {
             calls.push(options);
             const query = String(options.query ?? "");
+            const documentRows = query.includes("document_refs")
+              ? [
+                  {
+                    documentId: "doc-1",
+                    count: "3",
+                    traceId: "trace-1",
+                    content: "hello",
+                  },
+                ]
+              : [
+                  {
+                    trace_id: "trace-1",
+                    event_id: "event-1",
+                    started_at: "1700000000123",
+                    event_type: "thumbs_up_down",
+                    attributes: {
+                      "event.metrics.vote": "1",
+                      reason: "helpful",
+                    },
+                  },
+                ];
+            const isDocumentTotal = query.includes("uniq(toString(context.document_id))");
+
             return {
-              json: async () =>
-                query.includes("uniq(toString(context.document_id))")
-                  ? [{ total: "7" }]
-                  : query.includes("document_refs")
-                    ? [
-                        {
-                          documentId: "doc-1",
-                          count: "3",
-                          traceId: "trace-1",
-                          content: "hello",
-                        },
-                      ]
-                    : [
-                        {
-                          trace_id: "trace-1",
-                          event_id: "event-1",
-                          started_at: "1700000000123",
-                          event_type: "thumbs_up_down",
-                          attributes: {
-                            "event.metrics.vote": "1",
-                            reason: "helpful",
-                          },
-                        },
-                      ],
+              json: async () => (isDocumentTotal ? [{ total: "7" }] : documentRows),
             };
           },
         }) as unknown as ClickHouseClient,

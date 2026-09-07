@@ -8,6 +8,7 @@ import type {
 import { customModelEntrySchema, multimodalInputValues } from "@langwatch/model-provider-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -38,6 +39,24 @@ const MULTIMODAL_LABELS: Record<MultimodalInput, string> = {
   file: "Files",
   audio: "Audio",
 };
+
+function toggleInList<T>(list: T[], item: T): T[] {
+  return list.includes(item) ? list.filter((existing) => existing !== item) : [...list, item];
+}
+
+function optionalList<T>(list: T[]): T[] | undefined {
+  return list.length > 0 ? list : undefined;
+}
+
+function fieldError(message: string | undefined) {
+  if (!message) return undefined;
+
+  return (
+    <Text color="red.500" fontSize="xs">
+      {message}
+    </Text>
+  );
+}
 
 type AddCustomModelDialogProps = {
   open: boolean;
@@ -74,7 +93,8 @@ export function AddCustomModelDialog({
   const initialized = useRef(false);
 
   // Pre-fill form when initialValues change (edit mode)
-  if (open && initialValues && !initialized.current) {
+  const shouldPrefill = open && initialValues && !initialized.current;
+  if (shouldPrefill) {
     initialized.current = true;
     setModelId(initialValues.modelId);
     setDisplayName(initialValues.displayName);
@@ -113,15 +133,11 @@ export function AddCustomModelDialog({
   }, [onClose, resetForm]);
 
   const toggleParameter = useCallback((param: SupportedParameter) => {
-    setSupportedParameters((prev) =>
-      prev.includes(param) ? prev.filter((p) => p !== param) : [...prev, param],
-    );
+    setSupportedParameters((prev) => toggleInList(prev, param));
   }, []);
 
   const toggleMultimodal = useCallback((input: MultimodalInput) => {
-    setMultimodalInputs((prev) =>
-      prev.includes(input) ? prev.filter((i) => i !== input) : [...prev, input],
-    );
+    setMultimodalInputs((prev) => toggleInList(prev, input));
   }, []);
 
   const handleSubmit = useCallback(() => {
@@ -132,20 +148,13 @@ export function AddCustomModelDialog({
       displayName: displayName.trim(),
       mode: "chat",
       maxTokens: Number.isNaN(parsedMaxTokens) ? DEFAULT_MAX_TOKENS : parsedMaxTokens,
-      supportedParameters: supportedParameters.length > 0 ? supportedParameters : undefined,
-      multimodalInputs: multimodalInputs.length > 0 ? multimodalInputs : undefined,
+      supportedParameters: optionalList(supportedParameters),
+      multimodalInputs: optionalList(multimodalInputs),
     };
 
     const result = customModelEntrySchema.safeParse(entry);
     if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const field = issue.path[0];
-        if (field) {
-          fieldErrors[String(field)] = issue.message;
-        }
-      }
-      setErrors(fieldErrors);
+      setErrors(fieldErrorsFromZodIssues(result.error.issues));
       return;
     }
 
@@ -175,13 +184,7 @@ export function AddCustomModelDialog({
             <HorizontalFormControl
               label="Model ID"
               helper="Exactly as your provider specifies it, e.g. a fine-tune ID or deployment name"
-              error={
-                errors.modelId ? (
-                  <Text color="red.500" fontSize="xs">
-                    {errors.modelId}
-                  </Text>
-                ) : undefined
-              }
+              error={fieldError(errors.modelId)}
             >
               <Input
                 placeholder="e.g. gpt-5-custom"
@@ -194,13 +197,7 @@ export function AddCustomModelDialog({
             <HorizontalFormControl
               label="Display Name"
               helper="How this model appears in selectors across LangWatch"
-              error={
-                errors.displayName ? (
-                  <Text color="red.500" fontSize="xs">
-                    {errors.displayName}
-                  </Text>
-                ) : undefined
-              }
+              error={fieldError(errors.displayName)}
             >
               <Input
                 placeholder="e.g. GPT-5 Custom"
@@ -213,13 +210,7 @@ export function AddCustomModelDialog({
             <HorizontalFormControl
               label="Max Tokens"
               helper="Maximum number of output tokens the model supports"
-              error={
-                errors.maxTokens ? (
-                  <Text color="red.500" fontSize="xs">
-                    {errors.maxTokens}
-                  </Text>
-                ) : undefined
-              }
+              error={fieldError(errors.maxTokens)}
             >
               <Input
                 type="number"

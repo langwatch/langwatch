@@ -52,7 +52,8 @@ function timeBucketAxis({
   }
 
   const grouped = new Set(validation.blocks.flatMap((block) => block.groupByColumns));
-  if (!grouped.has(column.name.trim().toLowerCase())) {
+  const isGrouped = grouped.has(column.name.trim().toLowerCase());
+  if (!isGrouped) {
     return null;
   }
 

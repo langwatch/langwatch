@@ -73,6 +73,39 @@ const defaultPresetForDays = (defaultNDays: number): RelativePresetKey => {
 
 export type PeriodMode = "relative" | "absolute";
 
+/** An absolute range in the address wins; otherwise a relative preset does. */
+function readPeriodFromAddress({
+  defaultNDays,
+  now,
+  queryEndDate,
+  queryPeriod,
+  queryStartDate,
+}: {
+  defaultNDays: number;
+  now: Date;
+  queryEndDate: unknown;
+  queryPeriod: unknown;
+  queryStartDate: unknown;
+}): { period: Period; mode: PeriodMode; isDefault: boolean } {
+  const hasAbsoluteRange =
+    typeof queryStartDate === "string" &&
+    typeof queryEndDate === "string" &&
+    isValidDateString(queryStartDate) &&
+    isValidDateString(queryEndDate);
+  if (hasAbsoluteRange) {
+    const startDate = new Date(queryStartDate);
+    const endDate = new Date(queryEndDate);
+    const safeStart = startDate > endDate ? endDate : startDate;
+
+    return { period: { startDate: safeStart, endDate }, mode: "absolute", isDefault: false };
+  }
+
+  const picked = isRelativePresetKey(queryPeriod);
+  const presetKey = picked ? queryPeriod : defaultPresetForDays(defaultNDays);
+
+  return { period: computeRelativeWindow(presetKey, now), mode: "relative", isDefault: !picked };
+}
+
 export const usePeriodSelector = (defaultNDays = 30) => {
   const router = useRouter();
 
@@ -86,45 +119,26 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   const queryStartDate = router.query.startDate;
   const queryEndDate = router.query.endDate;
 
-  const { period, mode, isDefault } = useMemo<{
-    period: Period;
-    mode: PeriodMode;
-    isDefault: boolean;
-  }>(() => {
-    if (
-      typeof queryStartDate === "string" &&
-      typeof queryEndDate === "string" &&
-      isValidDateString(queryStartDate) &&
-      isValidDateString(queryEndDate)
-    ) {
-      const startDate = new Date(queryStartDate);
-      const endDate = new Date(queryEndDate);
-      const safeStart = startDate > endDate ? endDate : startDate;
-      return {
-        period: { startDate: safeStart, endDate },
-        mode: "absolute",
-        isDefault: false,
-      };
-    }
-
-    const picked = isRelativePresetKey(queryPeriod);
-    const presetKey = picked ? queryPeriod : defaultPresetForDays(defaultNDays);
-
-    return {
-      period: computeRelativeWindow(presetKey, now),
-      mode: "relative",
-      isDefault: !picked,
-    };
+  const { period, mode, isDefault } = useMemo(
+    () =>
+      readPeriodFromAddress({
+        defaultNDays,
+        now,
+        queryEndDate,
+        queryPeriod,
+        queryStartDate,
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryPeriod, queryStartDate, queryEndDate, defaultNDays]);
+    [queryPeriod, queryStartDate, queryEndDate, defaultNDays],
+  );
 
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
-      const validEndDate =
-        endDate instanceof Date && !isNaN(endDate.getTime()) ? endDate : new Date();
+      const hasValidEnd = endDate instanceof Date && !isNaN(endDate.getTime());
+      const validEndDate = hasValidEnd ? endDate : new Date();
 
-      let validStartDate =
-        startDate instanceof Date && !isNaN(startDate.getTime()) ? startDate : new Date();
+      const hasValidStart = startDate instanceof Date && !isNaN(startDate.getTime());
+      let validStartDate = hasValidStart ? startDate : new Date();
 
       if (validStartDate > validEndDate) {
         validStartDate = validEndDate;

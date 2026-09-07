@@ -75,20 +75,248 @@ export const MODEL_PROVIDER_MANAGE_PERMISSION = "project:manage";
 /** The query parameter the page-level scope filter lives in. */
 export const MODEL_PROVIDER_SCOPE_QUERY_KEY = "scope";
 
+type ProviderRowData = ReturnType<typeof useAllModelProvidersList>["providers"][number];
+
+/**
+ * One reason string per blocked action, undefined when the action works.
+ * Whatever is rendered inert carries its reason in a tooltip, so no control on
+ * this page can be clicked into silence.
+ */
+function manageDisabledReasons(hasManagePermission: boolean): {
+  addProvider: string | undefined;
+  rowActions: string | undefined;
+} {
+  if (hasManagePermission) return { addProvider: undefined, rowActions: undefined };
+
+  return {
+    addProvider: "You need model provider manage permissions to add new providers.",
+    rowActions: "You need model provider manage permissions to edit or delete providers.",
+  };
+}
+type ConnectionTests = ReturnType<typeof useModelProviderConnectionTest>;
+
+/**
+ * One provider row. System (env-fed) providers carry no menu: their config
+ * lives in the server's process environment, so the row reads as read-only.
+ */
+function ProviderRow({
+  connectionTests,
+  onDelete,
+  onEdit,
+  provider,
+  rowActionsDisabledReason,
+  scopeNameById,
+}: {
+  connectionTests: ConnectionTests;
+  onDelete: (row: { id?: string; provider: string; name: string }) => void;
+  onEdit: (params: { providerKey: string; modelProviderId: string }) => void;
+  provider: ProviderRowData;
+  rowActionsDisabledReason: string | undefined;
+  scopeNameById: Map<string, string>;
+}) {
+  const namedScopes = provider.scopes?.map((scope) => ({
+    ...scope,
+    name: scopeNameById.get(scope.scopeId),
+  }));
+  const providerIcon = modelProviderIcons[provider.provider as keyof typeof modelProviderIcons];
+  const isSystem = provider.isSystem === true;
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <HStack gap={3} align="center">
+          <Box width="24px" height="24px">
+            {providerIcon}
+          </Box>
+          <VStack gap={0} align="start">
+            <Text>{provider.name}</Text>
+            <ConnectionTestVerdict
+              state={provider.id ? connectionTests.results[provider.id] : void 0}
+            />
+          </VStack>
+        </HStack>
+      </Table.Cell>
+      <Table.Cell>
+        <ProviderScopeChips
+          scopes={namedScopes}
+          // Env-var-fed providers carry `isSystem`; the chip column reads
+          // "System" instead of an empty cell.
+          system={isSystem}
+        />
+      </Table.Cell>
+      <Table.Cell textAlign="right">
+        {isSystem ? null : (
+          <Menu.Root>
+            <Tooltip content={rowActionsDisabledReason ?? ""} disabled={!rowActionsDisabledReason}>
+              <TriggerAnchor>
+                <Menu.Trigger asChild>
+                  <Button variant="ghost" disabled={!!rowActionsDisabledReason}>
+                    <MoreVertical />
+                  </Button>
+                </Menu.Trigger>
+              </TriggerAnchor>
+            </Tooltip>
+            {!rowActionsDisabledReason && (
+              <Menu.Content>
+                <Menu.Item
+                  value="edit"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit({ providerKey: provider.provider, modelProviderId: provider.id });
+                  }}
+                >
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Edit size={14} />
+                    Edit Provider
+                  </Box>
+                </Menu.Item>
+                <Menu.Item
+                  value="test"
+                  disabled={!provider.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!provider.id) return;
+                    void connectionTests.test(provider.id);
+                  }}
+                >
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <PlugZap size={14} />
+                    Test Connection
+                  </Box>
+                </Menu.Item>
+                <Menu.Item
+                  value="delete"
+                  color="red"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete({
+                      id: provider.id ?? void 0,
+                      provider: provider.provider,
+                      // Match the row label (the instance name, e.g. "OpenAI2")
+                      // rather than the generic registry name, so the dialog
+                      // names the exact provider the reader clicked.
+                      name: provider.name,
+                    });
+                  }}
+                >
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Trash2 size={14} />
+                    Delete Provider
+                  </Box>
+                </Menu.Item>
+              </Menu.Content>
+            )}
+          </Menu.Root>
+        )}
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+/**
+ * The providers table, or the honest states that stand in for it: a skeleton
+ * while the list is in flight, and a guided empty state with the same add
+ * action as the header — without one where the reader is looking, the only
+ * way forward is a top-right button that is easy to miss.
+ */
+function ProvidersPanel({
+  addProviderDisabledReason,
+  addable,
+  connectionTests,
+  enabledProviders,
+  isLoading,
+  onDelete,
+  onEdit,
+  rowActionsDisabledReason,
+  scopeNameById,
+}: {
+  addProviderDisabledReason: string | undefined;
+  addable: React.ComponentProps<typeof AddModelProviderMenu>["addableProviders"];
+  connectionTests: ConnectionTests;
+  enabledProviders: ProviderRowData[];
+  isLoading: boolean;
+  onDelete: (row: { id?: string; provider: string; name: string }) => void;
+  onEdit: (params: { providerKey: string; modelProviderId: string }) => void;
+  rowActionsDisabledReason: string | undefined;
+  scopeNameById: Map<string, string>;
+}) {
+  if (isLoading) return <ProvidersTableSkeleton />;
+  if (enabledProviders.length === 0) {
+    return (
+      <EmptyState.Root width="full">
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <BrainCircuit size={24} />
+          </EmptyState.Indicator>
+          <VStack textAlign="center" gap={3}>
+            <VStack textAlign="center" gap={1}>
+              <EmptyState.Title>No model providers</EmptyState.Title>
+              <EmptyState.Description>Add a model provider to get started</EmptyState.Description>
+            </VStack>
+            {/* The empty-state call to action mirrors the page header — same
+                menu, same grant, same handler. Without one right where the
+                reader is looking, the only way forward is the top-right button,
+                which is easy to miss on a fresh empty screen. */}
+            <AddModelProviderMenu
+              addableProviders={addable}
+              disabledReason={addProviderDisabledReason}
+              onPick={(providerKey) => onEdit({ providerKey, modelProviderId: "new" })}
+            >
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!!addProviderDisabledReason}
+                data-testid="empty-state-add-model-provider"
+              >
+                <HStack gap={1}>
+                  <Plus size={14} />
+                  <Text>Add Model Provider</Text>
+                </HStack>
+              </Button>
+            </AddModelProviderMenu>
+          </VStack>
+        </EmptyState.Content>
+      </EmptyState.Root>
+    );
+  }
+
+  return (
+    <Card.Root width="full" overflow="hidden">
+      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+        <Table.Root variant="line" size="md" width="full">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Provider</Table.ColumnHeader>
+              <Table.ColumnHeader>Scope</Table.ColumnHeader>
+              <Table.ColumnHeader />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {enabledProviders.map((provider) => (
+              <ProviderRow
+                key={provider.id ?? `system-${provider.provider}`}
+                connectionTests={connectionTests}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                provider={provider}
+                rowActionsDisabledReason={rowActionsDisabledReason}
+                scopeNameById={scopeNameById}
+              />
+            ))}
+          </Table.Body>
+        </Table.Root>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
 export default function ModelProvidersScreen() {
   const host = useModelProviderHost();
   const { organizationId, projectId, teamId } = host.scope();
   const hasManagePermission = host.hasPermission(MODEL_PROVIDER_MANAGE_PERMISSION);
 
-  // One reason string per blocked action, `undefined` when the action works.
-  // Whatever is rendered inert carries its reason in a tooltip, so no control on
-  // this page can be clicked into silence.
-  const addProviderDisabledReason = hasManagePermission
-    ? undefined
-    : "You need model provider manage permissions to add new providers.";
-  const rowActionsDisabledReason = hasManagePermission
-    ? undefined
-    : "You need model provider manage permissions to edit or delete providers.";
+  const { addProvider: addProviderDisabledReason, rowActions: rowActionsDisabledReason } =
+    manageDisabledReasons(hasManagePermission);
 
   // Verdicts live for as long as the page is open and are keyed by row, so
   // testing one provider never overwrites what another just reported.
@@ -257,172 +485,17 @@ export default function ModelProvidersScreen() {
         </AddModelProviderMenu>
       </HStack>
 
-      {isLoading ? (
-        <ProvidersTableSkeleton />
-      ) : enabledProviders.length === 0 ? (
-        <EmptyState.Root width="full">
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <BrainCircuit size={24} />
-            </EmptyState.Indicator>
-            <VStack textAlign="center" gap={3}>
-              <VStack textAlign="center" gap={1}>
-                <EmptyState.Title>No model providers</EmptyState.Title>
-                <EmptyState.Description>Add a model provider to get started</EmptyState.Description>
-              </VStack>
-              {/* The empty-state call to action mirrors the page header — same
-                  menu, same grant, same handler. Without one right where the
-                  reader is looking, the only way forward is the top-right button,
-                  which is easy to miss on a fresh empty screen. */}
-              <AddModelProviderMenu
-                addableProviders={addable}
-                disabledReason={addProviderDisabledReason}
-                onPick={(providerKey) =>
-                  openProviderEditor({ providerKey, modelProviderId: "new" })
-                }
-              >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!!addProviderDisabledReason}
-                  data-testid="empty-state-add-model-provider"
-                >
-                  <HStack gap={1}>
-                    <Plus size={14} />
-                    <Text>Add Model Provider</Text>
-                  </HStack>
-                </Button>
-              </AddModelProviderMenu>
-            </VStack>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      ) : (
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Provider</Table.ColumnHeader>
-                  <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                  <Table.ColumnHeader />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {enabledProviders.map((provider) => {
-                  const namedScopes = provider.scopes?.map((scope) => ({
-                    ...scope,
-                    name: scopeNameById.get(scope.scopeId),
-                  }));
-                  const providerIcon =
-                    modelProviderIcons[provider.provider as keyof typeof modelProviderIcons];
-                  const isSystem = provider.isSystem === true;
-                  return (
-                    <Table.Row key={provider.id ?? `system-${provider.provider}`}>
-                      <Table.Cell>
-                        <HStack gap={3} align="center">
-                          <Box width="24px" height="24px">
-                            {providerIcon}
-                          </Box>
-                          <VStack gap={0} align="start">
-                            <Text>{provider.name}</Text>
-                            <ConnectionTestVerdict
-                              state={provider.id ? connectionTests.results[provider.id] : void 0}
-                            />
-                          </VStack>
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <ProviderScopeChips
-                          scopes={namedScopes}
-                          // Env-var-fed providers carry `isSystem`; the chip
-                          // column reads "System" instead of an empty cell.
-                          system={isSystem}
-                        />
-                      </Table.Cell>
-                      <Table.Cell textAlign="right">
-                        {/* System (env-fed) providers can't be edited through
-                            the UI: their config lives in the server's process
-                            env. Hide the menu so the row reads as read-only at
-                            a glance. */}
-                        {isSystem ? null : (
-                          <Menu.Root>
-                            <Tooltip
-                              content={rowActionsDisabledReason ?? ""}
-                              disabled={!rowActionsDisabledReason}
-                            >
-                              <TriggerAnchor>
-                                <Menu.Trigger asChild>
-                                  <Button variant="ghost" disabled={!!rowActionsDisabledReason}>
-                                    <MoreVertical />
-                                  </Button>
-                                </Menu.Trigger>
-                              </TriggerAnchor>
-                            </Tooltip>
-                            {!rowActionsDisabledReason && (
-                              <Menu.Content>
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    openProviderEditor({
-                                      providerKey: provider.provider,
-                                      modelProviderId: provider.id,
-                                    });
-                                  }}
-                                >
-                                  <Box display="flex" alignItems="center" gap={2}>
-                                    <Edit size={14} />
-                                    Edit Provider
-                                  </Box>
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="test"
-                                  disabled={!provider.id}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (!provider.id) return;
-                                    void connectionTests.test(provider.id);
-                                  }}
-                                >
-                                  <Box display="flex" alignItems="center" gap={2}>
-                                    <PlugZap size={14} />
-                                    Test Connection
-                                  </Box>
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="delete"
-                                  color="red"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setProviderToDelete({
-                                      id: provider.id ?? void 0,
-                                      provider: provider.provider,
-                                      // Match the row label (the instance name,
-                                      // e.g. "OpenAI2") rather than the generic
-                                      // registry name, so the dialog names the
-                                      // exact provider the reader clicked.
-                                      name: provider.name,
-                                    });
-                                  }}
-                                >
-                                  <Box display="flex" alignItems="center" gap={2}>
-                                    <Trash2 size={14} />
-                                    Delete Provider
-                                  </Box>
-                                </Menu.Item>
-                              </Menu.Content>
-                            )}
-                          </Menu.Root>
-                        )}
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
-      )}
+      <ProvidersPanel
+        addProviderDisabledReason={addProviderDisabledReason}
+        addable={addable}
+        connectionTests={connectionTests}
+        enabledProviders={enabledProviders}
+        isLoading={isLoading}
+        onDelete={setProviderToDelete}
+        onEdit={openProviderEditor}
+        rowActionsDisabledReason={rowActionsDisabledReason}
+        scopeNameById={scopeNameById}
+      />
 
       {/* Default Models renders whenever the project has providers OR orphan
           default-model configs. The section hides itself when BOTH are empty

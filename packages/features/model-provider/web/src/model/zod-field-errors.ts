@@ -12,6 +12,24 @@ export function mapZodIssuesToLogContext(
   }));
 }
 
+/**
+ * Field errors keyed by the issue's first path segment. Later issues on the
+ * same field win, which is how the custom-model dialogs have always read them.
+ */
+export function fieldErrorsFromZodIssues(
+  issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>,
+): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of issues) {
+    const field = issue.path[0];
+    if (!field) continue;
+
+    fieldErrors[String(field)] = issue.message;
+  }
+
+  return fieldErrors;
+}
+
 export interface ZodIssue {
   code: string;
   expected?: string;
@@ -49,34 +67,39 @@ export function getZodIssueMessage(issue: ZodIssue): string {
   return issue.message || "Invalid value";
 }
 
+/** First named path segment wins: the first issue to name a field owns its message. */
+function recordFieldError({
+  fieldErrors,
+  issue,
+}: {
+  fieldErrors: Record<string, string>;
+  issue: ZodIssue;
+}): void {
+  const fieldName = issue.path?.[0];
+  if (typeof fieldName !== "string" || fieldName.length === 0) return;
+  if (fieldErrors[fieldName]) return;
+
+  fieldErrors[fieldName] = getZodIssueMessage(issue);
+}
+
 /**
  * Parses Zod error to extract field-specific error messages
  */
 export function parseZodFieldErrors(zodError: ZodErrorStructure): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
+  if (!zodError.issues) return fieldErrors;
 
-  // Handle union errors by flattening them
-  if (zodError.issues) {
-    zodError.issues.forEach((issue) => {
-      if (issue.unionErrors) {
-        // Flatten union errors
-        issue.unionErrors.forEach((unionError) => {
-          unionError.issues?.forEach((nestedIssue) => {
-            if (nestedIssue.path && nestedIssue.path.length > 0) {
-              const fieldName = nestedIssue.path[0];
-              if (fieldName && typeof fieldName === "string" && !fieldErrors[fieldName]) {
-                fieldErrors[fieldName] = getZodIssueMessage(nestedIssue);
-              }
-            }
-          });
-        });
-      } else if (issue.path && issue.path.length > 0) {
-        const fieldName = issue.path[0];
-        if (fieldName && typeof fieldName === "string" && !fieldErrors[fieldName]) {
-          fieldErrors[fieldName] = getZodIssueMessage(issue);
-        }
+  for (const issue of zodError.issues) {
+    if (!issue.unionErrors) {
+      recordFieldError({ fieldErrors, issue });
+      continue;
+    }
+
+    for (const unionError of issue.unionErrors) {
+      for (const nestedIssue of unionError.issues ?? []) {
+        recordFieldError({ fieldErrors, issue: nestedIssue });
       }
-    });
+    }
   }
 
   return fieldErrors;

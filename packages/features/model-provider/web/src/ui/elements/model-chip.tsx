@@ -38,6 +38,93 @@ interface Props {
   displayNames?: Record<string, string>;
 }
 
+// Alias detection reads the id, never the display label — a custom model can
+// carry any name, and branching on it would let one named "latest" masquerade
+// as the alias (and vice versa).
+function aliasKindLabel(model: string): string | null {
+  if (!isLatestAlias(model)) return null;
+  const idFamily = model.split("/").slice(1).join("/");
+
+  return idFamily === "latest" ? "Latest" : "Latest smaller";
+}
+
+/**
+ * Alias rendering: `openai/latest` shows as "Latest (gpt-5.5)" with the
+ * resolved concrete id inline in muted text so the table reads as a single
+ * line, parens-disambiguated, instead of a stacked pair.
+ */
+function AliasLabel({
+  aliasLabel,
+  aliasResolved,
+  fontSize,
+  invalid,
+}: {
+  aliasLabel: string;
+  aliasResolved: string | null;
+  fontSize: string;
+  invalid: boolean;
+}) {
+  return (
+    <Text
+      fontSize={fontSize}
+      lineClamp={1}
+      color={invalid ? "red.600" : undefined}
+      textDecoration={invalid ? "line-through" : undefined}
+    >
+      <Text as="span" fontWeight="medium">
+        {aliasLabel}
+      </Text>
+      {aliasResolved && (
+        <Text as="span" color={invalid ? undefined : "fg.muted"} fontFamily="mono">
+          {" "}
+          ({aliasResolved.split("/").slice(1).join("/")})
+        </Text>
+      )}
+    </Text>
+  );
+}
+
+function ModelLabel({
+  fontSize,
+  invalid,
+  label,
+}: {
+  fontSize: string;
+  invalid: boolean;
+  label: string;
+}) {
+  return (
+    <Text
+      fontFamily="mono"
+      fontSize={fontSize}
+      lineClamp={1}
+      wordBreak="break-all"
+      color={invalid ? "red.600" : undefined}
+      textDecoration={invalid ? "line-through" : undefined}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function UpdateNeededBadge({ size }: { size: "sm" | "md" }) {
+  const isSmall = size === "sm";
+
+  return (
+    <HStack gap={1} color="red.600" flexShrink={0}>
+      <AlertTriangle size={isSmall ? 12 : 14} aria-hidden />
+      <Text
+        fontSize={isSmall ? "2xs" : "xs"}
+        fontWeight="medium"
+        textTransform="uppercase"
+        letterSpacing="wide"
+      >
+        Update needed
+      </Text>
+    </HStack>
+  );
+}
+
 export function ModelChip({
   model,
   size = "md",
@@ -47,21 +134,11 @@ export function ModelChip({
 }: Props) {
   const providerKey = model.split("/")[0] ?? "";
   const family = modelDisplayLabel({ fullModelId: model, displayNames });
-  // Alias detection reads the id, never `family` — a custom model can carry any
-  // display name, and branching on it would let one named "latest" masquerade
-  // as the alias (and vice versa).
-  const idFamily = model.split("/").slice(1).join("/");
   const icon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
   const iconSlot = size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
-  // Alias rendering: `openai/latest` shows as "Latest (gpt-5.5)" with the
-  // resolved concrete id inline in muted text so the table reads as a single
-  // line, parens-disambiguated, instead of a stacked pair.
+  const fontSize = size === "sm" ? "xs" : "sm";
   const aliasResolved = isLatestAlias(model) ? resolveLatestAlias(model) : null;
-  const aliasLabel = isLatestAlias(model)
-    ? idFamily === "latest"
-      ? "Latest"
-      : "Latest smaller"
-    : null;
+  const aliasLabel = aliasKindLabel(model);
 
   const chip = (
     <HStack
@@ -76,47 +153,16 @@ export function ModelChip({
         </Box>
       )}
       {aliasLabel ? (
-        <Text
-          fontSize={size === "sm" ? "xs" : "sm"}
-          lineClamp={1}
-          color={invalid ? "red.600" : undefined}
-          textDecoration={invalid ? "line-through" : undefined}
-        >
-          <Text as="span" fontWeight="medium">
-            {aliasLabel}
-          </Text>
-          {aliasResolved && (
-            <Text as="span" color={invalid ? undefined : "fg.muted"} fontFamily="mono">
-              {" "}
-              ({aliasResolved.split("/").slice(1).join("/")})
-            </Text>
-          )}
-        </Text>
+        <AliasLabel
+          aliasLabel={aliasLabel}
+          aliasResolved={aliasResolved}
+          fontSize={fontSize}
+          invalid={invalid}
+        />
       ) : (
-        <Text
-          fontFamily="mono"
-          fontSize={size === "sm" ? "xs" : "sm"}
-          lineClamp={1}
-          wordBreak="break-all"
-          color={invalid ? "red.600" : undefined}
-          textDecoration={invalid ? "line-through" : undefined}
-        >
-          {family || model}
-        </Text>
+        <ModelLabel fontSize={fontSize} invalid={invalid} label={family || model} />
       )}
-      {invalid && (
-        <HStack gap={1} color="red.600" flexShrink={0}>
-          <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
-          <Text
-            fontSize={size === "sm" ? "2xs" : "xs"}
-            fontWeight="medium"
-            textTransform="uppercase"
-            letterSpacing="wide"
-          >
-            Update needed
-          </Text>
-        </HStack>
-      )}
+      {invalid && <UpdateNeededBadge size={size} />}
     </HStack>
   );
 

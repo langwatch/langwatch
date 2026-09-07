@@ -66,9 +66,10 @@ export function useAnalyticsPeriod(defaultNDays = 30): AnalyticsPeriodState {
 
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
-      const validEnd = endDate instanceof Date && !isNaN(endDate.getTime()) ? endDate : new Date();
-      let validStart =
-        startDate instanceof Date && !isNaN(startDate.getTime()) ? startDate : new Date();
+      const hasValidEnd = endDate instanceof Date && !isNaN(endDate.getTime());
+      const validEnd = hasValidEnd ? endDate : new Date();
+      const hasValidStart = startDate instanceof Date && !isNaN(startDate.getTime());
+      let validStart = hasValidStart ? startDate : new Date();
       if (validStart > validEnd) validStart = validEnd;
 
       // An absolute range and a preset are the same setting written two ways,

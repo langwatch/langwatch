@@ -104,9 +104,8 @@ function sourceFiles(directory: string): string[] {
       found.push(...sourceFiles(path));
       continue;
     }
-    if (SOURCE_EXTENSIONS.some((extension) => entry.name.endsWith(extension))) {
-      found.push(path);
-    }
+    const isSourceFile = SOURCE_EXTENSIONS.some((extension) => entry.name.endsWith(extension));
+    if (isSourceFile) found.push(path);
   }
   return found;
 }

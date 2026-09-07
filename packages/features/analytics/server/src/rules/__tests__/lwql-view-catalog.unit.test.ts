@@ -205,13 +205,9 @@ describe("given the LangWatchQL view catalog", () => {
       for (const view of LWQL_VIEW_CATALOG) {
         for (const column of view.columns) {
           const where = `${view.name}.${column.name}`;
-          const expected = column.name.endsWith("Ms")
-            ? "ms"
-            : /\bin USD\b/.test(column.description)
-              ? "USD"
-              : column.name.endsWith("TokenCount")
-                ? "tokens"
-                : null;
+          const tokenUnit = column.name.endsWith("TokenCount") ? "tokens" : null;
+          const costUnit = /\bin USD\b/.test(column.description) ? "USD" : tokenUnit;
+          const expected = column.name.endsWith("Ms") ? "ms" : costUnit;
           if (expected === null) continue;
           checked += 1;
           expect(column.unit, `${where} measures ${expected}`).toBe(expected);

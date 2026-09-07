@@ -174,12 +174,12 @@ export function getParameterConfigWithModelOverrides(
   if (!baseConfig) return undefined;
 
   // For the unified reasoning parameter with dynamicOptions, use model's reasoningConfig
-  if (
+  const isDynamicReasoning =
     baseConfig.type === "select" &&
     baseConfig.dynamicOptions &&
     reasoningConfig &&
-    paramName === "reasoning"
-  ) {
+    paramName === "reasoning";
+  if (isDynamicReasoning) {
     // Determine the display label based on provider's parameter name
     const dynamicLabel = REASONING_PARAMETER_LABELS[reasoningConfig.parameterName] ?? "Reasoning";
 

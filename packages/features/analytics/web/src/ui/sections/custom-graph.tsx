@@ -322,10 +322,10 @@ const CustomGraph_ = React.memo(
         return onDataPointClick;
       }
       // Enable default handler for pie/donut charts and summary bar charts
-      if (
-        ["pie", "donnut"].includes(input.graphType) ||
-        (["bar", "horizontal_bar"].includes(input.graphType) && input.timeScale === "full")
-      ) {
+      const isCircular = ["pie", "donnut"].includes(input.graphType);
+      const isSummaryBar =
+        ["bar", "horizontal_bar"].includes(input.graphType) && input.timeScale === "full";
+      if (isCircular || isSummaryBar) {
         return defaultOnDataPointClick;
       }
       return undefined;
@@ -337,14 +337,14 @@ const CustomGraph_ = React.memo(
       // When timeScale is a number with groupBy and no pipeline, the backend returns empty buckets
       // But with a pipeline, numeric timeScale works correctly
       const shouldUseFull = input.graphType === "summary";
-      const timeScale_ = shouldUseFull
-        ? "full"
-        : input.timeScale === "full"
-          ? input.timeScale
-          : parseInt(input.timeScale.toString(), 10);
+      const requestedScale =
+        input.timeScale === "full" ? input.timeScale : parseInt(input.timeScale.toString(), 10);
+      const timeScale_ = shouldUseFull ? "full" : requestedScale;
 
       // Show 1 hour granularity for full period when days difference is 2 days or less
-      if (typeof timeScale_ === "number" && timeScale_ >= 1440 && daysDifference <= 2) {
+      const isShortDailyRange =
+        typeof timeScale_ === "number" && timeScale_ >= 1440 && daysDifference <= 2;
+      if (isShortDailyRange) {
         return 60;
       }
 
@@ -354,11 +354,10 @@ const CustomGraph_ = React.memo(
     // For pie and donut charts without a pipeline, add a default pipeline to get grouped data
     // The backend requires a pipeline to populate grouped buckets
     const queryInput = useMemo((): CustomGraphInput => {
-      if (
-        (input.graphType === "pie" || input.graphType === "donnut") &&
-        input.groupBy &&
-        !input.series.some((s) => s.pipeline)
-      ) {
+      const isCircular = input.graphType === "pie" || input.graphType === "donnut";
+      const needsDefaultPipeline =
+        isCircular && input.groupBy && !input.series.some((s) => s.pipeline);
+      if (needsDefaultPipeline) {
         // Helper to add pipeline while preserving literal types
         const addPipeline = (series: Series): Series => {
           // Explicitly construct object to preserve literal types
@@ -438,16 +437,13 @@ const CustomGraph_ = React.memo(
         ) ?? [],
       ),
     );
-    const currentAndPreviousDataFilled =
-      input.graphType === "scatter" || input.graphType === "line"
-        ? currentAndPreviousData
-        : fillEmptyData(
-            currentAndPreviousData,
-            expectedKeys,
-            input.graphType === "monitor_graph" && input.series[0]?.metric.includes("pass_rate")
-              ? 1
-              : 0,
-          );
+    const keepsGaps = input.graphType === "scatter" || input.graphType === "line";
+    const isPassRateMonitor =
+      input.graphType === "monitor_graph" && Boolean(input.series[0]?.metric.includes("pass_rate"));
+    const emptyValue = isPassRateMonitor ? 1 : 0;
+    const currentAndPreviousDataFilled = keepsGaps
+      ? currentAndPreviousData
+      : fillEmptyData(currentAndPreviousData, expectedKeys, emptyValue);
     const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
@@ -502,11 +498,12 @@ const CustomGraph_ = React.memo(
           hideGroupLabel,
         });
 
-        return input.series.length > 1
-          ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
-          : groupName
-            ? formatSingleSeriesName(groupName)
-            : (series?.name ?? aggKey);
+        const singleSeriesName = groupName
+          ? formatSingleSeriesName(groupName)
+          : (series?.name ?? aggKey);
+        const groupSuffix = groupName ? ` (${groupName})` : "";
+
+        return input.series.length > 1 ? (series?.name ?? aggKey) + groupSuffix : singleSeriesName;
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
     );
@@ -764,7 +761,9 @@ const CustomGraph_ = React.memo(
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
               onClick={(data: any, index: number) => {
-                if (handleDataPointClick && data && typeof index === "number" && pieData[index]) {
+                const isClickableSlice =
+                  handleDataPointClick && data && typeof index === "number" && pieData[index];
+                if (isClickableSlice) {
                   const entry = pieData[index]!;
                   const { series, groupKey } = getSeries(seriesByKey, entry.key);
                   // Derive evaluatorId from per-series metadata, falling back to groupByKey or
@@ -979,12 +978,12 @@ const CustomGraph_ = React.memo(
             cursor={{ fill: cursorColor }}
             labelFormatter={(_label, payload) => {
               if (input.graphType === "scatter") return "";
-              return (
-                formatDate(payload[0]?.payload.date) +
-                (input.includePrevious && payload[1]?.payload["previous>date"]
-                  ? " vs " + formatDate(payload[1]?.payload["previous>date"])
-                  : "")
-              );
+
+              const previousDate = payload[1]?.payload["previous>date"];
+              const comparison =
+                input.includePrevious && previousDate ? " vs " + formatDate(previousDate) : "";
+
+              return formatDate(payload[0]?.payload.date) + comparison;
             }}
             wrapperStyle={{ zIndex: 1000 }}
           />
@@ -1000,19 +999,14 @@ const CustomGraph_ = React.memo(
               const key = e.dataKey as string | undefined;
               if (key) toggleSeries(key.replace(/^previous>/, ""));
             }}
-            formatter={(value, entry) => (
-              <span
-                style={{
-                  opacity:
-                    entry.dataKey &&
-                    hiddenSeries.has((entry.dataKey as string).replace(/^previous>/, ""))
-                      ? 0.3
-                      : 1,
-                }}
-              >
-                {value}
-              </span>
-            )}
+            formatter={(value, entry) => {
+              const seriesKey = entry.dataKey
+                ? (entry.dataKey as string).replace(/^previous>/, "")
+                : undefined;
+              const isHidden = seriesKey !== undefined && hiddenSeries.has(seriesKey);
+
+              return <span style={{ opacity: isHidden ? 0.3 : 1 }}>{value}</span>;
+            }}
           />
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
@@ -1228,14 +1222,14 @@ const shapeDataForSummary = (
       const isCardinalitySeries = series?.aggregation === "cardinality";
       const formatOverride = isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
 
+      const directedMetric = series?.increaseIs
+        ? { ...formatOverride, increaseIs: series.increaseIs }
+        : formatOverride;
+
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric: formatOverride
-          ? series?.increaseIs
-            ? { ...formatOverride, increaseIs: series.increaseIs }
-            : formatOverride
-          : undefined,
+        metric: formatOverride ? directedMetric : undefined,
         value: totalValue,
         noDataUrl: series?.noDataUrl,
       };
@@ -1386,12 +1380,8 @@ function MonitorGraph({
   // day the same as a 100-run day. Fall back to that average only if the
   // full-period read errored, so a transient failure doesn't blank the card.
   const summaryRaw = summaryTimeseries.data?.currentPeriod?.[0]?.[firstKey];
-  const summaryValue =
-    typeof summaryRaw === "number"
-      ? summaryRaw
-      : summaryTimeseries.isError
-        ? dailyAverage
-        : undefined;
+  const fallbackValue = summaryTimeseries.isError ? dailyAverage : undefined;
+  const summaryValue = typeof summaryRaw === "number" ? summaryRaw : fallbackValue;
   const hasData = summaryValue !== undefined;
   const hasLoaded =
     currentAndPreviousDataFilled?.length !== undefined &&
@@ -1399,16 +1389,16 @@ function MonitorGraph({
   const gray400 = useColorRawValue("gray.400");
 
   // TODO: allow user to define the thresholds instead of hardcoded amounts
-  const colorSet: RotatingColorSet = input.monitorGraph?.disabled
-    ? "grayTones"
-    : summaryValue === undefined || summaryValue > 0.8 || !hasLoaded
-      ? "greenTones"
-      : summaryValue < 0.4
-        ? "redTones"
-        : "orangeTones";
+  const isHealthy = summaryValue === undefined || summaryValue > 0.8 || !hasLoaded;
+  const belowThresholdSet: RotatingColorSet =
+    summaryValue !== undefined && summaryValue < 0.4 ? "redTones" : "orangeTones";
+  const activeColorSet: RotatingColorSet = isHealthy ? "greenTones" : belowThresholdSet;
+  const colorSet: RotatingColorSet = input.monitorGraph?.disabled ? "grayTones" : activeColorSet;
 
   const finiteValues = allValues && allValues.length > 0 ? allValues.filter(Number.isFinite) : [];
-  const maxValue = isPassRate ? 1 : finiteValues.length > 0 ? Math.max(...finiteValues) : 1;
+  const scoreLabel = isPassRate ? "Pass Rate" : "Average Score";
+  const observedMax = finiteValues.length > 0 ? Math.max(...finiteValues) : 1;
+  const maxValue = isPassRate ? 1 : observedMax;
 
   // Color adjustments for light/dark mode
   // Light mode: light backgrounds, dark text
@@ -1458,19 +1448,11 @@ function MonitorGraph({
         </HStack>
         <HStack gap={2}>
           <Text fontSize="2xl" fontWeight="bold">
-            {hasLoaded ? (
-              hasData ? (
-                numeral(summaryValue).format(isPassRate ? "0%" : "0.[00]")
-              ) : (
-                "-"
-              )
-            ) : (
-              <Skeleton width="56px" height="36px" />
-            )}
+            {!hasLoaded && <Skeleton width="56px" height="36px" />}
+            {hasLoaded && !hasData && "-"}
+            {hasLoaded && hasData && numeral(summaryValue).format(isPassRate ? "0%" : "0.[00]")}
           </Text>
-          <Text fontSize="xs">
-            {hasData ? (isPassRate ? "Pass Rate" : "Average Score") : "No data yet"}
-          </Text>
+          <Text fontSize="xs">{hasData ? scoreLabel : "No data yet"}</Text>
         </HStack>
         <Text fontSize="xs">
           {filterParams.startDate &&

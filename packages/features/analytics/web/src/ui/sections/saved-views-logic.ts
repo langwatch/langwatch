@@ -107,7 +107,8 @@ export function filtersMatch(
     if (normA === undefined && normB === undefined) continue;
     if (normA === undefined || normB === undefined) return false;
 
-    if (JSON.stringify(normA) !== JSON.stringify(normB)) return false;
+    const isSameValue = JSON.stringify(normA) === JSON.stringify(normB);
+    if (!isSameValue) return false;
   }
 
   return true;
@@ -182,7 +183,7 @@ export function findMatchingView({
 
   // Check custom views (includes seeded origin views)
   for (const view of customViews) {
-    if (
+    const isSameView =
       filtersMatch(currentFilters, view.filters) &&
       (normalizedQuery ?? undefined) === (view.query ?? undefined) &&
       periodMatches({
@@ -190,8 +191,8 @@ export function findMatchingView({
         urlStartDate,
         urlEndDate,
         urlHasDateParams,
-      })
-    ) {
+      });
+    if (isSameView) {
       return view.id;
     }
   }

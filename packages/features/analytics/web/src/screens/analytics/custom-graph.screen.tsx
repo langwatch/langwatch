@@ -88,7 +88,10 @@ import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-f
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { analyticsApi, type AnalyticsFilterOption } from "../../behavior/analytics-api.ts";
 import { type RotatingColorSet, rotatingColors } from "@langwatch/design-system/rotating-colors";
-import { camelCaseToTitleCase, uppercaseFirstLetterLowerCaseRest } from "../../model/string-casing.ts";
+import {
+  camelCaseToTitleCase,
+  uppercaseFirstLetterLowerCaseRest,
+} from "../../model/string-casing.ts";
 
 /** Which of the builder's two addresses this render is. */
 export type CustomGraphScreenMode = "new" | "edit";
@@ -958,14 +961,14 @@ function SeriesFieldItem({
     }
 
     if (seriesLength === 1 && groupBy) {
+      const isPolarityGroup =
+        groupBy.startsWith("sentiment") ||
+        groupBy === "evaluations.evaluation_passed" ||
+        groupBy === "evaluations.evaluation_processing_state" ||
+        groupBy.includes("has_error");
       form.setValue(
         `series.${index}.colorSet`,
-        groupBy.startsWith("sentiment") ||
-          groupBy === "evaluations.evaluation_passed" ||
-          groupBy === "evaluations.evaluation_processing_state" ||
-          groupBy.includes("has_error")
-          ? "positiveNegativeNeutral"
-          : "colors",
+        isPolarityGroup ? "positiveNegativeNeutral" : "colors",
       );
     }
   }, [form, groupBy, index, seriesLength]);
@@ -1046,9 +1049,10 @@ function SeriesFieldItem({
               onDoubleClick={() => {
                 setExpandedSeries((prev) => {
                   if (Array.isArray(prev)) {
-                    return prev.includes(index.toString())
-                      ? prev.filter((i) => i.toString() !== index.toString())
-                      : [...prev, index.toString()];
+                    const key = index.toString();
+                    const isExpanded = prev.includes(key);
+
+                    return isExpanded ? prev.filter((i) => i.toString() !== key) : [...prev, key];
                   }
                   return prev;
                 });

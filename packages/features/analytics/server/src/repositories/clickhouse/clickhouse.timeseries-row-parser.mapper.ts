@@ -39,7 +39,8 @@ export function parseTimeseriesRows(input: {
 
   for (const row of rows) {
     const period = row.period === "current" ? current : previous;
-    const date = input.timeScale === "full" ? "full" : typeof row.date === "string" ? row.date : "";
+    const rowDate = typeof row.date === "string" ? row.date : "";
+    const date = input.timeScale === "full" ? "full" : rowDate;
     const bucket = period.get(date) ?? { date };
     period.set(date, bucket);
     const grouped = input.groupBy && row.group_key !== undefined && row.group_key !== null;

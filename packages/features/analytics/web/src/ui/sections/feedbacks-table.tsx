@@ -7,6 +7,13 @@ import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
+function voteGlyph(vote: number | null | undefined): string {
+  if (vote === 1) return "👍";
+  if (vote === -1) return "👎";
+
+  return "-";
+}
+
 export const FeedbacksTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
   const feedbacks = analyticsApi.analytics.feedbacks.useQuery(filterParams, queryOpts);
@@ -62,7 +69,7 @@ export const FeedbacksTable = () => {
                 cursor="pointer"
               >
                 <Table.Cell paddingLeft={0} textAlign="center" paddingRight="0">
-                  {vote === 1 ? "👍" : vote === -1 ? "👎" : "-"}
+                  {voteGlyph(vote)}
                 </Table.Cell>
                 <Table.Cell>
                   <Tooltip content={feedback}>

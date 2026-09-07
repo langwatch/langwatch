@@ -43,10 +43,12 @@ export default function DatasetEditorScreen() {
       enabled: !!project && !!datasetId,
       // Poll only while preparing; the functional form lets the query schedule
       // its own stop once the status settles.
-      refetchInterval: (query) =>
-        query.state.data?.status === "processing" || query.state.data?.status === "uploading"
-          ? PREPARING_POLL_MS
-          : false,
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        const isPreparing = status === "processing" || status === "uploading";
+
+        return isPreparing ? PREPARING_POLL_MS : false;
+      },
     },
   );
 

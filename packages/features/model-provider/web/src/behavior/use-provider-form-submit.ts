@@ -7,7 +7,11 @@ import {
 } from "@langwatch/model-provider-contract";
 import { describeError } from "@langwatch/ui-host/errors";
 
-import { useModelProviderToaster, useShowErrorToast } from "./model-provider-feedback.ts";
+import {
+  useModelProviderToaster,
+  useShowErrorToast,
+  type ModelProviderToast,
+} from "./model-provider-feedback.ts";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { api } from "./model-provider-api.ts";
 import {
@@ -99,6 +103,312 @@ export type AdvancedGatewayPayload = {
   langySkipPermissionsModels?: string[];
 };
 
+type ProviderScope = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
+
+/** The router falls back to legacy scopeType/scopeId when the array is empty. */
+function optionalScopes(scopes: ProviderScope[] | undefined): ProviderScope[] | undefined {
+  return scopes && scopes.length > 0 ? scopes : undefined;
+}
+
+/** Empty is how the operator clears a name, and the server reads absence for that. */
+function nameToSend(name: string | undefined): string | undefined {
+  const trimmed = (name ?? "").trim();
+
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/** Non-API-key fields (a base URL, say) edited while the credentials come from the environment. */
+function hasNonApiKeyEdits({
+  customKeys,
+  initialKeys,
+  isUsingEnvVars,
+}: {
+  customKeys: Record<string, string>;
+  initialKeys: Record<string, unknown>;
+  isUsingEnvVars: boolean | undefined;
+}): boolean {
+  if (!isUsingEnvVars) return false;
+
+  return hasUserModifiedNonApiKeyFields(customKeys, initialKeys);
+}
+
+/**
+ * The credential refusal in the words zod chose, or null when the keys parse.
+ * Environment-variable credentials skip the check unless a non-API-key field
+ * (a base URL, say) was edited.
+ */
+function findCustomKeysRefusal({
+  customKeys,
+  hasNonApiKeyChanges,
+  isUsingEnvVars,
+  providerKeysSchema,
+}: {
+  customKeys: Record<string, string>;
+  hasNonApiKeyChanges: boolean;
+  isUsingEnvVars: boolean | undefined;
+  providerKeysSchema: unknown;
+}): string | null {
+  const mustValidate = !isUsingEnvVars || hasNonApiKeyChanges;
+  if (!mustValidate) return null;
+
+  const managedOnly = z.object({ MANAGED: z.string() }).optional().nullable();
+  const keysSchema = providerKeysSchema
+    ? z
+        .union([providerKeysSchema as z.ZodTypeAny, z.object({ MANAGED: z.string() })])
+        .optional()
+        .nullable()
+    : managedOnly;
+  const keysToValidate: Record<string, unknown> = { ...customKeys };
+  const parsed = (keysSchema as any).safeParse
+    ? (keysSchema as any).safeParse(keysToValidate)
+    : { success: true };
+  if (parsed.success) return null;
+
+  return fromZodError(parsed.error as ZodError).message;
+}
+
+/**
+ * Roles whose picked model belongs to another provider. Saving those would
+ * persist a contradiction: this provider becomes the default while the model
+ * still points elsewhere. See #3785.
+ */
+function mismatchedDefaultModels({
+  projectDefaultModel,
+  projectTopicClusteringModel,
+  providerKey,
+  useAsDefaultProvider,
+}: {
+  projectDefaultModel: string | null;
+  projectTopicClusteringModel: string | null;
+  providerKey: string;
+  useAsDefaultProvider: boolean;
+}): string[] {
+  if (!useAsDefaultProvider) return [];
+
+  const prefix = `${providerKey}/`;
+  const mismatched: string[] = [];
+  if (projectDefaultModel && !projectDefaultModel.startsWith(prefix)) {
+    mismatched.push("Default model");
+  }
+  if (projectTopicClusteringModel && !projectTopicClusteringModel.startsWith(prefix)) {
+    mismatched.push("Topic clustering model");
+  }
+
+  return mismatched;
+}
+
+function mismatchToast({
+  mismatched,
+  providerKey,
+}: {
+  mismatched: string[];
+  providerKey: string;
+}): ModelProviderToast {
+  const providerDisplayName =
+    modelProviders[providerKey as keyof typeof modelProviders]?.name ?? providerKey;
+  const isSingle = mismatched.length === 1;
+  const azureHint = providerKey === "azure" ? " (or add a custom deployment)" : "";
+  const verb = isSingle ? "belongs" : "belong";
+
+  return {
+    title: isSingle
+      ? `Cannot save: ${mismatched[0]?.toLowerCase()} is invalid`
+      : "Cannot save: default models are invalid",
+    description: `${mismatched.join(" and ")} ${verb} to a different provider. Pick a model from ${providerDisplayName}${azureHint} before saving.`,
+    type: "error",
+    duration: 5000,
+  };
+}
+
+/**
+ * When editing an existing provider, the stored key is shown masked. Decide
+ * whether anything changed by ignoring those placeholders — an untouched key
+ * must not count as an edit — but send the form as the customer left it,
+ * placeholders included: each one tells the server to keep the credential
+ * already on file. An empty object would be validated against the provider's
+ * keysSchema, so it becomes absence instead.
+ */
+function customKeysToSendFor({
+  customKeys,
+  hasNonApiKeyChanges,
+  initialKeys,
+  isUsingEnvVars,
+}: {
+  customKeys: Record<string, string>;
+  hasNonApiKeyChanges: boolean;
+  initialKeys: Record<string, unknown>;
+  isUsingEnvVars: boolean | undefined;
+}): Record<string, unknown> | undefined {
+  const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
+  const keys = pickCustomKeys({
+    customKeys,
+    hasNonApiKeyChanges,
+    initialKeys,
+    isUsingEnvVars,
+    userEnteredNewKey,
+  });
+  if (keys && Object.keys(keys).length === 0) return undefined;
+
+  return keys;
+}
+
+function pickCustomKeys({
+  customKeys,
+  hasNonApiKeyChanges,
+  initialKeys,
+  isUsingEnvVars,
+  userEnteredNewKey,
+}: {
+  customKeys: Record<string, string>;
+  hasNonApiKeyChanges: boolean;
+  initialKeys: Record<string, unknown>;
+  isUsingEnvVars: boolean | undefined;
+  userEnteredNewKey: boolean;
+}): Record<string, unknown> | undefined {
+  if (!isUsingEnvVars) {
+    const hasRealChange = hasUserModifiedAnyCredential({ customKeys, initialKeys });
+
+    return hasRealChange ? { ...customKeys } : undefined;
+  }
+  if (!userEnteredNewKey && !hasNonApiKeyChanges) return undefined;
+
+  return userEnteredNewKey ? { ...customKeys } : filterMaskedApiKeys(customKeys);
+}
+
+/** The gateway and skip-permissions halves, each present only when its section rendered. */
+function advancedFields(payload: AdvancedGatewayPayload | null): Record<string, unknown> {
+  return {
+    ...(payload?.gateway && {
+      rateLimitRpm: payload.gateway.rateLimitRpm,
+      rateLimitTpm: payload.gateway.rateLimitTpm,
+      rateLimitRpd: payload.gateway.rateLimitRpd,
+      fallbackPriorityGlobal: payload.gateway.fallbackPriorityGlobal,
+      providerConfig: payload.gateway.providerConfig,
+    }),
+    ...(payload?.langySkipPermissionsModels !== undefined && {
+      langySkipPermissionsModels: payload.langySkipPermissionsModels,
+    }),
+  };
+}
+
+/**
+ * Malformed JSON in providerConfig raises here; the parent form already
+ * surfaces the inline error, so the submit aborts on a refusal.
+ */
+function readAdvancedPayload(
+  getAdvancedPayload: (() => AdvancedGatewayPayload | null) | undefined,
+): { payload: AdvancedGatewayPayload | null; refusal?: unknown } {
+  if (!getAdvancedPayload) return { payload: null };
+
+  try {
+    return { payload: getAdvancedPayload() };
+  } catch (err) {
+    return { payload: null, refusal: err };
+  }
+}
+
+function replayTargetScopes({
+  scopeId,
+  scopeType,
+  scopes,
+}: {
+  scopeId?: string;
+  scopeType?: ProviderScope["scopeType"];
+  scopes?: ProviderScope[];
+}): ProviderScope[] {
+  const explicit = optionalScopes(scopes);
+  if (explicit) return explicit;
+  if (scopeType && scopeId) return [{ scopeType, scopeId }];
+
+  return [];
+}
+
+type RoleWrite = { label: string; promise: Promise<unknown> };
+
+/**
+ * The onboarding picks replayed into ModelDefault. The additive seed in
+ * `updateModelProvider` already wrote the registry flagship for each role at
+ * every scope this provider covers; the picks made on this drawer must win.
+ */
+function roleWrites({
+  assign,
+  projectDefaultModel,
+  projectEmbeddingsModel,
+  projectTopicClusteringModel,
+  targetScopes,
+}: {
+  assign: (input: {
+    scopeType: ProviderScope["scopeType"];
+    scopeId: string;
+    role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+    model: string;
+  }) => Promise<unknown>;
+  projectDefaultModel: string | null;
+  projectEmbeddingsModel: string | null;
+  projectTopicClusteringModel: string | null;
+  targetScopes: ProviderScope[];
+}): RoleWrite[] {
+  const roles: Array<{
+    label: string;
+    model: string | null;
+    role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  }> = [
+    { label: "Default", model: projectDefaultModel, role: "DEFAULT" },
+    { label: "Fast", model: projectTopicClusteringModel, role: "FAST" },
+    { label: "Embeddings", model: projectEmbeddingsModel, role: "EMBEDDINGS" },
+  ];
+
+  const writes: RoleWrite[] = [];
+  for (const scope of targetScopes) {
+    for (const { label, model, role } of roles) {
+      if (!model) continue;
+
+      writes.push({
+        label: `${label} at ${scope.scopeType.toLowerCase()}`,
+        promise: assign({ scopeType: scope.scopeType, scopeId: scope.scopeId, role, model }),
+      });
+    }
+  }
+
+  return writes;
+}
+
+/**
+ * Best-effort: a single failed scope (RBAC blocking an org write for a
+ * non-admin, say) must not kill a submit whose provider row already landed.
+ * A silent allSettled would also hide ALL three role writes failing, leaving
+ * a success toast over an empty cascade, so the rejections come back as a
+ * warning naming which role failed and why. A tRPC rejection's message is the
+ * code slug, so `describeError` supplies the copy written for that code.
+ */
+async function reportRoleWriteFailures(writes: RoleWrite[]): Promise<ModelProviderToast | null> {
+  const results = await Promise.allSettled(writes.map((w) => w.promise));
+  const failed = results
+    .map((r, i) => ({ r, label: writes[i]!.label }))
+    .filter((x): x is { r: PromiseRejectedResult; label: string } => x.r.status === "rejected");
+  if (failed.length === 0) return null;
+
+  const reasons = failed
+    .map(
+      (f) =>
+        `${f.label}: ${describeError({
+          error: f.r.reason,
+          fallbackTitle: "Couldn't save this default",
+        })}`,
+    )
+    .join("; ");
+
+  return {
+    title:
+      failed.length === writes.length
+        ? "Default model assignments failed"
+        : "Some default model assignments failed",
+    description: reasons,
+    type: "warning",
+    duration: 8000,
+  };
+}
+
 export function useProviderFormSubmit({
   getFormSnapshot,
   getAdvancedPayload,
@@ -184,123 +494,60 @@ export function useProviderFormSubmit({
     } = snapshot;
 
     try {
-      // Check if user modified non-API-key fields (like URLs) when using env vars
-      const hasNonApiKeyChanges =
-        isUsingEnvVars && hasUserModifiedNonApiKeyFields(customKeys, initialKeys);
+      const hasNonApiKeyChanges = hasNonApiKeyEdits({ customKeys, initialKeys, isUsingEnvVars });
 
-      // Validate if not using env vars, OR if using env vars but has non-API-key changes
-      if (!isUsingEnvVars || hasNonApiKeyChanges) {
-        const keysSchema = providerKeysSchema
-          ? z
-              .union([providerKeysSchema as z.ZodTypeAny, z.object({ MANAGED: z.string() })])
-              .optional()
-              .nullable()
-          : z.object({ MANAGED: z.string() }).optional().nullable();
-        const keysToValidate: Record<string, unknown> = { ...customKeys };
-        const parsed = (keysSchema as any).safeParse
-          ? (keysSchema as any).safeParse(keysToValidate)
-          : { success: true };
-        if (!parsed.success) {
-          setErrors({
-            customKeysRoot: fromZodError(parsed.error as ZodError).message,
-          });
-          setIsSaving(false);
-          return;
-        }
+      const keysRefusal = findCustomKeysRefusal({
+        customKeys,
+        hasNonApiKeyChanges,
+        isUsingEnvVars,
+        providerKeysSchema,
+      });
+      if (keysRefusal) {
+        setErrors({ customKeysRoot: keysRefusal });
+        setIsSaving(false);
+        return;
       }
 
-      // Block save when "use as default provider" is enabled but the
-      // selected default model belongs to a different provider — otherwise
-      // the setRoleAssignmentForScope replay below would silently persist
-      // a contradiction (this provider becomes the default while the
-      // model still points elsewhere). See #3785.
-      if (useAsDefaultProvider) {
-        const prefix = `${provider.provider}/`;
-        const mismatched: string[] = [];
-        if (projectDefaultModel && !projectDefaultModel.startsWith(prefix)) {
-          mismatched.push("Default model");
-        }
-        if (projectTopicClusteringModel && !projectTopicClusteringModel.startsWith(prefix)) {
-          mismatched.push("Topic clustering model");
-        }
-        if (mismatched.length > 0) {
-          const providerDisplayName =
-            modelProviders[provider.provider as keyof typeof modelProviders]?.name ??
-            provider.provider;
-          toaster.create({
-            title:
-              mismatched.length === 1
-                ? `Cannot save: ${mismatched[0]?.toLowerCase()} is invalid`
-                : "Cannot save: default models are invalid",
-            description: `${mismatched.join(" and ")} ${
-              mismatched.length === 1 ? "belongs" : "belong"
-            } to a different provider. Pick a model from ${providerDisplayName}${
-              provider.provider === "azure" ? " (or add a custom deployment)" : ""
-            } before saving.`,
-            type: "error",
-            duration: 5000,
-          });
-          setIsSaving(false);
-          return;
-        }
+      const mismatched = mismatchedDefaultModels({
+        projectDefaultModel,
+        projectTopicClusteringModel,
+        providerKey: provider.provider,
+        useAsDefaultProvider,
+      });
+      if (mismatched.length > 0) {
+        toaster.create(mismatchToast({ mismatched, providerKey: provider.provider }));
+        setIsSaving(false);
+        return;
       }
 
-      // Determine what customKeys to send
-      let customKeysToSend: Record<string, unknown> | undefined;
-      const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
-      if (!isUsingEnvVars) {
-        // When editing an existing provider, the stored key is shown masked. Decide whether
-        // anything changed by ignoring those placeholders — an untouched key must not count as
-        // an edit — but send the form as the customer left it, placeholders included: each one
-        // tells the server to keep the credential already on file.
-        const hasRealChange = hasUserModifiedAnyCredential({
-          customKeys,
-          initialKeys,
-        });
-        customKeysToSend = hasRealChange ? { ...customKeys } : undefined;
-      } else if (userEnteredNewKey || hasNonApiKeyChanges) {
-        customKeysToSend = userEnteredNewKey ? { ...customKeys } : filterMaskedApiKeys(customKeys);
-      } else {
-        customKeysToSend = undefined;
-      }
+      const customKeysToSend = customKeysToSendFor({
+        customKeys,
+        hasNonApiKeyChanges,
+        initialKeys,
+        isUsingEnvVars,
+      });
 
       // Headers are not credentials. They have their own column, their own masked-placeholder
       // merge (`mergeExtraHeaders`), and both readers take them from there:
       // `prepareLitellmParams` builds `extra_headers` from `modelProvider.extraHeaders`, and
       // the gateway materialiser reads `mp.extraHeaders`.
-
-      // Safety net: if placeholder stripping leaves an empty customKeys
-      // object, send `undefined` so the server treats it as "no key change"
-      // and preserves the stored key, rather than validating `{}` against the
-      // provider's keysSchema.
-      if (customKeysToSend !== undefined && Object.keys(customKeysToSend).length === 0) {
-        customKeysToSend = undefined;
-      }
-
-      // Strip concealed for send
       const extraHeadersToSend = (extraHeaders ?? [])
         .filter((h) => h.key?.trim())
         .map(({ key, value }) => ({ key, value }));
 
-      const trimmedName = (name ?? "").trim();
-      let advancedPayload: AdvancedGatewayPayload | null = null;
-      if (getAdvancedPayload) {
-        try {
-          advancedPayload = getAdvancedPayload();
-        } catch (err) {
-          // Malformed JSON in providerConfig — the parent form already
-          // surfaces the inline error, so just abort the submit.
-          setIsSaving(false);
-          onError?.(err);
-          return;
-        }
+      const advanced = readAdvancedPayload(getAdvancedPayload);
+      if (advanced.refusal) {
+        setIsSaving(false);
+        onError?.(advanced.refusal);
+        return;
       }
+
       await updateMutation.mutateAsync({
         id: provider.id,
         projectId,
         organizationId,
         provider: provider.provider,
-        name: trimmedName === "" ? undefined : trimmedName,
+        name: nameToSend(name),
         // Always sent, because an empty string is how the operator clears the
         // handle. Leaving it out on a clear would keep the old one.
         routingHandle: (routingHandle ?? "").trim(),
@@ -309,115 +556,27 @@ export function useProviderFormSubmit({
         customModels,
         customEmbeddingsModels,
         extraHeaders: extraHeadersToSend,
-        // Send the full scope array when it's populated; the router
-        // falls back to legacy scopeType/scopeId for callers still
-        // writing through the single-tier path.
-        scopes: scopes && scopes.length > 0 ? scopes : undefined,
+        scopes: optionalScopes(scopes),
         scopeType,
         scopeId,
-        ...(advancedPayload?.gateway && {
-          rateLimitRpm: advancedPayload.gateway.rateLimitRpm,
-          rateLimitTpm: advancedPayload.gateway.rateLimitTpm,
-          rateLimitRpd: advancedPayload.gateway.rateLimitRpd,
-          fallbackPriorityGlobal: advancedPayload.gateway.fallbackPriorityGlobal,
-          providerConfig: advancedPayload.gateway.providerConfig,
-        }),
-        ...(advancedPayload?.langySkipPermissionsModels !== undefined && {
-          langySkipPermissionsModels: advancedPayload.langySkipPermissionsModels,
-        }),
+        ...advancedFields(advanced.payload),
       });
 
       // Project default models are no longer written from the provider
       // drawer — the redesigned DefaultModelsSection on the model-providers
       // settings page owns hierarchical default-model writes per scope.
       // See specs/model-providers/hierarchical-default-models.feature.
-
-      // Replay the onboarding picks into ModelDefault. Mario's additive seed in
-      // `updateModelProvider` already wrote the registry flagship for each role at every scope
-      // this provider covers, but the user explicitly picked a Default / Topic-clustering /
-      // Embeddings model on this drawer — those picks need to win.
       if (useAsDefaultProvider) {
-        const targetScopes =
-          scopes && scopes.length > 0
-            ? scopes
-            : scopeType && scopeId
-              ? [{ scopeType, scopeId }]
-              : [];
-        type RoleWrite = {
-          label: string;
-          promise: Promise<unknown>;
-        };
-        const writes: RoleWrite[] = [];
-        for (const s of targetScopes) {
-          if (projectDefaultModel) {
-            writes.push({
-              label: `Default at ${s.scopeType.toLowerCase()}`,
-              promise: setRoleAssignmentMutation.mutateAsync({
-                scopeType: s.scopeType,
-                scopeId: s.scopeId,
-                role: "DEFAULT",
-                model: projectDefaultModel,
-              }),
-            });
-          }
-          if (projectTopicClusteringModel) {
-            writes.push({
-              label: `Fast at ${s.scopeType.toLowerCase()}`,
-              promise: setRoleAssignmentMutation.mutateAsync({
-                scopeType: s.scopeType,
-                scopeId: s.scopeId,
-                role: "FAST",
-                model: projectTopicClusteringModel,
-              }),
-            });
-          }
-          if (projectEmbeddingsModel) {
-            writes.push({
-              label: `Embeddings at ${s.scopeType.toLowerCase()}`,
-              promise: setRoleAssignmentMutation.mutateAsync({
-                scopeType: s.scopeType,
-                scopeId: s.scopeId,
-                role: "EMBEDDINGS",
-                model: projectEmbeddingsModel,
-              }),
-            });
-          }
-        }
-        // Best-effort: a single failed scope (e.g. RBAC blocks an org write for a non-admin)
-        // shouldn't kill the whole submit — the provider row is already created. But silent
-        // allSettled would also hide ALL three role writes failing, leaving the user with a
-        // "Model Provider Updated" success toast and an empty cascade. Capture rejections and
-        // surface them as a warning.
-        const results = await Promise.allSettled(writes.map((w) => w.promise));
-        const failed = results
-          .map((r, i) => ({ r, label: writes[i]!.label }))
-          .filter(
-            (x): x is { r: PromiseRejectedResult; label: string } => x.r.status === "rejected",
-          );
-        if (failed.length > 0) {
-          // Each rejection keeps its own label, so the user learns WHICH role
-          // failed and why. The reason is a tRPC rejection, so its message is
-          // the code slug — `describeError` turns each one into the copy
-          // written for that code rather than listing slugs.
-          const reasons = failed
-            .map(
-              (f) =>
-                `${f.label}: ${describeError({
-                  error: f.r.reason,
-                  fallbackTitle: "Couldn't save this default",
-                })}`,
-            )
-            .join("; ");
-          toaster.create({
-            title:
-              failed.length === writes.length
-                ? "Default model assignments failed"
-                : "Some default model assignments failed",
-            description: reasons,
-            type: "warning",
-            duration: 8000,
-          });
-        }
+        const failureToast = await reportRoleWriteFailures(
+          roleWrites({
+            assign: (input) => setRoleAssignmentMutation.mutateAsync(input),
+            projectDefaultModel,
+            projectEmbeddingsModel,
+            projectTopicClusteringModel,
+            targetScopes: replayTargetScopes({ scopeId, scopeType, scopes }),
+          }),
+        );
+        if (failureToast) toaster.create(failureToast);
       }
 
       // Invalidate every cached provider/resolved-default query so the prompts page, evaluation

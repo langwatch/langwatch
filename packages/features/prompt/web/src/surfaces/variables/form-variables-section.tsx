@@ -135,11 +135,11 @@ export const FormVariablesSection = ({
         for (let i = 0; i < newVariables.length; i++) {
           const newVar = newVariables[i];
           const currentField = currentFields[i];
-          if (
+          const hasChanged =
             newVar &&
             currentField &&
-            (newVar.identifier !== currentField.identifier || newVar.type !== currentField.type)
-          ) {
+            (newVar.identifier !== currentField.identifier || newVar.type !== currentField.type);
+          if (hasChanged) {
             update(i, {
               identifier: newVar.identifier,
               type: newVar.type as LlmConfigInputType,

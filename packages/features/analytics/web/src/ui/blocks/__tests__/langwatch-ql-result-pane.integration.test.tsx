@@ -26,11 +26,27 @@ import type { LangWatchQLDiagnostic, LangWatchQLQueryResult } from "@langwatch/a
 
 import { readHandledError } from "../../../model/handled-error.ts";
 import { LangWatchQLResultPane } from "../langwatch-ql-result-pane.tsx";
-import type { LangWatchQLAnswer, LangWatchQLRequestState } from "../../../model/lwql-request-state.ts";
+import type {
+  LangWatchQLAnswer,
+  LangWatchQLRequestState,
+} from "../../../model/lwql-request-state.ts";
 
 import { handledErrorEnvelope, lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
 
 const SUBMITTED_SQL = "SELECT trace_id FROM analytics.traces_daily";
+
+function outcomeOf({
+  answer,
+  snapshot,
+}: {
+  answer: LangWatchQLAnswer | null;
+  snapshot: { sql: string; parameters: Record<string, never> };
+}): LangWatchQLRequestState["outcome"] {
+  if (answer === null) return null;
+  if (answer.kind === "result") return { kind: "result", result: answer.result, snapshot };
+
+  return { kind: "error", error: answer.error, snapshot };
+}
 
 function stateWith({
   answer,
@@ -56,12 +72,7 @@ function stateWith({
     submitted: { sql: submittedSql, parameters: {} },
     submissionId: 1,
     isInFlight,
-    outcome:
-      answer === null
-        ? null
-        : answer.kind === "result"
-          ? { kind: "result", result: answer.result, snapshot }
-          : { kind: "error", error: answer.error, snapshot },
+    outcome: outcomeOf({ answer, snapshot }),
   };
 }
 

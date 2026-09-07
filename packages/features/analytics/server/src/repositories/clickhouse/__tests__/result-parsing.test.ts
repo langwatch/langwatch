@@ -339,11 +339,12 @@ describe("result-parsing", () => {
             );
             const aggregation =
               seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
+            const keyedName = seriesItem.key
+              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
+              : `${i}/${seriesItem.metric}/${aggregation}`;
             const seriesName = seriesItem.pipeline
               ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
-              : seriesItem.key
-                ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
-                : `${i}/${seriesItem.metric}/${aggregation}`;
+              : keyedName;
             const value = row[alias];
             if (value !== undefined && value !== null) {
               groupData[groupKey]![seriesName] = Number(value);
@@ -362,11 +363,12 @@ describe("result-parsing", () => {
             );
             const aggregation =
               seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
+            const keyedName = seriesItem.key
+              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
+              : `${i}/${seriesItem.metric}/${aggregation}`;
             const seriesName = seriesItem.pipeline
               ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
-              : seriesItem.key
-                ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
-                : `${i}/${seriesItem.metric}/${aggregation}`;
+              : keyedName;
             const value = row[alias];
             if (value !== undefined && value !== null) {
               bucket[seriesName] = Number(value);

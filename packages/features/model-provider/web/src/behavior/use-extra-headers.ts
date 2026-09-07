@@ -27,6 +27,31 @@ function buildInitialHeaders(provider: MaybeStoredModelProvider): ExtraHeader[] 
   }));
 }
 
+const API_KEY_HEADER: ExtraHeader = { key: "api-key", value: "", concealed: false };
+
+function replaceHeaderAt(
+  headers: ExtraHeader[],
+  index: number,
+  change: (header: ExtraHeader) => ExtraHeader,
+): ExtraHeader[] {
+  return headers.map((header, i) => (i === index ? change(header) : header));
+}
+
+/** Azure gateway coupling: an empty list gets the `api-key` header it needs. */
+function withApiKeyHeader(headers: ExtraHeader[]): ExtraHeader[] {
+  return headers.length > 0 ? headers : [{ ...API_KEY_HEADER }];
+}
+
+function resetHeaders(
+  nextProvider: MaybeStoredModelProvider,
+  useApiGateway: boolean,
+): ExtraHeader[] {
+  const initial = buildInitialHeaders(nextProvider);
+  const needsApiKeyHeader = nextProvider.provider === "azure" && useApiGateway;
+
+  return needsApiKeyHeader ? withApiKeyHeader(initial) : initial;
+}
+
 export function useExtraHeaders({
   provider,
 }: {
@@ -46,34 +71,24 @@ export function useExtraHeaders({
 
   const toggleExtraHeaderConcealed = useCallback((index: number) => {
     setExtraHeaders((prev) =>
-      prev.map((h, i) => (i === index ? { ...h, concealed: !h.concealed } : h)),
+      replaceHeaderAt(prev, index, (h) => ({ ...h, concealed: !h.concealed })),
     );
   }, []);
 
   const setExtraHeaderKey = useCallback((index: number, key: string) => {
-    setExtraHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, key } : h)));
+    setExtraHeaders((prev) => replaceHeaderAt(prev, index, (h) => ({ ...h, key })));
   }, []);
 
   const setExtraHeaderValue = useCallback((index: number, value: string) => {
-    setExtraHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)));
+    setExtraHeaders((prev) => replaceHeaderAt(prev, index, (h) => ({ ...h, value })));
   }, []);
 
-  /** Adds an `api-key` header if the list is currently empty (Azure gateway coupling). */
   const ensureApiKeyHeader = useCallback(() => {
-    setExtraHeaders((prev) => {
-      if (prev.length > 0) return prev;
-      return [{ key: "api-key", value: "", concealed: false }];
-    });
+    setExtraHeaders(withApiKeyHeader);
   }, []);
 
   const reset = useCallback((nextProvider: MaybeStoredModelProvider, useApiGateway: boolean) => {
-    let nextExtraHeaders = buildInitialHeaders(nextProvider);
-
-    if (nextProvider.provider === "azure" && useApiGateway && nextExtraHeaders.length === 0) {
-      nextExtraHeaders = [{ key: "api-key", value: "", concealed: false }];
-    }
-
-    setExtraHeaders(nextExtraHeaders);
+    setExtraHeaders(resetHeaders(nextProvider, useApiGateway));
   }, []);
 
   return {

@@ -67,6 +67,10 @@ export function DatasetCellDisplay({
   const isCompact = rowHeightMode === "compact" && !isExpanded;
   const showClamped = isCompact && isOverflowing;
   const expandedMaxHeight = `${customHeight ?? EXPANDED_DEFAULT_MAX_HEIGHT}px`;
+  const expandedHeight = isExpanded ? expandedMaxHeight : void 0;
+  const cellMaxHeight = isCompact ? `${COMPACT_MAX_HEIGHT}px` : expandedHeight;
+  const expandedOverflow = isExpanded ? "auto" : void 0;
+  const cellOverflow = isCompact ? "hidden" : expandedOverflow;
   const image = dataType === "image" && value ? renderImage(value) : null;
 
   useEffect(() => {
@@ -162,12 +166,7 @@ export function DatasetCellDisplay({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Box
-        ref={contentRef}
-        height="100%"
-        maxHeight={isCompact ? `${COMPACT_MAX_HEIGHT}px` : isExpanded ? expandedMaxHeight : void 0}
-        overflow={isCompact ? "hidden" : isExpanded ? "auto" : void 0}
-      >
+      <Box ref={contentRef} height="100%" maxHeight={cellMaxHeight} overflow={cellOverflow}>
         {image ?? (
           <>
             {displayValue.text}

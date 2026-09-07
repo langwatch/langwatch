@@ -165,6 +165,36 @@ const mergeProviderRowsByKey = (
   return byKey;
 };
 
+/** Custom model ids across every provider row, whether or not the row is enabled. */
+const allCustomModelIds = (
+  providersByKey: Record<string, MaybeStoredModelProvider>,
+  mode: "chat" | "embedding",
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const [providerKey, config] of Object.entries(providersByKey)) {
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    for (const model of customList ?? []) ids.add(`${providerKey}/${model.modelId}`);
+  }
+
+  return ids;
+};
+
+/** One group per provider, custom models at the top of each. */
+const groupOptionsByProvider = (selectOptions: ModelOption[]): GroupedModelOptions => {
+  const byProvider: Record<string, ModelOption[]> = {};
+  for (const option of selectOptions) {
+    const provider = option.value.split("/")[0]!;
+    byProvider[provider] ??= [];
+    byProvider[provider].push(option);
+  }
+
+  return Object.entries(byProvider).map(([provider, models]) => ({
+    provider,
+    icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+    models: [...models.filter((m) => m.isCustom), ...models.filter((m) => !m.isCustom)],
+  }));
+};
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
@@ -190,16 +220,7 @@ export const useModelSelectionOptions = (
   const { selectOptions, groupedByProvider } = useMemo(() => {
     const providersByKey = mergeProviderRowsByKey(providers ?? []);
 
-    // Build a set of custom model IDs for quick lookup
-    const customModelIdSet = new Set<string>();
-    for (const [providerKey, config] of Object.entries(providersByKey)) {
-      const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
-      if (customList) {
-        for (const model of customList) {
-          customModelIdSet.add(`${providerKey}/${model.modelId}`);
-        }
-      }
-    }
+    const customModelIdSet = allCustomModelIds(providersByKey, mode);
 
     // Gemini's Agent Platform door serves chat but not embeddings (404 on
     // :batchEmbedContents), so registry embedding models are dropped here.
@@ -228,25 +249,7 @@ export const useModelSelectionOptions = (
       };
     });
 
-    // Group models by provider, with custom models at the top of each group
-    const groupedByProvider: GroupedModelOptions = Object.entries(
-      selectOptions.reduce(
-        (acc, option) => {
-          const provider = option.value.split("/")[0]!;
-          if (!acc[provider]) {
-            acc[provider] = [];
-          }
-          acc[provider].push(option);
-          return acc;
-        },
-        {} as Record<string, ModelOption[]>,
-      ),
-    ).map(([provider, models]) => ({
-      provider,
-      icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-      // Custom models first, then registry models
-      models: [...models.filter((m) => m.isCustom), ...models.filter((m) => !m.isCustom)],
-    }));
+    const groupedByProvider = groupOptionsByProvider(selectOptions);
 
     return { selectOptions, groupedByProvider };
   }, [providers, options, mode, featureKey]);
@@ -276,6 +279,248 @@ export const useModelSelectionOptions = (
     isEmpty: selectOptions.length === 0 || forceEmpty,
   };
 };
+
+type SelectorSize = "sm" | "md" | "full";
+
+/** Missing provider reads as a refusal; an unknown model only as unresolved. */
+function selectedModelColor({
+  isProviderMissing,
+  isUnknown,
+}: {
+  isProviderMissing: boolean;
+  isUnknown: boolean;
+}): string | undefined {
+  if (isProviderMissing) return "red.600";
+  if (isUnknown) return "gray.500";
+
+  return undefined;
+}
+
+const SKELETON_WIDTHS: Record<SelectorSize, string> = {
+  full: "full",
+  sm: "180px",
+  md: "240px",
+};
+
+const SKELETON_HEIGHTS: Record<SelectorSize, string> = {
+  full: "40px",
+  sm: "28px",
+  md: "40px",
+};
+
+const TRIGGER_WIDTHS: Record<SelectorSize, string> = {
+  full: "100%",
+  sm: "auto",
+  md: "auto",
+};
+
+/** Chakra's Select has no "full" size; the width carries that instead. */
+const SELECT_SIZES: Record<SelectorSize, "sm" | "md" | undefined> = {
+  full: undefined,
+  sm: "sm",
+  md: "md",
+};
+
+/** Case-insensitive match on either the label or the model id, groups dropped when empty. */
+function filterGroupsBySearch(groups: GroupedModelOptions, search: string): GroupedModelOptions {
+  const needle = search.toLowerCase();
+
+  return groups
+    .map((group) => ({
+      ...group,
+      models: group.models.filter(
+        (item) =>
+          item.label.toLowerCase().includes(needle) || item.value.toLowerCase().includes(needle),
+      ),
+    }))
+    .filter((group) => group.models.length > 0);
+}
+
+/** After a search, the highlight follows the first surviving row. */
+function highlightAfterSearch({
+  current,
+  items,
+}: {
+  current: string | null;
+  items: ModelOption[];
+}): { changed: boolean; value: string | null } {
+  const stillListed = items.some((item) => item.value === current);
+  if (stillListed) return { changed: false, value: current };
+
+  const firstValue = items[0]?.value ?? null;
+
+  return { changed: firstValue !== current, value: firstValue };
+}
+
+function UpdateNeededMark({ size }: { size: SelectorSize }) {
+  const isSmall = size === "sm";
+
+  return (
+    <HStack gap={1} color="red.600" flexShrink={0}>
+      <AlertTriangle size={isSmall ? 12 : 14} aria-hidden />
+      <Text
+        fontSize={isSmall ? "2xs" : "xs"}
+        fontWeight="medium"
+        textTransform="uppercase"
+        letterSpacing="wide"
+      >
+        Update needed
+      </Text>
+    </HStack>
+  );
+}
+
+/**
+ * Provider gone (deleted, or never configured at any reachable scope): the
+ * value is still persisted on the form, but it has to change before the
+ * feature can run. Same chip treatment ModelChip renders in the table.
+ */
+function SelectedModelValue({
+  isProviderMissing,
+  isUnknown,
+  label,
+  providerKey,
+  showIcon,
+  size,
+}: {
+  isProviderMissing: boolean;
+  isUnknown: boolean;
+  label: string;
+  providerKey: string;
+  showIcon: boolean;
+  size: SelectorSize;
+}) {
+  const isSmall = size === "sm";
+
+  return (
+    <HStack overflow="hidden" gap={2} align="center">
+      {showIcon && (
+        <ProviderIconGlyph
+          provider={providerKey as keyof typeof modelProviderIcons}
+          size={isSmall ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
+        />
+      )}
+      <Box
+        fontSize={isSmall ? 12 : 14}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+        color={selectedModelColor({ isProviderMissing, isUnknown })}
+        textDecoration={isProviderMissing ? "line-through" : undefined}
+      >
+        {label}
+      </Box>
+      {isProviderMissing && (
+        <Tooltip
+          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          positioning={{ placement: "top" }}
+          showArrow
+        >
+          <UpdateNeededMark size={size} />
+        </Tooltip>
+      )}
+    </HStack>
+  );
+}
+
+function ModelOptionItem({
+  item,
+  showDivider,
+  size,
+}: {
+  item: ModelOption;
+  showDivider: boolean;
+  size: SelectorSize;
+}) {
+  const isSmall = size === "sm";
+
+  return (
+    <>
+      {showDivider && <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />}
+      <Select.Item item={item}>
+        <HStack gap={2}>
+          {item.icon && (
+            <ProviderIconGlyph
+              provider={item.value.split("/")[0] as keyof typeof modelProviderIcons}
+              size={MODEL_ICON_SIZE}
+            />
+          )}
+          <Box fontSize={isSmall ? 12 : 14} fontFamily="mono" paddingY={isSmall ? 0 : "2px"}>
+            {item.label}
+          </Box>
+        </HStack>
+      </Select.Item>
+    </>
+  );
+}
+
+/** A subtle divider marks where a group's custom models end and the registry's begin. */
+function ModelOptionGroup({
+  group,
+  size,
+}: {
+  group: GroupedModelOptions[number];
+  size: SelectorSize;
+}) {
+  const hasCustom = group.models.some((m) => m.isCustom);
+  const hasRegistry = group.models.some((m) => !m.isCustom);
+  const isMixed = hasCustom && hasRegistry;
+
+  return (
+    <Select.ItemGroup
+      label={
+        <HStack gap={2} paddingX={2}>
+          <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+        </HStack>
+      }
+    >
+      {group.models.map((item, itemIndex) => (
+        <ModelOptionItem
+          key={item.value}
+          item={item}
+          showDivider={Boolean(isMixed && !item.isCustom && group.models[itemIndex - 1]?.isCustom)}
+          size={size}
+        />
+      ))}
+    </Select.ItemGroup>
+  );
+}
+
+function ConfigureModelsAction({ size }: { size: SelectorSize }) {
+  return (
+    <Box
+      position="sticky"
+      bottom={0}
+      bg="bg.panel"
+      borderTop="1px solid"
+      borderColor="border"
+      zIndex="1"
+    >
+      <Button
+        width="full"
+        fontWeight="500"
+        color="fg.muted"
+        paddingY={5}
+        justifyContent="flex-start"
+        variant="ghost"
+        colorPalette="gray"
+        size="sm"
+        borderRadius="none"
+        asChild
+      >
+        <Link
+          href="/settings/model-providers"
+          isExternal
+          _hover={{ textDecoration: "none" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <LuSettings2 />
+          <Text fontSize={size === "sm" ? 12 : 14}>Configure available models</Text>
+        </Link>
+      </Button>
+    </Box>
+  );
+}
 
 export const ModelSelector = React.memo(function ModelSelector({
   model,
@@ -315,17 +560,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   // of hooks when isEmpty flips between renders.
   const [modelSearch, setModelSearch] = useState("");
 
-  // Filter models by search and group by provider
-  const filteredGroups = groupedByProvider
-    .map((group) => ({
-      ...group,
-      models: group.models.filter(
-        (item) =>
-          item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
-          item.value.toLowerCase().includes(modelSearch.toLowerCase()),
-      ),
-    }))
-    .filter((group) => group.models.length > 0);
+  const filteredGroups = filterGroupsBySearch(groupedByProvider, modelSearch);
 
   // Flatten for collection (needed by Chakra Select)
   const allFilteredModels = filteredGroups.flatMap((group) => group.models);
@@ -348,55 +583,21 @@ export const ModelSelector = React.memo(function ModelSelector({
     !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
 
   const selectValueText = (
-    <HStack overflow="hidden" gap={2} align="center">
-      {selectedItem?.icon && (
-        <ProviderIconGlyph
-          provider={providerKey as keyof typeof modelProviderIcons}
-          size={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
-        />
-      )}
-      <Box
-        fontSize={size === "sm" ? 12 : 14}
-        fontFamily="mono"
-        lineClamp={1}
-        wordBreak="break-all"
-        color={isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined}
-        textDecoration={isProviderMissing ? "line-through" : undefined}
-      >
-        {selectedItem?.label ?? model}
-      </Box>
-      {isProviderMissing && (
-        <Tooltip
-          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
-          positioning={{ placement: "top" }}
-          showArrow
-        >
-          <HStack gap={1} color="red.600" flexShrink={0}>
-            <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
-            <Text
-              fontSize={size === "sm" ? "2xs" : "xs"}
-              fontWeight="medium"
-              textTransform="uppercase"
-              letterSpacing="wide"
-            >
-              Update needed
-            </Text>
-          </HStack>
-        </Tooltip>
-      )}
-    </HStack>
+    <SelectedModelValue
+      isProviderMissing={isProviderMissing}
+      isUnknown={isUnknown}
+      label={selectedItem?.label ?? model}
+      providerKey={providerKey}
+      showIcon={Boolean(selectedItem?.icon)}
+      size={size}
+    />
   );
 
   const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
   useEffect(() => {
-    const highlightedItem = allFilteredModels.find((item) => item.value === highlightedValue);
-    if (!highlightedItem) {
-      const firstValue = allFilteredModels[0]?.value ?? null;
-      if (firstValue !== highlightedValue) {
-        setHighlightedValue(firstValue);
-      }
-    }
+    const next = highlightAfterSearch({ current: highlightedValue, items: allFilteredModels });
+    if (next.changed) setHighlightedValue(next.value);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelSearch]);
 
@@ -404,11 +605,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   // state doesn't flash before the data resolves.
   if (isLoading) {
     return (
-      <Skeleton
-        width={size === "full" ? "full" : size === "sm" ? "180px" : "240px"}
-        height={size === "sm" ? "28px" : "40px"}
-        borderRadius="md"
-      />
+      <Skeleton width={SKELETON_WIDTHS[size]} height={SKELETON_HEIGHTS[size]} borderRadius="md" />
     );
   }
 
@@ -442,11 +639,11 @@ export const ModelSelector = React.memo(function ModelSelector({
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
       }}
-      size={size === "full" ? undefined : size}
+      size={SELECT_SIZES[size]}
     >
       <Select.Trigger
         className="fix-hidden-inputs"
-        width={size === "full" ? "100%" : "auto"}
+        width={TRIGGER_WIDTHS[size]}
         background="bg"
         borderRadius="lg"
         padding={0}
@@ -480,90 +677,30 @@ export const ModelSelector = React.memo(function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredGroups.map((group) => {
-          const hasCustom = group.models.some((m) => m.isCustom);
-          const hasRegistry = group.models.some((m) => !m.isCustom);
-
-          return (
-            <Select.ItemGroup
-              key={group.provider}
-              label={
-                <HStack gap={2} paddingX={2}>
-                  <Text fontWeight="medium">{titleCase(group.provider)}</Text>
-                </HStack>
-              }
-            >
-              {group.models.map((item, itemIndex) => {
-                // Add a subtle divider between custom and registry models
-                const prevItem = group.models[itemIndex - 1];
-                const showDivider =
-                  hasCustom && hasRegistry && !item.isCustom && prevItem?.isCustom;
-
-                return (
-                  <React.Fragment key={item.value}>
-                    {showDivider && (
-                      <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />
-                    )}
-                    <Select.Item item={item}>
-                      <HStack gap={2}>
-                        {item.icon && (
-                          <ProviderIconGlyph
-                            provider={item.value.split("/")[0] as keyof typeof modelProviderIcons}
-                            size={MODEL_ICON_SIZE}
-                          />
-                        )}
-                        <Box
-                          fontSize={size === "sm" ? 12 : 14}
-                          fontFamily="mono"
-                          paddingY={size === "sm" ? 0 : "2px"}
-                        >
-                          {item.label}
-                        </Box>
-                      </HStack>
-                    </Select.Item>
-                  </React.Fragment>
-                );
-              })}
-            </Select.ItemGroup>
-          );
-        })}
-        {showConfigureAction && (
-          <Box
-            position="sticky"
-            bottom={0}
-            bg="bg.panel"
-            borderTop="1px solid"
-            borderColor="border"
-            zIndex="1"
-          >
-            <Button
-              width="full"
-              fontWeight="500"
-              color="fg.muted"
-              paddingY={5}
-              justifyContent="flex-start"
-              variant="ghost"
-              colorPalette="gray"
-              size="sm"
-              borderRadius="none"
-              asChild
-            >
-              <Link
-                href="/settings/model-providers"
-                isExternal
-                _hover={{ textDecoration: "none" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <LuSettings2 />
-                <Text fontSize={size === "sm" ? 12 : 14}>Configure available models</Text>
-              </Link>
-            </Button>
-          </Box>
-        )}
+        {filteredGroups.map((group) => (
+          <ModelOptionGroup key={group.provider} group={group} size={size} />
+        ))}
+        {showConfigureAction && <ConfigureModelsAction size={size} />}
       </Select.Content>
     </Select.Root>
   );
 });
+
+/** Every custom model id an enabled provider declares for this mode. */
+const enabledCustomModelIds = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  mode: "chat" | "embedding",
+): string[] => {
+  const ids: string[] = [];
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.enabled) continue;
+
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    for (const model of customList ?? []) ids.push(`${providerKey}/${model.modelId}`);
+  }
+
+  return ids;
+};
 
 /** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
 export const getCustomModels = (
@@ -571,20 +708,8 @@ export const getCustomModels = (
   options: string[],
   mode: "chat" | "embedding" = "chat",
 ): string[] => {
-  const customModelIds: string[] = [];
+  const customModelIds = enabledCustomModelIds(modelProviders, mode);
   const registryModelIds: string[] = [];
-
-  // Add custom models first so they appear at the top
-  for (const [providerKey, config] of Object.entries(modelProviders)) {
-    if (!config.enabled) continue;
-    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
-    if (customList) {
-      for (const model of customList) {
-        customModelIds.push(`${providerKey}/${model.modelId}`);
-      }
-    }
-  }
-
   const customSet = new Set(customModelIds);
 
   // Include registry models from enabled providers, filtered by mode

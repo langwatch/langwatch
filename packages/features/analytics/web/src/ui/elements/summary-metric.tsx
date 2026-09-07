@@ -4,6 +4,43 @@ import { HelpCircle } from "react-feather";
 import { Delayed } from "./delayed.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
+function CurrentValue({
+  current,
+  format,
+}: {
+  current?: number | string;
+  format?: ((value: number) => string) | ((value: string) => string) | string;
+}) {
+  if (current === undefined) {
+    return (
+      <Delayed takeSpace>
+        <Skeleton height="1.5em" width="78px" />
+      </Delayed>
+    );
+  }
+  if (typeof format === "function") {
+    // @ts-expect-error the metric's `format` is a string or a formatter, and
+    // the narrowing above does not reach through the union's declaration.
+    return <>{format(current)}</>;
+  }
+
+  return <>{numeral(current).format(format ?? "0a")}</>;
+}
+
+/** No delta reads neutral; a directionless metric stays muted either way. */
+function changeColorFor({
+  change,
+  increaseReversal,
+}: {
+  change: number | undefined;
+  increaseReversal: number;
+}): string {
+  if (change === undefined || change === 0) return "gray.500";
+  if (increaseReversal === 0) return "fg.muted";
+
+  return change * increaseReversal > 0 ? "green.500" : "red.500";
+}
+
 export function SummaryMetric({
   label,
   current,
@@ -122,11 +159,12 @@ export function SummaryMetricValue({
   // A delta needs a real baseline: against a zero/absent previous period any
   // percentage is meaningless (it used to render as "+999%+ / 0 previous"),
   // so the value stands alone until there is something to compare with.
-  const change =
-    typeof current === "number" && typeof previous === "number" && previous > 0
-      ? Math.round(((current - previous) / previous) * 100) / 100
-      : undefined;
-  const increaseReversal = increaseIs === "neutral" ? 0 : increaseIs === "bad" ? -1 : 1;
+  const isComparable = typeof current === "number" && typeof previous === "number" && previous > 0;
+  const change = isComparable
+    ? Math.round(((current - previous) / previous) * 100) / 100
+    : undefined;
+  const directedReversal = increaseIs === "bad" ? -1 : 1;
+  const increaseReversal = increaseIs === "neutral" ? 0 : directedReversal;
 
   const formatChangeValue = (value: number) => {
     const abs = Math.abs(value);
@@ -143,31 +181,12 @@ export function SummaryMetricValue({
     return numeral(value).format(format ?? "0a");
   };
 
-  const changeColor =
-    change === undefined || change === 0
-      ? "gray.500"
-      : increaseReversal === 0
-        ? "fg.muted"
-        : change * increaseReversal > 0
-          ? "green.500"
-          : "red.500";
+  const changeColor = changeColorFor({ change, increaseReversal });
 
   return (
     <VStack align="start" gap={1}>
       <Box textStyle="2xl" fontWeight="600">
-        {current !== undefined ? (
-          typeof format === "function" ? (
-            // @ts-expect-error same union as above: a formatter, narrowed by typeof,
-            // that the declaration still types as `string | ((n: number) => string)`.
-            format(current)
-          ) : (
-            numeral(current).format(format ?? "0a")
-          )
-        ) : (
-          <Delayed takeSpace>
-            <Skeleton height="1.5em" width="78px" />
-          </Delayed>
-        )}
+        <CurrentValue current={current} format={format} />
       </Box>
       {change !== undefined && (
         <VStack align="start" gap={0} textStyle="xs">

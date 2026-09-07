@@ -698,14 +698,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.filter-translator.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts",
       "measured": "2026-09-06"
     },
@@ -734,10 +726,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/analytics/web/src/behavior/use-langwatch-ql-vega-view.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/analytics/web/src/model/grid-positions.ts",
       "measured": "2026-09-06"
     },
@@ -751,14 +739,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/analytics/web/src/screens/analytics/custom-graph.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/analytics/web/src/ui/elements/langwatch-ql-schema-browser.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/analytics/web/src/ui/elements/period-selector.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1158,10 +1138,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/behavior/datasets/use-dataset-slug-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/dataset/web/src/behavior/use-bulk-upload.ts",
       "measured": "2026-09-06"
     },
@@ -1174,19 +1150,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/behavior/use-dataset-slug-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/dataset/web/src/behavior/use-table-keyboard-navigation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/model/convert-record-values.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/model/dataset-image-url.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1195,14 +1159,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/dataset/web/src/screens/datasets/dataset-editor.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/screens/datasets/datasets.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/ui/blocks/dataset-picker-list.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1231,10 +1187,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/dataset/web/src/ui/sections/add-rows-from-csv-modal.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dataset/web/src/ui/sections/bulk-upload-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1998,86 +1950,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/behavior/model-provider-feedback.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/behavior/use-codex-device-sign-in.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/behavior/use-extra-headers.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/behavior/use-model-provider-api-key-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/behavior/use-model-provider-form.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/behavior/use-provider-form-submit.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/model/zod-field-errors.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/screens/model-provider/model-providers.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/elements/model-chip.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/elements/model-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/elements/modelProviders/icons-map.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/elements/provider-model-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/add-custom-embeddings-model-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/add-custom-model-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/default-model-override-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/llm-model-cost-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/llm-model-cost-matching-spans.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/model-provider-credentials-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/model-provider-custom-model-input.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/monitor/server/src/transport/api-trpc/monitor.api.ts",
       "measured": "2026-09-06"
     },
@@ -2498,10 +2370,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/prompt/web/src/screens/prompt-studio/chat/prompt-playground-chat.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/prompt/web/src/screens/prompt-studio/chat/synced-chat-input.tsx",
       "measured": "2026-09-06"
     },
@@ -2535,10 +2403,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/prompt/web/src/screens/prompt-studio/sidebar/published-prompt-actions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/prompt/web/src/surfaces/llm-parameters/max-tokens.utils.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3122,10 +2986,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/drawer.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/behavior/explorer/ai/use-typewriter-placeholder.ts",
       "measured": "2026-09-06"
     },
@@ -3143,10 +3003,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/behavior/filter.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/flame/use-flame-axis-zoom.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3214,10 +3070,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/behavior/view.store.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/model/attribute-format.ts",
       "measured": "2026-09-06"
     },
@@ -3246,19 +3098,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/model/url-state.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/blocks/explorer/onboarding/typewriter-hero.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/blocks/trace-input-output.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/elements/explorer/filter-sidebar/sidebar-resize-handle.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3271,10 +3115,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/elements/explorer/trace-drawer/json-highlight.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/elements/markdown/shiki-highlight.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3299,10 +3139,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/ai/ai-prompt-input.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/ai/use-ai-trace-action.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3338,14 +3174,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-conversation-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-drawer-url-sync.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-export-traces.ts",
       "measured": "2026-09-06"
     },
@@ -3362,19 +3190,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-span-tree.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-drawer-navigation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-drawer-shortcuts.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-drawer-url-hydrator.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3383,14 +3199,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-freshness.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-annotations.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-refresh.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3403,10 +3211,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-view-switching-dim.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/hooks/use-visible-trace-ids.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3426,35 +3230,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/auto-uppercase-operators.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/placeholder-editor.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/token-value-picker.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/use-filter-editor.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/toolbar/bulk-action-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/toolbar/column-picker-content.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3482,15 +3262,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/use-rail-layout.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3514,27 +3286,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/io-viewer-body.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/io-viewer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/panes/pane-layout.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/panes/resize-rail.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/panes/use-pane-layout.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3547,26 +3303,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/span-tab-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/accordion-shell.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/span-accordions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/use-section-focus-glow.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-header-chips.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3590,23 +3326,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/waterfall-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/conversation-groups.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/conversation-lens-body.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/group-lens-body.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/io-preview.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3638,19 +3362,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/trace-table/use-trace-lens-keyboard.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/explorer/traces-page/traces-page.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/external-image.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/flame/flame-breadcrumbs.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3659,10 +3371,6 @@
     },
     {
       "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/flame/flame-view.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/trace/web/src/ui/sections/flame/minimap.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4750,26 +4458,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/features/model-provider/web/src/behavior/use-provider-form-submit.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/model-provider/web/src/ui/elements/model-chip.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/model-provider/web/src/ui/elements/model-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/model-provider/web/src/ui/elements/provider-model-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|packages/features/navigation/web/src/ui/sections/shell-page-body.tsx",
       "measured": "2026-09-06"
     },
@@ -4994,27 +4682,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/token-value-picker.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/search-bar/use-filter-editor.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -5023,18 +4691,6 @@
     },
     {
       "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-card.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/span-accordions.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6022,154 +5678,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/analytics/server/src/repositories/clickhouse/__tests__/join-time-bound-partition-column.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.analytics.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/rules/analytics-field-availability.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/rules/analytics-filter-conditions.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/rules/langwatch-ql-query-walk.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/analytics.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/langwatch-ql-bucket-diagnostics.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/langwatch-ql-diagnostics.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/langwatch-ql-executor.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/langwatch-ql-production-provisioning.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/legacy-filter-matching.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/services/precondition-trace-data.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/server/src/transport/api-trpc/langwatch-ql.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/behavior/__tests__/no-background-work.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/behavior/use-analytics-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/behavior/use-widget-granularity.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/model/analytics-period.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/model/chart-date.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/model/grid-positions.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/model/lwql-schema-model.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/model/lwql-value-format.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/screens/analytics/custom-graph.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/blocks/langwatch-ql-result-pane.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/elements/langwatch-ql-parameters-editor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/elements/period-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/__tests__/vega-lazy-boundary.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/custom-graph.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/fields-filters.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/filters/fields-filters.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/filters/topics-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/langwatch-ql-workbench.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/saved-views-logic.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/analytics/web/src/ui/sections/topics-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts",
       "measured": "2026-09-06"
     },
@@ -6559,34 +6067,6 @@
     },
     {
       "key": "condition-shape|packages/features/dataset/server/src/services/dataset.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/behavior/use-dataset-editor-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/model/column-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/model/convert-record-values.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/model/reserved-columns.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/screens/datasets/dataset-editor.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/ui/sections/bulk-upload-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7070,34 +6550,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/model-provider/web/src/behavior/use-model-provider-form.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/web/src/model/__tests__/model-provider-credential-rules.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/web/src/model/model-error.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/web/src/model/model-provider-helpers.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/web/src/ui/elements/modelProviders/icons-map.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/web/src/ui/sections/model-provider-advanced-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/monitor/contract/src/monitor.ts",
       "measured": "2026-09-06"
     },
@@ -7295,86 +6747,6 @@
     },
     {
       "key": "condition-shape|packages/features/prompt/server/src/transport/api-rest/prompt.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/model/format-llm-error.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/model/prompts/local-config-to-form-values.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/model/zod-salvage.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/screens/prompt-studio/chat/prompt-playground-chat.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/screens/prompt-studio/dialogs/deploy-prompt-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/screens/prompt-studio/fields/prompt-messages-field.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/screens/prompt-studio/model-selection/outputs-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/screens/prompt-studio/prompt-config-provider.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/surfaces/llm-parameters/parameter-config.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/surfaces/llm-parameters/parameter-registry.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/surfaces/variables/form-variables-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/surfaces/variables/prompt-textarea/prompt-textarea.utils.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/surfaces/variables/variable-insert-menu.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/surfaces/variables/variable-mapping-input.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/ui/blocks/render-code.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/ui/elements/outputs/form-outputs-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/ui/elements/outputs/outputs-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/ui/elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/ui/sections/prompts/deploy-prompt-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/features/prompt/web/src/ui/sections/prompts/prompt-editor-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8394,94 +7766,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/analytics/server/src/repositories/__tests__/analytics.service.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/server/src/repositories/clickhouse/__tests__/result-parsing.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.analytics-persistence.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.timeseries-row-parser.mapper.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/server/src/rules/__tests__/lwql-view-catalog.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/server/src/services/langwatch-ql-view-statements.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/behavior/use-filter-toggle.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/screens/analytics/analytics-query.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/blocks/__tests__/langwatch-ql-result-pane.integration.test.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/elements/delayed.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/elements/langwatch-ql-schema-browser.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/elements/summary-metric.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/elements/vega-lite-spec-editor.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/__tests__/vega-lazy-boundary.unit.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/custom-graph.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/feedbacks-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/fields-filters.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/filters/fields-filters.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/filters/filter-toggle.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/filters/topics-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/analytics/web/src/ui/sections/topics-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/annotation/server/src/repositories/prisma/prisma.annotation-queue.repository.ts",
       "measured": "2026-09-06"
     },
@@ -8703,54 +7987,6 @@
     },
     {
       "key": "nested-ternary|packages/features/dataset/server/src/rules/dataset-selection.rules.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/behavior/datasets/use-dataset-slug-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/behavior/use-dataset-slug-validation.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/model/batch-name-dedup.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/screens/datasets/datasets.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/blocks/dataset-picker-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/blocks/dataset-slug-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/elements/dataset-cell-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/sections/add-or-edit-dataset-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/sections/bulk-upload-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9086,46 +8322,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/model-provider/web/src/behavior/use-codex-device-sign-in.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/behavior/use-model-provider-form.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/behavior/use-provider-form-submit.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/screens/model-provider/model-providers.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/ui/elements/model-chip.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/ui/elements/model-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/ui/sections/default-models-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/ui/sections/llm-model-cost-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/ui/sections/llm-model-cost-matching-spans.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/model-provider/web/src/ui/sections/model-provider-scope-section.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/monitor/web/src/screens/online-evaluations/online-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
@@ -9223,62 +8419,6 @@
     },
     {
       "key": "nested-ternary|packages/features/project/web/src/screens/home/home.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/behavior/use-load-span-into-prompt-studio.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/screens/prompt-studio/browser/window/prompt-browser-window-content.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/screens/prompt-studio/fields/messages/message-role-label.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/screens/prompt-studio/fields/prompt-messages-field.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/screens/prompt-studio/model-selection/llm-model-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/screens/prompt-studio/model-selection/model-selector.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/screens/prompt-studio/resizable-divider.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/surfaces/llm-parameters/use-slider-control.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/surfaces/variables/prompt-textarea/prompt-textarea-with-variables.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/surfaces/variables/variable-mapping-input.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/ui/blocks/prompt-push-dialog.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/ui/elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/prompt/web/src/ui/sections/prompt-list-drawer.tsx",
       "measured": "2026-09-06"
     },
     {

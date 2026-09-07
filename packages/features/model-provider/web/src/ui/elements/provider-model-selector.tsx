@@ -41,6 +41,249 @@ function filterGroupModels(group: GroupedModelOptions[number], search: string): 
   );
 }
 
+type SelectorSize = "sm" | "md" | "full";
+
+const TRIGGER_WIDTHS: Record<SelectorSize, string> = {
+  full: "100%",
+  sm: "auto",
+  md: "auto",
+};
+
+/** Chakra's Select has no "full" size; the width carries that instead. */
+const SELECT_SIZES: Record<SelectorSize, "sm" | "md" | undefined> = {
+  full: undefined,
+  sm: "sm",
+  md: "md",
+};
+
+function iconSlotFor(size: SelectorSize): string {
+  return size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE;
+}
+
+function labelFontSize(size: SelectorSize): number {
+  return size === "sm" ? 12 : 14;
+}
+
+/**
+ * Alias entries (`<provider>/latest`, `<provider>/latest-mini`) read as
+ * "Latest" / "Latest smaller model" with the resolved id as a subtitle, so
+ * the picker shows what the pick would actually get.
+ */
+function toModelOption({
+  displayNames,
+  modelValue,
+}: {
+  displayNames: Record<string, string> | undefined;
+  modelValue: string;
+}): ModelOption {
+  const modelProvider = modelValue.split("/")[0] ?? "";
+  const icon = modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
+  if (!isLatestAlias(modelValue)) {
+    return {
+      label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
+      value: modelValue,
+      icon,
+      subtitle: "",
+    };
+  }
+
+  const suffix = modelValue.split("/")[1] ?? "";
+
+  return {
+    label: suffix === "latest" ? "Latest" : "Latest smaller model",
+    value: modelValue,
+    icon,
+    subtitle: resolveLatestAlias(modelValue) ?? "",
+  };
+}
+
+function groupOptionsByProvider(selectOptions: ModelOption[]): GroupedModelOptions {
+  const byProvider: Record<string, ModelOption[]> = {};
+  for (const option of selectOptions) {
+    const provider = option.value.split("/")[0]!;
+    byProvider[provider] ??= [];
+    byProvider[provider].push(option);
+  }
+
+  return Object.entries(byProvider).map(([provider, models]) => ({
+    provider,
+    icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+    models,
+  }));
+}
+
+/**
+ * The inherit placeholder in the trigger: the inherited model's icon and
+ * family at reduced opacity, so an unpicked field reads as "this is what you
+ * get if you do not override" rather than as an empty selector.
+ */
+function InheritValueText({
+  displayNames,
+  inheritIcon,
+  inheritOption,
+  size,
+}: {
+  displayNames?: Record<string, string>;
+  inheritIcon: React.ReactNode;
+  inheritOption: { label: string; model?: string };
+  size: SelectorSize;
+}) {
+  const inheritedModel = inheritOption.model;
+
+  return (
+    <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
+      {inheritIcon && <Box minWidth={iconSlotFor(size)}>{inheritIcon}</Box>}
+      <Box
+        fontSize={labelFontSize(size)}
+        fontFamily={inheritedModel ? "mono" : undefined}
+        lineClamp={1}
+        wordBreak="break-all"
+      >
+        {inheritedModel
+          ? modelDisplayLabel({ fullModelId: inheritedModel, displayNames })
+          : inheritOption.label}
+      </Box>
+    </HStack>
+  );
+}
+
+function SelectedValueText({
+  displayNames,
+  isUnknown,
+  model,
+  selectedIcon,
+  selectedLabel,
+  size,
+}: {
+  displayNames?: Record<string, string>;
+  isUnknown: boolean;
+  model: string;
+  selectedIcon: React.ReactNode;
+  selectedLabel: string | undefined;
+  size: SelectorSize;
+}) {
+  return (
+    <HStack overflow="hidden" gap={2} align="center">
+      {selectedIcon && <Box minWidth={iconSlotFor(size)}>{selectedIcon}</Box>}
+      <Box
+        fontSize={labelFontSize(size)}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+        color={isUnknown ? "gray.500" : undefined}
+      >
+        {selectedLabel ?? modelDisplayLabel({ fullModelId: model, displayNames })}
+      </Box>
+    </HStack>
+  );
+}
+
+/**
+ * A free-standing row at the top of the dropdown, with no group wrapper and
+ * no label. The prior "Cascade" header was implementation jargon; the Inherit
+ * row reads well enough on its own.
+ */
+function InheritItem({
+  displayNames,
+  inheritIcon,
+  inheritItem,
+  label,
+  model,
+}: {
+  displayNames?: Record<string, string>;
+  inheritIcon: React.ReactNode;
+  inheritItem: ModelOption;
+  label: string;
+  model?: string;
+}) {
+  return (
+    <Select.Item item={inheritItem} data-testid="provider-model-selector-inherit">
+      <HStack gap={2}>
+        {inheritIcon && (
+          <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+            {inheritIcon}
+          </Box>
+        )}
+        <Box>
+          <Text fontSize="sm" fontWeight="medium">
+            {label}
+          </Text>
+          {model && (
+            <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineClamp={1}>
+              {modelDisplayLabel({ fullModelId: model, displayNames })}
+            </Text>
+          )}
+        </Box>
+      </HStack>
+    </Select.Item>
+  );
+}
+
+/**
+ * Two-line alias items keep icon and label on one HStack so the icon anchors
+ * to the label line; the resolved-id subtitle wraps under the text column,
+ * indented past the icon slot.
+ */
+function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
+  return (
+    <Select.Item item={item}>
+      <Box>
+        <HStack gap={2} align="center">
+          {item.icon && (
+            <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+              {item.icon}
+            </Box>
+          )}
+          <Box
+            fontSize={labelFontSize(size)}
+            fontFamily={item.subtitle ? undefined : "mono"}
+            fontWeight={item.subtitle ? "medium" : undefined}
+            paddingY={size === "sm" ? 0 : "2px"}
+          >
+            {item.label}
+          </Box>
+        </HStack>
+        {item.subtitle && (
+          <Text
+            fontSize="xs"
+            color="fg.muted"
+            fontFamily="mono"
+            lineClamp={1}
+            paddingLeft={`calc(${MODEL_ICON_SIZE} + var(--chakra-spacing-2))`}
+          >
+            {item.subtitle}
+          </Text>
+        )}
+      </Box>
+    </Select.Item>
+  );
+}
+
+function ModelItemGroup({
+  group,
+  size,
+}: {
+  group: GroupedModelOptions[number];
+  size: SelectorSize;
+}) {
+  return (
+    <Select.ItemGroup
+      label={
+        <HStack gap={2}>
+          <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+            {group.icon}
+          </Box>
+          <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+        </HStack>
+      }
+    >
+      {group.models.map((item) => (
+        <ModelItem key={item.value} item={item} size={size} />
+      ))}
+    </Select.ItemGroup>
+  );
+}
+
 /**
  * Model selector across providers, grouped by provider icon (from each model's prefix).
  * `inheritOption`, when set, prepends an "Inherit" entry that emits `INHERIT_SENTINEL` on pick,
@@ -82,51 +325,12 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   // instead of the raw alias suffix, plus they carry the resolved model id
   // as a subtitle so the user sees what they'd actually get.
   const selectOptions = useMemo(
-    () =>
-      options.map((modelValue) => {
-        const modelProvider = modelValue.split("/")[0] ?? "";
-        const icon = modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
-        if (isLatestAlias(modelValue)) {
-          const suffix = modelValue.split("/")[1] ?? "";
-          const aliasLabel = suffix === "latest" ? "Latest" : "Latest smaller model";
-          const resolved = resolveLatestAlias(modelValue);
-          return {
-            label: aliasLabel,
-            value: modelValue,
-            icon,
-            subtitle: resolved ?? "",
-          };
-        }
-        return {
-          label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
-          value: modelValue,
-          icon,
-          subtitle: "",
-        };
-      }),
+    () => options.map((modelValue) => toModelOption({ displayNames, modelValue })),
     [options, displayNames],
   );
 
-  // Group models by provider
   const groupedByProvider: GroupedModelOptions = useMemo(
-    () =>
-      Object.entries(
-        selectOptions.reduce(
-          (acc, option) => {
-            const provider = option.value.split("/")[0]!;
-            if (!acc[provider]) {
-              acc[provider] = [];
-            }
-            acc[provider].push(option);
-            return acc;
-          },
-          {} as Record<string, ModelOption[]>,
-        ),
-      ).map(([provider, models]) => ({
-        provider,
-        icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-        models,
-      })),
+    () => groupOptionsByProvider(selectOptions),
     [selectOptions],
   );
 
@@ -175,42 +379,24 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
   const isUnknown = !!model && !selectedItem;
 
-  const selectValueText =
-    !model && inheritOption ? (
-      <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
-        {inheritIcon && (
-          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>{inheritIcon}</Box>
-        )}
-        <Box
-          fontSize={size === "sm" ? 12 : 14}
-          fontFamily={inheritOption.model ? "mono" : undefined}
-          lineClamp={1}
-          wordBreak="break-all"
-        >
-          {inheritOption.model
-            ? modelDisplayLabel({
-                fullModelId: inheritOption.model,
-                displayNames,
-              })
-            : inheritOption.label}
-        </Box>
-      </HStack>
-    ) : (
-      <HStack overflow="hidden" gap={2} align="center">
-        {selectedIcon && (
-          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>{selectedIcon}</Box>
-        )}
-        <Box
-          fontSize={size === "sm" ? 12 : 14}
-          fontFamily="mono"
-          lineClamp={1}
-          wordBreak="break-all"
-          color={isUnknown ? "gray.500" : undefined}
-        >
-          {selectedItem?.label ?? modelDisplayLabel({ fullModelId: model, displayNames })}
-        </Box>
-      </HStack>
-    );
+  const showInheritPlaceholder = !model && inheritOption;
+  const selectValueText = showInheritPlaceholder ? (
+    <InheritValueText
+      displayNames={displayNames}
+      inheritIcon={inheritIcon}
+      inheritOption={inheritOption}
+      size={size}
+    />
+  ) : (
+    <SelectedValueText
+      displayNames={displayNames}
+      isUnknown={isUnknown}
+      model={model}
+      selectedIcon={selectedIcon}
+      selectedLabel={selectedItem?.label}
+      size={size}
+    />
+  );
 
   const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
@@ -244,12 +430,12 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
       }}
-      size={size === "full" ? undefined : size}
+      size={SELECT_SIZES[size]}
       disabled={disabled}
     >
       <Select.Trigger
         className="fix-hidden-inputs"
-        width={size === "full" ? "100%" : "auto"}
+        width={TRIGGER_WIDTHS[size]}
         background="bg.panel"
         padding={0}
       >
@@ -287,86 +473,17 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {inheritOption &&
-          inheritItem && (
-            // Free-standing item at the top of the dropdown — no group
-            // wrapper, no label. The prior "Cascade" group header was
-            // jargon ("cascade" is implementation talk, not a thing
-            // users think about); leaving the Inherit row to read on
-            // its own is enough context.
-            <Select.Item item={inheritItem} data-testid="provider-model-selector-inherit">
-              <HStack gap={2}>
-                {inheritIcon && (
-                  <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                    {inheritIcon}
-                  </Box>
-                )}
-                <Box>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {inheritOption.label}
-                  </Text>
-                  {inheritOption.model && (
-                    <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineClamp={1}>
-                      {modelDisplayLabel({
-                        fullModelId: inheritOption.model,
-                        displayNames,
-                      })}
-                    </Text>
-                  )}
-                </Box>
-              </HStack>
-            </Select.Item>
-          )}
+        {inheritOption && inheritItem && (
+          <InheritItem
+            displayNames={displayNames}
+            inheritIcon={inheritIcon}
+            inheritItem={inheritItem}
+            label={inheritOption.label}
+            model={inheritOption.model}
+          />
+        )}
         {filteredGroups.map((group) => (
-          <Select.ItemGroup
-            key={group.provider}
-            label={
-              <HStack gap={2}>
-                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                  {group.icon}
-                </Box>
-                <Text fontWeight="medium">{titleCase(group.provider)}</Text>
-              </HStack>
-            }
-          >
-            {group.models.map((item) => (
-              <Select.Item key={item.value} item={item}>
-                {/* Two-line alias items keep icon + label on the same
-                    HStack so the icon visually anchors to the label
-                    line. The resolved-id subtitle wraps under the
-                    text column, indented past the icon slot so the
-                    column reads cleanly. */}
-                <Box>
-                  <HStack gap={2} align="center">
-                    {item.icon && (
-                      <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                        {item.icon}
-                      </Box>
-                    )}
-                    <Box
-                      fontSize={size === "sm" ? 12 : 14}
-                      fontFamily={item.subtitle ? undefined : "mono"}
-                      fontWeight={item.subtitle ? "medium" : undefined}
-                      paddingY={size === "sm" ? 0 : "2px"}
-                    >
-                      {item.label}
-                    </Box>
-                  </HStack>
-                  {item.subtitle && (
-                    <Text
-                      fontSize="xs"
-                      color="fg.muted"
-                      fontFamily="mono"
-                      lineClamp={1}
-                      paddingLeft={`calc(${MODEL_ICON_SIZE} + var(--chakra-spacing-2))`}
-                    >
-                      {item.subtitle}
-                    </Text>
-                  )}
-                </Box>
-              </Select.Item>
-            ))}
-          </Select.ItemGroup>
+          <ModelItemGroup key={group.provider} group={group} size={size} />
         ))}
       </Select.Content>
     </Select.Root>

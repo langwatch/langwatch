@@ -25,16 +25,18 @@ export function isReservedColumnName(columnName: string): boolean {
  */
 export function getSafeColumnName(columnName: string, existingNames: Set<string>): string {
   // If the name is not reserved and doesn't exist, return as-is
-  if (!isReservedColumnName(columnName) && !existingNames.has(columnName)) {
-    return columnName;
-  }
+  const isAvailable = !isReservedColumnName(columnName) && !existingNames.has(columnName);
+  if (isAvailable) return columnName;
 
   // Generate a unique name by trying different suffixes
   let candidate = columnName;
   const suffix = "_";
   let counter = 0;
 
-  while (isReservedColumnName(candidate) || existingNames.has(candidate)) {
+  for (;;) {
+    const isTaken = isReservedColumnName(candidate) || existingNames.has(candidate);
+    if (!isTaken) break;
+
     if (counter === 0) {
       candidate = `${columnName}${suffix}`;
     } else {

@@ -83,11 +83,12 @@ export function CustomQueryPage() {
         </Badge>
       </PageLayout.Header>
 
-      {resolving ? (
+      {resolving && (
         <Box display="flex" justifyContent="center" paddingY={8}>
           <Spinner />
         </Box>
-      ) : available ? (
+      )}
+      {!resolving && available && (
         <Box width="full" flex="1" minHeight={0} display="flex" flexDirection="column">
           {/*
             Keyed on the project so switching projects starts a clean
@@ -98,7 +99,8 @@ export function CustomQueryPage() {
           */}
           <LangWatchQLWorkbench key={projectId} projectId={projectId} />
         </Box>
-      ) : (
+      )}
+      {!resolving && !available && (
         <AvailabilityFallback error={availability.error} reason={availability.data?.reason} />
       )}
     </>

@@ -260,11 +260,8 @@ export const PromptTextAreaWithVariables = ({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       // Determine which menu is active
-      const activeMenu = variableMenu.menuOpen
-        ? variableMenu
-        : logicMenu.menuOpen
-          ? logicMenu
-          : null;
+      const openLogicMenu = logicMenu.menuOpen ? logicMenu : null;
+      const activeMenu = variableMenu.menuOpen ? variableMenu : openLogicMenu;
 
       if (!activeMenu) {
         if (e.key === "Escape") return;
@@ -436,6 +433,14 @@ export const PromptTextAreaWithVariables = ({
 
   const visibleParagraphPositions = getVisibleParagraphPositions(isHovered);
 
+  const resizedHeight = userResizedHeight ? `${userResizedHeight}px` : undefined;
+  const textareaHeight = fillHeight ? "100%" : resizedHeight;
+  const defaultContextBottom = borderless ? "2px" : "10px";
+  const addContextBottom =
+    reservedBottomPadding !== null
+      ? `${reservedBottomPadding + (borderless ? 0 : 8)}px`
+      : defaultContextBottom;
+
   return (
     <>
       <Box
@@ -484,7 +489,7 @@ export const PromptTextAreaWithVariables = ({
             width: "100%",
             minHeight: fillHeight ? "100%" : minHeight,
             maxHeight: fillHeight ? undefined : maxHeight,
-            height: fillHeight ? "100%" : userResizedHeight ? `${userResizedHeight}px` : undefined,
+            height: textareaHeight,
             fontFamily: borderless
               ? undefined
               : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
@@ -591,13 +596,7 @@ export const PromptTextAreaWithVariables = ({
           {showAddContextButton && isHovered && !disabled && (
             <HStack
               position="absolute"
-              bottom={
-                reservedBottomPadding !== null
-                  ? `${reservedBottomPadding + (borderless ? 0 : 8)}px`
-                  : borderless
-                    ? "2px"
-                    : "10px"
-              }
+              bottom={addContextBottom}
               right={2}
               gap={1.5}
               data-testid="add-context-buttons"

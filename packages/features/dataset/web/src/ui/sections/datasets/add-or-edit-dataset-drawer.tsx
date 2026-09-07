@@ -73,6 +73,38 @@ type FormValues = {
 
 /** Columns a freshly created dataset starts with, matching the trace fields
  *  a record carries by default. */
+type SavedDataset = { datasetId?: string } | undefined;
+
+function datasetDrawerHeading({
+  datasetToSave,
+  isEditing,
+}: {
+  datasetToSave: SavedDataset;
+  isEditing: boolean;
+}): string {
+  if (isEditing) return "Edit Dataset";
+
+  return datasetToSave ? "Save Dataset" : "New Dataset";
+}
+
+function datasetSubmitLabel({
+  datasetToSave,
+  localOnly,
+}: {
+  datasetToSave: SavedDataset;
+  localOnly: boolean;
+}): string {
+  if (localOnly) return "Apply";
+
+  return datasetToSave ? "Save" : "Create Dataset";
+}
+
+function datasetSavedTitle(datasetToSave: SavedDataset): string {
+  if (datasetToSave?.datasetId) return "Dataset Updated";
+
+  return datasetToSave ? "Dataset Saved" : "Dataset Created";
+}
+
 export const DATASET_DEFAULT_COLUMNS: DatasetColumns = [
   { name: "trace_id", type: "string" },
   { name: "timestamp", type: "date" },
@@ -207,11 +239,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             columnTypes: data.columnTypes as DatasetColumns,
           });
           toaster.create({
-            title: props.datasetToSave?.datasetId
-              ? "Dataset Updated"
-              : props.datasetToSave
-                ? "Dataset Saved"
-                : "Dataset Created",
+            title: datasetSavedTitle(props.datasetToSave),
             description: props.datasetToSave?.datasetId
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
@@ -269,11 +297,10 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         <Drawer.Header>
           <HStack>
             <Heading>
-              {props.datasetToSave?.datasetId || props.localOnly
-                ? "Edit Dataset"
-                : props.datasetToSave
-                  ? "Save Dataset"
-                  : "New Dataset"}
+              {datasetDrawerHeading({
+                datasetToSave: props.datasetToSave,
+                isEditing: Boolean(props.datasetToSave?.datasetId || props.localOnly),
+              })}
             </Heading>
           </HStack>
         </Drawer.Header>
@@ -372,7 +399,10 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               minWidth="fit-content"
               loading={upsertDataset.isPending}
             >
-              {props.localOnly ? "Apply" : props.datasetToSave ? "Save" : "Create Dataset"}
+              {datasetSubmitLabel({
+                datasetToSave: props.datasetToSave,
+                localOnly: Boolean(props.localOnly),
+              })}
             </Button>
           </form>
         </Drawer.Body>

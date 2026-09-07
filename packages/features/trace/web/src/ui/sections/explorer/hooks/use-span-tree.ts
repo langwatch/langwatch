@@ -78,12 +78,8 @@ export function useSpanTreeCanonical() {
   // corrupt the tree.
   const { data: delta, dataUpdatedAt: deltaUpdatedAt } = deltaQuery;
   useEffect(() => {
-    if (!deltaUpdatedAt || delta === undefined) return;
-    const queryKey = spanTreeQueryKey(queryArgs);
-    const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
-    if (!existing) return;
-    const merged = mergeSpanTreeDelta(existing, delta);
-    if (merged !== existing) queryClient.setQueryData(queryKey, merged);
+    if (!deltaUpdatedAt) return;
+    mergeDeltaIntoCachedTree({ delta, queryArgs, queryClient });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deltaUpdatedAt]);
 
@@ -147,4 +143,22 @@ export function useSpanTreeWithCaptured() {
  */
 export function useSpanTree() {
   return useSpanTreeWithCaptured().corrected;
+}
+
+/** Folds one poll's delta into the assembled tree already in the cache. */
+function mergeDeltaIntoCachedTree({
+  delta,
+  queryArgs,
+  queryClient,
+}: {
+  delta: Parameters<typeof mergeSpanTreeDelta>[1] | undefined;
+  queryArgs: ReturnType<typeof useTraceQueryArgs>["queryArgs"];
+  queryClient: ReturnType<typeof useQueryClient>;
+}): void {
+  if (delta === undefined) return;
+  const queryKey = spanTreeQueryKey(queryArgs);
+  const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
+  if (!existing) return;
+  const merged = mergeSpanTreeDelta(existing, delta);
+  if (merged !== existing) queryClient.setQueryData(queryKey, merged);
 }

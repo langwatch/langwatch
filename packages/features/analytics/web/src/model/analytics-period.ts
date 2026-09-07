@@ -101,12 +101,12 @@ export const readAnalyticsPeriod = ({
 }): AnalyticsPeriodReading => {
   const startDate = query.startDate;
   const endDate = query.endDate;
-  if (
+  const hasAbsoluteRange =
     typeof startDate === "string" &&
     typeof endDate === "string" &&
     isValidDateString(startDate) &&
-    isValidDateString(endDate)
-  ) {
+    isValidDateString(endDate);
+  if (hasAbsoluteRange) {
     const start = new Date(startDate);
     const end = new Date(endDate);
     return {

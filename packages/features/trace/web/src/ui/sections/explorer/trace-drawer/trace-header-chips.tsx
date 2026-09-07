@@ -318,62 +318,90 @@ function buildLastUsedPromptChipDef({
     tone,
     onClick,
     tooltip: (
-      <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="320px">
-        <HStack gap={2}>
-          <Text textStyle="sm" fontWeight="semibold">
-            {handle}
-          </Text>
-          {versionNumber != null && (
-            <Text textStyle="xs" color="fg.muted">
-              v{versionNumber}
-            </Text>
-          )}
-        </HStack>
-        {state.missing ? (
-          <Text textStyle="2xs" color="fg.muted">
-            Prompt no longer exists in this project. The trace still shows what ran at the time.
-          </Text>
-        ) : (
-          <HStack gap={1}>
-            <Icon as={LuSparkles} boxSize={3} color="purple.fg" />
-            <Text textStyle="2xs" color="purple.fg" fontWeight="medium">
-              Latest run on this trace
-            </Text>
-          </HStack>
-        )}
-        {outOfDate && state.latestVersion != null && (
-          <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
-            <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
-            <Text textStyle="2xs" color="yellow.fg">
-              Out of date — current latest is v{state.latestVersion}.
-            </Text>
-          </HStack>
-        )}
-        {driftFromSelection && (
-          <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
-            <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
-            <Text textStyle="2xs" color="yellow.fg">
-              Pinned prompt resolved to a different concrete prompt at runtime.
-            </Text>
-          </HStack>
-        )}
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          paddingTop={1}
-          borderTopWidth="1px"
-          borderColor="border.muted"
-        >
-          {spanId
-            ? "Click to jump to the span that ran this prompt"
-            : "Click to open the Prompts tab"}
-        </Text>
-      </VStack>
+      <LastUsedPromptTooltip
+        driftFromSelection={driftFromSelection}
+        handle={handle}
+        outOfDate={outOfDate}
+        spanId={spanId}
+        state={state}
+        versionNumber={versionNumber}
+      />
     ),
     ariaLabel: spanId
       ? `Jump to the span that ran prompt ${handle}`
       : `Open prompt ${handle} in the Prompts tab`,
   };
+}
+
+/** What the "last used" prompt chip says when the reader hovers it. */
+function LastUsedPromptTooltip({
+  driftFromSelection,
+  handle,
+  outOfDate,
+  spanId,
+  state,
+  versionNumber,
+}: {
+  driftFromSelection: boolean;
+  handle: string;
+  outOfDate: boolean;
+  spanId: string | null;
+  state: PromptChipState;
+  versionNumber: number | null;
+}) {
+  return (
+    <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="320px">
+      <HStack gap={2}>
+        <Text textStyle="sm" fontWeight="semibold">
+          {handle}
+        </Text>
+        {versionNumber != null && (
+          <Text textStyle="xs" color="fg.muted">
+            v{versionNumber}
+          </Text>
+        )}
+      </HStack>
+      {state.missing ? (
+        <Text textStyle="2xs" color="fg.muted">
+          Prompt no longer exists in this project. The trace still shows what ran at the time.
+        </Text>
+      ) : (
+        <HStack gap={1}>
+          <Icon as={LuSparkles} boxSize={3} color="purple.fg" />
+          <Text textStyle="2xs" color="purple.fg" fontWeight="medium">
+            Latest run on this trace
+          </Text>
+        </HStack>
+      )}
+      {outOfDate && state.latestVersion != null && (
+        <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
+          <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
+          <Text textStyle="2xs" color="yellow.fg">
+            Out of date — current latest is v{state.latestVersion}.
+          </Text>
+        </HStack>
+      )}
+      {driftFromSelection && (
+        <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
+          <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
+          <Text textStyle="2xs" color="yellow.fg">
+            Pinned prompt resolved to a different concrete prompt at runtime.
+          </Text>
+        </HStack>
+      )}
+      <Text
+        textStyle="2xs"
+        color="fg.subtle"
+        paddingTop={1}
+        borderTopWidth="1px"
+        borderColor="border.muted"
+      >
+        {spanId
+          ? "Click to jump to the span that ran this prompt"
+          : "Click to open the Prompts tab"}
+      </Text>
+    </VStack>
+  );
 }
 
 /**

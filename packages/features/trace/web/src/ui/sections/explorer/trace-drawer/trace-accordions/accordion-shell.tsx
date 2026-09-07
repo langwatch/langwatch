@@ -135,32 +135,7 @@ export function Section({
           >
             {title}
           </Text>
-          {count != null && count > 0 && (
-            <Badge size="xs" variant="subtle" colorPalette="gray">
-              {count}
-            </Badge>
-          )}
-          {commentCount != null && commentCount > 0 && (
-            <Badge
-              size="xs"
-              variant="subtle"
-              colorPalette="purple"
-              gap={1}
-              aria-label={
-                commentCount === 1
-                  ? "1 comment in this section"
-                  : `${commentCount} comments in this section`
-              }
-            >
-              <Icon as={LuMessageSquare} boxSize={2.5} />
-              {commentCount}
-            </Badge>
-          )}
-          {empty && (count == null || count === 0) && (
-            <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
-              empty
-            </Text>
-          )}
+          <SectionBadges commentCount={commentCount} count={count} empty={empty} />
           {trackPresence ? (
             <SectionPresenceDot traceId={presenceTraceId!} tab={presenceTab!} section={value} />
           ) : null}
@@ -182,22 +157,88 @@ export function Section({
         </Accordion.ItemIndicator>
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
-        {trackPresence ? (
-          <PresenceSection id={value}>
-            <Box
-              paddingX={4}
-              paddingY={tokens.sectionContentY}
-              paddingBottom={tokens.sectionContentY + 1}
-            >
-              {renderChildren ? children : null}
-            </Box>
-          </PresenceSection>
-        ) : (
-          <Box paddingX={4} paddingY={2} paddingBottom={3}>
-            {renderChildren ? children : null}
-          </Box>
-        )}
+        <SectionContent
+          contentPaddingY={tokens.sectionContentY}
+          renderChildren={renderChildren}
+          trackPresence={trackPresence}
+          value={value}
+        >
+          {children}
+        </SectionContent>
       </Accordion.ItemContent>
     </Accordion.Item>
+  );
+}
+
+/** The count, comment count and "empty" markers beside a section's title. */
+function SectionBadges({
+  commentCount,
+  count,
+  empty,
+}: {
+  commentCount?: number;
+  count?: number;
+  empty?: boolean;
+}) {
+  return (
+    <>
+      {count != null && count > 0 && (
+        <Badge size="xs" variant="subtle" colorPalette="gray">
+          {count}
+        </Badge>
+      )}
+      {commentCount != null && commentCount > 0 && (
+        <Badge
+          size="xs"
+          variant="subtle"
+          colorPalette="purple"
+          gap={1}
+          aria-label={
+            commentCount === 1
+              ? "1 comment in this section"
+              : `${commentCount} comments in this section`
+          }
+        >
+          <Icon as={LuMessageSquare} boxSize={2.5} />
+          {commentCount}
+        </Badge>
+      )}
+      {empty && (count == null || count === 0) && (
+        <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
+          empty
+        </Text>
+      )}
+    </>
+  );
+}
+
+/** A section's padded body, wrapped for presence when the drawer is tracking it. */
+function SectionContent({
+  children,
+  contentPaddingY,
+  renderChildren,
+  trackPresence,
+  value,
+}: {
+  children: ReactNode;
+  contentPaddingY: number;
+  renderChildren: boolean;
+  trackPresence: boolean;
+  value: string;
+}) {
+  const body = renderChildren ? children : null;
+  if (!trackPresence) {
+    return (
+      <Box paddingX={4} paddingY={2} paddingBottom={3}>
+        {body}
+      </Box>
+    );
+  }
+  return (
+    <PresenceSection id={value}>
+      <Box paddingX={4} paddingY={contentPaddingY} paddingBottom={contentPaddingY + 1}>
+        {body}
+      </Box>
+    </PresenceSection>
   );
 }

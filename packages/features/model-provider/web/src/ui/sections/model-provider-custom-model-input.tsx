@@ -13,6 +13,98 @@ import { AddCustomEmbeddingsModelDialog } from "./add-custom-embeddings-model-di
 import { AddCustomModelDialog } from "./add-custom-model-dialog.tsx";
 import { RegistryModelsModal } from "./registry-models-modal.tsx";
 
+function CustomModelRow({
+  entry,
+  onDelete,
+  onEdit,
+}: {
+  entry: CustomModelEntry;
+  onDelete: (entry: CustomModelEntry) => void;
+  onEdit: (entry: CustomModelEntry) => void;
+}) {
+  const isChat = entry.mode === "chat";
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <Text fontSize="sm">{entry.modelId}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Text fontSize="sm">{entry.displayName}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Badge size="sm" colorPalette={isChat ? "blue" : "purple"}>
+          {isChat ? "Chat" : "Embedding"}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        <HStack gap={0}>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => onEdit(entry)}
+            aria-label={`Edit ${entry.modelId}`}
+          >
+            <Pencil size={14} />
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            colorPalette="red"
+            onClick={() => onDelete(entry)}
+            aria-label={`Delete ${entry.modelId}`}
+          >
+            <Trash2 size={14} />
+          </Button>
+        </HStack>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+function CustomModelsTable({
+  entries,
+  onDelete,
+  onEdit,
+}: {
+  entries: CustomModelEntry[];
+  onDelete: (entry: CustomModelEntry) => void;
+  onEdit: (entry: CustomModelEntry) => void;
+}) {
+  if (entries.length === 0) {
+    return (
+      <Box borderWidth="1px" borderRadius="md" padding={4} textAlign="center">
+        <Text fontSize="sm" color="fg.muted">
+          No custom models added
+        </Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Table.Root size="sm" variant="outline">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Model ID</Table.ColumnHeader>
+          <Table.ColumnHeader>Display Name</Table.ColumnHeader>
+          <Table.ColumnHeader>Type</Table.ColumnHeader>
+          <Table.ColumnHeader width="80px" />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {entries.map((entry) => (
+          <CustomModelRow
+            key={`${entry.mode}-${entry.modelId}`}
+            entry={entry}
+            onDelete={onDelete}
+            onEdit={onEdit}
+          />
+        ))}
+      </Table.Body>
+    </Table.Root>
+  );
+}
+
 /**
  * Renders the Custom Models section in the model provider configuration drawer.
  * Displays a table of user-defined custom models (chat and embeddings combined),
@@ -49,22 +141,20 @@ export const CustomModelInputSection = ({
 
   const handleDeleteModel = useCallback(
     (entry: CustomModelEntry) => {
-      if (entry.mode === "embedding") {
-        actions.removeCustomEmbeddingsModel(entry.modelId);
-      } else {
-        actions.removeCustomModel(entry.modelId);
-      }
+      const remove =
+        entry.mode === "embedding"
+          ? actions.removeCustomEmbeddingsModel
+          : actions.removeCustomModel;
+      remove(entry.modelId);
     },
     [actions],
   );
 
   const handleEditModel = useCallback((entry: CustomModelEntry) => {
     setEditingModel(entry);
-    if (entry.mode === "embedding") {
-      setAddEmbeddingsDialogOpen(true);
-    } else {
-      setAddModelDialogOpen(true);
-    }
+    const openDialog =
+      entry.mode === "embedding" ? setAddEmbeddingsDialogOpen : setAddModelDialogOpen;
+    openDialog(true);
   }, []);
 
   const handleAddModel = useCallback(
@@ -99,6 +189,9 @@ export const CustomModelInputSection = ({
     setEditingModel(undefined);
   }, []);
 
+  const editingChatModel = editingModel?.mode === "chat" ? editingModel : undefined;
+  const editingEmbeddingsModel = editingModel?.mode === "embedding" ? editingModel : undefined;
+
   return (
     <VStack width="full" gap={3} paddingTop={4} align="stretch">
       <HStack justify="space-between" align="center">
@@ -121,62 +214,11 @@ export const CustomModelInputSection = ({
         </Menu.Root>
       </HStack>
 
-      {allCustomModels.length === 0 ? (
-        <Box borderWidth="1px" borderRadius="md" padding={4} textAlign="center">
-          <Text fontSize="sm" color="fg.muted">
-            No custom models added
-          </Text>
-        </Box>
-      ) : (
-        <Table.Root size="sm" variant="outline">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Model ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Display Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Type</Table.ColumnHeader>
-              <Table.ColumnHeader width="80px" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {allCustomModels.map((entry) => (
-              <Table.Row key={`${entry.mode}-${entry.modelId}`}>
-                <Table.Cell>
-                  <Text fontSize="sm">{entry.modelId}</Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <Text fontSize="sm">{entry.displayName}</Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge size="sm" colorPalette={entry.mode === "chat" ? "blue" : "purple"}>
-                    {entry.mode === "chat" ? "Chat" : "Embedding"}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  <HStack gap={0}>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => handleEditModel(entry)}
-                      aria-label={`Edit ${entry.modelId}`}
-                    >
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      colorPalette="red"
-                      onClick={() => handleDeleteModel(entry)}
-                      aria-label={`Delete ${entry.modelId}`}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </HStack>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      )}
+      <CustomModelsTable
+        entries={allCustomModels}
+        onDelete={handleDeleteModel}
+        onEdit={handleEditModel}
+      />
 
       {showRegistryLink && (
         <HStack justify="end">
@@ -196,7 +238,7 @@ export const CustomModelInputSection = ({
         open={addModelDialogOpen}
         onClose={handleCloseModelDialog}
         onSubmit={handleAddModel}
-        initialValues={editingModel?.mode === "chat" ? editingModel : undefined}
+        initialValues={editingChatModel}
         dialogBackground={dialogBackground}
       />
 
@@ -204,7 +246,7 @@ export const CustomModelInputSection = ({
         open={addEmbeddingsDialogOpen}
         onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
-        initialValues={editingModel?.mode === "embedding" ? editingModel : undefined}
+        initialValues={editingEmbeddingsModel}
         dialogBackground={dialogBackground}
       />
 

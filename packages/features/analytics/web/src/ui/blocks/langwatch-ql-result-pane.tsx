@@ -86,7 +86,8 @@ function resultChip({
       title: "The visible result belongs to the statement as it was when it ran",
     };
   }
-  if (state.outcome.result.truncated) {
+  const isTruncated = state.outcome.result.truncated;
+  if (isTruncated) {
     return {
       label: "Partial",
       palette: "orange",

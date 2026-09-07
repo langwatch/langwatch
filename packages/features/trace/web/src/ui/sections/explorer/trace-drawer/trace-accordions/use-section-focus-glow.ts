@@ -64,44 +64,68 @@ export function useSectionFocusGlow({
         ? currentOpen
         : [...currentOpen, pendingFocus.section],
     );
-    const glowSection = pendingFocus.section;
-    const glowNonce = pendingFocus.nonce;
     const root = containerRef.current;
     if (!root) return;
-    let observer: MutationObserver | null = null;
-    let bailTimer = 0;
-    const tryScrollAndGlow = () => {
-      const el = root.querySelector<HTMLElement>(`[data-section="${glowSection}"]`);
-      if (!el) return false;
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      // Mount the overlay AFTER the scroll starts so the pulse lands
-      // on the section already in view rather than ticking out
-      // mid-scroll. The nonce keys the overlay so a re-click
-      // remounts + restarts the keyframe.
-      setGlow({ target: el, nonce: glowNonce });
-      clearFocus();
-      return true;
-    };
-    // Two rAFs so the accordion has actually expanded before we measure
-    // + scroll. The first flushes the open-state setState; layout
-    // commits on the second.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (tryScrollAndGlow()) return;
-        // The target section isn't in the DOM yet — common when the
-        // span tab just mounted and `useSpanDetail` is still loading
-        // (the skeleton renders instead of the accordion stack). Watch
-        // for the section to appear, then run the same scroll+glow.
-        const watch = watchForSectionAndGlow(root, tryScrollAndGlow, clearFocus);
-        observer = watch.observer;
-        bailTimer = watch.bailTimer;
-      });
+    return scrollSectionIntoGlow({
+      clearFocus,
+      nonce: pendingFocus.nonce,
+      root,
+      section: pendingFocus.section,
+      setGlow,
     });
-    return () => {
-      observer?.disconnect();
-      window.clearTimeout(bailTimer);
-    };
   }, [pendingFocus, traceId, sections, containerRef, clearFocus]);
 
   return { glow, handleGlowDone };
+}
+
+/**
+ * Scrolls the named section into view and pulses it, waiting for the section to
+ * mount when the stack has not rendered it yet. Returns the effect's cleanup.
+ */
+function scrollSectionIntoGlow({
+  clearFocus,
+  nonce,
+  root,
+  section,
+  setGlow,
+}: {
+  clearFocus: () => void;
+  nonce: number;
+  root: HTMLElement;
+  section: string;
+  setGlow: (glow: { target: HTMLElement; nonce: number }) => void;
+}): () => void {
+  let observer: MutationObserver | null = null;
+  let bailTimer = 0;
+  const scrollAndGlow = () => {
+    const el = root.querySelector<HTMLElement>(`[data-section="${section}"]`);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Mount the overlay AFTER the scroll starts so the pulse lands
+    // on the section already in view rather than ticking out
+    // mid-scroll. The nonce keys the overlay so a re-click
+    // remounts + restarts the keyframe.
+    setGlow({ target: el, nonce });
+    clearFocus();
+    return true;
+  };
+  // Two rAFs so the accordion has actually expanded before we measure
+  // + scroll. The first flushes the open-state setState; layout
+  // commits on the second.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (scrollAndGlow()) return;
+      // The target section isn't in the DOM yet — common when the
+      // span tab just mounted and `useSpanDetail` is still loading
+      // (the skeleton renders instead of the accordion stack). Watch
+      // for the section to appear, then run the same scroll+glow.
+      const watch = watchForSectionAndGlow(root, scrollAndGlow, clearFocus);
+      observer = watch.observer;
+      bailTimer = watch.bailTimer;
+    });
+  });
+  return () => {
+    observer?.disconnect();
+    window.clearTimeout(bailTimer);
+  };
 }

@@ -32,6 +32,24 @@ import { Popover } from "@langwatch/design-system/popover";
 import { Slider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
+/** An unparsable bound falls back to the slider's own end of the range. */
+function numberOrBound({
+  index,
+  max,
+  min,
+  value,
+}: {
+  index: number;
+  max: number;
+  min: number;
+  value: string;
+}): number {
+  const parsed = +value;
+  const bound = index === 0 ? min : max;
+
+  return isNaN(parsed) ? bound : parsed;
+}
+
 /**
  * The filter editor, bound to the address. TWO BUTTONS DID NOT TRAVEL WITH IT, and both are
  * somebody else's overlay: - "Save as view" opened the saved-views dialog.
@@ -214,6 +232,12 @@ function FieldsFilter({
     [optionCount, setOpen],
   );
 
+  const hasSelection = currentStringList.length > 0;
+  const selectedBackground = negated ? "red.subtle" : "blue.subtle";
+  const selectionBackground = hasSelection ? selectedBackground : "bg.muted";
+  const selectedForeground = negated ? "red.fg" : "blue.fg";
+  const selectionForeground = hasSelection ? selectedForeground : "fg.muted";
+
   return (
     <Field.Root>
       <Popover.Root
@@ -224,29 +248,13 @@ function FieldsFilter({
         <Popover.Trigger asChild>
           <Button
             variant="subtle"
-            backgroundColor={
-              currentStringList.length > 0 && negated
-                ? "red.subtle"
-                : currentStringList.length > 0
-                  ? "blue.subtle"
-                  : "bg.muted"
-            }
+            backgroundColor={selectionBackground}
             size="sm"
             width="100%"
             fontWeight="normal"
           >
             <HStack width="full" gap={1}>
-              <Text
-                color={
-                  currentStringList.length > 0 && negated
-                    ? "red.fg"
-                    : currentStringList.length > 0
-                      ? "blue.fg"
-                      : "fg.muted"
-                }
-                fontWeight="500"
-                paddingRight={4}
-              >
+              <Text color={selectionForeground} fontWeight="500" paddingRight={4}>
                 {currentStringList.length > 0 && negated ? "NOT " : ""}
                 {filter.name}
               </Text>
@@ -661,7 +669,8 @@ function ListSelection({
           const isHighlighted = virtualItem.index === highlightedIndex;
 
           const onChange_ = () => {
-            if (currentValues.includes(field.toString())) {
+            const isSelected = currentValues.includes(field.toString());
+            if (isSelected) {
               onChange(currentValues.filter((v) => v.toString() !== field.toString()));
             } else {
               onChange([...currentValues, field]);
@@ -830,10 +839,7 @@ function RangeFilter({
         step={0.1}
         value={
           currentValues && currentValues.length === 2
-            ? currentValues.map((v, i) => {
-                const n = +v;
-                return isNaN(n) ? (i === 0 ? min : max) : n;
-              })
+            ? currentValues.map((v, i) => numberOrBound({ index: i, max, min, value: v }))
             : [min, max]
         }
         onValueChange={(values) => {

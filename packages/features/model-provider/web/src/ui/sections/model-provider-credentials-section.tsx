@@ -14,6 +14,74 @@ import { isSecretCredentialField } from "../../model/model-provider-helpers.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
+ * One credential input. Requiredness is derived from the provider's own schema
+ * against the values entered so far, so a field that a base URL makes optional
+ * loses its marker the moment that URL is typed.
+ */
+const CredentialField = ({
+  apiKeyValidationError,
+  credentialKey,
+  description,
+  fieldErrors,
+  isOptional,
+  onApiKeyValidationClear,
+  onChange,
+  setFieldErrors,
+  value,
+}: {
+  apiKeyValidationError?: string;
+  credentialKey: string;
+  description?: string;
+  fieldErrors: Record<string, string>;
+  isOptional: boolean;
+  onApiKeyValidationClear?: () => void;
+  onChange: (value: string) => void;
+  setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  value: string;
+}) => {
+  const isPassword = isSecretCredentialField(credentialKey);
+  const fieldError = fieldErrors[credentialKey];
+
+  const handleChange = (nextValue: string) => {
+    onChange(nextValue);
+    if (fieldError) {
+      setFieldErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[credentialKey];
+        return updated;
+      });
+    }
+    // Clear API key validation error when user modifies the field
+    const shouldClearValidation = onApiKeyValidationClear && apiKeyValidationError;
+    if (shouldClearValidation) onApiKeyValidationClear();
+  };
+
+  return (
+    <Field.Root required={!isOptional} invalid={Boolean(fieldError)} width="full">
+      <SmallLabel>
+        {credentialKey}
+        {!isOptional && <Field.RequiredIndicator />}
+      </SmallLabel>
+      <Box width="full">
+        <Input
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          type={isPassword ? "password" : "text"}
+          // The label above is a styled Text, not a real label element,
+          // so the field carries its own accessible name.
+          aria-label={credentialKey}
+          autoComplete="off"
+          placeholder={isOptional ? "optional" : undefined}
+          width="full"
+        />
+      </Box>
+      {description && <Field.HelperText>{description}</Field.HelperText>}
+      {fieldError && <Field.ErrorText>{fieldError}</Field.ErrorText>}
+    </Field.Root>
+  );
+};
+
+/**
  * Renders credential input fields based on the provider's schema, or whatever the
  * composition put in the managed-provider slot when the credentials are not the
  * customer's to enter.
@@ -73,52 +141,20 @@ export const CredentialsSection = ({
   return (
     <>
       <VStack align="stretch" gap={3} width="full">
-        {Object.keys(state.displayKeys).map((key) => {
-          // Requiredness is derived from the provider's own schema against
-          // the values entered so far, so a field that a base URL makes
-          // optional loses its marker the moment that URL is typed.
-          const description = fieldMetadata?.[key]?.description;
-          const isOptional = !requiredKeys.has(key);
-          const isPassword = isSecretCredentialField(key);
-          const isInvalid = Boolean(fieldErrors[key]);
-
-          return (
-            <Field.Root key={key} required={!isOptional} invalid={isInvalid} width="full">
-              <SmallLabel>
-                {key}
-                {!isOptional && <Field.RequiredIndicator />}
-              </SmallLabel>
-              <Box width="full">
-                <Input
-                  value={state.customKeys[key] ?? ""}
-                  onChange={(e) => {
-                    actions.setCustomKey(key, e.target.value);
-                    if (fieldErrors[key]) {
-                      setFieldErrors((prev) => {
-                        const updated = { ...prev };
-                        delete updated[key];
-                        return updated;
-                      });
-                    }
-                    // Clear API key validation error when user modifies the field
-                    if (onApiKeyValidationClear && apiKeyValidationError) {
-                      onApiKeyValidationClear();
-                    }
-                  }}
-                  type={isPassword ? "password" : "text"}
-                  // The label above is a styled Text, not a real label element,
-                  // so the field carries its own accessible name.
-                  aria-label={key}
-                  autoComplete="off"
-                  placeholder={isOptional ? "optional" : undefined}
-                  width="full"
-                />
-              </Box>
-              {description && <Field.HelperText>{description}</Field.HelperText>}
-              {fieldErrors[key] && <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>}
-            </Field.Root>
-          );
-        })}
+        {Object.keys(state.displayKeys).map((key) => (
+          <CredentialField
+            key={key}
+            apiKeyValidationError={apiKeyValidationError}
+            credentialKey={key}
+            description={fieldMetadata?.[key]?.description}
+            fieldErrors={fieldErrors}
+            isOptional={!requiredKeys.has(key)}
+            onApiKeyValidationClear={onApiKeyValidationClear}
+            onChange={(value) => actions.setCustomKey(key, value)}
+            setFieldErrors={setFieldErrors}
+            value={state.customKeys[key] ?? ""}
+          />
+        ))}
       </VStack>
       {apiKeyValidationError && (
         <Field.Root invalid>

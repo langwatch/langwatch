@@ -76,6 +76,464 @@ export type EditModelProviderFormProps = {
   onSaved?: () => void;
 };
 
+/**
+ * The current provider counts as enabled: it will be when the form saves.
+ * Nothing loaded yet means one, for the same reason.
+ */
+function countEnabledProviders({
+  providerKey,
+  providers,
+}: {
+  providerKey: string;
+  providers: Record<string, { enabled?: boolean }> | undefined;
+}): number {
+  if (!providers) return 1;
+
+  const currentlyEnabled = Object.values(providers).filter((candidate) => candidate.enabled).length;
+  const alreadyEnabled = providers[providerKey]?.enabled ?? false;
+
+  return alreadyEnabled ? currentlyEnabled : currentlyEnabled + 1;
+}
+
+/** Enabled with no stored credentials means the environment supplies them. */
+function readsCredentialsFromEnvironment(provider: ModelProviderEditorValue): boolean {
+  if (!provider.enabled) return false;
+
+  const stored = provider.customKeys as Record<string, unknown> | null;
+
+  return !stored || Object.keys(stored).length === 0;
+}
+
+/**
+ * The draft the drawer opens with. The skip-permissions list is always
+ * seeded, because that field does not belong to the gateway; the gateway
+ * knobs are seeded only when their section renders, so toggling the flag has
+ * no payload-shape side effects.
+ */
+function initialDraftFor({
+  gatewayMenuEnabled,
+  provider,
+}: {
+  gatewayMenuEnabled: boolean;
+  provider: ModelProviderEditorValue;
+}): ModelProviderAdvancedDraft {
+  const seeded = draftFromProvider({
+    rateLimitRpm: provider.rateLimitRpm ?? null,
+    rateLimitTpm: provider.rateLimitTpm ?? null,
+    rateLimitRpd: provider.rateLimitRpd ?? null,
+    fallbackPriorityGlobal: provider.fallbackPriorityGlobal ?? null,
+    providerConfig: provider.providerConfig,
+    langySkipPermissionsModels: provider.langySkipPermissionsModels ?? null,
+  });
+  if (gatewayMenuEnabled) return seeded;
+
+  return { ...EMPTY_ADVANCED_DRAFT, skipPermissionsModels: seeded.skipPermissionsModels };
+}
+
+/**
+ * The advanced half of the payload. A malformed providerConfig raises, after
+ * reporting itself on the field it came from.
+ */
+function buildAdvancedPayload({
+  advancedDraft,
+  gatewayMenuEnabled,
+  onJsonError,
+  onJsonParsed,
+  showSkipPermissionsField,
+}: {
+  advancedDraft: ModelProviderAdvancedDraft;
+  gatewayMenuEnabled: boolean;
+  onJsonError: (error: unknown) => void;
+  onJsonParsed: () => void;
+  showSkipPermissionsField: boolean;
+}): AdvancedGatewayPayload | null {
+  const langySkipPermissionsModels = showSkipPermissionsField
+    ? parseSkipPermissionsDraft(advancedDraft)
+    : undefined;
+  if (!gatewayMenuEnabled) {
+    if (langySkipPermissionsModels === undefined) return null;
+
+    return { gateway: null, langySkipPermissionsModels };
+  }
+
+  try {
+    const gateway = parseAdvancedDraft(advancedDraft);
+    onJsonParsed();
+
+    return { gateway, langySkipPermissionsModels };
+  } catch (e) {
+    onJsonError(e);
+    throw e;
+  }
+}
+
+/**
+ * A rule that spans several credentials (an API key, or a base URL instead)
+ * names no single field, so it has no path to land on and would leave Save
+ * doing nothing visible. It anchors on a required field left empty.
+ */
+function anchorSchemaWideMessage({
+  displayKeys,
+  fieldErrors,
+  requiredKeys,
+  values,
+  zodError,
+}: {
+  displayKeys: Record<string, unknown>;
+  fieldErrors: Record<string, string>;
+  requiredKeys: Set<string>;
+  values: Record<string, string>;
+  zodError: ZodErrorStructure;
+}): void {
+  const schemaWideMessage = zodError.issues.find((issue) => !issue.path?.length)?.message;
+  if (!schemaWideMessage) return;
+
+  const anchorKey =
+    getEmptyRequiredCredentialKeys({ requiredKeys, values })[0] ?? Object.keys(displayKeys)[0];
+  if (!anchorKey || fieldErrors[anchorKey]) return;
+
+  fieldErrors[anchorKey] = schemaWideMessage;
+}
+
+/**
+ * The credential refusals keyed by field, or null when the keys parse.
+ * oauth-device providers skip the check entirely: the user never types
+ * credentials here, so a name or scope-only save must not trip on the token
+ * schema.
+ */
+function findCredentialFieldErrors({
+  displayKeys,
+  hasNonApiKeyChanges,
+  isOAuthDeviceProvider,
+  isUsingEnvVars,
+  keysSchema,
+  requiredKeys,
+  values,
+}: {
+  displayKeys: Record<string, unknown>;
+  hasNonApiKeyChanges: boolean;
+  isOAuthDeviceProvider: boolean;
+  isUsingEnvVars: boolean;
+  keysSchema: z.ZodTypeAny | undefined;
+  requiredKeys: Set<string>;
+  values: Record<string, string>;
+}): Record<string, string> | null {
+  const mustValidate = !isUsingEnvVars || hasNonApiKeyChanges;
+  if (!keysSchema || isOAuthDeviceProvider || !mustValidate) return null;
+
+  const schema = z.union([keysSchema, z.object({ MANAGED: z.string() })]);
+  const result = schema.safeParse({ ...values });
+  if (result.success) return null;
+
+  const zodError = result.error as ZodErrorStructure;
+  const fieldErrors = parseZodFieldErrors(zodError);
+  anchorSchemaWideMessage({ displayKeys, fieldErrors, requiredKeys, values, zodError });
+
+  return fieldErrors;
+}
+
+/** Whether the save may proceed: a refused credential stops it here. */
+async function probeCredential({
+  clearRefusal,
+  recordRefusal,
+  validateApiKey,
+}: {
+  clearRefusal: () => void;
+  recordRefusal: () => void;
+  validateApiKey: () => Promise<boolean>;
+}): Promise<boolean> {
+  const isValid = await validateApiKey();
+  if (!isValid) {
+    recordRefusal();
+
+    return false;
+  }
+  clearRefusal();
+
+  return true;
+}
+
+function finishSave({
+  closeDrawer,
+  onSaved,
+}: {
+  closeDrawer: () => void;
+  onSaved?: () => void;
+}): void {
+  if (onSaved) {
+    onSaved();
+
+    return;
+  }
+  closeDrawer();
+}
+
+/**
+ * Credentials, or the provider's own sign-in flow. oauth-device providers
+ * (codex) credential through that flow: the drawer swaps the API-key fields
+ * for it, and the sign-in poll has already persisted the row server-side, so
+ * the drawer's Save has nothing left to do. The coding-defaults ask is queued
+ * to the page-level host — a dialog mounted in this drawer would be unmounted
+ * the moment it opened.
+ */
+function ProviderCredentialsArea({
+  actions,
+  apiKeyValidationError,
+  clearApiKeyError,
+  closeDrawer,
+  fieldErrors,
+  isOAuthDeviceProvider,
+  onSaved,
+  organizationId,
+  projectId,
+  provider,
+  setFieldErrors,
+  state,
+  toaster,
+}: {
+  actions: ReturnType<typeof useModelProviderForm>[1];
+  apiKeyValidationError: string | undefined;
+  clearApiKeyError: () => void;
+  closeDrawer: () => void;
+  fieldErrors: Record<string, string>;
+  isOAuthDeviceProvider: boolean;
+  onSaved?: () => void;
+  organizationId?: string;
+  projectId: string;
+  provider: ModelProviderEditorValue;
+  setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  state: ReturnType<typeof useModelProviderForm>[0];
+  toaster: ReturnType<typeof useModelProviderToaster>;
+}) {
+  if (!isOAuthDeviceProvider) {
+    return (
+      <CredentialsSection
+        state={state}
+        actions={actions}
+        provider={provider}
+        fieldErrors={fieldErrors}
+        setFieldErrors={setFieldErrors}
+        organizationId={organizationId}
+        apiKeyValidationError={apiKeyValidationError}
+        onApiKeyValidationClear={clearApiKeyError}
+      />
+    );
+  }
+
+  return (
+    <CodexSignIn
+      projectId={projectId}
+      scopes={state.scopes}
+      setAsCodingDefaults={false}
+      onConnected={(account) => {
+        useCodexCodingDefaultsAskStore.getState().request({ projectId, scopes: state.scopes });
+        toaster.create({
+          title: "Codex connected",
+          description: account.email ? `Signed in as ${account.email}` : undefined,
+          type: "success",
+        });
+        finishSave({ closeDrawer, onSaved });
+      }}
+    />
+  );
+}
+
+/** Azure's own gateway toggle; every other provider has nothing to switch. */
+type OrganizationTeams = {
+  teams?: Array<{ id: string; name: string; projects: Array<{ id: string; name: string }> }>;
+};
+
+function availableTeamsOf(organization: OrganizationTeams | undefined) {
+  return (organization?.teams ?? []).map((candidate) => ({
+    id: candidate.id,
+    name: candidate.name,
+  }));
+}
+
+/** Projects read as "project · team", so two same-named projects stay apart. */
+function availableProjectsOf(organization: OrganizationTeams | undefined) {
+  return (organization?.teams ?? []).flatMap((candidateTeam) =>
+    candidateTeam.projects.map((candidateProject) => ({
+      id: candidateProject.id,
+      name: `${candidateProject.name} · ${candidateTeam.name}`,
+      teamId: candidateTeam.id,
+    })),
+  );
+}
+
+function ProviderNameField({
+  actions,
+  provider,
+  state,
+}: {
+  actions: ReturnType<typeof useModelProviderForm>[1];
+  provider: ModelProviderEditorValue;
+  state: ReturnType<typeof useModelProviderForm>[0];
+}) {
+  return (
+    <Field.Root width="full" required>
+      <SmallLabel>
+        Name
+        <Field.RequiredIndicator />
+      </SmallLabel>
+      <Box width="full">
+        <Input
+          value={state.name}
+          onChange={(e) => actions.setName(e.target.value)}
+          placeholder={provider.provider}
+          width="full"
+          maxLength={128}
+        />
+      </Box>
+      <Field.HelperText>
+        Distinguish multiple instances (e.g. "OpenAI – EU prod" vs "OpenAI – Dev").
+      </Field.HelperText>
+    </Field.Root>
+  );
+}
+
+function ApiGatewaySwitch({
+  actions,
+  isLlmProvider,
+  provider,
+  state,
+}: {
+  actions: ReturnType<typeof useModelProviderForm>[1];
+  isLlmProvider: boolean;
+  provider: ModelProviderEditorValue;
+  state: ReturnType<typeof useModelProviderForm>[0];
+}) {
+  const isAzureLlm = isLlmProvider && provider.provider === "azure";
+  if (!isAzureLlm) return null;
+
+  return (
+    <Field.Root>
+      <Switch
+        onCheckedChange={(details) => {
+          actions.setUseApiGateway(details.checked);
+        }}
+        checked={state.useApiGateway}
+      >
+        Use API Gateway
+      </Switch>
+    </Field.Root>
+  );
+}
+
+/** Neither half renders when the organization has no gateway and no Langy models. */
+function ProviderAdvancedArea({
+  accordionValue,
+  draft,
+  jsonError,
+  onAccordionValueChange,
+  onDraftChange,
+  provider,
+  showGatewayFields,
+  showSkipPermissionsField,
+  skipPermissionsError,
+  skipPermissionsPlaceholder,
+}: {
+  accordionValue: string[];
+  draft: ModelProviderAdvancedDraft;
+  jsonError: string | null;
+  onAccordionValueChange: (value: string[]) => void;
+  onDraftChange: (next: ModelProviderAdvancedDraft) => void;
+  provider: ModelProviderEditorValue;
+  showGatewayFields: boolean;
+  showSkipPermissionsField: boolean;
+  skipPermissionsError: string | null;
+  skipPermissionsPlaceholder: string;
+}) {
+  if (!showGatewayFields && !showSkipPermissionsField) return null;
+
+  const row = provider as {
+    id?: string;
+    healthStatus?: string | null;
+    circuitOpenedAt?: Date | string | null;
+    lastHealthCheckAt?: Date | string | null;
+    disabledAt?: Date | string | null;
+  };
+
+  return (
+    <ModelProviderAdvancedSection
+      modelProviderId={row.id}
+      draft={draft}
+      onDraftChange={onDraftChange}
+      jsonError={jsonError}
+      skipPermissionsError={skipPermissionsError}
+      skipPermissionsPlaceholder={skipPermissionsPlaceholder}
+      showGatewayFields={showGatewayFields}
+      showSkipPermissionsField={showSkipPermissionsField}
+      accordionValue={accordionValue}
+      onAccordionValueChange={onAccordionValueChange}
+      initial={{
+        healthStatus: row.healthStatus,
+        circuitOpenedAt: row.circuitOpenedAt,
+        lastHealthCheckAt: row.lastHealthCheckAt,
+        disabledAt: row.disabledAt,
+      }}
+    />
+  );
+}
+
+function SaveProviderButton({
+  canResolveTarget,
+  isBusy,
+  isDirty,
+  label,
+  onSave,
+}: {
+  canResolveTarget: boolean;
+  isBusy: boolean;
+  isDirty: boolean;
+  label: string;
+  onSave: () => void;
+}) {
+  return (
+    <HStack width="full" justify="end">
+      <Button
+        size="sm"
+        colorPalette="orange"
+        loading={isBusy}
+        disabled={!canResolveTarget || !isDirty}
+        onClick={onSave}
+      >
+        {label}
+      </Button>
+    </HStack>
+  );
+}
+
+/** Routing handle and custom models: both are LLM-provider concerns only. */
+function ProviderModelSections({
+  actions,
+  isLlmProvider,
+  isOAuthDeviceProvider,
+  provider,
+  state,
+}: {
+  actions: ReturnType<typeof useModelProviderForm>[1];
+  isLlmProvider: boolean;
+  isOAuthDeviceProvider: boolean;
+  provider: ModelProviderEditorValue;
+  state: ReturnType<typeof useModelProviderForm>[0];
+}) {
+  if (!isLlmProvider) return null;
+
+  return (
+    <>
+      <ModelProviderRoutingSection
+        providerKey={provider.provider}
+        routingHandle={state.routingHandle}
+        onRoutingHandleChange={actions.setRoutingHandle}
+      />
+      {!isOAuthDeviceProvider && (
+        <CustomModelInputSection state={state} actions={actions} provider={provider} />
+      )}
+    </>
+  );
+}
+
 export const EditModelProviderForm = ({
   projectId,
   organizationId,
@@ -98,17 +556,10 @@ export const EditModelProviderForm = ({
   const canManageOrganization = hasPermission("organization:manage");
   const canManageTeam = hasPermission("team:manage");
 
-  // Count enabled providers to determine if this is the only one
-  // Include the current provider being edited since it will be enabled when saved
-  const enabledProvidersCount = useMemo(() => {
-    if (!providers) return 1; // Current provider will be enabled when (if) saved
-    const currentlyEnabledCount = Object.values(providers).filter(
-      (candidate) => (candidate as { enabled?: boolean }).enabled,
-    ).length;
-    // If the current provider is not already enabled, add 1 since it will be enabled when saved
-    const isCurrentProviderAlreadyEnabled = providers[providerKey]?.enabled ?? false;
-    return isCurrentProviderAlreadyEnabled ? currentlyEnabledCount : currentlyEnabledCount + 1;
-  }, [providers, providerKey]);
+  const enabledProvidersCount = useMemo(
+    () => countEnabledProviders({ providerKey, providers }),
+    [providers, providerKey],
+  );
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -135,11 +586,10 @@ export const EditModelProviderForm = ({
   // without colliding with the first.
   const isTargetingSpecificRow = isResolvableProviderId(modelProviderId);
   const existingRow = useMemo(
-    () =>
-      isTargetingSpecificRow
-        ? findModelProviderById({ providers: allProviders, modelProviderId })
-        : undefined,
-    [isTargetingSpecificRow, allProviders, modelProviderId],
+    // `modelProviderId === "new"` never resolves, so the Add Model Provider
+    // menu can stand up a second instance without colliding with the first.
+    () => findModelProviderById({ providers: allProviders, modelProviderId }),
+    [allProviders, modelProviderId],
   );
 
   // Two DISTINCT concerns, deliberately not collapsed into one flag: - Whether we can SUBMIT.
@@ -174,13 +624,8 @@ export const EditModelProviderForm = ({
     [existingRow, providerKey],
   );
 
-  // Detect if provider is using environment variables (enabled but no stored customKeys)
-  // Must be computed before the hook call so we can pass it to the hook
-  // Handles both null and empty object {} cases
-  const isUsingEnvVars =
-    provider.enabled &&
-    (!provider.customKeys ||
-      Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
+  // Computed before the hook call so it can be passed to the hook.
+  const isUsingEnvVars = readsCredentialsFromEnvironment(provider);
 
   // Reset advanced draft when the *drawer subject* changes — i.e. the user opened the drawer on
   // a different provider row. We intentionally do NOT re-seed on every underlying-value change:
@@ -204,25 +649,10 @@ export const EditModelProviderForm = ({
     providerDefinition?.langySkipPermissionsModels ?? [],
   );
 
-  // The draft the drawer opens with. The skip-permissions list is always
-  // seeded, because that field does not belong to the gateway; the gateway
-  // knobs are seeded only when their section is rendered, so toggling the
-  // flag has no payload-shape side effects.
-  const initialAdvancedDraft = useMemo<ModelProviderAdvancedDraft>(() => {
-    const seeded = draftFromProvider({
-      rateLimitRpm: provider.rateLimitRpm ?? null,
-      rateLimitTpm: provider.rateLimitTpm ?? null,
-      rateLimitRpd: provider.rateLimitRpd ?? null,
-      fallbackPriorityGlobal: provider.fallbackPriorityGlobal ?? null,
-      providerConfig: provider.providerConfig,
-      langySkipPermissionsModels: provider.langySkipPermissionsModels ?? null,
-    });
-    if (gatewayMenuEnabled) return seeded;
-    return {
-      ...EMPTY_ADVANCED_DRAFT,
-      skipPermissionsModels: seeded.skipPermissionsModels,
-    };
-  }, [gatewayMenuEnabled, provider]);
+  const initialAdvancedDraft = useMemo<ModelProviderAdvancedDraft>(
+    () => initialDraftFor({ gatewayMenuEnabled, provider }),
+    [gatewayMenuEnabled, provider],
+  );
 
   useEffect(() => {
     setAdvancedDraft(initialAdvancedDraft);
@@ -247,24 +677,17 @@ export const EditModelProviderForm = ({
     setAdvancedAccordionValue([ADVANCED_ACCORDION_VALUE]);
   }, []);
 
-  const getAdvancedPayload = useCallback((): AdvancedGatewayPayload | null => {
-    const langySkipPermissionsModels = showSkipPermissionsField
-      ? parseSkipPermissionsDraft(advancedDraft)
-      : undefined;
-    if (!gatewayMenuEnabled) {
-      return langySkipPermissionsModels === undefined
-        ? null
-        : { gateway: null, langySkipPermissionsModels };
-    }
-    try {
-      const gateway = parseAdvancedDraft(advancedDraft);
-      setAdvancedJsonError(null);
-      return { gateway, langySkipPermissionsModels };
-    } catch (e) {
-      reportAdvancedJsonError(e);
-      throw e;
-    }
-  }, [gatewayMenuEnabled, showSkipPermissionsField, advancedDraft, reportAdvancedJsonError]);
+  const getAdvancedPayload = useCallback(
+    (): AdvancedGatewayPayload | null =>
+      buildAdvancedPayload({
+        advancedDraft,
+        gatewayMenuEnabled,
+        onJsonError: reportAdvancedJsonError,
+        onJsonParsed: () => setAdvancedJsonError(null),
+        showSkipPermissionsField,
+      }),
+    [gatewayMenuEnabled, showSkipPermissionsField, advancedDraft, reportAdvancedJsonError],
+  );
 
   // The server refuses a pattern that does not compile and names the field it
   // came from, so the refusal lands on the textarea and the accordion opens
@@ -290,13 +713,7 @@ export const EditModelProviderForm = ({
     canManageTeam,
     getAdvancedPayload,
     onError: handleSubmitError,
-    onSuccess: () => {
-      if (onSaved) {
-        onSaved();
-        return;
-      }
-      closeDrawer();
-    },
+    onSuccess: () => finishSave({ closeDrawer, onSaved }),
   });
 
   // Same answer the credential fields render their required markers from.
@@ -345,53 +762,25 @@ export const EditModelProviderForm = ({
     // Check if user modified non-API-key fields (like URLs)
     const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(state.customKeys, state.initialKeys);
 
-    // Validate keys according to schema before submitting. oauth-device
-    // providers skip this entirely: the user never types credentials
-    // here, so a name/scope-only save must not trip on the token schema.
-    if (
-      providerDefinition?.keysSchema &&
-      !isOAuthDeviceProvider &&
-      (!isUsingEnvVars || hasNonApiKeyChanges)
-    ) {
-      const keysSchema = z.union([
-        providerDefinition.keysSchema,
-        z.object({ MANAGED: z.string() }),
-      ]);
-
-      const keysToValidate: Record<string, unknown> = { ...state.customKeys };
-      const result = keysSchema.safeParse(keysToValidate);
-
-      if (!result.success) {
-        const zodError = result.error as ZodErrorStructure;
-        const parsedErrors = parseZodFieldErrors(zodError);
-        // A rule that spans several credentials (an API key, or a base URL
-        // instead) names no single field, so it has no path to land on and
-        // would leave Save doing nothing visible. Anchor it on a required
-        // field the customer has left empty.
-        const schemaWideMessage = zodError.issues.find((issue) => !issue.path?.length)?.message;
-        if (schemaWideMessage) {
-          const anchorKey =
-            getEmptyRequiredCredentialKeys({
-              requiredKeys,
-              values: state.customKeys,
-            })[0] ?? Object.keys(state.displayKeys)[0];
-          if (anchorKey && !parsedErrors[anchorKey]) {
-            parsedErrors[anchorKey] = schemaWideMessage;
-          }
-        }
-        setFieldErrors(parsedErrors);
-        return;
-      }
+    const credentialErrors = findCredentialFieldErrors({
+      displayKeys: state.displayKeys,
+      hasNonApiKeyChanges,
+      isOAuthDeviceProvider,
+      isUsingEnvVars: Boolean(isUsingEnvVars),
+      keysSchema: providerDefinition?.keysSchema,
+      requiredKeys,
+      values: state.customKeys,
+    });
+    if (credentialErrors) {
+      setFieldErrors(credentialErrors);
+      return;
     }
 
     // Only probe the upstream provider when the user has actually entered a new API key.
-    if (isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey && probeRequired) {
-      const isValid = await validateApiKey();
-      if (!isValid) {
-        recordRefusal();
-        return;
-      }
-      clearRefusal();
+    const needsProbe =
+      isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey && probeRequired;
+    if (needsProbe && !(await probeCredential({ clearRefusal, recordRefusal, validateApiKey }))) {
+      return;
     }
 
     void actions.submit();
@@ -421,37 +810,14 @@ export const EditModelProviderForm = ({
         </Text>
       )}
       <VStack align="start" width="full" gap={4}>
-        <Field.Root width="full" required>
-          <SmallLabel>
-            Name
-            <Field.RequiredIndicator />
-          </SmallLabel>
-          <Box width="full">
-            <Input
-              value={state.name}
-              onChange={(e) => actions.setName(e.target.value)}
-              placeholder={provider.provider}
-              width="full"
-              maxLength={128}
-            />
-          </Box>
-          <Field.HelperText>
-            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs "OpenAI – Dev").
-          </Field.HelperText>
-        </Field.Root>
+        <ProviderNameField actions={actions} provider={provider} state={state} />
 
-        {isLlmProvider && provider.provider === "azure" && (
-          <Field.Root>
-            <Switch
-              onCheckedChange={(details) => {
-                actions.setUseApiGateway(details.checked);
-              }}
-              checked={state.useApiGateway}
-            >
-              Use API Gateway
-            </Switch>
-          </Field.Root>
-        )}
+        <ApiGatewaySwitch
+          actions={actions}
+          isLlmProvider={isLlmProvider}
+          provider={provider}
+          state={state}
+        />
 
         <ProviderScopeSection
           state={state}
@@ -463,121 +829,60 @@ export const EditModelProviderForm = ({
           organizationName={organization?.name}
           projectId={project?.id}
           projectName={project?.name}
-          availableTeams={
-            organization?.teams?.map((candidate) => ({
-              id: candidate.id,
-              name: candidate.name,
-            })) ?? []
-          }
-          availableProjects={
-            organization?.teams?.flatMap((candidateTeam) =>
-              candidateTeam.projects.map((candidateProject) => ({
-                id: candidateProject.id,
-                name: `${candidateProject.name} · ${candidateTeam.name}`,
-                teamId: candidateTeam.id,
-              })),
-            ) ?? []
-          }
+          availableTeams={availableTeamsOf(organization)}
+          availableProjects={availableProjectsOf(organization)}
         />
 
-        {isOAuthDeviceProvider ? (
-          <CodexSignIn
-            projectId={project?.id ?? ""}
-            scopes={state.scopes}
-            setAsCodingDefaults={false}
-            onConnected={(account) => {
-              // The sign-in poll already persisted the provider row
-              // server-side, so the drawer's Save has nothing left to do:
-              // close it over the refreshed list. The coding-defaults ask
-              // is queued to the page-level host (a dialog mounted in this
-              // drawer would be unmounted right here, mid-question).
-              useCodexCodingDefaultsAskStore.getState().request({
-                projectId: project?.id ?? "",
-                scopes: state.scopes,
-              });
-              toaster.create({
-                title: "Codex connected",
-                description: account.email ? `Signed in as ${account.email}` : undefined,
-                type: "success",
-              });
-              if (onSaved) {
-                onSaved();
-                return;
-              }
-              closeDrawer();
-            }}
-          />
-        ) : (
-          <CredentialsSection
-            state={state}
-            actions={actions}
-            provider={provider}
-            fieldErrors={fieldErrors}
-            setFieldErrors={setFieldErrors}
-            organizationId={organizationId}
-            apiKeyValidationError={apiKeyValidationError}
-            onApiKeyValidationClear={clearApiKeyError}
-          />
-        )}
+        <ProviderCredentialsArea
+          actions={actions}
+          apiKeyValidationError={apiKeyValidationError}
+          clearApiKeyError={clearApiKeyError}
+          closeDrawer={closeDrawer}
+          fieldErrors={fieldErrors}
+          isOAuthDeviceProvider={isOAuthDeviceProvider}
+          onSaved={onSaved}
+          organizationId={organizationId}
+          projectId={project?.id ?? ""}
+          provider={provider}
+          setFieldErrors={setFieldErrors}
+          state={state}
+          toaster={toaster}
+        />
 
         <ExtraHeadersSection state={state} actions={actions} provider={provider} />
 
-        {isLlmProvider && (
-          <ModelProviderRoutingSection
-            providerKey={provider.provider}
-            routingHandle={state.routingHandle}
-            onRoutingHandleChange={actions.setRoutingHandle}
-          />
-        )}
+        <ProviderModelSections
+          actions={actions}
+          isLlmProvider={isLlmProvider}
+          isOAuthDeviceProvider={isOAuthDeviceProvider}
+          provider={provider}
+          state={state}
+        />
 
-        {isLlmProvider && !isOAuthDeviceProvider && (
-          <CustomModelInputSection state={state} actions={actions} provider={provider} />
-        )}
+        <ProviderAdvancedArea
+          accordionValue={advancedAccordionValue}
+          draft={advancedDraft}
+          jsonError={advancedJsonError}
+          onAccordionValueChange={setAdvancedAccordionValue}
+          onDraftChange={(next) => {
+            setAdvancedDraft(next);
+            setAdvancedJsonError(null);
+            setSkipPermissionsError(null);
+          }}
+          provider={provider}
+          showGatewayFields={gatewayMenuEnabled}
+          showSkipPermissionsField={showSkipPermissionsField}
+          skipPermissionsError={skipPermissionsError}
+          skipPermissionsPlaceholder={skipPermissionsPlaceholder}
+        />
 
-        {(gatewayMenuEnabled || showSkipPermissionsField) && (
-          <ModelProviderAdvancedSection
-            modelProviderId={(provider as { id?: string }).id}
-            draft={advancedDraft}
-            onDraftChange={(next) => {
-              setAdvancedDraft(next);
-              setAdvancedJsonError(null);
-              setSkipPermissionsError(null);
-            }}
-            jsonError={advancedJsonError}
-            skipPermissionsError={skipPermissionsError}
-            skipPermissionsPlaceholder={skipPermissionsPlaceholder}
-            showGatewayFields={gatewayMenuEnabled}
-            showSkipPermissionsField={showSkipPermissionsField}
-            accordionValue={advancedAccordionValue}
-            onAccordionValueChange={setAdvancedAccordionValue}
-            initial={{
-              healthStatus: (provider as { healthStatus?: string | null }).healthStatus,
-              circuitOpenedAt: (
-                provider as {
-                  circuitOpenedAt?: Date | string | null;
-                }
-              ).circuitOpenedAt,
-              lastHealthCheckAt: (
-                provider as {
-                  lastHealthCheckAt?: Date | string | null;
-                }
-              ).lastHealthCheckAt,
-              disabledAt: (provider as { disabledAt?: Date | string | null }).disabledAt,
-            }}
-          />
-        )}
-
-        <HStack width="full" justify="end">
-          <Button
-            size="sm"
-            colorPalette="orange"
-            loading={state.isSaving || isValidatingApiKey}
-            disabled={cannotResolveTarget || (!state.isDirty && !isAdvancedDirty)}
-            onClick={handleSave}
-          >
-            {saveLabel}
-          </Button>
-        </HStack>
+        <SaveProviderButton
+          canResolveTarget={!cannotResolveTarget}
+          isDirty={state.isDirty || isAdvancedDirty}
+          isBusy={state.isSaving || isValidatingApiKey}
+          label={saveLabel}
+          onSave={handleSave}
+        />
       </VStack>
     </VStack>
   );

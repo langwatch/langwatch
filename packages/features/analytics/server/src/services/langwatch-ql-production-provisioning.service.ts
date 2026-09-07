@@ -232,7 +232,8 @@ export class LangWatchQLProductionProvisioningService {
       }
 
       const hash = lwqlCapability.tenantCapability({ secret: project.lwqlKey });
-      if (existingHashes.has(hash) || plannedHashes.has(hash)) {
+      const isAlreadyMapped = existingHashes.has(hash) || plannedHashes.has(hash);
+      if (isAlreadyMapped) {
         continue;
       }
 

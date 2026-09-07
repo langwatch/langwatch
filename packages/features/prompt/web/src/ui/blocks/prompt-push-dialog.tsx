@@ -60,15 +60,16 @@ export function PromptPushDialog({
             <Text fontSize="sm" color="fg.muted">
               {`Select which replicas to push the latest version of "${promptName}" to:`}
             </Text>
-            {isLoading ? (
-              <Text>Loading replicas...</Text>
-            ) : errorMessage ? (
+            {isLoading && <Text>Loading replicas...</Text>}
+            {!isLoading && errorMessage && (
               <Text role="alert" color="red.fg">
                 {errorMessage}
               </Text>
-            ) : copies.length === 0 ? (
+            )}
+            {!isLoading && !errorMessage && copies.length === 0 && (
               <Text color="fg.muted">No replicas found.</Text>
-            ) : (
+            )}
+            {!isLoading && !errorMessage && copies.length > 0 && (
               <VStack gap={2} align="start" width="full">
                 {copies.map((copy) => (
                   <Checkbox

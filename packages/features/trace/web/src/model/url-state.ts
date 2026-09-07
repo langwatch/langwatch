@@ -32,32 +32,34 @@ export function parseFragment(fragment: string): FragmentState | null {
   const lensId = safeDecode(lensIdRaw ?? "");
   if (!lensId) return null;
 
+  return { lensId, overrides: paramString ? parseOverrides(paramString) : {} };
+}
+
+/** The bar-state overrides a fragment's query string carries. */
+function parseOverrides(paramString: string): BarStateOverrides {
   const overrides: BarStateOverrides = {};
-  if (paramString) {
-    const params = new URLSearchParams(paramString);
+  const params = new URLSearchParams(paramString);
 
-    const q = params.get("q");
-    if (q !== null) overrides.query = q;
+  const q = params.get("q");
+  if (q !== null) overrides.query = q;
 
-    const preset = params.get("preset");
-    if (preset) {
-      overrides.preset = preset;
-    } else {
-      const from = params.get("from");
-      const to = params.get("to");
-      if (from !== null && to !== null) {
-        const fromN = Number(from);
-        const toN = Number(to);
-        const bothFinite = Number.isFinite(fromN) && Number.isFinite(toN);
-        if (bothFinite) {
-          overrides.timeFrom = fromN;
-          overrides.timeTo = toN;
-        }
-      }
-    }
+  const preset = params.get("preset");
+  if (preset) {
+    overrides.preset = preset;
+    return overrides;
   }
 
-  return { lensId, overrides };
+  const from = params.get("from");
+  const to = params.get("to");
+  if (from === null || to === null) return overrides;
+  const fromN = Number(from);
+  const toN = Number(to);
+  const bothFinite = Number.isFinite(fromN) && Number.isFinite(toN);
+  if (bothFinite) {
+    overrides.timeFrom = fromN;
+    overrides.timeTo = toN;
+  }
+  return overrides;
 }
 
 interface ComputeOverridesInput {

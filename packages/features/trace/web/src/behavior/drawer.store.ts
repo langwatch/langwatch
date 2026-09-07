@@ -1,5 +1,5 @@
 import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
-import { create } from "zustand";
+import { create, type StateCreator } from "zustand";
 import { isPreviewTraceId } from "../model/preview-trace-id.ts";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store.ts";
 
@@ -15,7 +15,7 @@ export type DrawerTab = "span";
 
 type AccordionSection = "events" | "evals" | "conversation";
 
-interface TraceHistoryEntry {
+export interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
   /**
@@ -538,278 +538,356 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs, options) => {
-    // Reading the captured trace is a decision about the trace in front of the
-    // reader, not a preference: the next one opens corrected, the way every
-    // trace does until they ask otherwise.
-    useTraceEditStore.getState().setOverlayView("edited");
-    // An unsaved correction belongs to the trace it was written against. The
-    // guards ask before leaving a dirty one, so anything still here once the
-    // next trace opens would be saved against the wrong trace. A session on the
-    // trace being opened survives: a link straight into edit mode re-enters it.
-    useTraceEditStore.getState().dropSessionForOtherTrace(traceId);
-    set({
-      isOpen: true,
-      traceId,
-      // An opener that names no project keeps the one already open rather than falling
-      // back to the ambient project.
-      projectId: options?.projectId ?? get().projectId,
-      occurredAtMs: occurredAtMs ?? null,
-      expectedSpanCount: options?.expectedSpanCount ?? null,
-      selectedSpanId: null,
-      pinnedSpanIds: [],
-      // Edit mode belongs to the trace it was started on. Moving to another
-      // trace leaves it, and the caller re-enters explicitly when a link asked
-      // for it.
-      isEditing: false,
-    });
-  },
-
-  backfillOccurredAtMs: (occurredAtMs) =>
-    set((s) => {
-      if (s.occurredAtMs !== null) return {};
-      if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return {};
-      return { occurredAtMs };
-    }),
-
-  closeDrawer: () =>
-    set({
-      isOpen: false,
-      isMaximized: false,
-      shortcutsOpen: false,
-      traceId: null,
-      projectId: null,
-      occurredAtMs: null,
-      expectedSpanCount: null,
-      selectedSpanId: null,
-      pinnedSpanIds: [],
-      traceBackStack: [],
-      isEditing: false,
-    }),
-
-  selectSpan: (spanId) =>
-    set((s) => {
-      // Selecting a span always reopens the detail pane. Collapsing
-      // the pane no longer clears the selection (see
-      // `togglePaneCollapsed`), so re-opening the pane lands on the
-      // same span the operator last inspected; clicking a new span
-      // updates the selection and re-expands the pane in one step.
-      const next: Partial<DrawerState> = { selectedSpanId: spanId };
-      const detailCollapsed = s.paneState.spanDetail.collapsed;
-      if (detailCollapsed) {
-        const updatedPanes: Record<PaneId, PaneState> = {
-          ...s.paneState,
-          spanDetail: { ...s.paneState.spanDetail, collapsed: false },
-        };
-        persistPaneState(updatedPanes);
-        next.paneState = updatedPanes;
-      }
-      return next;
-    }),
-
-  clearSpan: () => set({ selectedSpanId: null }),
-
-  openSpanInTrace: (spanId) => {
-    // selectSpan handles re-expanding the detail pane; the transient
-    // view-mode + viz-tab switch lands us on the waterfall (where spans
-    // are scrollable) without persisting a tab preference the user
-    // didn't explicitly choose.
-    get().selectSpan(spanId);
-    get().setVizTabTransient("waterfall");
-    set({ viewMode: "trace" });
-  },
-
-  setIsEditing: (value) => set({ isEditing: value }),
-
-  setViewMode: (mode) => {
-    // Remember the user's last explicit mode choice so the next trace
-    // they open lands here instead of bouncing back to the default.
-    persistLastViewMode(mode);
-    set({ viewMode: mode });
-  },
-  setViewModeTransient: (mode) => set({ viewMode: mode }),
-  setVizTab: (tab) => {
-    persistLastVizTab(tab);
-    set({ vizTab: tab });
-  },
-  setVizTabTransient: (tab) => set({ vizTab: tab }),
-  setMaximized: (value) => set({ isMaximized: value }),
-  toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
-
-  setWidthPx: (px) => {
-    const next = px === null ? null : Math.max(DRAWER_MIN_WIDTH_PX, px);
-    persistWidth(next);
-    set({ widthPx: next });
-  },
-
-  toggleSnapMaximize: (viewportWidth) =>
-    set((s) => {
-      const snapWidth = Math.max(DRAWER_MIN_WIDTH_PX, viewportWidth - DRAWER_MAXIMIZE_EDGE_PX);
-      const isAtSnap = s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
-      if (isAtSnap) {
-        const restore = s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
-        persistWidth(restore);
-        return {
-          widthPx: restore,
-          preMaximizeWidthPx: null,
-          isMaximized: false,
-        };
-      }
-      persistWidth(snapWidth);
-      return {
-        preMaximizeWidthPx: s.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
-        widthPx: snapWidth,
-        isMaximized: true,
-      };
-    }),
-
-  togglePaneCollapsed: (id) =>
-    set((s) => {
-      const wasCollapsed = s.paneState[id].collapsed;
-      const next: Record<PaneId, PaneState> = {
-        ...s.paneState,
-        [id]: {
-          ...s.paneState[id],
-          collapsed: !wasCollapsed,
-          // Collapsing a maximized pane is nonsensical — drop maximize.
-          maximizedWithinGroup: false,
-        },
-      };
-      persistPaneState(next);
-      // Selection is preserved across collapse/uncollapse — operator
-      // feedback: hiding the pane and showing it again should land on
-      // the same span they were inspecting, not blank the selection.
-      // (Selection still clears via explicit `clearSpan` and the X
-      // affordance in the SpanTabBar.)
-      return { paneState: next };
-    }),
-
-  togglePaneMaximized: (id) =>
-    set((s) => {
-      const currentlyMaximized = s.paneState[id].maximizedWithinGroup;
-      // Maximizing one pane should demote every sibling — exactly-one
-      // pane can be maximized at a time. Without this normalization a
-      // sequence of clicks could leave several panes flagged maximized
-      // and `PaneLayout` would hide all of them at once.
-      const next: Record<PaneId, PaneState> = (Object.keys(s.paneState) as PaneId[]).reduce(
-        (acc, key) => {
-          acc[key] = {
-            ...s.paneState[key],
-            maximizedWithinGroup: key === id ? !currentlyMaximized : false,
-            collapsed: key === id ? false : s.paneState[key].collapsed,
-          };
-          return acc;
-        },
-        {} as Record<PaneId, PaneState>,
-      );
-      persistPaneState(next);
-      return { paneState: next };
-    }),
-  setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
-
-  setPinned: (value) => {
-    persistPinned(value);
-    set({ pinned: value });
-  },
-  togglePinned: () =>
-    set((s) => {
-      const next = !s.pinned;
-      persistPinned(next);
-      return { pinned: next };
-    }),
-
-  pinSpan: (spanId) =>
-    set((s) => {
-      if (s.pinnedSpanIds.includes(spanId)) return s;
-      // Cap at MAX_PINNED_SPANS so the URL serialisation can't blow up
-      // and so the SpanTabBar doesn't grow into a wrapped row.
-      if (s.pinnedSpanIds.length >= MAX_PINNED_SPANS) return s;
-      return { pinnedSpanIds: [...s.pinnedSpanIds, spanId] };
-    }),
-
-  unpinSpan: (spanId) =>
-    set((s) => {
-      if (!s.pinnedSpanIds.includes(spanId)) return s;
-      const next: Partial<DrawerState> = {
-        pinnedSpanIds: s.pinnedSpanIds.filter((id) => id !== spanId),
-      };
-      // Unpinning the active span tab clears the selection so we don't
-      // leave a hanging "ghost" tab pointing at a span that's no longer
-      // part of the strip.
-      if (s.selectedSpanId === spanId) {
-        next.selectedSpanId = null;
-      }
-      return next;
-    }),
-
-  clearPinnedSpans: () => set({ pinnedSpanIds: [] }),
-
-  toggleAccordion: (section) =>
-    set((s) => {
-      switch (section) {
-        case "events":
-          return { eventsExpanded: !s.eventsExpanded };
-        case "evals":
-          return { evalsExpanded: !s.evalsExpanded };
-        case "conversation":
-          return { conversationExpanded: !s.conversationExpanded };
-      }
-    }),
-
-  pushTraceHistory: (entry) =>
-    set((s) => {
-      const top = s.traceBackStack[s.traceBackStack.length - 1];
-      if (top && top.traceId === entry.traceId && top.viewMode === entry.viewMode) {
-        return s;
-      }
-      return { traceBackStack: [...s.traceBackStack, entry] };
-    }),
-
-  popTraceHistory: () => {
-    const stack = get().traceBackStack;
-    if (stack.length === 0) return null;
-    const previous = stack[stack.length - 1] ?? null;
-    set({ traceBackStack: stack.slice(0, -1) });
-    return previous;
-  },
-
-  popTraceHistoryTo: (index: number) => {
-    const stack = get().traceBackStack;
-    if (index < 0 || index >= stack.length) return null;
-    const target = stack[index] ?? null;
-    set({ traceBackStack: stack.slice(0, index) });
-    return target;
-  },
-
-  hydrateUrlState: (next) =>
-    set((s) => {
-      const patch: Partial<DrawerState> = {};
-      if (next.viewMode !== undefined && next.viewMode !== s.viewMode) {
-        patch.viewMode = next.viewMode;
-      }
-      if (next.vizTab !== undefined && next.vizTab !== s.vizTab) {
-        patch.vizTab = next.vizTab;
-      }
-      if (next.selectedSpanId !== undefined && next.selectedSpanId !== s.selectedSpanId) {
-        patch.selectedSpanId = next.selectedSpanId;
-      }
-      if (
-        next.pinnedSpanIds !== undefined &&
-        !arraysShallowEqual(next.pinnedSpanIds, s.pinnedSpanIds)
-      ) {
-        patch.pinnedSpanIds = next.pinnedSpanIds;
-      }
-      if (next.isEditing !== undefined && next.isEditing !== s.isEditing) {
-        // Browser history must not throw away work. Going back to a URL from
-        // before the reviewer started editing would otherwise drop an
-        // unsaved correction with no way to get it back, so a dirty session
-        // stays open and the URL is re-asserted by the sync effect.
-        const wouldDiscardUnsavedWork =
-          !next.isEditing && selectIsTraceEditDirty(useTraceEditStore.getState());
-        if (!wouldDiscardUnsavedWork) patch.isEditing = next.isEditing;
-      }
-      return Object.keys(patch).length === 0 ? s : patch;
-    }),
+  ...traceNavigationActions(set, get),
+  ...drawerLayoutActions(set),
+  ...drawerChromeActions(set, get),
 }));
 
+type DrawerSet = Parameters<StateCreator<DrawerState>>[0];
+type DrawerGet = Parameters<StateCreator<DrawerState>>[1];
+
+/** Which trace and which span the drawer is on, and how it got there. */
+function traceNavigationActions(
+  set: DrawerSet,
+  get: DrawerGet,
+): Pick<
+  DrawerState,
+  | "openTrace"
+  | "backfillOccurredAtMs"
+  | "closeDrawer"
+  | "selectSpan"
+  | "clearSpan"
+  | "openSpanInTrace"
+  | "setIsEditing"
+  | "setViewMode"
+  | "setViewModeTransient"
+  | "setVizTab"
+  | "setVizTabTransient"
+> {
+  return {
+    openTrace: (traceId, occurredAtMs, options) => {
+      // Reading the captured trace is a decision about the trace in front of the
+      // reader, not a preference: the next one opens corrected, the way every
+      // trace does until they ask otherwise.
+      useTraceEditStore.getState().setOverlayView("edited");
+      // An unsaved correction belongs to the trace it was written against. The
+      // guards ask before leaving a dirty one, so anything still here once the
+      // next trace opens would be saved against the wrong trace. A session on the
+      // trace being opened survives: a link straight into edit mode re-enters it.
+      useTraceEditStore.getState().dropSessionForOtherTrace(traceId);
+      set({
+        isOpen: true,
+        traceId,
+        // An opener that names no project keeps the one already open rather than falling
+        // back to the ambient project.
+        projectId: options?.projectId ?? get().projectId,
+        occurredAtMs: occurredAtMs ?? null,
+        expectedSpanCount: options?.expectedSpanCount ?? null,
+        selectedSpanId: null,
+        pinnedSpanIds: [],
+        // Edit mode belongs to the trace it was started on. Moving to another
+        // trace leaves it, and the caller re-enters explicitly when a link asked
+        // for it.
+        isEditing: false,
+      });
+    },
+
+    backfillOccurredAtMs: (occurredAtMs) =>
+      set((s) => {
+        if (s.occurredAtMs !== null) return {};
+        if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return {};
+        return { occurredAtMs };
+      }),
+
+    closeDrawer: () =>
+      set({
+        isOpen: false,
+        isMaximized: false,
+        shortcutsOpen: false,
+        traceId: null,
+        projectId: null,
+        occurredAtMs: null,
+        expectedSpanCount: null,
+        selectedSpanId: null,
+        pinnedSpanIds: [],
+        traceBackStack: [],
+        isEditing: false,
+      }),
+
+    selectSpan: (spanId) =>
+      set((s) => {
+        // Selecting a span always reopens the detail pane. Collapsing
+        // the pane no longer clears the selection (see
+        // `togglePaneCollapsed`), so re-opening the pane lands on the
+        // same span the operator last inspected; clicking a new span
+        // updates the selection and re-expands the pane in one step.
+        const next: Partial<DrawerState> = { selectedSpanId: spanId };
+        const detailCollapsed = s.paneState.spanDetail.collapsed;
+        if (detailCollapsed) {
+          const updatedPanes: Record<PaneId, PaneState> = {
+            ...s.paneState,
+            spanDetail: { ...s.paneState.spanDetail, collapsed: false },
+          };
+          persistPaneState(updatedPanes);
+          next.paneState = updatedPanes;
+        }
+        return next;
+      }),
+
+    clearSpan: () => set({ selectedSpanId: null }),
+
+    openSpanInTrace: (spanId) => {
+      // selectSpan handles re-expanding the detail pane; the transient
+      // view-mode + viz-tab switch lands us on the waterfall (where spans
+      // are scrollable) without persisting a tab preference the user
+      // didn't explicitly choose.
+      get().selectSpan(spanId);
+      get().setVizTabTransient("waterfall");
+      set({ viewMode: "trace" });
+    },
+
+    setIsEditing: (value) => set({ isEditing: value }),
+
+    setViewMode: (mode) => {
+      // Remember the user's last explicit mode choice so the next trace
+      // they open lands here instead of bouncing back to the default.
+      persistLastViewMode(mode);
+      set({ viewMode: mode });
+    },
+    setViewModeTransient: (mode) => set({ viewMode: mode }),
+    setVizTab: (tab) => {
+      persistLastVizTab(tab);
+      set({ vizTab: tab });
+    },
+    setVizTabTransient: (tab) => set({ vizTab: tab }),
+  };
+}
+
+/** How much room the drawer and its panes take. */
+function drawerLayoutActions(
+  set: DrawerSet,
+): Pick<
+  DrawerState,
+  | "setMaximized"
+  | "toggleMaximized"
+  | "setWidthPx"
+  | "toggleSnapMaximize"
+  | "togglePaneCollapsed"
+  | "togglePaneMaximized"
+> {
+  return {
+    setMaximized: (value) => set({ isMaximized: value }),
+    toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
+
+    setWidthPx: (px) => {
+      const next = px === null ? null : Math.max(DRAWER_MIN_WIDTH_PX, px);
+      persistWidth(next);
+      set({ widthPx: next });
+    },
+
+    toggleSnapMaximize: (viewportWidth) =>
+      set((s) => {
+        const snapWidth = Math.max(DRAWER_MIN_WIDTH_PX, viewportWidth - DRAWER_MAXIMIZE_EDGE_PX);
+        const isAtSnap = s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
+        if (isAtSnap) {
+          const restore = s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
+          persistWidth(restore);
+          return {
+            widthPx: restore,
+            preMaximizeWidthPx: null,
+            isMaximized: false,
+          };
+        }
+        persistWidth(snapWidth);
+        return {
+          preMaximizeWidthPx: s.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
+          widthPx: snapWidth,
+          isMaximized: true,
+        };
+      }),
+
+    togglePaneCollapsed: (id) =>
+      set((s) => {
+        const wasCollapsed = s.paneState[id].collapsed;
+        const next: Record<PaneId, PaneState> = {
+          ...s.paneState,
+          [id]: {
+            ...s.paneState[id],
+            collapsed: !wasCollapsed,
+            // Collapsing a maximized pane is nonsensical — drop maximize.
+            maximizedWithinGroup: false,
+          },
+        };
+        persistPaneState(next);
+        // Selection is preserved across collapse/uncollapse — operator
+        // feedback: hiding the pane and showing it again should land on
+        // the same span they were inspecting, not blank the selection.
+        // (Selection still clears via explicit `clearSpan` and the X
+        // affordance in the SpanTabBar.)
+        return { paneState: next };
+      }),
+
+    togglePaneMaximized: (id) =>
+      set((s) => {
+        const currentlyMaximized = s.paneState[id].maximizedWithinGroup;
+        // Maximizing one pane should demote every sibling — exactly-one
+        // pane can be maximized at a time. Without this normalization a
+        // sequence of clicks could leave several panes flagged maximized
+        // and `PaneLayout` would hide all of them at once.
+        const next: Record<PaneId, PaneState> = (Object.keys(s.paneState) as PaneId[]).reduce(
+          (acc, key) => {
+            acc[key] = {
+              ...s.paneState[key],
+              maximizedWithinGroup: key === id ? !currentlyMaximized : false,
+              collapsed: key === id ? false : s.paneState[key].collapsed,
+            };
+            return acc;
+          },
+          {} as Record<PaneId, PaneState>,
+        );
+        persistPaneState(next);
+        return { paneState: next };
+      }),
+  };
+}
+
+/** The drawer's own chrome: pinning, shortcuts, accordions and history. */
+function drawerChromeActions(
+  set: DrawerSet,
+  get: DrawerGet,
+): Pick<
+  DrawerState,
+  | "setShortcutsOpen"
+  | "setPinned"
+  | "togglePinned"
+  | "pinSpan"
+  | "unpinSpan"
+  | "clearPinnedSpans"
+  | "toggleAccordion"
+  | "pushTraceHistory"
+  | "popTraceHistory"
+  | "popTraceHistoryTo"
+  | "hydrateUrlState"
+> {
+  return {
+    setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
+
+    setPinned: (value) => {
+      persistPinned(value);
+      set({ pinned: value });
+    },
+    togglePinned: () =>
+      set((s) => {
+        const next = !s.pinned;
+        persistPinned(next);
+        return { pinned: next };
+      }),
+
+    pinSpan: (spanId) => set((s) => withSpanPinned(s, spanId)),
+
+    unpinSpan: (spanId) => set((s) => withSpanUnpinned(s, spanId)),
+
+    clearPinnedSpans: () => set({ pinnedSpanIds: [] }),
+
+    toggleAccordion: (section) => set((s) => withAccordionToggled(s, section)),
+
+    pushTraceHistory: (entry) =>
+      set((s) =>
+        repeatsTopOfStack(s.traceBackStack, entry)
+          ? s
+          : { traceBackStack: [...s.traceBackStack, entry] },
+      ),
+
+    popTraceHistory: () => {
+      const stack = get().traceBackStack;
+      if (stack.length === 0) return null;
+      const previous = stack[stack.length - 1] ?? null;
+      set({ traceBackStack: stack.slice(0, -1) });
+      return previous;
+    },
+
+    popTraceHistoryTo: (index: number) => {
+      const stack = get().traceBackStack;
+      if (index < 0 || index >= stack.length) return null;
+      const target = stack[index] ?? null;
+      set({ traceBackStack: stack.slice(0, index) });
+      return target;
+    },
+
+    hydrateUrlState: (next) => set((s) => hydratedUrlState(s, next)),
+  };
+}
+
 export { isViewMode, isVizTab };
+
+/**
+ * Pinning caps at MAX_PINNED_SPANS so the URL serialisation cannot blow up and
+ * the SpanTabBar cannot grow into a wrapped row.
+ */
+function withSpanPinned(s: DrawerState, spanId: string): Partial<DrawerState> {
+  if (s.pinnedSpanIds.includes(spanId)) return s;
+  if (s.pinnedSpanIds.length >= MAX_PINNED_SPANS) return s;
+  return { pinnedSpanIds: [...s.pinnedSpanIds, spanId] };
+}
+
+/**
+ * Unpinning the active span tab clears the selection too, so no "ghost" tab is
+ * left pointing at a span that is no longer part of the strip.
+ */
+function withSpanUnpinned(s: DrawerState, spanId: string): Partial<DrawerState> {
+  if (!s.pinnedSpanIds.includes(spanId)) return s;
+  const next: Partial<DrawerState> = {
+    pinnedSpanIds: s.pinnedSpanIds.filter((id) => id !== spanId),
+  };
+  if (s.selectedSpanId === spanId) next.selectedSpanId = null;
+  return next;
+}
+
+/** One accordion flipped. */
+function withAccordionToggled(
+  s: DrawerState,
+  section: "events" | "evals" | "conversation",
+): Partial<DrawerState> {
+  if (section === "events") return { eventsExpanded: !s.eventsExpanded };
+  if (section === "evals") return { evalsExpanded: !s.evalsExpanded };
+  return { conversationExpanded: !s.conversationExpanded };
+}
+
+/** Whether the entry is already what the back stack's top says. */
+function repeatsTopOfStack(stack: TraceHistoryEntry[], entry: TraceHistoryEntry): boolean {
+  const top = stack[stack.length - 1];
+  if (!top) return false;
+  return top.traceId === entry.traceId && top.viewMode === entry.viewMode;
+}
+
+/**
+ * Browser history must not throw away work. Going back to a URL from before the
+ * reviewer started editing would otherwise drop an unsaved correction with no
+ * way to get it back, so a dirty session stays open and the sync effect
+ * re-asserts the URL.
+ */
+function editingFromUrl(s: DrawerState, next: Partial<DrawerUrlState>): boolean | undefined {
+  if (next.isEditing === undefined || next.isEditing === s.isEditing) return undefined;
+  const wouldDiscardUnsavedWork =
+    !next.isEditing && selectIsTraceEditDirty(useTraceEditStore.getState());
+  return wouldDiscardUnsavedWork ? undefined : next.isEditing;
+}
+
+/** The URL's view state, as the fields it actually disagrees with the store on. */
+function hydratedUrlState(s: DrawerState, next: Partial<DrawerUrlState>): Partial<DrawerState> {
+  const patch: Partial<DrawerState> = {};
+  if (next.viewMode !== undefined && next.viewMode !== s.viewMode) patch.viewMode = next.viewMode;
+  if (next.vizTab !== undefined && next.vizTab !== s.vizTab) patch.vizTab = next.vizTab;
+  if (next.selectedSpanId !== undefined && next.selectedSpanId !== s.selectedSpanId) {
+    patch.selectedSpanId = next.selectedSpanId;
+  }
+  if (
+    next.pinnedSpanIds !== undefined &&
+    !arraysShallowEqual(next.pinnedSpanIds, s.pinnedSpanIds)
+  ) {
+    patch.pinnedSpanIds = next.pinnedSpanIds;
+  }
+  const isEditing = editingFromUrl(s, next);
+  if (isEditing !== undefined) patch.isEditing = isEditing;
+  return Object.keys(patch).length === 0 ? s : patch;
+}

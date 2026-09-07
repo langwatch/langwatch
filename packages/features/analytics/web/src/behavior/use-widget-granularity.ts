@@ -54,7 +54,8 @@ export function parseWidgetGranularity(
 
     const graphId = entry.slice(0, separator);
     const seconds = Number(entry.slice(separator + 1));
-    if (!Number.isInteger(seconds) || !isOfferedStep(seconds)) continue;
+    const isOfferedGranularity = Number.isInteger(seconds) && isOfferedStep(seconds);
+    if (!isOfferedGranularity) continue;
 
     parsed[graphId] = seconds;
   }

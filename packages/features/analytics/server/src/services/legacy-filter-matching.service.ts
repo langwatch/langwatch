@@ -75,7 +75,8 @@ export class LegacyFilterMatchingService {
         continue;
       }
 
-      if (EVALUATION_FIELDS.has(field) || UNSUPPORTED_FIELDS.has(field)) {
+      const isUnmatchableField = EVALUATION_FIELDS.has(field) || UNSUPPORTED_FIELDS.has(field);
+      if (isUnmatchableField) {
         if (hasActionableCondition(filterValue)) {
           return false;
         }
@@ -308,7 +309,8 @@ function matchEventMetricRange(
 
       const min = parseFloat(values[0] ?? "");
       const max = parseFloat(values[1] ?? "");
-      if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+      const isValidRange = Number.isFinite(min) && Number.isFinite(max) && min <= max;
+      if (!isValidRange) {
         continue;
       }
 

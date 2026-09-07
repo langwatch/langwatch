@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer.ts";
 import { parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import {
+  selectIsTraceEditDirty,
+  useTraceEditStore,
+} from "../../../../behavior/trace-edit.store.ts";
 import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode.ts";
 
 /**
@@ -19,33 +22,51 @@ export function useTraceDrawerUrlHydrator(): void {
   drawerRef.current = { openDrawer, closeDrawer };
 
   useEffect(() => {
-    const wantsOpen = currentDrawer === "traceV2Details";
-    const traceId = params.traceId ?? null;
-    const occurredAtMs = params.t ? Number(params.t) : null;
-    const validTimestamp =
-      occurredAtMs !== null && Number.isFinite(occurredAtMs) && occurredAtMs > 0
-        ? occurredAtMs
-        : null;
-
-    const store = useDrawerStore.getState();
-
-    if (wantsOpen && traceId) {
-      const alreadyOnTrace = store.traceId === traceId && store.occurredAtMs === validTimestamp;
-      if (!alreadyOnTrace) store.openTrace(traceId, validTimestamp);
-      syncEditMode({
-        traceId,
-        editParam: params.edit,
-        openDrawer: drawerRef.current.openDrawer,
-      });
-      return;
-    }
-
-    if (!wantsOpen && store.traceId) {
-      if (keepDrawerForUnsavedEdit(drawerRef.current)) return;
-      store.closeDrawer();
-      exitTraceEditMode();
-    }
+    hydrateDrawerFromUrl({
+      drawer: drawerRef.current,
+      editParam: params.edit,
+      occurredAtMs: timestampParam(params.t),
+      traceId: params.traceId ?? null,
+      wantsOpen: currentDrawer === "traceV2Details",
+    });
   }, [currentDrawer, params.traceId, params.t, params.edit]);
+}
+
+/** The `t` link parameter as a timestamp, or null when it names no usable one. */
+function timestampParam(raw: string | undefined): number | null {
+  const occurredAtMs = raw ? Number(raw) : null;
+  if (occurredAtMs === null || !Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return null;
+  return occurredAtMs;
+}
+
+/** Brings the drawer store in line with what the link asks for. */
+function hydrateDrawerFromUrl({
+  drawer,
+  editParam,
+  occurredAtMs,
+  traceId,
+  wantsOpen,
+}: {
+  drawer: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">;
+  editParam: string | undefined;
+  occurredAtMs: number | null;
+  traceId: string | null;
+  wantsOpen: boolean;
+}): void {
+  const store = useDrawerStore.getState();
+
+  if (wantsOpen && traceId) {
+    const alreadyOnTrace = store.traceId === traceId && store.occurredAtMs === occurredAtMs;
+    if (!alreadyOnTrace) store.openTrace(traceId, occurredAtMs);
+    syncEditMode({ traceId, editParam, openDrawer: drawer.openDrawer });
+    return;
+  }
+
+  if (!wantsOpen && store.traceId) {
+    if (keepDrawerForUnsavedEdit(drawer)) return;
+    store.closeDrawer();
+    exitTraceEditMode();
+  }
 }
 
 /**

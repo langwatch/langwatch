@@ -89,11 +89,10 @@ export function coerceToString(value: unknown): string | undefined {
 export function createDefaultPromptFormValues(
   spanData: PromptStudioSpanResult,
 ): PromptConfigFormValues {
-  const systemPrompt = spanData.llmConfig?.systemPrompt
-    ? typeof spanData.llmConfig.systemPrompt === "string"
-      ? spanData.llmConfig.systemPrompt
-      : JSON.stringify(spanData.llmConfig.systemPrompt)
-    : "";
+  const rawSystemPrompt = spanData.llmConfig?.systemPrompt;
+  const serialisedPrompt =
+    typeof rawSystemPrompt === "string" ? rawSystemPrompt : JSON.stringify(rawSystemPrompt);
+  const systemPrompt = rawSystemPrompt ? serialisedPrompt : "";
 
   // Build LLM config dynamically from the parameter map
   const llm: Record<string, unknown> = {

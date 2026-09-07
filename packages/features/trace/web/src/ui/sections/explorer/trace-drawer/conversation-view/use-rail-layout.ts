@@ -107,32 +107,39 @@ export function useRailLayout(): {
   useEffect(() => {
     const el = scroller;
     if (!el || typeof ResizeObserver === "undefined") return;
-
-    let frame: number | null = null;
-    const measure = () => {
-      frame = null;
-      const next = resolveRailLayout(el.getBoundingClientRect().width);
-      setLayout((current) =>
-        current.mode === next.mode && current.railWidth === next.railWidth ? current : next,
-      );
-    };
-    const schedule = () => {
-      if (frame !== null) return;
-      if (typeof requestAnimationFrame !== "function") {
-        measure();
-        return;
-      }
-      frame = requestAnimationFrame(measure);
-    };
-
-    schedule();
-    const observer = new ResizeObserver(schedule);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      if (frame !== null) cancelAnimationFrame(frame);
-    };
+    return observeRailWidth(el, setLayout);
   }, [scroller]);
 
   return { layout, setScroller };
+}
+
+/** Resolves the rail's shape from the scroller's width now and on every resize. */
+function observeRailWidth(
+  el: HTMLElement,
+  setLayout: (update: (current: RailLayout) => RailLayout) => void,
+): () => void {
+  let frame: number | null = null;
+  const measure = () => {
+    frame = null;
+    const next = resolveRailLayout(el.getBoundingClientRect().width);
+    setLayout((current) =>
+      current.mode === next.mode && current.railWidth === next.railWidth ? current : next,
+    );
+  };
+  const schedule = () => {
+    if (frame !== null) return;
+    if (typeof requestAnimationFrame !== "function") {
+      measure();
+      return;
+    }
+    frame = requestAnimationFrame(measure);
+  };
+
+  schedule();
+  const observer = new ResizeObserver(schedule);
+  observer.observe(el);
+  return () => {
+    observer.disconnect();
+    if (frame !== null) cancelAnimationFrame(frame);
+  };
 }

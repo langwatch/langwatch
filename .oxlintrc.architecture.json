@@ -289,29 +289,11 @@
     // ------------------------------------------------------------------
     {
       "files": [
-        "packages/architecture-lint/src/api-transport-boundaries.ts",
-        "packages/architecture-lint/src/check-feature-parity.ts",
-        "packages/architecture-lint/src/feature-layout.ts",
-        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
-        "packages/eventing/src/projections/projectionRouter.ts",
-        "packages/features/analytics/server/src/repositories/clickhouse/clickhouse.filter-translator.mapper.ts",
-        "packages/features/analytics/server/src/services/analytics-tripwire.service.ts",
-        "packages/features/experiment/web/src/ui/sections/batch-evaluation-results.types.ts",
-        "packages/features/experiment/web/src/ui/sections/batch-results/comparison-charts.tsx",
-        "packages/features/langy/web/src/model/langy-choices-timeline.ts",
-        "packages/features/ops/server/src/repositories/redis/queue.repository.ts",
-        "packages/features/trace/contract/src/trace-query-analysis.ts",
-        "packages/features/trace/server/src/rules/canonical-extraction.rules.ts",
-        "packages/features/trace/server/src/rules/langwatch-value.rules.ts",
-        "packages/features/trace/server/src/services/gen-ai-span.service.ts",
-        "packages/features/trace/server/src/services/mastra-canonicaliser.service.ts",
-        "packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
-        "packages/features/trace/web/src/behavior/transcript/content-parser.ts",
-        "packages/features/trace/web/src/model/prompt-attributes.ts",
-        "packages/features/trace/web/src/model/transcript/block-stack-items.ts",
-        "packages/group-queue/src/groupQueue.ts"
+        "packages/architecture-lint/src/api-transport-boundaries.ts"
       ],
-      "rules": { "max-depth": "off" }
+      "rules": {
+        "max-depth": "off"
+      }
     },
     {
       "files": [
@@ -408,7 +390,6 @@
         "packages/features/langy/web/src/features/langy/behavior/use-capability-data.ts",
         "packages/features/langy/web/src/features/langy/model/logic/langy-tool-failure.ts",
         "packages/features/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
-        "packages/features/langy/web/src/features/langy/ui/sections/composer.tsx",
         "packages/features/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
         "packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx",
         "packages/features/langy/web/src/model/langy-local-waits.ts",
@@ -416,11 +397,6 @@
         "packages/features/log/server/src/adapters/canonical-log.adapter.ts",
         "packages/features/model-provider/contract/src/model-cost.ts",
         "packages/features/model-provider/server/src/rules/reasoning-config.rules.ts",
-        "packages/features/model-provider/web/src/behavior/use-provider-form-submit.ts",
-        "packages/features/model-provider/web/src/ui/elements/model-chip.tsx",
-        "packages/features/model-provider/web/src/ui/elements/model-selector.tsx",
-        "packages/features/model-provider/web/src/ui/elements/provider-model-selector.tsx",
-        "packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx",
         "packages/features/navigation/web/src/ui/sections/shell-page-body.tsx",
         "packages/features/onboarding/web/src/ui/elements/shared/selectable-icon-card.tsx",
         "packages/features/onboarding/web/src/ui/sections/integration-checks.tsx",
@@ -465,7 +441,6 @@
         "packages/features/trace/server/src/projections/trace-summary.projection.ts",
         "packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
         "packages/features/trace/server/src/rules/trace-export-csv.rules.ts",
-        "packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
         "packages/features/trace/server/src/transport/api-rest/collector.api.ts",
         "packages/features/trace/server/src/transport/api-trpc/shared-trace.api.ts",
         "packages/features/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts",
@@ -478,17 +453,9 @@
         "packages/features/trace/web/src/model/sequence/topology-mermaid.ts",
         "packages/features/trace/web/src/ui/sections/add-annotation-queue-drawer.tsx",
         "packages/features/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/onboarding/traces-empty-onboarding.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/search-bar/token-value-picker.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/search-bar/use-filter-editor.ts",
         "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx",
         "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/metric-pill.tsx",
         "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/eval-cards/eval-card.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/markdown-view/build-trace-markdown.ts",
-        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/span-accordions.tsx",
-        "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx",
         "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/viz-placeholder.tsx",
         "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/tree-row.tsx",
         "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
@@ -538,21 +505,8 @@
         "sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts",
         "sdks/typescript/src/observability-sdk/setup/node/setup.ts"
       ],
-      "rules": { "complexity": "off" }
-    },
-
-    {
-      "files": [
-        "packages/features/*/server/src/services/**/*.service.ts",
-        "packages/enterprise/features/*/server/src/services/**/*.service.ts"
-      ],
       "rules": {
-        "curly": "error",
-        "langwatch/logical-statement-spacing": "error",
-        "langwatch/max-statements-per-line": "error",
-        "langwatch/service-member-spacing": "error",
-        "langwatch/service-quality": "error",
-        "langwatch/awaited-return-chain": "error"
+        "complexity": "off"
       }
     },
 

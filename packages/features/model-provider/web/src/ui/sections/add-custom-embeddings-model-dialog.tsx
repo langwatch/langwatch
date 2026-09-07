@@ -2,6 +2,7 @@ import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { customModelEntrySchema } from "@langwatch/model-provider-contract";
+import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
 import {
   DialogBody,
@@ -42,7 +43,8 @@ export function AddCustomEmbeddingsModelDialog({
   const initialized = useRef(false);
 
   // Pre-fill form when initialValues change (edit mode)
-  if (open && initialValues && !initialized.current) {
+  const shouldPrefill = open && initialValues && !initialized.current;
+  if (shouldPrefill) {
     initialized.current = true;
     setModelId(initialValues.modelId);
     setDisplayName(initialValues.displayName);
@@ -69,14 +71,7 @@ export function AddCustomEmbeddingsModelDialog({
 
     const result = customModelEntrySchema.safeParse(entry);
     if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const field = issue.path[0];
-        if (field) {
-          fieldErrors[String(field)] = issue.message;
-        }
-      }
-      setErrors(fieldErrors);
+      setErrors(fieldErrorsFromZodIssues(result.error.issues));
       return;
     }
 

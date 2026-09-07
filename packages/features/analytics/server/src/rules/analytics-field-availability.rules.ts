@@ -30,14 +30,12 @@ export type AnalyticsMetricSource = "trace" | "evaluation";
  * mapping — the router treats those as legacy-only.
  */
 export function getMetricSource(metricKey: string): AnalyticsMetricSource | undefined {
-  if (
-    metricKey.startsWith("performance.") ||
-    metricKey.startsWith("metadata.") ||
-    metricKey.startsWith("topics.") ||
-    metricKey.startsWith("traces.") ||
-    metricKey === "models" ||
-    metricKey === "trace_name"
-  ) {
+  const TRACE_METRIC_PREFIXES = ["performance.", "metadata.", "topics.", "traces."];
+  const TRACE_METRIC_KEYS = ["models", "trace_name"];
+  const isTraceMetric =
+    TRACE_METRIC_PREFIXES.some((prefix) => metricKey.startsWith(prefix)) ||
+    TRACE_METRIC_KEYS.includes(metricKey);
+  if (isTraceMetric) {
     return "trace";
   }
   if (metricKey.startsWith("evaluations.")) {

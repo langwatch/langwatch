@@ -131,10 +131,10 @@ export function filterLangWatchQLSchemaModel({
 
   const datasets: LangWatchQLSchemaDatasetModel[] = [];
   for (const dataset of model.datasets) {
-    if (
+    const datasetMatches =
       matches({ haystack: dataset.name, needle }) ||
-      matches({ haystack: dataset.description, needle })
-    ) {
+      matches({ haystack: dataset.description, needle });
+    if (datasetMatches) {
       datasets.push(dataset);
       continue;
     }

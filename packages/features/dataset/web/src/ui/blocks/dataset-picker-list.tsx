@@ -12,6 +12,7 @@ import { Database, Search } from "lucide-react";
 import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
 import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
 import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import { readableDate } from "../../model/readable-date.ts";
 
 export type DatasetPickerSelection = {
   datasetId: string;
@@ -48,23 +49,30 @@ export function DatasetPickerList({
     return ready.filter((dataset) => dataset.name.toLowerCase().includes(query));
   }, [datasets, searchQuery]);
 
+  const couldNotLoad = isError || datasets === undefined;
+  const noMatches = searchQuery
+    ? "No datasets match your search"
+    : "No datasets found in this project";
+  const emptyMessage = couldNotLoad ? "Could not load datasets" : noMatches;
+  const hasNothingToShow = couldNotLoad || filteredDatasets.length === 0;
+  const showsEmptyMessage = !isLoading && hasNothingToShow;
+  const showsDatasets = !isLoading && !hasNothingToShow;
+
   return (
     <VStack gap={4} align="stretch" flex={1} overflow="hidden" width="full">
       <DatasetSearchInput value={searchQuery} onChange={setSearchQuery} />
       <VStack gap={2} align="stretch" flex={1} overflowY="auto">
-        {isLoading ? (
+        {isLoading && (
           <HStack justify="center" paddingY={8}>
             <Spinner size="md" />
           </HStack>
-        ) : isError || datasets === undefined || filteredDatasets.length === 0 ? (
+        )}
+        {showsEmptyMessage && (
           <Box paddingY={8} textAlign="center" color="fg.muted">
-            {isError || datasets === undefined
-              ? "Could not load datasets"
-              : searchQuery
-                ? "No datasets match your search"
-                : "No datasets found in this project"}
+            {emptyMessage}
           </Box>
-        ) : (
+        )}
+        {showsDatasets &&
           filteredDatasets.map((dataset) => (
             <DatasetCard
               key={dataset.id}
@@ -80,8 +88,7 @@ export function DatasetPickerList({
                 })
               }
             />
-          ))
-        )}
+          ))}
       </VStack>
     </VStack>
   );
@@ -158,7 +165,7 @@ function DatasetCard({
             <Text>•</Text>
             <Text>{columnCount} columns</Text>
             <Text>•</Text>
-            <Text>Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}</Text>
+            <Text>Updated {formatDistanceToNow(readableDate(updatedAt), { addSuffix: true })}</Text>
           </HStack>
         </VStack>
       </HStack>

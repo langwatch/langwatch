@@ -63,18 +63,16 @@ export function useVisibleTraceIds(): VisibleTraceIds {
 
   const ids = new Set(items.map((item) => item.traceId));
 
-  // `startedAt` can be a number (ms) or an ISO string depending on the
-  // serializer. Normalise both to ms.
-  const topTimestamp: number | undefined =
-    items.length > 0
-      ? (() => {
-          const raw = items[0]?.startedAt;
-          if (raw === null || raw === undefined) return undefined;
-          if (typeof raw === "number") return raw;
-          const parsed = toEpochMs(raw);
-          return isNaN(parsed) ? undefined : parsed;
-        })()
-      : undefined;
+  return { ids, topTimestamp: toTimestampMs(items[0]?.startedAt), page };
+}
 
-  return { ids, topTimestamp, page };
+/**
+ * `startedAt` can be a number (ms) or an ISO string depending on the
+ * serializer. Normalise both to ms.
+ */
+function toTimestampMs(raw: number | string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  if (typeof raw === "number") return raw;
+  const parsed = toEpochMs(raw);
+  return isNaN(parsed) ? undefined : parsed;
 }

@@ -46,6 +46,38 @@ import { LabelledField } from "../elements/labelled-field.tsx";
  * Columns a freshly created dataset starts with, matching the trace fields a
  * record carries by default.
  */
+type SavedDataset = { datasetId?: string } | undefined;
+
+function datasetDrawerHeading({
+  datasetToSave,
+  isEditing,
+}: {
+  datasetToSave: SavedDataset;
+  isEditing: boolean;
+}): string {
+  if (isEditing) return "Edit Dataset";
+
+  return datasetToSave ? "Save Dataset" : "New Dataset";
+}
+
+function datasetSubmitLabel({
+  datasetToSave,
+  localOnly,
+}: {
+  datasetToSave: SavedDataset;
+  localOnly: boolean;
+}): string {
+  if (localOnly) return "Apply";
+
+  return datasetToSave ? "Save" : "Create Dataset";
+}
+
+function datasetSavedTitle(datasetToSave: SavedDataset): string {
+  if (datasetToSave?.datasetId) return "Dataset Updated";
+
+  return datasetToSave ? "Dataset Saved" : "Dataset Created";
+}
+
 export const DATASET_DEFAULT_COLUMNS: DatasetColumns = [
   { name: "trace_id", type: "string" },
   { name: "timestamp", type: "date" },
@@ -147,9 +179,9 @@ export function AddOrEditDatasetDrawer({
   }, [open]);
 
   const isEditing = !!datasetToSave?.datasetId || localOnly;
-  const heading = isEditing ? "Edit Dataset" : datasetToSave ? "Save Dataset" : "New Dataset";
+  const heading = datasetDrawerHeading({ datasetToSave, isEditing });
 
-  const submitLabel = localOnly ? "Apply" : datasetToSave ? "Save" : "Create Dataset";
+  const submitLabel = datasetSubmitLabel({ datasetToSave, localOnly });
 
   const submit = () => {
     const found = describeProblems({ name, columnTypes });
@@ -177,11 +209,7 @@ export function AddOrEditDatasetDrawer({
             columnTypes: saved.columnTypes,
           });
           host.succeeded({
-            title: datasetToSave?.datasetId
-              ? "Dataset Updated"
-              : datasetToSave
-                ? "Dataset Saved"
-                : "Dataset Created",
+            title: datasetSavedTitle(datasetToSave),
             description: datasetToSave?.datasetId
               ? `Successfully updated ${saved.name} dataset`
               : `Successfully created ${saved.name} dataset`,

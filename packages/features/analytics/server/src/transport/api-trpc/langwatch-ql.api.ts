@@ -40,7 +40,7 @@ import {
 } from "@langwatch/analytics-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { AnalyticsApp } from "#app/analytics.app";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 
 /**
  * The workbench and the analytics reads are two doors onto ONE feature, so
@@ -49,7 +49,7 @@ import type { AnalyticsApp } from "#app/analytics.app";
  * `Readonly<{ analytics: AnalyticsService }>` next door — two names for one
  * feature, which is how a rule ends up living in only one of them.
  */
-type LangWatchQLApplication = Readonly<{ analytics: AnalyticsApp }>;
+type LangWatchQLApplication = Readonly<{ analytics: AnalyticsApi }>;
 
 /** The host supplies authentication; authorization arrives as `policy`. */
 export type LangWatchQLTrpcContext = Readonly<{ app: LangWatchQLApplication }>;
@@ -182,7 +182,8 @@ export class LangWatchQLTrpcApi {
               });
               if (!enabled) return { available: false, reason: "disabled" as const };
 
-              if (!ctx.app.analytics.langWatchQLAvailable) {
+              const isProvisioned = ctx.app.analytics.isLangWatchQLAvailable();
+              if (!isProvisioned) {
                 return { available: false, reason: "unprovisioned" as const };
               }
               return { available: true };

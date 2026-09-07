@@ -57,6 +57,9 @@ export function LLMModelDisplay({
       ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
       : undefined);
 
+  const disabledColor = isDisabled ? "fg.muted" : undefined;
+  const labelColor = isProviderMissing ? "red.600" : disabledColor;
+
   const stack = (
     <HStack align="center" gap={2} {...props}>
       {iconNode && (
@@ -73,7 +76,7 @@ export function LLMModelDisplay({
           fontFamily="mono"
           lineClamp={1}
           wordBreak="break-all"
-          color={isProviderMissing ? "red.600" : isDisabled ? "fg.muted" : undefined}
+          color={labelColor}
           textDecoration={isProviderMissing || isDisabled ? "line-through" : undefined}
         >
           {modelOption?.label ?? model}

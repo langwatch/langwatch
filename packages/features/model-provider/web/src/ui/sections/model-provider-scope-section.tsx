@@ -83,15 +83,16 @@ export function ProviderScopeSection({
   const hasOrgOrTeam = Boolean(organizationId ?? teamId);
 
   if (isExisting) {
+    const fallbackScopes: ScopeSelection[] = provider.scopeType
+      ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId ?? "" }]
+      : [{ scopeType: "PROJECT", scopeId: projectId ?? "" }];
     const storedScopes: ScopeSelection[] =
       provider.scopes && provider.scopes.length > 0
         ? provider.scopes.map((s) => ({
             scopeType: s.scopeType,
             scopeId: s.scopeId,
           }))
-        : provider.scopeType
-          ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId ?? "" }]
-          : [{ scopeType: "PROJECT", scopeId: projectId ?? "" }];
+        : fallbackScopes;
 
     if (!hasOrgOrTeam && storedScopes.every((s) => s.scopeType === "PROJECT")) {
       return null;

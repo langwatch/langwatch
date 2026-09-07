@@ -69,6 +69,8 @@ export function ResizableDivider({
     };
   }, [isDragging, onPositionChange, onDragEnd, onToggle]);
 
+  const isActive = isDragging || isHovered;
+
   return (
     <Box
       data-testid="resizable-divider"
@@ -115,15 +117,11 @@ export function ResizableDivider({
         zIndex={11}
         pointerEvents="none"
       >
-        {isDragging || isHovered ? (
-          isExpanded ? (
-            <LuChevronUp size={12} color="var(--chakra-colors-fg-muted)" />
-          ) : (
-            <LuChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
-          )
-        ) : (
-          <LuGripHorizontal size={12} color="var(--chakra-colors-fg-subtle)" />
+        {isActive && isExpanded && <LuChevronUp size={12} color="var(--chakra-colors-fg-muted)" />}
+        {isActive && !isExpanded && (
+          <LuChevronDown size={12} color="var(--chakra-colors-fg-muted)" />
         )}
+        {!isActive && <LuGripHorizontal size={12} color="var(--chakra-colors-fg-subtle)" />}
       </Center>
     </Box>
   );

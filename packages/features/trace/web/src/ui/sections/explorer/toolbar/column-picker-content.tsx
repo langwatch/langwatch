@@ -43,24 +43,10 @@ export const ColumnPickerContent: React.FC = () => {
   // Per-evaluator eval columns are dynamic (not in the static capability
   // list); derive their option entries from the active columnOrder so they
   // render as toggles + in the reorder strip with resolved labels.
-  const evalColumnOptions = useMemo<LensColumnOption[]>(() => {
-    if (!isTraceGrouping) return [];
-    return columnOrder.filter(isEvalColumnId).flatMap((id) => {
-      const parsed = parseEvalColumnId(id);
-      if (!parsed) return [];
-      return [
-        {
-          id,
-          label: evalColumnLabel({
-            field: parsed.field,
-            evaluatorKey: parsed.evaluatorKey,
-            evaluatorNames: nameByKey,
-          }),
-          section: "Evaluations",
-        },
-      ];
-    });
-  }, [isTraceGrouping, columnOrder, nameByKey]);
+  const evalColumnOptions = useMemo<LensColumnOption[]>(
+    () => evalColumnOptionsFrom({ columnOrder, isTraceGrouping, nameByKey }),
+    [isTraceGrouping, columnOrder, nameByKey],
+  );
 
   // A column whose data the reader may not see is not offered at all: adding
   // it would only ever get them a column that cannot say anything.
@@ -93,16 +79,7 @@ export const ColumnPickerContent: React.FC = () => {
     .filter((c): c is LensColumnOption => !!c);
 
   const q = query.trim().toLowerCase();
-  const sections = useMemo(() => {
-    const grouped = groupBySection(allColumns);
-    if (!q) return grouped;
-    return grouped
-      .map((s) => ({
-        ...s,
-        columns: s.columns.filter((c) => c.label.toLowerCase().includes(q)),
-      }))
-      .filter((s) => s.columns.length > 0);
-  }, [allColumns, q]);
+  const sections = useMemo(() => sectionsMatching(allColumns, q), [allColumns, q]);
 
   return (
     <Stack width="284px" maxHeight="min(70vh, 520px)" overflowY="auto" gap={2.5} padding={2.5}>
@@ -271,6 +248,52 @@ const TimeColumnRow: React.FC<{
     </HStack>
   );
 };
+
+/**
+ * Per-evaluator eval columns are dynamic (not in the static capability list);
+ * their option entries come from the active column order, with labels resolved.
+ */
+function evalColumnOptionsFrom({
+  columnOrder,
+  isTraceGrouping,
+  nameByKey,
+}: {
+  columnOrder: string[];
+  isTraceGrouping: boolean;
+  nameByKey: Map<string, string>;
+}): LensColumnOption[] {
+  if (!isTraceGrouping) return [];
+  return columnOrder.filter(isEvalColumnId).flatMap((id) => {
+    const parsed = parseEvalColumnId(id);
+    if (!parsed) return [];
+    return [
+      {
+        id,
+        label: evalColumnLabel({
+          field: parsed.field,
+          evaluatorKey: parsed.evaluatorKey,
+          evaluatorNames: nameByKey,
+        }),
+        section: "Evaluations",
+      },
+    ];
+  });
+}
+
+/** The sections a search narrows to, or every section when nothing is typed. */
+function sectionsMatching(
+  allColumns: readonly LensColumnOption[],
+  q: string,
+): Array<{ title: string; columns: LensColumnOption[] }> {
+  const grouped = groupBySection(allColumns);
+  if (!q) return grouped;
+  return grouped
+    .map((s) => ({
+      ...s,
+      columns: s.columns.filter((c) => c.label.toLowerCase().includes(q)),
+    }))
+    .filter((s) => s.columns.length > 0);
+}
 
 function groupBySection(
   columns: readonly LensColumnOption[],

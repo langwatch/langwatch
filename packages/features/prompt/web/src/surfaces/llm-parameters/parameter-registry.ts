@@ -157,12 +157,12 @@ export class ParameterRegistry {
 
     // Apply dynamic options for the unified reasoning parameter
     // Options come from model's reasoningConfig.allowedValues
-    if (
+    const isDynamicReasoning =
       baseConfig.type === "select" &&
       baseConfig.dynamicOptions &&
       reasoningConfig &&
-      name === "reasoning"
-    ) {
+      name === "reasoning";
+    if (isDynamicReasoning) {
       return {
         ...baseConfig,
         options: reasoningConfig.allowedValues,

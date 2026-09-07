@@ -34,13 +34,9 @@ export const useFilterToggle = ({ defaultShowFilters } = { defaultShowFilters: f
     const queryString = router.asPath.split("?")[1] ?? "";
     const queryParams = qs.parse(queryString.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
 
-    const showFiltersValue = show
-      ? defaultShowFilters
-        ? undefined
-        : "true"
-      : defaultShowFilters
-        ? "false"
-        : undefined;
+    const shownValue = defaultShowFilters ? undefined : "true";
+    const hiddenValue = defaultShowFilters ? "false" : undefined;
+    const showFiltersValue = show ? shownValue : hiddenValue;
 
     const newParams = { ...queryParams };
     if (showFiltersValue === undefined) {

@@ -324,6 +324,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     if (isFormInitialized) return;
     if (!isOpen) return;
 
+    const isMissingPrompt = !promptQuery.data && !promptQuery.isLoading;
+    const isUnstoredPrompt = !promptId || isMissingPrompt;
+
     if (promptQuery.data) {
       const serverValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(
         promptQuery.data,
@@ -383,7 +386,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           }
         });
       }
-    } else if ((!promptId || (!promptQuery.data && !promptQuery.isLoading)) && modelMetadata) {
+    } else if (isUnstoredPrompt && modelMetadata) {
       // New prompt OR prompt referenced by ID but not found in DB (e.g. after
       // importing a workflow from another project). Use defaults with model's
       // max tokens, merging initialLocalConfig if available.

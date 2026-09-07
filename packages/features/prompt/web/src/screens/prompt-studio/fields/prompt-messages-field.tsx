@@ -291,11 +291,12 @@ export function PromptMessagesField({
    * Get the error for the messages field group
    */
   const messageErrors = useMemo(() => {
-    return Array.isArray(errors.version?.configData?.messages)
-      ? errors.version?.configData?.messages.map((message) => message.content?.message).join(", ")
-      : typeof errors.version?.configData?.messages === "string"
-        ? errors.version?.configData?.messages
-        : undefined;
+    const messages = errors.version?.configData?.messages;
+    if (Array.isArray(messages)) {
+      return messages.map((message) => message.content?.message).join(", ");
+    }
+
+    return typeof messages === "string" ? messages : undefined;
   }, [errors]);
 
   const systemIndex = useMemo(
@@ -333,6 +334,9 @@ export function PromptMessagesField({
   // Get non-system messages
   const nonSystemMessages = messageFields.fields.filter((_, idx) => idx !== systemIndex);
 
+  // Prompt mode shows only the system message, with no controls.
+  const isPromptMode = editingMode === "prompt";
+
   return (
     <Box
       width="full"
@@ -353,36 +357,34 @@ export function PromptMessagesField({
         flex={borderless ? 1 : undefined}
         height={borderless ? "100%" : undefined}
       >
-        {editingMode === "prompt" ? (
-          // Prompt mode: Only show system message without controls
-          systemField ? (
-            <Box
-              flex={borderless ? 1 : undefined}
-              height={borderless ? "100%" : undefined}
-              paddingX={borderless ? 1 : 0}
-              paddingTop={borderless ? 2 : 0}
-            >
-              <MessageRow
-                key="system-message-row"
-                field={systemField}
-                idx={systemIndex}
-                availableFields={availableFields}
-                otherNodesFields={otherNodesFields}
-                availableSources={availableSources}
-                messageErrors={messageErrors}
-                hasMessagesError={hasMessagesError}
-                getMessageError={getMessageError}
-                onRemove={() => messageFields.remove(systemIndex)}
-                onCreateVariable={handleCreateVariable}
-                onSetVariableMapping={onSetVariableMapping}
-                onAddEdge={onAddEdge}
-                showControls={false}
-                borderless={borderless}
-                fillHeight={borderless}
-              />
-            </Box>
-          ) : null
-        ) : (
+        {isPromptMode && systemField && (
+          <Box
+            flex={borderless ? 1 : undefined}
+            height={borderless ? "100%" : undefined}
+            paddingX={borderless ? 1 : 0}
+            paddingTop={borderless ? 2 : 0}
+          >
+            <MessageRow
+              key="system-message-row"
+              field={systemField}
+              idx={systemIndex}
+              availableFields={availableFields}
+              otherNodesFields={otherNodesFields}
+              availableSources={availableSources}
+              messageErrors={messageErrors}
+              hasMessagesError={hasMessagesError}
+              getMessageError={getMessageError}
+              onRemove={() => messageFields.remove(systemIndex)}
+              onCreateVariable={handleCreateVariable}
+              onSetVariableMapping={onSetVariableMapping}
+              onAddEdge={onAddEdge}
+              showControls={false}
+              borderless={borderless}
+              fillHeight={borderless}
+            />
+          </Box>
+        )}
+        {!isPromptMode && (
           // Messages mode: Show all messages with controls
           <>
             {systemField && (

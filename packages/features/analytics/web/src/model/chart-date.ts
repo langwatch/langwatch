@@ -17,7 +17,8 @@ export const formatChartDate = ({
   if (!date) return "";
 
   const parsed = new Date(date);
-  if (isNaN(parsed.getTime())) return "";
+  const isUnparseable = isNaN(parsed.getTime());
+  if (isUnparseable) return "";
 
   if (typeof timeScale === "number" && timeScale < 1440) {
     if (daysDifference > 1) {

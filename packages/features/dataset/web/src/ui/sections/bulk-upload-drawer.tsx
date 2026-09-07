@@ -484,11 +484,7 @@ function RowTrailing({
     case "rejected":
       return (
         <Text fontSize="13px" color="red.500">
-          {file.rejectedReason === "unsupported"
-            ? "Unsupported file"
-            : file.rejectedReason === "too-large"
-              ? "Too large"
-              : (file.error ?? "Failed")}
+          {rejectionText(file)}
         </Text>
       );
     case "cancelled":
@@ -500,6 +496,27 @@ function RowTrailing({
     default:
       return null;
   }
+}
+
+/** The row reports the normalization's verdict in place, once it settles. */
+function reportPolledStatus({
+  onFailed,
+  onReady,
+  status,
+  statusError,
+}: {
+  onFailed: (error?: string) => void;
+  onReady: () => void;
+  status: string | undefined;
+  statusError: string | undefined;
+}): void {
+  if (status === "ready") {
+    onReady();
+    return;
+  }
+  if (status !== "failed") return;
+
+  onFailed(statusError ?? undefined);
 }
 
 function BulkFileRow({
@@ -528,6 +545,8 @@ function BulkFileRow({
   // finalized (its dataset exists) so it offers neither cancel nor remove.
   const canCancel = file.status === "uploading";
   const isProcessing = file.status === "processing";
+  const canRemove = !canCancel && !isProcessing;
+  const hasFailed = file.status === "failed" || file.status === "rejected";
   const canConfirm = file.status === "pending" && !!file.columnTypes && file.columnTypes.length > 0;
 
   // Poll the dataset status inline once finalized (no nested container). The
@@ -538,18 +557,23 @@ function BulkFileRow({
     {
       enabled: isPolling,
       refetchOnWindowFocus: false,
-      refetchInterval: (query) => (query.state.data?.status === "processing" ? 3000 : false),
+      refetchInterval: (query) => {
+        const isProcessing = query.state.data?.status === "processing";
+
+        return isProcessing ? 3000 : false;
+      },
     },
   );
   const polledStatus = statusQuery.data?.status;
   useEffect(() => {
     if (!isPolling) return;
-    if (polledStatus === "ready") onReady();
-    else if (polledStatus === "failed") {
-      onFailed(
-        (statusQuery.data as { statusError?: string } | undefined)?.statusError ?? undefined,
-      );
-    }
+
+    reportPolledStatus({
+      onFailed,
+      onReady,
+      status: polledStatus,
+      statusError: (statusQuery.data as { statusError?: string } | undefined)?.statusError,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPolling, polledStatus]);
 
@@ -560,7 +584,7 @@ function BulkFileRow({
       padding={3}
       borderWidth="1px"
       borderRadius="lg"
-      borderColor={file.status === "failed" || file.status === "rejected" ? "red.300" : "border"}
+      borderColor={hasFailed ? "red.300" : "border"}
       bg="bg"
     >
       <HStack gap={3} width="full" align="center">
@@ -577,7 +601,7 @@ function BulkFileRow({
             <RefreshCw size={12} /> Retry
           </Button>
         )}
-        {canCancel ? (
+        {canCancel && (
           <Box
             as="button"
             aria-label="Cancel upload"
@@ -588,7 +612,8 @@ function BulkFileRow({
           >
             <X size={16} />
           </Box>
-        ) : isProcessing ? null : (
+        )}
+        {canRemove && (
           <Box
             as="button"
             aria-label="Remove file"
@@ -614,6 +639,13 @@ function BulkFileRow({
       )}
     </VStack>
   );
+}
+
+function rejectionText(file: { rejectedReason?: string; error?: string | null }): string {
+  if (file.rejectedReason === "unsupported") return "Unsupported file";
+  if (file.rejectedReason === "too-large") return "Too large";
+
+  return file.error ?? "Failed";
 }
 
 export function BulkUploadDrawer({

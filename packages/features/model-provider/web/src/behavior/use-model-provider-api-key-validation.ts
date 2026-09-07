@@ -15,6 +15,18 @@ const describeRefusal = (domainError: SerializedHandledError): string => {
   return description ? `${title}. ${description}` : title;
 };
 
+type ProviderScopeSelection = Array<{
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+}>;
+
+/** An empty selection means "the handles already on the call", not "no scopes". */
+function scopesOrUndefined(
+  scopes: ProviderScopeSelection | undefined,
+): ProviderScopeSelection | undefined {
+  return scopes && scopes.length > 0 ? scopes : undefined;
+}
+
 /**
  * Hook for validating model provider API keys via tRPC, scoped to a project or organization.
  */
@@ -23,10 +35,7 @@ export function useModelProviderApiKeyValidation(
   customKeys: Record<string, string>,
   projectId: string | undefined,
   organizationId: string | undefined,
-  scopes?: Array<{
-    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-    scopeId: string;
-  }>,
+  scopes?: ProviderScopeSelection,
 ) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
@@ -39,7 +48,8 @@ export function useModelProviderApiKeyValidation(
     // The probe reads nothing from storage — it sends the typed keys
     // straight at the provider — so it needs a tenant to authorize
     // against and nothing more. Either handle names one.
-    if (!projectId && !organizationId) {
+    const hasNoTenant = !projectId && !organizationId;
+    if (hasNoTenant) {
       setValidationError("No organization to validate against");
       return false;
     }
@@ -53,7 +63,7 @@ export function useModelProviderApiKeyValidation(
         organizationId,
         provider,
         customKeys,
-        scopes: scopes && scopes.length > 0 ? scopes : undefined,
+        scopes: scopesOrUndefined(scopes),
       });
 
       if (!result.valid) {

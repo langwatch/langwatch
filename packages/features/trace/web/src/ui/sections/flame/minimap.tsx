@@ -85,42 +85,14 @@ export function Minimap({
       e.preventDefault();
       const rect = ref.current?.getBoundingClientRect();
       if (!rect || fullDur <= 0) return;
-      const startX = e.clientX;
-      const startVp = viewport;
-      document.body.style.cursor = "ew-resize";
-
-      const handleMove = (ev: PointerEvent) => {
-        const dx = ev.clientX - startX;
-        const dt = (dx / rect.width) * fullDur;
-        if (edge === "left") {
-          const proposed = startVp.startMs + dt;
-          const maxStart = startVp.endMs - MIN_VIEWPORT_MS;
-          onViewport({
-            startMs: Math.min(proposed, maxStart),
-            endMs: startVp.endMs,
-          });
-        } else {
-          const proposed = startVp.endMs + dt;
-          const minEnd = startVp.startMs + MIN_VIEWPORT_MS;
-          onViewport({
-            startMs: startVp.startMs,
-            endMs: Math.max(proposed, minEnd),
-          });
-        }
-      };
-
-      const cleanup = () => {
-        document.body.style.cursor = "";
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", cleanup);
-        window.removeEventListener("pointercancel", cleanup);
-        window.removeEventListener("blur", cleanup);
-      };
-
-      window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", cleanup);
-      window.addEventListener("pointercancel", cleanup);
-      window.addEventListener("blur", cleanup);
+      beginEdgeDrag({
+        edge,
+        fullDur,
+        onViewport,
+        rect,
+        startVp: viewport,
+        startX: e.clientX,
+      });
     },
     [viewport, fullDur, onViewport],
   );
@@ -332,4 +304,63 @@ function HandleGrip() {
       ))}
     </Flex>
   );
+}
+
+/** The viewport one edge drag proposes, held to the minimum viewport width. */
+function resizedViewport({
+  dt,
+  edge,
+  startVp,
+}: {
+  dt: number;
+  edge: "left" | "right";
+  startVp: Viewport;
+}): Viewport {
+  if (edge === "left") {
+    return {
+      startMs: Math.min(startVp.startMs + dt, startVp.endMs - MIN_VIEWPORT_MS),
+      endMs: startVp.endMs,
+    };
+  }
+  return {
+    startMs: startVp.startMs,
+    endMs: Math.max(startVp.endMs + dt, startVp.startMs + MIN_VIEWPORT_MS),
+  };
+}
+
+/** Follows one drag of a minimap edge until the pointer is released. */
+function beginEdgeDrag({
+  edge,
+  fullDur,
+  onViewport,
+  rect,
+  startVp,
+  startX,
+}: {
+  edge: "left" | "right";
+  fullDur: number;
+  onViewport: (v: Viewport) => void;
+  rect: DOMRect;
+  startVp: Viewport;
+  startX: number;
+}): void {
+  document.body.style.cursor = "ew-resize";
+
+  const handleMove = (ev: PointerEvent) => {
+    const dt = ((ev.clientX - startX) / rect.width) * fullDur;
+    onViewport(resizedViewport({ dt, edge, startVp }));
+  };
+
+  const cleanup = () => {
+    document.body.style.cursor = "";
+    window.removeEventListener("pointermove", handleMove);
+    window.removeEventListener("pointerup", cleanup);
+    window.removeEventListener("pointercancel", cleanup);
+    window.removeEventListener("blur", cleanup);
+  };
+
+  window.addEventListener("pointermove", handleMove);
+  window.addEventListener("pointerup", cleanup);
+  window.addEventListener("pointercancel", cleanup);
+  window.addEventListener("blur", cleanup);
 }

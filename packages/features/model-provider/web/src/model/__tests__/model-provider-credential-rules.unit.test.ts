@@ -164,7 +164,8 @@ describe("getRequiredCredentialKeys()", () => {
         ACME_BASE_URL: z.string().nullable().optional(),
       })
       .superRefine((data, ctx) => {
-        if (!data.ACME_API_KEY?.trim() && !data.ACME_BASE_URL?.trim()) {
+        const hasNeitherCredential = !data.ACME_API_KEY?.trim() && !data.ACME_BASE_URL?.trim();
+        if (hasNeitherCredential) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Add an API key, or a base URL.",

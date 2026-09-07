@@ -52,6 +52,36 @@ export function calculateSensibleDefaults(
 }
 
 /**
+ * A value that sat at the previous model's maximum stays maxed on the new one;
+ * a customised value is capped at the new model's maximum. Without previous
+ * metadata the value is assumed to have been at the maximum.
+ */
+function carryMaxTokens({
+  newModelMetadata,
+  previousModelMetadata,
+  previousValues,
+}: {
+  newModelMetadata?: ModelMetadataForFrontend;
+  previousModelMetadata?: ModelMetadataForFrontend;
+  previousValues?: LLMConfigValues;
+}): number | undefined {
+  if (!previousValues || !newModelMetadata) return undefined;
+
+  const previousMaxTokens =
+    (previousValues.maxTokens as number | undefined) ??
+    (previousValues.max_tokens as number | undefined);
+  if (previousMaxTokens === undefined) return undefined;
+
+  const previousMax = previousModelMetadata
+    ? getMaxTokenLimit(previousModelMetadata)
+    : previousMaxTokens;
+  const newMax = getMaxTokenLimit(newModelMetadata);
+  const wasAtMax = previousMaxTokens >= previousMax;
+
+  return wasAtMax ? newMax : Math.min(previousMaxTokens, newMax);
+}
+
+/**
  * Returns a clean LLMConfig for a new model.
  * Clears all registered parameters and applies sensible defaults.
  *
@@ -92,29 +122,15 @@ export function buildModelChangeValues(
     }
   }
 
-  // Smart max_tokens handling when switching models
-  if (previousValues && newModelMetadata) {
-    const previousMaxTokens =
-      (previousValues.maxTokens as number | undefined) ??
-      (previousValues.max_tokens as number | undefined);
-
-    if (previousMaxTokens !== undefined) {
-      const previousMax = previousModelMetadata
-        ? getMaxTokenLimit(previousModelMetadata)
-        : previousMaxTokens; // If no previous metadata, assume it was at max
-      const newMax = getMaxTokenLimit(newModelMetadata);
-
-      // Check if previous value was at the max (user hadn't customized it)
-      const wasAtMax = previousMaxTokens >= previousMax;
-
-      const newMaxTokens = wasAtMax
-        ? newMax // Keep it maxed out for the new model
-        : Math.min(previousMaxTokens, newMax); // User had a custom value - cap it at new model's max
-
-      // Set both camelCase and snake_case for compatibility with different consumers
-      resultRecord.maxTokens = newMaxTokens;
-      resultRecord.max_tokens = newMaxTokens;
-    }
+  const carriedMaxTokens = carryMaxTokens({
+    newModelMetadata,
+    previousModelMetadata,
+    previousValues,
+  });
+  if (carriedMaxTokens !== undefined) {
+    // Both spellings, for consumers that read either one.
+    resultRecord.maxTokens = carriedMaxTokens;
+    resultRecord.max_tokens = carriedMaxTokens;
   }
 
   return result;

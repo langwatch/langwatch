@@ -27,13 +27,9 @@ export function useFilterToggle({ defaultShowFilters = false } = {}) {
 
   const setShowFilters = useCallback(
     (show: boolean) => {
-      const value = show
-        ? defaultShowFilters
-          ? void 0
-          : "true"
-        : defaultShowFilters
-          ? "false"
-          : void 0;
+      const shownValue = defaultShowFilters ? void 0 : "true";
+      const hiddenValue = defaultShowFilters ? "false" : void 0;
+      const value = show ? shownValue : hiddenValue;
       host.setQuery({ ...host.route().query, show_filters: value });
     },
     [defaultShowFilters, host],

@@ -184,7 +184,8 @@ export function DeployPromptDialog({
       setNewTagName("");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to create tag";
-      if (message.toLowerCase().includes("already exists")) {
+      const isDuplicateName = message.toLowerCase().includes("already exists");
+      if (isDuplicateName) {
         setAddTagError(`${name} already exists`);
       } else {
         setAddTagError(message);

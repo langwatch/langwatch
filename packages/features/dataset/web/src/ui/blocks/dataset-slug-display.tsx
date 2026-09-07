@@ -32,12 +32,10 @@ export function DatasetSlugDisplay({
 }: DatasetSlugDisplayProps) {
   if (!displaySlug) return null;
 
-  const alert =
-    slugInfo?.hasConflict && slugInfo.conflictsWith ? (
-      <SlugConflictAlert conflictsWith={slugInfo.conflictsWith} />
-    ) : !slugInfo?.hasConflict && slugWillChange ? (
-      <SlugChangeWarningAlert />
-    ) : null;
+  const conflictsWith = slugInfo?.hasConflict ? slugInfo.conflictsWith : undefined;
+  const warnsAboutChange = !slugInfo?.hasConflict && slugWillChange;
+  const changeAlert = warnsAboutChange ? <SlugChangeWarningAlert /> : null;
+  const alert = conflictsWith ? <SlugConflictAlert conflictsWith={conflictsWith} /> : changeAlert;
 
   return (
     <Box {...boxProps}>

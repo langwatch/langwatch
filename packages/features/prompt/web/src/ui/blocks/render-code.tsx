@@ -72,13 +72,12 @@ export const RenderCode = ({
   // highlight still current?" from the props keeps the plain-text fallback
   // showing the right code until the new highlight lands, with no dependence
   // on effect or microtask ordering.
-  const html =
+  const isCurrentHighlight =
     highlighted &&
     highlighted.code === code &&
     highlighted.language === language &&
-    highlighted.colorMode === colorMode
-      ? highlighted.html
-      : null;
+    highlighted.colorMode === colorMode;
+  const html = isCurrentHighlight ? highlighted.html : null;
 
   return (
     <Box position="relative" className="group" style={propsStyle}>

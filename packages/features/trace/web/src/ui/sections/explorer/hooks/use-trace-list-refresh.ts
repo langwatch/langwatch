@@ -44,19 +44,7 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
   // catches every (list, discover, newCount) variant without needing
   // to enumerate them one by one.
   const fetchingCount = useIsFetching({
-    predicate: (q) => {
-      const key = q.queryKey;
-      if (!Array.isArray(key) || key.length === 0) return false;
-      try {
-        const head = JSON.stringify(key[0]);
-        return (
-          head.includes('"tracesV2"') &&
-          (head.includes('"list"') || head.includes('"discover"') || head.includes('"newCount"'))
-        );
-      } catch {
-        return false;
-      }
-    },
+    predicate: (q) => isTraceExplorerQuery(q.queryKey),
   });
 
   // Narrower than `fetchingCount` above: only a `list` fetch counts — not
@@ -64,16 +52,7 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
   // (a span landing on a trace already on screen), not just when a new trace
   // actually shows up.
   const listFetchingCount = useIsFetching({
-    predicate: (q) => {
-      const key = q.queryKey;
-      if (!Array.isArray(key) || key.length === 0) return false;
-      try {
-        const head = JSON.stringify(key[0]);
-        return head.includes('"tracesV2"') && head.includes('"list"');
-      } catch {
-        return false;
-      }
-    },
+    predicate: (q) => isTraceListQuery(q.queryKey),
   });
 
   const requestRefresh = useRefreshUIStore((s) => s.requestRefresh);
@@ -101,4 +80,31 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     isRefreshing: fetchingCount > 0,
     shouldSpin: refreshRequested || listFetchingCount > 0,
   };
+}
+
+/** The JSON form of a tRPC query key's head, or null when it has none. */
+function queryKeyHead(key: unknown): string | null {
+  if (!Array.isArray(key) || key.length === 0) return null;
+  try {
+    return JSON.stringify(key[0]);
+  } catch {
+    return null;
+  }
+}
+
+/** Any of the trace explorer's own queries: list, discover or newCount. */
+function isTraceExplorerQuery(key: unknown): boolean {
+  const head = queryKeyHead(key);
+  if (head === null) return false;
+  return (
+    head.includes('"tracesV2"') &&
+    (head.includes('"list"') || head.includes('"discover"') || head.includes('"newCount"'))
+  );
+}
+
+/** The trace list query alone. */
+function isTraceListQuery(key: unknown): boolean {
+  const head = queryKeyHead(key);
+  if (head === null) return false;
+  return head.includes('"tracesV2"') && head.includes('"list"');
 }

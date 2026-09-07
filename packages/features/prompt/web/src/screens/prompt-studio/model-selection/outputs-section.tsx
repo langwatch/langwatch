@@ -10,7 +10,11 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { WorkflowCodeEditor } from "@langwatch/workflow-web/surfaces/workflow-code-editor";
 import type { Field } from "@langwatch/workflow-contract";
-import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "../../../surfaces/variables/index.ts";
+import {
+  FieldTypeSelect,
+  TYPE_LABELS,
+  VariableTypeIcon,
+} from "../../../surfaces/variables/index.ts";
 import { outputsSchema } from "@langwatch/prompt-contract";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 
@@ -473,10 +477,8 @@ const JsonSchemaDialog = ({
       open={open}
       onOpenChange={({ open }) => {
         if (!open) {
-          if (
-            JSON.stringify(value, null, 2) !== code &&
-            !confirm("Changes will be lost. Are you sure?")
-          ) {
+          const isEdited = JSON.stringify(value, null, 2) !== code;
+          if (isEdited && !confirm("Changes will be lost. Are you sure?")) {
             return;
           }
           onClose();

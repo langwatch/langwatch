@@ -29,6 +29,121 @@ export type CodexSignInPhase =
 
 type PendingPhase = Extract<CodexSignInPhase, { name: "pending" }>;
 
+function clearPollTimer(timer: { current: ReturnType<typeof setTimeout> | null }): void {
+  if (!timer.current) return;
+
+  clearTimeout(timer.current);
+  timer.current = null;
+}
+
+function failureMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+/**
+ * The email is only known from THIS session's sign-in — the status query does
+ * not expose it (see codexStatus) — so a re-visit shows the generic label.
+ */
+function connectedAccount({
+  phase,
+  storedStatus,
+}: {
+  phase: CodexSignInPhase;
+  storedStatus: { plan: string } | null;
+}): { email: string; plan: string } | null {
+  if (phase.name === "complete") return { email: phase.email, plan: phase.plan };
+  if (storedStatus) return { email: "", plan: storedStatus.plan };
+
+  return null;
+}
+
+type PollRound = {
+  attempt: number;
+  attemptRef: { current: number };
+  onConnected?: (account: { email: string; plan: string }) => void;
+  pending: PendingPhase;
+  poll: {
+    mutateAsync(input: {
+      projectId: string;
+      deviceAuthId: string;
+      userCode: string;
+      scopes: ScopeAssignment[];
+      setAsCodingDefaults: boolean;
+    }): Promise<{ status: "pending" } | { status: "complete"; email: string; plan: string }>;
+  };
+  projectId: string;
+  scopes: ScopeAssignment[];
+  setAsCodingDefaults: boolean;
+  setPhase: (phase: CodexSignInPhase) => void;
+  utils: { modelProvider: { invalidate: () => Promise<void> } };
+};
+
+/**
+ * One poll round. A stale timer from a cancelled attempt never writes its
+ * result over a newer one, which is what every attempt check guards.
+ *
+ * The poll may have written the LANGY and FAST role defaults too, so every
+ * default-model answer is refreshed on completion. Snapping Langy's model
+ * pill to the new default cannot travel here: that helper is
+ * `@langwatch/langy-web`'s and langy-web already depends on this package, so
+ * importing it back would be a cycle. The pill's DATA still refetches; only
+ * the store's follow is missing, so an open panel keeps the outgoing model
+ * until it remounts.
+ */
+async function runPollRound({
+  attempt,
+  attemptRef,
+  onConnected,
+  pending,
+  poll,
+  projectId,
+  scopes,
+  setAsCodingDefaults,
+  setPhase,
+  utils,
+}: PollRound): Promise<"again" | "stop"> {
+  if (attempt !== attemptRef.current) return "stop";
+
+  const elapsedMs = nowInstant().epochMilliseconds - pending.startedAtMs;
+  if (elapsedMs > CODEX_SIGN_IN_TTL_MS) {
+    setPhase({
+      name: "error",
+      message: "The sign-in timed out before it was approved.",
+      timedOut: true,
+    });
+
+    return "stop";
+  }
+
+  try {
+    const result = await poll.mutateAsync({
+      projectId,
+      deviceAuthId: pending.deviceAuthId,
+      userCode: pending.userCode,
+      scopes,
+      setAsCodingDefaults,
+    });
+    if (attempt !== attemptRef.current) return "stop";
+    if (result.status !== "complete") return "again";
+
+    setPhase({ name: "complete", email: result.email, plan: result.plan });
+    await utils.modelProvider.invalidate();
+    onConnected?.({ email: result.email, plan: result.plan });
+
+    return "stop";
+  } catch (error) {
+    if (attempt !== attemptRef.current) return "stop";
+
+    setPhase({
+      name: "error",
+      message: failureMessage(error, "The sign-in failed. Try again."),
+      timedOut: false,
+    });
+
+    return "stop";
+  }
+}
+
 export function useCodexDeviceSignIn({
   projectId,
   scopes,
@@ -58,12 +173,7 @@ export function useCodexDeviceSignIn({
   const deleteProvider = api.modelProvider.delete.useMutation();
   const utils = api.useUtils();
 
-  const clearTimer = () => {
-    if (pollTimer.current) {
-      clearTimeout(pollTimer.current);
-      pollTimer.current = null;
-    }
-  };
+  const clearTimer = () => clearPollTimer(pollTimer);
   useEffect(() => clearTimer, []);
 
   const schedulePoll = useCallback(
@@ -71,53 +181,21 @@ export function useCodexDeviceSignIn({
       clearTimer();
       pollTimer.current = setTimeout(() => {
         void (async () => {
-          if (attempt !== attemptRef.current) return;
-          if (nowInstant().epochMilliseconds - pending.startedAtMs > CODEX_SIGN_IN_TTL_MS) {
-            setPhase({
-              name: "error",
-              message: "The sign-in timed out before it was approved.",
-              timedOut: true,
-            });
-            return;
-          }
-          try {
-            const result = await poll.mutateAsync({
-              projectId,
-              deviceAuthId: pending.deviceAuthId,
-              userCode: pending.userCode,
-              scopes,
-              setAsCodingDefaults,
-            });
-            if (attempt !== attemptRef.current) return;
-            if (result.status === "complete") {
-              setPhase({
-                name: "complete",
-                email: result.email,
-                plan: result.plan,
-              });
-              // The poll may have written the LANGY and FAST role defaults
-              // too, so every default-model answer is refreshed either way.
-              // What `platform/app` also did here — snap Langy's model pill to
-              // the new default — cannot travel: that helper is
-              // `@langwatch/langy-web`'s and langy-web already depends on THIS
-              // package, so importing it back would be a cycle. The pill's
-              // DATA still refetches (tRPC keys the cache on the procedure
-              // path, so this reaches its `getResolvedDefault` entry); only the
-              // store's follow is missing, so an open panel keeps the outgoing
-              // model in its own state until it remounts.
-              await utils.modelProvider.invalidate();
-              onConnected?.({ email: result.email, plan: result.plan });
-              return;
-            }
-            schedulePoll({ pending, attempt });
-          } catch (error) {
-            if (attempt !== attemptRef.current) return;
-            setPhase({
-              name: "error",
-              message: error instanceof Error ? error.message : "The sign-in failed. Try again.",
-              timedOut: false,
-            });
-          }
+          const outcome = await runPollRound({
+            attempt,
+            attemptRef,
+            onConnected,
+            pending,
+            poll,
+            projectId,
+            scopes,
+            setAsCodingDefaults,
+            setPhase,
+            utils,
+          });
+          if (outcome !== "again") return;
+
+          schedulePoll({ pending, attempt });
         })();
       }, pending.intervalSeconds * 1000);
     },
@@ -144,8 +222,7 @@ export function useCodexDeviceSignIn({
       if (attempt !== attemptRef.current) return;
       setPhase({
         name: "error",
-        message:
-          error instanceof Error ? error.message : "Could not reach OpenAI to start the sign-in.",
+        message: failureMessage(error, "Could not reach OpenAI to start the sign-in."),
         timedOut: false,
       });
     }
@@ -174,14 +251,7 @@ export function useCodexDeviceSignIn({
       });
   }, [deleteProvider, projectId, storedProviderId, utils]);
 
-  // The email is only known from THIS session's sign-in (the status query
-  // doesn't expose it — see codexStatus); a re-visit shows the generic label.
-  const connected =
-    phase.name === "complete"
-      ? { email: phase.email, plan: phase.plan }
-      : storedStatus
-        ? { email: "", plan: storedStatus.plan }
-        : null;
+  const connected = connectedAccount({ phase, storedStatus });
 
   return {
     phase,

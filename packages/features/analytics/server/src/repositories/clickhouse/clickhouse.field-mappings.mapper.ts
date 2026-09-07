@@ -590,9 +590,8 @@ export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet
   const alias = tableAliases.stored_spans;
 
   for (const col of SPAN_SELECTABLE_COLUMNS) {
-    if (buildColumnPattern(col, alias).test(joined)) {
-      columns.add(col);
-    }
+    const isReferenced = buildColumnPattern(col, alias).test(joined);
+    if (isReferenced) columns.add(col);
   }
 
   return columns;
@@ -653,9 +652,8 @@ export function extractReferencedEvaluationColumns(expressions: string[]): Reado
   const alias = tableAliases.evaluation_runs;
 
   for (const col of EVALUATION_SELECTABLE_COLUMNS) {
-    if (buildColumnPattern(col, alias).test(joined)) {
-      columns.add(col);
-    }
+    const isReferenced = buildColumnPattern(col, alias).test(joined);
+    if (isReferenced) columns.add(col);
   }
 
   return columns;
@@ -671,9 +669,8 @@ export function extractReferencedTraceColumns(expressions: string[]): ReadonlySe
   const alias = tableAliases.trace_summaries;
 
   for (const col of TRACE_ANALYTICS_COLUMNS) {
-    if (buildColumnPattern(col, alias).test(joined)) {
-      columns.add(col);
-    }
+    const isReferenced = buildColumnPattern(col, alias).test(joined);
+    if (isReferenced) columns.add(col);
   }
 
   return columns;
@@ -692,7 +689,8 @@ export function qualifiedColumn(esField: string): string {
   const column = mapping.column;
 
   // If column already starts with a function or is complex, don't prefix
-  if (column.includes("(") || column.includes("[")) {
+  const isComplex = column.includes("(") || column.includes("[");
+  if (isComplex) {
     // For map access, we need to prefix the table alias
     if (column.includes("[")) {
       const parts = column.split("[");

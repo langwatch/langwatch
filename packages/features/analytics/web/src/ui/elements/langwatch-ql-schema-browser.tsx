@@ -272,42 +272,87 @@ export function LangWatchQLSchemaBrowser({
         onChange={(event) => setSearch(event.target.value)}
       />
 
-      {error ? (
-        renderError ? (
-          renderError(error)
-        ) : (
-          <Text fontSize="13px" color="red.fg" role="alert">
-            Couldn't load the schema
-          </Text>
-        )
-      ) : isLoading ? (
-        <HStack gap={2} padding={2} color="fg.muted">
-          <Spinner size="sm" />
-          <Text fontSize="13px">Loading the schema</Text>
-        </HStack>
-      ) : visible.datasets.length === 0 ? (
-        <Text fontSize="12px" color="fg.muted" padding={2}>
-          {model.datasets.length === 0
-            ? "No datasets are available to you yet."
-            : `Nothing matches "${search}".`}
-        </Text>
-      ) : (
-        <Stack gap={0.5}>
-          {visible.datasets.map((dataset) => (
-            <DatasetEntry
-              key={dataset.name}
-              dataset={dataset}
-              expanded={expanded.has(dataset.name) || search.trim().length > 0}
-              canToggle={search.trim().length === 0}
-              onToggle={() => toggle(dataset.name)}
-              onInsert={onInsert}
-            />
-          ))}
-        </Stack>
-      )}
+      <SchemaBrowserBody
+        error={error}
+        expanded={expanded}
+        isLoading={isLoading}
+        model={model}
+        onInsert={onInsert}
+        renderError={renderError}
+        search={search}
+        toggle={toggle}
+        visible={visible}
+      />
 
       <TimeWindowNote />
     </VStack>
+  );
+}
+
+function SchemaBrowserBody({
+  error,
+  expanded,
+  isLoading,
+  model,
+  onInsert,
+  renderError,
+  search,
+  toggle,
+  visible,
+}: {
+  error: unknown;
+  expanded: ReadonlySet<string>;
+  isLoading: boolean;
+  model: LangWatchQLSchemaModel;
+  onInsert: (text: string) => void;
+  renderError?: (error: unknown) => React.ReactNode;
+  search: string;
+  toggle: (dataset: string) => void;
+  visible: LangWatchQLSchemaModel;
+}) {
+  if (error) {
+    if (renderError) return <>{renderError(error)}</>;
+
+    return (
+      <Text fontSize="13px" color="red.fg" role="alert">
+        Couldn't load the schema
+      </Text>
+    );
+  }
+  if (isLoading) {
+    return (
+      <HStack gap={2} padding={2} color="fg.muted">
+        <Spinner size="sm" />
+        <Text fontSize="13px">Loading the schema</Text>
+      </HStack>
+    );
+  }
+  if (visible.datasets.length === 0) {
+    const emptyMessage =
+      model.datasets.length === 0
+        ? "No datasets are available to you yet."
+        : `Nothing matches "${search}".`;
+
+    return (
+      <Text fontSize="12px" color="fg.muted" padding={2}>
+        {emptyMessage}
+      </Text>
+    );
+  }
+
+  return (
+    <Stack gap={0.5}>
+      {visible.datasets.map((dataset) => (
+        <DatasetEntry
+          key={dataset.name}
+          dataset={dataset}
+          expanded={expanded.has(dataset.name) || search.trim().length > 0}
+          canToggle={search.trim().length === 0}
+          onToggle={() => toggle(dataset.name)}
+          onInsert={onInsert}
+        />
+      ))}
+    </Stack>
   );
 }
 

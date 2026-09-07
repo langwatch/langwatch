@@ -30,6 +30,15 @@ function buildEvaluatorExistsCondition(additionalWhere: string): FilterCondition
   });
 }
 
+/** Absent, an empty list, or an empty object: none of them narrow anything. */
+function isEmptyFilterParams(filterParams: unknown): boolean {
+  if (!filterParams) return true;
+  if (Array.isArray(filterParams)) return filterParams.length === 0;
+  if (typeof filterParams !== "object") return false;
+
+  return Object.keys(filterParams).length === 0;
+}
+
 /**
  * ClickHouse WHERE clause builders for filtering traces.
  * Returns null if the filter is not supported in ClickHouse.
@@ -200,7 +209,8 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     const minScore = parseFloat(values[0] ?? "");
     const maxScore = parseFloat(values[1] ?? "");
     // Reject invalid ranges: NaN values or min > max
-    if (!Number.isFinite(minScore) || !Number.isFinite(maxScore)) {
+    const isFiniteRange = Number.isFinite(minScore) && Number.isFinite(maxScore);
+    if (!isFiniteRange) {
       return { sql: "1=0", params: {} };
     }
     if (minScore > maxScore) {
@@ -301,7 +311,8 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
     const minValue = parseFloat(values[0] ?? "");
     const maxValue = parseFloat(values[1] ?? "");
     // Reject invalid ranges: NaN values or min > max
-    if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+    const isFiniteRange = Number.isFinite(minValue) && Number.isFinite(maxValue);
+    if (!isFiniteRange) {
       return { sql: "1=0", params: {} };
     }
     if (minValue > maxValue) {
@@ -472,15 +483,7 @@ export function generateClickHouseFilterConditions(
   Object.assign(allParams, spanBound.params);
 
   for (const [field, filterParams] of Object.entries(filters)) {
-    if (
-      !filterParams ||
-      (Array.isArray(filterParams) && filterParams.length === 0) ||
-      (typeof filterParams === "object" &&
-        !Array.isArray(filterParams) &&
-        Object.keys(filterParams).length === 0)
-    ) {
-      continue;
-    }
+    if (isEmptyFilterParams(filterParams)) continue;
 
     const filterField = field as FilterField;
     const conditionBuilder = clickHouseFilterConditions[filterField];

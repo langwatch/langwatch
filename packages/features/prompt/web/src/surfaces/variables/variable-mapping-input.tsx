@@ -503,12 +503,10 @@ export const VariableMappingInput = ({
   // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      const isOutsideContainer = containerRef.current && !containerRef.current.contains(target);
+      const isOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target);
+      if (isOutsideContainer && isOutsideDropdown) {
         setIsOpen(false);
       }
     };
@@ -589,6 +587,11 @@ export const VariableMappingInput = ({
 
   // Track current option index for highlighting
   let currentOptionIndex = -1;
+
+  const closedInputValue = isSourceMapping ? "" : getDisplayValue();
+  const nestedOrPlaceholder = inProgressPath ? "Select nested field..." : placeholder;
+  const mappedPlaceholder = isSourceMapping ? "" : nestedOrPlaceholder;
+  const inputPlaceholder = isMissing && !optionalHighlighting ? "Required" : mappedPlaceholder;
 
   return (
     <Box position="relative" ref={containerRef} width="full">
@@ -686,19 +689,11 @@ export const VariableMappingInput = ({
 
           <Input
             ref={inputRef}
-            value={isOpen ? searchQuery : isSourceMapping ? "" : getDisplayValue()}
+            value={isOpen ? searchQuery : closedInputValue}
             onChange={handleInputChange}
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder={
-              isMissing && !optionalHighlighting
-                ? "Required"
-                : isSourceMapping
-                  ? ""
-                  : inProgressPath
-                    ? "Select nested field..."
-                    : placeholder
-            }
+            placeholder={inputPlaceholder}
             _placeholder={{ color: isMissing ? "orange.fg" : undefined }}
             size="sm"
             border="none"
@@ -852,7 +847,9 @@ export const VariableMappingInput = ({
                             {(() => {
                               const label = field.label ?? field.name ?? "";
                               // Render "* (description)" with gray parenthesis part
-                              if (label.startsWith("* (") && label.endsWith(")")) {
+                              const isStarredDescription =
+                                label.startsWith("* (") && label.endsWith(")");
+                              if (isStarredDescription) {
                                 const parenContent = label.slice(2); // "(description)"
                                 return (
                                   <>

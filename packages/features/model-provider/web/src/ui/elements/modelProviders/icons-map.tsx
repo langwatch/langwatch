@@ -71,6 +71,41 @@ export function ProviderIconGlyph({
 
 type ProviderKey = keyof typeof modelProviderIcons;
 
+const startsWithAny =
+  (...prefixes: string[]) =>
+  (model: string) =>
+    prefixes.some((prefix) => model.startsWith(prefix));
+
+// Read in order: the first matcher that recognises the id names the provider.
+const PROVIDER_MATCHERS: ReadonlyArray<{
+  provider: ProviderKey;
+  matches: (model: string) => boolean;
+}> = [
+  {
+    provider: "openai",
+    matches: startsWithAny(
+      "gpt-",
+      "o1",
+      "o3",
+      "o4",
+      "text-embedding-",
+      "dall-e",
+      "whisper",
+      "chatgpt-",
+    ),
+  },
+  { provider: "anthropic", matches: startsWithAny("claude-", "claude/") },
+  { provider: "gemini", matches: startsWithAny("gemini-", "gemma-", "text-bison") },
+  { provider: "deepseek", matches: startsWithAny("deepseek-") },
+  { provider: "xai", matches: startsWithAny("grok-", "xai") },
+  { provider: "groq", matches: startsWithAny("groq") },
+  {
+    provider: "bedrock",
+    matches: (model) => model.includes("bedrock") || model.startsWith("anthropic.claude"),
+  },
+  { provider: "cerebras", matches: startsWithAny("cerebras") },
+];
+
 /**
  * Which provider a recorded model string belongs to, or null when we cannot
  * tell.
@@ -97,28 +132,8 @@ export function inferProvider(model: string): ProviderKey | null {
     if (candidate in modelProviderIcons) return candidate as ProviderKey;
   }
   const lower = (slash > 0 ? model.slice(slash + 1) : model).toLowerCase();
-  if (
-    lower.startsWith("gpt-") ||
-    lower.startsWith("o1") ||
-    lower.startsWith("o3") ||
-    lower.startsWith("o4") ||
-    lower.startsWith("text-embedding-") ||
-    lower.startsWith("dall-e") ||
-    lower.startsWith("whisper") ||
-    lower.startsWith("chatgpt-")
-  ) {
-    return "openai";
-  }
-  if (lower.startsWith("claude-") || lower.startsWith("claude/")) return "anthropic";
-  if (lower.startsWith("gemini-") || lower.startsWith("gemma-") || lower.startsWith("text-bison")) {
-    return "gemini";
-  }
-  if (lower.startsWith("deepseek-")) return "deepseek";
-  if (lower.startsWith("grok-") || lower.startsWith("xai")) return "xai";
-  if (lower.startsWith("groq")) return "groq";
-  if (lower.includes("bedrock") || lower.startsWith("anthropic.claude")) return "bedrock";
-  if (lower.startsWith("cerebras")) return "cerebras";
-  return null;
+
+  return PROVIDER_MATCHERS.find((matcher) => matcher.matches(lower))?.provider ?? null;
 }
 
 /**

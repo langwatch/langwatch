@@ -224,22 +224,18 @@ export class LangWatchQLViewStatementsService {
         // here the projection is an identity. Reading `sourceColumns` instead
         // would name the *application's* columns, which the engine table does not
         // have.
-        const expression = postgres
-          ? sourceColumn(column.name)
-          : grouped
-            ? groupedColumnExpression(view, column)
-            : catalogShapes.columnExpression({ column, source: sourceColumn });
+        const engineExpression = grouped
+          ? groupedColumnExpression(view, column)
+          : catalogShapes.columnExpression({ column, source: sourceColumn });
+        const expression = postgres ? sourceColumn(column.name) : engineExpression;
 
         return `  ${expression} AS ${sqlText.quotedColumn(column.name)}`;
       })
       .join(",\n");
     const aliased = `${relation} AS ${SOURCE_ALIAS}`;
     const from = strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
-    const where = postgres
-      ? `\n${postgresTenantPredicate({ names })}`
-      : strategy === "in-tuple"
-        ? `\n${dedupPredicate(view, relation)}`
-        : "";
+    const enginePredicate = strategy === "in-tuple" ? `\n${dedupPredicate(view, relation)}` : "";
+    const where = postgres ? `\n${postgresTenantPredicate({ names })}` : enginePredicate;
     const groupBy = grouped ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}` : "";
 
     return (

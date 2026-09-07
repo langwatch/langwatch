@@ -413,9 +413,8 @@ export const getMenuOptionCount = (
 
   availableSources.forEach((source) => {
     source.fields.forEach((field) => {
-      if (field.name.toLowerCase().includes(query.toLowerCase())) {
-        count++;
-      }
+      const isMatch = field.name.toLowerCase().includes(query.toLowerCase());
+      if (isMatch) count++;
     });
   });
 

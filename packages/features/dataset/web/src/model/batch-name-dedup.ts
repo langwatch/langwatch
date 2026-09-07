@@ -17,7 +17,8 @@ export const baseNameFromFilename = (filename: string): string => {
   const dot = filename.lastIndexOf(".");
   // dot > 0 → strip the extension; dot === 0 → a dotfile (no stem) → empty;
   // dot < 0 → no extension, keep as-is.
-  const stem = dot > 0 ? filename.slice(0, dot) : dot === 0 ? "" : filename;
+  const withoutExtension = dot === 0 ? "" : filename;
+  const stem = dot > 0 ? filename.slice(0, dot) : withoutExtension;
   const trimmed = stem.trim();
   return trimmed === "" ? "New Dataset" : trimmed;
 };

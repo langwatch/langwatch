@@ -67,30 +67,28 @@ function isNoisyKey(key: string): boolean {
 function flattenAttributes(obj: Record<string, unknown>, prefix = ""): string[] {
   const out: string[] = [];
   for (const [k, v] of Object.entries(obj)) {
-    const path = prefix ? `${prefix}.${k}` : k;
-    if (isNoisyKey(path)) continue;
-    if (v == null || v === "") continue;
-    if (Array.isArray(v)) {
-      const inline = v.map((x) =>
-        typeof x === "object" && x != null ? JSON.stringify(x) : String(x),
-      );
-      const joined = inline.join(", ");
-      if (joined.length <= 120) {
-        out.push(`${path}: [${truncate(joined, 120)}]`);
-      } else {
-        // Long arrays — render per-item with `-` to stay readable
-        out.push(`${path}:`);
-        for (const item of inline) out.push(`  - ${truncate(item)}`);
-      }
-      continue;
-    }
-    if (typeof v === "object") {
-      out.push(...flattenAttributes(v as Record<string, unknown>, path));
-      continue;
-    }
-    out.push(`${path}: ${truncate(String(v))}`);
+    out.push(...attributeLines(prefix ? `${prefix}.${k}` : k, v));
   }
   return out;
+}
+
+/** One attribute as lines: nothing for noise and blanks, nested for objects. */
+function attributeLines(path: string, v: unknown): string[] {
+  if (isNoisyKey(path)) return [];
+  if (v == null || v === "") return [];
+  if (Array.isArray(v)) return arrayAttributeLines(path, v);
+  if (typeof v === "object") return flattenAttributes(v as Record<string, unknown>, path);
+  return [`${path}: ${truncate(String(v))}`];
+}
+
+/** An array attribute inline, or one item per line once it stops being readable. */
+function arrayAttributeLines(path: string, values: unknown[]): string[] {
+  const inline = values.map((x) =>
+    typeof x === "object" && x != null ? JSON.stringify(x) : String(x),
+  );
+  const joined = inline.join(", ");
+  if (joined.length <= 120) return [`${path}: [${truncate(joined, 120)}]`];
+  return [`${path}:`, ...inline.map((item) => `  - ${truncate(item)}`)];
 }
 
 interface CompactMessage {
@@ -117,60 +115,61 @@ function compactIO(raw: string | null | undefined): string[] {
   }
 
   const messages = extractChatMessages(parsed);
-  if (messages.length === 0) {
-    // Some other JSON payload — render as flat key: value lines if it's
-    // an object, else just stringify it compactly.
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return flattenAttributes(parsed as Record<string, unknown>);
-    }
-    return [truncate(JSON.stringify(parsed), 600)];
+  if (messages.length === 0) return nonChatLines(parsed);
+  return messages.flatMap(compactMessageLines);
+}
+
+/**
+ * Some other JSON payload — flat key: value lines when it is an object, else
+ * stringified compactly.
+ */
+function nonChatLines(parsed: unknown): string[] {
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    return flattenAttributes(parsed as Record<string, unknown>);
   }
+  return [truncate(JSON.stringify(parsed), 600)];
+}
 
-  const out: string[] = [];
-  for (const m of messages) {
-    const head = m.tool ? `${m.role} [${m.tool}]` : m.role;
+const RICH_BLOCK_TYPES = [
+  "thinking",
+  "reasoning",
+  "redacted_thinking",
+  "tool_use",
+  "tool_call",
+  "tool_result",
+];
 
-    // If the message carries structured blocks (thinking, tool_use,
-    // tool_result, mixed text), expand them as nested YAML so each block
-    // is independently inspectable. We also expand when the raw string
-    // content holds inline thinking tags so the shimmer treatment kicks
-    // in for those messages too.
-    const hasRichBlocks =
-      (Array.isArray(m.rawContent) &&
-        m.rawContent.some(
-          (b) =>
-            b &&
-            typeof b === "object" &&
-            [
-              "thinking",
-              "reasoning",
-              "redacted_thinking",
-              "tool_use",
-              "tool_call",
-              "tool_result",
-            ].includes((b as Record<string, unknown>).type as string),
-        )) ||
-      (typeof m.rawContent === "string" && THINKING_TAG_RE.test(m.rawContent));
-    // Reset regex lastIndex — `THINKING_TAG_RE` is global so test() advances it.
-    THINKING_TAG_RE.lastIndex = 0;
+function isRichBlock(b: unknown): boolean {
+  return (
+    !!b &&
+    typeof b === "object" &&
+    RICH_BLOCK_TYPES.includes((b as Record<string, unknown>).type as string)
+  );
+}
 
-    if (hasRichBlocks) {
-      out.push(`- ${head}:`);
-      for (const ln of renderMessageBlocks(m.rawContent)) {
-        out.push(`    ${ln}`);
-      }
-      continue;
-    }
+/**
+ * Whether the message carries structured blocks (thinking, tool_use,
+ * tool_result, mixed text), or raw string content holding inline thinking tags:
+ * both get expanded as nested YAML so each block is independently inspectable.
+ */
+function hasRichBlocks(m: CompactMessage): boolean {
+  const rich =
+    (Array.isArray(m.rawContent) && m.rawContent.some(isRichBlock)) ||
+    (typeof m.rawContent === "string" && THINKING_TAG_RE.test(m.rawContent));
+  // Reset regex lastIndex — `THINKING_TAG_RE` is global so test() advances it.
+  THINKING_TAG_RE.lastIndex = 0;
+  return rich;
+}
 
-    const content = truncate(m.content, 500);
-    if (content.includes("\n")) {
-      out.push(`- ${head}: |`);
-      for (const line of content.split("\n")) out.push(`    ${line}`);
-    } else {
-      out.push(`- ${head}: ${content}`);
-    }
+/** One chat message as YAML-flavoured lines. */
+function compactMessageLines(m: CompactMessage): string[] {
+  const head = m.tool ? `${m.role} [${m.tool}]` : m.role;
+  if (hasRichBlocks(m)) {
+    return [`- ${head}:`, ...renderMessageBlocks(m.rawContent).map((ln) => `    ${ln}`)];
   }
-  return out;
+  const content = truncate(m.content, 500);
+  if (!content.includes("\n")) return [`- ${head}: ${content}`];
+  return [`- ${head}: |`, ...content.split("\n").map((line) => `    ${line}`)];
 }
 
 /**
@@ -181,29 +180,30 @@ function compactIO(raw: string | null | undefined): string[] {
 function extractSystemMessages(trace: TraceHeader, fullSpans?: FullSpan[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-
-  const tryExtract = (raw: string | null | undefined) => {
-    if (!raw) return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return;
-    }
-    const messages = extractChatMessages(parsed);
-    for (const m of messages) {
-      if (m.role !== "system") continue;
-      const content = m.content.trim();
-      if (!content) continue;
-      if (seen.has(content)) continue;
-      seen.add(content);
-      out.push(content);
-    }
-  };
-
-  tryExtract(trace.input);
-  for (const s of fullSpans ?? []) tryExtract(s.input);
+  collectSystemMessages(trace.input, seen, out);
+  for (const s of fullSpans ?? []) collectSystemMessages(s.input, seen, out);
   return out;
+}
+
+/** Appends the system prompts one payload names, skipping any already seen. */
+function collectSystemMessages(
+  raw: string | null | undefined,
+  seen: Set<string>,
+  out: string[],
+): void {
+  if (!raw) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  for (const m of extractChatMessages(parsed)) {
+    const content = m.role === "system" ? m.content.trim() : "";
+    if (!content || seen.has(content)) continue;
+    seen.add(content);
+    out.push(content);
+  }
 }
 
 /** The tool a message names, either by its own name or by answering a call. */
@@ -233,32 +233,29 @@ function extractChatMessages(parsed: unknown): CompactMessage[] {
 function stringifyMessageContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (content == null) return "";
-  if (Array.isArray(content)) {
-    return content
-      .map((b) => {
-        if (typeof b === "string") return b;
-        if (b && typeof b === "object") {
-          const block = b as Record<string, unknown>;
-          if (block.type === "text" && typeof block.text === "string") {
-            return block.text;
-          }
-          if (block.type === "image" || block.type === "image_url") {
-            return "[image]";
-          }
-          if (block.type === "tool_use" || block.type === "tool_call") {
-            const name = typeof block.name === "string" ? block.name : "tool";
-            return `[tool:${name}]`;
-          }
-          if (block.type === "tool_result") {
-            return "[tool_result]";
-          }
-          return JSON.stringify(block);
-        }
-        return String(b);
-      })
-      .join(" ");
-  }
+  if (Array.isArray(content)) return content.map(contentBlockText).join(" ");
   return JSON.stringify(content);
+}
+
+/** One content block as its single-line preview text. */
+function contentBlockText(b: unknown): string {
+  if (typeof b === "string") return b;
+  if (!b || typeof b !== "object") return String(b);
+  const block = b as Record<string, unknown>;
+  if (block.type === "text" && typeof block.text === "string") {
+    return block.text;
+  }
+  if (block.type === "image" || block.type === "image_url") {
+    return "[image]";
+  }
+  if (block.type === "tool_use" || block.type === "tool_call") {
+    const name = typeof block.name === "string" ? block.name : "tool";
+    return `[tool:${name}]`;
+  }
+  if (block.type === "tool_result") {
+    return "[tool_result]";
+  }
+  return JSON.stringify(block);
 }
 
 /**
@@ -399,37 +396,31 @@ const BLOCK_RENDERERS: Record<string, BlockRenderer> = {
   image_url: renderImageBlock,
 };
 
+/** Plain text with any inline thinking tags split out into their own lines. */
+function textSegmentLines(text: string): string[] {
+  return splitThinkingFromText(text).map((seg) =>
+    seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
+  );
+}
+
+/** One entry of a content array, through its registered renderer. */
+function contentBlockLines(b: unknown): string[] {
+  if (typeof b === "string") return textSegmentLines(b);
+  if (!b || typeof b !== "object") return [];
+  const block = b as Block;
+  const renderer = typeof block.type === "string" ? BLOCK_RENDERERS[block.type] : undefined;
+  // Fallback: terse JSON for unknown block shapes.
+  if (!renderer) return [truncate(JSON.stringify(block), 240)];
+  const lines: string[] = [];
+  renderer(block, lines);
+  return lines;
+}
+
 function renderMessageBlocks(content: unknown): string[] {
   if (content == null) return [];
-  if (typeof content === "string") {
-    // Plain string — split out any inline thinking tags before emitting.
-    return splitThinkingFromText(content).map((seg) =>
-      seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
-    );
-  }
-  if (!Array.isArray(content)) {
-    return [stringifyMessageContent(content)];
-  }
-
-  const lines: string[] = [];
-  for (const b of content) {
-    if (typeof b === "string") {
-      for (const seg of splitThinkingFromText(b)) {
-        lines.push(seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content);
-      }
-      continue;
-    }
-    if (!b || typeof b !== "object") continue;
-    const block = b as Block;
-    const renderer = typeof block.type === "string" ? BLOCK_RENDERERS[block.type] : undefined;
-    if (renderer) {
-      renderer(block, lines);
-    } else {
-      // Fallback: terse JSON for unknown block shapes.
-      lines.push(truncate(JSON.stringify(block), 240));
-    }
-  }
-  return lines;
+  if (typeof content === "string") return textSegmentLines(content);
+  if (!Array.isArray(content)) return [stringifyMessageContent(content)];
+  return content.flatMap(contentBlockLines);
 }
 
 /**
@@ -483,6 +474,52 @@ function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
   return lines;
 }
 
+/** Every span's stack depth, by walking its parent chain. */
+function spanDepths(spans: SpanTreeNode[]): Map<string, number> {
+  const byId = new Map(spans.map((s) => [s.spanId, s]));
+  const depthOf = new Map<string, number>();
+  const depthFor = (s: SpanTreeNode): number => {
+    const known = depthOf.get(s.spanId);
+    if (known !== undefined) return known;
+    const parent = s.parentSpanId ? byId.get(s.parentSpanId) : undefined;
+    const d = parent ? depthFor(parent) + 1 : 0;
+    depthOf.set(s.spanId, d);
+    return d;
+  };
+  for (const s of spans) depthFor(s);
+  return depthOf;
+}
+
+const FLAME_SHADES = ["▓", "█", "▒", "░"];
+
+/** One flame row: every span at this depth painted along the time axis. */
+function flameRowCells({
+  depth,
+  depthOf,
+  minStart,
+  spans,
+  total,
+  width,
+}: {
+  depth: number;
+  depthOf: Map<string, number>;
+  minStart: number;
+  spans: SpanTreeNode[];
+  total: number;
+  width: number;
+}): string {
+  const cells = new Array<string>(width).fill(" ");
+  const fraction = (timeMs: number) => ((timeMs - minStart) / total) * width;
+  for (const s of spans) {
+    if (depthOf.get(s.spanId) !== depth) continue;
+    const start = Math.max(0, Math.min(width - 1, Math.floor(fraction(s.startTimeMs))));
+    const end = Math.max(start + 1, Math.max(1, Math.min(width, Math.ceil(fraction(s.endTimeMs)))));
+    const glyph = s.status === "error" ? "▓" : FLAME_SHADES[depth % FLAME_SHADES.length]!;
+    for (let i = start; i < end; i++) cells[i] = glyph;
+  }
+  return cells.join("");
+}
+
 /**
  * Unicode flame graph — one row per stack depth, spans positioned and sized along the
  * time axis. Uses block characters so the visual lands intact when pasted. Different
@@ -495,40 +532,14 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
   const maxEnd = Math.max(...spans.map((s) => s.endTimeMs));
   const total = Math.max(1, maxEnd - minStart);
 
-  // Compute depth for every span by walking parent chain.
-  const byId = new Map(spans.map((s) => [s.spanId, s]));
-  const depthOf = new Map<string, number>();
-  const computeDepth = (s: SpanTreeNode): number => {
-    if (depthOf.has(s.spanId)) return depthOf.get(s.spanId)!;
-    if (!s.parentSpanId || !byId.has(s.parentSpanId)) {
-      depthOf.set(s.spanId, 0);
-      return 0;
-    }
-    const d = computeDepth(byId.get(s.parentSpanId)!) + 1;
-    depthOf.set(s.spanId, d);
-    return d;
-  };
-  for (const s of spans) computeDepth(s);
-
+  const depthOf = spanDepths(spans);
   const maxDepth = Math.max(0, ...Array.from(depthOf.values()));
-  const cellFor = (timeMs: number): number =>
-    Math.max(0, Math.min(width - 1, Math.floor(((timeMs - minStart) / total) * width)));
-  const endCellFor = (timeMs: number): number =>
-    Math.max(1, Math.min(width, Math.ceil(((timeMs - minStart) / total) * width)));
 
   // Rows from deepest to shallowest so the call stack reads top-down.
   const lines: string[] = [];
-  const SHADES = ["▓", "█", "▒", "░"];
   for (let d = maxDepth; d >= 0; d--) {
-    const cells = new Array<string>(width).fill(" ");
-    for (const s of spans) {
-      if (depthOf.get(s.spanId) !== d) continue;
-      const start = cellFor(s.startTimeMs);
-      const end = Math.max(start + 1, endCellFor(s.endTimeMs));
-      const glyph = s.status === "error" ? "▓" : SHADES[d % SHADES.length]!;
-      for (let i = start; i < end; i++) cells[i] = glyph;
-    }
-    lines.push(`d${d} │ ${cells.join("")}`);
+    const cells = flameRowCells({ depth: d, depthOf, minStart, spans, total, width });
+    lines.push(`d${d} │ ${cells}`);
   }
   // Bottom axis with start/mid/end markers.
   lines.push(`   └${"─".repeat(width)}`);
@@ -540,57 +551,43 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
   return lines;
 }
 
-export function buildTraceMarkdown(
-  trace: TraceHeader,
-  spans: SpanTreeNode[],
-  opts: MarkdownConfig,
-  fullSpans?: FullSpan[],
-  events: DerivedTraceEvent[] = [],
-): string {
-  const lines: string[] = [];
+/**
+ * Identity strapline: what kind of trace this is, where it ran, and whether it
+ * succeeded.
+ */
+function subtitleParts(trace: TraceHeader): string[] {
+  const parts: string[] = [];
+  if (trace.origin) parts.push(`**${trace.origin}**`);
+  if (trace.serviceName) parts.push(`_${trace.serviceName}_`);
+  parts.push(`status: \`${trace.status}\``);
+  return parts;
+}
 
-  // Header — real markdown so the rendered view has hierarchy: an h1
-  // title, a subtitle strapline (origin · service · status), then the
-  // metadata as bold-key lines. Two-space line endings keep adjacent
-  // fields on visually-grouped lines without forcing blank gaps.
-  const name = (trace.traceName || undefined) ?? trace.name ?? trace.traceId;
-  lines.push(`# ${name}`);
-  lines.push("");
-
-  // Subtitle: identity strapline. Reads at a glance what kind of trace
-  // this is, where it ran, and whether it succeeded.
-  const subtitleParts: string[] = [];
-  if (trace.origin) subtitleParts.push(`**${trace.origin}**`);
-  if (trace.serviceName) subtitleParts.push(`_${trace.serviceName}_`);
-  subtitleParts.push(`status: \`${trace.status}\``);
-  lines.push(`> ${subtitleParts.join(" · ")}`);
-  lines.push("");
-
-  // Quick-look metric strip — the numbers people scan first.
-  const quickLook: string[] = [];
-  quickLook.push(`⏱️ ${formatDuration(trace.durationMs)}`);
+/** The metric strip people scan first. */
+function quickLookParts(trace: TraceHeader): string[] {
+  const parts: string[] = [`⏱️ ${formatDuration(trace.durationMs)}`];
   if (trace.totalTokens > 0) {
-    quickLook.push(
+    parts.push(
       `🔤 ${trace.totalTokens.toLocaleString()} tokens${trace.tokensEstimated ? "*" : ""}`,
     );
   }
   if ((trace.totalCost ?? 0) > 0) {
-    quickLook.push(`💰 ${formatCost(trace.totalCost ?? 0)}`);
+    parts.push(`💰 ${formatCost(trace.totalCost ?? 0)}`);
   }
   if (trace.spanCount) {
-    quickLook.push(`📊 ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`);
+    parts.push(`📊 ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`);
   }
   if (trace.ttft != null) {
-    quickLook.push(`⚡ TTFT ${formatDuration(trace.ttft)}`);
+    parts.push(`⚡ TTFT ${formatDuration(trace.ttft)}`);
   }
-  if (quickLook.length > 0) {
-    lines.push(quickLook.join(" · "));
-    lines.push("");
-  }
+  return parts;
+}
 
-  // Detail block — fields with concrete values that the LLM (or a human)
-  // might quote. Keep them bold-keyed so they read scanably in rendered
-  // markdown and stay structured for token-efficient extraction.
+/**
+ * Fields with concrete values a reader or a model might quote. Bold-keyed so
+ * they read scanably rendered and stay structured for extraction.
+ */
+function detailParts(trace: TraceHeader): string[] {
   const detail: string[] = [];
   detail.push(`**Trace ID** \`${trace.traceId}\``);
   detail.push(`**Started** ${readableDate(trace.timestamp).toISOString()}`);
@@ -610,191 +607,242 @@ export function buildTraceMarkdown(
   if (scenarioRunId) {
     detail.push(`**Scenario run** \`${scenarioRunId}\``);
   }
+  return detail;
+}
+
+/**
+ * Real markdown so the rendered view has hierarchy: an h1 title, a subtitle
+ * strapline, then the metadata as bold-key lines. Two-space line endings keep
+ * adjacent fields visually grouped without forcing blank gaps.
+ */
+function headerLines(trace: TraceHeader): string[] {
+  const lines: string[] = [];
+  const name = (trace.traceName || undefined) ?? trace.name ?? trace.traceId;
+  lines.push(`# ${name}`);
+  lines.push("");
+  lines.push(`> ${subtitleParts(trace).join(" · ")}`);
+  lines.push("");
+
+  const quickLook = quickLookParts(trace);
+  if (quickLook.length > 0) {
+    lines.push(quickLook.join(" · "));
+    lines.push("");
+  }
+
+  const detail = detailParts(trace);
   if (detail.length > 0) {
-    // Two-space line endings — stay on adjacent visual lines without
-    // forcing a blank-line paragraph break between each field.
     lines.push(detail.map((d) => `${d}  `).join("\n"));
     lines.push("");
   }
 
   lines.push("---");
   lines.push("");
+  return lines;
+}
 
-  // System prompts go straight to the top — they're what most LLMs need
-  // to anchor reasoning about the trace ("what was this agent told to do?")
-  // and burying them in the per-span input dump makes them easy to miss.
+/**
+ * System prompts go straight to the top — they are what most models need to
+ * anchor reasoning about the trace, and burying them in the per-span input dump
+ * makes them easy to miss.
+ */
+function systemLines(trace: TraceHeader, fullSpans: FullSpan[] | undefined): string[] {
   const systemPrompts = extractSystemMessages(trace, fullSpans);
-  if (systemPrompts.length > 0) {
-    lines.push("# system");
-    for (const prompt of systemPrompts) {
-      const body = truncate(prompt, 1500);
-      if (body.includes("\n")) {
-        lines.push("- |");
-        for (const line of body.split("\n")) lines.push(`    ${line}`);
-      } else {
-        lines.push(`- ${body}`);
-      }
+  if (systemPrompts.length === 0) return [];
+
+  const lines: string[] = ["# system"];
+  for (const prompt of systemPrompts) {
+    const body = truncate(prompt, 1500);
+    if (!body.includes("\n")) {
+      lines.push(`- ${body}`);
+      continue;
     }
-    lines.push("");
+    lines.push("- |");
+    for (const line of body.split("\n")) lines.push(`    ${line}`);
   }
+  lines.push("");
+  return lines;
+}
+
+/** A fenced chart section, empty when the chart renderer produced nothing. */
+function fencedLines(heading: string, rendered: string[]): string[] {
+  if (rendered.length === 0) return [];
+  return [`# ${heading}`, "```", ...rendered, "```", ""];
+}
+
+/** One `# input` / `# output` section, compacted for tokens. */
+function ioLines(heading: string, raw: string | null | undefined): string[] {
+  const compact = compactIO(raw);
+  if (compact.length === 0) return [];
+  return [`# ${heading}`, ...compact, ""];
+}
+
+/**
+ * Keep AI spans plus every ancestor of an AI span. Without this a non-AI parent
+ * (for example "Scenario Turn", which has no span type) is dropped and its
+ * children float up as roots, losing the structure the reader expects.
+ */
+function spansInScope(
+  spans: SpanTreeNode[],
+  spanScope: MarkdownConfig["spanScope"],
+): SpanTreeNode[] {
+  if (spanScope === "all") return spans;
+  const byId = new Map(spans.map((s) => [s.spanId, s]));
+  const keep = new Set<string>();
+  for (const s of spans) {
+    keepAiSpanAndAncestors(s, byId, keep);
+  }
+  return spans.filter((s) => keep.has(s.spanId));
+}
+
+/** The kept spans bucketed under their kept parent, each bucket in start order. */
+function childrenByParentSpan(filtered: SpanTreeNode[]): Map<string | null, SpanTreeNode[]> {
+  const childrenByParent = new Map<string | null, SpanTreeNode[]>();
+  const filteredIds = new Set(filtered.map((s) => s.spanId));
+  for (const span of filtered) {
+    const parent =
+      span.parentSpanId && filteredIds.has(span.parentSpanId) ? span.parentSpanId : null;
+    const arr = childrenByParent.get(parent) ?? [];
+    arr.push(span);
+    childrenByParent.set(parent, arr);
+  }
+  for (const arr of childrenByParent.values()) {
+    arr.sort((a, b) => a.startTimeMs - b.startTimeMs);
+  }
+  return childrenByParent;
+}
+
+/**
+ * One terse line per span: `  - name (type, dur, model[, error])`. No code
+ * fence, no box drawing — a YAML-style indented list.
+ */
+function spanLine(span: SpanTreeNode, depth: number): string {
+  const indent = "  ".repeat(depth);
+  const bits: string[] = [span.type ?? "span", formatDuration(span.durationMs)];
+  if (span.model) bits.push(span.model);
+  if (span.status === "error") bits.push("error");
+  return `${indent}- ${span.name} (${bits.join(", ")})`;
+}
+
+/** A span's attributes and input/output, as far as the configuration asks for them. */
+function spanBodyLines({
+  full,
+  opts,
+  subIndent,
+}: {
+  full: FullSpan | undefined;
+  opts: MarkdownConfig;
+  subIndent: string;
+}): string[] {
+  const lines: string[] = [];
+  const section = (heading: string, body: string[]) => {
+    if (body.length === 0) return;
+    lines.push(`${subIndent}${heading}:`);
+    for (const ln of body) lines.push(`${subIndent}  ${ln}`);
+  };
+
+  if (opts.includeSpanAttributes && full?.params) {
+    section("attributes", flattenAttributes(full.params as Record<string, unknown>));
+  }
+  if (opts.includeSpanIO && full?.input) {
+    section("input", compactIO(full.input));
+  }
+  if (opts.includeSpanIO && full?.output) {
+    section("output", compactIO(full.output));
+  }
+  return lines;
+}
+
+/** The `# spans` section: the kept span tree, depth-first, each with its body. */
+function spansLines({
+  fullSpans,
+  opts,
+  spans,
+  trace,
+}: {
+  fullSpans: FullSpan[] | undefined;
+  opts: MarkdownConfig;
+  spans: SpanTreeNode[];
+  trace: TraceHeader;
+}): string[] {
+  const filtered = spansInScope(spans, opts.spanScope);
+  if (filtered.length === 0) return [];
+
+  const childrenByParent = childrenByParentSpan(filtered);
+  const fullById = new Map<string, FullSpan>();
+  for (const fs of fullSpans ?? []) fullById.set(fs.spanId, fs);
+
+  const lines: string[] = ["# spans"];
+  const writeSpan = (span: SpanTreeNode, depth: number) => {
+    lines.push(spanLine(span, depth));
+    const subIndent = "  ".repeat(depth + 1);
+    if (opts.spanDetail === "full") {
+      const offsetMs = Math.max(0, Math.round(span.startTimeMs - trace.timestamp));
+      lines.push(`${subIndent}id: ${span.spanId.slice(0, 16)} · +${offsetMs}ms`);
+    }
+    lines.push(...spanBodyLines({ full: fullById.get(span.spanId), opts, subIndent }));
+    for (const kid of childrenByParent.get(span.spanId) ?? []) {
+      writeSpan(kid, depth + 1);
+    }
+  };
+
+  for (const root of childrenByParent.get(null) ?? []) {
+    writeSpan(root, 0);
+  }
+  lines.push("");
+  return lines;
+}
+
+/** The `# events` section, each event offset from the trace start. */
+function eventsLines(trace: TraceHeader, events: DerivedTraceEvent[]): string[] {
+  if (events.length === 0) return [];
+  const lines: string[] = ["# events"];
+  for (const evt of events) {
+    const offsetMs = Math.max(0, Math.round(evt.timestamp - trace.timestamp));
+    lines.push(`  - ${evt.name} (+${offsetMs}ms)`);
+  }
+  lines.push("");
+  return lines;
+}
+
+/** The `# metadata` section: the trace's own attributes, flattened. */
+function metadataLines(trace: TraceHeader): string[] {
+  if (Object.keys(trace.attributes).length === 0) return [];
+  const flat = flattenAttributes(trace.attributes);
+  if (flat.length === 0) return [];
+  return ["# metadata", ...flat, ""];
+}
+
+export function buildTraceMarkdown(
+  trace: TraceHeader,
+  spans: SpanTreeNode[],
+  opts: MarkdownConfig,
+  fullSpans?: FullSpan[],
+  events: DerivedTraceEvent[] = [],
+): string {
+  const lines: string[] = [...headerLines(trace), ...systemLines(trace, fullSpans)];
 
   if (trace.status === "error" && trace.error) {
-    lines.push("# error");
-    lines.push(truncate(trace.error, 800));
-    lines.push("");
+    lines.push("# error", truncate(trace.error, 800), "");
   }
 
-  // Optional Unicode waterfall — only when the user explicitly opts in via
-  // the Configure popover, since charts cost tokens.
+  // The Unicode charts are opt-in from the Configure popover, since charts
+  // cost tokens.
   if (opts.includeWaterfall && spans.length > 0) {
-    const wf = renderSpanTimeline(spans, 48);
-    if (wf.length > 0) {
-      lines.push("# waterfall");
-      lines.push("```");
-      for (const ln of wf) lines.push(ln);
-      lines.push("```");
-      lines.push("");
-    }
+    lines.push(...fencedLines("waterfall", renderSpanTimeline(spans, 48)));
   }
-
-  // Optional Unicode flame graph — same gating, separate chart.
   if (opts.includeFlame && spans.length > 0) {
-    const fg = renderUnicodeFlame(spans, 48);
-    if (fg.length > 0) {
-      lines.push("# flame");
-      lines.push("```");
-      for (const ln of fg) lines.push(ln);
-      lines.push("```");
-      lines.push("");
-    }
+    lines.push(...fencedLines("flame", renderUnicodeFlame(spans, 48)));
   }
 
-  if (opts.includeIO && trace.input) {
-    const compact = compactIO(trace.input);
-    if (compact.length > 0) {
-      lines.push("# input");
-      for (const ln of compact) lines.push(ln);
-      lines.push("");
-    }
-  }
-
-  if (opts.includeIO && trace.output) {
-    const compact = compactIO(trace.output);
-    if (compact.length > 0) {
-      lines.push("# output");
-      for (const ln of compact) lines.push(ln);
-      lines.push("");
-    }
-  }
+  if (opts.includeIO && trace.input) lines.push(...ioLines("input", trace.input));
+  if (opts.includeIO && trace.output) lines.push(...ioLines("output", trace.output));
 
   if (opts.spanScope !== "none" && spans.length > 0) {
-    let filtered: SpanTreeNode[];
-    if (opts.spanScope === "all") {
-      filtered = spans;
-    } else {
-      // Keep AI spans plus every ancestor of an AI span. Without this, a
-      // non-AI parent (e.g. "Scenario Turn", which has no span-type) gets
-      // dropped and its children float up as roots — losing the structure
-      // the user expects to see in the markdown.
-      const byId = new Map(spans.map((s) => [s.spanId, s]));
-      const keep = new Set<string>();
-      for (const s of spans) {
-        keepAiSpanAndAncestors(s, byId, keep);
-      }
-      filtered = spans.filter((s) => keep.has(s.spanId));
-    }
-
-    if (filtered.length > 0) {
-      lines.push("# spans");
-
-      const childrenByParent = new Map<string | null, SpanTreeNode[]>();
-      const filteredIds = new Set(filtered.map((s) => s.spanId));
-      for (const span of filtered) {
-        const parent =
-          span.parentSpanId && filteredIds.has(span.parentSpanId) ? span.parentSpanId : null;
-        const arr = childrenByParent.get(parent) ?? [];
-        arr.push(span);
-        childrenByParent.set(parent, arr);
-      }
-      for (const arr of childrenByParent.values()) {
-        arr.sort((a, b) => a.startTimeMs - b.startTimeMs);
-      }
-
-      const fullById = new Map<string, FullSpan>();
-      for (const fs of fullSpans ?? []) fullById.set(fs.spanId, fs);
-
-      // One terse line per span: `  - name (type, dur, model[, error])`
-      // No code fence, no box-drawing — just YAML-style indented list.
-      const renderSpanLine = (span: SpanTreeNode, depth: number): string => {
-        const indent = "  ".repeat(depth);
-        const bits: string[] = [span.type ?? "span", formatDuration(span.durationMs)];
-        if (span.model) bits.push(span.model);
-        if (span.status === "error") bits.push("error");
-        return `${indent}- ${span.name} (${bits.join(", ")})`;
-      };
-
-      const writeSpan = (span: SpanTreeNode, depth: number) => {
-        lines.push(renderSpanLine(span, depth));
-
-        const full = fullById.get(span.spanId);
-        const subIndent = "  ".repeat(depth + 1);
-
-        if (opts.spanDetail === "full") {
-          const offsetMs = Math.max(0, Math.round(span.startTimeMs - trace.timestamp));
-          lines.push(`${subIndent}id: ${span.spanId.slice(0, 16)} · +${offsetMs}ms`);
-        }
-
-        if (opts.includeSpanAttributes && full?.params) {
-          const flat = flattenAttributes(full.params as Record<string, unknown>);
-          if (flat.length > 0) {
-            lines.push(`${subIndent}attributes:`);
-            for (const ln of flat) lines.push(`${subIndent}  ${ln}`);
-          }
-        }
-        if (opts.includeSpanIO && full?.input) {
-          const compact = compactIO(full.input);
-          if (compact.length > 0) {
-            lines.push(`${subIndent}input:`);
-            for (const ln of compact) lines.push(`${subIndent}  ${ln}`);
-          }
-        }
-        if (opts.includeSpanIO && full?.output) {
-          const compact = compactIO(full.output);
-          if (compact.length > 0) {
-            lines.push(`${subIndent}output:`);
-            for (const ln of compact) lines.push(`${subIndent}  ${ln}`);
-          }
-        }
-
-        for (const kid of childrenByParent.get(span.spanId) ?? []) {
-          writeSpan(kid, depth + 1);
-        }
-      };
-
-      for (const root of childrenByParent.get(null) ?? []) {
-        writeSpan(root, 0);
-      }
-      lines.push("");
-    }
+    lines.push(...spansLines({ fullSpans, opts, spans, trace }));
   }
 
-  if (events.length > 0) {
-    lines.push("# events");
-    for (const evt of events) {
-      const offsetMs = Math.max(0, Math.round(evt.timestamp - trace.timestamp));
-      lines.push(`  - ${evt.name} (+${offsetMs}ms)`);
-    }
-    lines.push("");
-  }
-
-  if (opts.includeMetadata && Object.keys(trace.attributes).length > 0) {
-    const flat = flattenAttributes(trace.attributes);
-    if (flat.length > 0) {
-      lines.push("# metadata");
-      for (const ln of flat) lines.push(ln);
-      lines.push("");
-    }
-  }
+  lines.push(...eventsLines(trace, events));
+  if (opts.includeMetadata) lines.push(...metadataLines(trace));
 
   return lines.join("\n").trim();
 }

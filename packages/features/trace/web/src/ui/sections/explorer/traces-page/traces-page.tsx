@@ -97,25 +97,17 @@ export const TracesPage: React.FC = () => {
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
   const tourActive = useOnboardingStore((s) => s.tourActive);
   const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
-  const setupDismissed = project ? !!setupDismissedByProject[project.id] : false;
   // Read the onboarding stage at the top level so we can decide whether to surface the
   // FilterSidebar even while the empty state is technically "active".
   const topLevelOnboardingStage = useOnboardingStore((s) => s.stage);
-  const sidebarVisibleDuringEmpty =
-    topLevelOnboardingStage === "serviceSegue" ||
-    topLevelOnboardingStage === "facetsReveal" ||
-    topLevelOnboardingStage === "outro";
-  // Legacy empty-state journey — only fires when `tourActive` is explicitly
-  // set. For no-traces users the new Phase 2 flow takes over: show
-  // `IntegratePane` by default, or `ResultsPane` (with sample data) when
-  // the user opts in via "See sample data".
-  const showEmptyState = tourActive && !setupDismissed;
-  // Dim the surrounding chrome only while the legacy journey card is active.
-  const dimChrome = showEmptyState && !setupDisengaged;
-  // Phase 2 routing: for no-traces users without the legacy journey running,
-  // show the IntegratePane hero unless they've explicitly opted into sample
-  // preview. Once real traces arrive, always show ResultsPane.
-  const showIntegratePane = !showEmptyState && hasAnyTraces === false && !showSamplePreview;
+  const { dimChrome, showEmptyState, showIntegratePane, sidebarVisibleDuringEmpty } = paneRouting({
+    hasAnyTraces,
+    setupDisengaged,
+    setupDismissed: project ? !!setupDismissedByProject[project.id] : false,
+    showSamplePreview,
+    stage: topLevelOnboardingStage,
+    tourActive,
+  });
 
   // Legacy journey (tourActive, dormant for new users) or the real results —
   // held apart from the integration hero so the pane choice reads as a pair.
@@ -149,7 +141,7 @@ export const TracesPage: React.FC = () => {
     const projectId = project?.id ?? null;
     const prev = prevProjectIdRef.current;
     prevProjectIdRef.current = projectId;
-    if (prev === null || projectId === null || prev === projectId) return;
+    if (!isProjectSwitch(prev, projectId)) return;
     closeDrawerOnSwitch();
     clearFilters();
   }, [project?.id, closeDrawerOnSwitch, clearFilters]);
@@ -330,6 +322,93 @@ const FilterAside: React.FC<{
 });
 FilterAside.displayName = "FilterAside";
 
+/**
+ * Which pane the explorer shows and how much of the chrome around it is dimmed:
+ * the legacy empty-state journey, the integration hero, or the results.
+ */
+function paneRouting({
+  hasAnyTraces,
+  setupDisengaged,
+  setupDismissed,
+  showSamplePreview,
+  stage,
+  tourActive,
+}: {
+  hasAnyTraces: boolean | undefined;
+  setupDisengaged: boolean;
+  setupDismissed: boolean;
+  showSamplePreview: boolean;
+  stage: string;
+  tourActive: boolean;
+}): {
+  dimChrome: boolean;
+  showEmptyState: boolean;
+  showIntegratePane: boolean;
+  sidebarVisibleDuringEmpty: boolean;
+} {
+  const sidebarVisibleDuringEmpty =
+    stage === "serviceSegue" || stage === "facetsReveal" || stage === "outro";
+  // Legacy empty-state journey — only fires when `tourActive` is explicitly
+  // set. For no-traces users the new Phase 2 flow takes over: show
+  // `IntegratePane` by default, or `ResultsPane` (with sample data) when
+  // the user opts in via "See sample data".
+  const showEmptyState = tourActive && !setupDismissed;
+  return {
+    // Dim the surrounding chrome only while the legacy journey card is active.
+    dimChrome: showEmptyState && !setupDisengaged,
+    showEmptyState,
+    // Phase 2 routing: for no-traces users without the legacy journey running,
+    // show the IntegratePane hero unless they've explicitly opted into sample
+    // preview. Once real traces arrive, always show ResultsPane.
+    showIntegratePane: !showEmptyState && hasAnyTraces === false && !showSamplePreview,
+    sidebarVisibleDuringEmpty,
+  };
+}
+
+/** Whether the page moved from one real project to another. */
+function isProjectSwitch(previous: string | null, current: string | null): boolean {
+  if (previous === null || current === null) return false;
+  return previous !== current;
+}
+
+/**
+ * The aurora ribbon is a one-shot arrival moment, armed either by entering
+ * sample preview on a project with no traces or by the first real trace
+ * landing. Both are mount-scoped: nothing persists it across a reload.
+ */
+function useAuroraRibbon({
+  hasAnyTraces,
+  isPreviewActive,
+}: {
+  hasAnyTraces: boolean | undefined;
+  isPreviewActive: boolean;
+}): boolean {
+  const auroraArmedSample = isPreviewActive && hasAnyTraces === false;
+  const prevHasAnyTracesRef = useRef<boolean | undefined>(undefined);
+  const [auroraArmedFirstReal, setAuroraArmedFirstReal] = useState(false);
+  useEffect(() => {
+    const prev = prevHasAnyTracesRef.current;
+    prevHasAnyTracesRef.current = hasAnyTraces;
+    if (prev === false && hasAnyTraces === true) {
+      setAuroraArmedFirstReal(true);
+    }
+  }, [hasAnyTraces]);
+  const [showAurora, setShowAurora] = useState(false);
+  useEffect(() => {
+    if (!auroraArmedSample && !auroraArmedFirstReal) {
+      setShowAurora(false);
+      return;
+    }
+    setShowAurora(true);
+    const t = setTimeout(() => {
+      setShowAurora(false);
+      setAuroraArmedFirstReal(false);
+    }, 3600);
+    return () => clearTimeout(t);
+  }, [auroraArmedSample, auroraArmedFirstReal]);
+  return showAurora;
+}
+
 const ResultsPane: React.FC = React.memo(() => {
   const { data, totalHits } = useTraceListQuery();
   const pageTraceIds = useMemo(() => data.map((t) => t.traceId), [data]);
@@ -366,29 +445,7 @@ const ResultsPane: React.FC = React.memo(() => {
   // Aurora ribbon is a *one-shot* arrival moment. Two ways to arm it, both purely
   // mount-scoped (no persistence — if you're not on the page when it happens, it's
   // gone):
-  const auroraArmedSample = isPreviewActive && hasAnyTraces === false;
-  const prevHasAnyTracesRef = useRef<boolean | undefined>(undefined);
-  const [auroraArmedFirstReal, setAuroraArmedFirstReal] = useState(false);
-  useEffect(() => {
-    const prev = prevHasAnyTracesRef.current;
-    prevHasAnyTracesRef.current = hasAnyTraces;
-    if (prev === false && hasAnyTraces === true) {
-      setAuroraArmedFirstReal(true);
-    }
-  }, [hasAnyTraces]);
-  const [showAurora, setShowAurora] = useState(false);
-  useEffect(() => {
-    if (!auroraArmedSample && !auroraArmedFirstReal) {
-      setShowAurora(false);
-      return;
-    }
-    setShowAurora(true);
-    const t = setTimeout(() => {
-      setShowAurora(false);
-      setAuroraArmedFirstReal(false);
-    }, 3600);
-    return () => clearTimeout(t);
-  }, [auroraArmedSample, auroraArmedFirstReal]);
+  const showAurora = useAuroraRibbon({ hasAnyTraces, isPreviewActive });
 
   const isSelectedExport = selectionMode === "all-matching" || explicitCount > 0;
   const cappedHits = Math.min(totalHits, SELECT_ALL_MATCHING_CAP);

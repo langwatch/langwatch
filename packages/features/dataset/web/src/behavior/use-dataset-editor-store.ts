@@ -38,9 +38,9 @@ export function rekeyEditorRecords(
     for (let i = 0; i < nextNames.length; i++) {
       const prevName = prevNames[i]!;
       const nextName = nextNames[i]!;
-      if (prevName !== nextName && !nextNames.includes(prevName) && !prevNames.includes(nextName)) {
-        renamedByNewName.set(nextName, prevName);
-      }
+      const isRename =
+        prevName !== nextName && !nextNames.includes(prevName) && !prevNames.includes(nextName);
+      if (isRename) renamedByNewName.set(nextName, prevName);
     }
   }
   return records.map((record) => {

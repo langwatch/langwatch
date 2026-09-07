@@ -1,5 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { useMemo, useRef } from "react";
+import { type ReactNode, useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
 import { PrivacyDroppedNotice } from "../../../privacy-dropped-notice.tsx";
@@ -69,11 +69,7 @@ export function TraceSummaryAccordions({
   const isCanonicalThisTrace = canonicalHeader?.traceId === trace.traceId;
   const capturedInput = isCanonicalThisTrace ? canonicalHeader.input : undefined;
   const capturedOutput = isCanonicalThisTrace ? canonicalHeader.output : undefined;
-  const hasIO = !!(trace.input || trace.output);
-  // A restrict privacy rule hides content the viewer may not see — the server
-  // nulls `input`/`output` and sets these flags. The IO section then reads as a
-  // "Redacted" state, NOT an "empty" one: there IS content, it is just hidden.
-  const hasRedactedIO = !!(trace.inputRedacted || trace.outputRedacted);
+  const { hasIO, hasRedactedIO } = traceIOFlags(trace);
   // The media_refs reserved attributes are rendering plumbing (consumed by
   // the media strips below and the table's preview column) — as metadata
   // rows they are two long JSON blobs that drown the real attributes.
@@ -100,10 +96,8 @@ export function TraceSummaryAccordions({
   const { project } = useOrganizationTeamProject();
   const promptsHref = project?.slug ? `/${project.slug}/prompts` : undefined;
   const resources = useTraceResources(trace.traceId);
-  const hasResourceAttributes = Object.keys(resources.resourceAttributes).length > 0;
-  const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
-  const hasAttributes = hasTraceAttributes || hasResourceAttributes;
-  const hasScope = !!resources.scope?.name;
+  const { hasAttributes, hasResourceAttributes, hasScope, hasTraceAttributes } =
+    traceAttributeFlags({ resources, traceAttributes });
 
   const { rich: richEvals, pendingCount, isLoading: evalsLoading } = useTraceEvaluations();
 
@@ -156,57 +150,38 @@ export function TraceSummaryAccordions({
   // matters for traces that only have span-level failures (no rolled
   // up trace.error), where the header chip would otherwise list pills
   // that lead to a section gate that never opens.
-  const hasError = trace.status === "error" && (!!trace.error || errorSpans.length > 0);
-
-  const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
-  const hasEventsContent = traceEvents.length > 0;
-
-  // A signal counts as "empty" (→ compact card) only once its query has
-  // settled with nothing. While it's still loading it's neither a full
-  // section (no content yet) nor a card (not confirmed empty) — simply
-  // absent, so it never flashes a full-width empty state before settling.
-  const evalsEmpty = !hasEvalsContent && !evalsLoading;
-  const eventsEmpty = !hasEventsContent && !eventsLoading;
-  const promptsEmpty = !trace.containsPrompt;
+  const { evalsEmpty, eventsEmpty, hasError, hasEvalsContent, hasEventsContent, promptsEmpty } =
+    traceSignalFlags({
+      errorSpans,
+      evalsForList,
+      evalsLoading,
+      eventsLoading,
+      pendingCount,
+      trace,
+      traceEvents,
+    });
 
   // Empty signals collapse into one shared "Other" section as compact cards
   // rather than each eating a full-width accordion. Ordered evals → events →
   // prompts to mirror their normal section order.
   const emptyCards = useMemo(
-    () =>
-      [
-        evalsEmpty ? ("evals" as const) : null,
-        eventsEmpty ? ("events" as const) : null,
-        promptsEmpty ? ("prompts" as const) : null,
-      ].filter((v): v is "evals" | "events" | "prompts" => v !== null),
+    () => emptySignalCards({ evalsEmpty, eventsEmpty, promptsEmpty }),
     [evalsEmpty, eventsEmpty, promptsEmpty],
   );
   const showOther = emptyCards.length > 0;
 
-  const sections = useMemo(() => {
-    const list: Array<
-      "io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other"
-    > = [];
-    if (hasError && !hasIO) list.push("exceptions");
-    list.push("io");
-    if (hasError && hasIO) list.push("exceptions");
-    // Prompts the trace used — the span-level Prompt accordion only shows
-    // when a span is selected, so the trace summary surfaced no prompt
-    // info even when spans carried managed prompts. `containsPrompt` is
-    // the cheap trace-level precondition. When absent, the prompt CTA moves
-    // into the shared "Other" section below.
-    if (trace.containsPrompt) list.push("prompts");
-    list.push("attributes");
-    // Evals / Events render as their own full-width section only once their
-    // query has content. Confirmed-empty ones drop into "Other" as a compact
-    // card; while a query is still loading the signal is simply absent (no
-    // placeholder), so it never flashes a full-width empty state on the way
-    // to becoming a card.
-    if (hasEvalsContent) list.push("evals");
-    if (hasEventsContent) list.push("events");
-    if (showOther) list.push("other");
-    return list;
-  }, [hasIO, hasError, trace.containsPrompt, hasEvalsContent, hasEventsContent, showOther]);
+  const sections = useMemo(
+    () =>
+      traceSectionIds({
+        containsPrompt: trace.containsPrompt,
+        hasError,
+        hasEvalsContent,
+        hasEventsContent,
+        hasIO,
+        showOther,
+      }),
+    [hasIO, hasError, trace.containsPrompt, hasEvalsContent, hasEventsContent, showOther],
+  );
 
   // Auto-open Metadata only when the trace has its own attributes — when
   // only resource attributes are present (which is most of the time on
@@ -251,269 +226,43 @@ export function TraceSummaryAccordions({
         />
       ) : null}
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
-        {sections.map((id, idx) => {
-          const isFirst = idx === 0;
-          const isOpen = openSections.includes(id);
-          if (id === "io") {
-            return (
-              <Section
-                key="io"
-                value="io"
-                title="Input and Output"
-                commentCount={sectionComments.io}
-                // Redacted content is hidden, not absent — don't tag the section
-                // "empty" when a privacy rule nulled the I/O.
-                empty={!hasIO && !hasRedactedIO}
-                spotlightAnchor={hasIO ? "drawer-io" : undefined}
-                isFirst={isFirst}
-                open={isOpen}
-              >
-                <VStack align="stretch" gap={2}>
-                  <PrivacyDroppedNotice
-                    categories={trace.privacy?.droppedCategories ?? undefined}
-                  />
-                  {/* Drive redaction off the header DTO's own flags (like the
-                      span path) so the marker can never disagree with the
-                      content the server already nulled, and a redacted side
-                      renders the shared "Redacted" marker instead of the
-                      "no input recorded" placeholder. */}
-                  <RedactedField
-                    field="input"
-                    redacted={trace.inputRedacted ?? false}
-                    visibleTo={trace.inputVisibleTo}
-                  >
-                    <TraceInputField
-                      capturedInput={capturedInput}
-                      inputCorrected={inputCorrected}
-                      isEditing={isEditing}
-                      trace={trace}
-                    />
-                    <SummaryMediaStrip
-                      refsJson={trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]}
-                      side="input"
-                    />
-                  </RedactedField>
-                  <RedactedField
-                    field="output"
-                    redacted={trace.outputRedacted ?? false}
-                    visibleTo={trace.outputVisibleTo}
-                  >
-                    <TraceOutputField
-                      capturedOutput={capturedOutput}
-                      isEditing={isEditing}
-                      outputCorrected={outputCorrected}
-                      trace={trace}
-                    />
-                    <SummaryMediaStrip
-                      refsJson={trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]}
-                      side="output"
-                    />
-                  </RedactedField>
-                </VStack>
-              </Section>
-            );
-          }
-          if (id === "prompts") {
-            return (
-              <Section
-                key="prompts"
-                value="prompts"
-                title="Prompts"
-                isFirst={isFirst}
-                open={isOpen}
-              >
-                <PromptsPanel
-                  trace={trace}
-                  spans={spans}
-                  onSelectSpan={onSelectSpan ?? (() => undefined)}
-                  hideHeader
-                />
-              </Section>
-            );
-          }
-          if (id === "attributes") {
-            const attrCount =
-              countFlatLeaves(traceAttributes) + countFlatLeaves(resources.resourceAttributes);
-            return (
-              <Section
-                key="attributes"
-                value="attributes"
-                title="Metadata"
-                count={attrCount}
-                commentCount={sectionComments.attributes}
-                empty={!hasAttributes && !isEditing && !resources.isLoading}
-                isFirst={isFirst}
-                open={isOpen}
-              >
-                {(hasAttributes || isEditing) && (
-                  <AttributeTable
-                    attributes={metadataEditing.baselineAttributes}
-                    resourceAttributes={
-                      hasResourceAttributes ? resources.resourceAttributes : undefined
-                    }
-                    title="Trace Attributes"
-                    editing={metadataEditing.editing}
-                    correctedFrom={metadataCorrected ? capturedAttributes : undefined}
-                    comments={metadataComments}
-                  />
-                )}
-                {!hasAttributes && !isEditing && resources.isLoading && (
-                  <EmptyHint>Loading metadata…</EmptyHint>
-                )}
-                {!hasAttributes && !isEditing && !resources.isLoading && (
-                  <EmptyHint>No metadata recorded</EmptyHint>
-                )}
-              </Section>
-            );
-          }
-          if (id === "scope") {
-            return (
-              <Section
-                key="scope"
-                value="scope"
-                title="Instrumentation Scope"
-                isFirst={isFirst}
-                open={isOpen}
-              >
-                <ScopeBlock scope={resources.scope} />
-              </Section>
-            );
-          }
-          if (id === "exceptions") {
-            // Show the per-trace exception count in the section title — matches
-            // how the Evals and Events sections render their counts. Without
-            // this, "Exceptions" was the only erroring section in the drawer
-            // without a count, leaving users to expand it to find out whether
-            // they were looking at one bad span or twenty.
-            const exceptionsCount =
-              errorSpans.length + (trace.error && errorSpans.length === 0 ? 1 : 0);
-            return (
-              <Section
-                key="exceptions"
-                value="exceptions"
-                title="Exceptions"
-                count={exceptionsCount > 0 ? exceptionsCount : undefined}
-                isFirst={isFirst}
-                open={isOpen}
-              >
-                <ExceptionsContent
-                  error={trace.error}
-                  errorSpans={errorSpans}
-                  onSelectSpan={onSelectSpan}
-                  onFocusSection={() =>
-                    requestFocus({
-                      traceId: trace.traceId,
-                      section: "exceptions",
-                    })
-                  }
-                />
-              </Section>
-            );
-          }
-          if (id === "evals") {
-            return (
-              <Section
-                key="evals"
-                value="evals"
-                title="Evals"
-                spotlightAnchor={hasEvalsContent ? "drawer-evals" : undefined}
-                count={evalsForList.length > 0 ? evalsForList.length : undefined}
-                empty={!evalsLoading && evalsForList.length === 0 && pendingCount === 0}
-                isFirst={isFirst}
-                open={isOpen}
-              >
-                {evalsLoading ? (
-                  <EmptyHint>Loading evaluations…</EmptyHint>
-                ) : (
-                  <VStack align="stretch" gap={2}>
-                    {pendingCount > 0 && (
-                      <Text textStyle="xs" color="fg.muted">
-                        {pendingCount} evaluation{pendingCount === 1 ? "" : "s"} pending
-                      </Text>
-                    )}
-                    <EvalsList evals={evalsForList} onSelectSpan={onSelectSpan} />
-                  </VStack>
-                )}
-              </Section>
-            );
-          }
-          if (id === "other") {
-            // Empty evals / events / prompts share this one section as a row
-            // of compact cards instead of each consuming a full-width
-            // accordion — same info, far less vertical space.
-            return (
-              <Section key="other" value="other" title="Other" isFirst={isFirst} open={isOpen}>
-                <HStack align="stretch" gap={2} flexWrap="wrap">
-                  {emptyCards.map((card) => {
-                    if (card === "evals") {
-                      return (
-                        <EmptySignalCard
-                          key="evals"
-                          icon={LuFlaskConical}
-                          title="No evals"
-                          description="Score traces automatically with evaluators."
-                          ctaLabel="Learn more"
-                          ctaHref="https://docs.langwatch.ai/evaluations/online-evaluation/overview"
-                          isCtaExternal
-                        />
-                      );
-                    }
-                    if (card === "events") {
-                      return (
-                        <EmptySignalCard
-                          key="events"
-                          icon={LuCalendarClock}
-                          title="No events"
-                          description="Capture tool calls, feedback, and milestones."
-                          ctaLabel="Learn more"
-                          ctaHref="https://docs.langwatch.ai/integration/overview"
-                          isCtaExternal
-                        />
-                      );
-                    }
-                    return (
-                      <EmptySignalCard
-                        key="prompts"
-                        icon={LuFileText}
-                        title="No managed prompt"
-                        description="Version, test, and reuse prompts across traces."
-                        ctaLabel={promptsHref ? "Set up a prompt" : "Learn more"}
-                        ctaHref={promptsHref ?? "https://docs.langwatch.ai/prompts/template-syntax"}
-                        isCtaExternal={!promptsHref}
-                      />
-                    );
-                  })}
-                </HStack>
-              </Section>
-            );
-          }
-          // events
-          return (
-            <Section
-              key="events"
-              value="events"
-              title="Events"
-              spotlightAnchor={hasEventsContent ? "drawer-events" : undefined}
-              count={traceEvents.length}
-              isFirst={isFirst}
-              open={isOpen}
-            >
-              <VStack align="stretch" gap={2}>
-                {traceEvents.map((evt, i) => (
-                  <EventCard
-                    key={`${evt.spanId}-${evt.timestamp}-${i}`}
-                    name={evt.name}
-                    timestampMs={evt.timestamp}
-                    anchorMs={trace.timestamp}
-                    attributes={evt.attributes}
-                    spanId={evt.spanId}
-                    onSelectSpan={onSelectSpan}
-                  />
-                ))}
-              </VStack>
-            </Section>
-          );
-        })}
+        {sections.map((id, idx) =>
+          traceSectionElement({
+            capturedAttributes,
+            capturedInput,
+            capturedOutput,
+            emptyCards,
+            errorSpans,
+            evalsForList,
+            evalsLoading,
+            hasAttributes,
+            hasEvalsContent,
+            hasEventsContent,
+            hasIO,
+            hasRedactedIO,
+            hasResourceAttributes,
+            hasTraceAttributes,
+            id,
+            inputCorrected,
+            isEditing,
+            isFirst: idx === 0,
+            isOpen: openSections.includes(id),
+            metadataComments,
+            metadataCorrected,
+            metadataEditing,
+            onSelectSpan,
+            outputCorrected,
+            pendingCount,
+            promptsHref,
+            requestFocus,
+            resources,
+            sectionComments,
+            spans,
+            trace,
+            traceAttributes,
+            traceEvents,
+          }),
+        )}
       </AccordionShell>
     </Box>
   );
@@ -630,4 +379,463 @@ function TraceOutputField({
       {viewer}
     </CorrectedFieldFrame>
   );
+}
+
+interface TraceSectionContext {
+  capturedAttributes: Record<string, unknown> | undefined;
+  capturedInput: string | null | undefined;
+  capturedOutput: string | null | undefined;
+  emptyCards: Array<"evals" | "events" | "prompts">;
+  errorSpans: ReturnType<typeof rankedErrorSpans>;
+  evalsForList: Array<
+    ReturnType<typeof useTraceEvaluations>["rich"][number] & { spanName?: string }
+  >;
+  evalsLoading: boolean;
+  hasAttributes: boolean;
+  hasEvalsContent: boolean;
+  hasEventsContent: boolean;
+  hasIO: boolean;
+  hasRedactedIO: boolean;
+  hasResourceAttributes: boolean;
+  hasTraceAttributes: boolean;
+  id: string;
+  inputCorrected: boolean;
+  outputCorrected: boolean;
+  isEditing: boolean;
+  isFirst: boolean;
+  isOpen: boolean;
+  metadataComments: AttributeComments;
+  metadataCorrected: boolean;
+  metadataEditing: ReturnType<typeof useTraceMetadataEditing>;
+  onSelectSpan?: (spanId: string) => void;
+  pendingCount: number;
+  promptsHref: string | undefined;
+  requestFocus: ReturnType<typeof useFocusSectionStore.getState>["request"];
+  resources: ReturnType<typeof useTraceResources>;
+  sectionComments: ReturnType<typeof commentCountsBySection>;
+  spans: SpanTreeNode[];
+  trace: TraceHeader;
+  traceAttributes: Record<string, unknown>;
+  traceEvents: ReturnType<typeof useTraceEvents>["events"];
+}
+
+/** The accordion section one id names. */
+function traceSectionElement(ctx: TraceSectionContext): ReactNode {
+  if (ctx.id === "io") return ioTraceSection(ctx);
+  if (ctx.id === "prompts") return promptsTraceSection(ctx);
+  if (ctx.id === "attributes") return attributesTraceSection(ctx);
+  if (ctx.id === "scope") return scopeTraceSection(ctx);
+  if (ctx.id === "exceptions") return exceptionsTraceSection(ctx);
+  if (ctx.id === "evals") return evalsTraceSection(ctx);
+  if (ctx.id === "other") return otherTraceSection(ctx);
+  return eventsTraceSection(ctx);
+}
+
+/** The trace's own input and output, with the media strips and redaction markers. */
+function ioTraceSection(ctx: TraceSectionContext): ReactNode {
+  return (
+    <Section
+      key="io"
+      value="io"
+      title="Input and Output"
+      commentCount={ctx.sectionComments.io}
+      // Redacted content is hidden, not absent — don't tag the section
+      // "empty" when a privacy rule nulled the I/O.
+      empty={!ctx.hasIO && !ctx.hasRedactedIO}
+      spotlightAnchor={ctx.hasIO ? "drawer-io" : undefined}
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      <VStack align="stretch" gap={2}>
+        <PrivacyDroppedNotice categories={ctx.trace.privacy?.droppedCategories ?? undefined} />
+        {/* Drive redaction off the header DTO's own flags (like the
+          span path) so the marker can never disagree with the
+          content the server already nulled, and a redacted side
+          renders the shared "Redacted" marker instead of the
+          "no input recorded" placeholder. */}
+        <RedactedField
+          field="input"
+          redacted={ctx.trace.inputRedacted ?? false}
+          visibleTo={ctx.trace.inputVisibleTo}
+        >
+          <TraceInputField
+            capturedInput={ctx.capturedInput}
+            inputCorrected={ctx.inputCorrected}
+            isEditing={ctx.isEditing}
+            trace={ctx.trace}
+          />
+          <SummaryMediaStrip
+            refsJson={ctx.trace.attributes?.[RESERVED_INPUT_MEDIA_REFS]}
+            side="input"
+          />
+        </RedactedField>
+        <RedactedField
+          field="output"
+          redacted={ctx.trace.outputRedacted ?? false}
+          visibleTo={ctx.trace.outputVisibleTo}
+        >
+          <TraceOutputField
+            capturedOutput={ctx.capturedOutput}
+            isEditing={ctx.isEditing}
+            outputCorrected={ctx.outputCorrected}
+            trace={ctx.trace}
+          />
+          <SummaryMediaStrip
+            refsJson={ctx.trace.attributes?.[RESERVED_OUTPUT_MEDIA_REFS]}
+            side="output"
+          />
+        </RedactedField>
+      </VStack>
+    </Section>
+  );
+}
+
+/** The managed prompts this trace used. */
+function promptsTraceSection(ctx: TraceSectionContext): ReactNode {
+  return (
+    <Section key="prompts" value="prompts" title="Prompts" isFirst={ctx.isFirst} open={ctx.isOpen}>
+      <PromptsPanel
+        trace={ctx.trace}
+        spans={ctx.spans}
+        onSelectSpan={ctx.onSelectSpan ?? (() => undefined)}
+        hideHeader
+      />
+    </Section>
+  );
+}
+
+/** The trace's metadata and the resource attributes behind it. */
+function attributesTraceSection(ctx: TraceSectionContext): ReactNode {
+  const attrCount =
+    countFlatLeaves(ctx.traceAttributes) + countFlatLeaves(ctx.resources.resourceAttributes);
+  return (
+    <Section
+      key="attributes"
+      value="attributes"
+      title="Metadata"
+      count={attrCount}
+      commentCount={ctx.sectionComments.attributes}
+      empty={!ctx.hasAttributes && !ctx.isEditing && !ctx.resources.isLoading}
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      {(ctx.hasAttributes || ctx.isEditing) && (
+        <AttributeTable
+          attributes={ctx.metadataEditing.baselineAttributes}
+          resourceAttributes={
+            ctx.hasResourceAttributes ? ctx.resources.resourceAttributes : undefined
+          }
+          title="Trace Attributes"
+          editing={ctx.metadataEditing.editing}
+          correctedFrom={ctx.metadataCorrected ? ctx.capturedAttributes : undefined}
+          comments={ctx.metadataComments}
+        />
+      )}
+      {!ctx.hasAttributes && !ctx.isEditing && ctx.resources.isLoading && (
+        <EmptyHint>Loading metadata…</EmptyHint>
+      )}
+      {!ctx.hasAttributes && !ctx.isEditing && !ctx.resources.isLoading && (
+        <EmptyHint>No metadata recorded</EmptyHint>
+      )}
+    </Section>
+  );
+}
+
+/** The instrumentation scope the trace was produced by. */
+function scopeTraceSection(ctx: TraceSectionContext): ReactNode {
+  return (
+    <Section
+      key="scope"
+      value="scope"
+      title="Instrumentation Scope"
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      <ScopeBlock scope={ctx.resources.scope} />
+    </Section>
+  );
+}
+
+/** The trace-level error and the spans that failed under it. */
+function exceptionsTraceSection(ctx: TraceSectionContext): ReactNode {
+  // Show the per-ctx.trace exception count in the section title — matches
+  // how the Evals and Events sections render their counts. Without
+  // this, "Exceptions" was the only erroring section in the drawer
+  // without a count, leaving users to expand it to find out whether
+  // they were looking at one bad span or twenty.
+  const exceptionsCount =
+    ctx.errorSpans.length + (ctx.trace.error && ctx.errorSpans.length === 0 ? 1 : 0);
+  return (
+    <Section
+      key="exceptions"
+      value="exceptions"
+      title="Exceptions"
+      count={exceptionsCount > 0 ? exceptionsCount : undefined}
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      <ExceptionsContent
+        error={ctx.trace.error}
+        errorSpans={ctx.errorSpans}
+        onSelectSpan={ctx.onSelectSpan}
+        onFocusSection={() =>
+          ctx.requestFocus({
+            traceId: ctx.trace.traceId,
+            section: "exceptions",
+          })
+        }
+      />
+    </Section>
+  );
+}
+
+/** The evaluations that ran against this trace. */
+function evalsTraceSection(ctx: TraceSectionContext): ReactNode {
+  return (
+    <Section
+      key="evals"
+      value="evals"
+      title="Evals"
+      spotlightAnchor={ctx.hasEvalsContent ? "drawer-evals" : undefined}
+      count={ctx.evalsForList.length > 0 ? ctx.evalsForList.length : undefined}
+      empty={!ctx.evalsLoading && ctx.evalsForList.length === 0 && ctx.pendingCount === 0}
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      {ctx.evalsLoading ? (
+        <EmptyHint>Loading evaluations…</EmptyHint>
+      ) : (
+        <VStack align="stretch" gap={2}>
+          {ctx.pendingCount > 0 && (
+            <Text textStyle="xs" color="fg.muted">
+              {ctx.pendingCount} evaluation{ctx.pendingCount === 1 ? "" : "s"} pending
+            </Text>
+          )}
+          <EvalsList evals={ctx.evalsForList} onSelectSpan={ctx.onSelectSpan} />
+        </VStack>
+      )}
+    </Section>
+  );
+}
+
+/** Signals that settled with nothing, as compact cards rather than empty sections. */
+function otherTraceSection(ctx: TraceSectionContext): ReactNode {
+  // Empty evals / events / prompts share this one section as a row
+  // of compact cards instead of each consuming a full-width
+  // accordion — same info, far less vertical space.
+  return (
+    <Section key="other" value="other" title="Other" isFirst={ctx.isFirst} open={ctx.isOpen}>
+      <HStack align="stretch" gap={2} flexWrap="wrap">
+        {ctx.emptyCards.map((card) => {
+          if (card === "evals") {
+            return (
+              <EmptySignalCard
+                key="evals"
+                icon={LuFlaskConical}
+                title="No evals"
+                description="Score traces automatically with evaluators."
+                ctaLabel="Learn more"
+                ctaHref="https://docs.langwatch.ai/evaluations/online-evaluation/overview"
+                isCtaExternal
+              />
+            );
+          }
+          if (card === "events") {
+            return (
+              <EmptySignalCard
+                key="events"
+                icon={LuCalendarClock}
+                title="No events"
+                description="Capture tool calls, feedback, and milestones."
+                ctaLabel="Learn more"
+                ctaHref="https://docs.langwatch.ai/integration/overview"
+                isCtaExternal
+              />
+            );
+          }
+          return (
+            <EmptySignalCard
+              key="prompts"
+              icon={LuFileText}
+              title="No managed prompt"
+              description="Version, test, and reuse prompts across traces."
+              ctaLabel={ctx.promptsHref ? "Set up a prompt" : "Learn more"}
+              ctaHref={ctx.promptsHref ?? "https://docs.langwatch.ai/prompts/template-syntax"}
+              isCtaExternal={!ctx.promptsHref}
+            />
+          );
+        })}
+      </HStack>
+    </Section>
+  );
+}
+
+/** The trace's own events, including legacy track-event payloads. */
+function eventsTraceSection(ctx: TraceSectionContext): ReactNode {
+  return (
+    <Section
+      key="events"
+      value="events"
+      title="Events"
+      spotlightAnchor={ctx.hasEventsContent ? "drawer-events" : undefined}
+      count={ctx.traceEvents.length}
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      <VStack align="stretch" gap={2}>
+        {ctx.traceEvents.map((evt, i) => (
+          <EventCard
+            key={`${evt.spanId}-${evt.timestamp}-${i}`}
+            name={evt.name}
+            timestampMs={evt.timestamp}
+            anchorMs={ctx.trace.timestamp}
+            attributes={evt.attributes}
+            spanId={evt.spanId}
+            onSelectSpan={ctx.onSelectSpan}
+          />
+        ))}
+      </VStack>
+    </Section>
+  );
+}
+
+/**
+ * Empty signals collapse into one shared "Other" section as compact cards
+ * rather than each eating a full-width accordion. Ordered evals, events then
+ * prompts, mirroring their normal section order.
+ */
+function emptySignalCards({
+  evalsEmpty,
+  eventsEmpty,
+  promptsEmpty,
+}: {
+  evalsEmpty: boolean;
+  eventsEmpty: boolean;
+  promptsEmpty: boolean;
+}): Array<"evals" | "events" | "prompts"> {
+  const cards: Array<"evals" | "events" | "prompts"> = [];
+  if (evalsEmpty) cards.push("evals");
+  if (eventsEmpty) cards.push("events");
+  if (promptsEmpty) cards.push("prompts");
+  return cards;
+}
+
+/** The sections the trace summary shows, in the order the stack renders them. */
+function traceSectionIds({
+  containsPrompt,
+  hasError,
+  hasEvalsContent,
+  hasEventsContent,
+  hasIO,
+  showOther,
+}: {
+  containsPrompt: boolean | undefined;
+  hasError: boolean;
+  hasEvalsContent: boolean;
+  hasEventsContent: boolean;
+  hasIO: boolean;
+  showOther: boolean;
+}): Array<"io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other"> {
+  const list: Array<
+    "io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other"
+  > = [];
+  if (hasError && !hasIO) list.push("exceptions");
+  list.push("io");
+  if (hasError && hasIO) list.push("exceptions");
+  // Prompts the trace used — the span-level Prompt accordion only shows when a
+  // span is selected, so the trace summary surfaced no prompt information even
+  // when spans carried managed prompts. `containsPrompt` is the cheap
+  // trace-level precondition; without it the prompt call to action moves into
+  // the shared "Other" section.
+  if (containsPrompt) list.push("prompts");
+  list.push("attributes");
+  // Evals and Events render as their own full-width section only once their
+  // query has content. A confirmed-empty one drops into "Other" as a compact
+  // card; while a query is still loading the signal is simply absent, so it
+  // never flashes a full-width empty state on the way to becoming a card.
+  if (hasEvalsContent) list.push("evals");
+  if (hasEventsContent) list.push("events");
+  if (showOther) list.push("other");
+  return list;
+}
+
+/**
+ * A restrict privacy rule hides content the viewer may not see: the server
+ * nulls `input`/`output` and sets these flags. The I/O section then reads as
+ * "Redacted", not "empty" — there IS content, it is just hidden.
+ */
+function traceIOFlags(trace: TraceHeader): { hasIO: boolean; hasRedactedIO: boolean } {
+  return {
+    hasIO: !!(trace.input || trace.output),
+    hasRedactedIO: !!(trace.inputRedacted || trace.outputRedacted),
+  };
+}
+
+/** What the Metadata and Scope sections have to show. */
+function traceAttributeFlags({
+  resources,
+  traceAttributes,
+}: {
+  resources: ReturnType<typeof useTraceResources>;
+  traceAttributes: Record<string, unknown>;
+}): {
+  hasAttributes: boolean;
+  hasResourceAttributes: boolean;
+  hasScope: boolean;
+  hasTraceAttributes: boolean;
+} {
+  const hasResourceAttributes = Object.keys(resources.resourceAttributes).length > 0;
+  const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
+  return {
+    hasAttributes: hasTraceAttributes || hasResourceAttributes,
+    hasResourceAttributes,
+    hasScope: !!resources.scope?.name,
+    hasTraceAttributes,
+  };
+}
+
+/**
+ * A signal counts as "empty" — and so becomes a compact card — only once its
+ * query has settled with nothing. While it is still loading it is neither a full
+ * section nor a card, simply absent, so it never flashes a full-width empty
+ * state before settling.
+ */
+function traceSignalFlags({
+  errorSpans,
+  evalsForList,
+  evalsLoading,
+  eventsLoading,
+  pendingCount,
+  trace,
+  traceEvents,
+}: {
+  errorSpans: ReturnType<typeof rankedErrorSpans>;
+  evalsForList: TraceSectionContext["evalsForList"];
+  evalsLoading: boolean;
+  eventsLoading: boolean;
+  pendingCount: number;
+  trace: TraceHeader;
+  traceEvents: TraceSectionContext["traceEvents"];
+}): {
+  evalsEmpty: boolean;
+  eventsEmpty: boolean;
+  hasError: boolean;
+  hasEvalsContent: boolean;
+  hasEventsContent: boolean;
+  promptsEmpty: boolean;
+} {
+  const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
+  const hasEventsContent = traceEvents.length > 0;
+  return {
+    evalsEmpty: !hasEvalsContent && !evalsLoading,
+    eventsEmpty: !hasEventsContent && !eventsLoading,
+    // The Exceptions section shows whenever an error trace has either a
+    // trace-level error string or at least one errored span. The latter matters
+    // for traces with only span-level failures, where the header chip would
+    // otherwise list pills leading to a section gate that never opens.
+    hasError: trace.status === "error" && (!!trace.error || errorSpans.length > 0),
+    hasEvalsContent,
+    hasEventsContent,
+    promptsEmpty: !trace.containsPrompt,
+  };
 }

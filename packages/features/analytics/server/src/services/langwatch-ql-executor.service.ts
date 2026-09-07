@@ -99,9 +99,11 @@ export class LangWatchQLExecutorService {
     // Re-checked rather than asserted: `absent` is computed by a callback, which
     // TypeScript cannot use to narrow these five, and reaching for `!` here would
     // silently outlive someone editing the list above.
-    if (!url || !username || !password || !database || !tenantSetting) {
-      return null;
-    }
+    if (!url) return null;
+    if (!username) return null;
+    if (!password) return null;
+    if (!database) return null;
+    if (!tenantSetting) return null;
 
     return { url, username, password, database, tenantSetting };
   }

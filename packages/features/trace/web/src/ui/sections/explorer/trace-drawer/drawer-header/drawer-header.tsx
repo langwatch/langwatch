@@ -438,50 +438,15 @@ export const DrawerHeader = memo(function DrawerHeader({
     enabled: !readOnly,
   });
 
-  // Cache + reasoning are summed across the trace's spans by the fold and
-  // parked on reserved keys (the raw per-span gen_ai.usage.cache_* values
-  // never reach the trace attribute map). Read the reserved sums first and
-  // fall back to the raw keys for traces folded before the sum landed.
-  const cacheReadTokens = readNumberAttribute(
-    trace.attributes,
-    "langwatch.reserved.cache_read_tokens",
-    "gen_ai.usage.cache_read.input_tokens",
-    "gen_ai.usage.cached_tokens",
-  );
-  const cacheCreationTokens = readNumberAttribute(
-    trace.attributes,
-    "langwatch.reserved.cache_creation_tokens",
-    "gen_ai.usage.cache_creation.input_tokens",
-  );
-  // Anthropic's cache-write TTL split (5m writes bill 1.25x base input, 1h
-  // writes 2x), summed by the fold off the response bodies. Absent for every
-  // other provider and for sessions without raw body telemetry.
-  const cacheCreation5mTokens = readNumberAttribute(
-    trace.attributes,
-    "langwatch.reserved.cache_creation_5m_tokens",
-  );
-  const cacheCreation1hTokens = readNumberAttribute(
-    trace.attributes,
-    "langwatch.reserved.cache_creation_1h_tokens",
-  );
-  const reasoningTokens = readNumberAttribute(
-    trace.attributes,
-    "langwatch.reserved.reasoning_tokens",
-    "gen_ai.usage.reasoning_tokens",
-  );
-
-  // The reasoning EFFORT request setting (low/medium/high/...), lifted onto
-  // the trace summary by the fold. Distinct from the reasoning TOKEN count
-  // above; shown next to the model since it is a per-request model setting.
-  const reasoningEffort = trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
-
-  // How full the window already was when this trace's first model call ran.
-  // Sits before Tokens because it is the number a reader checks first: the
-  // sums that follow only mean something once you know what they started from.
-  const contextSizeTokens = readNumberAttribute(
-    trace.attributes,
-    "langwatch.reserved.context_size_tokens",
-  );
+  const {
+    cacheCreation1hTokens,
+    cacheCreation5mTokens,
+    cacheCreationTokens,
+    cacheReadTokens,
+    contextSizeTokens,
+    reasoningEffort,
+    reasoningTokens,
+  } = readTokenUsage(trace.attributes);
 
   // Total tokens the model actually processed = input + output PLUS cache read + cache
   // write.
@@ -521,156 +486,31 @@ export const DrawerHeader = memo(function DrawerHeader({
   // strip can group them with subtle dividers between identity / run / tag /
   // custom. Auto-pins are skipped when the user has already pinned the same
   // key explicitly so we never show the same row twice.
-  const categorizedPins = useMemo<CategorizedPin[]>(() => {
-    const userKeys = new Set(pins.map((p) => `${p.source}:${p.key}`));
-    const out: CategorizedPin[] = [];
-    // Per-key navigation handlers — keep these centralised so user pins
-    // on the same key (e.g. someone manually pinning `scenario.run_id`)
-    // pick up the same affordance for free.
-    const buildNavigate = (
-      key: string,
-      value: string,
-    ): { onNavigate: () => void; navigateLabel: string } | undefined => {
-      switch (key) {
-        case "gen_ai.conversation.id":
-        case "langwatch.thread_id":
-          return {
-            navigateLabel: "Open conversation",
-            onNavigate: () => setViewMode("conversation"),
-          };
-        case "scenario.run_id":
-          return {
-            navigateLabel: "Open scenario run",
-            onNavigate: () =>
-              openDrawer("scenarioRunDetail", {
-                urlParams: { scenarioRunId: value },
-              }),
-          };
-        case "langwatch.prompt.selected":
-        case "langwatch.prompt.last_used":
-        case "langwatch.prompt.version":
-          // Prompt-related pins jump to the Prompts tab — and when we know
-          // which span carried the prompt, focus it so the editor opens
-          // on the right invocation rather than the trace's first span.
-          return {
-            navigateLabel: "Open prompt",
-            onNavigate: () => {
-              // Prompts is no longer a separate tab — SpanDetailPane
-              // auto-renders the PromptsPanel when the selected span has
-              // prompt data. So all we do here is select the span and
-              // the right panel adapts.
-              const spanId =
-                key === "langwatch.prompt.selected"
-                  ? trace.selectedPromptSpanId
-                  : trace.lastUsedPromptSpanId;
-              if (spanId) selectSpan(spanId);
-            },
-          };
-        default:
-          return undefined;
-      }
-    };
-    for (const def of HOISTED_AUTO_PINS) {
-      // The rich `Scenario run` chip (built from `useScenarioChipData` in
-      // `TraceHeaderChips`) already surfaces the scenario run id with status + criteria
-      // + click-to-open behaviour.
-      if (
-        def.key === "scenario.run_id" &&
-        (trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
-      ) {
-        continue;
-      }
-      if (userKeys.has(`attribute:${def.key}`)) continue;
-      const resolved = def.resolve ? def.resolve(trace) : trace.attributes[def.key];
-      const value = formatPinValue({ key: def.key, value: resolved ?? null });
-      if (!value) continue;
-      const filterField = FILTERABLE_PIN_FIELDS[def.key];
-      const navigate = buildNavigate(def.key, value);
-      out.push({
-        pin: { source: "attribute", key: def.key, label: def.label },
-        value,
-        auto: true,
-        category: def.category,
-        onFilter: filterField
-          ? () =>
-              guardTraceEditExit(() => {
-                toggleFacet(filterField, value);
-                closeDrawer();
-              })
-          : undefined,
-        onNavigate: navigate?.onNavigate,
-        navigateLabel: navigate?.navigateLabel,
-      });
-    }
-
-    // Auto-promote `metadata.*` attribute keys onto the pin strip.
-    const seenMetadataKeys = new Set<string>();
-    for (const [key, rawValue] of Object.entries(trace.attributes)) {
-      if (!key.startsWith("metadata.")) continue;
-      if (userKeys.has(`attribute:${key}`)) continue;
-      if (AUTO_PIN_SUPPRESSED_METADATA_KEYS.has(key)) continue;
-      if (seenMetadataKeys.has(key)) continue;
-      seenMetadataKeys.add(key);
-      const value = formatPinValue({ key, value: rawValue ?? null });
-      if (!value) continue;
-      // Label strips the `metadata.` prefix for readability — the strip
-      // is dense and the prefix is redundant inside the per-trace context.
-      const label = key.slice("metadata.".length);
-      // Auto-pinned metadata pins gain a filter affordance: clicking the filter icon
-      // scopes the trace table to traces that share this attribute key/value.
-      const filterQuery = formatMetadataFilterQuery({ key, value });
-      out.push({
-        pin: { source: "attribute", key, label },
-        value,
-        auto: true,
-        category: "custom",
-        onFilter: filterQuery
-          ? () =>
-              guardTraceEditExit(() => {
-                applyQueryTextFromPin(filterQuery);
-                closeDrawer();
-              })
-          : undefined,
-      });
-    }
-
-    for (const p of pins) {
-      const valueSource = p.source === "resource" ? resources.resourceAttributes : trace.attributes;
-      const value = formatPinValue({
-        key: p.key,
-        value: resolveAttributeValue(valueSource, p.key),
-      });
-      const filterField = FILTERABLE_PIN_FIELDS[p.key];
-      const navigate = value ? buildNavigate(p.key, value) : undefined;
-      out.push({
-        pin: p,
-        value,
-        auto: false,
-        category: "custom",
-        onFilter:
-          filterField && value
-            ? () =>
-                guardTraceEditExit(() => {
-                  toggleFacet(filterField, value);
-                  closeDrawer();
-                })
-            : undefined,
-        onNavigate: navigate?.onNavigate,
-        navigateLabel: navigate?.navigateLabel,
-      });
-    }
-    return out;
-  }, [
-    pins,
-    trace,
-    resources.resourceAttributes,
-    toggleFacet,
-    applyQueryTextFromPin,
-    closeDrawer,
-    openDrawer,
-    setViewMode,
-    selectSpan,
-  ]);
+  const categorizedPins = useMemo<CategorizedPin[]>(
+    () =>
+      categorizePins({
+        applyQueryTextFromPin,
+        closeDrawer,
+        openDrawer,
+        pins,
+        resourceAttributes: resources.resourceAttributes,
+        selectSpan,
+        setViewMode,
+        toggleFacet,
+        trace,
+      }),
+    [
+      pins,
+      trace,
+      resources.resourceAttributes,
+      toggleFacet,
+      applyQueryTextFromPin,
+      closeDrawer,
+      openDrawer,
+      setViewMode,
+      selectSpan,
+    ],
+  );
 
   const handleCopyTraceId = () => {
     void navigator.clipboard.writeText(trace.traceId);
@@ -691,35 +531,16 @@ export const DrawerHeader = memo(function DrawerHeader({
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
   // local — keeping both colocated avoids lifting state purely for the
   // sake of a single shortcut.
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-        return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key === "\\") {
-        e.preventDefault();
-        setRawOpen((v) => !v);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  useEffect(() => listenForRawJsonShortcut(setRawOpen), []);
 
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   // Build a query string from the highest-signal axes available on this trace.
   // Service + status are usually present; root span name is a strong cluster
   // signal. We quote bare strings to keep liqe happy with spaces/dashes.
-  const findSimilarQuery = useMemo(() => {
-    const parts: string[] = [];
-    if (trace.serviceName) parts.push(`service:"${trace.serviceName}"`);
-    if (trace.status === "error") parts.push("status:error");
-    if (trace.traceName) {
-      const escaped = trace.traceName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-      parts.push(`"${escaped}"`);
-    }
-    return parts.join(" ");
-  }, [trace.serviceName, trace.status, trace.traceName]);
+  const findSimilarQuery = useMemo(
+    () => buildFindSimilarQuery(trace),
+    [trace.serviceName, trace.status, trace.traceName],
+  );
   const handleFindSimilar = useCallback(() => {
     if (!findSimilarQuery) return;
     guardTraceEditExit(() => {
@@ -732,18 +553,10 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   // Title fallback chain: explicit traceName attribute → root span name (the server
   // populates `trace.name` from it) → trace ID prefix as a last resort.
-  const { titleText, titleIsFallback } = useMemo(() => {
-    const explicit = trace.traceName?.trim();
-    if (explicit) return { titleText: explicit, titleIsFallback: false };
-    const spanName = trace.name?.trim();
-    if (spanName && spanName !== trace.traceId && !trace.traceId.startsWith(spanName)) {
-      return { titleText: spanName, titleIsFallback: false };
-    }
-    return {
-      titleText: trace.traceId.slice(0, 12),
-      titleIsFallback: true,
-    };
-  }, [trace.traceName, trace.name, trace.traceId]);
+  const { titleText, titleIsFallback } = useMemo(
+    () => resolveHeaderTitle(trace),
+    [trace.traceName, trace.name, trace.traceId],
+  );
 
   const chipDefs = useTraceHeaderChipDefs(trace, {
     onSelectSpan: selectSpan,
@@ -780,88 +593,19 @@ export const DrawerHeader = memo(function DrawerHeader({
           The chip itself shows only the id (no "Trace ID" label),
           with hover-to-expand + click-to-copy. */}
       <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
-        <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
-          {canGoBack && !readOnly && (
-            <MenuRoot>
-              <Tooltip
-                content={
-                  <HStack gap={1}>
-                    <Text>
-                      {backStackDepth > 1
-                        ? `Back (${backStackDepth} traces). Right-click for full history`
-                        : "Back to previous trace"}
-                    </Text>
-                    <Kbd>B</Kbd>
-                  </HStack>
-                }
-                positioning={{ placement: "bottom" }}
-              >
-                <TriggerAnchor>
-                  <MenuContextTrigger asChild>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={goBack}
-                      aria-label="Back to previous trace"
-                      flexShrink={0}
-                    >
-                      <Icon as={LuArrowLeft} boxSize={3.5} />
-                    </Button>
-                  </MenuContextTrigger>
-                </TriggerAnchor>
-              </Tooltip>
-              <MenuContent minWidth="240px">
-                {/* Most-recent first so the visual order matches the
-                    direction of "back" — top of menu = one step back. */}
-                {backStack
-                  .map((entry, idx) => ({ entry, idx }))
-                  .reverse()
-                  .map(({ entry, idx }) => {
-                    const stepsBack = backStack.length - idx;
-                    return (
-                      <MenuItem
-                        key={`${entry.traceId}:${idx}`}
-                        value={`${idx}`}
-                        onClick={() => goBackTo(idx)}
-                      >
-                        <Text textStyle="xs" color="fg.muted" minWidth="16px">
-                          {stepsBack === 1 ? "←" : `${stepsBack}↑`}
-                        </Text>
-                        <Text textStyle="xs" flex={1} truncate>
-                          {entry.traceId.slice(0, 16)}
-                          <Text as="span" textStyle="2xs" color="fg.subtle" marginLeft={2}>
-                            {entry.viewMode}
-                          </Text>
-                        </Text>
-                      </MenuItem>
-                    );
-                  })}
-              </MenuContent>
-            </MenuRoot>
-          )}
-          <TraceIdChip traceId={trace.traceId} />
-          {readOnly || !project ? (
-            // Renaming is a mutation; a share viewer has no session to make it,
-            // and without a resolved project there is no tenant to make it in.
-            <Text
-              fontSize="sm"
-              fontWeight="600"
-              color={titleIsFallback ? "fg.muted" : "fg"}
-              lineClamp={1}
-            >
-              {titleText}
-            </Text>
-          ) : (
-            <EditableTraceName
-              projectId={project.id}
-              traceId={trace.traceId}
-              titleText={titleText}
-              titleIsFallback={titleIsFallback}
-            />
-          )}
-          <StatusChip trace={trace} statusColor={statusColor} />
-          <SyntheticTraceBadge attributes={trace.attributes} />
-        </HStack>
+        <HeaderIdentity
+          backStack={backStack}
+          backStackDepth={backStackDepth}
+          canGoBack={canGoBack}
+          goBack={goBack}
+          goBackTo={goBackTo}
+          project={project}
+          readOnly={readOnly}
+          statusColor={statusColor}
+          titleIsFallback={titleIsFallback}
+          titleText={titleText}
+          trace={trace}
+        />
 
         {/* Negative margins cancel the header padding so the close button sits flush with the
             drawer edge, matching the other drawers' absolutely-positioned DrawerCloseTrigger. */}
@@ -871,230 +615,48 @@ export const DrawerHeader = memo(function DrawerHeader({
             unmounted, not hidden — `display:none` would still run the menu's
             queries. */}
         {!readOnly && (
-          <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
-            {canShare && (
-              <Tooltip content="Share" positioning={{ placement: "bottom" }}>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => setShareOpen(true)}
-                  aria-label="Share trace"
-                >
-                  <Icon as={LuShare2} boxSize={3.5} />
-                </Button>
-              </Tooltip>
-            )}
-            <Tooltip
-              content={
-                <HStack gap={1}>
-                  <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
-                  <Kbd>R</Kbd>
-                </HStack>
-              }
-              positioning={{ placement: "bottom" }}
-            >
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => void handleRefresh()}
-                disabled={isRefreshing}
-                aria-label="Refresh trace"
-                css={
-                  isRefreshing
-                    ? {
-                        "& svg": {
-                          animation: "tracesV2DrawerRefreshSpin 0.9s linear infinite",
-                        },
-                        "@keyframes tracesV2DrawerRefreshSpin": {
-                          from: { transform: "rotate(0deg)" },
-                          to: { transform: "rotate(360deg)" },
-                        },
-                      }
-                    : undefined
-                }
-              >
-                <Icon as={LuRefreshCw} boxSize={3.5} />
-              </Button>
-            </Tooltip>
-            <Tooltip
-              content={
-                <HStack gap={1}>
-                  <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
-                  <Kbd>M</Kbd>
-                </HStack>
-              }
-              positioning={{ placement: "bottom" }}
-            >
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={handleMaximizeClick}
-                aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
-              >
-                <Icon as={isMaximized ? LuMinimize2 : LuMaximize2} boxSize={3.5} />
-              </Button>
-            </Tooltip>
-            <TraceOverflowMenu
-              traceId={trace.traceId}
-              conversationId={trace.conversationId}
-              onCopyTraceId={handleCopyTraceId}
-              onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
-              dejaViewHref={dejaView.href ?? null}
-              onOpenRawJson={() => setRawOpen(true)}
-              onShowShortcuts={() => setShortcutsOpen(true)}
-              onAddToAnnotationQueue={handleAddToAnnotationQueue}
-              pinned={pinned}
-              onTogglePinned={togglePinned}
-              readOnly={readOnly}
-            />
-            <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
-            <Tooltip
-              content={
-                <HStack gap={1}>
-                  <Text>Close</Text>
-                  <Kbd>Esc</Kbd>
-                </HStack>
-              }
-              positioning={{ placement: "bottom" }}
-            >
-              {/* Plain ghost Button — the standard Chakra `CloseButton`
-                (IconButton wrapper) intermittently swallowed the click
-                under our Drawer.Root setup: the URL stripped fine but
-                the drawer didn't unmount, leaving the operator stuck.
-                A bare Button calling `onClose` directly is the same
-                pattern this drawer used pre-revamp and behaves
-                reliably across Chakra's Drawer focus management. */}
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={onClose}
-                aria-label="Close drawer"
-                paddingX={1.5}
-                paddingY={1.5}
-                height="auto"
-                minWidth="auto"
-                color="fg.muted"
-                _hover={{ bg: "bg.muted", color: "fg" }}
-                _active={{ bg: "bg.emphasized" }}
-              >
-                <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
-              </Button>
-            </Tooltip>
-          </HStack>
+          <HeaderActions
+            canShare={canShare}
+            dejaViewHref={dejaView.href ?? null}
+            isMaximized={isMaximized}
+            isRefreshing={isRefreshing}
+            onAddToAnnotationQueue={handleAddToAnnotationQueue}
+            onClose={onClose}
+            onCopyTraceId={handleCopyTraceId}
+            onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
+            onMaximizeClick={handleMaximizeClick}
+            onOpenRawJson={() => setRawOpen(true)}
+            onRefresh={handleRefresh}
+            onShare={() => setShareOpen(true)}
+            onShowShortcuts={() => setShortcutsOpen(true)}
+            onTogglePinned={togglePinned}
+            pinned={pinned}
+            readOnly={readOnly}
+            trace={trace}
+          />
         )}
       </HStack>
 
       {/* Row 2: performance metrics, pinned context, and source/tools chips flow into one wrapped
           strip so a single row of pills doesn't carry a permanent empty band underneath. */}
-      <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
-        {/* Section 1: Performance metrics */}
-        <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
-        {trace.spanCount > 0 && (
-          <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />
-        )}
-        {trace.ttft != null && (
-          <Tooltip
-            content={`Time to First Token: ${formatDuration(trace.ttft)}`}
-            positioning={{ placement: "top" }}
-          >
-            <Box>
-              <MetricPill label="TTFT" value={formatDuration(trace.ttft)} />
-            </Box>
-          </Tooltip>
-        )}
-        {grandCost > 0 && (
-          <Tooltip
-            content={
-              <CostBreakdownTooltipContent
-                isBundled={isBundledCost}
-                billedCost={billedCost}
-                nonBilledCost={nonBilledCost}
-                grandCost={grandCost}
-                tokensEstimated={trace.tokensEstimated}
-                estimatedNote={trace.tokensEstimated && !hasAuthoritativeTokens}
-              />
-            }
-            positioning={{ placement: "top" }}
-          >
-            <Box>
-              {isBundledCost ? (
-                <MetricPill label="Cost" value="Bundled" tone="purple" />
-              ) : (
-                <MetricPill label="Cost" value={formatCost(billedCost)} />
-              )}
-            </Box>
-          </Tooltip>
-        )}
-        {contextSizeTokens != null && contextSizeTokens > 0 && (
-          <Tooltip
-            content="Context carried into this trace's first model call."
-            positioning={{ placement: "top" }}
-          >
-            <Box>
-              <MetricPill label="Context size" value={formatTokens(contextSizeTokens)} />
-            </Box>
-          </Tooltip>
-        )}
-        {trace.totalTokens > 0 && (
-          <Tooltip
-            content={
-              <TokenBreakdownTooltipContent
-                inputTokens={trace.inputTokens}
-                outputTokens={trace.outputTokens}
-                cacheReadTokens={cacheReadTokens}
-                cacheCreationTokens={cacheCreationTokens}
-                cacheCreation5mTokens={cacheCreation5mTokens}
-                cacheCreation1hTokens={cacheCreation1hTokens}
-                reasoningTokens={reasoningTokens}
-                totalWithCache={totalTokensWithCache}
-                estimated={trace.tokensEstimated && !hasAuthoritativeTokens}
-              />
-            }
-            positioning={{ placement: "top" }}
-          >
-            <Box>
-              <MetricPill
-                label="Tokens"
-                value={
-                  trace.inputTokens != null && trace.outputTokens != null
-                    ? `${formatTokens(trace.inputTokens)} in · ${formatTokens(trace.outputTokens)} out`
-                    : trace.totalTokens.toLocaleString()
-                }
-              />
-            </Box>
-          </Tooltip>
-        )}
-        {reasoningTokens != null && reasoningTokens > 0 && (
-          <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />
-        )}
-        {trace.models.length > 0 &&
-          (trace.models.length > 1 ? (
-            // Folded +N (matches the table's model chip) — the count lives
-            // inside the pill value rather than as a separate badge; the
-            // full model list is one hover away via the tooltip.
-            <ModelsTooltip models={trace.models}>
-              <Box display="inline-flex">
-                <MetricPill
-                  label="Models"
-                  value={`${trace.models[0]!}  +${trace.models.length - 1}`}
-                />
-              </Box>
-            </ModelsTooltip>
-          ) : (
-            <MetricPill label="Model" value={trace.models[0]!} />
-          ))}
-        {reasoningEffort && <MetricPill label="Reasoning effort" value={reasoningEffort} />}
-
-        {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
-            prompts, annotations). Capped at 6 inline; surplus rolls into
-            the standard "+N more" popover. No PinDivider before this
-            section — the chip borders give enough visual grouping on
-            their own, the extra rule just read as a stray line. */}
-        {primaryChips.map((c) => (
-          <Chip key={c.id} {...c} />
-        ))}
-        {chipsOverflow}
-      </HStack>
+      <HeaderMetricsRow
+        billedCost={billedCost}
+        cacheCreation1hTokens={cacheCreation1hTokens}
+        cacheCreation5mTokens={cacheCreation5mTokens}
+        cacheCreationTokens={cacheCreationTokens}
+        cacheReadTokens={cacheReadTokens}
+        chipsOverflow={chipsOverflow}
+        contextSizeTokens={contextSizeTokens}
+        grandCost={grandCost}
+        hasAuthoritativeTokens={hasAuthoritativeTokens}
+        isBundledCost={isBundledCost}
+        nonBilledCost={nonBilledCost}
+        primaryChips={primaryChips}
+        reasoningEffort={reasoningEffort}
+        reasoningTokens={reasoningTokens}
+        totalTokensWithCache={totalTokensWithCache}
+        trace={trace}
+      />
 
       {/* Pin strip only renders when there's something to show — many traces have no auto-pins,
           and a small height jump between trace-with-pins and trace-without beats dead chrome. */}
@@ -1108,93 +670,880 @@ export const DrawerHeader = memo(function DrawerHeader({
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
           timestamp tuck into the right corner of the same row, so they
           aren't claiming a slot in the chip strip above. */}
-      <Box marginX={-4}>
-        <ModeSwitch
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          hasConversation={!!trace.conversationId}
-          // Conversation mode needs a session (tracesV2.list + annotation
-          // reads), so share viewers don't get the tab at all. See ADR-057.
-          isConversationHidden={readOnly}
-          // `useConversationContext` returns `isLoading: true` while the
-          // turns are in flight; combined with `turns.length === 0` it
-          // means the conversation hasn't resolved yet. We only want the
-          // "loading" gate when a conversationId is declared — otherwise
-          // the tab is permanently disabled with a different reason.
-          isConversationLoading={
-            !!trace.conversationId &&
-            conversationContext.isLoading &&
-            conversationContext.turns.length === 0
-          }
-          traceId={trace.traceId}
-          // Usage/Terminal ride the session-backed tracesV2 reads, which are
-          // protected — share viewers don't get those tabs either.
-          showTerminal={
-            !readOnly &&
-            isTerminalOrigin({
-              serviceName: trace.serviceName,
-              origin: trace.origin,
-            })
-          }
-          isEditing={isEditing}
-          endSlot={
-            <HStack gap={2}>
-              {/* Switching between the corrected and the captured trace, and
-                  the full difference between them. Renders nothing until the
-                  trace actually has a correction. */}
-              {!readOnly && <EditedOriginalToggle />}
-              {/* Presence avatars sit at the trailing edge of the mode-tab
-                  row — out of the way of the title and not crowding the
-                  action cluster. Copy trace ID lives in the overflow
-                  menu / `Y` shortcut, so the inline chip is gone. */}
-              <TracePresenceAvatars traceId={trace.traceId} max={5} size="2xs" />
-              <Tooltip
-                content={
-                  <VStack align="start" gap={0.5}>
-                    <Text textStyle="xs">
-                      First span recorded {formatRelativeTimeAgo(trace.timestamp)}
-                    </Text>
-                    <Text textStyle="xs" color="fg.muted">
-                      {formatAbsoluteTime(trace.timestamp)}
-                    </Text>
-                  </VStack>
-                }
-                positioning={{ placement: "bottom-end" }}
-                openDelay={400}
-                closeDelay={150}
-                interactive
-              >
-                <Text textStyle="xs" color="fg.subtle" cursor="help">
-                  {/* Compact "16d ago" — keeps the unit attached to the
-                      number for tight surfaces while still carrying the
-                      natural-language "ago" hint. The tooltip resolves
-                      the absolute UTC timestamp and is interactive so
-                      the user can hover over it and select / copy the
-                      date without it disappearing. */}
-                  {formatRelativeTimeAgo(trace.timestamp)}
-                </Text>
-              </Tooltip>
-            </HStack>
-          }
-        />
-      </Box>
+      <HeaderModeSwitch
+        conversationContext={conversationContext}
+        isEditing={isEditing}
+        onViewModeChange={setViewMode}
+        readOnly={readOnly}
+        trace={trace}
+        viewMode={viewMode}
+      />
       <RawJsonDialog open={rawOpen} onClose={() => setRawOpen(false)} trace={trace} />
       {!readOnly && (
-        <>
-          <ShareTraceDialog
-            open={shareOpen}
-            onClose={() => setShareOpen(false)}
-            projectId={project?.id}
-            traceId={trace.traceId}
-          />
-          <AddToAnnotationQueueDialog
-            open={annotationQueueOpen}
-            onClose={() => setAnnotationQueueOpen(false)}
-            traceIds={[trace.traceId]}
-          />
-          <PersonalFeatureGateDialog state={annotationGate.dialogState} />
-        </>
+        <SessionOnlyDialogs
+          annotationGate={annotationGate}
+          annotationQueueOpen={annotationQueueOpen}
+          onCloseAnnotationQueue={() => setAnnotationQueueOpen(false)}
+          onCloseShare={() => setShareOpen(false)}
+          projectId={project?.id}
+          shareOpen={shareOpen}
+          traceId={trace.traceId}
+        />
       )}
     </VStack>
   );
 });
+
+/**
+ * Cache and reasoning totals are summed across the trace's spans by the fold and
+ * parked on reserved keys (the raw per-span `gen_ai.usage.cache_*` values never
+ * reach the trace attribute map), so the reserved sums are read first and the raw
+ * keys are the fallback for traces folded before the sum landed.
+ */
+function readTokenUsage(attributes: TraceHeader["attributes"]): {
+  cacheCreation1hTokens: number | null;
+  cacheCreation5mTokens: number | null;
+  cacheCreationTokens: number | null;
+  cacheReadTokens: number | null;
+  contextSizeTokens: number | null;
+  reasoningEffort: string | null;
+  reasoningTokens: number | null;
+} {
+  return {
+    // Anthropic's cache-write TTL split (5m writes bill 1.25x base input, 1h
+    // writes 2x), summed by the fold off the response bodies. Absent for every
+    // other provider and for sessions without raw body telemetry.
+    cacheCreation1hTokens: readNumberAttribute(
+      attributes,
+      "langwatch.reserved.cache_creation_1h_tokens",
+    ),
+    cacheCreation5mTokens: readNumberAttribute(
+      attributes,
+      "langwatch.reserved.cache_creation_5m_tokens",
+    ),
+    cacheCreationTokens: readNumberAttribute(
+      attributes,
+      "langwatch.reserved.cache_creation_tokens",
+      "gen_ai.usage.cache_creation.input_tokens",
+    ),
+    cacheReadTokens: readNumberAttribute(
+      attributes,
+      "langwatch.reserved.cache_read_tokens",
+      "gen_ai.usage.cache_read.input_tokens",
+      "gen_ai.usage.cached_tokens",
+    ),
+    // How full the window already was when this trace's first model call ran.
+    // Read before Tokens because the sums only mean something once you know
+    // what they started from.
+    contextSizeTokens: readNumberAttribute(attributes, "langwatch.reserved.context_size_tokens"),
+    // The reasoning EFFORT request setting (low/medium/high/…), distinct from
+    // the reasoning TOKEN count: it is a per-request model setting.
+    reasoningEffort: attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null,
+    reasoningTokens: readNumberAttribute(
+      attributes,
+      "langwatch.reserved.reasoning_tokens",
+      "gen_ai.usage.reasoning_tokens",
+    ),
+  };
+}
+
+/**
+ * The `\` shortcut for the raw-JSON dialog. Lives beside the dialog's own local
+ * open state rather than in the shell, so neither has to be lifted for the sake
+ * of one shortcut.
+ */
+function listenForRawJsonShortcut(setRawOpen: (update: (open: boolean) => boolean) => void) {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key !== "\\") return;
+    e.preventDefault();
+    setRawOpen((v) => !v);
+  };
+  document.addEventListener("keydown", handleKeyDown);
+  return () => document.removeEventListener("keydown", handleKeyDown);
+}
+
+/**
+ * A query built from the highest-signal axes this trace has. Service and status
+ * are usually present; the root span name is a strong cluster signal. Bare
+ * strings are quoted to keep liqe happy with spaces and dashes.
+ */
+function buildFindSimilarQuery(trace: TraceHeader): string {
+  const parts: string[] = [];
+  if (trace.serviceName) parts.push(`service:"${trace.serviceName}"`);
+  if (trace.status === "error") parts.push("status:error");
+  if (trace.traceName) {
+    const escaped = trace.traceName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    parts.push(`"${escaped}"`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Title fallback chain: the explicit traceName attribute, then the root span
+ * name (the server populates `trace.name` from it), then the trace id prefix.
+ */
+function resolveHeaderTitle(trace: TraceHeader): {
+  titleText: string;
+  titleIsFallback: boolean;
+} {
+  const explicit = trace.traceName?.trim();
+  if (explicit) return { titleText: explicit, titleIsFallback: false };
+  const spanName = trace.name?.trim();
+  if (spanName && spanName !== trace.traceId && !trace.traceId.startsWith(spanName)) {
+    return { titleText: spanName, titleIsFallback: false };
+  }
+  return { titleText: trace.traceId.slice(0, 12), titleIsFallback: true };
+}
+
+interface PinBuildContext {
+  applyQueryTextFromPin: (query: string) => void;
+  closeDrawer: () => void;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  pins: ReturnType<typeof usePinnedAttributes>["pins"];
+  resourceAttributes: ReturnType<typeof useTraceResources>["resourceAttributes"];
+  selectSpan: ReturnType<typeof useDrawerStore.getState>["selectSpan"];
+  setViewMode: ReturnType<typeof useDrawerStore.getState>["setViewMode"];
+  toggleFacet: ReturnType<typeof useFilterStore.getState>["toggleFacet"];
+  trace: TraceHeader;
+}
+
+type PinNavigation = { onNavigate: () => void; navigateLabel: string } | undefined;
+
+/**
+ * Where a pin's key can take the reader. Centralised so a user pin on the same
+ * key (someone manually pinning `scenario.run_id`, say) picks up the same
+ * affordance for free.
+ */
+function pinNavigation({
+  ctx,
+  key,
+  value,
+}: {
+  ctx: PinBuildContext;
+  key: string;
+  value: string;
+}): PinNavigation {
+  if (key === "gen_ai.conversation.id" || key === "langwatch.thread_id") {
+    return {
+      navigateLabel: "Open conversation",
+      onNavigate: () => ctx.setViewMode("conversation"),
+    };
+  }
+  if (key === "scenario.run_id") {
+    return {
+      navigateLabel: "Open scenario run",
+      onNavigate: () =>
+        ctx.openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId: value } }),
+    };
+  }
+  if (!PROMPT_PIN_KEYS.has(key)) return undefined;
+  // Prompts is no longer a separate tab — SpanDetailPane auto-renders the
+  // PromptsPanel when the selected span has prompt data, so selecting the span
+  // that carried the prompt is all this does, and the panel adapts.
+  return {
+    navigateLabel: "Open prompt",
+    onNavigate: () => {
+      const spanId =
+        key === "langwatch.prompt.selected"
+          ? ctx.trace.selectedPromptSpanId
+          : ctx.trace.lastUsedPromptSpanId;
+      if (spanId) ctx.selectSpan(spanId);
+    },
+  };
+}
+
+const PROMPT_PIN_KEYS = new Set([
+  "langwatch.prompt.selected",
+  "langwatch.prompt.last_used",
+  "langwatch.prompt.version",
+]);
+
+/** Filtering the trace table by a pin's own field, once the reader is free to leave. */
+function pinFacetFilter({
+  ctx,
+  field,
+  value,
+}: {
+  ctx: PinBuildContext;
+  field: string;
+  value: string;
+}): () => void {
+  return () =>
+    guardTraceEditExit(() => {
+      ctx.toggleFacet(field, value);
+      ctx.closeDrawer();
+    });
+}
+
+/** The hoisted auto-pins this trace carries a value for. */
+function hoistedAutoPins(ctx: PinBuildContext, userKeys: Set<string>): CategorizedPin[] {
+  const out: CategorizedPin[] = [];
+  for (const def of HOISTED_AUTO_PINS) {
+    // The rich `Scenario run` chip (built from `useScenarioChipData` in
+    // `TraceHeaderChips`) already surfaces the scenario run id with status,
+    // criteria and click-to-open behaviour.
+    const scenarioChipShowsIt =
+      def.key === "scenario.run_id" &&
+      !!(ctx.trace.scenarioRunId ?? ctx.trace.attributes["scenario.run_id"]);
+    if (scenarioChipShowsIt) continue;
+    if (userKeys.has(`attribute:${def.key}`)) continue;
+    const resolved = def.resolve ? def.resolve(ctx.trace) : ctx.trace.attributes[def.key];
+    const value = formatPinValue({ key: def.key, value: resolved ?? null });
+    if (!value) continue;
+    const filterField = FILTERABLE_PIN_FIELDS[def.key];
+    const navigate = pinNavigation({ ctx, key: def.key, value });
+    out.push({
+      pin: { source: "attribute", key: def.key, label: def.label },
+      value,
+      auto: true,
+      category: def.category,
+      onFilter: filterField ? pinFacetFilter({ ctx, field: filterField, value }) : undefined,
+      onNavigate: navigate?.onNavigate,
+      navigateLabel: navigate?.navigateLabel,
+    });
+  }
+  return out;
+}
+
+/**
+ * `metadata.*` attribute keys promoted onto the strip. The label drops the
+ * prefix, which is redundant inside the per-trace context, and the filter icon
+ * scopes the table to traces sharing the key and value.
+ */
+function metadataAutoPins(ctx: PinBuildContext, userKeys: Set<string>): CategorizedPin[] {
+  const out: CategorizedPin[] = [];
+  const seenMetadataKeys = new Set<string>();
+  for (const [key, rawValue] of Object.entries(ctx.trace.attributes)) {
+    if (!key.startsWith("metadata.")) continue;
+    if (userKeys.has(`attribute:${key}`)) continue;
+    if (AUTO_PIN_SUPPRESSED_METADATA_KEYS.has(key)) continue;
+    if (seenMetadataKeys.has(key)) continue;
+    seenMetadataKeys.add(key);
+    const value = formatPinValue({ key, value: rawValue ?? null });
+    if (!value) continue;
+    const filterQuery = formatMetadataFilterQuery({ key, value });
+    out.push({
+      pin: { source: "attribute", key, label: key.slice("metadata.".length) },
+      value,
+      auto: true,
+      category: "custom",
+      onFilter: filterQuery
+        ? () =>
+            guardTraceEditExit(() => {
+              ctx.applyQueryTextFromPin(filterQuery);
+              ctx.closeDrawer();
+            })
+        : undefined,
+    });
+  }
+  return out;
+}
+
+/** The reader's own pins, resolved against the trace or its resource attributes. */
+function userPins(ctx: PinBuildContext): CategorizedPin[] {
+  return ctx.pins.map((p) => {
+    const valueSource = p.source === "resource" ? ctx.resourceAttributes : ctx.trace.attributes;
+    const value = formatPinValue({ key: p.key, value: resolveAttributeValue(valueSource, p.key) });
+    const filterField = FILTERABLE_PIN_FIELDS[p.key];
+    const navigate = value ? pinNavigation({ ctx, key: p.key, value }) : undefined;
+    return {
+      pin: p,
+      value,
+      auto: false,
+      category: "custom" as PinCategory,
+      onFilter:
+        filterField && value ? pinFacetFilter({ ctx, field: filterField, value }) : undefined,
+      onNavigate: navigate?.onNavigate,
+      navigateLabel: navigate?.navigateLabel,
+    };
+  });
+}
+
+/**
+ * Auto and user pins resolved into one array with category buckets, so the strip
+ * can group them with subtle dividers between identity / run / tag / custom. An
+ * auto-pin is skipped when the reader already pinned the same key explicitly, so
+ * the same row never shows twice.
+ */
+function categorizePins(ctx: PinBuildContext): CategorizedPin[] {
+  const userKeys = new Set(ctx.pins.map((p) => `${p.source}:${p.key}`));
+  return [...hoistedAutoPins(ctx, userKeys), ...metadataAutoPins(ctx, userKeys), ...userPins(ctx)];
+}
+
+/**
+ * The back button, with the whole navigation stack behind a right-click. Most
+ * recent first, so the menu's order matches the direction of "back".
+ */
+function BackNavigationMenu({
+  backStack,
+  backStackDepth,
+  goBack,
+  goBackTo,
+}: {
+  backStack: ReturnType<typeof useTraceDrawerNavigation>["backStack"];
+  backStackDepth: number;
+  goBack: () => void;
+  goBackTo: (index: number) => void;
+}) {
+  return (
+    <MenuRoot>
+      <Tooltip
+        content={
+          <HStack gap={1}>
+            <Text>
+              {backStackDepth > 1
+                ? `Back (${backStackDepth} traces). Right-click for full history`
+                : "Back to previous trace"}
+            </Text>
+            <Kbd>B</Kbd>
+          </HStack>
+        }
+        positioning={{ placement: "bottom" }}
+      >
+        <TriggerAnchor>
+          <MenuContextTrigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={goBack}
+              aria-label="Back to previous trace"
+              flexShrink={0}
+            >
+              <Icon as={LuArrowLeft} boxSize={3.5} />
+            </Button>
+          </MenuContextTrigger>
+        </TriggerAnchor>
+      </Tooltip>
+      <MenuContent minWidth="240px">
+        {/* Most-recent first so the visual order matches the
+            direction of "back" — top of menu = one step back. */}
+        {backStack
+          .map((entry, idx) => ({ entry, idx }))
+          .reverse()
+          .map(({ entry, idx }) => {
+            const stepsBack = backStack.length - idx;
+            return (
+              <MenuItem
+                key={`${entry.traceId}:${idx}`}
+                value={`${idx}`}
+                onClick={() => goBackTo(idx)}
+              >
+                <Text textStyle="xs" color="fg.muted" minWidth="16px">
+                  {stepsBack === 1 ? "←" : `${stepsBack}↑`}
+                </Text>
+                <Text textStyle="xs" flex={1} truncate>
+                  {entry.traceId.slice(0, 16)}
+                  <Text as="span" textStyle="2xs" color="fg.subtle" marginLeft={2}>
+                    {entry.viewMode}
+                  </Text>
+                </Text>
+              </MenuItem>
+            );
+          })}
+      </MenuContent>
+    </MenuRoot>
+  );
+}
+
+/**
+ * The drawer's own chrome: share, refresh, maximize, the overflow menu, and
+ * close. Every one of these needs a session, so the cluster is unmounted rather
+ * than hidden for a share viewer — `display:none` would still run the overflow
+ * menu's queries.
+ */
+function HeaderActions({
+  canShare,
+  dejaViewHref,
+  isMaximized,
+  isRefreshing,
+  onAddToAnnotationQueue,
+  onClose,
+  onCopyTraceId,
+  onFindSimilar,
+  onMaximizeClick,
+  onOpenRawJson,
+  onRefresh,
+  onShare,
+  onShowShortcuts,
+  onTogglePinned,
+  pinned,
+  readOnly,
+  trace,
+}: {
+  canShare: boolean;
+  dejaViewHref: string | null;
+  isMaximized: boolean;
+  isRefreshing: boolean;
+  onAddToAnnotationQueue: () => void;
+  onClose: () => void;
+  onCopyTraceId: () => void;
+  onFindSimilar: (() => void) | null;
+  onMaximizeClick: () => void;
+  onOpenRawJson: () => void;
+  onRefresh: () => Promise<void> | void;
+  onShare: () => void;
+  onShowShortcuts: () => void;
+  onTogglePinned: () => void;
+  pinned: boolean;
+  readOnly: boolean;
+  trace: TraceHeader;
+}) {
+  return (
+    <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
+      {canShare && (
+        <Tooltip content="Share" positioning={{ placement: "bottom" }}>
+          <Button size="xs" variant="ghost" onClick={onShare} aria-label="Share trace">
+            <Icon as={LuShare2} boxSize={3.5} />
+          </Button>
+        </Tooltip>
+      )}
+      <Tooltip
+        content={
+          <HStack gap={1}>
+            <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
+            <Kbd>R</Kbd>
+          </HStack>
+        }
+        positioning={{ placement: "bottom" }}
+      >
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => void onRefresh()}
+          disabled={isRefreshing}
+          aria-label="Refresh trace"
+          css={
+            isRefreshing
+              ? {
+                  "& svg": {
+                    animation: "tracesV2DrawerRefreshSpin 0.9s linear infinite",
+                  },
+                  "@keyframes tracesV2DrawerRefreshSpin": {
+                    from: { transform: "rotate(0deg)" },
+                    to: { transform: "rotate(360deg)" },
+                  },
+                }
+              : undefined
+          }
+        >
+          <Icon as={LuRefreshCw} boxSize={3.5} />
+        </Button>
+      </Tooltip>
+      <Tooltip
+        content={
+          <HStack gap={1}>
+            <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
+            <Kbd>M</Kbd>
+          </HStack>
+        }
+        positioning={{ placement: "bottom" }}
+      >
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={onMaximizeClick}
+          aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+        >
+          <Icon as={isMaximized ? LuMinimize2 : LuMaximize2} boxSize={3.5} />
+        </Button>
+      </Tooltip>
+      <TraceOverflowMenu
+        traceId={trace.traceId}
+        conversationId={trace.conversationId}
+        onCopyTraceId={onCopyTraceId}
+        onFindSimilar={onFindSimilar}
+        dejaViewHref={dejaViewHref}
+        onOpenRawJson={onOpenRawJson}
+        onShowShortcuts={onShowShortcuts}
+        onAddToAnnotationQueue={onAddToAnnotationQueue}
+        pinned={pinned}
+        onTogglePinned={onTogglePinned}
+        readOnly={readOnly}
+      />
+      <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
+      <Tooltip
+        content={
+          <HStack gap={1}>
+            <Text>Close</Text>
+            <Kbd>Esc</Kbd>
+          </HStack>
+        }
+        positioning={{ placement: "bottom" }}
+      >
+        {/* Plain ghost Button — the standard Chakra `CloseButton`
+          (IconButton wrapper) intermittently swallowed the click
+          under our Drawer.Root setup: the URL stripped fine but
+          the drawer didn't unmount, leaving the operator stuck.
+          A bare Button calling `onClose` directly is the same
+          pattern this drawer used pre-revamp and behaves
+          reliably across Chakra's Drawer focus management. */}
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={onClose}
+          aria-label="Close drawer"
+          paddingX={1.5}
+          paddingY={1.5}
+          height="auto"
+          minWidth="auto"
+          color="fg.muted"
+          _hover={{ bg: "bg.muted", color: "fg" }}
+          _active={{ bg: "bg.emphasized" }}
+        >
+          <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
+        </Button>
+      </Tooltip>
+    </HStack>
+  );
+}
+
+/**
+ * Performance metrics, pinned context and the source/tools chips in one wrapped
+ * strip, so a single row of pills doesn't carry a permanent empty band beneath.
+ */
+function HeaderMetricsRow({
+  billedCost,
+  cacheCreation1hTokens,
+  cacheCreation5mTokens,
+  cacheCreationTokens,
+  cacheReadTokens,
+  chipsOverflow,
+  contextSizeTokens,
+  grandCost,
+  hasAuthoritativeTokens,
+  isBundledCost,
+  nonBilledCost,
+  primaryChips,
+  reasoningEffort,
+  reasoningTokens,
+  totalTokensWithCache,
+  trace,
+}: {
+  billedCost: number;
+  cacheCreation1hTokens: number | null;
+  cacheCreation5mTokens: number | null;
+  cacheCreationTokens: number | null;
+  cacheReadTokens: number | null;
+  chipsOverflow: ReturnType<typeof splitChipsForOverflow>["overflowChip"];
+  contextSizeTokens: number | null;
+  grandCost: number;
+  hasAuthoritativeTokens: boolean;
+  isBundledCost: boolean;
+  nonBilledCost: number;
+  primaryChips: ReturnType<typeof splitChipsForOverflow>["primary"];
+  reasoningEffort: string | null;
+  reasoningTokens: number | null;
+  totalTokensWithCache: number;
+  trace: TraceHeader;
+}) {
+  return (
+    <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
+      {/* Section 1: Performance metrics */}
+      <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
+      {trace.spanCount > 0 && <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />}
+      {trace.ttft != null && (
+        <Tooltip
+          content={`Time to First Token: ${formatDuration(trace.ttft)}`}
+          positioning={{ placement: "top" }}
+        >
+          <Box>
+            <MetricPill label="TTFT" value={formatDuration(trace.ttft)} />
+          </Box>
+        </Tooltip>
+      )}
+      {grandCost > 0 && (
+        <Tooltip
+          content={
+            <CostBreakdownTooltipContent
+              isBundled={isBundledCost}
+              billedCost={billedCost}
+              nonBilledCost={nonBilledCost}
+              grandCost={grandCost}
+              tokensEstimated={trace.tokensEstimated}
+              estimatedNote={trace.tokensEstimated && !hasAuthoritativeTokens}
+            />
+          }
+          positioning={{ placement: "top" }}
+        >
+          <Box>
+            {isBundledCost ? (
+              <MetricPill label="Cost" value="Bundled" tone="purple" />
+            ) : (
+              <MetricPill label="Cost" value={formatCost(billedCost)} />
+            )}
+          </Box>
+        </Tooltip>
+      )}
+      {contextSizeTokens != null && contextSizeTokens > 0 && (
+        <Tooltip
+          content="Context carried into this trace's first model call."
+          positioning={{ placement: "top" }}
+        >
+          <Box>
+            <MetricPill label="Context size" value={formatTokens(contextSizeTokens)} />
+          </Box>
+        </Tooltip>
+      )}
+      {trace.totalTokens > 0 && (
+        <Tooltip
+          content={
+            <TokenBreakdownTooltipContent
+              inputTokens={trace.inputTokens}
+              outputTokens={trace.outputTokens}
+              cacheReadTokens={cacheReadTokens}
+              cacheCreationTokens={cacheCreationTokens}
+              cacheCreation5mTokens={cacheCreation5mTokens}
+              cacheCreation1hTokens={cacheCreation1hTokens}
+              reasoningTokens={reasoningTokens}
+              totalWithCache={totalTokensWithCache}
+              estimated={trace.tokensEstimated && !hasAuthoritativeTokens}
+            />
+          }
+          positioning={{ placement: "top" }}
+        >
+          <Box>
+            <MetricPill
+              label="Tokens"
+              value={
+                trace.inputTokens != null && trace.outputTokens != null
+                  ? `${formatTokens(trace.inputTokens)} in · ${formatTokens(trace.outputTokens)} out`
+                  : trace.totalTokens.toLocaleString()
+              }
+            />
+          </Box>
+        </Tooltip>
+      )}
+      {reasoningTokens != null && reasoningTokens > 0 && (
+        <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />
+      )}
+      {trace.models.length > 0 &&
+        (trace.models.length > 1 ? (
+          // Folded +N (matches the table's model chip) — the count lives
+          // inside the pill value rather than as a separate badge; the
+          // full model list is one hover away via the tooltip.
+          <ModelsTooltip models={trace.models}>
+            <Box display="inline-flex">
+              <MetricPill
+                label="Models"
+                value={`${trace.models[0]!}  +${trace.models.length - 1}`}
+              />
+            </Box>
+          </ModelsTooltip>
+        ) : (
+          <MetricPill label="Model" value={trace.models[0]!} />
+        ))}
+      {reasoningEffort && <MetricPill label="Reasoning effort" value={reasoningEffort} />}
+
+      {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
+          prompts, annotations). Capped at 6 inline; surplus rolls into
+          the standard "+N more" popover. No PinDivider before this
+          section — the chip borders give enough visual grouping on
+          their own, the extra rule just read as a stray line. */}
+      {primaryChips.map((c) => (
+        <Chip key={c.id} {...c} />
+      ))}
+      {chipsOverflow}
+    </HStack>
+  );
+}
+
+/**
+ * Inline mode tabs — Trace / Conversation. The trace id and its relative
+ * timestamp tuck into the right corner of the same row, so they aren't claiming
+ * a slot in the chip strip above.
+ */
+function HeaderModeSwitch({
+  conversationContext,
+  isEditing,
+  onViewModeChange,
+  readOnly,
+  trace,
+  viewMode,
+}: {
+  conversationContext: ReturnType<typeof useConversationContext>;
+  isEditing: boolean;
+  onViewModeChange: ReturnType<typeof useDrawerStore.getState>["setViewMode"];
+  readOnly: boolean;
+  trace: TraceHeader;
+  viewMode: ReturnType<typeof useDrawerStore.getState>["viewMode"];
+}) {
+  return (
+    <Box marginX={-4}>
+      <ModeSwitch
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        hasConversation={!!trace.conversationId}
+        // Conversation mode needs a session (tracesV2.list + annotation
+        // reads), so share viewers don't get the tab at all. See ADR-057.
+        isConversationHidden={readOnly}
+        // `useConversationContext` returns `isLoading: true` while the
+        // turns are in flight; combined with `turns.length === 0` it
+        // means the conversation hasn't resolved yet. We only want the
+        // "loading" gate when a conversationId is declared — otherwise
+        // the tab is permanently disabled with a different reason.
+        isConversationLoading={
+          !!trace.conversationId &&
+          conversationContext.isLoading &&
+          conversationContext.turns.length === 0
+        }
+        traceId={trace.traceId}
+        // Usage/Terminal ride the session-backed tracesV2 reads, which are
+        // protected — share viewers don't get those tabs either.
+        showTerminal={
+          !readOnly &&
+          isTerminalOrigin({
+            serviceName: trace.serviceName,
+            origin: trace.origin,
+          })
+        }
+        isEditing={isEditing}
+        endSlot={
+          <HStack gap={2}>
+            {/* Switching between the corrected and the captured trace, and
+                the full difference between them. Renders nothing until the
+                trace actually has a correction. */}
+            {!readOnly && <EditedOriginalToggle />}
+            {/* Presence avatars sit at the trailing edge of the mode-tab
+                row — out of the way of the title and not crowding the
+                action cluster. Copy trace ID lives in the overflow
+                menu / `Y` shortcut, so the inline chip is gone. */}
+            <TracePresenceAvatars traceId={trace.traceId} max={5} size="2xs" />
+            <Tooltip
+              content={
+                <VStack align="start" gap={0.5}>
+                  <Text textStyle="xs">
+                    First span recorded {formatRelativeTimeAgo(trace.timestamp)}
+                  </Text>
+                  <Text textStyle="xs" color="fg.muted">
+                    {formatAbsoluteTime(trace.timestamp)}
+                  </Text>
+                </VStack>
+              }
+              positioning={{ placement: "bottom-end" }}
+              openDelay={400}
+              closeDelay={150}
+              interactive
+            >
+              <Text textStyle="xs" color="fg.subtle" cursor="help">
+                {/* Compact "16d ago" — keeps the unit attached to the
+                    number for tight surfaces while still carrying the
+                    natural-language "ago" hint. The tooltip resolves
+                    the absolute UTC timestamp and is interactive so
+                    the user can hover over it and select / copy the
+                    date without it disappearing. */}
+                {formatRelativeTimeAgo(trace.timestamp)}
+              </Text>
+            </Tooltip>
+          </HStack>
+        }
+      />
+    </Box>
+  );
+}
+
+/** The dialogs a share viewer has no session to open. */
+function SessionOnlyDialogs({
+  annotationGate,
+  annotationQueueOpen,
+  onCloseAnnotationQueue,
+  onCloseShare,
+  projectId,
+  shareOpen,
+  traceId,
+}: {
+  annotationGate: ReturnType<typeof usePersonalFeatureGate>;
+  annotationQueueOpen: boolean;
+  onCloseAnnotationQueue: () => void;
+  onCloseShare: () => void;
+  projectId: string | undefined;
+  shareOpen: boolean;
+  traceId: string;
+}) {
+  return (
+    <>
+      <ShareTraceDialog
+        open={shareOpen}
+        onClose={onCloseShare}
+        projectId={projectId}
+        traceId={traceId}
+      />
+      <AddToAnnotationQueueDialog
+        open={annotationQueueOpen}
+        onClose={onCloseAnnotationQueue}
+        traceIds={[traceId]}
+      />
+      <PersonalFeatureGateDialog state={annotationGate.dialogState} />
+    </>
+  );
+}
+
+/**
+ * The row's leading cluster: back navigation, the trace id chip, the title and
+ * the status. The chip leads the row and carries only the id, with
+ * hover-to-expand and click-to-copy.
+ */
+function HeaderIdentity({
+  backStack,
+  backStackDepth,
+  canGoBack,
+  goBack,
+  goBackTo,
+  project,
+  readOnly,
+  statusColor,
+  titleIsFallback,
+  titleText,
+  trace,
+}: {
+  backStack: ReturnType<typeof useTraceDrawerNavigation>["backStack"];
+  backStackDepth: number;
+  canGoBack: boolean;
+  goBack: () => void;
+  goBackTo: (index: number) => void;
+  project: ReturnType<typeof useOrganizationTeamProject>["project"];
+  readOnly: boolean;
+  statusColor: string;
+  titleIsFallback: boolean;
+  titleText: string;
+  trace: TraceHeader;
+}) {
+  return (
+    <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
+      {canGoBack && !readOnly && (
+        <BackNavigationMenu
+          backStack={backStack}
+          backStackDepth={backStackDepth}
+          goBack={goBack}
+          goBackTo={goBackTo}
+        />
+      )}
+      <TraceIdChip traceId={trace.traceId} />
+      {readOnly || !project ? (
+        // Renaming is a mutation; a share viewer has no session to make it,
+        // and without a resolved project there is no tenant to make it in.
+        <Text
+          fontSize="sm"
+          fontWeight="600"
+          color={titleIsFallback ? "fg.muted" : "fg"}
+          lineClamp={1}
+        >
+          {titleText}
+        </Text>
+      ) : (
+        <EditableTraceName
+          projectId={project.id}
+          traceId={trace.traceId}
+          titleText={titleText}
+          titleIsFallback={titleIsFallback}
+        />
+      )}
+      <StatusChip trace={trace} statusColor={statusColor} />
+      <SyntheticTraceBadge attributes={trace.attributes} />
+    </HStack>
+  );
+}

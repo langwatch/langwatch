@@ -28,9 +28,9 @@ export function invalidColumnNameKeys(columns: DatasetConfirmColumns): Set<strin
   }
   const invalid = new Set<string>();
   for (const column of columns) {
-    if (column.name.trim() === "" || (nameCounts.get(column.name) ?? 0) > 1) {
-      invalid.add(column.sourceHeader);
-    }
+    const isBlank = column.name.trim() === "";
+    const isDuplicate = (nameCounts.get(column.name) ?? 0) > 1;
+    if (isBlank || isDuplicate) invalid.add(column.sourceHeader);
   }
   return invalid;
 }
