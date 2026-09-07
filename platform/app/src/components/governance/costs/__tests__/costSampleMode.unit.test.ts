@@ -12,19 +12,28 @@ import { describe, expect, it } from "vitest";
 
 import {
   resolveRealDataState,
+  type SummaryForSampleDecision,
   sampleModeActive,
   settleRealDataState,
   summaryAsRead,
 } from "../costSampleMode";
 
-/** A headline summary in the wire shape, empty unless overridden. */
+/** A headline summary in the DTO's own shape, empty unless overridden. */
 function summary(
-  overrides: Partial<Parameters<typeof summaryAsRead>[0] & object> = {},
-) {
+  overrides: Partial<SummaryForSampleDecision> = {},
+): SummaryForSampleDecision {
   return {
     unavailableReason: null,
-    billed: { amountUsd: null, cellsWithoutAmount: 0 },
-    gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+    billed: {
+      amountUsd: null,
+      cellsWithoutAmount: 0,
+      currenciesWithoutUsdAmount: [],
+    },
+    gateway: {
+      amountUsd: null,
+      cellsWithoutAmount: 0,
+      currenciesWithoutUsdAmount: [],
+    },
     seats: { status: "awaiting_data" },
     ...overrides,
   };
@@ -48,7 +57,13 @@ describe("reading the headline summary as a real-data read", () => {
   describe("given a pulled bill and nothing else", () => {
     it("counts as real data — a real bill must keep the invented panels off", () => {
       const read = summaryAsRead(
-        summary({ billed: { amountUsd: 123.45, cellsWithoutAmount: 0 } }),
+        summary({
+          billed: {
+            amountUsd: 123.45,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+        }),
       );
       expect(resolveRealDataState([read])).toBe("present");
     });
@@ -57,7 +72,13 @@ describe("reading the headline summary as a real-data read", () => {
   describe("given a bill whose total is withheld for currency", () => {
     it("still counts as real data — withheld is not absent", () => {
       const read = summaryAsRead(
-        summary({ billed: { amountUsd: null, cellsWithoutAmount: 4 } }),
+        summary({
+          billed: {
+            amountUsd: null,
+            cellsWithoutAmount: 4,
+            currenciesWithoutUsdAmount: ["EUR"],
+          },
+        }),
       );
       expect(resolveRealDataState([read])).toBe("present");
     });
@@ -66,7 +87,19 @@ describe("reading the headline summary as a real-data read", () => {
   describe("given seat pools and no money", () => {
     it("counts as real data", () => {
       const read = summaryAsRead(
-        summary({ seats: { status: "reported", pools: [{}] } }),
+        summary({
+          seats: {
+            status: "reported",
+            pools: [
+              {
+                skuPartNumber: "VIRTUAL_AGENT_USL",
+                day: "2026-08-01",
+                seatsBought: 5,
+                seatsAssigned: 3,
+              },
+            ],
+          },
+        }),
       );
       expect(resolveRealDataState([read])).toBe("present");
     });

@@ -198,7 +198,7 @@ function useSpenderRows({
  */
 function useSampleMode(
   breakdowns: ReturnType<typeof useBreakdownQueries>,
-  summaryData: Parameters<typeof summaryAsRead>[0],
+  summaryData: GovernanceCostSummaryDto | undefined,
 ) {
   const [optIn, setOptIn] = useState<boolean | null>(null);
   const showSample = sampleModeActive({

@@ -13,7 +13,18 @@
  * removes those panels rather than emptying them: a permanently blank panel
  * would imply we looked and found nothing.
  */
+import type { GovernanceCostSummaryDto } from "@ee/governance/services/governanceCost.service";
 import { useRef } from "react";
+
+/**
+ * What the sample decision reads off the headline summary — derived from the
+ * DTO rather than transcribed, so a renamed field or a restructured seats
+ * union breaks this file at compile time instead of silently never counting.
+ */
+export type SummaryForSampleDecision = Pick<
+  GovernanceCostSummaryDto,
+  "unavailableReason" | "billed" | "gateway" | "seats"
+>;
 
 /**
  * What the real reads have told us so far. `unknown` is a distinct answer
@@ -86,14 +97,7 @@ export function useSettledRealDataState(
  * so it answers as such rather than staying unknown forever.
  */
 export function summaryAsRead(
-  data:
-    | {
-        unavailableReason: string | null;
-        billed: { amountUsd: number | null; cellsWithoutAmount: number };
-        gateway: { amountUsd: number | null; cellsWithoutAmount: number };
-        seats: { status: string; pools?: ReadonlyArray<unknown> };
-      }
-    | undefined,
+  data: SummaryForSampleDecision | undefined,
 ): { length: number } | null {
   if (data === undefined) return null;
   if (data.unavailableReason !== null) return { length: 0 };
@@ -104,7 +108,7 @@ export function summaryAsRead(
   const reported =
     (laneReported(data.billed) ? 1 : 0) +
     (laneReported(data.gateway) ? 1 : 0) +
-    ((data.seats.pools?.length ?? 0) > 0 ? 1 : 0);
+    (data.seats.status === "reported" && data.seats.pools.length > 0 ? 1 : 0);
   return { length: reported };
 }
 
