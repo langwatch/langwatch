@@ -39,6 +39,7 @@ import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import {
   createDemoRepo,
   type DemoRepo,
+  demoProviderEnvLines,
   getCliApiKey,
   openaiKey,
 } from "./local-control-fixture";
@@ -959,7 +960,7 @@ export async function createGuidedCheckout({
   const repo = await createDemoRepo({ language: "langgraph", name });
   await fs.writeFile(
     path.join(repo.root, ".env"),
-    `OPENAI_API_KEY=${openaiKey()}\n`,
+    `${demoProviderEnvLines().join("\n")}\n`,
     "utf8",
   );
   return repo;
