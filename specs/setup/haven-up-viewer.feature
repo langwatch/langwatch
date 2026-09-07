@@ -67,3 +67,11 @@ Feature: haven up terminal viewer — scroll and search
     And "q" and Ctrl-C still detach the viewer
     And "X" pressed twice still stops the stack, and once still only warns
     And the session dashboard's own up/down/enter/r/a bindings are unaffected
+
+  Scenario: Captures from lanes that no longer run are not tabs
+    Given the capture directory holds a log file last written hours before this viewer opened
+    And a lane that is running now writes its own capture
+    When the viewer discovers captures
+    Then the old capture is not a tab
+    And the running lane's capture is a tab
+    And the old capture stays readable through haven logs

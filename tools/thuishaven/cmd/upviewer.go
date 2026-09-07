@@ -145,21 +145,26 @@ type viewerModel struct {
 	// key that stops the stack always takes two deliberate presses.
 	confirmStop bool
 	tickN       int // refresh counter, so the snapshot polls on a slow beat
+	// startedAt gates which captures become tabs: a file last written before
+	// this viewer opened belongs to a lane that no longer runs (a retired lane
+	// name, an earlier selection) and stays reachable through `haven logs`.
+	startedAt time.Time
 
 	width, height int
 }
 
 func newViewerModel(slug, combined, capDir string) *viewerModel {
 	return &viewerModel{
-		slug:     slug,
-		combined: combined,
-		capDir:   capDir,
-		groups:   []string{viewerAllGroup},
-		lines:    map[string][]string{},
-		offsets:  map[string]int64{},
-		scroll:   map[string]int{},
-		matchIdx: -1,
-		banner:   fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
+		slug:      slug,
+		combined:  combined,
+		capDir:    capDir,
+		groups:    []string{viewerAllGroup},
+		lines:     map[string][]string{},
+		offsets:   map[string]int64{},
+		scroll:    map[string]int{},
+		matchIdx:  -1,
+		startedAt: time.Now(),
+		banner:    fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
 	}
 }
 
@@ -505,6 +510,9 @@ func (m *viewerModel) ingest() {
 	for _, svc := range capturedServices(m.capDir) {
 		cli := fileToCLIService(svc)
 		if !m.hasGroup(cli) {
+			if !m.captureWrittenSinceStart(svc) {
+				continue
+			}
 			m.groups = append(m.groups, cli)
 			if cli == m.preferred {
 				m.selected = len(m.groups) - 1
@@ -973,4 +981,17 @@ func (m *viewerModel) headerBlock() string {
 		"  " + water(`  ~~~~~~~~~~~~~~~~`),
 	}
 	return strings.Join(rows, "\n") + "\n"
+}
+
+// captureLivenessGrace covers lanes that wrote before the viewer finished opening.
+const captureLivenessGrace = 10 * time.Second
+
+// captureWrittenSinceStart reports whether a service's capture file has been
+// written since this viewer opened. Older captures are stale lanes, not tabs.
+func (m *viewerModel) captureWrittenSinceStart(fileSvc string) bool {
+	info, err := os.Stat(filepath.Join(m.capDir, fileSvc+".log"))
+	if err != nil {
+		return false
+	}
+	return !info.ModTime().Before(m.startedAt.Add(-captureLivenessGrace))
 }

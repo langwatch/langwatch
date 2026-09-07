@@ -73,6 +73,14 @@ describe("shouldIgnoreWatchPath", () => {
     assert.equal(shouldIgnoreWatchPath("src/foo.spec.tsx"), true);
   });
 
+  it("ignores an editor temp file written beside its target", () => {
+    assert.equal(
+      shouldIgnoreWatchPath("../../packages/features/trace/web/src/a.tsx.tmp.17938.dfd323429215"),
+      true,
+    );
+    assert.equal(shouldIgnoreWatchPath("../../packages/features/trace/web/src/a.tsx"), false);
+  });
+
   it("ignores dist and generated churn", () => {
     assert.equal(shouldIgnoreWatchPath("../../packages/features/trace/server/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);

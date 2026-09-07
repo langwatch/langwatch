@@ -800,3 +800,32 @@ func TestViewerExistingBindingsUnaffectedBySearchAndScroll(t *testing.T) {
 		t.Error("the dashboard's own down binding must still move the cursor, not scroll")
 	}
 }
+
+// A capture left behind by a lane that no longer runs (a retired lane name,
+// an earlier selection) is not a tab; `haven logs` still reads it.
+// @scenario "Captures from lanes that no longer run are not tabs"
+func TestViewerHidesStaleCaptures(t *testing.T) {
+	dir := t.TempDir()
+	stale := time.Now().Add(-2 * time.Hour)
+	for _, svc := range []string{"api", "workers"} {
+		p := filepath.Join(dir, svc+".log")
+		if err := os.WriteFile(p, []byte(stale.UTC().Format(time.RFC3339Nano)+" old\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, stale, stale); err != nil {
+			t.Fatal(err)
+		}
+	}
+	live := time.Now().UTC().Format(time.RFC3339Nano) + " hello from backend\n"
+	if err := os.WriteFile(filepath.Join(dir, "backend.log"), []byte(live), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.ingest()
+	if m.hasGroup("api") || m.hasGroup("workers") {
+		t.Fatalf("groups = %v, want no tab for a capture written hours before the viewer opened", m.groups)
+	}
+	if !m.hasGroup("backend") {
+		t.Fatalf("groups = %v, want backend", m.groups)
+	}
+}
