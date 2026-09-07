@@ -108,5 +108,16 @@ describe("the pages under /settings", () => {
       expect(source).toContain("/settings/roles?tab=assignments");
       expect(source).not.toContain("<SettingsLayout");
     });
+
+    it("forwards the old authentication address onto Security", () => {
+      const source = readFileSync(
+        sourceFileOf("pages/settings/authentication"),
+        "utf-8",
+      );
+
+      expect(source).toContain("<Navigate");
+      expect(source).toContain("/settings/security");
+      expect(source).not.toContain("<SettingsLayout");
+    });
   });
 });
