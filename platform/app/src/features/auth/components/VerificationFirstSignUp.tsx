@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
@@ -78,6 +78,8 @@ export function VerificationFirstSignUp() {
   useEffect(forgetCarriedEmail, []);
 
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
+  const { mutateAsync: requestEnrollment, error: enrollmentError } =
+    api.auth.signUpEnrollment.useMutation();
   // The link is spent against the better-auth endpoint rather than a tRPC
   // procedure, because a link spent on an existing account opens that
   // account's first session — a cookie, which tRPC cannot set. See
@@ -130,6 +132,46 @@ export function VerificationFirstSignUp() {
   const spent = useRef(false);
   const askedOnMount = useRef(false);
 
+  const resolveEnrollment = useCallback(
+    async (email: string, proof: string) => {
+      try {
+        const decision = await requestEnrollment({
+          email,
+          addressProof: proof,
+        });
+        if (decision.outcome === "enroll") {
+          setEnrollmentMethods(decision.methodSet);
+          setVerifiedEmail(email);
+          setAddressProof(proof);
+          setPostLinkRouting(null);
+          return;
+        }
+
+        if (
+          decision.outcome === "redirect" ||
+          decision.outcome === "existing_account"
+        ) {
+          const routed = await decide({ identifier: email });
+          if (routed?.outcome === "redirect_to_connection") {
+            setRoutedEmail(email);
+            setPostLinkRouting(null);
+            return;
+          }
+          if (routed?.outcome === "method_picker") {
+            setWelcomeBackEmail(email);
+            setPostLinkRouting(null);
+            return;
+          }
+        }
+
+        setPostLinkRouting({ email, addressProof: proof });
+      } catch {
+        setPostLinkRouting({ email, addressProof: proof });
+      }
+    },
+    [decide, requestEnrollment],
+  );
+
   // The emailed link is spent once, on arrival. Guarded by a ref rather than
   // by mutation state because the token is single-use: a second attempt would
   // fail on a link that worked.
@@ -171,27 +213,7 @@ export function VerificationFirstSignUp() {
             return;
           }
 
-          const decision = await decide({ identifier: email });
-          if (decision?.outcome === "redirect_to_connection") {
-            setRoutedEmail(email);
-            return;
-          }
-          if (decision?.outcome === "route_to_signup") {
-            const policy = await decide({ identifier: null });
-            if (policy?.outcome !== "method_picker") {
-              setPostLinkRouting({ email, addressProof });
-              return;
-            }
-            setEnrollmentMethods(policy.methodSet);
-            setVerifiedEmail(email);
-            setAddressProof(addressProof);
-            return;
-          }
-          if (decision?.outcome === "method_picker") {
-            setWelcomeBackEmail(email);
-            return;
-          }
-          setPostLinkRouting({ email, addressProof });
+          await resolveEnrollment(email, addressProof);
         },
       )
       .catch((failure: unknown) => {
@@ -201,7 +223,7 @@ export function VerificationFirstSignUp() {
         setLinkError(failure);
         report.refused("link", readHandledError(failure)?.code ?? null);
       });
-  }, [verifyToken, callbackUrl, decide, report]);
+  }, [verifyToken, callbackUrl, decide, report, resolveEnrollment]);
 
   // What this instance offers with no address in hand, so the same social
   // buttons the log-in screen shows are available here from the first step.
@@ -366,30 +388,10 @@ export function VerificationFirstSignUp() {
   if (postLinkRouting) {
     return (
       <PostLinkRoutingFailure
-        error={routing.error}
-        onRetry={async () => {
-          const decision = await decide({
-            identifier: postLinkRouting.email,
-          });
-          if (decision?.outcome === "redirect_to_connection") {
-            setPostLinkRouting(null);
-            setRoutedEmail(postLinkRouting.email);
-            return;
-          }
-          if (decision?.outcome === "route_to_signup") {
-            const policy = await decide({ identifier: null });
-            if (policy?.outcome !== "method_picker") return;
-            setEnrollmentMethods(policy.methodSet);
-            setVerifiedEmail(postLinkRouting.email);
-            setAddressProof(postLinkRouting.addressProof);
-            setPostLinkRouting(null);
-            return;
-          }
-          if (decision?.outcome === "method_picker") {
-            setPostLinkRouting(null);
-            setWelcomeBackEmail(postLinkRouting.email);
-          }
-        }}
+        error={enrollmentError ?? routing.error}
+        onRetry={() =>
+          resolveEnrollment(postLinkRouting.email, postLinkRouting.addressProof)
+        }
       />
     );
   }
