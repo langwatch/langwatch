@@ -145,7 +145,12 @@ function ownStaticFactoryRanges(
           member.name.text === "create" &&
           (member.modifiers?.some(isStaticKeyword) ?? false),
       );
-      if (hasPrivateConstructor && factory?.body) {
+      if (
+        hasPrivateConstructor &&
+        factory &&
+        isMethodDeclaration(factory) &&
+        factory.body
+      ) {
         const visitFactory = (current: Node): void => {
           if (
             isNewExpression(current) &&

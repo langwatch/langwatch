@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityLookupRouter } from "../identityLookup";
@@ -19,6 +20,7 @@ const { activityRows, mockAuditLog, mockLookup } = vi.hoisted(() => ({
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: mockAuditLog }));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityLookup: () => mockLookup,
+  identityStorageAdapter: () => memoryAdapter({}),
   secondaryStorage: () => ({ configured: false, connection: () => null }),
 }));
 
