@@ -305,7 +305,11 @@ describe("setupModelEnv", () => {
         vi.mocked(getResolvedDefaultForFeature).mockResolvedValueOnce(null);
 
         const error = await refusalFrom({
-          promise: setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
+          promise: setupModelEnv(
+            "openai/text-embedding-ada-002",
+            true,
+            "proj-1",
+          ),
         });
 
         expect(error.code).toBe("evaluator_config_error");
@@ -324,7 +328,11 @@ describe("setupModelEnv", () => {
         });
 
         const error = await refusalFrom({
-          promise: setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
+          promise: setupModelEnv(
+            "openai/text-embedding-ada-002",
+            true,
+            "proj-1",
+          ),
         });
 
         expect(error.code).toBe("evaluator_config_error");
