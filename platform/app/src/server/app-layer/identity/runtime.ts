@@ -99,7 +99,7 @@ import { MfaLedgerWriter } from "./mfa-ledger";
 import { IdentityNewbornReconciliationService } from "./newborn-reconciliation";
 import { OrganizationMfaService } from "./organization-mfa.service";
 import {
-  LoggingOrganizationMfaNotifier,
+  EmailOrganizationMfaNotifier,
   PrismaOrganizationConnectionFactors,
   PrismaOrganizationMemberFactors,
   PrismaOrganizationMfaSettings,
@@ -619,7 +619,7 @@ export function organizationMfa(): OrganizationMfaService {
     sessions: new PrismaSessionFactors(prisma),
     members: new PrismaOrganizationMemberFactors(prisma),
     connections: new PrismaOrganizationConnectionFactors(prisma),
-    notifier: new LoggingOrganizationMfaNotifier(),
+    notifier: new EmailOrganizationMfaNotifier(prisma),
     // Stated once, here, like every other environment read this root owns.
     offered: deploymentOffersTwoStepVerification,
     // The plan, resolved the one way the app resolves plans: the provider

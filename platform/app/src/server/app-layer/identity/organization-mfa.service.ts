@@ -105,10 +105,11 @@ export interface OrganizationConnectionFactorPort {
  * stays testable.
  */
 export interface OrganizationMfaNotifier {
-  requirementTurnedOn(args: {
+  requirementChanged(args: {
     organizationId: string;
     actorUserId: string;
-    /** Everyone the requirement now applies to — held or not. */
+    required: boolean;
+    /** Every active member affected by the change. */
     memberUserIds: readonly string[];
   }): Promise<void>;
 }
@@ -348,14 +349,13 @@ export class OrganizationMfaService {
       );
     }
     await this.deps.settings.write({ organizationId, mfaRequired });
-    if (mfaRequired) {
-      const members = await this.deps.members.membersOf({ organizationId });
-      await this.deps.notifier.requirementTurnedOn({
-        organizationId,
-        actorUserId,
-        memberUserIds: members.map((member) => member.userId),
-      });
-    }
+    const members = await this.deps.members.membersOf({ organizationId });
+    await this.deps.notifier.requirementChanged({
+      organizationId,
+      actorUserId,
+      required: mfaRequired,
+      memberUserIds: members.map((member) => member.userId),
+    });
     return { previous: current.mfaRequired, next: mfaRequired };
   }
 
