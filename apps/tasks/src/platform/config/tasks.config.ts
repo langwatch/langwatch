@@ -1,11 +1,12 @@
 import {
   Config,
   type ConfigValue,
-  environmentOneOrTrueSchema,
-  objectStorageConfigDefinition,
   runtimeIdentityConfigDefinition,
   RuntimeConfig,
 } from "@langwatch/config";
+import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
+import { secretServerConfigDefinition } from "@langwatch/secret-contract";
+import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
 /**
@@ -16,16 +17,16 @@ export const tasksConfigDefinition = RuntimeConfig.define({
   databaseUrl: Config.value(z.string().min(1).optional(), { env: "DATABASE_URL" }),
   clickhouseUrl: Config.value(z.string().min(1).optional(), { env: "CLICKHOUSE_URL" }),
   redisUrl: Config.value(z.string().min(1).optional(), { env: "REDIS_URL" }),
-  storage: { ...objectStorageConfigDefinition },
+  storage: { ...storedObjectServerConfigDefinition },
   /** Consumed by `ModelProviderCredentialsMigrateTask`; absent means that
    * task refuses at run time rather than at catalogue construction. */
-  credentialsSecret: Config.optionalSecret({ env: "CREDENTIALS_SECRET" }),
+  credentialsSecret: secretServerConfigDefinition.encryptionKey,
   /**
    * Whether this is the managed cloud. The system-migration pass reads it to decide pacing:
    * cloud is paced per organization by enrollment rows, a self-hosted installation admits every
    * organization for every migration already released for self-hosting.
    */
-  isSaaS: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
+  isSaaS: saasServerConfigDefinition.isSaas,
   /** Comma-separated module specifiers loaded at boot; see task-modules-loader.ts. */
   taskModules: Config.value(z.string().optional(), { env: "LANGWATCH_TASK_MODULES" }),
   nodeEnvironment: runtimeIdentityConfigDefinition.nodeEnvironment,

@@ -10,3 +10,4 @@ export * from "./plan-types.ts";
 export * from "./pricing.ts";
 export * from "./stripe-price-catalog.ts";
 export * from "./stripe-prices.ts";
+export * from "./billing.config.ts";

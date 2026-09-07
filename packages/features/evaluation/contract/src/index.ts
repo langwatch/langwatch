@@ -11,4 +11,6 @@ export * from "./evaluation.errors.ts";
 export * from "./evaluation.performance.ts";
 export * from "./evaluation.queries.ts";
 export * from "./evaluation.service.ts";
+export * from "./evaluation.api.ts";
 export * from "./evaluation-execution.errors.ts";
+export * from "./evaluation.config.ts";

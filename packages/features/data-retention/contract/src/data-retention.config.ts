@@ -1,8 +1,32 @@
+import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { z } from "zod";
 import {
   MAX_RETENTION_DAYS,
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_WEEK_DAYS,
-} from "@langwatch/data-retention-contract";
+} from "./data-retention.ts";
+
+/**
+ * The retention a tenant's data is stamped with when nothing in its scope
+ * cascade says otherwise.
+ *
+ * Carried as written rather than coerced at the leaf, because the rule is
+ * cross-field: the override is admissible only under a recognised
+ * non-production environment, and `NODE_ENV` is bound once by the process's
+ * own identity block. {@link resolvePlatformDefaultRetentionDays} applies the
+ * rule at the root, immediately after the one parse.
+ */
+export const dataRetentionServerConfigDefinition = RuntimeConfig.define({
+  platformDefaultDays: Config.value(z.string().optional(), {
+    env: "LANGWATCH_DEFAULT_RETENTION_DAYS",
+  }),
+});
+
+export type DataRetentionServerConfig = ConfigValue<typeof dataRetentionServerConfigDefinition>;
+
+export const dataRetentionServerConfigSchema = compileRuntimeConfig(
+  dataRetentionServerConfigDefinition,
+);
 
 /**
  * The only environments allowed to lower the platform retention default.
@@ -15,6 +39,9 @@ const NON_PRODUCTION_NODE_ENVS = ["development", "test"] as const;
  * Resolves the retention stamped when no override exists in a tenant's scope
  * cascade. `LANGWATCH_DEFAULT_RETENTION_DAYS` lowers it for a local stack, in
  * whole weeks, and only under a recognised non-production environment.
+ *
+ * Both processes stamp rows in one ClickHouse, so both read this one way: a
+ * process that resolved a different default would expire the other's rows.
  */
 export function resolvePlatformDefaultRetentionDays(
   source: Readonly<{ LANGWATCH_DEFAULT_RETENTION_DAYS?: string; NODE_ENV?: string }>,

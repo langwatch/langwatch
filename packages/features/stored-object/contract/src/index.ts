@@ -9,5 +9,7 @@ export * from "./stored-object-storage.errors.ts";
 export * from "./stored-object.errors.ts";
 export * from "./stored-object.queries.ts";
 export * from "./stored-object.service.ts";
+export * from "./stored-object.api.ts";
 export * from "./storage-uri.ts";
 export * from "./uploads.ts";
+export * from "./stored-object.config.ts";

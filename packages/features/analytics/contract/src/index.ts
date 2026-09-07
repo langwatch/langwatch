@@ -7,6 +7,7 @@ export {
   type PreconditionTraceData,
 } from "./analytics.precondition-matchers.ts";
 export * from "./analytics.service.ts";
+export * from "./analytics.api.ts";
 export * from "./analytics.lwql.ts";
 export * from "./analytics.lwql-time-window.ts";
 export * from "./series-points.ts";
@@ -17,3 +18,4 @@ export * from "./analytics.query-shapes.ts";
 export * from "./analytics-query.errors.ts";
 export * from "./langwatch-ql.errors.ts";
 export * from "./analytics.input-schemas.ts";
+export * from "./analytics.config.ts";

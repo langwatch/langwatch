@@ -1,10 +1,9 @@
+import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
 import { z } from "zod";
 
-import { Config, RuntimeConfig } from "./runtime-config.ts";
-
 /**
- * The one outbound mail gateway every process that sends mail selects through,
- * at the deployment's own spelling.
+ * The one outbound mail gateway every process that sends mail selects
+ * through.
  *
  * A password-reset link leaving one process from a different sender domain
  * than a reminder leaving another would fail one deployment's SPF policy and
@@ -15,16 +14,15 @@ import { Config, RuntimeConfig } from "./runtime-config.ts";
  * deployments treat `USE_AWS_SES=false` as enabled, and changing that would
  * select a different gateway in one process and not another.
  *
- * The gateway settings stay optional. A deployment with no email provider
+ * Every gateway setting stays optional. A deployment with no email provider
  * configured is an ordinary self-hosted install: it composes, mounts every
  * pipeline, and fails only at the moment of a send.
  *
- * The base host a sender address and every mailed link are derived from is
- * NOT here — each process binds `BASE_HOST` at its own leaf, because some
- * already bind it for an unrelated purpose and this module refuses to bind
- * one variable twice.
+ * The base host a sender address and every mailed link derive from is NOT
+ * here. Both processes already bind `BASE_HOST` for a purpose of their own,
+ * and one variable may be bound once.
  */
-export const mailConfigDefinition = RuntimeConfig.define({
+export const notificationServerConfigDefinition = RuntimeConfig.define({
   defaultFrom: Config.value(z.string().optional(), { env: "EMAIL_DEFAULT_FROM" }),
   provider: Config.value(z.string().optional(), { env: "EMAIL_PROVIDER" }),
   ses: {
@@ -47,3 +45,14 @@ export const mailConfigDefinition = RuntimeConfig.define({
     apiKey: Config.optionalSecret({ env: "RESEND_API_KEY" }),
   },
 });
+
+export type NotificationServerConfig = ConfigValue<typeof notificationServerConfigDefinition>;
+
+export const notificationServerConfigSchema = compileRuntimeConfig(
+  notificationServerConfigDefinition,
+);
+
+/** All a browser learns: whether this deployment can send mail at all. */
+export const notificationWebConfigSchema = z.strictObject({ email: z.boolean() });
+
+export type NotificationWebConfig = z.infer<typeof notificationWebConfigSchema>;

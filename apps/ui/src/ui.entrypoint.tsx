@@ -15,6 +15,7 @@ import { toPublicEnvironment } from "./behavior/public-environment";
 import { UiShellPort } from "./behavior/ui-runtime.port";
 import { UiRuntime } from "./behavior/ui.runtime";
 import { createUiApplication } from "./features/installed-ui-features.composition";
+import { parseUiFeatureConfig } from "./behavior/ui-feature-config";
 import { OnboardingAttributionProvider } from "./features/onboarding/ui/sections/onboarding-attribution-provider";
 import type { PublicEnvironment } from "./model/public-environment";
 import { UiErrorToaster } from "./ui/elements/ui-error-toaster";
@@ -39,21 +40,25 @@ function UiNoFooter() {
 function useNoNavigationTracking() {}
 
 /**
- * Read once, inside the hook rather than module scope, so a missing boot
- * configuration surfaces through the root error boundary instead of
- * blanking the document. Also configures the docs runtime here, first.
+ * Read and validated once, at boot, before the first render: every feature's
+ * own web schema parses the slice it acts on, so a browser never draws a
+ * screen over a value its feature would have refused. The hook below only
+ * hands back what boot already resolved.
  */
 let publicEnvironment: PublicEnvironment | undefined;
+function resolveBootPublicEnvironment(): PublicEnvironment {
+  const config = readPublicAppConfig();
+  parseUiFeatureConfig(config);
+  configureDocsRuntime({
+    mode: config.mode,
+    hostname: typeof window === "undefined" ? undefined : window.location.hostname,
+  });
+  publicEnvironment = toPublicEnvironment(config);
+  return publicEnvironment;
+}
+
 function useBootPublicEnvironment(): { data: PublicEnvironment | undefined } {
-  if (!publicEnvironment) {
-    const config = readPublicAppConfig();
-    configureDocsRuntime({
-      mode: config.mode,
-      hostname: typeof window === "undefined" ? undefined : window.location.hostname,
-    });
-    publicEnvironment = toPublicEnvironment(config);
-  }
-  return { data: publicEnvironment };
+  return { data: publicEnvironment ?? resolveBootPublicEnvironment() };
 }
 
 /**
@@ -115,4 +120,5 @@ class BrowserUiShell extends UiShellPort {
   }
 }
 
+resolveBootPublicEnvironment();
 UiRuntime.create({ document, shell: BrowserUiShell.create() }).start();

@@ -21,6 +21,15 @@ export * from "./trace-query-parser.ts";
 export * from "./trace-query.contract.ts";
 export * from "./trace.queries.ts";
 export * from "./trace.service.ts";
+export * from "./trace-viewer.service.ts";
+export * from "./trace-content-read.service.ts";
+export {
+  TraceApi,
+  type TraceAnnotationCommands,
+  type TraceAnnotationMarker,
+  type TraceSuggestionTarget,
+  type TraceApi as TraceApiContract,
+} from "./trace.api.ts";
 export * from "./trace-record.ts";
 export * from "./trace.errors.ts";
 export * from "./trace-projection.ts";
@@ -154,13 +163,11 @@ export {
   type OtlpSpan,
 } from "./trace.otlp.ts";
 export * from "./trace-edit-overlay-apply.ts";
-export * from "./trace-prompt-reference.ts";
 export * from "./trace-python-repr.ts";
 export * from "./trace-list-window.ts";
 export * from "./trace-collector-common.ts";
 export * from "./trace-rag-chunks.ts";
 export * from "./trace-rag-extraction.ts";
-export * from "./trace-mapping.ts";
 export * from "./trace-pcm-to-wav.ts";
 export * from "./trace-metadata-editable-keys.ts";
 export * from "./trace-otel-ids.ts";
@@ -170,3 +177,4 @@ export * from "./trace-export.vocabulary.ts";
 export * from "./trace-legacy-read.types.ts";
 export * from "./trace-projection.types.ts";
 export * from "./trace-query-evaluation.types.ts";
+export * from "./trace.config.ts";

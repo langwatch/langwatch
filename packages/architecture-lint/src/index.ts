@@ -8,6 +8,7 @@ import { changedSourceFiles } from "./comment-blocks.ts";
 import { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
 import { lintDeclarations } from "./declarations.ts";
 import { lintEventingRoles } from "./eventing-roles.ts";
+import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
@@ -32,6 +33,7 @@ export type {
   PackageKind,
 } from "./types.ts";
 export { readFeatureCatalogue } from "./feature-catalogue.ts";
+export { lintFeatureConfiguration } from "./feature-configuration.ts";
 export {
   boundaryEdgesFromViolations,
   compareBoundaryEdgeBaseline,
@@ -82,6 +84,7 @@ export {
 } from "./legacy-feature-fragments.ts";
 export { discoverClassifiedPackages } from "./workspace.ts";
 export { lintFeatureLayouts } from "./feature-layout.ts";
+export { lintFeatureSetupInfrastructure } from "./feature-setup-infrastructure.ts";
 export { lintManifests } from "./manifests.ts";
 export { formatServiceCeilingsBaseline } from "./service-ceilings.ts";
 export { collectServiceCeilings } from "./service-ceilings.ts";
@@ -154,6 +157,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
   const violations = [
     ...discovery.violations,
     ...lintFeatureLayouts(root, discovery.packages),
+    ...lintFeatureConfiguration(root, discovery.catalogue),
     ...lintFrontendUiBoundaries(root, discovery.packages),
     ...lintGlobalAppAccess(root),
     ...(options.legacyFeatureFragments === false

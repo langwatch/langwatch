@@ -1,5 +1,10 @@
-export { resolvePlatformDefaultRetentionDays } from "./rules/platform-default-retention.rules.ts";
 export { PrismaDataRetentionAdapter } from "./adapters/prisma.data-retention.adapter.ts";
+export { DataRetentionApp } from "./app/data-retention.app.ts";
+export { dataRetentionServer } from "./data-retention.server.ts";
+export type {
+  DataRetentionAppConfig,
+  DataRetentionInfrastructure,
+} from "./app/data-retention.app.ts";
 export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
 export {
   DataRetentionTrpcApi,

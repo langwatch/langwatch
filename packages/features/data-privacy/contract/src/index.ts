@@ -1,4 +1,5 @@
 export * from "./data-privacy.ts";
+export * from "./data-privacy.app.ts";
 export * from "./data-privacy.attribute-pattern.ts";
 export * from "./data-privacy.chat-array.ts";
 export * from "./data-privacy.content-catalog.ts";
@@ -6,5 +7,7 @@ export * from "./data-privacy.errors.ts";
 export * from "./data-privacy.markers.ts";
 export * from "./data-privacy.resolution.ts";
 export * from "./data-privacy.service.ts";
+export * from "./data-privacy.api.ts";
 export * from "./data-privacy.snapshot.ts";
 export * from "./data-privacy.visibility.ts";
+export * from "./data-privacy.config.ts";

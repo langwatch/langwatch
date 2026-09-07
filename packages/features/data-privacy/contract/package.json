@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "zod": "^4.4.3"
   },

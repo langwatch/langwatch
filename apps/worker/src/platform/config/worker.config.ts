@@ -1,16 +1,9 @@
 import {
   assertObservabilityDoesNotSelfIngest,
-  authzConfigDefinition,
   clickhouseConfigDefinition,
   Config,
-  egressConfigDefinition,
-  environmentOneOrTrueSchema,
-  githubAppConfigDefinition,
   groupQueueConfigDefinition,
-  licensingConfigDefinition,
   loggerConfigDefinition,
-  mailConfigDefinition,
-  objectStorageConfigDefinition,
   observabilityConfigDefinition,
   parseDataplaneS3RoutingTable,
   postgresConfigDefinition,
@@ -20,6 +13,33 @@ import {
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
+import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
+import { authzServerConfigDefinition } from "@langwatch/authz-contract";
+import { automationServerConfigDefinition } from "@langwatch/automation-contract";
+import {
+  assertBillingServerConfig,
+  billingServerConfigDefinition,
+} from "@langwatch/enterprise-billing-contract";
+import { dataPrivacyServerConfigDefinition } from "@langwatch/data-privacy-contract";
+import {
+  dataRetentionServerConfigDefinition,
+  resolvePlatformDefaultRetentionDays,
+} from "@langwatch/data-retention-contract";
+import { evaluationServerConfigDefinition } from "@langwatch/evaluation-contract";
+import { gatewayServerConfigDefinition } from "@langwatch/gateway-contract";
+import { githubServerConfigDefinition } from "@langwatch/github-contract";
+import { assertLangyServerConfig, langyServerConfigDefinition } from "@langwatch/langy-contract";
+import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
+import { logServerConfigDefinition } from "@langwatch/log-contract";
+import { metricServerConfigDefinition } from "@langwatch/metric-contract";
+import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
+import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
+import { opsServerConfigDefinition } from "@langwatch/ops-contract";
+import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
+import { secretServerConfigDefinition } from "@langwatch/secret-contract";
+import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
+import { traceServerConfigDefinition } from "@langwatch/trace-contract";
+import { webhookServerConfigDefinition } from "@langwatch/enterprise-webhook-contract";
 import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
@@ -29,7 +49,6 @@ import {
   poolSizingFromEnv,
   type PoolSizingInput,
 } from "@langwatch/clickhouse-client";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
@@ -72,56 +91,39 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * Optional in the same way as the app's schema, since a worker must boot
    * without a GitHub App configured.
    */
-  github: {
-    ...githubAppConfigDefinition,
-    privateKey: Config.optionalSecret({ env: "GITHUB_LANGY_PRIVATE_KEY" }),
-  },
+  github: { ...githubServerConfigDefinition },
   /**
    * The one variable both graphs gate their cross-pipeline billing meter on.
    * Disagreement silently drops or double-meters billable events.
    * `environmentOneOrTrueSchema` matches the App's reading exactly.
    */
   deployment: {
-    saas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
+    saas: saasServerConfigDefinition.isSaas,
     /**
      * Read at the App's own spelling; SSO admin gating relies on it
      * (ADR-117 D05 tier 1). Unset means nobody — the fail-closed answer
      * both surfaces must agree on.
      */
-    adminEmails: Config.value(optionalEnvironmentString, { env: "ADMIN_EMAILS" }),
+    adminEmails: saasServerConfigDefinition.adminEmails,
     /**
      * Rotation-only variable; unset falls back to the embedded production
      * public key. Read at the App's spelling since plan resolution runs in
      * both processes (ADR-027); blank resolves to undefined, never "".
      */
-    licensePublicKey: licensingConfigDefinition.publicKey,
+    licensePublicKey: licensingServerConfigDefinition.publicKey,
   },
   /**
    * Optional as the app's schema is: a self-hosted worker composes no
    * sender, a SaaS worker refuses to compose without a key — matching
    * `AppStripeRuntime.create`.
    */
-  stripe: {
-    secretKey: Config.optionalSecret({ env: "STRIPE_SECRET_KEY" }),
-  },
+  stripe: { ...billingServerConfigDefinition },
   /**
    * PostHog vars read at the app's spelling since both graphs feed one
    * `first_trace_integrated` funnel; not secrets, hence `Config.value`.
    * Ops vars (`INSTALL_METHOD`, `DISABLE_USAGE_STATS`) match the app too.
    */
-  ops: {
-    disableUsageStats: Config.value(environmentOneOrTrueSchema, {
-      env: "DISABLE_USAGE_STATS",
-    }),
-    installMethod: Config.value(optionalEnvironmentString, { env: "INSTALL_METHOD" }),
-    clickhouseBackupMetrics: Config.value(optionalEnvironmentString, {
-      env: "CLICKHOUSE_BACKUP_METRICS_ENABLED",
-    }),
-  },
-  productAnalytics: {
-    key: Config.value(optionalEnvironmentString, { env: "POSTHOG_KEY" }),
-    host: Config.value(optionalEnvironmentString, { env: "POSTHOG_HOST" }),
-  },
+  ops: { ...opsServerConfigDefinition },
   /**
    * App's own spelling (`mailer.private-config.ts`): mismatched sender
    * domains fail SPF on one side only. `BASE_HOST` is load-bearing — see
@@ -129,123 +131,64 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   mail: {
     baseHost: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
-    ...mailConfigDefinition,
+    ...notificationServerConfigDefinition,
   },
   /**
-   * Automation ceilings: app's own vars/defaults, since both graphs share
-   * one Redis keyspace. `nextauthSecret` below signs unsubscribe links
-   * (ADR-031) AND is the `CREDENTIALS_SECRET` fallback (ADR-027 order).
+   * The deployment's one browser-session identity, read through the auth
+   * feature's own schema so both processes reach one answer. Its secret also
+   * signs unsubscribe links (ADR-031) and is the `CREDENTIALS_SECRET`
+   * fallback (ADR-027 order).
    */
-  nextauthSecret: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_SECRET" }),
+  browserSession: { ...authServerConfigDefinition },
   /**
    * Both switches at the API tier's exact spelling/rule — one deployment
    * needs one answer. `DEMO_PROJECT_ID` blank means no demo project, never
    * a project id of "" (a blank filter widens rather than narrows).
    */
-  authz: { ...authzConfigDefinition },
-  automation: {
-    emailHourlyCap: Config.value(z.coerce.number().int().positive().default(100), {
-      env: "TRIGGER_EMAIL_HOURLY_CAP",
-    }),
-    tenantDailyCap: Config.value(z.coerce.number().int().positive().default(10000), {
-      env: "TRIGGER_EMAIL_TENANT_DAILY_CAP",
-    }),
-    credentialsEncryptionKey: Config.optionalSecret({ env: "CREDENTIALS_SECRET" }),
-    /**
-     * All three carried though only one tier is used, since the tier is
-     * resolved per-project. Defaults match `automation.persistCapUsage`,
-     * which the automations screen reports back to the customer.
-     */
-    persistDailyCapFree: Config.value(z.coerce.number().int().positive().default(50), {
-      env: "TRIGGER_PERSIST_DAILY_CAP_FREE",
-    }),
-    persistDailyCapPaid: Config.value(z.coerce.number().int().positive().default(500), {
-      env: "TRIGGER_PERSIST_DAILY_CAP_PAID",
-    }),
-    persistDailyCapEnterprise: Config.value(z.coerce.number().int().positive().default(5000), {
-      env: "TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE",
-    }),
-  },
+  authz: { ...authzServerConfigDefinition },
+  automation: { ...automationServerConfigDefinition },
+  /** The stored-credential cipher key; automation decrypts with the same one. */
+  secret: { ...secretServerConfigDefinition },
   /**
    * Same four vars the app reads for redaction; missing `LANGEVALS_ENDPOINT`
    * is fatal in production. Credentials carried raw/unparsed — the parse
    * and its degrade-on-invalid-JSON behaviour live in `resolveWorkerTracePrivacyConfig`.
    */
-  tracePrivacy: {
-    googleApplicationCredentials: Config.optionalSecret({ env: "GOOGLE_APPLICATION_CREDENTIALS" }),
-    /**
-     * Raw boolean-or-string, not parsed: `environmentBooleanSchema` reads
-     * "1" as true (app reads it false) and refuses any other spelling,
-     * which would stop this process booting where the app just proceeds.
-     */
-    googleDlpDisabled: Config.value(z.union([z.boolean(), z.string()]).optional(), {
-      env: "LANGWATCH_DISABLE_GOOGLE_DLP",
-    }),
-    langevalsEndpoint: Config.value(optionalEnvironmentString, {
-      env: "LANGEVALS_ENDPOINT",
-    }),
-    dataPrivacyEnforcement: Config.value(optionalEnvironmentString, {
-      env: "LANGWATCH_DATA_PRIVACY_ENFORCEMENT",
-    }),
-  },
+  tracePrivacy: { ...dataPrivacyServerConfigDefinition },
+  /** Where the evaluator service answers; the privacy pipeline reads it too. */
+  evaluation: { ...evaluationServerConfigDefinition },
   /**
    * Decides something different from the four privacy vars it's projected
    * alongside (estimating usage for spans that arrived without it). Timeout
    * carried raw: `z.coerce.number()` would reject "10s", where the app parses it as 10.
    */
-  tokenizer: {
-    bpeDirectory: Config.value(optionalEnvironmentString, { env: "TIKTOKENS_PATH" }),
-    fetchTimeoutMs: Config.value(z.union([z.string(), z.number()]).optional(), {
-      env: "TIKTOKEN_FETCH_TIMEOUT_MS",
-    }),
-  },
+  trace: { ...traceServerConfigDefinition },
   /**
    * Both default OFF, read at the app's spelling: these gate what a
    * customer is ALLOWED to point an endpoint at, so disagreement here
    * means one surface accepts an endpoint the other refuses to deliver.
    */
-  webhooks: {
-    allowInsecureLocalUrls: Config.value(optionalEnvironmentString, {
-      env: "WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS",
-    }),
-    allowAmbientAwsCredentials: Config.value(optionalEnvironmentString, {
-      env: "WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS",
-    }),
-  },
+  webhooks: { ...webhookServerConfigDefinition },
   /**
    * URL and secret are refused TOGETHER, as `resolveLangyWorkerConfig`
    * refuses them: a URL alone dispatches unauthenticated, a secret alone
    * dispatches nowhere. Both absent is a valid "no agent manager" deployment.
    */
-  langy: {
-    agentUrl: Config.value(optionalEnvironmentString, { env: "LANGY_AGENT_URL" }),
-    internalSecret: Config.optionalSecret({ env: "LANGY_INTERNAL_SECRET" }),
-  },
+  langy: { ...langyServerConfigDefinition },
   /**
    * Carried raw (not a number): `settlementGraceMs` in
    * `@langwatch/gateway-server` owns the parse, bound and warning — the
    * same function the REST settlement policy calls on the same variable.
    */
-  gateway: {
-    spendSettlementGraceMs: Config.value(optionalEnvironmentString, {
-      env: "LW_SPEND_SETTLEMENT_GRACE_MS",
-    }),
-  },
+  gateway: { spendSettlementGraceMs: gatewayServerConfigDefinition.spendSettlementGraceMs },
   /**
    * Same vars/functions the app reads, since the app produces into these
    * pipelines while this process consumes them — a differently-clamped
    * lane count would split a command from its own retry.
    */
   processing: {
-    metricShards: Config.value(optionalEnvironmentString, { env: "METRIC_PROCESSING_SHARDS" }),
-    logShards: Config.value(optionalEnvironmentString, { env: "LOG_PROCESSING_SHARDS" }),
-    /**
-     * Same var the app reads: producer and consumer must clamp the lane
-     * count identically or a span lands on a group nothing claims.
-     */
-    traceSpanShards: Config.value(optionalEnvironmentString, {
-      env: "TRACE_SPAN_PROCESSING_SHARDS",
-    }),
+    metricShards: metricServerConfigDefinition.processingShards,
+    logShards: logServerConfigDefinition.processingShards,
   },
   /**
    * ADR-066. Same var the app reads: both graphs cache one Redis keyspace,
@@ -273,17 +216,12 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   liveness: {
     metricsPort: Config.value(optionalEnvironmentString, { env: "WORKER_METRICS_PORT" }),
-    metricsToken: Config.optionalSecret({ env: "METRICS_API_KEY" }),
   },
   /**
    * Same var/default the app reads: both graphs stamp rows in one
    * ClickHouse, so a different default here expires a tenant's events early.
    */
-  retention: {
-    defaultDays: Config.value(optionalEnvironmentString, {
-      env: "LANGWATCH_DEFAULT_RETENTION_DAYS",
-    }),
-  },
+  retention: { ...dataRetentionServerConfigDefinition },
   infrastructure: {
     /**
      * App's own spelling: the process store, every ledger head and every
@@ -298,17 +236,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
     clickhouse: { ...clickhouseConfigDefinition },
     redis: { ...redisConfigDefinition },
     groupQueue: { ...groupQueueConfigDefinition },
-    storage: {
-      ...objectStorageConfigDefinition,
-      /**
-       * Read via `environmentOneOrTrueSchema`, matching the App exactly
-       * ("1" or case-insensitive "true", nothing else) — disagreement either
-       * writes spool objects nothing reaps, or ingests oversized spans inline.
-       */
-      azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
-        env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
-      }),
-    },
+    storage: { ...storedObjectServerConfigDefinition },
     outboundProxy: {
       https: Config.value(optionalProxyValue, { env: "HTTPS_PROXY" }),
       http: Config.value(optionalProxyValue, { env: "HTTP_PROXY" }),
@@ -319,21 +247,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * existing ones (`deployment.saas`, `automation.credentialsEncryptionKey`)
      * so a credential fence never disagrees between App and worker.
      */
-    execution: {
-      defaultModel: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_DEFAULT_MODEL",
-      }),
-    },
-    modelProvider: {
-      ...egressConfigDefinition,
-      // Same variable `apps/api` resolves its authoring model handles
-      // through — two addresses would bill two different proxies for one
-      // project's key. Unset: no execution handle, but provider READS
-      // still work.
-      nlpServiceUrl: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_NLP_SERVICE",
-      }),
-    },
+    modelProvider: { ...modelProviderServerConfigDefinition },
   },
 });
 
@@ -696,8 +610,14 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     definition: workerConfigDefinition,
     source: normalizeWorkerConfigSource(source),
   }).value;
-  refuseWorkerSelfIngest(value, source);
-  const mail = resolveWorkerMailConfig(value.mail, value.nextauthSecret);
+  refuseWorkerSelfIngest(value);
+  // Every rule that spans more than one leaf, refused here rather than at
+  // first use: each one names a deployment that boots and then fails on a
+  // job, which reads as an outage rather than as the mistake it is.
+  assertAuthServerConfig(value.browserSession);
+  assertLangyServerConfig(value.langy);
+  assertBillingServerConfig(value.stripe);
+  const mail = resolveWorkerMailConfig(value.mail, value.browserSession.sessionSecret);
   const langy = resolveWorkerLangyConfig(value.langy);
 
   return {
@@ -717,57 +637,50 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       environment: value.environment,
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
-    deployment: {
-      ...value.deployment,
-      // Blank is not a key: an operator who exported the variable empty has
-      // rotated nothing, and an empty string reaching the verifier refuses
-      // every licence the deployment holds.
-      licensePublicKey: value.deployment.licensePublicKey?.trim() || undefined,
-    },
+    deployment: value.deployment,
     ...(mail ? { mail } : {}),
-    automation: resolveWorkerAutomationConfig(value.automation, value.nextauthSecret),
-    authz: {
-      // The platform app's exact rule, so one variable means one thing across
-      // every tier that reads it.
-      epochCacheEnabled: value.authz.epochCache === "1" || value.authz.epochCache === "true",
-      demoProjectId: value.authz.demoProjectId?.trim() || undefined,
-    },
+    automation: resolveWorkerAutomationConfig(
+      value.automation,
+      value.secret.encryptionKey ?? value.browserSession.sessionSecret,
+    ),
+    authz: value.authz,
     tracePrivacy: resolveWorkerTracePrivacyConfig({
       tracePrivacy: value.tracePrivacy,
+      langevalsEndpoint: value.evaluation.langevalsEndpoint,
       nodeEnvironment: value.nodeEnvironment,
     }),
-    langevals: { endpoint: value.tracePrivacy.langevalsEndpoint },
-    tokenizer: resolveWorkerTraceTokenizerConfig(value.tokenizer),
-    stripe: value.stripe,
+    langevals: { endpoint: value.evaluation.langevalsEndpoint },
+    tokenizer: resolveWorkerTraceTokenizerConfig(value.trace.tokenizer),
+    stripe: { secretKey: value.stripe.stripeSecretKey },
     ops: {
       usageStats: {
         // Two switches, one meaning: an operator who opted out and the hosted
         // product, which reports its own usage by another path.
-        disabled: value.ops.disableUsageStats || value.deployment.saas,
+        disabled: value.ops.usageStats.disabled || value.deployment.saas,
         // Self-hosted is the default because a deployment that named no method
         // installed itself, which is what the receiver records it as.
-        installMethod: value.ops.installMethod?.trim() || "self-hosted",
+        installMethod: value.ops.usageStats.installMethod?.trim() || "self-hosted",
         hostname: value.mail.baseHost?.trim() || undefined,
         environment: value.nodeEnvironment,
       },
-      collectClickHouseBackupMetrics: collectsClickHouseBackupMetrics(
-        value.ops.clickhouseBackupMetrics,
-      ),
+      collectClickHouseBackupMetrics: value.ops.collectClickHouseBackupMetrics,
     },
-    productAnalytics: value.productAnalytics,
+    productAnalytics: value.ops.productAnalytics,
     gateway: value.gateway,
-    webhooks: {
-      allowInsecureLocalUrls: value.webhooks.allowInsecureLocalUrls === "1",
-      allowAmbientAwsCredentials: value.webhooks.allowAmbientAwsCredentials === "1",
-    },
+    webhooks: value.webhooks,
     ...(langy ? { langy } : {}),
     github: value.github,
-    processing: value.processing,
+    processing: { ...value.processing, traceSpanShards: value.trace.spanProcessingShards },
     liveness: {
       metricsPort: resolveWorkerMetricsPort(value.liveness.metricsPort),
-      metricsToken: value.liveness.metricsToken,
+      metricsToken: value.ops.metricsApiKey,
     },
-    retention: { defaultDays: resolveWorkerRetentionDays(value.retention.defaultDays) },
+    retention: {
+      defaultDays: resolvePlatformDefaultRetentionDays({
+        LANGWATCH_DEFAULT_RETENTION_DAYS: value.retention.platformDefaultDays,
+        NODE_ENV: value.nodeEnvironment,
+      }),
+    },
     eventing: value.eventing,
     infrastructure: {
       database: { url: value.infrastructure.database.url },
@@ -779,8 +692,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         // A blank override is not a model. It resolves to the registry
         // flagship rather than to an empty string, which a child would carry
         // to the provider as a model named "".
-        defaultModel:
-          value.infrastructure.execution.defaultModel?.trim() || REGISTRY_FLAGSHIP_MODEL,
+        defaultModel: value.infrastructure.modelProvider.defaultModel ?? REGISTRY_FLAGSHIP_MODEL,
       },
       clickhouse: {
         url: value.infrastructure.clickhouse.url?.trim() || undefined,
@@ -843,13 +755,9 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
 /**
  * Narrows the predecessor's blanket `LANGWATCH_API_KEY` refusal to true
  * self-ingestion only, since exporting to a DIFFERENT install is supported.
- * `NEXTAUTH_URL` read from source to recognise this deployment's front door.
+ * `NEXTAUTH_URL` names this deployment's own front door.
  */
-function refuseWorkerSelfIngest(
-  value: WorkerConfigProjection,
-  source: Readonly<Record<string, unknown>>,
-): void {
-  const nextauthUrl = source.NEXTAUTH_URL;
+function refuseWorkerSelfIngest(value: WorkerConfigProjection): void {
   assertObservabilityDoesNotSelfIngest({
     runtime: "worker",
     apiKeyEnv: "LANGWATCH_API_KEY",
@@ -858,7 +766,7 @@ function refuseWorkerSelfIngest(
     endpoint: value.observability.endpoint,
     deployment: [
       { env: "BASE_HOST", value: value.mail.baseHost },
-      { env: "NEXTAUTH_URL", value: typeof nextauthUrl === "string" ? nextauthUrl : undefined },
+      { env: "NEXTAUTH_URL", value: value.browserSession.sessionUrl },
     ],
   });
 }
@@ -929,10 +837,9 @@ function resolveWorkerMailConfig(
  */
 function resolveWorkerAutomationConfig(
   automation: WorkerConfigProjection["automation"],
-  nextauthSecret: string | undefined,
+  storedSecretKey: string | undefined,
 ): WorkerAutomationConfig {
-  const credentialsEncryptionKey =
-    automation.credentialsEncryptionKey?.trim() || nextauthSecret?.trim();
+  const credentialsEncryptionKey = storedSecretKey?.trim();
 
   return {
     emailHourlyCap: automation.emailHourlyCap,
@@ -952,6 +859,7 @@ function resolveWorkerAutomationConfig(
 export function resolveWorkerTracePrivacyConfig(
   input: {
     tracePrivacy: WorkerConfigProjection["tracePrivacy"];
+    langevalsEndpoint: string | undefined;
     nodeEnvironment: WorkerConfigProjection["nodeEnvironment"];
   },
   onInvalidCredentials: (failure: GoogleDlpCredentialsFailure) => void = () => undefined,
@@ -980,11 +888,11 @@ export function resolveWorkerTracePrivacyConfig(
       credentials,
     },
     presidio: {
-      endpoint: input.tracePrivacy.langevalsEndpoint,
+      endpoint: input.langevalsEndpoint,
       timeoutMs: DEFAULT_PRESIDIO_TIMEOUT_MS,
     },
     isProduction: input.nodeEnvironment === "production",
-    nativePolicyEnforced: input.tracePrivacy.dataPrivacyEnforcement !== "off",
+    nativePolicyEnforced: input.tracePrivacy.enforcement !== "off",
   };
 }
 
@@ -1055,30 +963,19 @@ function resolveWorkerPrivateClickHouseRoutes(
 }
 
 /** The environment bag as the shared ClickHouse helpers read it. */
-/**
- * Allowlist split on commas, trimmed, blanks dropped. Flag arrives
- * pre-read as 1-or-true (App's spelling), so all three tiers agree.
- */
+/** Every reading is the feature's own; this only adds the process's env bag. */
 function resolveWorkerModelProviderConfig(
   value: Readonly<{
     blockLocalHttpCalls: boolean;
-    allowedProxyHosts: string | undefined;
+    allowedProxyHosts: readonly string[];
     nlpServiceUrl: string | undefined;
   }>,
   environment: Readonly<Record<string, string | undefined>>,
 ): WorkerModelProviderConfig {
-  const nlpServiceUrl = value.nlpServiceUrl?.trim();
   return {
     blockLocalHttpCalls: value.blockLocalHttpCalls,
-    allowedProxyHosts:
-      value.allowedProxyHosts
-        ?.split(",")
-        .map((host) => host.trim())
-        .filter((host) => host.length > 0) ?? [],
-    // A blank variable is an unset one. An empty base URL would compose a
-    // proxy address of `/go/proxy/v1`, which resolves against nothing and
-    // fails on the first model call rather than at boot.
-    nlpServiceUrl: nlpServiceUrl ? nlpServiceUrl : undefined,
+    allowedProxyHosts: value.allowedProxyHosts,
+    nlpServiceUrl: value.nlpServiceUrl,
     environment,
   };
 }
@@ -1105,29 +1002,4 @@ function resolveWorkerMetricsPort(value: string | undefined): number {
     );
   }
   return port;
-}
-
-/**
- * Unparseable falls back to the default (not a refusal), matching the
- * app: a typo in an operator's override must not stop the fleet folding.
- */
-function resolveWorkerRetentionDays(value: string | undefined): number {
-  if (value === undefined || value === "") return PLATFORM_DEFAULT_RETENTION_DAYS;
-  const days = Number.parseInt(value, 10);
-  return Number.isFinite(days) && days > 0 ? days : PLATFORM_DEFAULT_RETENTION_DAYS;
-}
-
-/** Values of `CLICKHOUSE_BACKUP_METRICS_ENABLED` that turn backup collection off. */
-const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
-
-/**
- * ON unless explicitly disabled: the gauges predate this flag and
- * production alerts already depend on them, while emitting deployments
- * set nothing. Defaulting off would silently disarm live monitoring.
- */
-function collectsClickHouseBackupMetrics(raw: string | undefined): boolean {
-  if (typeof raw !== "string") return true;
-  const normalized = raw.trim().toLowerCase();
-  if (normalized === "") return true;
-  return !BACKUP_METRICS_OFF_VALUES.has(normalized);
 }

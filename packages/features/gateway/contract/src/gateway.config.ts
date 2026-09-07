@@ -1,3 +1,36 @@
+import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { z } from "zod";
+
+/**
+ * What a process needs to terminate virtual-key traffic and settle its spend.
+ *
+ * The three secrets are all-or-none, refused at boot by
+ * {@link assertGatewaySecretsAllOrNone}: a deployment that set one of them
+ * boots and then fails its first virtual-key request, which reads to a
+ * customer as an outage rather than as the configuration mistake it is.
+ *
+ * `spendSettlementGraceMs` is carried as written. `@langwatch/gateway-server`
+ * owns its bound and its warning, and the REST settlement policy and the
+ * settlement sweeper call that one function on this one value, so a second
+ * parse here would be a second answer.
+ */
+export const gatewayServerConfigDefinition = RuntimeConfig.define({
+  /** Verified before any handler runs; blank answers 500, never falls open. */
+  internalSecret: Config.value(z.string().optional(), { env: "LW_GATEWAY_INTERNAL_SECRET" }),
+  /** Signs short-lived JWTs handed OUT to the data plane; rotates separately. */
+  jwtSecret: Config.value(z.string().optional(), { env: "LW_GATEWAY_JWT_SECRET" }),
+  /** Separate from the API-key pepper: virtual keys rotate independently. */
+  virtualKeyPepper: Config.value(z.string().optional(), { env: "LW_VIRTUAL_KEY_PEPPER" }),
+  /** How long after a request an outcome may still arrive. */
+  spendSettlementGraceMs: Config.value(z.string().optional(), {
+    env: "LW_SPEND_SETTLEMENT_GRACE_MS",
+  }),
+});
+
+export type GatewayServerConfig = ConfigValue<typeof gatewayServerConfigDefinition>;
+
+export const gatewayServerConfigSchema = compileRuntimeConfig(gatewayServerConfigDefinition);
+
 /**
  * The boot refusal that keeps a deployment out of a half-configured AI Gateway.
  *
@@ -86,3 +119,10 @@ function stated(raw: unknown): string | undefined {
   const value = raw.trim();
   return value === "" ? undefined : value;
 }
+
+/** The browser only learns where the gateway answers, never a secret. */
+export const gatewayWebConfigSchema = z.strictObject({
+  gatewayBaseUrl: z.string().min(1),
+});
+
+export type GatewayWebConfig = z.infer<typeof gatewayWebConfigSchema>;

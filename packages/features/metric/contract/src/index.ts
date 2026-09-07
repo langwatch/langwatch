@@ -4,6 +4,7 @@ export {
   type MetricPiiRedactionLevel,
   type PreparedMetricDataPoint,
 } from "./metric.service.ts";
+export * from "./metric.api.ts";
 export { scalarsFromCanonicalAttributes } from "./metric-attributes.ts";
 export {
   metricDataPointReceivedEventSchema,
@@ -48,4 +49,4 @@ export {
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
 } from "./metric-rollup/sequence.ts";
-export * from "./metric.api.ts";
+export * from "./metric.config.ts";

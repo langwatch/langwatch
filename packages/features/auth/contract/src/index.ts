@@ -1,6 +1,8 @@
+export { AuthApi, type AuthApi as AuthApiContract } from "./auth.api.ts";
 export * from "./auth.service.ts";
 export * from "./browser-session.ts";
 export * from "./cli-session-keys.ts";
 export * from "./front-door.responses.ts";
 export * from "./sso-matching.ts";
 export * from "./sso-path-gate.ts";
+export * from "./auth.config.ts";

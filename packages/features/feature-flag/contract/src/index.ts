@@ -98,7 +98,10 @@ export {
   operatorFeatureFlagSchema,
 } from "./feature-flag.service.ts";
 export type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
-export { frontendFeatureFlagMapSchema, frontendFeatureFlagSchema } from "./frontend-feature-flags.ts";
+export {
+  frontendFeatureFlagMapSchema,
+  frontendFeatureFlagSchema,
+} from "./frontend-feature-flags.ts";
 export type {
   PublicAnonymousFeatureFlag,
   PublicAnonymousFlagMap,
@@ -108,3 +111,5 @@ export {
   publicAnonymousFlagMapSchema,
 } from "./public-anonymous-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags.ts";
+export * from "./feature-flag.app.ts";
+export * from "./feature-flag.api.ts";

@@ -3,7 +3,7 @@ import {
   assertGatewaySecretsAllOrNone,
   GATEWAY_SECRET_MIN_LENGTH,
   GatewaySecretsConfigurationError,
-} from "../gateway-secrets.ts";
+} from "../gateway.config.ts";
 
 /** Long enough to clear the floor without writing a length into the literal. */
 const provisioned = (label: string): string => label.padEnd(GATEWAY_SECRET_MIN_LENGTH, "0");

@@ -1,6 +1,7 @@
 export * from "./model-provider.ts";
 export * from "./model-provider.errors.ts";
 export * from "./model-provider.service.ts";
+export * from "./model-provider.api.ts";
 export * from "./model-provider-wire-format.ts";
 export * from "./model-provider-credential.ts";
 export * from "./model-provider-registry.ts";
@@ -30,3 +31,4 @@ export * from "./catalog/resolve-supported-parameters.ts";
 export * from "./catalog/static-model-costs.ts";
 export * from "./model-cost-preview.ts";
 export * from "./catalog/tier-targets.ts";
+export * from "./model-provider.config.ts";

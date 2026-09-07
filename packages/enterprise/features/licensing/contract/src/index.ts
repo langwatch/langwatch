@@ -12,8 +12,10 @@ export * from "./license.commands.ts";
 export * from "./license.errors.ts";
 export * from "./license.queries.ts";
 export * from "./license.service.ts";
+export * from "./licensing.api.ts";
 
 /** The enforcement half: what a limit is called, and how it refuses. Was
  * `platform/app/src/server/license-enforcement/{constants,errors}.ts`. */
 export * from "./license-limit-labels.ts";
 export * from "./license-enforcement.errors.ts";
+export * from "./licensing.config.ts";

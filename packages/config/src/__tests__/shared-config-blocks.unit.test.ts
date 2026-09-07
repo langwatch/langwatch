@@ -1,24 +1,20 @@
 /**
- * One shared block per concern that `apps/api`, `apps/worker` and (where its shape matches)
- * `apps/tasks` all spread into their own definitions.
+ * One shared INFRASTRUCTURE block per concern that `apps/api`, `apps/worker`
+ * and (where its shape matches) `apps/tasks` all spread into their own
+ * definitions. A block a single feature owns lives in that feature's contract
+ * instead, beside the rules that read it.
  */
 import { describe, expect, it } from "vitest";
 
-import { authzConfigDefinition } from "../authz.config.ts";
 import { clickhouseConfigDefinition } from "../clickhouse.config.ts";
-import { egressConfigDefinition } from "../egress.config.ts";
-import { githubAppConfigDefinition } from "../github.config.ts";
-import { licensingConfigDefinition } from "../licensing.config.ts";
 import { loggerConfigDefinition } from "../logger.config.ts";
-import { mailConfigDefinition } from "../mail.config.ts";
-import { objectStorageConfigDefinition } from "../object-storage.config.ts";
 import { observabilityConfigDefinition } from "../observability.config.ts";
 import { postgresConfigDefinition } from "../postgres.config.ts";
 import { groupQueueConfigDefinition } from "../queue.config.ts";
 import { redisConfigDefinition } from "../redis.config.ts";
 import { runtimeIdentityConfigDefinition } from "../runtime-identity.config.ts";
 import { trustedProxyConfigDefinition } from "../trusted-proxy.config.ts";
-import { InvalidRuntimeConfigError, RuntimeConfig } from "../runtime-config.ts";
+import { RuntimeConfig } from "../runtime-config.ts";
 
 describe("shared configuration blocks", () => {
   it("resolves the shared Postgres connection from DATABASE_URL", () => {
@@ -66,57 +62,6 @@ describe("shared configuration blocks", () => {
     expect(value).toEqual({ url: "http://clickhouse.example.test:8123" });
   });
 
-  /** @scenario "The env schema declares the Azure backend variables as first-class keys" */
-  it("resolves the shared object storage block's backend, S3 and Azure leaves", () => {
-    const value = RuntimeConfig.create({
-      name: "object-storage-block",
-      definition: objectStorageConfigDefinition,
-      source: {
-        STORED_OBJECTS_BACKEND: "azure",
-        LANGWATCH_LOCAL_STORAGE_PATH: "/data/objects",
-        S3_BUCKET_NAME: "langwatch-storage",
-        AZURE_BLOB_ACCOUNT_NAME: "langwatchstorage",
-        AZURE_TENANT_ID: "tenant-1",
-      },
-    }).value;
-
-    expect(value.backend).toBe("azure");
-    expect(value.localFilesystemRoot).toBe("/data/objects");
-    expect(value.s3.bucket).toBe("langwatch-storage");
-    expect(value.azure.accountName).toBe("langwatchstorage");
-    expect(value.azure.identity.tenantId).toBe("tenant-1");
-  });
-
-  /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
-  it("refuses a stored-objects backend outside the supported set rather than ignoring it", () => {
-    expect(() =>
-      RuntimeConfig.create({
-        name: "object-storage-block",
-        definition: objectStorageConfigDefinition,
-        source: { STORED_OBJECTS_BACKEND: "gcs" },
-      }),
-    ).toThrow(InvalidRuntimeConfigError);
-  });
-
-  it("resolves the shared mail gateway block across every transport", () => {
-    const value = RuntimeConfig.create({
-      name: "mail-block",
-      definition: mailConfigDefinition,
-      source: {
-        EMAIL_PROVIDER: "smtp",
-        SMTP_HOST: "smtp.acme.test",
-        SMTP_PORT: "587",
-        SENDGRID_API_KEY: "sg-key",
-        RESEND_API_KEY: "re-key",
-      },
-    }).value;
-
-    expect(value.provider).toBe("smtp");
-    expect(value.smtp).toMatchObject({ host: "smtp.acme.test", port: "587" });
-    expect(value.sendgrid.apiKey).toBe("sg-key");
-    expect(value.resend.apiKey).toBe("re-key");
-  });
-
   it("resolves the shared GroupQueue dispatch knobs", () => {
     const value = RuntimeConfig.create({
       name: "queue-block",
@@ -133,24 +78,6 @@ describe("shared configuration blocks", () => {
       zstdWritesEnabled: "true",
       tenantConcurrencyCap: "0",
     });
-  });
-
-  it("resolves the shared egress policy through the deployment's one-or-true rule", () => {
-    expect(
-      RuntimeConfig.create({
-        name: "egress-block",
-        definition: egressConfigDefinition,
-        source: { BLOCK_LOCAL_HTTP_CALLS: "true", ALLOWED_PROXY_HOSTS: "proxy.example.test" },
-      }).value,
-    ).toEqual({ blockLocalHttpCalls: true, allowedProxyHosts: "proxy.example.test" });
-
-    expect(
-      RuntimeConfig.create({
-        name: "egress-block",
-        definition: egressConfigDefinition,
-        source: { BLOCK_LOCAL_HTTP_CALLS: "yes" },
-      }).value.blockLocalHttpCalls,
-    ).toBe(false);
   });
 
   it("resolves the shared LangWatch SDK observability identity", () => {
@@ -191,16 +118,6 @@ describe("shared configuration blocks", () => {
     });
   });
 
-  it("resolves the shared AuthZ switches", () => {
-    const value = RuntimeConfig.create({
-      name: "authz-block",
-      definition: authzConfigDefinition,
-      source: { AUTHZ_EPOCH_CACHE: "1", DEMO_PROJECT_ID: "project-1" },
-    }).value;
-
-    expect(value).toEqual({ epochCache: "1", demoProjectId: "project-1" });
-  });
-
   it("resolves the shared runtime identity, defaulting to a local development boot", () => {
     expect(
       RuntimeConfig.create({
@@ -223,25 +140,6 @@ describe("shared configuration blocks", () => {
     });
   });
 
-  it("resolves the shared Enterprise licensing public key", () => {
-    expect(
-      RuntimeConfig.create({
-        name: "licensing-block",
-        definition: licensingConfigDefinition,
-        source: { LANGWATCH_LICENSE_PUBLIC_KEY: "rotated-key" },
-      }).value,
-    ).toEqual({ publicKey: "rotated-key" });
-  });
-
-  it("resolves the shared Langy GitHub App identity leaves", () => {
-    expect(
-      RuntimeConfig.create({
-        name: "github-block",
-        definition: githubAppConfigDefinition,
-        source: { GITHUB_LANGY_APP_ID: "12345", GITHUB_LANGY_HOST: "github.acme.test" },
-      }).value,
-    ).toEqual({ appId: "12345", host: "github.acme.test" });
-  });
   /** @scenario "A forwarding header from an untrusted peer is ignored" */
   it("resolves the trusted proxy list, defaulting to none so no forwarding header is trusted", () => {
     expect(

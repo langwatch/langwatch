@@ -5,6 +5,27 @@ import { resolveFeatureFlagEnvOverride } from "./feature-flag-environment.ts";
 
 const optionalEnvironmentValueSchema = z.string().optional();
 
+/**
+ * The forced-on list, as a deployment writes it: one comma-separated string
+ * of flag keys.
+ *
+ * A name that is not a registered flag is dropped rather than refused. The
+ * list travels with a release and outlives it: a deployment that forced a
+ * flag on stays booting after that flag is retired, which is the behaviour a
+ * rollout switch has to have.
+ */
+export const featureFlagServerConfigSchema = z
+  .string()
+  .optional()
+  .transform((value) =>
+    (value ?? "")
+      .split(",")
+      .map((key) => key.trim())
+      .filter((key): key is FeatureFlagKey => isFeatureFlagKey(key)),
+  );
+
+export type FeatureFlagServerConfig = z.infer<typeof featureFlagServerConfigSchema>;
+
 export interface FeatureFlagConfig {
   overrides: ReadonlyMap<string, boolean>;
   forceEnabled: ReadonlySet<string>;
@@ -34,13 +55,9 @@ export function resolveFeatureFlagConfig(
     }
   }
 
-  const forceEnabled = new Set<FeatureFlagKey>();
-  for (const key of read("FEATURE_FLAG_FORCE_ENABLE")?.split(",") ?? []) {
-    const trimmed = key.trim();
-    if (isFeatureFlagKey(trimmed)) {
-      forceEnabled.add(trimmed);
-    }
-  }
+  const forceEnabled = new Set<FeatureFlagKey>(
+    featureFlagServerConfigSchema.parse(read("FEATURE_FLAG_FORCE_ENABLE")),
+  );
 
   return { overrides, forceEnabled };
 }

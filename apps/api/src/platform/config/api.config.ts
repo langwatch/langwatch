@@ -1,18 +1,10 @@
 import {
-  assertGatewaySecretsAllOrNone,
   assertObservabilityDoesNotSelfIngest,
-  authzConfigDefinition,
   clickhouseConfigDefinition,
   Config,
-  egressConfigDefinition,
   environmentBooleanSchema,
-  environmentOneOrTrueSchema,
-  githubAppConfigDefinition,
   groupQueueConfigDefinition,
-  licensingConfigDefinition,
   loggerConfigDefinition,
-  mailConfigDefinition,
-  objectStorageConfigDefinition,
   observabilityConfigDefinition,
   parseDataplaneS3RoutingTable,
   postgresConfigDefinition,
@@ -23,6 +15,38 @@ import {
   portSchema,
   type ConfigValue,
 } from "@langwatch/config";
+import { agentServerConfigDefinition } from "@langwatch/agent-contract";
+import {
+  analyticsServerConfigDefinition,
+  assertAnalyticsServerConfig,
+} from "@langwatch/analytics-contract";
+import { apiKeyServerConfigDefinition } from "@langwatch/api-key-contract";
+import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
+import { authzServerConfigDefinition } from "@langwatch/authz-contract";
+import {
+  assertBillingServerConfig,
+  billingServerConfigDefinition,
+} from "@langwatch/enterprise-billing-contract";
+import {
+  dataRetentionServerConfigDefinition,
+  resolvePlatformDefaultRetentionDays,
+} from "@langwatch/data-retention-contract";
+import { evaluationServerConfigDefinition } from "@langwatch/evaluation-contract";
+import {
+  assertGatewaySecretsAllOrNone,
+  gatewayServerConfigDefinition,
+} from "@langwatch/gateway-contract";
+import { githubServerConfigDefinition } from "@langwatch/github-contract";
+import { assertLangyServerConfig, langyServerConfigDefinition } from "@langwatch/langy-contract";
+import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
+import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
+import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
+import { opsServerConfigDefinition } from "@langwatch/ops-contract";
+import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
+import { scimServerConfigDefinition } from "@langwatch/enterprise-scim-contract";
+import { secretServerConfigDefinition } from "@langwatch/secret-contract";
+import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
+import { workflowServerConfigDefinition } from "@langwatch/workflow-contract";
 import {
   createLogger,
   loggerConfigurationFrom,
@@ -42,7 +66,6 @@ import {
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-server";
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import type {
@@ -140,109 +163,68 @@ export const apiConfigDefinition = RuntimeConfig.define({
    * Resolved from {@link STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE}.
    * Blank-vs-wrong-shape is the cipher's own rule to enforce.
    */
-  storedSecretEncryptionKey: Config.value(optionalEnvironmentString, {
-    env: "CREDENTIALS_SECRET",
-  }),
+  storedSecretEncryptionKey: secretServerConfigDefinition.encryptionKey,
   /**
    * A separate leaf from the cipher key above: this is the HMAC key
    * VERBATIM, never the decoded bytes, so the two rotate independently.
    */
-  apiKeyPepper: Config.value(optionalEnvironmentString, {
-    env: "API_KEY_PEPPER",
-  }),
+  apiKeyPepper: apiKeyServerConfigDefinition.pepper,
   /**
    * Separate from the API-key pepper — virtual keys rotate independently.
    * Blank is fine: `VirtualKeyCryptoAdapter` fails at first hash, not boot.
    */
-  virtualKeyPepper: Config.value(optionalEnvironmentString, {
-    env: "LW_VIRTUAL_KEY_PEPPER",
-  }),
+  virtualKeyPepper: gatewayServerConfigDefinition.virtualKeyPepper,
   /**
    * Verified by `/api/internal/gateway` before any handler runs. Blank
    * answers 500 `gateway_internal_secret_missing` rather than falling open.
    */
-  gatewayInternalSecret: Config.value(optionalEnvironmentString, {
-    env: "LW_GATEWAY_INTERNAL_SECRET",
-  }),
+  gatewayInternalSecret: gatewayServerConfigDefinition.internalSecret,
   /**
    * Signs short-lived JWTs handed to the data plane — separate from the
    * HMAC secret above (that's IN, this is OUT), rotated independently.
    */
-  gatewayJwtSecret: Config.value(optionalEnvironmentString, {
-    env: "LW_GATEWAY_JWT_SECRET",
-  }),
+  gatewayJwtSecret: gatewayServerConfigDefinition.jwtSecret,
   /**
    * How long after a request an outcome may still arrive, in milliseconds.
    * Parsed by the gateway package's `settlementGraceMs`, which this raw value
    * feeds, so the REST policy and the settlement sweeper never disagree.
    */
-  spendSettlementGraceMs: Config.value(optionalEnvironmentString, {
-    env: "LW_SPEND_SETTLEMENT_GRACE_MS",
-  }),
+  spendSettlementGraceMs: gatewayServerConfigDefinition.spendSettlementGraceMs,
   /**
    * The metrics-scrape bearer, under the name every LangWatch tier reads it
    * by. Blank means unconfigured, which in production means no metrics
    * endpoint served.
    */
-  metricsApiKey: Config.value(optionalEnvironmentString, {
-    env: "METRICS_API_KEY",
-  }),
+  metricsApiKey: opsServerConfigDefinition.metricsApiKey,
   /**
    * The Langy agent's callback bearer. Blank answers 503 `Not configured`
    * rather than falling open — a deployment with no Langy agent needs none.
    */
-  langyInternalSecret: Config.value(optionalEnvironmentString, {
-    env: "LANGY_INTERNAL_SECRET",
-  }),
+  langyInternalSecret: langyServerConfigDefinition.internalSecret,
+  /** The Langy agent manager's address, refused unless its secret rides with it. */
+  langyAgentUrl: langyServerConfigDefinition.agentUrl,
   /**
    * `auth0WebhookSecret` blank answers 404, not 401 — an unconfigured
    * install looks unrouted. `provenOffboarding` (`SCIM_V2_GRANTS`) is a
    * CONSTRUCTION input, not a per-tenant flag: one offboarding path per process.
    */
-  scim: {
-    auth0WebhookSecret: Config.value(optionalEnvironmentString, {
-      env: "AUTH0_SCIM_WEBHOOK_SECRET",
-    }),
-    provenOffboarding: Config.value(environmentBooleanSchema.default(false), {
-      env: "SCIM_V2_GRANTS",
-    }),
-  },
+  scim: { ...scimServerConfigDefinition },
   /**
    * The ClickHouse EXPLAIN endpoint's operator secret. Blank means the
    * endpoint is not registered — no way to reach a cross-tenant EXPLAIN by
    * presenting nothing.
    */
-  opsApiKey: Config.value(optionalEnvironmentString, {
-    env: "LANGWATCH_OPS_API_KEY",
-  }),
+  opsApiKey: opsServerConfigDefinition.apiKey,
   /**
    * `AUTHZ_EPOCH_CACHE` reads "1 or true, else off" like the platform app.
    * `DEMO_PROJECT_ID` blank means no demo project, never `""`.
    */
-  authz: {
-    ...authzConfigDefinition,
-    /**
-     * The demo project's attributed account — a separate fact from the
-     * project id, since the project is readable by everybody. Both blank on
-     * a deployment with no demo project.
-     */
-    demoProjectUserId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_USER_ID" }),
-  },
+  authz: { ...authzServerConfigDefinition },
   /**
    * `secret` is `NEXTAUTH_SECRET` verbatim, never derived from the cipher
    * key. `url` is not re-bound from `publicBaseUrl`.
    */
-  browserSession: {
-    secret: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_SECRET" }),
-    url: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_URL" }),
-    mfaEnrollmentOpen: Config.value(optionalEnvironmentString, {
-      env: "MFA_ENROLLMENT_OPEN",
-    }),
-    passkeysEnabled: Config.value(optionalEnvironmentString, { env: "PASSKEYS_ENABLED" }),
-    passkeyHandleSecret: Config.value(optionalEnvironmentString, {
-      env: "PASSKEY_HANDLE_SECRET",
-    }),
-  },
+  browserSession: { ...authServerConfigDefinition },
   /**
    * Facts about the install itself, read at the App's own spellings so this
    * process and the background one cannot disagree about them.
@@ -253,34 +235,24 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * office matches a signed-in person against this list, and a process that
      * never read it hides `/api/admin/*` from everyone.
      */
-    adminEmails: Config.value(optionalEnvironmentString, { env: "ADMIN_EMAILS" }),
+    adminEmails: saasServerConfigDefinition.adminEmails,
   },
   /**
    * Same env vars as the worker's mail config, so sender domains agree on
    * SPF. `BASE_HOST` is read from `publicBaseUrl`, not re-bound here.
    */
-  mail: { ...mailConfigDefinition },
+  mail: { ...notificationServerConfigDefinition },
   /**
    * The payment provider, under the names every LangWatch tier already reads
    * them by. Every leaf is optional: a self-hosted or OSS install bills through
    * nobody, and `resolveApiBillingConfig` answers nothing rather than letting a
    * half-configured Stripe boot a webhook that cannot verify a signature.
    */
-  billing: {
-    stripeSecretKey: Config.value(optionalEnvironmentString, { env: "STRIPE_SECRET_KEY" }),
-    stripeWebhookSecret: Config.value(optionalEnvironmentString, {
-      env: "STRIPE_WEBHOOK_SECRET",
-    }),
-    licensePaymentLinkId: Config.value(optionalEnvironmentString, {
-      env: "STRIPE_LICENSE_PAYMENT_LINK_ID",
-    }),
-    licensePrivateKey: Config.value(optionalEnvironmentString, {
-      env: "LANGWATCH_LICENSE_PRIVATE_KEY",
-    }),
-    slackSubscriptionsChannel: Config.value(optionalEnvironmentString, {
-      env: "SLACK_CHANNEL_SUBSCRIPTIONS",
-    }),
-  },
+  billing: { ...billingServerConfigDefinition },
+  /** The retention every tenant is stamped with when its cascade names none. */
+  dataRetention: { ...dataRetentionServerConfigDefinition },
+  /** The studio's per-project Lambda fleet, and the engine's staging bounds. */
+  workflow: { ...workflowServerConfigDefinition },
   infrastructure: {
     /**
      * Optional, like Redis: no database composes none, never an
@@ -297,14 +269,8 @@ export const apiConfigDefinition = RuntimeConfig.define({
        * A THIRD identity for the cross-tenant EXPLAIN endpoint. Never falls
        * back to the tenant-keyed client; unset means unserved.
        */
-      opsUrl: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_OPS_URL" }),
-      langwatchQl: {
-        url: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_URL" }),
-        username: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_USER" }),
-        password: Config.value(optionalEnvironmentString, { env: "LWQL_CLICKHOUSE_PASSWORD" }),
-        database: Config.value(optionalEnvironmentString, { env: "LWQL_DATABASE" }),
-        tenantSetting: Config.value(optionalEnvironmentString, { env: "LWQL_TENANT_SETTING" }),
-      },
+      opsUrl: opsServerConfigDefinition.clickhouseOpsUrl,
+      langwatchQl: { ...analyticsServerConfigDefinition.langwatchQl },
     },
     /**
      * Absent execution addresses refuse at the call, not at boot — a
@@ -312,70 +278,38 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * this listener's bind address (they differ behind a proxy).
      */
     execution: {
-      nlpServiceUrl: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_NLP_SERVICE",
-      }),
-      langevalsEndpoint: Config.value(optionalEnvironmentString, {
-        env: "LANGEVALS_ENDPOINT",
-      }),
+      langevalsEndpoint: evaluationServerConfigDefinition.langevalsEndpoint,
       publicBaseUrl: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
-      defaultModel: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_DEFAULT_MODEL",
-      }),
     },
     /**
      * `isSaas` gates SYSTEM providers explicitly, never inferred from an
      * `OPENAI_API_KEY` a self-hosted install happens to export.
      */
     modelProvider: {
-      isSaas: Config.value(optionalEnvironmentString, { env: "IS_SAAS" }),
-      ...egressConfigDefinition,
+      isSaas: saasServerConfigDefinition.isSaas,
+      ...modelProviderServerConfigDefinition,
     },
     /**
      * All five optional and read together: none set reads as "not connected"
      * via the feature's `configured` flag, not a call failure. `host` is
      * empty for github.com, the Enterprise Server host otherwise.
      */
-    github: {
-      ...githubAppConfigDefinition,
-      privateKey: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_PRIVATE_KEY" }),
-      appSlug: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_SLUG" }),
-      webhookSecret: Config.value(optionalEnvironmentString, {
-        env: "GITHUB_LANGY_WEBHOOK_SECRET",
-      }),
-    },
+    github: { ...githubServerConfigDefinition },
     /**
      * Optional; absent is normal since the licensing contract embeds the
      * production public key. Exists for ROTATION. The worker reads the SAME
      * variable (ADR-027) so both processes agree on whether it's licensed.
      */
-    licensing: { ...licensingConfigDefinition },
+    licensing: { ...licensingServerConfigDefinition },
     /**
      * BACKEND is a selection, not a fallback chain: naming `azure` never
      * silently resolves to a configured S3 bucket instead.
      */
-    storedObjects: {
-      ...objectStorageConfigDefinition,
-      /**
-       * The operator's assertion that the Azure container reaps an orphaned
-       * trace spool object. Read exactly the way the worker reads it, since
-       * disagreement either orphans spool objects or ingests spans inline.
-       */
-      azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
-        env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
-      }),
-    },
+    storedObjects: { ...storedObjectServerConfigDefinition },
     redis: { ...redisConfigDefinition },
     groupQueue: { ...groupQueueConfigDefinition },
     /** The connected-agent transport's replica count and its relay payload cap (ADR-128). */
-    connectedAgents: {
-      replicaCount: Config.value(z.coerce.number().int().positive().default(1), {
-        env: "LANGWATCH_APP_REPLICAS",
-      }),
-      relayMaxPayloadMb: Config.value(z.coerce.number().positive().optional(), {
-        env: "LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
-      }),
-    },
+    connectedAgents: { ...agentServerConfigDefinition },
   },
 });
 
@@ -587,78 +521,33 @@ export type ApiMailConfig = Readonly<{
 export type ApiNlpLambdaFleetConfig = StudioLambdaConfig;
 
 /**
- * `LANGWATCH_NLP_LAMBDA_CONFIG` is one JSON blob describing the studio's Lambda
- * deployment. Classified (it carries the account's own AWS credentials), so it
- * is parsed here, at this process's one boot seam for such variables — never
- * in the workflow feature itself, which stays pure functions over the result.
+ * `LANGWATCH_NLP_LAMBDA_CONFIG` is one JSON document describing the studio's
+ * Lambda deployment. It is parsed by the workflow feature's own leaf, at this
+ * process's one boot seam, and this only turns the parsed fields into the
+ * shape the studio host takes.
  */
-const studioLambdaConfigSchema = z.object({
-  AWS_REGION: z.string().min(1),
-  AWS_ACCESS_KEY_ID: z.string().min(1),
-  AWS_SECRET_ACCESS_KEY: z.string().min(1),
-  role_arn: z.string().min(1),
-  image_uri: z.string().min(1),
-  cache_bucket: z.string().min(1),
-  subnet_ids: z.array(z.string().min(1)),
-  security_group_ids: z.array(z.string().min(1)),
-});
-
-/**
- * Whether `LANGWATCH_NLP_LAMBDA_CONFIG` was named at all, regardless of
- * whether it parsed. `composeApiStudioHost` refuses by name on a fleet that
- * was named but not usable, rather than quietly falling back to the shared
- * engine address — a distinct outcome from naming no fleet at all, which
- * `fleet` alone cannot tell apart from a malformed one.
- */
-function resolveApiNlpLambdaFleetNamed(source: Readonly<Record<string, unknown>>): boolean {
-  const raw = source.LANGWATCH_NLP_LAMBDA_CONFIG;
-  return typeof raw === "string" && raw.trim() !== "";
-}
-
 function resolveNlpLambdaFleetConfig(
-  source: Readonly<Record<string, unknown>>,
+  workflow: ApiConfigProjection["workflow"],
   langwatchEndpoint: string,
 ): ApiNlpLambdaFleetConfig | undefined {
-  const raw = source.LANGWATCH_NLP_LAMBDA_CONFIG;
-  if (typeof raw !== "string" || raw.trim() === "") return undefined;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    configLogger().warn(
-      { envVar: "LANGWATCH_NLP_LAMBDA_CONFIG" },
-      "Ignoring an unparseable NLP Lambda configuration; the Lambda fleet is not composed",
-    );
-    return undefined;
-  }
-  const fields = studioLambdaConfigSchema.safeParse(parsed);
-  if (!fields.success) {
-    configLogger().warn(
-      { envVar: "LANGWATCH_NLP_LAMBDA_CONFIG" },
-      "NLP Lambda configuration is incomplete; the Lambda fleet is not composed",
-    );
-    return undefined;
-  }
+  const fields = workflow.nlpLambdaFleet;
+  if (!fields) return undefined;
 
   return buildStudioLambdaConfig({
     fields: {
-      region: fields.data.AWS_REGION,
-      accessKeyId: fields.data.AWS_ACCESS_KEY_ID,
-      secretAccessKey: fields.data.AWS_SECRET_ACCESS_KEY,
-      roleArn: fields.data.role_arn,
-      imageUri: fields.data.image_uri,
-      cacheBucket: fields.data.cache_bucket,
-      subnetIds: fields.data.subnet_ids,
-      securityGroupIds: fields.data.security_group_ids,
+      region: fields.AWS_REGION,
+      accessKeyId: fields.AWS_ACCESS_KEY_ID,
+      secretAccessKey: fields.AWS_SECRET_ACCESS_KEY,
+      roleArn: fields.role_arn,
+      imageUri: fields.image_uri,
+      cacheBucket: fields.cache_bucket,
+      subnetIds: fields.subnet_ids,
+      securityGroupIds: fields.security_group_ids,
     },
     langwatchEndpoint,
-    codeBlockTimeoutRawValue:
-      typeof source.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS === "string"
-        ? source.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
-        : undefined,
-    stagingThresholdBytesRawValue: source.LANGEVALS_STAGING_THRESHOLD_BYTES,
-    stagingTtlSecondsRawValue: source.LANGEVALS_STAGING_TTL_SECONDS,
+    codeBlockTimeoutRawValue: workflow.codeBlockTimeoutSeconds,
+    stagingThresholdBytesRawValue: workflow.stagingThresholdBytes,
+    stagingTtlSecondsRawValue: workflow.stagingTtlSeconds,
   });
 }
 
@@ -668,10 +557,13 @@ export type ApiConfig = Readonly<
     | "authz"
     | "billing"
     | "browserSession"
+    | "dataRetention"
     | "infrastructure"
+    | "langyAgentUrl"
     | "mail"
     | "shutdown"
     | "validateTrpcOutput"
+    | "workflow"
   > & {
     authz: ApiAuthzConfig;
     /**
@@ -710,16 +602,16 @@ export type ApiConfig = Readonly<
     platformDefaultRetentionDays: number;
     /**
      * The AWS account the studio's per-project NLP Lambda functions live in,
-     * or nothing where the deployment fronts the engine with none, or named
-     * one it did not describe (see `nlpLambdaFleetNamed`).
+     * or nothing where the deployment fronts the engine with none. A
+     * deployment that named a fleet it did not describe never gets here: the
+     * workflow feature's leaf refuses that boot.
      */
     nlpLambdaFleet: ApiNlpLambdaFleetConfig | undefined;
     /**
-     * True whenever the deployment named `LANGWATCH_NLP_LAMBDA_CONFIG` at all,
-     * whether or not it parsed. `composeApiStudioHost` refuses a named-but-
-     * unusable fleet by name rather than quietly falling back to the shared
-     * engine address, which `nlpLambdaFleet` alone cannot distinguish from a
-     * deployment that named no fleet.
+     * True whenever the deployment named `LANGWATCH_NLP_LAMBDA_CONFIG` at all.
+     * A named-but-unusable fleet now refuses the boot, so this agrees with
+     * `nlpLambdaFleet` and the studio host's own refusal for that case is
+     * unreachable. It stays declared until that host is rewired.
      */
     nlpLambdaFleetNamed: boolean;
     shutdown: ApiShutdownConfig;
@@ -739,10 +631,17 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     },
   }).value;
   refuseApiSelfIngest(value);
-  // All three or none: a deployment that set some of the gateway secrets boots
-  // and then fails on its first virtual-key request, which reads as an outage
-  // rather than as the configuration mistake it is.
+  // Every rule that spans more than one leaf, refused here rather than at
+  // first use: each one names a deployment that boots and then fails on a
+  // request, which reads as an outage rather than as the mistake it is.
   assertGatewaySecretsAllOrNone(source);
+  assertAuthServerConfig(value.browserSession);
+  assertLangyServerConfig({
+    agentUrl: value.langyAgentUrl,
+    internalSecret: value.langyInternalSecret,
+  });
+  assertBillingServerConfig(value.billing);
+  assertAnalyticsServerConfig({ langwatchQl: value.infrastructure.clickhouse.langwatchQl });
   // Destructured out of the spread rather than overwritten: the projection's
   // `mail` is the raw environment, and leaving it in place would put an
   // unresolved gateway on a deployment that named no `BASE_HOST`.
@@ -762,19 +661,16 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       telemetry: resolveTelemetryConfiguration(source),
       serviceName: value.serviceName,
     }),
-    platformDefaultRetentionDays: resolvePlatformDefaultRetentionDays(environmentStrings(source)),
+    platformDefaultRetentionDays: resolvePlatformDefaultRetentionDays({
+      LANGWATCH_DEFAULT_RETENTION_DAYS: value.dataRetention.platformDefaultDays,
+      NODE_ENV: value.nodeEnvironment,
+    }),
     nlpLambdaFleet: resolveNlpLambdaFleetConfig(
-      source,
+      value.workflow,
       value.infrastructure.execution.publicBaseUrl ?? "",
     ),
-    nlpLambdaFleetNamed: resolveApiNlpLambdaFleetNamed(source),
-    authz: {
-      // The platform app's exact rule, so one variable means one thing across
-      // the deployment rather than one thing per tier.
-      epochCacheEnabled: value.authz.epochCache === "1" || value.authz.epochCache === "true",
-      demoProjectId: value.authz.demoProjectId?.trim() || undefined,
-      demoProjectUserId: value.authz.demoProjectUserId?.trim() || undefined,
-    },
+    nlpLambdaFleetNamed: value.workflow.nlpLambdaFleet !== undefined,
+    authz: value.authz,
     browserSession: resolveBrowserSessionConfig({
       ...value.browserSession,
       publicUrl: value.infrastructure.execution.publicBaseUrl,
@@ -794,7 +690,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         poolSizing: poolSizingFromEnv(environmentStrings(source)),
       },
       execution: {
-        nlpServiceUrl: value.infrastructure.execution.nlpServiceUrl?.trim() || undefined,
+        nlpServiceUrl: value.infrastructure.modelProvider.nlpServiceUrl,
         langevalsEndpoint: value.infrastructure.execution.langevalsEndpoint?.trim() || undefined,
         publicBaseUrl: value.infrastructure.execution.publicBaseUrl?.trim() || undefined,
         // The SAME variable the process's own telemetry is exported to, read
@@ -804,8 +700,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         // A blank override is not a model. It resolves to the registry
         // flagship rather than to an empty string, which a child would carry
         // to the provider as a model named "".
-        defaultModel:
-          value.infrastructure.execution.defaultModel?.trim() || REGISTRY_FLAGSHIP_MODEL,
+        defaultModel: value.infrastructure.modelProvider.defaultModel ?? REGISTRY_FLAGSHIP_MODEL,
       },
       modelProvider: resolveModelProviderConfig(
         value.infrastructure.modelProvider,
@@ -818,9 +713,7 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         webhookSecret: value.infrastructure.github.webhookSecret?.trim() ?? "",
         host: value.infrastructure.github.host?.trim() || undefined,
       },
-      licensing: {
-        publicKey: value.infrastructure.licensing.publicKey?.trim() || undefined,
-      },
+      licensing: value.infrastructure.licensing,
       storedObjects: {
         backend: value.infrastructure.storedObjects.backend,
         localFilesystemRoot:
@@ -891,7 +784,7 @@ function refuseApiSelfIngest(value: ApiConfigProjection): void {
     endpoint: value.observability.endpoint,
     deployment: [
       { env: "BASE_HOST", value: value.infrastructure.execution.publicBaseUrl },
-      { env: "NEXTAUTH_URL", value: value.browserSession.url },
+      { env: "NEXTAUTH_URL", value: value.browserSession.sessionUrl },
       { env: "API_HOST/API_PORT", value: value.host, port: value.port },
     ],
   });
@@ -980,59 +873,43 @@ function resolveApiMailConfig(
  */
 function resolveBrowserSessionConfig(
   value: Readonly<{
-    secret: string | undefined;
-    url: string | undefined;
+    sessionSecret: string | undefined;
+    sessionUrl: string | undefined;
     publicUrl: string | undefined;
-    mfaEnrollmentOpen: string | undefined;
-    passkeysEnabled: string | undefined;
+    mfaEnrollmentOpen: boolean;
+    passkeysEnabled: boolean;
     passkeyHandleSecret: string | undefined;
   }>,
 ): ApiBrowserSessionConfig | undefined {
-  const secret = value.secret?.trim() || undefined;
-  const baseUrl = value.url?.trim() || undefined;
+  const secret = value.sessionSecret?.trim() || undefined;
+  const baseUrl = value.sessionUrl?.trim() || undefined;
   if (!secret || !baseUrl) return undefined;
 
   return {
     secret,
     baseUrl,
     publicBaseUrl: value.publicUrl?.trim() || undefined,
-    // The platform app reads both as the literal string "on", so this one
-    // does too: a plugin mounted in one process and not another is a route
-    // that exists for half the fleet.
-    mfaEnrollmentOpen: value.mfaEnrollmentOpen?.trim() === "on",
-    passkeysEnabled: value.passkeysEnabled?.trim() === "on",
+    mfaEnrollmentOpen: value.mfaEnrollmentOpen,
+    passkeysEnabled: value.passkeysEnabled,
     passkeyHandleSecret: value.passkeyHandleSecret?.trim() || secret,
   };
 }
 
-/**
- * `isSaas` reads `"1"`/`"true"` as on, everything else (including `"yes"`)
- * off — the platform app's rule. Allowlist entries are split, trimmed, and
- * blank ones dropped so an empty host can't sit in the list looking like one.
- */
+/** Every reading is the feature's own; this only adds the process's env bag. */
 function resolveModelProviderConfig(
   value: Readonly<{
-    isSaas: string | undefined;
+    isSaas: boolean;
     blockLocalHttpCalls: boolean;
-    allowedProxyHosts: string | undefined;
+    allowedProxyHosts: readonly string[];
   }>,
   environment: Readonly<Record<string, string | undefined>>,
 ): ApiModelProviderConfigResolution {
   return {
-    isSaas: isEnabledFlag(value.isSaas),
+    isSaas: value.isSaas,
     blockLocalHttpCalls: value.blockLocalHttpCalls,
-    allowedProxyHosts:
-      value.allowedProxyHosts
-        ?.split(",")
-        .map((host) => host.trim())
-        .filter((host) => host.length > 0) ?? [],
+    allowedProxyHosts: value.allowedProxyHosts,
     environment,
   };
-}
-
-/** The platform app's exact reading of a boolean environment variable. */
-function isEnabledFlag(value: string | undefined): boolean {
-  return value === "1" || value?.toLowerCase() === "true";
 }
 
 /**

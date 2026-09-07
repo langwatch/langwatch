@@ -16,3 +16,4 @@ export {
   type ScimTokenSummary,
 } from "./scim-token.ts";
 export { SCIM_ROLES, resolveHighestRole, type ScimRole } from "./scim-role-resolver.ts";
+export * from "./scim.config.ts";

@@ -45,6 +45,7 @@ describe("bootWorker", () => {
     });
   });
 
+  /** @scenario "The worker validates its configuration before it connects or consumes" */
   it("rejects invalid configuration before observability, resources, or composition", async () => {
     const createComposition = vi.fn();
 
@@ -73,6 +74,37 @@ describe("bootWorker", () => {
     expect(createComposition).not.toHaveBeenCalled();
     expect(mocks.createObservability).not.toHaveBeenCalled();
     expect(mocks.configureLogger).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "An unreadable switch is refused instead of read as off" */
+  it("rejects an unsafe webhook fence written in a spelling nothing reads", async () => {
+    const createComposition = vi.fn();
+
+    await expect(
+      bootWorker({
+        source: { WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS: "true" },
+        createComposition,
+      }),
+    ).rejects.toThrow("Invalid worker configuration");
+
+    expect(createComposition).not.toHaveBeenCalled();
+    expect(mocks.createObservability).not.toHaveBeenCalled();
+    expect(mocks.configureLogger).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
+  it("rejects a half-configured agent manager before the process graph exists", async () => {
+    const createComposition = vi.fn();
+
+    await expect(
+      bootWorker({
+        source: { LANGY_AGENT_URL: "http://127.0.0.1:5564" },
+        createComposition,
+      }),
+    ).rejects.toThrow(/both its address and its shared secret/);
+
+    expect(createComposition).not.toHaveBeenCalled();
+    expect(mocks.createObservability).not.toHaveBeenCalled();
   });
 
   it("creates one graph and drains Eventing, resources, then observability", async () => {

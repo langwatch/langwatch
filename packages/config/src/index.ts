@@ -26,16 +26,10 @@ export {
 export { postgresConfigDefinition } from "./postgres.config.ts";
 export { redisConfigDefinition } from "./redis.config.ts";
 export { clickhouseConfigDefinition } from "./clickhouse.config.ts";
-export { objectStorageConfigDefinition } from "./object-storage.config.ts";
-export { mailConfigDefinition } from "./mail.config.ts";
 export { groupQueueConfigDefinition } from "./queue.config.ts";
-export { egressConfigDefinition } from "./egress.config.ts";
 export { observabilityConfigDefinition } from "./observability.config.ts";
 export { loggerConfigDefinition } from "./logger.config.ts";
-export { authzConfigDefinition } from "./authz.config.ts";
 export { runtimeIdentityConfigDefinition } from "./runtime-identity.config.ts";
-export { licensingConfigDefinition } from "./licensing.config.ts";
-export { githubAppConfigDefinition } from "./github.config.ts";
 export { trustedProxyConfigDefinition } from "./trusted-proxy.config.ts";
 
 // These switches intentionally retain the old instrumentation policy: only
@@ -192,14 +186,6 @@ export {
   parseDataplaneS3RoutingTable,
   type SkippedDataplaneS3Route,
 } from "./dataplane-s3.ts";
-export {
-  assertGatewaySecretsAllOrNone,
-  GATEWAY_SECRET_ENVS,
-  GATEWAY_SECRET_GENERATE_COMMAND,
-  GATEWAY_SECRET_MIN_LENGTH,
-  type GatewaySecretEnv,
-  GatewaySecretsConfigurationError,
-} from "./gateway-secrets.ts";
 export {
   assertObservabilityDoesNotSelfIngest,
   DEFAULT_LANGWATCH_ENDPOINT,

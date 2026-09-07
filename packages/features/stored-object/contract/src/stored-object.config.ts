@@ -1,12 +1,16 @@
+import {
+  Config,
+  compileRuntimeConfig,
+  environmentOneOrTrueSchema,
+  RuntimeConfig,
+  type ConfigValue,
+} from "@langwatch/config";
 import { z } from "zod";
-
-import { Config, RuntimeConfig } from "./runtime-config.ts";
 
 /**
  * Where a deployment keeps the bytes it externalizes out of traces, datasets,
  * scenarios and evaluation payloads, and the Azure Blob identity it reads and
- * writes that backend through — the whole shape every process that resolves
- * object storage binds identically.
+ * writes that backend through.
  *
  * `backend` is a SELECTION rather than a fallback chain: a deployment that
  * named `azure` means it, and resolving a project to S3 because an S3 bucket
@@ -17,21 +21,24 @@ import { Config, RuntimeConfig } from "./runtime-config.ts";
  *
  * `azure` is read together and interpreted nowhere here: which of the four
  * auth modes applies, which variables each one requires, and whether a
- * plaintext endpoint or a sovereign cloud is admissible are the stored object
- * feature's own rules. `identity` is the AKS azure-workload-identity webhook's
- * own three variables, named here because a process's config module is its
- * only environment reader, not because an operator sets them directly.
+ * plaintext endpoint or a sovereign cloud is admissible are this feature's
+ * own rules, applied where a blob is addressed. `identity` is the AKS
+ * workload-identity webhook's own three variables, named because a process
+ * reads no environment outside its config, not because an operator sets them.
  *
- * Per-organization S3 ROUTES are not here: their names carry the organization
- * id (`DATAPLANE_S3__<label>__<organizationId>`), so a declarative projection
- * can only name variables it knows in advance, and every process parses them
- * off the raw environment with the shared `parseDataplaneS3RoutingTable`
- * helper instead.
+ * Per-organization S3 ROUTES are not here: their names carry the
+ * organization id (`DATAPLANE_S3__<label>__<organizationId>`), so a
+ * declarative projection can only name variables it knows in advance, and
+ * every process parses them off the raw environment with one shared helper.
  */
-export const objectStorageConfigDefinition = RuntimeConfig.define({
+export const storedObjectServerConfigDefinition = RuntimeConfig.define({
   backend: Config.value(z.enum(["s3", "azure"]).optional(), { env: "STORED_OBJECTS_BACKEND" }),
   localFilesystemRoot: Config.value(z.string().optional(), {
     env: "LANGWATCH_LOCAL_STORAGE_PATH",
+  }),
+  /** Whether the Azure container reaps an orphaned trace spool object. */
+  azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
+    env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
   }),
   s3: {
     bucket: Config.value(z.string().optional(), { env: "S3_BUCKET_NAME" }),
@@ -61,3 +68,9 @@ export const objectStorageConfigDefinition = RuntimeConfig.define({
     },
   },
 });
+
+export type StoredObjectServerConfig = ConfigValue<typeof storedObjectServerConfigDefinition>;
+
+export const storedObjectServerConfigSchema = compileRuntimeConfig(
+  storedObjectServerConfigDefinition,
+);
