@@ -6276,11 +6276,15 @@ The first run issues your personal key, prints `issued your personal virtual key
 
 ## Your keys and devices
 
-Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices** tab lists the CLI sessions signed in on your account.
+Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
 
 Revoke a key from the same list when a laptop is lost or a secret leaked. The gateway refuses the key on the next request.
 
-`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your keys stay valid until you revoke them.
+`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your virtual keys stay valid until you revoke them.
+
+### Ingestion keys follow the CLI session
+
+An ingestion key that the CLI mints for a tool belongs to the login session on that machine. It is retired when you run `langwatch logout` there, when you revoke that device from the **Devices and keys** tab, or when the session reaches the end of its window. Every live key is listed on that tab under the device it came from, so you can see and revoke each one on its own.
 
 ## Your usage and budget
 
