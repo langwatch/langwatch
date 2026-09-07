@@ -169,11 +169,10 @@ function PeopleList({
     onClose: onInviteLinkClose,
   } = useDisclosure();
 
-  const pendingInvites =
-    api.invite.getOrganizationPendingInvites.useQuery(
-      { organizationId: organization.id },
-      { enabled: !!organization.id },
-    );
+  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization.id },
+  );
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]

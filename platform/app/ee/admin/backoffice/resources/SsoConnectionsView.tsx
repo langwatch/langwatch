@@ -316,7 +316,9 @@ function rowActionsFor({
           "Evidence reference (ticket, contract, or verification record)",
         );
         if (!evidenceRef?.trim()) return;
-        const note = window.prompt("Why does this evidence prove domain control?");
+        const note = window.prompt(
+          "Why does this evidence prove domain control?",
+        );
         if (!note?.trim()) return;
         commands.attestDomain.mutate({
           ...target,

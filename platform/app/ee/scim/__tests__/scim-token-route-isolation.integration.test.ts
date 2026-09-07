@@ -130,7 +130,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         token: legacyToken,
         path: `/api/scim/v2/Users/${directUserId}`,
         method: "PATCH",
-        body: patch([{ op: "replace", path: "name.givenName", value: "Taken" }]),
+        body: patch([
+          { op: "replace", path: "name.givenName", value: "Taken" },
+        ]),
       });
 
       await expectForbidden(response);
@@ -183,7 +185,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
 
     expect(response.status).toBe(404);
     expect(await authoritySnapshot(first.organizationId)).toEqual(firstBefore);
-    expect(await authoritySnapshot(second.organizationId)).toEqual(secondBefore);
+    expect(await authoritySnapshot(second.organizationId)).toEqual(
+      secondBefore,
+    );
   });
 
   describe("given the grandfathered connection is still serving its own directory", () => {
@@ -193,7 +197,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         token: legacyToken,
         path: `/api/scim/v2/Users/${legacyUserId}`,
         method: "PATCH",
-        body: patch([{ op: "replace", path: "name.givenName", value: "Still" }]),
+        body: patch([
+          { op: "replace", path: "name.givenName", value: "Still" },
+        ]),
       });
 
       expect(response.status).toBe(200);
@@ -201,29 +207,29 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
     });
   });
 
-  describe.each(["FINALIZING", "FINALIZED"] as const)(
-    "given the direct replacement is %s",
-    (migrationPhase) => {
-      it("refuses the legacy token before recording it as used", async () => {
-        await prisma.ssoConnection.update({
-          where: { id: first.directConnectionId },
-          data: { migrationPhase },
-        });
-        await clearTokenUse(first.legacyConnectionId);
-        const before = await authoritySnapshot(first.organizationId);
-
-        const response = await requestWithToken({
-          token: legacyToken,
-          path: `/api/scim/v2/Users/${legacyUserId}`,
-          method: "DELETE",
-        });
-
-        await expectForbidden(response);
-        expect(await authoritySnapshot(first.organizationId)).toEqual(before);
-        expect(await tokenLastUsedAt(first.legacyConnectionId)).toBeNull();
+  describe.each([
+    "FINALIZING",
+    "FINALIZED",
+  ] as const)("given the direct replacement is %s", (migrationPhase) => {
+    it("refuses the legacy token before recording it as used", async () => {
+      await prisma.ssoConnection.update({
+        where: { id: first.directConnectionId },
+        data: { migrationPhase },
       });
-    },
-  );
+      await clearTokenUse(first.legacyConnectionId);
+      const before = await authoritySnapshot(first.organizationId);
+
+      const response = await requestWithToken({
+        token: legacyToken,
+        path: `/api/scim/v2/Users/${legacyUserId}`,
+        method: "DELETE",
+      });
+
+      await expectForbidden(response);
+      expect(await authoritySnapshot(first.organizationId)).toEqual(before);
+      expect(await tokenLastUsedAt(first.legacyConnectionId)).toBeNull();
+    });
+  });
 
   it("refuses a TORN_DOWN connection's own token without recording it as used", async () => {
     await prisma.ssoConnection.update({
@@ -380,7 +386,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         scimConnectionId: connectionId,
       },
     });
-    await prisma.groupMembership.create({ data: { groupId: group.id, userId } });
+    await prisma.groupMembership.create({
+      data: { groupId: group.id, userId },
+    });
     await prisma.roleBinding.create({
       data: {
         id: `${ns}-direct-group-grant`,
@@ -401,52 +409,60 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       orderBy: { userId: "asc" },
     });
     const scopedUserIds = memberships.map(({ userId }) => userId);
-    const [users, directoryIds, groups, groupMemberships, grants] = await Promise.all([
-      prisma.user.findMany({
-        where: { id: { in: scopedUserIds } },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          deactivatedAt: true,
-        },
-        orderBy: { id: "asc" },
-      }),
-      prisma.scimExternalId.findMany({
-        where: { userId: { in: scopedUserIds } },
-        select: { connectionId: true, externalId: true, userId: true },
-        orderBy: [{ connectionId: "asc" }, { externalId: "asc" }],
-      }),
-      prisma.group.findMany({
-        where: { organizationId },
-        select: {
-          id: true,
-          name: true,
-          externalId: true,
-          scimConnectionId: true,
-        },
-        orderBy: { id: "asc" },
-      }),
-      prisma.groupMembership.findMany({
-        where: { group: { organizationId } },
-        select: { groupId: true, userId: true },
-        orderBy: [{ groupId: "asc" }, { userId: "asc" }],
-      }),
-      prisma.roleBinding.findMany({
-        where: { organizationId },
-        select: {
-          id: true,
-          userId: true,
-          groupId: true,
-          role: true,
-          scopeType: true,
-          scopeId: true,
-        },
-        orderBy: { id: "asc" },
-      }),
-    ]);
+    const [users, directoryIds, groups, groupMemberships, grants] =
+      await Promise.all([
+        prisma.user.findMany({
+          where: { id: { in: scopedUserIds } },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            deactivatedAt: true,
+          },
+          orderBy: { id: "asc" },
+        }),
+        prisma.scimExternalId.findMany({
+          where: { userId: { in: scopedUserIds } },
+          select: { connectionId: true, externalId: true, userId: true },
+          orderBy: [{ connectionId: "asc" }, { externalId: "asc" }],
+        }),
+        prisma.group.findMany({
+          where: { organizationId },
+          select: {
+            id: true,
+            name: true,
+            externalId: true,
+            scimConnectionId: true,
+          },
+          orderBy: { id: "asc" },
+        }),
+        prisma.groupMembership.findMany({
+          where: { group: { organizationId } },
+          select: { groupId: true, userId: true },
+          orderBy: [{ groupId: "asc" }, { userId: "asc" }],
+        }),
+        prisma.roleBinding.findMany({
+          where: { organizationId },
+          select: {
+            id: true,
+            userId: true,
+            groupId: true,
+            role: true,
+            scopeType: true,
+            scopeId: true,
+          },
+          orderBy: { id: "asc" },
+        }),
+      ]);
 
-    return { users, memberships, directoryIds, groups, groupMemberships, grants };
+    return {
+      users,
+      memberships,
+      directoryIds,
+      groups,
+      groupMemberships,
+      grants,
+    };
   }
 
   function patch(Operations: unknown[]) {
@@ -468,7 +484,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(body === undefined ? {} : { "Content-Type": "application/scim+json" }),
+        ...(body === undefined
+          ? {}
+          : { "Content-Type": "application/scim+json" }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
@@ -476,7 +494,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
 
   async function expectForbidden(response: Response): Promise<void> {
     expect(response.status).toBe(403);
-    expect(response.headers.get("content-type")).toContain("application/scim+json");
+    expect(response.headers.get("content-type")).toContain(
+      "application/scim+json",
+    );
     await expect(response.json()).resolves.toMatchObject({
       schemas: [SCIM_ERROR_SCHEMA],
       status: "403",

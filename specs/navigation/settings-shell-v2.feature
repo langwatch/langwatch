@@ -30,18 +30,13 @@ Feature: Settings shell
   which put a page they use often at the bottom of a group they have no
   use for.
 
-  PEOPLE & ACCESS holds Members, Teams & Projects, Roles, Authentication,
-  Directory, Access and Audit Log. Authentication is the ORGANIZATION's: how
-  everyone in it signs in, and how their accounts arrive. How the reader
-  themselves signs in is Security, under You, and the two are never the same
-  entry. Role Bindings is gone as an entry: it
-  is the second tab of Roles, and its address forwards there. Groups is
-  gone as an entry too: a group is a thing a directory sends, so group
-  management is a tab of Directory rather than a sibling of it. Directory
-  is the page an identity provider provisions people through, named for
-  what it holds rather than for the protocol it speaks. Access is offered
-  on every plan, because the rules it holds apply to every organization
-  and the card that is enterprise-only carries its own lock.
+  PEOPLE & ACCESS holds Directory and Roles. Directory consolidates Members,
+  Teams & Projects, Groups and Access as tabs, while Roles holds Role Bindings
+  as its second tab. Their old addresses forward to the corresponding tabs.
+  Directory is offered on every plan and is named for what it holds rather
+  than for the provisioning protocol it speaks. Authentication remains in
+  ORGANIZATION because it controls how everyone in the organization signs in;
+  how the reader themselves signs in is Security, under You.
 
   @integration
   Scenario: The Settings sidebar opens with the way back
@@ -52,8 +47,8 @@ Feature: Settings shell
   @integration
   Scenario: The settings menu is grouped with its gates kept
     Given I open Settings
-    Then the sidebar shows the ORGANIZATION and ACCESS groups
-    And General and Members keep their current addresses
+    Then the sidebar shows the ORGANIZATION and PEOPLE & ACCESS groups
+    And General and Directory have their consolidated addresses
 
   @integration
   Scenario: The You section comes first and is about the reader
@@ -72,11 +67,10 @@ Feature: Settings shell
   Scenario: The access group is named for people and holds the organization's pages
     Given I open Settings in a new navigation mode
     Then the group is called "People & access"
-    And it offers Members, Roles, Authentication, Directory and Access
-    And there is no separate Role Bindings entry, since it is a tab of Roles
-    And there is no separate Groups entry, since it is a tab of Directory
-    And Authentication is the organization's page, not the reader's own
-    And Access is offered on every plan
+    And it offers Directory and Roles
+    And it has no separate Members, Groups, Access or Role Bindings entry
+    And Authentication stays in the Organization group
+    And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
   Scenario: Enterprise entries carry a quiet grey pill

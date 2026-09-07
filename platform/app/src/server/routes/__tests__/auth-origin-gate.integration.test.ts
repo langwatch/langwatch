@@ -183,14 +183,17 @@ describe("given a dev checkout running on a non-default port", () => {
     });
 
     it("lets an IdP POST reach BetterAuth only at the exact SAML ACS path", async () => {
-      const response = await app.request("/api/auth/sso/saml2/sp/acs/unknown-provider", {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          origin: "https://idp.example.com",
+      const response = await app.request(
+        "/api/auth/sso/saml2/sp/acs/unknown-provider",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            origin: "https://idp.example.com",
+          },
+          body: new URLSearchParams({ SAMLResponse: "not-a-saml-response" }),
         },
-        body: new URLSearchParams({ SAMLResponse: "not-a-saml-response" }),
-      });
+      );
 
       expect(response.status).toBe(404);
       expect(await response.json()).not.toMatchObject({
