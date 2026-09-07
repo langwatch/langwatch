@@ -107,3 +107,26 @@ reachable from the contract root.
 API and worker runtimes can share one governance model. Eventing registration
 remains a composition concern and must use the same contract facts once its
 schema boundary consumes Standard Schema/Zod 4.
+
+## OTLP receiver policy
+
+Governance owns source classification, Copilot scope restrictions and bundled
+billing decisions. `resolveOtlpReceiverPolicies` returns declarative attribute
+and scope policies through its existing complete contract. Core `@langwatch/otlp`
+applies them and unconditionally replaces or removes the authenticated API-key
+attribute last. Trace and Governance receivers share those mechanics; neither
+needs a forwarding provenance port or another feature's server implementation.
+
+The API credential adapter resolves policy alongside credential metadata.
+This moves the read/cache lookup before body parsing; captured policy errors
+are raised only at the existing post-parse point so malformed-body and usage
+responses retain precedence. Missing Governance remains a retryable refusal for
+ingestion-source keys. The default process's incomplete Governance composition
+is a separate migration task, not a reason to invent an unlicensed fallback.
+
+The complete `GovernanceService` contract is still the migration boundary;
+Governance's missing canonical FeatureApi/App installer is recorded in the
+[cleanup work packets](../../../../../dev/docs/research/architecture-cleanup-work-packets.md).
+This correction does not claim that broader adoption is complete.
+
+Behaviour: [OTLP receiver policy](../../../../../specs/server/otlp-receiver-policy.feature).

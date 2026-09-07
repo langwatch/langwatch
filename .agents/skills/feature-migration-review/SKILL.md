@@ -15,8 +15,12 @@ proof that the migration is complete.
    idempotency, and side effects.
 2. Compare deleted tests with canonical coverage. List every lost scenario;
    restore meaningful coverage before approving deletion.
-3. Verify singular ownership: one public abstract service, one process-owned
+3. Verify singular ownership: one callable Feature API contract, one process-owned
    implementation, private repositories, and no duplicate caller-local service.
+   Every server feature, including Enterprise, uses its canonical
+   `defineFeature(...).withApp(...)` installer. Browser-only features need no
+   invented server. Repository registration is static App metadata, never an
+   instance API exposing persistence.
 4. Reject callback/capability bags, service locators, `Pick`/`Omit`, inferred
    `Parameters`/`ReturnType` contracts, casts, suppressions, global App/Prisma,
    request-time construction, or package env access. In particular reject the
@@ -33,6 +37,12 @@ proof that the migration is complete.
    and lock importers, strict contract build config, and concise current ADR/spec.
 8. Run focused typechecks/tests, Oxfmt, Oxc, architecture lint, comment review,
    test-quality review, and diff check. Inspect the cached diff before commit.
+
+For recurring findings, identify the existing lint and why it did not prevent
+the change: missing coverage, a baseline, an omitted check or stale guidance.
+Add or tighten deterministic enforcement with an adversarial fixture before
+adding more prompt text. Retain runtime/security parity checks where static
+analysis cannot establish behaviour.
 
 Report blockers first, then exact residuals and verified commands. Do not call a
 batch complete while a parity, coverage, composition, or package-link gate is

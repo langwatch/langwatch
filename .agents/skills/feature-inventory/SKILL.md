@@ -27,6 +27,13 @@ or when a proposed slice may duplicate an existing service or repository.
 5. Separate feature behaviour from UI/API/worker composition. Existing URL
    prefixes and database tables do not define feature ownership.
 
+When a cleanup report is requested, distinguish verified findings from search
+heuristics. Group fixes into dependency-closed tasks with exact path ownership,
+target code shape, behavioural invariants and checks. Name the existing lint or
+a precise missing rule for each recurring defect. Treat large composition-root
+retirements as umbrella outcomes, not one agent task. Check active session
+metadata before assigning overlapping paths; do not reproduce raw sessions.
+
 ## Output
 
 Provide an evidence-backed ownership map, the target service boundary, exact
