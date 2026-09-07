@@ -372,11 +372,26 @@ describe("given the share-control command", () => {
           : { action: "approve" };
       }) as never;
 
+      // The picker lists the newest first, so the two need timestamps of their
+      // own: built from the clock they land in the same millisecond most of the
+      // time, and the run where they do not reverses the list.
+      const now = Date.parse("2026-01-01T12:00:00.000Z");
       const requests = [
-        requestNamed("req_1", "Instrument tracing"),
-        requestNamed("req_2", "Fix the refund scenario"),
+        {
+          ...requestNamed("req_1", "Instrument tracing"),
+          createdAt: new Date(now - 20_000).toISOString(),
+        },
+        {
+          ...requestNamed("req_2", "Fix the refund scenario"),
+          createdAt: new Date(now - 3 * 60_000).toISOString(),
+        },
       ];
-      const choice = await chooseRequest({ requests, root: "/work/acme", ask });
+      const choice = await chooseRequest({
+        requests,
+        root: "/work/acme",
+        ask,
+        now,
+      });
 
       const picker = asked[0]!.choices as Array<{
         title: string;
