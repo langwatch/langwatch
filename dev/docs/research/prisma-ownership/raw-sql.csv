@@ -1,0 +1,596 @@
+file,line,current_feature_or_package,quoted_known_tables_hint_only,sql_excerpt
+apps/worker/src/app/worker-gateway-spend.composition.ts,348,@apps/worker,IdempotencyReceipt,"database.$executeRaw`
+    DELETE FROM ""IdempotencyReceipt""
+    WHERE ""expiresAt"" < ${now}
+    -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)
+  `"
+packages/prisma-client/src/readiness.ts,16,@packages/prisma-client,,"options.connection.client.$queryRawUnsafe(
+      ""-- @tenancy: prisma readiness probe\nSELECT 1 AS ready"",
+    )"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,170,@packages/eventing,,"tx.$queryRaw`
+          -- @tenancy: advisory-lock helper, key is process-ref-bounded
+          WITH process_lock AS MATERIALIZED (
+            SELECT pg_advisory_xact_lock(
+              hashtextextended(${refLockKey(commit.ref)}, 0)
+            )
+          )
+          SELECT 1 AS ""acquired"" FROM process_lock
+        `"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,424,@packages/eventing,ProcessManagerOutbox,"this.#prisma.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
+        -- @tenancy: outbox claim is cross-project worker infrastructure by design
+        WITH candidates AS (
+          SELECT ""id""
+          FROM ""ProcessManagerOutbox""
+          WHERE ""status"" = 'pending'::""ProcessManagerOutboxStatus""
+            AND ""nextAttemptAt"" <= ${now}
+            AND (""leasedUntil"" IS NULL OR ""leasedUntil"" <= ${now})
+            ${processNameFilter}
+          ORDER BY ""nextAttemptAt"" ASC, ""createdAt"" ASC, ""id"" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT ${params.limit}
+        )
+        UPDATE ""ProcessManagerOutbox"" AS outbox
+        SET ""leasedUntil"" = ${leasedUntil},
+            ""leaseToken"" = CAST(${leaseBatchToken} AS TEXT) || ':' || outbox.""id"",
+            ""attempts"" = outbox.""attempts"" + 1,
+            ""updatedAt"" = ${now}
+        FROM candidates
+        WHERE outbox.""id"" = candidates.""id""
+        RETURNING outbox.*
+    `)"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,559,@packages/eventing,ProcessManagerInstance,"this.#prisma.$queryRaw<ProcessManagerInstance[]>(
+      Prisma.sql`
+        SELECT *
+        FROM ""ProcessManagerInstance""
+        WHERE ""nextWakeAt"" <= ${asDate(params.now)}
+        ${processNameFilter}
+        ORDER BY ""nextWakeAt"" ASC, ""processName"" ASC,
+                 ""projectId"" ASC, ""processKey"" ASC
+        LIMIT ${params.limit}
+      `,
+    )"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,619,@packages/eventing,ProcessManagerOutbox,"this.#prisma.$executeRaw`
+      DELETE FROM ""ProcessManagerOutbox""
+      WHERE ""processName"" = ${params.processName}
+        AND ""status"" = 'dispatched'::""ProcessManagerOutboxStatus""
+        AND ""dispatchedAt"" < ${asDate(params.before)}
+      -- @tenancy: process-manager outbox retention cross-tenant sweep (system-owned maintenance)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,635,@packages/eventing,ProcessManagerOutbox,"this.#prisma.$executeRaw`
+      DELETE FROM ""ProcessManagerOutbox""
+      WHERE ""id"" IN (
+        SELECT ""id"" FROM ""ProcessManagerOutbox""
+        WHERE ""status"" = 'dispatched'::""ProcessManagerOutboxStatus""
+          AND ""dispatchedAt"" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, dispatched outbox (system-owned maintenance)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,653,@packages/eventing,ProcessManagerOutbox,"this.#prisma.$executeRaw`
+      DELETE FROM ""ProcessManagerOutbox""
+      WHERE ""id"" IN (
+        SELECT ""id"" FROM ""ProcessManagerOutbox""
+        WHERE ""status"" IN (
+            'dead'::""ProcessManagerOutboxStatus"",
+            'discarded'::""ProcessManagerOutboxStatus""
+          )
+          AND ""updatedAt"" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, dead outbox (system-owned maintenance)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-process-store.ts,670,@packages/eventing,ProcessManagerInbox,"this.#prisma.$executeRaw`
+      DELETE FROM ""ProcessManagerInbox""
+      WHERE ""id"" IN (
+        SELECT ""id"" FROM ""ProcessManagerInbox""
+        WHERE ""consumedAt"" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, consumed inbox (system-owned maintenance)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,29,@packages/eventing,ScheduledJob,"this.prisma.$queryRaw<ScheduledJobRecord[]>`
+      SELECT ""id"", ""projectId"", ""targetType"", ""targetId"", ""cron"", ""timezone"",
+             ""nextRunAt"", ""lastSlot"", ""currentSlot"", ""attempts"", ""lastError"",
+             ""active"", ""createdAt"", ""updatedAt""
+      FROM ""ScheduledJob""
+      WHERE ""active"" = true AND ""nextRunAt"" <= ${toPgTimestampUtc(now)}::timestamp
+      ORDER BY ""nextRunAt"" ASC
+      LIMIT ${limit}
+      -- @tenancy: scheduler cross-tenant due-scan (system-owned primitive)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,46,@packages/eventing,ScheduledJob,"this.prisma.$queryRaw<{ nextRunAt: Date | null }[]>`
+      SELECT MIN(""nextRunAt"") AS ""nextRunAt""
+      FROM ""ScheduledJob""
+      WHERE ""active"" = true
+      -- @tenancy: scheduler cross-tenant earliest-due peek (system primitive)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,104,@packages/eventing,ScheduledJob,"this.prisma.$executeRaw`
+      UPDATE ""ScheduledJob""
+      SET ""nextRunAt"" = ${toPgTimestampUtc(leaseUntil)}::timestamp,
+          ""currentSlot"" = COALESCE(""currentSlot"", ${toPgTimestampUtc(slot)}::timestamp),
+          ""updatedAt"" = now()
+      WHERE ""id"" = ${id}
+        AND ""projectId"" = ${projectId}
+        AND ""nextRunAt"" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,143,@packages/eventing,ScheduledJob,"this.prisma.$executeRaw`
+      UPDATE ""ScheduledJob""
+      SET ""nextRunAt"" = ${toPgTimestampUtc(nextRunAt)}::timestamp,
+          ""lastSlot"" = ${lastSlot === null ? null : toPgTimestampUtc(lastSlot)}::timestamp,
+          ""currentSlot"" = ${currentSlot === null ? null : toPgTimestampUtc(currentSlot)}::timestamp,
+          ""attempts"" = ${attempts},
+          ""lastError"" = ${lastError},
+          ""updatedAt"" = now()
+      WHERE ""id"" = ${id}
+        AND ""projectId"" = ${projectId}
+        AND ""nextRunAt"" = ${toPgTimestampUtc(expectedLease)}::timestamp
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,247,@packages/eventing,ScheduledJob,"this.prisma.$queryRaw<ScheduledJobRecord[]>`
+      SELECT ""id"", ""projectId"", ""targetType"", ""targetId"", ""cron"", ""timezone"",
+             ""nextRunAt"", ""lastSlot"", ""currentSlot"", ""attempts"", ""lastError"",
+             ""active"", ""createdAt"", ""updatedAt""
+      FROM ""ScheduledJob""
+      ORDER BY ""active"" DESC, ""nextRunAt"" ASC
+      LIMIT ${limit}
+      -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,268,@packages/eventing,ScheduledJob,"this.prisma.$queryRaw<ScheduledJobRecord[]>`
+        SELECT ""id"", ""projectId"", ""targetType"", ""targetId"", ""cron"", ""timezone"",
+               ""nextRunAt"", ""lastSlot"", ""currentSlot"", ""attempts"", ""lastError"",
+               ""active"", ""createdAt"", ""updatedAt""
+        FROM ""ScheduledJob""
+        WHERE ""active"" = false
+        ORDER BY ""nextRunAt"" ASC
+        LIMIT ${limit}
+        -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+      `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,278,@packages/eventing,ScheduledJob,"this.prisma.$queryRaw<Array<{ total: number }>>`
+        SELECT COUNT(*)::int AS ""total""
+        FROM ""ScheduledJob""
+        WHERE ""active"" = false
+        -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+      `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,291,@packages/eventing,ScheduledJob,"this.prisma.$queryRaw<ScheduledJobRecord[]>`
+      SELECT ""id"", ""projectId"", ""targetType"", ""targetId"", ""cron"", ""timezone"",
+             ""nextRunAt"", ""lastSlot"", ""currentSlot"", ""attempts"", ""lastError"",
+             ""active"", ""createdAt"", ""updatedAt""
+      FROM ""ScheduledJob""
+      WHERE ""id"" = ${id}
+      LIMIT 1
+      -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,323,@packages/eventing,ScheduledJob,"this.prisma.$executeRaw`
+      UPDATE ""ScheduledJob""
+      SET ""active"" = ${active}
+      WHERE ""id"" = ${id}
+        AND ""projectId"" = ${projectId}
+      -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,344,@packages/eventing,ScheduledJob,"this.prisma.$executeRaw`
+      UPDATE ""ScheduledJob""
+      SET ""currentSlot"" = NULL,
+          ""attempts"" = 0,
+          ""lastError"" = NULL,
+          ""nextRunAt"" = ${toPgTimestampUtc(now)}::timestamp,
+          ""updatedAt"" = now()
+      WHERE ""id"" = ${id}
+        AND ""projectId"" = ${projectId}
+        AND ""nextRunAt"" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
+      -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
+    `"
+packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts,385,@packages/eventing,ScheduledJob,"this.prisma.$executeRaw`
+      UPDATE ""ScheduledJob""
+      SET ""nextRunAt"" = ${toPgTimestampUtc(now)}::timestamp,
+          ""updatedAt"" = now()
+      WHERE ""id"" = ${id}
+        AND ""projectId"" = ${projectId}
+        AND ""active"" = true
+        AND ""currentSlot"" IS NULL
+        AND ""nextRunAt"" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
+      -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
+    `"
+packages/enterprise/features/governance/server/src/repositories/prisma/prisma.ai-tool-catalog.repository.ts,225,governance,,"transaction.$executeRaw`-- @tenancy: advisory-lock helper, key is organization-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input.organizationId}`}, 0))`"
+packages/features/analytics/server/src/tasks/lwql-provision.task.ts,73,analytics,,database.$executeRawUnsafe(lwqlProvisioning.withTenancyOptOut(statement))
+packages/features/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts,131,model-provider,,"database.$executeRaw`-- @tenancy: transaction-scoped advisory lock; organization is in the lock key
+SELECT pg_advisory_xact_lock(hashtextextended(${`mdc-org:${organizationId}`}, 0))`"
+packages/features/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts,134,model-provider,,"database.$executeRaw`-- @tenancy: transaction-scoped advisory lock; scope is in the lock key
+SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scope.scopeType}:${scope.scopeId}`}, 0))`"
+packages/features/scenario/server/src/repositories/prisma/scenario.repository.ts,686,scenario,Scenario,"transaction.$executeRaw`
+      SELECT id
+      FROM ""Scenario""
+      WHERE id = ${scenarioId} AND ""projectId"" = ${projectId}
+      FOR UPDATE
+    `"
+packages/features/scenario/server/src/repositories/prisma/scenario.repository.ts,725,scenario,SimulationSuite,"transaction.$executeRaw`
+        SELECT id
+        FROM ""SimulationSuite""
+        WHERE id = ${testSuiteId} AND ""projectId"" = ${projectId}
+        FOR UPDATE
+      `"
+packages/enterprise/features/webhook/server/src/repositories/prisma/prisma.webhook-endpoint.repository.ts,512,webhook,WebhookEndpoint,"this.prisma.$queryRaw<Array<{ organizationId: string }>>`
+      SELECT DISTINCT ""organizationId""
+      FROM ""WebhookEndpoint""
+      WHERE ""status"" = 'ACTIVE'::""WebhookEndpointStatus""
+        AND ""archivedAt"" IS NULL
+      -- @tenancy: webhook delivery sweep entry point (system-owned worker)
+    `"
+packages/enterprise/features/webhook/server/src/repositories/prisma/prisma.webhook-retention.repository.ts,27,webhook,WebhookEndpointDelivery,"this.prisma.$executeRaw`
+      DELETE FROM ""WebhookEndpointDelivery""
+      WHERE ""firedAt"" < ${before}
+      -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
+    `"
+packages/enterprise/features/webhook/server/src/repositories/prisma/prisma.webhook-retention.repository.ts,42,webhook,IdempotencyReceipt,"this.prisma.$executeRaw`
+      DELETE FROM ""IdempotencyReceipt""
+      WHERE ""expiresAt"" < ${now}
+      -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)
+    `"
+packages/features/dataset/server/src/adapters/postgres.dataset-migration.adapter.ts,130,dataset,,"database.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0))`"
+packages/features/dataset/server/src/repositories/prisma/prisma.dataset-content.repository.ts,83,dataset,,"client.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`"
+packages/features/identity/server/src/repositories/prisma/prisma.identity-resolution.repository.ts,63,identity,Identifier; SystemMigrationTenantState,"this.prisma.$queryRaw<ResolutionRow[]>`
+      SELECT i.""userId"" AS ""userId"", s.""status"" AS ""status""
+      FROM ""Identifier"" i
+      LEFT JOIN ""SystemMigrationTenantState"" s
+        ON s.""tenantId"" = i.""userId""
+       AND s.""migrationName"" = ${IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME}
+      WHERE ${match}
+      ORDER BY i.""attachedAt"" ASC, i.""id"" ASC
+      LIMIT 1
+    `"
+packages/features/identity/server/src/repositories/prisma/prisma.identity-reservations.repository.ts,69,identity,IdentifierReservation,"this.database.$queryRaw<IdentifierReservationHolder[]>`
+      -- @tenancy: the lock is keyed by a normalized address and claimed
+      -- before any user is known to hold it, which is what it decides.
+      INSERT INTO ""IdentifierReservation""
+        (""normalizedValue"", ""userId"", ""identifierId"", ""commandId"")
+      VALUES (${normalizedValue}, ${userId}, ${identifierId}, ${commandId})
+      ON CONFLICT (""normalizedValue"") DO UPDATE
+        SET ""normalizedValue"" = ""IdentifierReservation"".""normalizedValue""
+      RETURNING ""normalizedValue"", ""userId"", ""identifierId"", ""commandId""
+    `"
+packages/features/identity/server/src/repositories/prisma/prisma.identity-reservations.repository.ts,113,identity,Identifier; IdentifierReservation,"this.database.$queryRaw<{ normalizedValue: string }[]>`
+      -- @tenancy: the sweep is fleet-wide by construction - it hunts locks
+      -- that no user's live identifier backs.
+      SELECT r.""normalizedValue""
+      FROM ""IdentifierReservation"" r
+      LEFT JOIN ""Identifier"" i
+        ON i.""id"" = r.""identifierId""
+       AND i.""state"" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})
+      WHERE r.""createdAt"" < ${toDate(olderThan)}
+        AND i.""id"" IS NULL
+      ORDER BY r.""createdAt"" ASC
+      LIMIT ${limit}
+    `"
+packages/features/gateway/server/src/repositories/prisma/prisma.gateway-realtime-session.repository.ts,50,gateway,,"tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) -- @tenancy: a lock, not a read; the lock key is itself scoped to one project and key`"
+packages/features/github/server/src/repositories/prisma/github-pull-requests.repository.ts,369,github,GithubBranchPullRequestCheck,"this.prisma.$executeRaw`
+      INSERT INTO ""GithubBranchPullRequestCheck"" (
+        ""id"", ""organizationId"", ""repositoryHost"", ""repositoryFullName"",
+        ""headBranch"", ""lastCheckedAt"", ""prCount"", ""notFoundAt"",
+        ""recheckAfter"", ""attempts"", ""lastRequestedAt"", ""createdAt"", ""updatedAt""
+      )
+      VALUES (
+        ${nanoid()}, ${organizationId}, ${host}, ${fullName},
+        ${headBranch}, ${at}::timestamp, 0, NULL,
+        ${leaseUntil}::timestamp, 0, ${at}::timestamp, ${at}::timestamp, ${at}::timestamp
+      )
+      ON CONFLICT (""organizationId"", ""repositoryHost"", ""repositoryFullName"", ""headBranch"")
+      DO UPDATE SET
+        ""recheckAfter"" = ${leaseUntil}::timestamp,
+        ""lastRequestedAt"" = CASE
+          WHEN ${shouldRecordDemand}::boolean THEN ${at}::timestamp
+          ELSE ""GithubBranchPullRequestCheck"".""lastRequestedAt""
+        END,
+        ""updatedAt"" = ${at}::timestamp
+      WHERE
+        (""GithubBranchPullRequestCheck"".""recheckAfter"" IS NULL
+          OR ""GithubBranchPullRequestCheck"".""recheckAfter"" <= ${at}::timestamp)
+        AND NOT (
+          ""GithubBranchPullRequestCheck"".""prCount"" > 0
+          AND ""GithubBranchPullRequestCheck"".""lastCheckedAt"" > ${freshSince}::timestamp
+        )
+    `"
+packages/features/github/server/src/repositories/prisma/github-pull-requests.repository.ts,505,github,GithubBranchPullRequestCheck,"this.prisma.$executeRaw`
+      DELETE FROM ""GithubBranchPullRequestCheck""
+      WHERE ""lastRequestedAt"" < ${cutoff}::timestamp
+      -- @tenancy: GitHub branch bookkeeping retention sweep (system-owned maintenance)
+    `"
+packages/features/suite/server/src/repositories/prisma/prisma.suite.repository.ts,110,suite,SimulationSuite,"transaction.$executeRaw`
+        SELECT id
+        FROM ""SimulationSuite""
+        WHERE id = ${input.id}
+          AND ""projectId"" = ${input.projectId}
+        FOR UPDATE
+      `"
+packages/features/suite/server/src/repositories/prisma/prisma.suite.repository.ts,205,suite,,"transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`"
+packages/features/suite/server/src/repositories/prisma/prisma.suite.repository.ts,306,suite,,"transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`"
+packages/features/authz/server/src/repositories/prisma/prisma.authz-projection.repository.ts,470,authz,Grant,"this.prisma.$executeRaw`
+      INSERT INTO ""Grant"" (
+        ""id"", ""organizationId"", ""principalType"", ""principalId"", ""roleKey"",
+        ""legacyRole"", ""source"", ""scopeType"", ""scopeId"", ""token"", ""permission"",
+        ""resourceKind"", ""projectId"", ""createdByUserId"", ""expiresAt"",
+        ""maxViews"", ""occurredAt"", ""updatedAt""
+      ) VALUES (
+        ${row.id}, ${row.organizationId},
+        ${row.principalType}::""GrantPrincipalType"", ${row.principalId},
+        ${row.roleKey}, ${row.legacyRole}, ${row.source},
+        ${row.scopeType}::""GrantScopeType"", ${row.scopeId}, ${row.token},
+        ${row.permission}, ${row.resourceKind}, ${row.projectId},
+        ${row.createdByUserId}, ${row.expiresAt ? toDate(row.expiresAt) : null}, ${row.maxViews},
+        ${toDate(row.occurredAt)}, NOW()
+      )
+      ON CONFLICT (""id"") DO UPDATE SET
+        ""organizationId""  = EXCLUDED.""organizationId"",
+        ""principalType""   = EXCLUDED.""principalType"",
+        ""principalId""     = EXCLUDED.""principalId"",
+        ""roleKey""         = EXCLUDED.""roleKey"",
+        ""legacyRole""      = EXCLUDED.""legacyRole"",
+        ""source""          = EXCLUDED.""source"",
+        ""scopeType""       = EXCLUDED.""scopeType"",
+        ""scopeId""         = EXCLUDED.""scopeId"",
+        ""token""           = EXCLUDED.""token"",
+        ""permission""      = EXCLUDED.""permission"",
+        ""resourceKind""    = EXCLUDED.""resourceKind"",
+        ""projectId""       = EXCLUDED.""projectId"",
+        ""createdByUserId"" = EXCLUDED.""createdByUserId"",
+  "
+packages/features/authz/server/src/repositories/prisma/prisma.authz-projection.repository.ts,510,authz,Role,"this.prisma.$executeRaw`
+      INSERT INTO ""Role"" (
+        ""id"", ""organizationId"", ""name"", ""description"", ""permissions"",
+        ""kind"", ""occurredAt"", ""updatedAt""
+      ) VALUES (
+        ${row.id}, ${row.organizationId}, ${row.name}, ${row.description},
+        ${JSON.stringify(row.permissions)}::jsonb, ${row.kind},
+        ${toDate(row.occurredAt)}, NOW()
+      )
+      ON CONFLICT (""id"") DO UPDATE SET
+        ""organizationId"" = EXCLUDED.""organizationId"",
+        ""name""           = EXCLUDED.""name"",
+        ""description""    = EXCLUDED.""description"",
+        ""permissions""    = EXCLUDED.""permissions"",
+        ""kind""           = EXCLUDED.""kind"",
+        ""occurredAt""     = EXCLUDED.""occurredAt"",
+        ""updatedAt""      = NOW()
+      WHERE ""Role"".""occurredAt"" < EXCLUDED.""occurredAt""
+    `"
+packages/features/organization/server/src/repositories/prisma/prisma.team.repository.ts,230,organization,Team,"transaction.$queryRaw`SELECT id FROM ""Team"" WHERE id = ${input.teamId} AND ""organizationId"" = ${input.organizationId} FOR UPDATE`"
+packages/features/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts,96,organization,OrganizationUser,"tx.$queryRaw<Array<{ userId: string }>>`
+    SELECT ""userId"" FROM ""OrganizationUser""
+    WHERE ""organizationId"" = ${organizationId}
+      AND ""role""::text = ${OrganizationUserRole.ADMIN}
+      AND ""disabledAt"" IS NULL
+    ORDER BY ""userId""
+    FOR UPDATE
+  `"
+packages/features/automation/server/src/repositories/prisma/prisma.webhook-delivery.repository.ts,75,automation,WebhookEndpointDelivery,"this.database.$executeRaw`
+			DELETE FROM ""WebhookEndpointDelivery""
+			WHERE ""firedAt"" < ${before}
+			-- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
+		`"
+packages/features/automation/server/src/repositories/prisma/prisma.trigger.repository.ts,60,automation,Trigger,"this.database.$queryRaw<ReportScheduleTarget[]>`
+			SELECT ""id"", ""projectId"", ""actionParams""
+			FROM ""Trigger""
+			WHERE ""triggerKind"" = 'REPORT'
+			  AND ""active"" = true
+			  AND ""deleted"" = false
+			-- @tenancy: report-schedule reconciliation cross-tenant sweep (worker boot)
+		`"
+packages/features/ops/server/src/repositories/prisma/prisma.process-manager-purge.repository.ts,50,ops,ProcessManagerOutbox,"this.database.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+            -- @tenancy: cross-tenant process-manager retention; ops-gated
+            SELECT count(*)::bigint AS n FROM ""ProcessManagerOutbox""
+            WHERE ""status"" = 'dispatched'
+              AND ""dispatchedAt"" < now() - (${retentionDays}::int * interval '1 day')
+          `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-manager-purge.repository.ts,56,ops,ProcessManagerInbox,"this.database.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+            -- @tenancy: cross-tenant process-manager retention; ops-gated
+            SELECT count(*)::bigint AS n FROM ""ProcessManagerInbox""
+            WHERE ""consumedAt"" < now() - (${retentionDays}::int * interval '1 day')
+          `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-manager-purge.repository.ts,75,ops,ProcessManagerOutbox,"this.database.$executeRaw(Prisma.sql`
+        -- @tenancy: cross-tenant process-manager retention; ops-gated
+        WITH batch AS (
+          SELECT ctid FROM ""ProcessManagerOutbox""
+          WHERE ""status"" = 'dispatched'
+            AND ""dispatchedAt"" < now() - (${retentionDays}::int * interval '1 day')
+          LIMIT ${batchSize}
+        )
+        DELETE FROM ""ProcessManagerOutbox"" o USING batch WHERE o.ctid = batch.ctid
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-manager-purge.repository.ts,87,ops,ProcessManagerInbox,"this.database.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant process-manager retention; ops-gated
+      WITH batch AS (
+        SELECT ctid FROM ""ProcessManagerInbox""
+        WHERE ""consumedAt"" < now() - (${retentionDays}::int * interval '1 day')
+        LIMIT ${batchSize}
+      )
+      DELETE FROM ""ProcessManagerInbox"" i USING batch WHERE i.ctid = batch.ctid
+    `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-manager-purge.repository.ts,101,ops,,"this.database.$executeRawUnsafe(
+          `-- @tenancy: cross-tenant process-manager housekeeping; ops-gated\nVACUUM (ANALYZE) ""${table}""`,
+        )"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,59,ops,ProcessManagerInstance,"this.prisma.$queryRaw<
+        Array<{ processName: string; instances: number; overdueWakes: number }>
+      >(Prisma.sql`
+        -- @tenancy: cross-tenant ops fleet counts; the surface is ops-gated
+        SELECT ""processName"",
+               COUNT(*)::int AS ""instances"",
+               COUNT(*) FILTER (WHERE ""nextWakeAt"" < ${overdueWakeBefore})::int AS ""overdueWakes""
+        FROM ""ProcessManagerInstance""
+        GROUP BY ""processName""
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,69,ops,ProcessManagerOutbox,"this.prisma.$queryRaw<
+        Array<{
+          processName: string;
+          pendingMessages: number;
+          overduePending: number;
+          lapsedLeases: number;
+          deadMessages: number;
+        }>
+      >(Prisma.sql`
+        -- @tenancy: cross-tenant ops fleet counts; the surface is ops-gated
+        SELECT ""processName"",
+               COUNT(*) FILTER (WHERE ""status"" = 'pending')::int AS ""pendingMessages"",
+               COUNT(*) FILTER (
+                 WHERE ""status"" = 'pending'
+                   AND ""nextAttemptAt"" < ${overduePendingBefore}
+                   AND (""leasedUntil"" IS NULL OR ""leasedUntil"" < ${now})
+               )::int AS ""overduePending"",
+               COUNT(*) FILTER (
+                 WHERE ""status"" = 'pending' AND ""leasedUntil"" < ${now}
+               )::int AS ""lapsedLeases"",
+               COUNT(*) FILTER (WHERE ""status"" = 'dead')::int AS ""deadMessages""
+        FROM ""ProcessManagerOutbox""
+        WHERE ""status"" IN ('pending', 'dead')
+        GROUP BY ""processName""
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,146,ops,ProcessManagerInstance,"this.prisma.$queryRaw<
+        Array<{
+          processName: string;
+          projectId: string;
+          processKey: string;
+          tenantId: string;
+          revision: number;
+          nextWakeAt: Date | null;
+          updatedAt: Date;
+        }>
+      >(Prisma.sql`
+        -- @tenancy: cross-tenant ops listing; rows carry their project identity
+        SELECT ""processName"", ""projectId"", ""processKey"", ""tenantId"",
+               ""revision"", ""nextWakeAt"", ""updatedAt""
+        FROM ""ProcessManagerInstance""
+        WHERE 1 = 1
+        ${nameFilter}
+        ${searchFilter}
+        ORDER BY ""updatedAt"" DESC
+        LIMIT ${params.pageSize}
+        OFFSET ${(params.page - 1) * params.pageSize}
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,168,ops,ProcessManagerInstance,"this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        -- @tenancy: cross-tenant ops listing; rows carry their project identity
+        SELECT COUNT(*)::int AS ""total""
+        FROM ""ProcessManagerInstance""
+        WHERE 1 = 1
+        ${nameFilter}
+        ${searchFilter}
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,186,ops,ProcessManagerOutbox,"this.prisma.$queryRaw<
+        Array<{
+          processName: string;
+          projectId: string;
+          processKey: string;
+          pending: number;
+          dead: number;
+        }>
+      >(Prisma.sql`
+        -- @tenancy: scoped to the page's (processName, projectId, processKey) tuples above
+        SELECT ""processName"", ""projectId"", ""processKey"",
+               COUNT(*) FILTER (WHERE ""status"" = 'pending')::int AS ""pending"",
+               COUNT(*) FILTER (WHERE ""status"" = 'dead')::int AS ""dead""
+        FROM ""ProcessManagerOutbox""
+        WHERE ""status"" IN ('pending', 'dead')
+          AND (""processName"", ""projectId"", ""processKey"") IN (${pairs})
+        GROUP BY ""processName"", ""projectId"", ""processKey""
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,232,ops,ProcessManagerInstance,"this.prisma.$queryRaw<
+      Array<{
+        processName: string;
+        projectId: string;
+        processKey: string;
+        nextWakeAt: Date;
+      }>
+    >(Prisma.sql`
+      -- @tenancy: cross-tenant ops listing; rows carry their project identity
+      SELECT ""processName"", ""projectId"", ""processKey"", ""nextWakeAt""
+      FROM ""ProcessManagerInstance""
+      WHERE ""nextWakeAt"" IS NOT NULL
+      ORDER BY ""nextWakeAt"" ASC
+      LIMIT ${Math.min(Math.max(params.limit, 1), 200)}
+    `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,310,ops,ProcessManagerOutbox,"this.prisma.$queryRaw<
+        Array<
+          Omit<
+            DeadOutboxMessageView,
+            ""nextAttemptAt"" | ""leasedUntil"" | ""createdAt"" | ""updatedAt""
+          > & {
+            nextAttemptAt: Date;
+            leasedUntil: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+            traceCarrier: unknown;
+          }
+        >
+      >(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT ""id"", ""processName"", ""projectId"", ""processKey"", ""messageKey"",
+               ""intentType"", ""status"", ""attempts"", ""nextAttemptAt"",
+               ""leasedUntil"", ""createdAt"", ""updatedAt"", ""sourceEventId"",
+               ""traceCarrier"", ""payload""
+        FROM ""ProcessManagerOutbox""
+        WHERE ""status"" = 'dead'
+        ${nameFilter}
+        ORDER BY ""updatedAt"" DESC, ""id"" DESC
+        LIMIT ${params.pageSize}
+        OFFSET ${(params.page - 1) * params.pageSize}
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,336,ops,ProcessManagerOutbox,"this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        SELECT COUNT(*)::int AS ""total""
+        FROM ""ProcessManagerOutbox""
+        WHERE ""status"" = 'dead'
+        ${nameFilter}
+      `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,371,ops,ProcessManagerOutbox,"this.prisma.$queryRaw<
+      Array<{ processName: string; count: number; oldestUpdatedAt: Date }>
+    >(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter totals; the surface is ops-gated
+      SELECT ""processName"",
+             COUNT(*)::int AS ""count"",
+             MIN(""updatedAt"") AS ""oldestUpdatedAt""
+      FROM ""ProcessManagerOutbox""
+      WHERE ""status"" = 'dead'
+      GROUP BY ""processName""
+      ORDER BY COUNT(*) DESC
+    `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,493,ops,ProcessManagerOutbox,"this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE ""ProcessManagerOutbox""
+      SET ""status"" = 'pending',
+          ""attempts"" = 0,
+          -- Spread over a minute rather than making every message due at the
+          -- same instant: a fleet redrive can release thousands of intents,
+          -- and handing the dispatcher one due batch the size of the whole
+          -- backlog is how a recovery becomes the next incident.
+          ""nextAttemptAt"" =
+            CAST(${now} AS timestamptz) + (random() * interval '60 seconds'),
+          ""leasedUntil"" = NULL,
+          ""leaseToken"" = NULL,
+          ""updatedAt"" = ${now}
+      -- The status guard is repeated on the UPDATE itself, not left to the
+      -- subquery. The subquery picks ids under one snapshot and the UPDATE
+      -- locks them under another, so a concurrent single-row redrive or
+      -- discard that landed in between would otherwise be clobbered. The
+      -- single-row paths guard the same way for the same reason.
+      WHERE ""status"" = 'dead'
+        AND ""id"" IN (
+          SELECT ""id"" FROM ""ProcessManagerOutbox""
+          WHERE ""status"" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
+    `)"
+packages/features/ops/server/src/repositories/prisma/prisma.process-ops.repository.ts,527,ops,ProcessManagerOutbox,"this.prisma.$executeRaw(Prisma.sql`
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      UPDATE ""ProcessManagerOutbox""
+      SET ""status"" = 'discarded',
+          ""updatedAt"" = ${now}
+      -- Guarded on the UPDATE too; see redriveAllDeadMessages.
+      WHERE ""status"" = 'dead'
+        AND ""id"" IN (
+          SELECT ""id"" FROM ""ProcessManagerOutbox""
+          WHERE ""status"" = 'dead'
+          ${nameFilter}
+          LIMIT ${BULK_RECOVERY_LIMIT}
+        )
+    `)"

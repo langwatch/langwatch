@@ -51,3 +51,9 @@ export {
   safeArgKeys,
   withQueryTiming,
 } from "./slow-query-warning.ts";
+export {
+  prismaTables,
+  scopedPrismaClient,
+  type PrismaRelationException,
+  type ScopedPrismaClient,
+} from "./ownership.ts";

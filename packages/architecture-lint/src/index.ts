@@ -7,12 +7,13 @@ import { lintArchitectureRecords } from "./architecture-records.ts";
 import { lintCycles } from "./cycles.ts";
 import { changedSourceFiles } from "./comment-blocks.ts";
 import { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
-import { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
 import { lintDeclarations } from "./declarations.ts";
+import { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
 import { lintEventingRoles } from "./eventing-roles.ts";
-import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
+import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
+import { lintPrismaTableOwnership } from "./prisma-table-ownership.ts";
 import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
@@ -97,8 +98,8 @@ export { lintServiceCeilingsBaseline } from "./service-ceilings.ts";
 export { lintServiceCeilings } from "./service-ceilings.ts";
 export { lintServiceCeilingsFile } from "./service-ceilings.ts";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
-export { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
 export { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
+export { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
 export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 export type {
   ModuleImport,
@@ -164,6 +165,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintEnterpriseSourceLicense(root),
     ...lintFeatureLayouts(root, discovery.packages),
     ...lintFeatureConfiguration(root, discovery.catalogue),
+    ...lintPrismaTableOwnership(root, discovery.catalogue),
     ...lintFrontendUiBoundaries(root, discovery.packages),
     ...lintGlobalAppAccess(root),
     ...(options.legacyFeatureFragments === false
@@ -171,8 +173,8 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
       : lintLegacyFeatureFragments(root, discovery.catalogue, discovery.packages)),
     ...lintEventingRoles(root, discovery.packages),
     ...lintArchitectureRecords(discovery.packages),
-    ...lintDeclarationProjectReferences(root, discovery.packages),
     ...lintStrictContractBuildConfigs(root, discovery.packages),
+    ...lintDeclarationProjectReferences(root, discovery.packages),
     ...lintStrictPortModules(root, discovery.packages),
     ...lintManifests(discovery.packages),
     ...lintOverengineeringBaseline(root, discovery.packages),

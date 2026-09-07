@@ -1,0 +1,130 @@
+{
+  "status": "proposal",
+  "schema": "packages/prisma-client/prisma/schema.prisma",
+  "owners": {
+    "user": ["User"],
+    "auth": ["Session"],
+    "identity": [
+      "Account",
+      "AccountCredential",
+      "VerificationToken",
+      "Identifier",
+      "IdentifierReservation",
+      "IdentityProjectionCursor",
+      "TwoFactor",
+      "Passkey",
+      "MfaEnrollment",
+      "SsoConnection",
+      "JoinRequest",
+      "ScimSyncState"
+    ],
+    "organization": [
+      "Organization",
+      "Team",
+      "OrganizationUser",
+      "TeamUser",
+      "OrganizationInvite",
+      "Group",
+      "GroupMembership"
+    ],
+    "project": ["Project"],
+    "authz": ["CustomRole", "Role", "RoleBinding", "Grant", "GrantUsage"],
+    "scim": ["ScimToken", "ScimExternalId"],
+    "api-key": ["ApiKey"],
+    "governance": [
+      "Department",
+      "PlatformToolPolicy",
+      "IngestionSource",
+      "IngestionTemplate",
+      "IngestionPullRunProjection",
+      "AnomalyRule",
+      "AnomalyAlert",
+      "AiToolEntry",
+      "AiToolEntryTeam",
+      "AiToolEntryDepartment"
+    ],
+    "gateway": [
+      "VirtualKey",
+      "VirtualKeyScope",
+      "RoutingPolicy",
+      "RoutingPolicyScope",
+      "GatewayGuardrail",
+      "GatewayBudget",
+      "GatewayBudgetBucketBoundary",
+      "GatewayBudgetLedger",
+      "GatewayChangeEvent",
+      "GatewayCacheRule",
+      "GatewayRealtimeSession"
+    ],
+    "model-provider": [
+      "ModelProvider",
+      "ModelProviderScope",
+      "ModelDefaultConfig",
+      "ModelDefaultConfigScope",
+      "CustomLLMModelCost"
+    ],
+    "billing": ["Subscription", "Invoice", "InvoiceItem", "BillingMeterCheckpoint"],
+    "audit-log": ["AuditLog"],
+    "annotation": [
+      "Annotation",
+      "AnnotationScore",
+      "AnnotationQueue",
+      "AnnotationQueueMembers",
+      "AnnotationQueueScores",
+      "AnnotationQueueItem"
+    ],
+    "dataset": ["Dataset", "DatasetRecord"],
+    "experiment": ["Experiment", "ExperimentVersion"],
+    "evaluation": ["BatchEvaluation", "Cost"],
+    "evaluator": ["Evaluator"],
+    "agent": ["Agent"],
+    "workflow": ["Workflow", "WorkflowVersion"],
+    "prompt": ["LlmPromptConfig", "LlmPromptConfigVersion", "PromptTag", "PromptTagAssignment"],
+    "scenario": ["Scenario", "ScenarioVersion"],
+    "suite": ["SimulationSuite"],
+    "dashboard": ["Dashboard", "SavedView", "CustomGraph"],
+    "monitor": ["Monitor"],
+    "automation": ["Trigger", "TriggerSent", "EmailSuppression"],
+    "webhook": ["WebhookEndpoint", "WebhookEndpointDelivery"],
+    "github": ["GithubInstallation", "GithubPullRequest", "GithubBranchPullRequestCheck"],
+    "langy": [
+      "LangyConversationProjection",
+      "LangyTurnRequest",
+      "LangyActiveTurn",
+      "LangyConversationTurnProjection",
+      "LangyMessageProjection"
+    ],
+    "secret": ["ProjectSecret"],
+    "share": ["ShareLink"],
+    "data-retention": ["RetentionPolicy", "PinnedTrace"],
+    "data-privacy": ["DataPrivacyPolicy"],
+    "trace": ["TraceEditOverlay"],
+    "topic": [
+      "Topic",
+      "TopicClusteringRunProjection",
+      "TopicModelProjection",
+      "TopicClusteringRunHistoryProjection"
+    ],
+    "analytics": ["Analytics"],
+    "notification": ["Notification"],
+    "feature-flag": ["FeatureFlag", "FeatureFlagExperimentSetting"],
+    "ops": ["BugReport"],
+    "@platform/eventing": [
+      "ProcessManagerInstance",
+      "ProcessManagerInbox",
+      "ProcessManagerOutbox",
+      "ProcessManagerOutboxAttempt",
+      "ScheduledJob"
+    ],
+    "@platform/system-migrations": ["SystemMigrationTenantState", "SystemMigrationEnrollment"],
+    "@platform/api": ["IdempotencyReceipt"],
+    "stored-object": ["StoredObject"]
+  },
+  "proposedRootChanges": {
+    "webhook": {
+      "from": "packages/enterprise/features/webhook",
+      "to": "packages/features/webhook",
+      "reason": "Core outbound delivery used by multiple features; Enterprise caller does not make the shared capability Enterprise."
+    }
+  }
+}
