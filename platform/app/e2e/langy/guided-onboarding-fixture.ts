@@ -22,6 +22,10 @@ import {
 } from "~/features/guided-onboarding/kickoff";
 import type { GuidedPath } from "~/features/guided-onboarding/paths";
 import {
+  GUIDED_PROVIDERS,
+  guidedChatModels,
+} from "~/features/guided-onboarding/takeover/providers";
+import {
   ADMIN_EMAIL,
   APP_BASE,
   PROJECT_ID,
@@ -135,7 +139,19 @@ export interface GuidedOrganization {
 }
 
 const PROVIDER = "openai";
-const MODEL = "gpt-5";
+
+/**
+ * The model the guided provider screen lands on for OpenAI, resolved the way
+ * the screen resolves it: it preselects the first chat pill, and the first
+ * pill is the registry's recommended model.
+ *
+ * A literal here pinned the suite to a model the product had stopped using,
+ * and the gateway path then passed every run while the live path failed every
+ * run, because the skill's wording convinced one model and not the other.
+ */
+const MODEL = guidedChatModels(
+  GUIDED_PROVIDERS.find((provider) => provider.id === PROVIDER)!,
+)[0]!;
 
 /**
  * A fresh organization as the takeover leaves it: the guided variant, the
