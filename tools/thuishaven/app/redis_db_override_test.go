@@ -94,6 +94,7 @@ func TestRedisDBOverrideParsing(t *testing.T) {
 	}
 }
 
+// @scenario "LANGWATCH_HAVEN_PUBLIC_URL accepts only http and https schemes"
 func TestPublicURLFromEnvParsing(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
