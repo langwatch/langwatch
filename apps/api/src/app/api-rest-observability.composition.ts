@@ -1,15 +1,15 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
   apiErrorBody,
+  isFrameworkRefusal,
   loggerMiddleware,
   tracerMiddleware,
   type ApiErrorBody,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { ApiRestSecurityObservability } from "../api-rest.security";
+import type { ApiRestSecurityObservability } from "../api-rest.security.ts";
 
 const logger = createLogger("langwatch:api:rest");
 
@@ -67,7 +67,7 @@ const renderLegacy: ErrorHandler = (error, context) => {
   if (HandledError.isHandled(error)) {
     return context.json(legacyErrorBody(error), status);
   }
-  if (error instanceof HTTPException && status < 500) {
+  if (isFrameworkRefusal(error) && status < 500) {
     return context.json({ error: error.message, message: error.message }, status);
   }
   return context.json({ error: "Internal Server Error", message: UNKNOWN_ERROR_MESSAGE }, status);
@@ -126,11 +126,10 @@ export function canonicalErrorFor(error: unknown): {
     : apiErrorBody({
         status,
         code:
-          error instanceof HTTPException && status < 500
+          isFrameworkRefusal(error) && status < 500
             ? (CODE_BY_STATUS[status] ?? "internal_error")
             : "internal_error",
-        message:
-          error instanceof HTTPException && status < 500 ? error.message : UNKNOWN_ERROR_MESSAGE,
+        message: isFrameworkRefusal(error) && status < 500 ? error.message : UNKNOWN_ERROR_MESSAGE,
       });
   return { status, body };
 }
@@ -142,7 +141,7 @@ export function canonicalErrorFor(error: unknown): {
  */
 function statusOf(error: Error): ContentfulStatusCode {
   if (HandledError.isHandled(error)) return error.httpStatus as ContentfulStatusCode;
-  if (error instanceof HTTPException) return error.status;
+  if (isFrameworkRefusal(error)) return error.status;
   return 500;
 }
 

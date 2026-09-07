@@ -14,9 +14,8 @@ const SECRET_KEYS = new Set(
 function isSecretResolutionSite(workspacePath) {
   const owner = /^packages\/secrets\//.test(workspacePath);
   const configModule = /(?:^|\/)platform\/config\//.test(workspacePath);
-  const processBoot = /\.(?:composition|executable|entrypoint|main|process|runtime)\.[cm]?tsx?$/.test(
-    workspacePath,
-  );
+  const processBoot =
+    /\.(?:composition|executable|entrypoint|main|process|runtime)\.[cm]?tsx?$/.test(workspacePath);
   return owner || configModule || processBoot;
 }
 
@@ -58,7 +57,9 @@ export const secretsThroughSourceRule = defineRule({
   create(context, file) {
     if (isNonProductionSource(file.workspacePath)) return {};
     if (isSecretResolutionSite(file.workspacePath)) return {};
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "secrets-through-source" })) {
+    if (
+      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "secrets-through-source" })
+    ) {
       return {};
     }
 

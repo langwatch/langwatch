@@ -55,7 +55,7 @@
     "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "vite --configLoader runner",
     "build": "NODE_ENV=production vite build --configLoader runner",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

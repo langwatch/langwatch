@@ -416,6 +416,14 @@ Feature: Webhook endpoints, signed outbound event delivery
       When it calls the webhook endpoints api
       Then the request is rejected as an enterprise feature
 
+    @integration
+    Scenario: The plan gate answers on a deployment with no Enterprise governance application
+      Given a deployment that composed no Enterprise governance application
+      And an organization whose plan lacks webhook endpoints
+      When it calls the webhook endpoints api
+      Then the request is refused as forbidden, naming the plan
+      So a knowable refusal is never reported as an unknown platform failure
+
   Rule: The emitted events log is the primitive, webhooks ride it
 
     @integration

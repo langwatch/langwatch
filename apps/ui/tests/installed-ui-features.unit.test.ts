@@ -110,7 +110,15 @@ const CHROME_PAGE_KEYS = ["features/chrome/UiAppChrome"];
  * The root address, `/`. Its whole body is the landing redirect, and it carries
  * no page guard for the same reason the front door carries none.
  */
-const NAVIGATION_PAGE_KEYS = ["pages/@project/[...path]/index", "pages/index", "pages/not-found"];
+const NAVIGATION_PAGE_KEYS = [
+  "pages/@project/[...path]/index",
+  "pages/index",
+  "pages/not-found",
+  // The same page for an address under /settings that names nothing. A second
+  // key so the route table can mount it INSIDE the settings group, which is
+  // what keeps the sidebar and the top bar drawn around the 404.
+  "pages/settings/not-found",
+];
 
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a

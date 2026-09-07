@@ -83,6 +83,14 @@ Feature: Handled errors — the handled-error boundary
     And the body carries the refusal's own sentence
 
   @unit @bdd @domain-errors
+  Scenario: A framework refusal raised through a second copy of the framework is still a refusal
+    Given a route raises a refusal carrying status 404 from a second copy of the HTTP framework
+    When the client calls that route
+    Then the HTTP status is 404
+    And the body carries the refusal's own sentence
+    So a refusal never becomes a 500 because two packages resolved the framework differently
+
+  @unit @bdd @domain-errors
   Scenario: A framework refusal at 5xx still collapses to the generic body
     Given a route raises the HTTP framework's own refusal with status 503
     When the client calls that route
