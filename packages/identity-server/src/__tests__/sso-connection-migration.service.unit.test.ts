@@ -1,5 +1,6 @@
 import {
   emptySsoConnection,
+  qualifySsoDomainOwnership,
   type SsoConnectionCommand,
   type SsoConnectionState,
 } from "@langwatch/identity";
@@ -74,7 +75,41 @@ beforeEach(() => {
 });
 
 describe("Auth0 connection migration lifecycle", () => {
-  it("does not inherit a grandfathered configuration as ownership proof", async () => {
+  it("inherits an exact legacy-import proof without resetting its evidence", async () => {
+    const imported = legacyImportProof();
+    connections.seed({
+      ...legacyConnection(),
+      domainVerifications: [imported],
+    });
+
+    await service.registerReplacementConnection({
+      ...commandIdentity(DIRECT, T0 + 1),
+      type: "oidc",
+      idp: IDP,
+      arrivalPolicy: "refuse",
+      replacesConnectionId: LEGACY,
+    });
+
+    const replacement = await held(DIRECT);
+    expect(replacement).toMatchObject({
+      state: "VERIFIED",
+      verifiedDomains: ["acme.com"],
+      domainVerifications: [imported],
+    });
+    expect(
+      qualifySsoDomainOwnership({
+        state: replacement!,
+        domain: "acme.com",
+      }).status,
+    ).toBe("QUALIFIED");
+  });
+
+  it("does not inherit a legacy method with missing import provenance", async () => {
+    connections.seed({
+      ...legacyConnection(),
+      domainVerifications: [{ ...legacyImportProof(), legacyImport: null }],
+    });
+
     await service.registerReplacementConnection({
       ...commandIdentity(DIRECT, T0 + 1),
       type: "oidc",
@@ -135,6 +170,7 @@ describe("Auth0 connection migration lifecycle", () => {
     });
   });
 
+  /** @scenario "A legacy connection may have exactly one explicit direct replacement" */
   it("registers one explicit replacement and refuses a third connection", async () => {
     await service.registerReplacementConnection({
       ...commandIdentity(DIRECT, T0 + 1),
@@ -161,6 +197,7 @@ describe("Auth0 connection migration lifecycle", () => {
     ).rejects.toMatchObject({ code: "sso_connection_already_registered" });
   });
 
+  /** @scenario "A legacy connection may have exactly one explicit direct replacement" */
   it("refuses the ordinary lower-level registration bypass beside legacy", async () => {
     await expect(
       service.registerConnection({
@@ -332,5 +369,30 @@ function legacyConnection(): SsoConnectionState {
     verifiedDomains: ["acme.com"],
     createdAtMs: T0,
     updatedAtMs: T0,
+  };
+}
+
+function legacyImportProof(): SsoConnectionState["domainVerifications"][number] {
+  return {
+    domain: "acme.com",
+    method: "legacy-configuration",
+    actorId: null,
+    verifiedAtMs: T0,
+    proofState: "VERIFIED",
+    firstAbsentAtMs: null,
+    graceEndsAtMs: null,
+    tokenHash: null,
+    evidenceRef: `legacy-sso-config:${ORG}:${LEGACY}:acme.com`,
+    note: null,
+    verifier: { type: "system", id: null },
+    legacyImport: {
+      migration: "sso-connection-grandfather-v1",
+      version: 1,
+      organizationId: ORG,
+      predecessorConnectionId: LEGACY,
+      domain: "acme.com",
+      importedAtMs: T0,
+      evidenceRef: `legacy-sso-config:${ORG}:${LEGACY}:acme.com`,
+    },
   };
 }

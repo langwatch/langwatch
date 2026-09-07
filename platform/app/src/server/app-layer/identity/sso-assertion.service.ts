@@ -17,7 +17,9 @@ import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
  * which parts of it it acts on.
  */
 export interface SignInConnection {
+  connectionId?: string;
   organizationId: string;
+  replacesConnectionId?: string | null;
   state: string;
   verifiedDomains: readonly string[];
   domainVerifications: readonly SsoDomainVerification[];
@@ -72,6 +74,9 @@ export const domainStanding = ({
   connection: Pick<
     SignInConnection,
     | "state"
+    | "connectionId"
+    | "organizationId"
+    | "replacesConnectionId"
     | "verifiedDomains"
     | "domainVerifications"
     | "lapsedDomains"

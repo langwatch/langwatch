@@ -11,11 +11,9 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   # verbs it already has. This deliverable adds surfaces, permissions and
   # ceremonies - and not one guard.
   #
-  # OIDC ONLY. The connection is protocol-agnostic on purpose, so SAML
-  # arrives later as one more way to terminate a connection, and the engine
-  # choice - ADR-117's named debt - moves to D09, where a named customer's
-  # connection defines the requirement instead of a guess. Registering a
-  # SAML connection through any of these surfaces is refused by name.
+  # D09 now terminates both OIDC and SAML connections through the same
+  # lifecycle. A signing certificate authenticates assertions from an IdP;
+  # it is never evidence that the organization owns an email domain.
   #
   # Three tiers. They differ in WHO drives the setup and WHAT authorizes the
   # domain. They never differ in which guards run:
@@ -32,14 +30,13 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   #     customer is somebody completing a test sign-in, which is the entire
   #     point of a test sign-in.
   #
-  #   TIER 2  self-hosted self-serve, licence-bound       SECOND, SIMPLEST
+  #   TIER 2  self-hosted self-serve, licence-gated       SECOND, SIMPLEST
   #     an organization administrator, in Settings
-  #     register -> claim -> approve (the licence) -> prove (licence) ->
+  #     register -> claim -> prove (DNS record or HTTPS file) ->
   #     activate
-  #     no LangWatch in the loop at all. There is nobody to reach, so the
-  #     enterprise licence IS the authorization: no claim queue, no
-  #     approval step of ours, no DNS ceremony. This tier is genuinely
-  #     smaller than tier 3, not larger.
+  #     the licence grants access to setup; it does not prove domain
+  #     ownership. The same customer-controlled evidence used by hosted
+  #     self-serve decides an uncontested claim.
   #
   #   TIER 3  hosted self-serve                           LAST, SEPARABLE
   #     an organization administrator, in Settings
@@ -169,21 +166,21 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Then the confirmation names "acme" by name and says who would lose their way in
     And the removal is refused outright when the organization's name cannot be resolved
 
-  # ── Tier 2: self-hosted, and the licence is the authorization ──────────
+  # ── Tier 2: self-hosted, licence-gated with ownership proof ─────────
 
   @integration
   Scenario: A self-hosted administrator sets single sign-on up with nobody else involved
     Given a self-hosted installation holding a genuine licence
     When "ana" registers the identity provider and claims "acme.com" in Settings
-    Then the claim is approved on the licence's authority in the same step
-    And nothing is queued for LangWatch to look at
+    Then the licence permits setup but does not approve or prove the claim
+    And "ana" is given a domain-ownership record to publish
 
   @integration
-  Scenario: The licence proves the domain, so there is no record to publish
+  Scenario: A licensed installation still needs domain-ownership evidence
     Given a self-hosted installation holding a genuine licence
     When "ana" asks to prove "acme.com"
-    Then she is asked to confirm the installation's licence rather than publish anything
-    And the domain is proved without her leaving the page
+    Then she is given a record and file address carrying the same minted token
+    And the domain remains unproved until one of those exact locations serves it
 
   @unit
   Scenario: The proof is recorded as a hash and the identity provider's secret is not recorded at all
@@ -216,7 +213,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   Scenario: A self-hosted administrator is not offered attestation either
     Given a self-hosted installation holding a genuine licence
     When "ana" asks to prove "acme.com"
-    Then the licence is what proves it
+    Then publishing the record or file is what proves it
     And attesting the domain is not something she can reach
 
   @unit

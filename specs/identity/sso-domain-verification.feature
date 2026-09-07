@@ -78,8 +78,8 @@ Feature: Proving a domain by publishing a record
   # alerts. Publishing the record again restores everything with nothing to
   # redo.
   #
-  # ONLY RECORDS ARE RE-READ. An attested domain, a licence-proved one and a
-  # grandfathered one have no TXT record to be missing, so none of them is
+  # ONLY PUBLISHED PROOFS ARE RE-READ. An attested or grandfathered domain
+  # has no customer-published proof to be missing, so neither is
   # ever asked about — and neither is a domain proved before we began keeping
   # the ceremony's hash, because a re-read that cannot compare a value is not
   # evidence of anything.
@@ -260,11 +260,11 @@ Feature: Proving a domain by publishing a record
     And no fact is recorded
 
   @unit
-  Scenario: A licence-bound ceremony cannot stand in for a decision
+  Scenario: Entitlement cannot stand in for domain ownership
     Given "ana"'s claim on "acme.com" is waiting
-    When a licence-bound ceremony is asked for on that claim
+    When a valid Enterprise licence is presented without a published proof
     Then it is refused with the code "sso_connection_invalid_transition"
-    And only a published record may decide a claim nobody has decided
+    And only customer-controlled domain evidence may decide an uncontested claim
 
   # ── The one thing that still reaches a person ──────────────────────────
 
@@ -358,9 +358,9 @@ Feature: Proving a domain by publishing a record
     And no claim was re-decided, no fresh token was minted, and nothing went into a queue
 
   @unit
-  Scenario: A domain no published record ever proved is never doubted by DNS
-    Given "acme.com" was attested by a LangWatch operator and "beta.example" was proved by a licence
-    When anything tries to record a missing record against either
+  Scenario: A domain no published proof ever proved is never doubted by DNS
+    Given "acme.com" was attested by a LangWatch operator and "beta.example" was grandfathered
+    When anything tries to record a missing published proof against either
     Then it is refused with the code "sso_connection_invalid_transition"
     And neither domain can be lapsed by an answer about somebody else's kind of evidence
 
@@ -410,6 +410,13 @@ Feature: Proving a domain by publishing a record
     When "ana" adds "acme.co.uk" and it moves through claim, approval and proof
     Then the connection stays ACTIVE at every step, and sign-in on "acme.com" is never interrupted
     And only activating, suspending or tearing down moves the connection's own state
+
+  @unit
+  Scenario: Every exact domain on one connection is qualified independently
+    Given one connection proved "acme.com" and "beta.example"
+    When its identity provider asserts addresses on those exact domains
+    Then both assertions are accepted
+    But an assertion on "sub.beta.example" or any other unproved domain is refused
 
   # ── Somebody else got there first ──────────────────────────────────────
 

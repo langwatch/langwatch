@@ -99,6 +99,18 @@ export type SsoVerificationMethod = z.infer<typeof ssoVerificationMethodSchema>;
 export const ssoAttestationEvidenceRefSchema = z.string().trim().min(1).max(500);
 export const ssoAttestationNoteSchema = z.string().trim().min(1).max(1_000);
 
+export const LEGACY_SSO_DOMAIN_IMPORT_MIGRATION = "sso-connection-grandfather-v1";
+export const legacySsoDomainImportSchema = z.object({
+  migration: z.literal(LEGACY_SSO_DOMAIN_IMPORT_MIGRATION),
+  version: z.literal(1),
+  organizationId: z.string().min(1),
+  predecessorConnectionId: z.string().min(1),
+  domain: z.string().min(1),
+  importedAtMs: z.number().int().positive(),
+  evidenceRef: z.string().min(1).max(500),
+});
+export type LegacySsoDomainImport = z.infer<typeof legacySsoDomainImportSchema>;
+
 /**
  * What happens to somebody who signs in through this connection and is not a
  * member yet (ADR-117 §3).
@@ -253,6 +265,7 @@ export const ssoDomainVerificationSchema = z.object({
   evidenceRef: z.string().min(1).max(500).nullable().optional(),
   note: z.string().min(1).max(1_000).nullable().optional(),
   verifier: identityActorSchema.nullable().optional(),
+  legacyImport: legacySsoDomainImportSchema.nullable().optional(),
 });
 export type SsoDomainVerification = z.infer<
   typeof ssoDomainVerificationSchema
@@ -546,6 +559,7 @@ export const domainVerifiedPayloadSchema = z.object({
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
   actor: identityActorSchema,
+  legacyImport: legacySsoDomainImportSchema.optional(),
   ...sourced,
 });
 
@@ -1228,7 +1242,23 @@ export function reduceSsoConnection({
         }),
         pendingVerification: null,
       };
-    case DOMAIN_VERIFIED_EVENT_TYPE:
+    case DOMAIN_VERIFIED_EVENT_TYPE: {
+      const legacyImport: LegacySsoDomainImport | null =
+        fact.data.legacyImport ??
+        (fact.data.method === "legacy-configuration" &&
+        fact.data.source === "legacy-grandfathered" &&
+        fact.data.actor.type === "system" &&
+        fact.data.actor.id === null
+          ? {
+              migration: LEGACY_SSO_DOMAIN_IMPORT_MIGRATION,
+              version: 1,
+              organizationId: state.organizationId,
+              predecessorConnectionId: state.connectionId,
+              domain: fact.data.domain,
+              importedAtMs: fact.occurredAt,
+              evidenceRef: `legacy-sso-config:${state.organizationId}:${state.connectionId}:${fact.data.domain}`,
+            }
+          : null);
       return {
         ...touched,
         state: lifecycleAfterDomainFact(state, "VERIFIED"),
@@ -1255,15 +1285,18 @@ export function reduceSsoConnection({
               ? state.pendingVerification.tokenHash
               : null,
           evidenceRef:
-            state.pendingVerification?.domain === fact.data.domain &&
+            legacyImport?.evidenceRef ??
+            (state.pendingVerification?.domain === fact.data.domain &&
             state.pendingVerification.method === "dns-txt"
               ? state.pendingVerification.tokenHash
-              : null,
+              : null),
           note: null,
           verifier: fact.data.actor,
+          legacyImport,
         }),
         pendingVerification: null,
       };
+    }
     // The three condition facts (ADR-123). None of them touches `state`,
     // `verifiedDomains` or anything routing reads: what they change is what
     // the evidence SAYS, and the only behaviour hanging off that is whether
@@ -1499,9 +1532,9 @@ export type SsoDomainOwnershipQualification =
  * The one qualification used wherever domain control grants authority.
  *
  * `verifiedDomains` is compatibility/routing history, not evidence. A licence
- * token speaks for an installation and a grandfathered configuration says
- * only which route existed; neither proves that the organization controls a
- * public domain. Published proofs must retain their ceremony hash and time.
+ * token speaks for an installation. A grandfathered configuration qualifies
+ * only with the exact provenance captured by its one-time legacy import.
+ * Published proofs must retain their ceremony hash and time.
  * An operator attestation must retain the authenticated human, time, bounded
  * evidence reference and note. Nothing missing is inferred back into place.
  */
@@ -1510,6 +1543,9 @@ export function qualifySsoDomainOwnership({
   domain,
 }: {
   state: {
+    connectionId?: string;
+    organizationId?: string;
+    replacesConnectionId?: string | null;
     verifiedDomains: readonly string[];
     domainVerifications: readonly SsoDomainVerification[];
   };
@@ -1547,6 +1583,25 @@ export function qualifySsoDomainOwnership({
       !note.success ||
       verifier?.type !== "user" ||
       verifier.id === null
+    ) {
+      return { status: "UNKNOWN", reason: "incomplete" };
+    }
+    return { status: "QUALIFIED", proof };
+  }
+
+  if (proof.method === "legacy-configuration") {
+    const imported = legacySsoDomainImportSchema.safeParse(proof.legacyImport);
+    if (
+      !imported.success ||
+      imported.data.organizationId !== state.organizationId ||
+      imported.data.predecessorConnectionId !==
+        (state.replacesConnectionId ?? state.connectionId) ||
+      imported.data.domain !== domain ||
+      imported.data.importedAtMs !== proof.verifiedAtMs ||
+      proof.evidenceRef !== imported.data.evidenceRef ||
+      proof.actorId !== null ||
+      proof.verifier?.type !== "system" ||
+      proof.verifier.id !== null
     ) {
       return { status: "UNKNOWN", reason: "incomplete" };
     }

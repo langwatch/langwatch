@@ -129,6 +129,30 @@ describe("given a live connection", () => {
       ).toEqual({ action: "continue" });
     });
 
+    /** @scenario "Every exact domain on one connection is qualified independently" */
+    it("accepts each exact proved domain and no subdomain of either", async () => {
+      const betaProof = { ...DOMAIN_PROOF, domain: "beta.example" };
+      const { service } = serviceOver({
+        row: connection({
+          verifiedDomains: ["acme.com", "beta.example"],
+          domainVerifications: [DOMAIN_PROOF, betaProof],
+        }),
+      });
+
+      for (const email of ["ana@acme.com", "bea@beta.example"]) {
+        await expect(service.decide({ providerId: CONNECTION_ID, email })).resolves.toEqual({
+          action: "continue",
+        });
+      }
+
+      await expect(
+        service.decide({
+          providerId: CONNECTION_ID,
+          email: "attacker@sub.beta.example",
+        }),
+      ).resolves.toMatchObject({ action: "reject" });
+    });
+
     it("keeps an exact previously bound member signing in after ownership proof lapses", async () => {
       const { service } = serviceOver({
         row: connection({

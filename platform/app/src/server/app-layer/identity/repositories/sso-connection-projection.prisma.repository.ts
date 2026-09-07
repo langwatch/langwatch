@@ -463,5 +463,6 @@ function toDomainVerification(raw: unknown): SsoDomainVerification {
     evidenceRef: entry.evidenceRef ?? null,
     note: entry.note ?? null,
     verifier: entry.verifier ?? null,
+    legacyImport: entry.legacyImport ?? null,
   };
 }

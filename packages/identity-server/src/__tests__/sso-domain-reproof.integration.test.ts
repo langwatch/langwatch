@@ -433,7 +433,7 @@ describe("re-reading the record that proves a domain", () => {
   });
 
   describe("given a domain no published record ever proved", () => {
-    /** @scenario "A domain no published record ever proved is never doubted by DNS" */
+    /** @scenario "A domain no published proof ever proved is never doubted by DNS" */
     it("refuses to doubt an attested domain by name, and states nothing", async () => {
       connections.seed({
         ...emptySsoConnection({ connectionId: "ssoc_attested" }),

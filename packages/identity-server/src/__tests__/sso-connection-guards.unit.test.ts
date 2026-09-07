@@ -504,6 +504,21 @@ describe("sso connection guards", () => {
       });
       expect(held?.state).toBe("ACTIVE");
       expect(held?.source).toBe("legacy-grandfathered");
+      expect(held?.domainVerifications).toEqual([
+        expect.objectContaining({
+          domain: "acme.com",
+          method: "legacy-configuration",
+          legacyImport: {
+            migration: "sso-connection-grandfather-v1",
+            version: 1,
+            organizationId: ORG,
+            predecessorConnectionId: CONNECTION,
+            domain: "acme.com",
+            importedAtMs: T0,
+            evidenceRef: `legacy-sso-config:${ORG}:${CONNECTION}:acme.com`,
+          },
+        }),
+      ]);
 
       // Suspend it, then try to bring it back with no break-glass binding:
       // the activation-shaped guard is not what resume runs, so the honest
@@ -567,6 +582,19 @@ describe("sso connection guards", () => {
       });
       expect(held?.state).toBe("ACTIVE");
       expect(held?.verifiedDomains).toEqual(["acme.com"]);
+    });
+
+    it("refuses a legacy import attributed to a user", async () => {
+      await expect(
+        guards.grandfatherConnection({
+          ...identity,
+          source: "legacy-grandfathered",
+          type: "oidc",
+          idp: IDP,
+          arrivalPolicy: "admit",
+          domains: ["acme.com"],
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
     });
   });
 
@@ -639,7 +667,7 @@ describe("sso connection guards", () => {
       expect(held?.domainClaims[0]?.state).toBe("WAITING");
     });
 
-    /** @scenario "A licence-bound ceremony cannot stand in for a decision" */
+    /** @scenario "Entitlement cannot stand in for domain ownership" */
     it("refuses a licence ceremony against a claim nobody decided", async () => {
       await run(() =>
         guards.registerConnection({

@@ -258,7 +258,9 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
           verifiedDomains: { has: domain },
         },
         select: {
+          id: true,
           organizationId: true,
+          replacesConnectionId: true,
           verifiedDomains: true,
           domainVerifications: true,
           state: true,
@@ -323,6 +325,9 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
 
 function connectionHasQualifiedProof(
   row: {
+    id: string;
+    organizationId: string;
+    replacesConnectionId: string | null;
     verifiedDomains: string[];
     domainVerifications: unknown;
   },
@@ -333,7 +338,13 @@ function connectionHasQualifiedProof(
     : [];
   return (
     qualifySsoDomainOwnership({
-      state: { verifiedDomains: row.verifiedDomains, domainVerifications },
+      state: {
+        connectionId: row.id,
+        organizationId: row.organizationId,
+        replacesConnectionId: row.replacesConnectionId,
+        verifiedDomains: row.verifiedDomains,
+        domainVerifications,
+      },
       domain,
     }).status === "QUALIFIED"
   );

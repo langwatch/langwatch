@@ -470,6 +470,16 @@ export class SsoConnectionGuards {
   async grandfatherConnection(
     data: GrandfatherConnectionCommandData,
   ): Promise<SsoConnectionFactInput[]> {
+    if (
+      data.source !== "legacy-grandfathered" ||
+      data.actor.type !== "system" ||
+      data.actor.id !== null
+    ) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: legacy import requires the system migration actor`,
+      );
+    }
+
     const existing = await this.connections.findConnection({
       connectionId: data.connectionId,
     });
@@ -503,36 +513,39 @@ export class SsoConnectionGuards {
           source,
         },
       },
-      ...domains.map(
-        (domain: string): SsoConnectionFactInput => ({
-          type: DOMAIN_CLAIMED_EVENT_TYPE,
-          data: { connectionId, domain, actor, source },
-        }),
-      ),
-      ...domains.map(
-        (domain: string): SsoConnectionFactInput => ({
-          type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-          data: {
-            connectionId,
+      ...domains.map((domain: string): SsoConnectionFactInput => ({
+        type: DOMAIN_CLAIMED_EVENT_TYPE,
+        data: { connectionId, domain, actor, source },
+      })),
+      ...domains.map((domain: string): SsoConnectionFactInput => ({
+        type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        data: {
+          connectionId,
+          domain,
+          actor,
+          authority: "platform-operator",
+          source,
+        },
+      })),
+      ...domains.map((domain: string): SsoConnectionFactInput => ({
+        type: DOMAIN_VERIFIED_EVENT_TYPE,
+        data: {
+          connectionId,
+          domain,
+          method: "legacy-configuration",
+          actor,
+          source,
+          legacyImport: {
+            migration: "sso-connection-grandfather-v1",
+            version: 1,
+            organizationId: data.organizationId,
+            predecessorConnectionId: connectionId,
             domain,
-            actor,
-            authority: "platform-operator",
-            source,
+            importedAtMs: data.occurredAtMs,
+            evidenceRef: `legacy-sso-config:${data.organizationId}:${connectionId}:${domain}`,
           },
-        }),
-      ),
-      ...domains.map(
-        (domain: string): SsoConnectionFactInput => ({
-          type: DOMAIN_VERIFIED_EVENT_TYPE,
-          data: {
-            connectionId,
-            domain,
-            method: "legacy-configuration",
-            actor,
-            source,
-          },
-        }),
-      ),
+        },
+      })),
       {
         type: CONNECTION_ACTIVATED_EVENT_TYPE,
         data: {

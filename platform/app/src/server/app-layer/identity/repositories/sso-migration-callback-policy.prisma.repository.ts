@@ -352,6 +352,9 @@ export class PrismaSsoMigrationCallbackPolicy
       return (
         qualifySsoDomainOwnership({
           state: {
+            connectionId: replacement.id,
+            organizationId: replacement.organizationId,
+            replacesConnectionId: replacement.replacesConnectionId,
             verifiedDomains: replacement.verifiedDomains,
             domainVerifications,
           },
@@ -423,6 +426,8 @@ export class PrismaSsoMigrationCallbackPolicy
         metadata.success &&
         qualifySsoDomainOwnership({
           state: {
+            connectionId: connection.id,
+            organizationId: ownership.organizationId,
             verifiedDomains: connection.verifiedDomains,
             domainVerifications,
           },

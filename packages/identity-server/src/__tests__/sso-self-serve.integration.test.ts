@@ -1162,17 +1162,25 @@ describe("self-serve single sign-on setup", () => {
         connectionId: "ssoc_carried",
       });
       // Nothing about their existing sign-in changes: the connection is live
-      // and the history records the configured domain. That legacy history is
-      // not upgraded into proof of domain ownership.
+      // and the one-time migration records the exact configured domain as an
+      // imported legacy attestation. No later domain inherits that evidence.
       expect(carried?.state).toBe("ACTIVE");
       expect(carried?.type).toBe("saml");
       expect(carried?.verifiedDomains).toEqual(["carried.example"]);
       expect(carried?.domainVerifications).toEqual([
-        expect.objectContaining({ method: "legacy-configuration" }),
+        expect.objectContaining({
+          method: "legacy-configuration",
+          legacyImport: expect.objectContaining({
+            organizationId: OTHER_ORG,
+            predecessorConnectionId: "ssoc_carried",
+            domain: "carried.example",
+          }),
+        }),
       ]);
-      expect(
-        await connections.findDomainOwner({ domain: "carried.example" }),
-      ).toBeNull();
+      expect(await connections.findDomainOwner({ domain: "carried.example" })).toEqual({
+        connectionId: "ssoc_carried",
+        organizationId: OTHER_ORG,
+      });
 
       // And a NEWLY registered SAML connection is no longer refused for
       // being SAML (D09) — what it is refused for is arriving without the

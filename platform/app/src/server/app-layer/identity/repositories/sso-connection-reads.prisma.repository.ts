@@ -135,7 +135,9 @@ export class PrismaSsoConnectionReadRepository
     if (row === null) return null;
     const state = rowToConnection(row);
     return {
+      connectionId: state.connectionId,
       organizationId: state.organizationId,
+      replacesConnectionId: state.replacesConnectionId,
       state: state.state,
       verifiedDomains: state.verifiedDomains,
       domainVerifications: state.domainVerifications,

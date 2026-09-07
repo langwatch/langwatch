@@ -8,10 +8,12 @@ import {
 import { describe, expect, it } from "vitest";
 
 const DOMAIN = "acme.com";
+const ORG = "org_acme";
 
 function stateWith(proof?: SsoDomainVerification): SsoConnectionState {
   return {
     ...emptySsoConnection({ connectionId: "ssoc_test" }),
+    organizationId: ORG,
     verifiedDomains: [DOMAIN],
     domainVerifications: proof ? [proof] : [],
   };
@@ -68,17 +70,45 @@ describe("SSO domain ownership proof qualification", () => {
     ).toEqual({ status: "UNKNOWN", reason: "absent" });
   });
 
-  it.each(["legacy-configuration", "license-token"] as const)(
-    "treats %s as inferred configuration rather than ownership proof",
-    (method) => {
-      expect(
-        qualifySsoDomainOwnership({
-          state: stateWith(proof({ method, tokenHash: null })),
-          domain: DOMAIN,
+  it("treats a license token as installation evidence, not domain proof", () => {
+    expect(
+      qualifySsoDomainOwnership({
+        state: stateWith(proof({ method: "license-token", tokenHash: null })),
+        domain: DOMAIN,
+      }),
+    ).toEqual({ status: "UNKNOWN", reason: "inferred" });
+  });
+
+  it("accepts only an exact grandfather-import attestation", () => {
+    const imported = proof({
+      method: "legacy-configuration",
+      actorId: null,
+      tokenHash: null,
+      evidenceRef: "legacy-sso-config:org_acme:ssoc_test:acme.com",
+      verifier: { type: "system", id: null },
+      legacyImport: {
+        migration: "sso-connection-grandfather-v1",
+        version: 1,
+        organizationId: ORG,
+        predecessorConnectionId: "ssoc_test",
+        domain: DOMAIN,
+        importedAtMs: 1_756_000_000_000,
+        evidenceRef: "legacy-sso-config:org_acme:ssoc_test:acme.com",
+      },
+    });
+    expect(qualifySsoDomainOwnership({ state: stateWith(imported), domain: DOMAIN }).status).toBe(
+      "QUALIFIED",
+    );
+    expect(
+      qualifySsoDomainOwnership({
+        state: stateWith({
+          ...imported,
+          legacyImport: { ...imported.legacyImport!, domain: "new.acme.com" },
         }),
-      ).toEqual({ status: "UNKNOWN", reason: "inferred" });
-    },
-  );
+        domain: DOMAIN,
+      }),
+    ).toEqual({ status: "UNKNOWN", reason: "incomplete" });
+  });
 
   it.each(["dns-txt", "https-file"] as const)(
     "accepts a live %s proof with retained evidence and time",
