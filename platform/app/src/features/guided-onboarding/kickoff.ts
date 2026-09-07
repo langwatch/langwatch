@@ -212,6 +212,33 @@ export function buildGuidedKickoffParts({
  * after that snapshot was taken. Settling on the server, from the state as
  * stored when the turn starts, is what makes the brief carry it either way.
  */
+/**
+ * The sent kickoff with its state fields replaced by the stored ones. A fact
+ * the state does not carry drops its field rather than setting it to
+ * undefined: the part travels as an event-sourcing command payload, and a
+ * field present with no value fails the command's schema, which surfaces as
+ * the agent being unavailable. Dropping it also clears the value the panel
+ * sent from a stale snapshot, which is the point of settling.
+ */
+function settleInput({
+  sent,
+  facts,
+}: {
+  sent: GuidedKickoffInput;
+  facts: GuidedKickoffStateFacts;
+}): GuidedKickoffInput {
+  const input = { ...sent };
+  for (const field of GUIDED_KICKOFF_STATE_FIELDS) {
+    delete input[field];
+  }
+  for (const [field, value] of Object.entries(facts)) {
+    if (value !== undefined) {
+      (input as Record<string, unknown>)[field] = value;
+    }
+  }
+  return input;
+}
+
 export function settleGuidedKickoffParts({
   parts,
   facts,
@@ -229,7 +256,7 @@ export function settleGuidedKickoffParts({
       (part as { text: string }).text.startsWith(continuation),
   );
   const [typed, brief] = buildGuidedKickoffParts({
-    input: { ...sent, ...facts },
+    input: settleInput({ sent, facts }),
     continuing,
   });
   return parts.map((part) => {

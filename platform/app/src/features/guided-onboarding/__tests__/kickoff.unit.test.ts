@@ -269,6 +269,34 @@ describe("settleGuidedKickoffParts", () => {
       expect(settled[1].text).toContain("reveal rvl_late");
     });
 
+    it("carries no virtual key field at all when the state recorded none", () => {
+      const sentWithStaleKey = buildGuidedKickoffParts({
+        input: {
+          path: "gateway",
+          paths: ["gateway"],
+          tourStatus: "skipped",
+          virtualKeyName: "production-app",
+          virtualKeyPreview: "vk-lw-01M1X40",
+          virtualKeyRevealId: "rvl_stale",
+        },
+      });
+      const settled = settleGuidedKickoffParts({
+        parts: sentWithStaleKey,
+        facts: guidedKickoffStateFactsOf({ paths: ["gateway"] }),
+      })!;
+
+      // Present with no value is not the same as absent: the part travels as
+      // a command payload, and a field set to undefined fails its schema.
+      const typed = settled[0] as Record<string, unknown>;
+      expect(Object.keys(typed)).not.toContain("virtualKeyName");
+      expect(Object.keys(typed)).not.toContain("virtualKeyPreview");
+      expect(Object.keys(typed)).not.toContain("virtualKeyRevealId");
+      expect(JSON.parse(JSON.stringify(typed))).toEqual(typed);
+      expect((settled[1] as { text: string }).text).toContain(
+        "Virtual key: none minted by the tour",
+      );
+    });
+
     it("leaves every other part where it was", () => {
       const extra = { type: "file", url: "https://acme.example/a.png" };
       const settled = settleGuidedKickoffParts({
