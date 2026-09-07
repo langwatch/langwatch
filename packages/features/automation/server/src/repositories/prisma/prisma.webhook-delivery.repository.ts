@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { WebhookDeliveryRepository } from "../webhook-delivery.repository.ts";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -69,8 +70,8 @@ export class PrismaWebhookDeliveryRepository extends WebhookDeliveryRepository {
     });
   }
 
-  async pruneExpired(now = new Date()): Promise<number> {
-    const before = new Date(now.getTime() - RETENTION_MS);
+  async pruneExpired(now: Date = toDate(nowInstant())): Promise<number> {
+    const before = toDate(fromDate(now).subtract({ milliseconds: RETENTION_MS }));
     return this.database.$executeRaw`
 			DELETE FROM "WebhookEndpointDelivery"
 			WHERE "firedAt" < ${before}

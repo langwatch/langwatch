@@ -6,6 +6,7 @@ import {
 import { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
 import { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import { TriggerRepository } from "../repositories/trigger.repository.ts";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 export { RUNAWAY_PAUSE_REASON };
 
@@ -32,8 +33,8 @@ export class RunawayContainmentService {
 
   async handle(input: AutomationPersistCapBreach): Promise<void> {
     const { trigger, projectId, cap, skipped } = input;
-    const now = this.clock.now();
-    const dayBucket = Math.floor(now.getTime() / 86_400_000);
+    const now = fromDate(this.clock.now());
+    const dayBucket = Math.floor(now.epochMilliseconds / 86_400_000);
     try {
       this.runaway.onCeilingBreach();
       this.runaway.error(
@@ -88,7 +89,7 @@ export class RunawayContainmentService {
 
   private async pauseAndNotify(
     input: AutomationPersistCapBreach,
-    now: Date,
+    now: Instant,
     dayBucket: number,
   ): Promise<void> {
     if (
@@ -105,7 +106,7 @@ export class RunawayContainmentService {
       projectId: input.projectId,
       active: false,
       pausedReason: RUNAWAY_PAUSE_REASON,
-      pausedAt: now,
+      pausedAt: toDate(now),
     });
     this.runaway.onAutoPaused(RUNAWAY_PAUSE_REASON);
     this.runaway.error(

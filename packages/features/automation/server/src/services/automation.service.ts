@@ -41,6 +41,7 @@ import { AutomationGraphService } from "./trigger-graph.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
+import { fromDate } from "@langwatch/time";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 export class AutomationService extends AutomationCapability {
@@ -128,7 +129,7 @@ export class AutomationService extends AutomationCapability {
     cap: number;
     dedupKey: string;
   }): Promise<AutomationPersistCapDecision> {
-    return this.persistCaps.consumePersistCapSlot(input);
+    return this.persistCaps.consumePersistCapSlot({ ...input, now: fromDate(input.now) });
   }
 
   readPersistCapCounts(input: {
@@ -137,7 +138,7 @@ export class AutomationService extends AutomationCapability {
     now: Date;
     cap: number;
   }): Promise<Record<string, AutomationPersistCapCount>> {
-    return this.persistCaps.readPersistCapCounts(input);
+    return this.persistCaps.readPersistCapCounts({ ...input, now: fromDate(input.now) });
   }
 
   getById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
@@ -267,7 +268,7 @@ export class AutomationService extends AutomationCapability {
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {
     return this.history.findAllStatsForProject({
       projectId: input.projectId,
-      firesSince: new Date(this.clock.now().getTime() - 30 * 24 * 60 * 60 * 1000),
+      firesSince: fromDate(this.clock.now()).subtract({ milliseconds: 30 * 24 * 60 * 60 * 1000 }),
     });
   }
 
@@ -301,8 +302,8 @@ export class AutomationService extends AutomationCapability {
       triggerId: input.triggerId,
       traceId: input.traceId ?? null,
       customGraphId: input.customGraphId ?? null,
-      createdAt: input.createdAt,
-      resolvedAt: input.resolvedAt ?? null,
+      createdAt: fromDate(input.createdAt),
+      resolvedAt: input.resolvedAt ? fromDate(input.resolvedAt) : null,
     });
   }
 

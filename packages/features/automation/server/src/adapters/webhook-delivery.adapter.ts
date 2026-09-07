@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/automation-contract";
 import { isDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:webhook-delivery");
 
@@ -91,7 +92,7 @@ async function deliverWebhook({
   body,
   triggerName,
 }: WebhookDeliveryRequest & { transport: WebhookDeliveryTransport }): Promise<WebhookSendResult> {
-  const startedAt = Date.now();
+  const startedAt = nowInstant().epochMilliseconds;
   const baseRow = { projectId, triggerId, dispatchId: eventId };
   const safeRecord = async (row: WebhookDeliveryInput) => {
     if (!recorder) return;
@@ -122,7 +123,7 @@ async function deliverWebhook({
     await safeRecord({
       ...baseRow,
       responseStatus: result.status,
-      latencyMs: Date.now() - startedAt,
+      latencyMs: nowInstant().epochMilliseconds - startedAt,
       outcome: "success",
     });
     return result;
@@ -135,7 +136,7 @@ async function deliverWebhook({
     await safeRecord({
       ...baseRow,
       responseStatus: result?.status ?? null,
-      latencyMs: Date.now() - startedAt,
+      latencyMs: nowInstant().epochMilliseconds - startedAt,
       error,
       response: captureFailureResponse({ result }),
       outcome: retryable ? "retryable" : "terminal",

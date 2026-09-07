@@ -11806,14 +11806,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/automation/server/src/adapters/webhook-delivery.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/adapters/webhook-provider.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/automation/server/src/app/automation.app.ts",
       "measured": "2026-09-06"
     },
@@ -11830,10 +11822,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/automation/server/src/ports/automation-provider.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/automation/server/src/ports/automation-scheduled-intent.port.ts",
       "measured": "2026-09-06"
     },
@@ -11842,27 +11830,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/automation/server/src/ports/scheduled-jobs.port.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/processes/trigger-settlement.process.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/repositories/graph-trigger-sent.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/repositories/trigger-fire-history.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/automation/server/src/repositories/webhook-delivery.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/rules/retry-after-message.rules.ts",
       "measured": "2026-09-06"
     },
     {
@@ -11870,59 +11838,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/automation/server/src/services/email-cap.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/graph-trigger-evaluation-plan.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/automation/server/src/services/graph-trigger-heartbeat.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/automation/server/src/services/persist-cap.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/report-chart.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/report-dispatch.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/report-schedule.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/report-trace-row.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/runaway-containment.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/services/trigger-evaluator.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/automation/server/src/services/trigger-graph.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/subscribers/evaluation-alert-trigger-match.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/subscribers/graph-trigger-activity.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/automation/server/src/transport/api-trpc/automation.api.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12386,10 +12306,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/gateway/server/src/adapters/virtual-key-crypto.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/server/src/app/gateway.app.ts",
       "measured": "2026-09-06"
     },
@@ -12414,10 +12330,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/gateway/server/src/processes/gateway-spend-commands.process.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts",
       "measured": "2026-09-06"
     },
@@ -12431,14 +12343,6 @@
     },
     {
       "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-budget.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-key-budget.repository.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/gateway/server/src/repositories/gateway-realtime-session.repository.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12458,23 +12362,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-realtime-session-reconciliation.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/gateway/server/src/services/gateway-realtime-session.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/server/src/services/gateway-usage.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/gateway/server/src/services/gateway.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/gateway/server/src/services/virtual-key-budget.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -12498,19 +12386,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/elevenlabs-webhook.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/gateway-internal.api.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/gateway-platform.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/gateway/server/src/transport/api-rest/gateway-spend.api.ts",
       "measured": "2026-09-06"
     },
     {

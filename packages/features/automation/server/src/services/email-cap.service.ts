@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { AutomationEmailCapStorePort } from "../ports/email-cap.port.ts";
+import type { Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 
@@ -21,7 +22,7 @@ type CapDecision = {
 type ConsumeInput = {
   counterKey: string;
   claimKey: string;
-  now: Date;
+  now: Instant;
   cap: number;
   increment: number;
   ttlSeconds: number;
@@ -38,7 +39,7 @@ class EmailCapMemoryStore {
   private readonly entries = new Map<string, MemoryEntry>();
 
   consume(input: ConsumeInput): CapDecision {
-    const now = input.now.getTime();
+    const now = input.now.epochMilliseconds;
     this.sweepExpired(now);
 
     const claim = this.entries.get(`claim:${input.claimKey}`);
@@ -88,14 +89,14 @@ class EmailCapMemoryStore {
 export type ConsumeHourlyEmailCapInput = {
   projectId: string;
   triggerId: string;
-  now: Date;
+  now: Instant;
   cap: number;
   dedupKey: string;
 };
 
 export type ConsumeDailyEmailCapInput = {
   projectId: string;
-  now: Date;
+  now: Instant;
   cap: number;
   recipientCount: number;
   dedupKey: string;
@@ -116,7 +117,7 @@ export class AutomationEmailCapService {
   }
 
   consumeHourly(input: ConsumeHourlyEmailCapInput): Promise<CapDecision> {
-    const bucket = Math.floor(input.now.getTime() / HOUR_MS);
+    const bucket = Math.floor(input.now.epochMilliseconds / HOUR_MS);
 
     return this.consume({
       counterKey: `trigger-email-cap:${input.projectId}:${input.triggerId}:${bucket}`,
@@ -130,7 +131,7 @@ export class AutomationEmailCapService {
   }
 
   consumeDaily(input: ConsumeDailyEmailCapInput): Promise<CapDecision> {
-    const bucket = Math.floor(input.now.getTime() / DAY_MS);
+    const bucket = Math.floor(input.now.epochMilliseconds / DAY_MS);
 
     return this.consume({
       counterKey: `trigger-email-tenant-cap:${input.projectId}:${bucket}`,

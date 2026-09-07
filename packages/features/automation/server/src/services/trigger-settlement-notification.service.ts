@@ -33,6 +33,7 @@ import {
   TriggerSettlementEmailService,
   type SettlementNotificationCandidate,
 } from "./trigger-settlement-email.service.ts";
+import { fromDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:settlement-notification");
 
@@ -432,7 +433,7 @@ export class TriggerSettlementNotificationService {
       headers: this.composition.webhooks.decryptHeaders(params),
       signingSecrets: this.composition.webhooks.decryptSigningSecrets(
         params,
-        this.composition.clock.now(),
+        fromDate(this.composition.clock.now()),
       ),
       body: rendered.body,
       triggerName: input.trigger.name,

@@ -7,6 +7,7 @@ import type {
   TriggerRepository,
 } from "../../repositories/trigger.repository.ts";
 import { ReportScheduleService } from "../report-schedule.service.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 /** Only the one read the reconcile sweep makes; the rest is not this test's subject. */
 function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {
@@ -32,7 +33,7 @@ class Jobs extends ScheduledJobStorePort {
     targetId: string;
     cron: string;
     timezone: string;
-    nextRunAt: Date;
+    nextRunAt: Instant;
   }): Promise<void> {
     this.rows = [
       {
@@ -65,7 +66,7 @@ describe("ReportScheduleService", () => {
       triggerId: "r",
       schedule: { cron: "0 9 * * *", timezone: "UTC" },
     });
-    expect(jobs.rows[0]?.nextRunAt).toEqual(new Date("2026-01-01T09:00:00Z"));
+    expect(jobs.rows[0]?.nextRunAt).toEqual(Temporal.Instant.from("2026-01-01T09:00:00Z"));
     expect(wake.count).toBe(1);
     await service.remove({ projectId: "p", triggerId: "r" });
     expect(await service.getAll({ projectId: "p" })).toEqual([

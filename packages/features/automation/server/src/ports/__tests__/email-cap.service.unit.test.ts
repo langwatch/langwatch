@@ -5,6 +5,7 @@ import {
   type ConsumeHourlyEmailCapInput,
 } from "../../services/email-cap.service.ts";
 import type { AutomationEmailCapStorePort } from "../email-cap.port.ts";
+import { Temporal } from "@langwatch/time";
 
 // The package accepts the infrastructure connection explicitly. This holder
 // keeps the test's Redis-vs-memory choice local without a process-global App.
@@ -81,7 +82,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           eval: vi.fn(),
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const result = await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -109,7 +110,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           eval: vi.fn().mockRejectedValue(new Error("connection refused")),
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const cap = 3;
         const results = [];
         // Call cap + 1 times — the last must be over the cap, proving the
@@ -151,7 +152,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           eval: evalFn,
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -197,7 +198,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           eval: vi.fn().mockResolvedValue(null),
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const args = {
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -220,7 +221,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
     describe("when the SAME dispatch is consumed twice (outbox retry)", () => {
       /** @scenario "Email delivery caps are idempotent across retries" */
       it("does not double-count: the second call re-reads the same slot", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const args = {
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -245,7 +246,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
 
     describe("when dispatches arrive under the cap", () => {
       it("allows them and counts up monotonically", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const first = await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -268,7 +269,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
 
     describe("when a dispatch pushes the count past the cap", () => {
       it("reports the slot as not allowed", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         for (let i = 0; i < 2; i++) {
           await consumeEmailCapSlot({
             projectId: PROJECT_ID,
@@ -294,7 +295,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
   describe("given the cap was exhausted in the previous hour", () => {
     describe("when a dispatch arrives in the next hour bucket", () => {
       it("starts a fresh count and allows it again", async () => {
-        const firstHour = new Date("2026-06-11T10:59:00Z");
+        const firstHour = Temporal.Instant.from("2026-06-11T10:59:00Z");
         await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -311,7 +312,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         });
         expect(overCapSameHour.allowed).toBe(false);
 
-        const nextHour = new Date("2026-06-11T11:00:00Z");
+        const nextHour = Temporal.Instant.from("2026-06-11T11:00:00Z");
         const rolledOver = await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -328,7 +329,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
   describe("given a dispatch lands exactly at the cap", () => {
     describe("when count equals cap", () => {
       it("reports the slot as allowed (<= boundary)", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: TRIGGER_ID,
@@ -352,7 +353,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
   describe("given two distinct triggers in the same project", () => {
     describe("when each dispatches in the same hour", () => {
       it("counts them independently", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const a = await consumeEmailCapSlot({
           projectId: PROJECT_ID,
           triggerId: "trig-a",
@@ -383,7 +384,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
   describe("given a fresh day bucket", () => {
     describe("when dispatches accumulate recipients up to the cap then over it", () => {
       it("allows the dispatch that lands at the cap and drops the one that exceeds it", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         // cap=10, two dispatches of 6 recipients each: first → count 6 (under),
         // second → count 12 (over). Proves the counter advances by recipientCount.
         const first = await consumeTenantEmailCapSlot({
@@ -409,7 +410,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     describe("when the SAME dispatch is consumed twice (outbox retry)", () => {
       /** @scenario "Email delivery caps are idempotent across retries" */
       it("does not double-count: the retry re-reads the same total without INCRBY", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const args = {
           projectId: PROJECT_ID,
           now,
@@ -437,7 +438,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
   describe("given the cap was exhausted in the previous day", () => {
     describe("when a dispatch arrives in the next day bucket", () => {
       it("starts a fresh count and allows it again", async () => {
-        const firstDay = new Date("2026-06-11T23:00:00Z");
+        const firstDay = Temporal.Instant.from("2026-06-11T23:00:00Z");
         await consumeTenantEmailCapSlot({
           projectId: PROJECT_ID,
           now: firstDay,
@@ -454,7 +455,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
         });
         expect(overSameDay.allowed).toBe(false);
 
-        const nextDay = new Date("2026-06-12T01:00:00Z");
+        const nextDay = Temporal.Instant.from("2026-06-12T01:00:00Z");
         const rolledOver = await consumeTenantEmailCapSlot({
           projectId: PROJECT_ID,
           now: nextDay,
@@ -485,7 +486,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           eval: vi.fn().mockResolvedValue(null),
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const result = await consumeTenantEmailCapSlot({
           projectId: PROJECT_ID,
           now,
@@ -508,7 +509,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
 
         await consumeTenantEmailCapSlot({
           projectId: PROJECT_ID,
-          now: new Date("2026-06-11T10:15:00Z"),
+          now: Temporal.Instant.from("2026-06-11T10:15:00Z"),
           cap: 100,
           recipientCount: 1,
           dedupKey: "proj-1:tenant:single-recipient",
@@ -531,7 +532,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           eval: vi.fn().mockResolvedValue(null),
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const args = {
           projectId: PROJECT_ID,
           now,
@@ -566,7 +567,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           eval: vi.fn().mockRejectedValue(new Error("connection refused")),
         });
 
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const first = await consumeTenantEmailCapSlot({
           projectId: PROJECT_ID,
           now,
@@ -597,7 +598,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
   describe("given two distinct projects", () => {
     describe("when each dispatches on the same day", () => {
       it("counts them independently", async () => {
-        const now = new Date("2026-06-11T10:15:00Z");
+        const now = Temporal.Instant.from("2026-06-11T10:15:00Z");
         const a = await consumeTenantEmailCapSlot({
           projectId: "proj-a",
           now,

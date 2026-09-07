@@ -1,5 +1,6 @@
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port.ts";
+import type { Instant } from "@langwatch/time";
 
 /** The cap fields a key's own drawer sets. */
 export type GatewayKeyBudgetFields = {
@@ -34,14 +35,14 @@ export abstract class GatewayKeyBudgetRepository {
       organizationId: string;
       virtualKeyId: string;
       createdById: string;
-      resetsAt: Date;
+      resetsAt: Instant;
       fields: GatewayKeyBudgetFields;
     },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget>;
   /** `resetsAt` moves only when the window changes under it. */
   abstract updateForKey(
-    input: { id: string; resetsAt?: Date; fields: GatewayKeyBudgetFields },
+    input: { id: string; resetsAt?: Instant; fields: GatewayKeyBudgetFields },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget>;
   abstract findActiveForKey(
@@ -49,7 +50,7 @@ export abstract class GatewayKeyBudgetRepository {
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget[]>;
   abstract archive(
-    input: { id: string; archivedAt: Date },
+    input: { id: string; archivedAt: Instant },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget>;
 }

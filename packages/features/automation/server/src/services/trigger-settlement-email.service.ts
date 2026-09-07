@@ -11,6 +11,7 @@ import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import type { AutomationSettlementLedgerPort } from "../ports/automation-settlement-ledger.port.ts";
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
+import { fromDate } from "@langwatch/time";
 
 export type SettlementNotificationCandidate = {
   traceId: string;
@@ -117,7 +118,7 @@ export class TriggerSettlementEmailService {
     const hourly = await this.composition.emailCaps.consumeHourly({
       projectId: input.projectId,
       triggerId: input.triggerId,
-      now: this.composition.clock.now(),
+      now: fromDate(this.composition.clock.now()),
       cap: this.composition.emailHourlyCap,
       dedupKey: `${input.projectId}/${input.triggerId}:digest:${input.digest}`,
     });
@@ -127,7 +128,7 @@ export class TriggerSettlementEmailService {
 
     const daily = await this.composition.emailCaps.consumeDaily({
       projectId: input.projectId,
-      now: this.composition.clock.now(),
+      now: fromDate(this.composition.clock.now()),
       cap: this.composition.tenantDailyCap,
       recipientCount: recipients.length,
       dedupKey: `${input.projectId}:tenant:${input.triggerId}:${input.digest}`,

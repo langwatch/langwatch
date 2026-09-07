@@ -1,4 +1,5 @@
 import type { WebhookActionParams } from "@langwatch/automation-contract";
+import type { Instant } from "@langwatch/time";
 
 export type AutomationWebhookStoredParams = {
   url: string;
@@ -29,7 +30,7 @@ export abstract class AutomationWebhookProviderPort {
       previousSigningSecretEncrypted?: string;
       previousSigningSecretExpiresAt?: number;
     },
-    now?: Date,
+    now?: Instant,
   ): string[];
 
   abstract persist(input: {

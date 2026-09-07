@@ -1,7 +1,9 @@
+import type { Instant } from "@langwatch/time";
+
 export type ScheduledJobRecord = {
   targetId: string;
-  nextRunAt: Date;
-  lastSlot: Date | null;
+  nextRunAt: Instant;
+  lastSlot: Instant | null;
   active: boolean;
 };
 
@@ -12,7 +14,7 @@ export abstract class ScheduledJobStorePort {
     targetId: string;
     cron: string;
     timezone: string;
-    nextRunAt: Date;
+    nextRunAt: Instant;
   }): Promise<void>;
   abstract deactivateForTarget(input: {
     projectId: string;

@@ -30,7 +30,12 @@ import type {
   GraphTriggerSentRepository,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { AutomationHeartbeatPort, AutomationLoggerPort } from "../ports/automation-graph.port.ts";
+import type {
+  AutomationHeartbeatPort,
+  AutomationLoggerPort,
+} from "../ports/automation-graph.port.ts";
+import type { Instant } from "@langwatch/time";
+import { fromDate } from "@langwatch/time";
 
 export type AnalyticsMetricSource = RepositoryMetricSource;
 export type ClickHouseClient = {
@@ -116,7 +121,8 @@ export class GraphTriggerHeartbeatService {
     return new GraphTriggerHeartbeatService(deps);
   }
 
-  async decide({ now }: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
+  async decide({ now: at }: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
+    const now = fromDate(at);
     const deps = this.deps;
     const triggerSent = deps.triggerSent;
     // Step 1: load the union of "has graph triggers" + "has open sent"
@@ -187,7 +193,7 @@ export class GraphTriggerHeartbeatService {
     deps: GraphTriggerHeartbeatDeps;
     projectId: string;
     hasOpenSent: boolean;
-    now: Date;
+    now: Instant;
   }): Promise<GraphTriggerSweepCandidate[]> {
     const candidates = await this.loadCandidatesForProject({
       deps,
@@ -219,7 +225,7 @@ export class GraphTriggerHeartbeatService {
         continue;
       }
 
-      const cutoff = now.getTime() - candidate.windowMs;
+      const cutoff = now.epochMilliseconds - candidate.windowMs;
       if (recency.lastOccurredAtMs !== null && recency.lastOccurredAtMs > cutoff) {
         // Real-time path is firing for this trigger; skip.
         continue;
@@ -331,7 +337,7 @@ export class GraphTriggerHeartbeatService {
     projectId: string;
     source: AnalyticsMetricSource;
     boundWindowMs: number;
-    now: Date;
+    now: Instant;
   }): Promise<ProjectRecency> {
     let client: ClickHouseClient | null;
     try {
@@ -353,7 +359,7 @@ export class GraphTriggerHeartbeatService {
       return { projectId, source, lastOccurredAtMs: null };
     }
 
-    const startMs = now.getTime() - boundWindowMs;
+    const startMs = now.epochMilliseconds - boundWindowMs;
     const table = SLIM_TABLE_BY_SOURCE[source];
     const idColumn = SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE[source];
     // One IN-tuple dedup pattern (slim is ReplacingMergeTree(UpdatedAt)),

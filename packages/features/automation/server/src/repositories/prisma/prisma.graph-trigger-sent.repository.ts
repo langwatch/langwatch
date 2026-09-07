@@ -4,6 +4,7 @@ import {
   type OpenGraphTriggerSent,
 } from "../graph-trigger-sent.repository.ts";
 import { parseSeriesIndex } from "@langwatch/automation-contract";
+import { toDate, type Instant } from "@langwatch/time";
 
 /** Prisma-backed graph-alert incident ledger, private to Automation server. */
 /**
@@ -170,10 +171,10 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     await this.database.triggerSent.delete({ where: input });
   }
 
-  async markResolvedById(input: { id: string; projectId: string; now: Date }): Promise<void> {
+  async markResolvedById(input: { id: string; projectId: string; now: Instant }): Promise<void> {
     await this.database.triggerSent.update({
       where: { id: input.id, projectId: input.projectId },
-      data: { resolvedAt: input.now, openIncidentKey: null },
+      data: { resolvedAt: toDate(input.now), openIncidentKey: null },
     });
   }
 }

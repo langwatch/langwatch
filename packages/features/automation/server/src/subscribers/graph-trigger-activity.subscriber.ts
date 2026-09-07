@@ -4,6 +4,7 @@ import type {
   AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
 import type { AutomationGraphActivityPort } from "../ports/automation-graph-activity.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
 
@@ -47,7 +48,7 @@ export async function handleGraphTriggerActivity(
   const projectId = context.tenantId;
 
   // Old-event guard — replay floods, resyncs, late-arriving spans.
-  if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
+  if (event.occurredAt < nowInstant().epochMilliseconds - 60 * 60 * 1000) return;
 
   const triggers = await automation.getActiveGraphTriggersForProject(projectId);
   if (triggers.length === 0) return;

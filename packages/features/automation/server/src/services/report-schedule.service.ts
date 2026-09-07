@@ -3,12 +3,14 @@ import {
   REPORT_SCHEDULER_TARGET_TYPE,
   reportActionParamsSchema,
   type ReportActionParams,
+  type ReportSchedule,
   type ReportScheduleInput,
 } from "@langwatch/automation-contract";
 import { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
 import { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 export class ReportScheduleService {
   private constructor(
     private readonly jobs: ScheduledJobStorePort,
@@ -26,13 +28,14 @@ export class ReportScheduleService {
     return new ReportScheduleService(deps.jobs, deps.clock, deps.wake, deps.triggers);
   }
 
-  static computeNextRunAt(input: { cron: string; timezone: string; after: Date }): Date {
-    const next = new Cron(input.cron, { timezone: input.timezone }).nextRun(input.after);
+  static computeNextRunAt(input: { cron: string; timezone: string; after: Instant }): Instant {
+    const after = toDate(input.after);
+    const next = new Cron(input.cron, { timezone: input.timezone }).nextRun(after);
     if (!next) {
-      throw new Error(`No report run exists after ${input.after.toISOString()}`);
+      throw new Error(`No report run exists after ${after.toISOString()}`);
     }
 
-    return next;
+    return fromDate(next);
   }
 
   static tryExtract(actionParams: unknown): ReportActionParams | null {
@@ -48,7 +51,7 @@ export class ReportScheduleService {
   }): Promise<void> {
     const nextRunAt = ReportScheduleService.computeNextRunAt({
       ...input.schedule,
-      after: this.clock.now(),
+      after: fromDate(this.clock.now()),
     });
     await this.jobs.upsertForTarget({
       projectId: input.projectId,
@@ -115,14 +118,7 @@ export class ReportScheduleService {
     return { repaired };
   }
 
-  async getAll(input: { projectId: string }): Promise<
-    Array<{
-      triggerId: string;
-      nextRunAt: Date | null;
-      lastRunAt: Date | null;
-      active: boolean;
-    }>
-  > {
+  async getAll(input: { projectId: string }): Promise<ReportSchedule[]> {
     const rows = await this.jobs.findAllForProject({
       projectId: input.projectId,
       targetType: REPORT_SCHEDULER_TARGET_TYPE,
@@ -130,8 +126,8 @@ export class ReportScheduleService {
 
     return rows.map((row) => ({
       triggerId: row.targetId,
-      nextRunAt: row.active ? row.nextRunAt : null,
-      lastRunAt: row.lastSlot,
+      nextRunAt: row.active ? toDate(row.nextRunAt) : null,
+      lastRunAt: row.lastSlot === null ? null : toDate(row.lastSlot),
       active: row.active,
     }));
   }

@@ -1,5 +1,6 @@
 import { type ReportTraceRow, reportSnippet } from "@langwatch/automation-contract";
 import type { TraceListItem } from "@langwatch/trace-contract";
+import { Temporal } from "@langwatch/time";
 
 export class ReportTraceRowService {
   static create(): ReportTraceRowService {
@@ -19,7 +20,9 @@ export class ReportTraceRowService {
     return {
       traceId: item.traceId,
       url: `${projectUrl}/traces/${item.traceId}`,
-      timestamp: new Date(item.timestamp).toISOString(),
+      timestamp: Temporal.Instant.fromEpochMilliseconds(item.timestamp).toString({
+        smallestUnit: "millisecond",
+      }),
       input: reportSnippet(item.input),
       output: reportSnippet(item.output),
       model: (item.models ?? []).join(", "),

@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 export interface OpenGraphTriggerSent {
   id: string;
   triggerId: string;
@@ -36,5 +38,5 @@ export abstract class GraphTriggerSentRepository {
     customGraphId: string;
   }): Promise<OpenGraphTriggerSent | null>;
   abstract deleteOpenClaim(params: { id: string; projectId: string }): Promise<void>;
-  abstract markResolvedById(params: { id: string; projectId: string; now: Date }): Promise<void>;
+  abstract markResolvedById(params: { id: string; projectId: string; now: Instant }): Promise<void>;
 }

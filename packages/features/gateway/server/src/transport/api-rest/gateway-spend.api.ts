@@ -40,6 +40,7 @@ import {
   type OrganizationScopedContext,
   organizationOf,
 } from "@langwatch/api/rest";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
 const spendFilters = GatewaySpendFiltersAdapter.create();
@@ -635,7 +636,7 @@ export function createGatewaySpendRestApp(options: {
       keys: query.group_by,
       bucket: query.bucket,
       toMs: query.to,
-      nowMs: Date.now(),
+      nowMs: nowInstant().epochMilliseconds,
       allowUnstable: query.allow_unstable,
       settlementPolicy: ports.settlementPolicy,
     });
@@ -721,7 +722,7 @@ export function createGatewaySpendRestApp(options: {
     const organization = organizationOf(c);
     const endUserId = input.id;
     const query = input;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
     const toMs = query.to ?? now;
     const { tenantIds } = await ports.resolveSpendScope({
@@ -751,8 +752,10 @@ export function createGatewaySpendRestApp(options: {
       data: {
         end_user_id: endUserId,
         window: query.window,
-        from: new Date(fromMs).toISOString(),
-        to: new Date(toMs).toISOString(),
+        from: Temporal.Instant.fromEpochMilliseconds(fromMs).toString({
+          smallestUnit: "millisecond",
+        }),
+        to: Temporal.Instant.fromEpochMilliseconds(toMs).toString({ smallestUnit: "millisecond" }),
         cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
         request_count: rollup.requestCount,
         usage: {
@@ -817,8 +820,12 @@ export function createGatewaySpendRestApp(options: {
         replay_id: replayId,
         replayed,
         window: {
-          from: new Date(body.from).toISOString(),
-          to: new Date(body.to).toISOString(),
+          from: Temporal.Instant.fromEpochMilliseconds(body.from).toString({
+            smallestUnit: "millisecond",
+          }),
+          to: Temporal.Instant.fromEpochMilliseconds(body.to).toString({
+            smallestUnit: "millisecond",
+          }),
         },
       },
     };

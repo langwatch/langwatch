@@ -5,6 +5,7 @@ import {
   type GatewayKeyBudgetFields,
   type GatewayKeyBudgetScope,
 } from "../gateway-key-budget.repository.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 /** The client slice a key's own caps are written through. */
 export type GatewayKeyBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;
@@ -33,7 +34,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
       organizationId: string;
       virtualKeyId: string;
       createdById: string;
-      resetsAt: Date;
+      resetsAt: Instant;
       fields: GatewayKeyBudgetFields;
     },
     transaction?: GatewayPersistenceTransaction,
@@ -46,20 +47,20 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
         scopeId: input.virtualKeyId,
         managedByVirtualKeyId: input.virtualKeyId,
         createdById: input.createdById,
-        resetsAt: input.resetsAt,
+        resetsAt: toDate(input.resetsAt),
       },
     });
   }
 
   updateForKey(
-    input: { id: string; resetsAt?: Date; fields: GatewayKeyBudgetFields },
+    input: { id: string; resetsAt?: Instant; fields: GatewayKeyBudgetFields },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
     return this.client(transaction).gatewayBudget.update({
       where: { id: input.id },
       data: {
         ...input.fields,
-        ...(input.resetsAt ? { resetsAt: input.resetsAt } : {}),
+        ...(input.resetsAt ? { resetsAt: toDate(input.resetsAt) } : {}),
       },
     });
   }
@@ -92,10 +93,13 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
   }
 
   archive(
-    { id, archivedAt }: { id: string; archivedAt: Date },
+    { id, archivedAt }: { id: string; archivedAt: Instant },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return this.client(transaction).gatewayBudget.update({ where: { id }, data: { archivedAt } });
+    return this.client(transaction).gatewayBudget.update({
+      where: { id },
+      data: { archivedAt: toDate(archivedAt) },
+    });
   }
 
   private client(

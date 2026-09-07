@@ -12,6 +12,7 @@ import {
   trendChartOf,
   type ReportGraphInput,
 } from "../rules/report-chart.rules.ts";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;
@@ -28,10 +29,12 @@ function formatBucketLabel({
   date: string;
   timeScale: ReportGraphInput["timeScale"];
 }): string {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) {
+  const epochMs = toEpochMs(date);
+  if (Number.isNaN(epochMs)) {
     return date;
   }
+
+  const parsed = toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
 
   const daily = timeScale === "full" || Number(timeScale) >= DAY_SCALE_MINUTES;
 

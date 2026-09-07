@@ -9,6 +9,7 @@ import { isNoDataPredicate } from "@langwatch/automation-contract";
 import type { GraphAlertDispatchResult } from "../ports/automation-graph.port.ts";
 import { TriggerEvaluatorService } from "./trigger-evaluator.service.ts";
 import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service.ts";
+import { toDate } from "@langwatch/time";
 
 /**
  * Identity for one firing, derived from the trigger, the graph and the fire it
@@ -142,8 +143,8 @@ export class GraphTriggerAlertDeliveryService {
       currentValue: values.currentValue,
       previousValue: values.previousValue,
       history: [...values.previousPoints, ...values.currentPoints],
-      window: { start: plan.startDate, end: plan.now },
-      occurredAt: plan.now,
+      window: { start: toDate(plan.startDate), end: toDate(plan.now) },
+      occurredAt: toDate(plan.now),
       reason: plan.request.reason,
       project,
       baseHost: plan.request.deps.baseHost,

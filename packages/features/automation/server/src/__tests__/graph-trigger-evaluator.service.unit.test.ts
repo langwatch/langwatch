@@ -19,6 +19,7 @@ import {
   type OpenGraphTriggerSent,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import type { Instant } from "@langwatch/time";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {
@@ -144,7 +145,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
   allRows: OpenGraphTriggerSent[] = [];
   claimCalls = 0;
   deleteCalls: Array<{ id: string; projectId: string }> = [];
-  resolveCalls: Array<{ id: string; projectId: string; now: Date }> = [];
+  resolveCalls: Array<{ id: string; projectId: string; now: Instant }> = [];
 
   async tryFindOpenForGraphAlert(params: {
     triggerId: string;
@@ -214,7 +215,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     this.allRows = this.allRows.filter((r) => r.id !== params.id);
   }
 
-  async markResolvedById(params: { id: string; projectId: string; now: Date }): Promise<void> {
+  async markResolvedById(params: { id: string; projectId: string; now: Instant }): Promise<void> {
     this.resolveCalls.push(params);
     // Resolve frees the identity (clears openIncidentKey): the row leaves the
     // OPEN set so the next claim on the same triggerId succeeds. It stays in

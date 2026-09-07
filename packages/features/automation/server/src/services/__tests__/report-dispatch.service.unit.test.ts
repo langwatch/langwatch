@@ -17,6 +17,7 @@ import { AutomationSlackProviderPort } from "../../ports/automation-provider.por
 import { ReportChartService } from "../report-chart.service.ts";
 import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service.ts";
 import { ReportTraceRowService } from "../report-trace-row.service.ts";
+import { fromDate } from "@langwatch/time";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };
@@ -380,7 +381,7 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
       expect(deps.recordFire).toHaveBeenCalledWith({
         projectId: PROJECT.id,
         triggerId: "report-1",
-        firedAt: SLOT,
+        firedAt: fromDate(SLOT),
       });
     });
   });

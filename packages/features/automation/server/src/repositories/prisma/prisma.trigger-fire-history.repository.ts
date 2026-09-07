@@ -1,6 +1,7 @@
 import type { TriggerFire, TriggerFireStats } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TriggerFireHistoryRepository } from "../trigger-fire-history.repository.ts";
+import { toDate, type Instant } from "@langwatch/time";
 const mapFire = (row: unknown): TriggerFire => {
   const value = row as Record<string, unknown>;
   return {
@@ -29,16 +30,23 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
     triggerId: string;
     traceId: string | null;
     customGraphId: string | null;
-    createdAt: Date;
-    resolvedAt: Date | null;
+    createdAt: Instant;
+    resolvedAt: Instant | null;
   }): Promise<TriggerFire> {
-    const row = await this.database.triggerSent.create({ data: input });
+    const row = await this.database.triggerSent.create({
+      data: {
+        ...input,
+        createdAt: toDate(input.createdAt),
+        resolvedAt: input.resolvedAt === null ? null : toDate(input.resolvedAt),
+      },
+    });
     return mapFire(row);
   }
   async findAllStatsForProject(input: {
     projectId: string;
-    firesSince: Date;
+    firesSince: Instant;
   }): Promise<TriggerFireStats[]> {
+    const firesSince = toDate(input.firesSince);
     const [lastFired, recentCounts, openIncidents] = await Promise.all([
       this.database.triggerSent.groupBy({
         by: ["triggerId"],
@@ -50,7 +58,7 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
         by: ["triggerId"],
         where: {
           projectId: input.projectId,
-          createdAt: { gte: input.firesSince },
+          createdAt: { gte: firesSince },
         },
         orderBy: { triggerId: "asc" },
         _count: { _all: true },
@@ -115,7 +123,7 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
   }
   findStats(input: {
     projectId: string;
-    firesSince: Date;
+    firesSince: Instant;
   }): Promise<import("@langwatch/automation-contract").AutomationFireStats[]> {
     return this.findAllStatsForProject(input).then((rows) =>
       rows.map(({ currentlyFiring: _current, ...row }) => row),

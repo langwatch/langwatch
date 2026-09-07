@@ -9,6 +9,7 @@ import {
   AutomationWebhookProviderPort,
   type AutomationWebhookStoredParams,
 } from "../ports/automation-provider.port.ts";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -53,7 +54,7 @@ export class WebhookProviderAdapter extends AutomationWebhookProviderPort {
       previousSigningSecretEncrypted?: string;
       previousSigningSecretExpiresAt?: number;
     },
-    now?: Date,
+    now?: Instant,
   ): string[] {
     return WebhookProviderAdapter.decryptSigningSecrets(params, this.crypto, now);
   }
@@ -83,13 +84,13 @@ export class WebhookProviderAdapter extends AutomationWebhookProviderPort {
       previousSigningSecretExpiresAt?: number;
     },
     crypto: AutomationWebhookSecretCrypto,
-    now: Date = new Date(),
+    now: Instant = nowInstant(),
   ): string[] {
     if (!params.signingSecretEncrypted) return [];
     const previousIsValid =
       params.previousSigningSecretEncrypted !== undefined &&
       params.previousSigningSecretExpiresAt !== undefined &&
-      params.previousSigningSecretExpiresAt > now.getTime();
+      params.previousSigningSecretExpiresAt > now.epochMilliseconds;
     return [
       crypto.decrypt(params.signingSecretEncrypted),
       ...(previousIsValid && params.previousSigningSecretEncrypted
@@ -185,7 +186,8 @@ export class WebhookProviderAdapter extends AutomationWebhookProviderPort {
     return {
       signingSecretEncrypted: crypto.encrypt(submitted),
       previousSigningSecretEncrypted: existing?.signingSecretEncrypted,
-      previousSigningSecretExpiresAt: Date.now() + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
+      previousSigningSecretExpiresAt:
+        nowInstant().epochMilliseconds + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
     };
   }
 

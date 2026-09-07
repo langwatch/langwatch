@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Temporal } from "@langwatch/time";
 
 export const GATEWAY_SPEND_PIPELINE_NAME = "gateway_spend_processing" as const;
 export const GATEWAY_SPEND_AGGREGATE_TYPE = "gateway_request" as const;
@@ -64,8 +65,14 @@ const boundedMetadataJson = z
 const occurredAtMs = z
   .number()
   .int()
-  .min(Date.UTC(2020, 0, 1))
-  .max(Date.UTC(2100, 0, 1));
+  .min(
+    Temporal.PlainDateTime.from({ year: 2020, month: 1, day: 1 }).toZonedDateTime("UTC")
+      .epochMilliseconds,
+  )
+  .max(
+    Temporal.PlainDateTime.from({ year: 2100, month: 1, day: 1 }).toZonedDateTime("UTC")
+      .epochMilliseconds,
+  );
 
 /**
  * Every quantity a provider bills by, one named integer field each — not a map, which would kill sumIf rollups, lose per-field defaults, and turn a typo into a silently unpriced quantity; every field defaults to zero. input/output_audio_tokens and input/output_image_tokens are DISJOINT from the text token counts (audio/image price several times higher; charging both would double that portion); image_count is display-only; reasoning_tokens stays a subset of output_tokens, also display-only. audio_ms is whole milliseconds; the one division by 1000 happens at the rating seam.

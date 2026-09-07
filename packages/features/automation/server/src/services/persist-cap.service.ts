@@ -6,6 +6,7 @@ import type {
   AutomationPlanProvider,
 } from "@langwatch/automation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automations:persist-cap");
 
@@ -38,7 +39,7 @@ export interface AutomationPersistCapRedisPort {
 export type ConsumePersistCapSlotInput = {
   projectId: string;
   triggerId: string;
-  now: Date;
+  now: Instant;
   cap: number;
   dedupKey: string;
 };
@@ -46,7 +47,7 @@ export type ConsumePersistCapSlotInput = {
 export type ReadPersistCapCountsInput = {
   projectId: string;
   triggerIds: readonly string[];
-  now: Date;
+  now: Instant;
   cap: number;
 };
 
@@ -89,10 +90,10 @@ export class AutomationPersistCapService {
   }: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
   }): string {
     return `persist-cap:${AutomationPersistCapService.capSlotTag({ projectId, triggerId })}:${Math.floor(
-      now.getTime() / DAY_MS,
+      now.epochMilliseconds / DAY_MS,
     )}`;
   }
 
@@ -131,7 +132,7 @@ export class AutomationPersistCapService {
   }: {
     projectId: string;
     triggerId: string;
-    now: Date;
+    now: Instant;
     cap: number;
     /**
      * Stable identity for THIS logical dispatch — the (trigger, trace) pair. An
@@ -165,14 +166,14 @@ export class AutomationPersistCapService {
     }
 
     return decide(
-      AutomationPersistCapService.countInMemory({ key, claimKey, nowMs: now.getTime() }),
+      AutomationPersistCapService.countInMemory({ key, claimKey, nowMs: now.epochMilliseconds }),
     );
   }
 
   /** Resolve a contract override or plan-tier cap. Failed lookups use, but do not cache, paid. */
   async resolvePersistDailyCap(projectId: string): Promise<number> {
     const cached = capCache.get(projectId);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > nowInstant().epochMilliseconds) {
       return cached.value;
     }
 
@@ -187,7 +188,10 @@ export class AutomationPersistCapService {
         await this.dependencies.planProvider.getActivePlan({ organizationId }),
         this.dependencies.config,
       );
-      capCache.set(projectId, { value: cap, expiresAt: Date.now() + CAP_CACHE_TTL_MS });
+      capCache.set(projectId, {
+        value: cap,
+        expiresAt: nowInstant().epochMilliseconds + CAP_CACHE_TTL_MS,
+      });
 
       return cap;
     } catch (error) {
@@ -221,7 +225,7 @@ export class AutomationPersistCapService {
   }: {
     projectId: string;
     triggerIds: readonly string[];
-    now: Date;
+    now: Instant;
     cap: number;
   }): Promise<Record<string, { count: number; skipped: number }>> {
     const counts: Record<string, { count: number; skipped: number }> = {};
@@ -255,7 +259,7 @@ export class AutomationPersistCapService {
       raw = keys.map((key) => {
         const entry = memoryStore.get(key);
 
-        return entry && entry.expiresAt > now.getTime() ? String(entry.count) : null;
+        return entry && entry.expiresAt > now.epochMilliseconds ? String(entry.count) : null;
       });
     }
 

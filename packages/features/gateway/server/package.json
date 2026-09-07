@@ -76,6 +76,46 @@
     "./composition/gateway-spend-fold": {
       "types": "./src/projections/gateway-spend.projection.ts",
       "default": "./src/projections/gateway-spend.projection.ts"
+    },
+    "./api-trpc/gateway-budget": {
+      "types": "./src/transport/api-trpc/gateway-budget.api.ts",
+      "default": "./src/transport/api-trpc/gateway-budget.api.ts"
+    },
+    "./api-trpc/gateway-cache-rule": {
+      "types": "./src/transport/api-trpc/gateway-cache-rule.api.ts",
+      "default": "./src/transport/api-trpc/gateway-cache-rule.api.ts"
+    },
+    "./api-trpc/gateway-guardrail": {
+      "types": "./src/transport/api-trpc/gateway-guardrail.api.ts",
+      "default": "./src/transport/api-trpc/gateway-guardrail.api.ts"
+    },
+    "./api-trpc/gateway-spend-event": {
+      "types": "./src/transport/api-trpc/gateway-spend-event.api.ts",
+      "default": "./src/transport/api-trpc/gateway-spend-event.api.ts"
+    },
+    "./api-trpc/gateway-usage": {
+      "types": "./src/transport/api-trpc/gateway-usage.api.ts",
+      "default": "./src/transport/api-trpc/gateway-usage.api.ts"
+    },
+    "./api-trpc/virtual-key": {
+      "types": "./src/transport/api-trpc/virtual-key.api.ts",
+      "default": "./src/transport/api-trpc/virtual-key.api.ts"
+    },
+    "./api-rest/gateway-platform": {
+      "types": "./src/transport/api-rest/gateway-platform.api.ts",
+      "default": "./src/transport/api-rest/gateway-platform.api.ts"
+    },
+    "./api-rest/gateway-internal": {
+      "types": "./src/transport/api-rest/gateway-internal.api.ts",
+      "default": "./src/transport/api-rest/gateway-internal.api.ts"
+    },
+    "./api-rest/gateway-spend": {
+      "types": "./src/transport/api-rest/gateway-spend.api.ts",
+      "default": "./src/transport/api-rest/gateway-spend.api.ts"
+    },
+    "./api-rest/elevenlabs-webhook": {
+      "types": "./src/transport/api-rest/elevenlabs-webhook.api.ts",
+      "default": "./src/transport/api-rest/elevenlabs-webhook.api.ts"
     }
   },
   "scripts": {
@@ -101,6 +141,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
     "hono": "^4.12.27",

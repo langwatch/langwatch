@@ -18,6 +18,7 @@ import type {
 } from "../repositories/gateway-key-budget.repository.ts";
 import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port.ts";
 import type { VirtualKeyBudgetInput } from "./virtual-key-validation.service.ts";
+import { fromDate, nowInstant } from "@langwatch/time";
 
 export class VirtualKeyBudgetService {
   private constructor(
@@ -75,7 +76,7 @@ export class VirtualKeyBudgetService {
             // Changing the window changes what "this period" means, so the
             // reset instant has to be recomputed with it.
             ...(existing.window !== budget.window
-              ? { resetsAt: GatewayWindow.nextResetAt(budget.window) }
+              ? { resetsAt: fromDate(GatewayWindow.nextResetAt(budget.window)) }
               : {}),
           },
           tx,
@@ -85,7 +86,7 @@ export class VirtualKeyBudgetService {
             organizationId: vk.organizationId,
             virtualKeyId: vk.id,
             createdById: actorUserId,
-            resetsAt: GatewayWindow.nextResetAt(budget.window),
+            resetsAt: fromDate(GatewayWindow.nextResetAt(budget.window)),
             fields,
           },
           tx,
@@ -138,7 +139,10 @@ export class VirtualKeyBudgetService {
       tx,
     );
     for (const budget of budgets) {
-      const archived = await this.keyBudgets.archive({ id: budget.id, archivedAt: new Date() }, tx);
+      const archived = await this.keyBudgets.archive(
+        { id: budget.id, archivedAt: nowInstant() },
+        tx,
+      );
       await this.changeEvents.append(
         {
           organizationId: vk.organizationId,

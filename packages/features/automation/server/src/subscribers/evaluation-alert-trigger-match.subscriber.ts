@@ -5,6 +5,7 @@ import type {
   AutomationEvaluationTriggerFilterPort,
   AutomationTriggerMatchRecorderPort,
 } from "../ports/automation-evaluation-subscriber.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);
 
@@ -41,7 +42,7 @@ export async function handleEvaluationAlertTriggerMatch(
   event: EvaluationEvent,
   context: { tenantId: string; state: EvaluationState },
 ): Promise<void> {
-  if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
+  if (event.occurredAt < nowInstant().epochMilliseconds - 60 * 60 * 1000) return;
   const evaluation = context.state;
   if (
     evaluation.status !== "processed" &&

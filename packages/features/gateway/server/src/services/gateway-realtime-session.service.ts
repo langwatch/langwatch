@@ -20,6 +20,7 @@ import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confir
 import type { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port.ts";
 import { createHash } from "crypto";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
 
@@ -102,7 +103,7 @@ export class GatewayRealtimeSessionService {
         traceId: input.traceId ?? null,
         requestedModel: input.requestedModel ?? null,
       },
-      staleBefore: new Date(Date.now() - REALTIME_OPEN_SESSION_WINDOW_MS),
+      staleBefore: nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS }),
       closeReason: EXPIRY_CLOSE_REASON,
     });
   }
@@ -148,7 +149,7 @@ export class GatewayRealtimeSessionService {
     modelProviderId: string;
     vendorConversationId?: string;
     echoedSessionId?: string;
-    callStartedAt?: Date;
+    callStartedAt?: Instant;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<GatewayRealtimeSession | null> {
     const sessions = params.collaborators.sessions;
@@ -177,9 +178,9 @@ export class GatewayRealtimeSessionService {
       }
     }
 
-    const since = new Date(
-      (params.callStartedAt?.getTime() ?? Date.now()) - REALTIME_OPEN_SESSION_WINDOW_MS,
-    );
+    const since = (params.callStartedAt ?? nowInstant()).subtract({
+      milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS,
+    });
     // Two candidates is already one too many, so two is all that is read.
     const candidates = await sessions.findOpenSince({
       ...tenancy,
@@ -208,12 +209,12 @@ export class GatewayRealtimeSessionService {
     session: GatewayRealtimeSessionRecord;
     usage: Partial<SpendUsage>;
     vendorCostRaw?: unknown;
-    occurredAt?: Date;
+    occurredAt?: Instant;
     durationMs?: number;
     reason: string;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<void> {
-    const occurredAt = params.occurredAt ?? new Date();
+    const occurredAt = params.occurredAt ?? nowInstant();
     const usage: SpendUsage = { ...EMPTY_SPEND_USAGE, ...params.usage };
 
     // Confirmation goes first; the row closes only once it has landed — the
@@ -227,7 +228,7 @@ export class GatewayRealtimeSessionService {
     });
     await params.collaborators.spendConfirmation.confirmSpend({
       gateway_request_id: params.session.id,
-      occurred_at: occurredAt.getTime(),
+      occurred_at: occurredAt.epochMilliseconds,
       tenantId: params.session.projectId,
       model: params.session.model,
       model_provider_id: params.session.modelProviderId,
@@ -295,7 +296,7 @@ export class GatewayRealtimeSessionService {
     projectId: string;
     virtualKeyId: string;
     usage: Partial<SpendUsage>;
-    now?: Date;
+    now?: Instant;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<"closed" | "already_closed" | "not_found"> {
     // Matched on the key as well as the project. A trace project is shared by
@@ -321,14 +322,14 @@ export class GatewayRealtimeSessionService {
       return "already_closed";
     }
 
-    const now = params.now ?? new Date();
+    const now = params.now ?? nowInstant();
     await this.closeAndConfirmRealtimeSession({
       session,
       usage: params.usage,
       occurredAt: now,
       collaborators: params.collaborators,
       reason: "usage reported by the client",
-      durationMs: Math.max(0, now.getTime() - session.mintedAt.getTime()),
+      durationMs: Math.max(0, now.epochMilliseconds - session.mintedAt.getTime()),
     });
 
     return "closed";
@@ -341,15 +342,15 @@ export class GatewayRealtimeSessionService {
    */
   async expireStaleRealtimeSessions(params: {
     virtualKeyId?: string;
-    now?: Date;
+    now?: Instant;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<number> {
-    const now = params.now ?? new Date();
+    const now = params.now ?? nowInstant();
 
     return await params.collaborators.sessions.expireStale({
       ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
       now,
-      staleBefore: new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS),
+      staleBefore: now.subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS }),
       closeReason: EXPIRY_CLOSE_REASON,
     });
   }
@@ -383,7 +384,7 @@ async function recordRealtimeSessionSpan(params: {
   usage: SpendUsage;
   costNanoUsd: number;
   durationMs: number;
-  occurredAt: Date;
+  occurredAt: Instant;
   /**
    * Absent on a deployment that composes no trace storage. The settlement
    * span is then not written, which is the honest answer: there is no trace
@@ -399,7 +400,7 @@ async function recordRealtimeSessionSpan(params: {
     return;
   }
 
-  const endMs = params.occurredAt.getTime();
+  const endMs = params.occurredAt.epochMilliseconds;
   const startMs = Math.max(0, endMs - Math.max(0, params.durationMs));
   // The canonical attribute names, the same ones the gateway's mint span
   // writes. The trace fold reads cost from `langwatch.span.cost` and tokens

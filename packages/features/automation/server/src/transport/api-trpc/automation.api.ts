@@ -74,6 +74,7 @@ import {
   type AutomationApp,
 } from "#app/automation.app";
 import { buildRetryAfterMessage } from "../../rules/retry-after-message.rules.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 /**
  * The app's KSUID resource for a trigger row (`KSUID_RESOURCES.TRIGGER`). The
@@ -405,7 +406,7 @@ export class AutomationTrpcApi {
                 actionParams: input.actionParams,
                 filters: input.filters,
                 projectId: input.projectId,
-                lastRunAt: new Date(),
+                lastRunAt: toDate(nowInstant()),
                 notificationCadence: resolveCadenceForCreate(
                   input.action,
                   input.notificationCadence,
@@ -528,7 +529,7 @@ export class AutomationTrpcApi {
               const counts = await ctx.app.automation.readPersistCapCounts({
                 projectId: input.projectId,
                 triggerIds: triggers.map((trigger) => trigger.id),
-                now: new Date(),
+                now: toDate(nowInstant()),
                 cap,
               });
               return { cap, counts };
@@ -1141,7 +1142,7 @@ export class AutomationTrpcApi {
                     ...data,
                     deleted: false,
                     active: true,
-                    lastRunAt: new Date(),
+                    lastRunAt: toDate(nowInstant()),
                     notificationCadence: resolveCadenceForCreate(
                       input.action,
                       input.notificationCadence,
@@ -1153,7 +1154,7 @@ export class AutomationTrpcApi {
                   trigger = await ctx.app.automation.create({
                     id: ksuid(TRIGGER_KSUID_RESOURCE).toString(),
                     projectId: input.projectId,
-                    lastRunAt: new Date(),
+                    lastRunAt: toDate(nowInstant()),
                     notificationCadence: resolveCadenceForCreate(
                       input.action,
                       input.notificationCadence,

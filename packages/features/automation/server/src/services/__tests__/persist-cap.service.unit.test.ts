@@ -10,11 +10,12 @@ const planMock = vi.hoisted(() => ({
 // The TTL cache would otherwise carry one test's plan answer into the next.
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 import { SettlementProjectService } from "../../ports/__tests__/support/settlement.fixtures.ts";
+import { Temporal } from "@langwatch/time";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";
-const DAY_ONE = new Date("2026-08-09T12:00:00.000Z");
-const DAY_TWO = new Date("2026-08-10T00:00:01.000Z");
+const DAY_ONE = Temporal.Instant.from("2026-08-09T12:00:00.000Z");
+const DAY_TWO = Temporal.Instant.from("2026-08-10T00:00:01.000Z");
 
 const projects = new SettlementProjectService();
 const persistCapDependencies = {
@@ -52,7 +53,7 @@ describe("given the two keys one Lua script touches together", () => {
       const counter = AutomationPersistCapService.persistCapKey({
         projectId: PROJECT_ID,
         triggerId: TRIGGER_ID,
-        now: new Date("2026-08-09T12:00:00.000Z"),
+        now: Temporal.Instant.from("2026-08-09T12:00:00.000Z"),
       });
       const claim = AutomationPersistCapService.persistCapClaimKey({
         projectId: PROJECT_ID,

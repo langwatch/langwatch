@@ -45,6 +45,7 @@ import { type GatewayBudgetScope } from "../repositories/gateway-budget.reposito
 import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service.ts";
 import { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
+import { nowInstant, toDate } from "@langwatch/time";
 
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 
@@ -126,7 +127,7 @@ export class GatewayService extends GatewayServiceContract {
       return {
         budgets: [],
         spendAvailable: true,
-        readAt: new Date(),
+        readAt: toDate(nowInstant()),
         scopeReach: new Map(),
       };
     }

@@ -2,6 +2,7 @@ import type {
   GatewayRealtimeSession,
   GatewayRealtimeSessionStatus,
 } from "@langwatch/gateway-contract";
+import type { Instant } from "@langwatch/time";
 
 /** What a reserve attempt answers. */
 export type ReserveResult =
@@ -30,7 +31,7 @@ export abstract class GatewayRealtimeSessionRepository {
   abstract reserve(input: {
     session: NewGatewayRealtimeSession;
     /** Rows minted before this are expired first, under the same lock. */
-    staleBefore: Date;
+    staleBefore: Instant;
     closeReason: string;
   }): Promise<ReserveResult>;
   abstract correlate(input: {
@@ -59,7 +60,7 @@ export abstract class GatewayRealtimeSessionRepository {
     organizationId: string;
     vendor: string;
     modelProviderId: string;
-    since: Date;
+    since: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSession[]>;
   abstract tryFindForReport(input: {
@@ -71,14 +72,14 @@ export abstract class GatewayRealtimeSessionRepository {
   abstract close(input: {
     sessionId: string;
     projectId: string;
-    closedAt: Date;
+    closedAt: Instant;
     closeReason: string;
     vendorCostRaw?: unknown;
   }): Promise<number>;
   abstract expireStale(input: {
     virtualKeyId?: string;
-    now: Date;
-    staleBefore: Date;
+    now: Instant;
+    staleBefore: Instant;
     closeReason: string;
   }): Promise<number>;
 }

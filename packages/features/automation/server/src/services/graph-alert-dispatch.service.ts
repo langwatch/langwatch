@@ -16,6 +16,7 @@ import type {
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationWebhookProviderPort } from "../ports/automation-provider.port.ts";
+import { fromDate } from "@langwatch/time";
 
 function destinationHash(destination: string): string {
   return createHash("sha256").update(destination).digest("hex").slice(0, 16);
@@ -111,7 +112,7 @@ export class GraphAlertDispatchService {
       return emptyResult("email");
     }
 
-    const now = this.clock.now();
+    const now = fromDate(this.clock.now());
     const hourly = await this.emailCaps.consumeHourly({
       projectId: input.project.id,
       triggerId: input.trigger.id,
@@ -247,7 +248,7 @@ export class GraphAlertDispatchService {
       url: params.url,
       method: params.method,
       headers: this.webhooks.decryptHeaders(params),
-      signingSecrets: this.webhooks.decryptSigningSecrets(params, this.clock.now()),
+      signingSecrets: this.webhooks.decryptSigningSecrets(params, fromDate(this.clock.now())),
       body: rendered.body,
       triggerName: input.trigger.name,
     });

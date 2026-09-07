@@ -23,6 +23,7 @@ import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:api:elevenlabs");
@@ -87,7 +88,7 @@ export function verifyElevenLabsSignature(params: {
   const parsed = parseSignatureHeader(params.header);
   if (!parsed) return false;
 
-  const now = params.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const now = params.nowSeconds ?? Math.floor(nowInstant().epochMilliseconds / 1000);
   if (Math.abs(now - parsed.sentAt) > SIGNATURE_TOLERANCE_SECONDS) return false;
 
   const expected = createHmac("sha256", params.secret)
@@ -230,7 +231,9 @@ async function applyPostCallReport(params: {
     modelProviderId: params.modelProviderId,
     vendorConversationId: data?.conversation_id,
     echoedSessionId: echoedSessionId(params.payload),
-    callStartedAt: startedAtSecs ? new Date(startedAtSecs * 1000) : undefined,
+    callStartedAt: startedAtSecs
+      ? Temporal.Instant.fromEpochMilliseconds(startedAtSecs * 1000)
+      : undefined,
     collaborators: params.sessions,
   });
   if (!session) return;

@@ -26,6 +26,7 @@ import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { createAutomationTestRuntime } from "../../testing.ts";
+import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
 
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
   findProjectsWithGraphTriggers = async () => [];
@@ -129,7 +130,7 @@ class Jobs extends ScheduledJobStorePort {
     targetId: string;
     cron: string;
     timezone: string;
-    nextRunAt: Date;
+    nextRunAt: Instant;
   }) {
     this.rows = [
       ...this.rows.filter((row) => row.targetId !== input.targetId),
@@ -223,18 +224,18 @@ class Fires extends TriggerFireHistoryRepository {
       triggerId: string;
       traceId: string | null;
       customGraphId: string | null;
-      createdAt: Date;
-      resolvedAt: Date | null;
+      createdAt: Instant;
+      resolvedAt: Instant | null;
     }) => ({
       id: "fire-1",
       triggerId: input.triggerId,
       customGraphId: input.customGraphId,
-      createdAt: input.createdAt,
-      resolvedAt: input.resolvedAt,
+      createdAt: toDate(input.createdAt),
+      resolvedAt: input.resolvedAt === null ? null : toDate(input.resolvedAt),
     }),
   );
   findAllStatsForProject = vi.fn(
-    async (_input: { projectId: string; firesSince: Date }) => this.stats,
+    async (_input: { projectId: string; firesSince: Instant }) => this.stats,
   );
   findAllRecentByTriggerId = vi.fn(
     async (_input: { projectId: string; triggerId: string; limit: number }) => this.fires,
@@ -387,8 +388,8 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
       triggerId: "report",
       traceId: null,
       customGraphId: null,
-      createdAt: firedAt,
-      resolvedAt: firedAt,
+      createdAt: fromDate(firedAt),
+      resolvedAt: fromDate(firedAt),
     });
   });
 
@@ -407,7 +408,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
     expect(await service.getFireStats({ projectId: "p" })).toEqual(history.stats);
     const input = history.findAllStatsForProject.mock.calls[0]?.[0];
     expect(input?.projectId).toBe("p");
-    expect(input?.firesSince).toEqual(new Date("2025-12-02T00:00:00Z"));
+    expect(input?.firesSince).toEqual(Temporal.Instant.from("2025-12-02T00:00:00Z"));
   });
 
   it("selects trigger-scoped or project fire history based on the query", async () => {
@@ -538,7 +539,7 @@ describe("AutomationService email suppression", () => {
     jobs.rows = [
       {
         targetId: "paused",
-        nextRunAt: new Date("2026-01-02T10:00:00Z"),
+        nextRunAt: Temporal.Instant.from("2026-01-02T10:00:00Z"),
         lastSlot: null,
         active: false,
       },

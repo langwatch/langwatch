@@ -15,6 +15,7 @@ import { Cron } from "croner";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import type { AutomationNotificationDeliveryPort } from "../ports/automation-notification-delivery.port.ts";
 import type { AutomationSlackProviderPort } from "../ports/automation-provider.port.ts";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:report-dispatch");
 
@@ -63,7 +64,7 @@ export interface ReportDispatchDeps {
    * history and last-sent alongside everything else. Without this a report can
    * run for a month and leave no trace that it ever did.
    */
-  recordFire(params: { projectId: string; triggerId: string; firedAt: Date }): Promise<void>;
+  recordFire(params: { projectId: string; triggerId: string; firedAt: Instant }): Promise<void>;
   baseHost: string;
 }
 
@@ -128,11 +129,12 @@ export class ReportDispatchService {
   }: {
     cron: string;
     timezone: string;
-    slot: Date;
+    slot: Instant;
   }): number {
-    let previous: Date | undefined;
+    let previous: Instant | undefined;
     try {
-      [previous] = new Cron(cron, { timezone }).previousRuns(1, slot);
+      const [run] = new Cron(cron, { timezone }).previousRuns(1, toDate(slot));
+      previous = run === undefined ? undefined : fromDate(run);
     } catch {
       return WEEK_MS;
     }
@@ -141,7 +143,7 @@ export class ReportDispatchService {
       return WEEK_MS;
     }
 
-    const span = slot.getTime() - previous.getTime();
+    const span = slot.epochMilliseconds - previous.epochMilliseconds;
     if (!Number.isFinite(span) || span <= 0) {
       return WEEK_MS;
     }
@@ -182,7 +184,7 @@ export class ReportDispatchService {
       ReportDispatchService.reportWindowMs({
         cron: report.schedule.cron,
         timezone: report.schedule.timezone,
-        slot: fire.slot,
+        slot: fromDate(fire.slot),
       });
 
     const { traces, charts } = await loadReportData({
@@ -218,7 +220,7 @@ export class ReportDispatchService {
       deps,
       projectId: project.id,
       triggerId: trigger.id,
-      firedAt: fire.slot,
+      firedAt: fromDate(fire.slot),
     });
   }
 }
@@ -435,7 +437,7 @@ async function recordReportFire({
   deps: ReportDispatchDeps;
   projectId: string;
   triggerId: string;
-  firedAt: Date;
+  firedAt: Instant;
 }): Promise<void> {
   try {
     await deps.recordFire({ projectId, triggerId, firedAt });

@@ -3,6 +3,7 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port.ts";
+import { nowInstant } from "@langwatch/time";
 
 const VK_PREFIX = "vk-lw-";
 
@@ -40,7 +41,7 @@ export class VirtualKeyCryptoAdapter extends GatewayVirtualKeyCryptoPort {
   }
 
   /** The minting and parsing halves of the port, over this module's format. */
-  mintSecret(nowMs: number = Date.now()): string {
+  mintSecret(nowMs: number = nowInstant().epochMilliseconds): string {
     return VirtualKeyCryptoAdapter.mintSecret(nowMs);
   }
 
@@ -68,7 +69,7 @@ export class VirtualKeyCryptoAdapter extends GatewayVirtualKeyCryptoPort {
   }
 
   /** Generates a sortable 26-character Crockford-base32 ULID. */
-  static mintUlid(now: number = Date.now()): string {
+  static mintUlid(now: number = nowInstant().epochMilliseconds): string {
     const out = Array.from({ length: 26 }, () => "");
     let ts = BigInt(now);
     for (let i = 9; i >= 0; i--) {
@@ -87,7 +88,7 @@ export class VirtualKeyCryptoAdapter extends GatewayVirtualKeyCryptoPort {
   }
 
   /** Mints a virtual-key secret that is shown once and never stored plaintext. */
-  static mintSecret(now: number = Date.now()): string {
+  static mintSecret(now: number = nowInstant().epochMilliseconds): string {
     return `${VK_PREFIX}${VirtualKeyCryptoAdapter.mintUlid(now)}`;
   }
 

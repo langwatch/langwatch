@@ -5,6 +5,7 @@ import {
   type ElevenLabsConversationReader,
   type RealtimeSessionReconciliationRepository,
 } from "../../services/gateway-realtime-session-reconciliation.service.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 const session = {
   id: "session-1",
@@ -47,7 +48,7 @@ function buildWorker(options?: {
     conversations,
     logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
     config: realtimeSessionReconciliationConfig,
-    clock: { now: () => new Date() },
+    clock: { now: () => nowInstant() },
   });
 
   return { worker, repository, conversations };
@@ -57,7 +58,7 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
   /** @scenario Reconciliation confirms a completed ElevenLabs conversation */
   it("expires stale sessions, reads eligible sessions exactly, and confirms rounded duration", async () => {
     const { worker, repository, conversations } = buildWorker();
-    const now = new Date("2026-08-25T12:00:00.000Z");
+    const now = Temporal.Instant.from("2026-08-25T12:00:00.000Z");
 
     await expect(worker.poll(now)).resolves.toEqual({
       examined: 1,
@@ -65,7 +66,7 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
       expired: 2,
     });
     expect(repository.listOpenElevenLabsSessions).toHaveBeenCalledWith({
-      mintedBefore: new Date("2026-08-25T11:58:00.000Z"),
+      mintedBefore: Temporal.Instant.from("2026-08-25T11:58:00.000Z"),
       limit: 25,
     });
     expect(conversations.readConversation).toHaveBeenCalledWith({

@@ -17,6 +17,7 @@ import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { Instant } from "@langwatch/time";
 
 export type GraphActionParams = {
   members?: string[] | null;
@@ -133,8 +134,8 @@ export type GraphEvaluationPlan = {
   seriesName: string;
   series: GraphSeries;
   graph: StoredGraphConfig;
-  now: Date;
-  startDate: Date;
+  now: Instant;
+  startDate: Instant;
   timeseriesInput: TimeseriesInputType;
 };
 

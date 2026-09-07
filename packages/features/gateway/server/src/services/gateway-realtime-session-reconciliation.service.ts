@@ -1,5 +1,6 @@
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import { z } from "zod";
+import type { Instant } from "@langwatch/time";
 
 export const elevenLabsConversationReportSchema = z
   .object({
@@ -24,13 +25,13 @@ export interface RealtimeSessionReconciliationLogger {
 }
 
 export interface RealtimeSessionReconciliationClock {
-  now(): Date;
+  now(): Instant;
 }
 
 export interface RealtimeSessionReconciliationRepository {
-  expireStaleSessions(input: { now: Date }): Promise<number>;
+  expireStaleSessions(input: { now: Instant }): Promise<number>;
   listOpenElevenLabsSessions(input: {
-    mintedBefore: Date;
+    mintedBefore: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSessionRecord[]>;
   releaseMissingVendorConversation(input: {
@@ -116,7 +117,7 @@ export class GatewayRealtimeSessionReconciliationService {
   }> {
     const expired = await this.repository.expireStaleSessions({ now });
     const sessions = await this.repository.listOpenElevenLabsSessions({
-      mintedBefore: new Date(now.getTime() - this.config.pollAfterMs),
+      mintedBefore: now.subtract({ milliseconds: this.config.pollAfterMs }),
       limit: this.config.maxSessionsPerTick,
     });
 

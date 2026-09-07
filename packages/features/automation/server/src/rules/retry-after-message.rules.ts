@@ -6,10 +6,13 @@
  * retry-seconds arithmetic (clamped to >= 1, correct pluralisation) can be
  * unit-tested without standing up a tRPC procedure.
  */
+
+import { nowInstant } from "@langwatch/time";
+
 export function buildRetryAfterMessage({
   prefix,
   resetAt,
-  now = Date.now(),
+  now = nowInstant().epochMilliseconds,
 }: {
   prefix: string;
   resetAt: number;

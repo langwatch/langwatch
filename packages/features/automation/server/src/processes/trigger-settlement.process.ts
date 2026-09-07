@@ -6,6 +6,7 @@ import {
   type TriggerActionClass,
   type TriggerMatchRecordedEventData,
 } from "@langwatch/automation-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 
 export interface PendingMatch {
   settleDueAt: number;
@@ -76,14 +77,16 @@ export class TriggerSettlement {
   }: {
     action: TriggerAction;
     cadence: NotificationCadence;
-    now: Date;
-  }): Date {
+    now: Instant;
+  }): Instant {
     if (PERSIST_TRIGGER_ACTIONS.has(action) || cadence === "immediate") {
       return now;
     }
 
     const windowMs = CADENCE_WINDOW_MS[cadence];
-    return new Date((Math.floor(now.getTime() / windowMs) + 1) * windowMs);
+    return Temporal.Instant.fromEpochMilliseconds(
+      (Math.floor(now.epochMilliseconds / windowMs) + 1) * windowMs,
+    );
   }
 
   private static nextWakeFrom(state: SettlementState): number | null {
@@ -114,8 +117,8 @@ export class TriggerSettlement {
     const dispatchDueAt = TriggerSettlement.computeScheduledFor({
       action: view.action,
       cadence: view.notificationCadence,
-      now: new Date(settleDueAt),
-    }).getTime();
+      now: Temporal.Instant.fromEpochMilliseconds(settleDueAt),
+    }).epochMilliseconds;
     const pendingMatches = {
       ...previousState.pendingMatches,
       [view.traceId]: {

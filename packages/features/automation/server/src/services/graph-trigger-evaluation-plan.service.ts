@@ -9,6 +9,7 @@ import type {
   StoredGraphConfig,
   TimeseriesInputType,
 } from "./trigger-evaluator.service.ts";
+import { fromDate, type Instant } from "@langwatch/time";
 
 export class GraphTriggerEvaluationPlanService {
   private constructor() {}
@@ -81,8 +82,8 @@ export class GraphTriggerEvaluationPlanService {
       return series;
     }
 
-    const now = request.deps.clock.now();
-    const startDate = new Date(now.getTime() - trigger.params.timePeriod! * 60 * 1000);
+    const now = fromDate(request.deps.clock.now());
+    const startDate = now.subtract({ milliseconds: trigger.params.timePeriod! * 60 * 1000 });
 
     return {
       request,
@@ -126,13 +127,13 @@ export class GraphTriggerEvaluationPlanService {
     filters: unknown,
     graph: StoredGraphConfig,
     series: GraphSeries,
-    startDate: Date,
-    endDate: Date,
+    startDate: Instant,
+    endDate: Instant,
   ): TimeseriesInputType {
     return {
       projectId,
-      startDate: startDate.getTime(),
-      endDate: endDate.getTime(),
+      startDate: startDate.epochMilliseconds,
+      endDate: endDate.epochMilliseconds,
       filters: (filters ?? {}) as TimeseriesInputType["filters"],
       series: [{ ...series, name: void 0 }],
       groupBy: graph.groupBy,

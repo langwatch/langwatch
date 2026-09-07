@@ -10,6 +10,7 @@ import {
   type NewGatewayRealtimeSession,
   type ReserveResult,
 } from "../gateway-realtime-session.repository.ts";
+import { toDate, type Instant } from "@langwatch/time";
 
 /** The client slice realtime sessions are booked and settled through. */
 export type GatewayRealtimeSessionDatabase = Pick<
@@ -35,7 +36,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     closeReason,
   }: {
     session: NewGatewayRealtimeSession;
-    staleBefore: Date;
+    staleBefore: Instant;
     closeReason: string;
   }): Promise<ReserveResult> {
     return await this.database.$transaction(async (tx) => {
@@ -63,7 +64,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
           where: {
             virtualKeyId: session.virtualKeyId,
             status: "OPEN",
-            mintedAt: { lt: staleBefore },
+            mintedAt: { lt: toDate(staleBefore) },
           },
           data: { status: "EXPIRED", closedAt: new Date(), closeReason },
         });
@@ -155,7 +156,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     organizationId: string;
     vendor: string;
     modelProviderId: string;
-    since: Date;
+    since: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSession[]> {
     return this.database.gatewayRealtimeSession.findMany({
@@ -164,7 +165,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
         vendor,
         modelProviderId,
         status: "OPEN",
-        mintedAt: { gt: since },
+        mintedAt: { gt: toDate(since) },
       },
       take: limit,
     });
@@ -193,7 +194,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   }: {
     sessionId: string;
     projectId: string;
-    closedAt: Date;
+    closedAt: Instant;
     closeReason: string;
     vendorCostRaw?: unknown;
   }): Promise<number> {
@@ -201,7 +202,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
       where: { id: sessionId, projectId, status: { in: ["OPEN", "EXPIRED"] } },
       data: {
         status: "CLOSED",
-        closedAt,
+        closedAt: toDate(closedAt),
         closeReason,
         ...(vendorCostRaw === undefined
           ? {}
@@ -219,17 +220,17 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     closeReason,
   }: {
     virtualKeyId?: string;
-    now: Date;
-    staleBefore: Date;
+    now: Instant;
+    staleBefore: Instant;
     closeReason: string;
   }): Promise<number> {
     const { count } = await this.database.gatewayRealtimeSession.updateMany({
       where: {
         ...(virtualKeyId ? { virtualKeyId } : {}),
         status: "OPEN",
-        mintedAt: { lt: staleBefore },
+        mintedAt: { lt: toDate(staleBefore) },
       },
-      data: { status: "EXPIRED", closedAt: now, closeReason },
+      data: { status: "EXPIRED", closedAt: toDate(now), closeReason },
     });
 
     return count;

@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";
 import { WebhookProviderAdapter } from "../webhook-provider.adapter.ts";
+import { Temporal } from "@langwatch/time";
 
 /** Reversible and obviously not real, so a leak in a failure message is loud. */
 const crypto = {
@@ -150,7 +151,7 @@ describe("WebhookProviderAdapter.persist", () => {
 });
 
 describe("WebhookProviderAdapter.decryptSigningSecrets", () => {
-  const now = new Date("2026-08-31T12:00:00.000Z");
+  const now = Temporal.Instant.from("2026-08-31T12:00:00.000Z");
 
   describe("given only a current secret", () => {
     it("answers with that one", () => {
@@ -167,7 +168,7 @@ describe("WebhookProviderAdapter.decryptSigningSecrets", () => {
           {
             signingSecretEncrypted: crypto.encrypt("new"),
             previousSigningSecretEncrypted: crypto.encrypt("old"),
-            previousSigningSecretExpiresAt: now.getTime() + 60_000,
+            previousSigningSecretExpiresAt: now.epochMilliseconds + 60_000,
           },
           now,
         ),
@@ -182,7 +183,7 @@ describe("WebhookProviderAdapter.decryptSigningSecrets", () => {
           {
             signingSecretEncrypted: crypto.encrypt("new"),
             previousSigningSecretEncrypted: crypto.encrypt("old"),
-            previousSigningSecretExpiresAt: now.getTime() - 1,
+            previousSigningSecretExpiresAt: now.epochMilliseconds - 1,
           },
           now,
         ),
