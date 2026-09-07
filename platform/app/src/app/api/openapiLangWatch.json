@@ -32587,15 +32587,6 @@
                               "null"
                             ]
                           },
-                          "strategy": {
-                            "type": "string",
-                            "enum": [
-                              "priority",
-                              "cost",
-                              "latency",
-                              "round_robin"
-                            ]
-                          },
                           "is_default": {
                             "type": "boolean"
                           }
@@ -32604,7 +32595,6 @@
                           "id",
                           "name",
                           "description",
-                          "strategy",
                           "is_default"
                         ]
                       }
@@ -32857,15 +32847,6 @@
                         "null"
                       ]
                     },
-                    "strategy": {
-                      "type": "string",
-                      "enum": [
-                        "priority",
-                        "cost",
-                        "latency",
-                        "round_robin"
-                      ]
-                    },
                     "is_default": {
                       "type": "boolean"
                     }
@@ -32874,7 +32855,6 @@
                     "id",
                     "name",
                     "description",
-                    "strategy",
                     "is_default"
                   ]
                 }

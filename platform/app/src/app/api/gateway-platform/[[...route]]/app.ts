@@ -265,7 +265,7 @@ const budgetDtoSchema = z.object({
 
 /**
  * The read-only summary a routing policy publishes on the REST surface.
- * Exactly the five-field subset: no scope rows, no modelProviderIds, no
+ * Exactly the four-field subset: no scope rows, no modelProviderIds, no
  * policyRules, no modelAliases, no modelAllowlist, no organizationId. The
  * route handler asserts exact key-set equality in tests via Object.keys.
  */
@@ -273,7 +273,6 @@ const routingPolicyDtoSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  strategy: z.enum(["priority", "cost", "latency", "round_robin"]),
   is_default: z.boolean(),
 });
 
@@ -2427,23 +2426,21 @@ async function addOrganizationToContext(c: any, next: () => Promise<void>) {
 }
 
 /**
- * Map a full RoutingPolicy row onto the five-field REST summary.
+ * Map a full RoutingPolicy row onto the four-field REST summary.
  * Strips scopes, modelProviderIds, modelAliases, modelAllowlist,
  * policyRules, organizationId, createdAt/updatedAt — nothing but
- * {id, name, description, strategy, is_default}.
+ * {id, name, description, is_default}.
  */
 function toRoutingPolicyDto(policy: {
   id: string;
   name: string;
   description: string | null;
-  strategy: string;
   isDefault: boolean;
 }) {
   return {
     id: policy.id,
     name: policy.name,
     description: policy.description,
-    strategy: policy.strategy,
     is_default: policy.isDefault,
   };
 }
@@ -2500,7 +2497,7 @@ secured.access(apiKeyPermission("routingPolicies:view")).get(
   describeRoute({
     summary: "Get routing policy",
     description:
-      "One routing policy in the same five-field summary shape GET /routing-policies returns. The by-id lookup is NEVER the sole authorization: a policy belonging to another organization, or scoped to a sibling project the caller cannot see, answers the routing_policy_not_found error body — byte-identical to an nonexistent id — so no 404 can leak existence across tenant boundaries.",
+      "One routing policy in the same four-field summary shape GET /routing-policies returns. The by-id lookup is NEVER the sole authorization: a policy belonging to another organization, or scoped to a sibling project the caller cannot see, answers the routing_policy_not_found error body — byte-identical to an nonexistent id — so no 404 can leak existence across tenant boundaries.",
     tags: ["Routing Policies"],
     responses: {
       ...canonicalBaseResponses,

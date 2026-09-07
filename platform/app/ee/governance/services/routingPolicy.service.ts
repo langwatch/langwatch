@@ -59,7 +59,6 @@ export type RoutingPolicyScopeEntry = {
 
 export type RoutingPolicyWithScopes = RoutingPolicy & {
   scopes: RoutingPolicyScopeRow[];
-  strategy: string;
 };
 
 const WIRE_TO_ENUM: Record<RoutingPolicyScope, RoutingPolicyScopeType> = {

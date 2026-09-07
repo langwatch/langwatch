@@ -131,7 +131,6 @@ beforeAll(async () => {
         id: POLICY_PROJECT_ID,
         name: `Project Policy ${suffix}`,
         description: `Policy scoped to project ${suffix}`,
-        strategy: "priority",
         isDefault: false,
         organizationId: ORG_ID,
       },
@@ -139,7 +138,6 @@ beforeAll(async () => {
         id: POLICY_TEAM_ID,
         name: `Team Policy ${suffix}`,
         description: `Policy scoped to team ${suffix}`,
-        strategy: "cost",
         isDefault: false,
         organizationId: ORG_ID,
       },
@@ -147,7 +145,6 @@ beforeAll(async () => {
         id: POLICY_ORG_ID,
         name: `Org Policy ${suffix}`,
         description: `Policy scoped to org ${suffix}`,
-        strategy: "latency",
         isDefault: false,
         organizationId: ORG_ID,
       },
@@ -155,7 +152,6 @@ beforeAll(async () => {
         id: POLICY_SIBLING_ID,
         name: `Sibling Policy ${suffix}`,
         description: `Policy scoped to sibling project ${suffix}`,
-        strategy: "round_robin",
         isDefault: false,
         organizationId: ORG_ID,
       },
@@ -163,7 +159,6 @@ beforeAll(async () => {
         id: FOREIGN_POLICY_ID,
         name: `Foreign Policy ${suffix}`,
         description: `Policy in foreign org ${suffix}`,
-        strategy: "priority",
         isDefault: false,
         organizationId: FOREIGN_ORG_ID,
       },
@@ -294,7 +289,7 @@ describe("GET /routing-policies", () => {
     );
   });
 
-  it("returns policy objects with exactly the five-field summary subset", async () => {
+  it("returns policy objects with exactly the four-field summary subset", async () => {
     const response = await app.request(`/api/gateway/v1/routing-policies`, {
       method: "GET",
       headers: apiKeyAuth(projectApiKey),
@@ -311,7 +306,6 @@ describe("GET /routing-policies", () => {
         "id",
         "name",
         "description",
-        "strategy",
         "is_default",
       ]);
 
@@ -353,7 +347,7 @@ describe("GET /routing-policies", () => {
 });
 
 describe("GET /routing-policies/:id", () => {
-  it("returns the same five-field subset", async () => {
+  it("returns the same four-field subset", async () => {
     const response = await app.request(
       `/api/gateway/v1/routing-policies/${POLICY_PROJECT_ID}`,
       {
@@ -370,7 +364,6 @@ describe("GET /routing-policies/:id", () => {
       "id",
       "name",
       "description",
-      "strategy",
       "is_default",
     ]);
   });
@@ -425,7 +418,6 @@ describe("GET /routing-policies/:id", () => {
         id: policyId,
         organizationId: ORG_ID,
         name: "Org Policy",
-        strategy: "priority",
         isDefault: false,
         createdById: "user",
         updatedById: "user",

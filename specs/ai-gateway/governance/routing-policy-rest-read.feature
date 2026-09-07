@@ -18,18 +18,18 @@ Feature: Read-only REST discovery of routing policies
     And the returned id set is exactly {"p-project", "p-team", "p-org"}
 
   @unimplemented
-  Scenario: Policy objects expose exactly the five-field summary subset
+  Scenario: Policy objects expose exactly the four-field summary subset
     Given at least one policy selectable at "project-a"
     When the client calls GET /routing-policies with the project API key
-    Then each returned policy object has key set exactly {id, name, description, strategy, isDefault}
+    Then each returned policy object has key set exactly {id, name, description, isDefault}
     And no returned object contains policyRules, modelAliases, modelAllowlist, modelProviderIds, organizationId, or scope assignments
 
   @unimplemented
-  Scenario: Get by id returns the same five-field subset
+  Scenario: Get by id returns the same four-field subset
     Given a policy "p-project" scoped to project "project-a"
     When the client calls GET /routing-policies/p-project with the project API key
     Then the response status is 200
-    And the response body has key set exactly {id, name, description, strategy, isDefault}
+    And the response body has key set exactly {id, name, description, isDefault}
 
   @unimplemented
   Scenario: A listed id round-trips through virtual-key create
@@ -45,7 +45,7 @@ Feature: Read-only REST discovery of routing policies
   Scenario: The regenerated OpenAPI spec documents both paths completely
     Given the regenerated OpenAPI spec artifact from this change
     Then the spec contains a path object for GET /routing-policies and GET /routing-policies/{id}
-    And each path declares a 200 response schema with exactly the five-field subset
+    And each path declares a 200 response schema with exactly the four-field subset
     And each path declares a security scheme and documented 403 and 404 responses
     And the spec diff for this change touches no path outside /routing-policies*
 
@@ -133,7 +133,7 @@ Feature: Read-only REST discovery of routing policies
 
 # --- AC Coverage Map ---
 # AC1  (list visibility)          -> "List returns exactly the policies selectable at the project's scope"
-# AC2  (field subset)             -> "Policy objects expose exactly the five-field summary subset"; "Get by id returns the same five-field subset"
+# AC2  (field subset)             -> "Policy objects expose exactly the four-field summary subset"; "Get by id returns the same four-field subset"
 # AC3  (round-trip)               -> "A listed id round-trips through virtual-key create"
 # AC4  (OpenAPI)                  -> "The regenerated OpenAPI spec documents both paths completely"
 # AC5  (no existence oracle)      -> "Invisible ids are byte-identical 404s with no existence oracle"
