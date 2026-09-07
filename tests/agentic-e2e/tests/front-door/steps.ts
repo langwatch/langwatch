@@ -28,6 +28,7 @@ import {
   test,
 } from "@playwright/test";
 import { z } from "zod";
+import { getProjectSlug } from "../helpers";
 import { findSignUpVerificationToken } from "./db";
 
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
@@ -280,7 +281,7 @@ export async function thenTheLinkSignsMeInWithNoSecondPrompt(
 
 /**
  * Provisions an org + project for the current session via the same API
- * onboarding path `tests/auth.setup.ts` uses, so `/settings` renders the
+ * onboarding path `tests/auth.setup.ts` uses, so a project page renders the
  * ordinary authenticated shell rather than an onboarding wizard.
  */
 export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
@@ -336,7 +337,8 @@ export async function thenIAmCalledByMyEmailNeverNull(
   page: Page,
   email: string,
 ): Promise<void> {
-  await page.goto("/settings");
+  const projectSlug = await getProjectSlug(page);
+  await page.goto(`/${projectSlug}/messages`);
   await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
     timeout: 15000,
   });
@@ -346,7 +348,9 @@ export async function thenIAmCalledByMyEmailNeverNull(
   // account — and a modal's backdrop swallows the click on the user menu
   // behind it. Answer them the way a person in a hurry does, then carry on.
   await whenIDeclineWhatTheShellOffersFirst(page);
-  await page.getByRole("button", { name: /Open user menu/ }).click();
+  await page
+    .getByRole("button", { name: `Open user menu for ${email}` })
+    .click();
   const group = page.getByText(new RegExp(`\\(${escapeRegExp(email)}\\)`));
   await expect(group).toBeVisible({ timeout: 10000 });
   await expect(group).not.toContainText("null");
@@ -381,21 +385,17 @@ export async function whenIDeclineWhatTheShellOffersFirst(
     name: "Your colleagues are already here",
   });
   const nudge = page.getByTestId("secure-account-nudge");
-  for (let round = 0; round < 3; round++) {
-    // Each wait swallows its own timeout, so the losers of the race never
-    // surface as unhandled rejections after the winner has been acted on.
-    const which = await Promise.race([
-      takeover
-        .waitFor({ state: "visible", timeout: 3000 })
-        .then(() => "takeover" as const)
-        .catch(() => "none" as const),
-      nudge
-        .waitFor({ state: "visible", timeout: 3000 })
-        .then(() => "nudge" as const)
-        .catch(() => "none" as const),
-    ]);
-    if (which === "none") return;
-    if (which === "takeover") {
+  for (let round = 0; round < 2; round++) {
+    try {
+      await takeover.or(nudge).first().waitFor({
+        state: "visible",
+        timeout: 15000,
+      });
+    } catch {
+      return;
+    }
+
+    if (await takeover.isVisible()) {
       await takeover
         .getByRole("button", { name: /keep working on my own/ })
         .click();
@@ -403,6 +403,7 @@ export async function whenIDeclineWhatTheShellOffersFirst(
     } else {
       await nudge.getByRole("button", { name: "Not now" }).click();
       await expect(nudge).not.toBeVisible();
+      return;
     }
   }
 }
