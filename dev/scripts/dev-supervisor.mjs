@@ -151,6 +151,9 @@ const WATCH_IGNORE_PATTERNS = [
   // An editor or agent writing `name.ts.tmp.<pid>.<hash>` then renaming it over
   // the target: the rename is the change worth a restart, the temp file is not.
   /\.tmp\.\d+\.[0-9a-f]+$/,
+  // A test's scratch directory (`.tmp-rest-handler-tQBUui/fixture.ts`): a
+  // suite running beside the stack must not restart it once per fixture.
+  /(^|\/)\.tmp-[^/]+(\/|$)/,
 ];
 /** The pipe the sentinel reports the stack's pid, then its exit code, on. */
 const HANDSHAKE_FD = 3;

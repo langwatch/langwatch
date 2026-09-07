@@ -81,6 +81,12 @@ describe("shouldIgnoreWatchPath", () => {
     assert.equal(shouldIgnoreWatchPath("../../packages/features/trace/web/src/a.tsx"), false);
   });
 
+  it("ignores a test suite's scratch directory beside the package", () => {
+    assert.equal(shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui/fixture.ts"), true);
+    assert.equal(shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui"), true);
+    assert.equal(shouldIgnoreWatchPath("../../packages/api/src/rest/pipeline.ts"), false);
+  });
+
   it("ignores dist and generated churn", () => {
     assert.equal(shouldIgnoreWatchPath("../../packages/features/trace/server/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);
