@@ -1,13 +1,24 @@
 /**
  * The signed session token that binds a browser "Talk to it" call to the
- * project and agent it was minted for.
+ * project, the vendor agent it was minted for, and the saved agent row when
+ * one already exists.
  *
  * Mint returns this token instead of a bare id; finish carries it back and
- * verifies it. Because the payload names the project, the transport, the agent
- * row and the vendor agent id — and is HMAC-signed with the app secret — a
- * finish cannot be pointed at another project's conversation, and a conversation
- * whose vendor agent id differs from the token's is rejected before anything is
- * written. The token is short-lived (the call budget plus a grace window).
+ * verifies it. The payload names the project, the row id (or null for an
+ * unsaved draft — the row is created at finish), the transport and the
+ * vendor agent id — server-resolved from the row's own stored config when a
+ * row exists, otherwise taken from the mint request for a not-yet-saved
+ * draft — and is HMAC-signed with the app secret, so finish cannot be pointed
+ * at another project's conversation. Ownership here is at the granularity of
+ * the ElevenLabs key the project resolves to: an organization where several
+ * projects share one key can mint and finish against any agent visible to
+ * that key, since the key itself, not the row, is what ElevenLabs checks.
+ * Once the provider's own record for the conversation is available, finish
+ * refuses it outright if that record names a different vendor agent than the
+ * token. Before the provider record is ready (or when the fetch fails),
+ * finish falls back to the client's live transcript, trusted only as far as
+ * the token's project — there is no provider record yet to check it against.
+ * The token is short-lived (the call budget plus a grace window).
  *
  * Server-only: it signs with `node:crypto` and the app's stored secret. The
  * ElevenLabs API key never appears in a token — only ids and the project it is
@@ -28,10 +39,12 @@ export interface VoiceSessionTokenPayload {
   sessionId: string;
   /** The project the session was minted under; finish must match it. */
   projectId: string;
-  /** The saved agent row id, or null for an agent the drawer had not saved. */
+  /** The saved agent row id, or null when the drawer had not saved one yet
+   *  at mint time (finish creates the row in that case). */
   agentId: string | null;
-  /** The vendor agent id the session was minted for; the finished
-   *  conversation's own agent id must equal this. */
+  /** The vendor agent id the session was minted for: read off the row when
+   *  one exists, otherwise the mint request's own value for an unsaved
+   *  draft. The finished conversation's own agent id must equal this. */
   agentExternalId: string;
   transport: VoiceTransport;
   /** Expiry, ms since epoch. A token is invalid once `now >= exp`. */

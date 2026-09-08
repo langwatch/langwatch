@@ -275,12 +275,12 @@ export const VoiceAgentDataSchema = z.object({
   agentId: z.string(),
   voiceTarget: VoiceTargetSchema,
   /**
-   * Environment the SDK builds its own OpenAI / ElevenLabs clients from for the
-   * simulated caller's text-to-speech and for the transcription the judge uses.
-   * Only `OPENAI_API_KEY` (always needed — transcription runs on OpenAI for
-   * every voice run) and `ELEVENLABS_API_KEY` (only when a caller voice speaks
-   * through ElevenLabs). Resolved from the project's model provider rows and
-   * merged into the child env for a voice target only, mirroring the transport
+   * Environment the SDK builds its own OpenAI client from for the simulated
+   * caller's text-to-speech and for the transcription the judge uses. Only
+   * `OPENAI_API_KEY` — transcription runs on OpenAI for every voice run, and
+   * `CALLER_VOICES` offers no ElevenLabs voice today, so no ElevenLabs key
+   * travels here. Resolved from the project's model provider rows and merged
+   * into the child env for a voice target only, mirroring the transport
    * credential's ride-in-job-data-only handling: never logged, never in an
    * event. Empty when the project has no OpenAI key, which the child surfaces
    * as a named failure. Defaulted so a job queued before it existed still

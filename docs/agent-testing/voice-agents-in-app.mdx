@@ -29,7 +29,7 @@ A normal scenario run needs no manual call: the simulated caller speaks the scen
 
 ## Turn it on
 
-The feature sits behind the product flag `release_voice_agents_enabled`, off by default.
+In-app voice agents are in private beta. The feature sits behind the product flag `release_voice_agents_enabled`, off by default. To request access, reach out to support at support@langwatch.ai.
 
 <Tabs>
   <Tab title="Self-hosted">
@@ -84,7 +84,13 @@ Set these as app environment variables.
 | Variable | Default | Effect |
 |---|---|---|
 | `VOICE_CALL_MAX_SECONDS` | 300 | A call is cut at the limit. The run is marked "Cut at the call limit" and the judge still scores what was said. |
-| `VOICE_RUNS_MAX_CONCURRENT` | 2 | More voice runs queue instead of failing. Text runs are unaffected. |
+| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Per pod, per project. More voice runs queue instead of failing. Text runs are unaffected. On a multi-pod deployment the effective ceiling for a project is this number times the pod count, since each pod tracks its own count. |
+
+`VOICE_CALL_MAX_SECONDS` is enforced by the server and governs a scenario run: the simulated caller, the judge and the recorded transcript all stop at that limit. A **Talk to it** or **Call it myself** call in the browser is bounded by the browser tab instead, up to ElevenLabs' own maximum call length: closing or reloading the tab, or losing the connection, ends the call at whatever point that happens, not at `VOICE_CALL_MAX_SECONDS`.
+
+<Note>
+  **Security**: projects in one organization that share a single ElevenLabs key share that workspace's agents and conversations, since ElevenLabs checks the key, not the project. A project-scoped key is the way to isolate a project's voice agents from the rest of the organization.
+</Note>
 
 ## Traps
 

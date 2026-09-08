@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NOT_TARGETED } from "../targeting";
 import { isVoiceAgentsEnabledForProject } from "../voiceAgents";
+import { VOICE_AGENTS_FLAG_KEY } from "../voiceAgents.message";
 
 const isEnabledMock = vi.fn();
 vi.mock("~/server/featureFlag", async (importOriginal) => {
@@ -45,14 +46,11 @@ describe("isVoiceAgentsEnabledForProject", () => {
 
       expect(enabled).toBe(true);
       expect(resolveOrganizationIdMock).not.toHaveBeenCalled();
-      expect(isEnabledMock).toHaveBeenCalledWith(
-        "release_voice_agents_enabled",
-        {
-          distinctId: "project_1",
-          projectId: "project_1",
-          organizationId: "org_1",
-        },
-      );
+      expect(isEnabledMock).toHaveBeenCalledWith(VOICE_AGENTS_FLAG_KEY, {
+        distinctId: "project_1",
+        projectId: "project_1",
+        organizationId: "org_1",
+      });
     });
   });
 
@@ -63,14 +61,11 @@ describe("isVoiceAgentsEnabledForProject", () => {
       await isVoiceAgentsEnabledForProject({ projectId: "project_1" });
 
       expect(resolveOrganizationIdMock).toHaveBeenCalledWith("project_1");
-      expect(isEnabledMock).toHaveBeenCalledWith(
-        "release_voice_agents_enabled",
-        {
-          distinctId: "project_1",
-          projectId: "project_1",
-          organizationId: "org_resolved",
-        },
-      );
+      expect(isEnabledMock).toHaveBeenCalledWith(VOICE_AGENTS_FLAG_KEY, {
+        distinctId: "project_1",
+        projectId: "project_1",
+        organizationId: "org_resolved",
+      });
     });
   });
 
@@ -80,14 +75,11 @@ describe("isVoiceAgentsEnabledForProject", () => {
 
       await isVoiceAgentsEnabledForProject({ projectId: "project_1" });
 
-      expect(isEnabledMock).toHaveBeenCalledWith(
-        "release_voice_agents_enabled",
-        {
-          distinctId: "project_1",
-          projectId: "project_1",
-          organizationId: NOT_TARGETED,
-        },
-      );
+      expect(isEnabledMock).toHaveBeenCalledWith(VOICE_AGENTS_FLAG_KEY, {
+        distinctId: "project_1",
+        projectId: "project_1",
+        organizationId: NOT_TARGETED,
+      });
     });
   });
 });

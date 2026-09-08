@@ -61,6 +61,15 @@ vi.mock("~/server/app-layer/app", () => ({
   resetApp: async () => {},
 }));
 
+const findById = vi.fn();
+vi.mock("~/server/agents/agent.repository", () => ({
+  AgentRepository: class {
+    findById(...args: unknown[]) {
+      return findById(...args);
+    }
+  },
+}));
+
 const fetchCallRecord = vi.fn();
 const mintSession = vi.fn();
 vi.mock("~/server/scenarios/voice/voice-transport.registry", () => ({
@@ -91,7 +100,8 @@ async function post(path: string, body: unknown): Promise<Response> {
 const MINT_BODY = {
   projectId: PROJECT_ID,
   transport: "elevenlabs_convai",
-  agentId: "el_agent",
+  agentId: "agent_from_body",
+  agentRowId: "agent_row",
 };
 
 beforeEach(() => {
@@ -104,6 +114,13 @@ beforeEach(() => {
   getElevenLabsApiCredential.mockResolvedValue({
     apiKey: "sk-secret",
     baseUrl: "https://api.elevenlabs.io",
+  });
+  // The stored voice agent row a mint resolves its vendor agent id from.
+  findById.mockResolvedValue({
+    id: "agent_row",
+    projectId: PROJECT_ID,
+    type: "voice",
+    config: { transport: "elevenlabs_convai", agentId: "el_agent" },
   });
 });
 
@@ -136,6 +153,86 @@ describe("Feature: Voice session HTTP door", () => {
       expect(res.status).toBe(400);
       expect((await res.json()).code).toBe("voice_key_missing");
       expect(mintSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a mint request for an agent row that does not exist", () => {
+    it("refuses with the agent-not-found code, as a 404", async () => {
+      findById.mockResolvedValue(null);
+      const res = await post("/api/voice/session", MINT_BODY);
+      expect(res.status).toBe(404);
+      expect((await res.json()).code).toBe("agent_not_found");
+      expect(mintSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a mint request for a row that is not a voice agent", () => {
+    it("refuses with the agent-not-found code, as a 404", async () => {
+      findById.mockResolvedValue({
+        id: "agent_row",
+        projectId: PROJECT_ID,
+        type: "http",
+        config: {},
+      });
+      const res = await post("/api/voice/session", MINT_BODY);
+      expect(res.status).toBe(404);
+      expect((await res.json()).code).toBe("agent_not_found");
+      expect(mintSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a mint request for a valid voice agent row", () => {
+    it("mints against the row's stored vendor agent id, not a body value", async () => {
+      findById.mockResolvedValue({
+        id: "agent_row",
+        projectId: PROJECT_ID,
+        type: "voice",
+        config: { transport: "elevenlabs_convai", agentId: "el_agent_stored" },
+      });
+      mintSession.mockResolvedValue({ signedUrl: "wss://signed.example/abc" });
+
+      const res = await post("/api/voice/session", MINT_BODY);
+
+      expect(res.status).toBe(200);
+      expect(mintSession).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "el_agent_stored" }),
+      );
+      const body = (await res.json()) as { sessionToken: string };
+      const claims = JSON.parse(
+        Buffer.from(
+          body.sessionToken.split(".")[0] ?? "",
+          "base64url",
+        ).toString("utf8"),
+      ) as { agentExternalId: string; agentId: string };
+      expect(claims.agentExternalId).toBe("el_agent_stored");
+      expect(claims.agentId).toBe("agent_row");
+    });
+  });
+
+  describe("given a mint request with no agent row yet (an unsaved draft)", () => {
+    it("mints against the body's agent id and a null row id", async () => {
+      mintSession.mockResolvedValue({ signedUrl: "wss://signed.example/abc" });
+
+      const res = await post("/api/voice/session", {
+        projectId: PROJECT_ID,
+        transport: "elevenlabs_convai",
+        agentId: "agent_from_body",
+      });
+
+      expect(res.status).toBe(200);
+      expect(findById).not.toHaveBeenCalled();
+      expect(mintSession).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "agent_from_body" }),
+      );
+      const body = (await res.json()) as { sessionToken: string };
+      const claims = JSON.parse(
+        Buffer.from(
+          body.sessionToken.split(".")[0] ?? "",
+          "base64url",
+        ).toString("utf8"),
+      ) as { agentExternalId: string; agentId: string | null };
+      expect(claims.agentExternalId).toBe("agent_from_body");
+      expect(claims.agentId).toBeNull();
     });
   });
 
@@ -238,7 +335,7 @@ describe("Feature: Voice session HTTP door", () => {
     it("refuses the mint with the disabled code, as a 404", async () => {
       const res = await post("/api/voice/session", MINT_BODY);
       expect(res.status).toBe(404);
-      expect((await res.json()).error).toBe("voice_agents_disabled");
+      expect((await res.json()).code).toBe("voice_agents_disabled");
       expect(mintSession).not.toHaveBeenCalled();
     });
 
@@ -261,7 +358,7 @@ describe("Feature: Voice session HTTP door", () => {
         endedAt: 2,
       });
       expect(res.status).toBe(404);
-      expect((await res.json()).error).toBe("voice_agents_disabled");
+      expect((await res.json()).code).toBe("voice_agents_disabled");
       expect(fetchCallRecord).not.toHaveBeenCalled();
     });
 
@@ -271,7 +368,7 @@ describe("Feature: Voice session HTTP door", () => {
         `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
       );
       expect(res.status).toBe(404);
-      expect((await res.json()).error).toBe("voice_agents_disabled");
+      expect((await res.json()).code).toBe("voice_agents_disabled");
       expect(getScenarioRunData).not.toHaveBeenCalled();
     });
   });

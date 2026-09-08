@@ -64,12 +64,32 @@ export class VoiceConversationMismatchError extends Error {
   }
 }
 
+/**
+ * The mint request named an agent row that does not exist in this project, or
+ * exists but is not a voice agent. Minting never trusts a client-supplied
+ * vendor agent id (AC13/AC29) — the row is the only source of it.
+ */
+export class VoiceAgentRowNotFoundError extends Error {
+  readonly code = "agent_not_found" as const;
+  constructor() {
+    super("The voice agent was not found in this project");
+    this.name = "VoiceAgentRowNotFoundError";
+  }
+}
+
 export interface VoiceSessionPorts {
   /** The provider key and host for this project's transport, or null. */
   resolveCredential(input: {
     projectId: string;
     transport: VoiceTransport;
   }): Promise<VoiceTransportCredential | null>;
+  /** The vendor agent id stored on the project's voice agent row, or null
+   *  when the row does not exist or is not type "voice". This — never the
+   *  request body — is what a mint is minted against. */
+  resolveVoiceAgentRow(input: {
+    projectId: string;
+    agentRowId: string;
+  }): Promise<{ id: string; agentExternalId: string } | null>;
   /** The run already written for this id, or null. Returns the agent id it
    *  attached so a duplicate finish can answer with it. */
   findExistingRun(input: {
@@ -134,8 +154,15 @@ export interface MintResult {
 
 /**
  * Ask the transport for a signed URL and return only what the browser needs to
- * open the call. No key crosses this boundary. Throws
- * {@link VoiceKeyMissingError} when the project has no key, or
+ * open the call. When the drawer already has a saved agent row, the vendor
+ * agent id is read off that row rather than trusted from the request, so a
+ * mint against a saved agent can only ever open a call against the agent this
+ * project actually saved there (AC13/AC29). When there is no row yet (an
+ * unsaved draft — AC5's "Talk to it without saving first"), the vendor id
+ * comes from the request body, exactly as before mint had a row to check
+ * against; the row itself is created at finish. Throws
+ * {@link VoiceAgentRowNotFoundError} when a named row is missing or not a
+ * voice agent, {@link VoiceKeyMissingError} when the project has no key, or
  * {@link VoiceMintFailedError} when the provider refuses.
  */
 export async function mintVoiceSession(
@@ -143,19 +170,26 @@ export async function mintVoiceSession(
   {
     projectId,
     transport,
-    agentId,
+    agentId: bodyAgentId,
     agentRowId,
     maxDurationSeconds,
   }: {
     projectId: string;
     transport: VoiceTransport;
-    /** The vendor agent id the session is minted for. */
+    /** The vendor agent id from the form. Used only when there is no saved
+     *  row yet — a saved row's own vendor id always wins. */
     agentId: string;
     /** The saved agent row id, when the drawer already has one. */
     agentRowId?: string;
     maxDurationSeconds: number;
   },
 ): Promise<MintResult> {
+  const row = agentRowId
+    ? await ports.resolveVoiceAgentRow({ projectId, agentRowId })
+    : null;
+  if (agentRowId && !row) throw new VoiceAgentRowNotFoundError();
+  const agentId = row?.agentExternalId ?? bodyAgentId;
+
   const runner = runnerFor(ports, transport);
   const credential = await ports.resolveCredential({ projectId, transport });
   if (!credential) throw new VoiceKeyMissingError(runner.missingKeyMessage);
@@ -169,12 +203,13 @@ export async function mintVoiceSession(
     );
   }
 
-  // The token binds the call to its project and agent for the whole of its
-  // life plus a grace window; finish rejects anything outside these claims.
+  // The token binds the call to its project, the row (when one exists) and
+  // the vendor agent for the whole of its life plus a grace window; finish
+  // rejects anything outside these claims.
   const sessionToken = ports.signSessionToken({
     sessionId: ports.newSessionId(),
     projectId,
-    agentId: agentRowId ?? null,
+    agentId: row?.id ?? null,
     agentExternalId: agentId,
     transport,
     exp: ports.now() + maxDurationSeconds * 1000 + VOICE_SESSION_TOKEN_GRACE_MS,

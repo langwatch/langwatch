@@ -1053,13 +1053,16 @@ async function fetchVoiceAgentData({
     ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
     : null;
 
-  // The SDK builds its own OpenAI / ElevenLabs clients from the child's process
-  // env for the caller's TTS and for the transcription the judge uses. The
-  // platform's guardrail is that credentials come from the project's model
-  // provider rows only, so resolve them the same way the model params are:
-  // `prepareEnvKeys` maps the OpenAI provider's customKeys / env fallbacks onto
-  // `OPENAI_API_KEY`. Only these two keys travel; nothing else from the
-  // operator env reaches the child.
+  // The SDK builds its own OpenAI client from the child's process env for the
+  // caller's TTS and for the transcription the judge uses. The platform's
+  // guardrail is that credentials come from the project's model provider rows
+  // only, so resolve it the same way the model params are: `prepareEnvKeys`
+  // maps the OpenAI provider's customKeys / env fallbacks onto
+  // `OPENAI_API_KEY`. Nothing else from the operator env reaches the child.
+  // (No ElevenLabs key travels here: the target transport's adapter takes its
+  // key as an explicit option, never from env, and `CALLER_VOICES` offers no
+  // `elevenlabs/...` voice today, so no code path in the child reads
+  // `ELEVENLABS_API_KEY`.)
   const providers = await getProjectModelProviders(projectId);
   const openaiProvider = providers.openai;
   const callerEnv: Record<string, string> = {};
@@ -1067,11 +1070,6 @@ async function fetchVoiceAgentData({
     ? prepareEnvKeys(openaiProvider).OPENAI_API_KEY
     : undefined;
   if (openaiApiKey) callerEnv.OPENAI_API_KEY = openaiApiKey;
-  // Carried for a caller voice that speaks through ElevenLabs. Caller voices are
-  // OpenAI-only today (see `CALLER_VOICES`), so this is a forward-looking
-  // passthrough of the same key the transport already holds; the SDK reads it
-  // from env only when a caller voice is `elevenlabs/...`.
-  if (credential?.apiKey) callerEnv.ELEVENLABS_API_KEY = credential.apiKey;
 
   return {
     type: "voice",

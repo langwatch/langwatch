@@ -6,6 +6,8 @@ import type {
   SerializedReason,
 } from "@langwatch/handled-error";
 
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
+
 import type { AppErrorCode } from "./codes";
 import {
   type HandledErrorShape,
@@ -3172,10 +3174,9 @@ const presentations = {
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
   voice_agents_disabled: {
-    // Must match VOICE_AGENTS_DISABLED_MESSAGE in
-    // ~/server/featureFlag/voiceAgents.message (kept a literal here so this
-    // client-bundled registry never imports server-only Prisma code).
-    title: "Voice agents are not enabled for this project",
+    // voiceAgents.message has zero imports of its own, so pulling it in here
+    // never drags server-only Prisma code into this client-bundled registry.
+    title: VOICE_AGENTS_DISABLED_MESSAGE,
     describe: () => "Ask an admin to turn the feature on for this project.",
   },
   gateway_budget_cycle_anchor_invalid: {

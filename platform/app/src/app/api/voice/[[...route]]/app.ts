@@ -18,6 +18,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { AgentRepository } from "~/server/agents/agent.repository";
 import {
+  parseVoiceAgentConfig,
   VOICE_TRANSPORT_PROVIDER,
   VOICE_TRANSPORTS,
   type VoiceTransport,
@@ -29,6 +30,7 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { isVoiceAgentsEnabledForProject } from "~/server/featureFlag/voiceAgents";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 import {
   findElevenLabsProviderForProject,
   getElevenLabsApiCredential,
@@ -44,6 +46,7 @@ import {
 import {
   finishVoiceSession,
   mintVoiceSession,
+  VoiceAgentRowNotFoundError,
   VoiceConversationMismatchError,
   VoiceKeyMissingError,
   VoiceMintFailedError,
@@ -80,9 +83,30 @@ async function resolveCredential({
   return getElevenLabsApiCredential({ modelProviderId: provider.id });
 }
 
+/** Looks up the vendor agent id off a saved voice agent row: when a mint
+ *  names a row, its stored id wins over anything the request body claims
+ *  (AC13/AC29). Null when the row does not exist in the project or is not a
+ *  voice agent. */
+async function resolveVoiceAgentRow({
+  projectId,
+  agentRowId,
+}: {
+  projectId: string;
+  agentRowId: string;
+}): Promise<{ id: string; agentExternalId: string } | null> {
+  const agent = await new AgentRepository(prisma).findById({
+    projectId,
+    id: agentRowId,
+  });
+  if (agent?.type !== "voice") return null;
+  const config = parseVoiceAgentConfig(agent.config);
+  return { id: agent.id, agentExternalId: config.agentId };
+}
+
 /** The real ports the service runs against in production. */
 const ports: VoiceSessionPorts = {
   resolveCredential,
+  resolveVoiceAgentRow,
   async findExistingRun({ projectId, scenarioRunId }) {
     const run = await getApp().simulations.runs.getScenarioRunData({
       projectId,
@@ -156,11 +180,14 @@ async function requireProject(
 /** The body/status pair for a failed {@link requireProject} gate. */
 function gateFailureResponse(
   gate: Extract<Awaited<ReturnType<typeof requireProject>>, { ok: false }>,
-): [{ error: string }, 401 | 403 | 404] {
+): [{ code: string; message: string }, 401 | 403 | 404] {
   if ("disabled" in gate) {
-    return [{ error: "voice_agents_disabled" }, 404];
+    return [
+      { code: "voice_agents_disabled", message: VOICE_AGENTS_DISABLED_MESSAGE },
+      404,
+    ];
   }
-  return [{ error: "Forbidden" }, gate.status];
+  return [{ code: "forbidden", message: "Forbidden" }, gate.status];
 }
 
 // POST /api/voice/session — mint a signed-URL session from the form values.
@@ -202,11 +229,17 @@ secured
         });
         return c.json(result, 200);
       } catch (error) {
+        if (error instanceof VoiceAgentRowNotFoundError) {
+          return c.json({ code: error.code, message: error.message }, 404);
+        }
         if (error instanceof VoiceKeyMissingError) {
           return c.json({ code: error.code, message: error.message }, 400);
         }
         if (error instanceof VoiceMintFailedError) {
-          logger.warn({ projectId, agentId, err: error }, "voice mint failed");
+          logger.warn(
+            { projectId, agentId, agentRowId, err: error },
+            "voice mint failed",
+          );
           return c.json({ code: error.code, message: error.message }, 400);
         }
         throw error;

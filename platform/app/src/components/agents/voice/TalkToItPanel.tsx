@@ -19,6 +19,7 @@ import {
   isRedCountdown,
   remainingSeconds,
 } from "~/server/scenarios/voice/voice-countdown";
+import { VOICE_CALL_MAX_SECONDS_DEFAULT } from "~/server/scenarios/voice/voice-limits";
 import {
   CONSENT_NOTICE,
   CUT_AT_LIMIT_MESSAGE,
@@ -38,7 +39,7 @@ import {
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
 
 /** Placeholder cap before minting; the session mint response replaces it. */
-const PRE_MINT_MAX_SECONDS_PLACEHOLDER = 300;
+const PRE_MINT_MAX_SECONDS_PLACEHOLDER = VOICE_CALL_MAX_SECONDS_DEFAULT;
 
 interface MintResponse {
   transport: VoiceTransport;
@@ -267,6 +268,9 @@ async function mintSession({
       body: JSON.stringify({
         projectId: props.projectId,
         transport: props.transport,
+        // Used only when there is no saved row yet (an unsaved draft); once
+        // a row exists the server reads its own stored vendor id instead
+        // (AC13/AC29), so this is ignored rather than trusted at that point.
         agentId: props.agentId,
         // Undefined is dropped by JSON.stringify, so an unsaved agent sends
         // no row id.

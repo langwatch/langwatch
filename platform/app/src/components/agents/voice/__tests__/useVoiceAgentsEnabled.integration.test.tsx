@@ -11,6 +11,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { VOICE_AGENTS_FLAG_KEY } from "~/server/featureFlag/voiceAgents.message";
 import { useVoiceAgentsEnabled } from "../useVoiceAgentsEnabled";
 
 const state = vi.hoisted(() => ({
@@ -73,7 +74,7 @@ describe("useVoiceAgentsEnabled", () => {
       renderHook(() => useVoiceAgentsEnabled());
 
       expect(useFeatureFlagMock).toHaveBeenCalledWith(
-        "release_voice_agents_enabled",
+        VOICE_AGENTS_FLAG_KEY,
         expect.objectContaining({
           projectId: "project_1",
           organizationId: "organization_1",
@@ -90,7 +91,7 @@ describe("useVoiceAgentsEnabled", () => {
       renderHook(() => useVoiceAgentsEnabled());
 
       expect(useFeatureFlagMock).toHaveBeenCalledWith(
-        "release_voice_agents_enabled",
+        VOICE_AGENTS_FLAG_KEY,
         expect.objectContaining({ projectId: NOT_TARGETED }),
       );
     });
@@ -103,7 +104,7 @@ describe("useVoiceAgentsEnabled", () => {
       renderHook(() => useVoiceAgentsEnabled());
 
       expect(useFeatureFlagMock).toHaveBeenCalledWith(
-        "release_voice_agents_enabled",
+        VOICE_AGENTS_FLAG_KEY,
         expect.objectContaining({
           organizationId: undefined,
           enabled: false,

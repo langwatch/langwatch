@@ -7,6 +7,7 @@ import type { CallRecord } from "../call-record";
 import {
   finishVoiceSession,
   mintVoiceSession,
+  VoiceAgentRowNotFoundError,
   VoiceConversationMismatchError,
   VoiceKeyMissingError,
   type VoiceSessionPorts,
@@ -41,6 +42,10 @@ function fakePorts(
 ): VoiceSessionPorts {
   return {
     resolveCredential: vi.fn(async () => CREDENTIAL),
+    resolveVoiceAgentRow: vi.fn(async () => ({
+      id: "agent_row",
+      agentExternalId: "agent_xyz",
+    })),
     findExistingRun: vi.fn(async () => null),
     createVoiceAgent: vi.fn(async () => ({ id: "agent_created" })),
     writeCallRun: vi.fn(async () => {}),
@@ -75,7 +80,7 @@ const FINISH_BASE = {
 };
 
 describe("mintVoiceSession", () => {
-  describe("when the project has a key", () => {
+  describe("when the project has a key and the row is a voice agent", () => {
     /** @scenario "Session mint returns only the signed URL, the conversation id and the max duration" */
     it("returns the signed URL, a signed session token and the max duration — never the key", async () => {
       const ports = fakePorts(fakeRunner());
@@ -83,6 +88,7 @@ describe("mintVoiceSession", () => {
         projectId: "p1",
         transport: "elevenlabs_convai",
         agentId: "agent_xyz",
+        agentRowId: "agent_row",
         maxDurationSeconds: 300,
       });
 
@@ -94,22 +100,80 @@ describe("mintVoiceSession", () => {
       expect(payload).toMatchObject({
         projectId: "p1",
         agentExternalId: "agent_xyz",
-        agentId: null,
+        agentId: "agent_row",
         transport: "elevenlabs_convai",
       });
       expect(JSON.stringify(result)).not.toContain(CREDENTIAL.apiKey);
     });
 
-    it("carries the saved agent row id into the token when the drawer has one", async () => {
-      const ports = fakePorts(fakeRunner());
+    it("mints against the vendor id from the stored row, ignoring what a body would have named", async () => {
+      const resolveVoiceAgentRow = vi.fn(async () => ({
+        id: "agent_row",
+        agentExternalId: "agent_from_row",
+      }));
+      const mintSpy = vi.fn(async () => ({
+        signedUrl: "wss://signed.example/abc",
+      }));
+      const ports = fakePorts(fakeRunner({ mintSession: mintSpy }), {
+        resolveVoiceAgentRow,
+      });
+
+      const result = await mintVoiceSession(ports, {
+        projectId: "p1",
+        transport: "elevenlabs_convai",
+        // A client-supplied agentId that must be ignored once a row exists.
+        agentId: "agent_from_body",
+        agentRowId: "agent_row",
+        maxDurationSeconds: 300,
+      });
+
+      expect(mintSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "agent_from_row" }),
+      );
+      expect(JSON.parse(result.sessionToken)).toMatchObject({
+        agentExternalId: "agent_from_row",
+        agentId: "agent_row",
+      });
+    });
+  });
+
+  describe("when there is no saved agent row yet (an unsaved draft)", () => {
+    it("mints against the body's vendor agent id and carries a null row id", async () => {
+      const resolveVoiceAgentRow = vi.fn();
+      const ports = fakePorts(fakeRunner(), { resolveVoiceAgentRow });
+
       const result = await mintVoiceSession(ports, {
         projectId: "p1",
         transport: "elevenlabs_convai",
         agentId: "agent_xyz",
-        agentRowId: "agent_row",
         maxDurationSeconds: 300,
       });
-      expect(JSON.parse(result.sessionToken).agentId).toBe("agent_row");
+
+      expect(resolveVoiceAgentRow).not.toHaveBeenCalled();
+      expect(JSON.parse(result.sessionToken)).toMatchObject({
+        agentExternalId: "agent_xyz",
+        agentId: null,
+      });
+    });
+  });
+
+  describe("when the named row is missing or not a voice agent", () => {
+    it("refuses with VoiceAgentRowNotFoundError and never calls the transport", async () => {
+      const runner = fakeRunner();
+      const ports = fakePorts(runner, {
+        resolveVoiceAgentRow: vi.fn(async () => null),
+      });
+
+      await expect(
+        mintVoiceSession(ports, {
+          projectId: "p1",
+          transport: "elevenlabs_convai",
+          agentId: "agent_xyz",
+          agentRowId: "agent_row",
+          maxDurationSeconds: 300,
+        }),
+      ).rejects.toBeInstanceOf(VoiceAgentRowNotFoundError);
+      expect(runner.mintSession).not.toHaveBeenCalled();
     });
   });
 
@@ -125,6 +189,7 @@ describe("mintVoiceSession", () => {
           projectId: "p1",
           transport: "elevenlabs_convai",
           agentId: "agent_xyz",
+          agentRowId: "agent_row",
           maxDurationSeconds: 300,
         }),
       ).rejects.toBeInstanceOf(VoiceKeyMissingError);
@@ -135,7 +200,7 @@ describe("mintVoiceSession", () => {
 
 describe("finishVoiceSession", () => {
   describe("when the same conversation is finished twice", () => {
-    /** @scenario "Hanging up twice, a mid-call reload and a late webhook each produce exactly one run" */
+    /** @scenario "Hanging up twice produces exactly one run" */
     it("writes the run once and returns the existing run the second time", async () => {
       const runner = fakeRunner();
       let stored: string | null = null;

@@ -259,10 +259,23 @@ export const agentsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      if (input.type === "voice") {
+      const agentService = AgentService.create(ctx.prisma);
+
+      // `type` is optional on update, so a config-only edit of a stored voice
+      // agent (e.g. AgentVoiceEditorDrawer's save) never sends it — the gate
+      // must also look at what is actually persisted, not just the payload.
+      // Skip the read when the payload already names "voice"; there is
+      // nothing the stored row could tell us that would change the outcome.
+      const stored =
+        input.type === "voice"
+          ? null
+          : await agentService.getById({
+              id: input.id,
+              projectId: input.projectId,
+            });
+      if (input.type === "voice" || stored?.type === "voice") {
         await assertVoiceAgentsEnabled(input.projectId);
       }
-      const agentService = AgentService.create(ctx.prisma);
 
       // Repository will validate config against the type's DSL schema
       return await agentService.update({

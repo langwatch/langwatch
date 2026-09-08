@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { AgentService } from "~/server/agents/agent.service";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 import { createInnerTRPCContext } from "../../trpc";
 import { agentsRouter } from "../agents";
 
@@ -118,6 +119,29 @@ describe("agentsRouter voice-agent gate", () => {
       expect(copyAgentSpy).not.toHaveBeenCalled();
     });
 
+    it("refuses a config-only update of a stored voice agent while the flag is off", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_1",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      const updateSpy = vi
+        .spyOn(AgentService.prototype, "update")
+        .mockRejectedValue(new Error("must not be called"));
+
+      await expect(
+        caller.update({
+          id: "agent_1",
+          projectId: "project_1",
+          config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: VOICE_AGENTS_DISABLED_MESSAGE,
+      });
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
     it("refuses to sync a voice agent copy while the flag is off", async () => {
       vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
         id: "agent_copy",
@@ -150,6 +174,12 @@ describe("agentsRouter voice-agent gate", () => {
 
     /** @scenario "Updating a non-voice field does not check the voice flag" */
     it("does not check the voice flag for an update naming no type", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_1",
+        type: "http",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+
       // The fake prisma has no repository behind it, so the update call
       // itself fails past the gate; only that it never reached the flag
       // check is under test here.

@@ -4,8 +4,12 @@
  * Two knobs, both with the defaults the AC names:
  *   - VOICE_CALL_MAX_SECONDS   (default 300): the wall-clock a single call may
  *     run before LangWatch ends it and the run is judged on what was said.
- *   - VOICE_RUNS_MAX_CONCURRENT (default 2, per project): how many voice runs
- *     a project may execute at once; the rest wait in the queue.
+ *   - VOICE_RUNS_MAX_CONCURRENT (default 2, per pod per project): how many
+ *     voice runs a project may execute at once on a single execution pod; the
+ *     rest wait in the queue. The gate is an in-memory map inside that pod's
+ *     execution pool (see `voice-concurrency-gate.ts`), so it does not see
+ *     other pods — the effective ceiling for a project is this number times
+ *     the pod count, not this number alone.
  *
  * Read from `process.env` directly (with a tolerant parse) rather than the
  * validated env schema so the child process and the worker pool can both reach
