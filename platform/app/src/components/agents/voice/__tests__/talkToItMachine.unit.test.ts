@@ -18,7 +18,6 @@ function drive(events: Parameters<typeof talkReducer>[1][]): TalkState {
 
 describe("talkReducer", () => {
   describe("when the microphone is denied", () => {
-    /** @scenario "Microphone access denied shows a retry notice and starts no run" */
     it("moves to a retryable error, not stuck on connecting, and writes no run", () => {
       const state = drive([{ type: "START" }, { type: "MIC_DENIED" }]);
       expect(state).toEqual({

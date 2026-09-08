@@ -127,6 +127,7 @@ describe("TalkToItPanel", () => {
   });
 
   describe("when the microphone is denied", () => {
+    /** @scenario "Microphone access denied shows a retry notice and starts no run" */
     it("shows the retry notice and never stays on connecting", async () => {
       Object.defineProperty(navigator, "mediaDevices", {
         configurable: true,

@@ -11,6 +11,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { AgentService } from "~/server/agents/agent.service";
 import { createInnerTRPCContext } from "../../trpc";
 import { agentsRouter } from "../agents";
 
@@ -96,6 +97,50 @@ describe("agentsRouter voice-agent gate", () => {
         }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
+
+    it("refuses to copy a voice agent into a project", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_source",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      const copyAgentSpy = vi
+        .spyOn(AgentService.prototype, "copyAgent")
+        .mockRejectedValue(new Error("must not be called"));
+
+      await expect(
+        caller.copy({
+          agentId: "agent_1",
+          projectId: "project_target",
+          sourceProjectId: "project_source",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(copyAgentSpy).not.toHaveBeenCalled();
+    });
+
+    it("refuses to sync a voice agent copy while the flag is off", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_copy",
+        projectId: "project_target",
+        copiedFromAgentId: "agent_source",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      vi.spyOn(AgentService.prototype, "getByIdOnly").mockResolvedValue({
+        id: "agent_source",
+        projectId: "project_source",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getByIdOnly>>);
+      const syncSpy = vi
+        .spyOn(AgentService.prototype, "syncFromSource")
+        .mockRejectedValue(new Error("must not be called"));
+
+      await expect(
+        caller.syncFromSource({
+          agentId: "agent_copy",
+          projectId: "project_target",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(syncSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("given the project's release_voice_agents_enabled flag is on", () => {
@@ -114,6 +159,30 @@ describe("agentsRouter voice-agent gate", () => {
           // Expected: the fake prisma has nothing behind it.
         });
       expect(isEnabledMock).not.toHaveBeenCalled();
+    });
+
+    it("copies a voice agent when the target project has the flag on", async () => {
+      vi.spyOn(AgentService.prototype, "getById").mockResolvedValue({
+        id: "agent_1",
+        projectId: "project_source",
+        type: "voice",
+      } as Awaited<ReturnType<typeof AgentService.prototype.getById>>);
+      const copyAgentSpy = vi
+        .spyOn(AgentService.prototype, "copyAgent")
+        .mockResolvedValue({
+          id: "agent_copy",
+          projectId: "project_target",
+          name: "Support line",
+          copiedFromAgentId: "agent_1",
+        });
+
+      await caller.copy({
+        agentId: "agent_1",
+        projectId: "project_target",
+        sourceProjectId: "project_source",
+      });
+
+      expect(copyAgentSpy).toHaveBeenCalledTimes(1);
     });
   });
 });
