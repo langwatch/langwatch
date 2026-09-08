@@ -107,9 +107,27 @@ const annotation = runtime.mount(annotationTrpcTransport, (ctx) => ctx.app.annot
 const rest = createRestRuntime({ identity: { authenticate } });
 const annotations = rest.mount(annotationRest.router(), {
   app: () => annotationApi,
-  credential: "projectKey",
   onError: annotationErrorHandler,
 });
+```
+
+The declaration names its own door, and the handler's `scope` follows it. Two
+doors exist: `projectKey`, which every declaration gets without asking and which
+resolves `{ tier: "project", id }`, and `organizationKey`, declared with
+`.withCredential("organizationKey")` before the family's first route, which
+resolves `{ tier: "organization", id }`. A mount that names the other one is
+refused; `public`, `session` and `internalSecret` are still named on the mount,
+because no door resolves a declared scope for them yet.
+
+```ts
+const roleRest = defineRestRouter(RoleApi)
+  .withNamespace("roles")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("organizationKey")
+  .get("/", "listRoles")
+  .withPermission("organization:manage")
+  .withOutput(roleRestListSchema)
+  .handle(async ({ app, scope }) => ({ roles: await app.listRoles({ organizationId: scope.id }) }));
 ```
 
 `ApiRuntimePorts` are the process's, not the feature's: `identity` says who is

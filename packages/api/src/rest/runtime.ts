@@ -405,9 +405,35 @@ export type RestDeprecation = Readonly<{
   readonly notice?: string;
 }>;
 
-type ProjectScope = Extract<AuthzDeclaredScopeId, { tier: "project" }>;
-type ProjectScopedHandlerArguments<Input, App> = Omit<ApiHandlerArguments<Input, App>, "scope"> & {
-  readonly scope: ProjectScope;
+/**
+ * The credentials a declaration may choose a door for. `session`,
+ * `internalSecret` and `public` are absent on purpose: no door resolves a
+ * declared scope for them yet, so a declaration naming one would type its
+ * handler's scope as a value nothing establishes. Those arrive with their own
+ * doors; until then a family serving one names it on the mount instead.
+ */
+export type RestDoorCredential = Extract<Credential, "projectKey" | "organizationKey">;
+
+/**
+ * Which scope tier each door's credential resolves. The one table: the type
+ * a handler reads and the tier the runtime asserts both come from here, so a
+ * door cannot promise one tier and hand over another.
+ */
+const DOOR_SCOPE_TIER = {
+  projectKey: "project",
+  organizationKey: "organization",
+} as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"]>;
+
+/** The scope a handler on `Door` is handed: the tier that door resolves. */
+type DoorScope<Door extends RestDoorCredential> = Extract<
+  AuthzDeclaredScopeId,
+  { tier: (typeof DOOR_SCOPE_TIER)[Door] }
+>;
+type ScopedHandlerArguments<Input, App, Door extends RestDoorCredential> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "scope"
+> & {
+  readonly scope: DoorScope<Door>;
 };
 /** A public route resolves no credential, so it knows neither actor nor scope. */
 type PublicHandlerArguments<Input, App> = Omit<
@@ -417,14 +443,19 @@ type PublicHandlerArguments<Input, App> = Omit<
   readonly actor: null;
   readonly scope: null;
 };
-type HandlerArgumentsFor<Access extends RouteAccessKind, Input, App> = Access extends "public"
+type HandlerArgumentsFor<
+  Access extends RouteAccessKind,
+  Input,
+  App,
+  Door extends RestDoorCredential,
+> = Access extends "public"
   ? PublicHandlerArguments<Input, App>
-  : ProjectScopedHandlerArguments<Input, App>;
+  : ScopedHandlerArguments<Input, App, Door>;
 type RouteAccessKind = "scoped" | "public";
 type StoredHandler<Api> = {
   invoke(
     args:
-      | ProjectScopedHandlerArguments<unknown, Api>
+      | ScopedHandlerArguments<unknown, Api, RestDoorCredential>
       | PublicHandlerArguments<unknown, Api>,
     ...facts: unknown[]
   ): unknown;
@@ -466,6 +497,11 @@ export type RestTransportDeclaration<Api> = Readonly<{
   readonly namespace: string;
   readonly version: DateVersion;
   readonly addressing: RestAddressing;
+  /**
+   * The door these routes are answered behind, and so the scope every handler
+   * is handed. Declared, not mounted: the handler's own type follows it.
+   */
+  readonly credential: RestDoorCredential;
   /** Applies to every route the family declares, unless a route names its own. */
   readonly deprecated?: RestDeprecation;
   readonly routes: readonly RestTransportRoute<Api>[];
@@ -494,9 +530,10 @@ class RouteBuilder<
   Permission extends boolean = false,
   Middleware extends readonly RestTransportMiddleware[] = [],
   Access extends RouteAccessKind = "scoped",
+  Door extends RestDoorCredential = "projectKey",
 > {
   constructor(
-    private readonly router: RestTransportRouter<Api>,
+    private readonly router: RestTransportRouter<Api, Door>,
     private readonly method: Method,
     private readonly path: Path,
     private readonly operation: string,
@@ -520,7 +557,19 @@ class RouteBuilder<
     schema: ExactPathSchema<Path, Schema> &
       DistinctSchema<Schema, Body> &
       DistinctSchema<Schema, Query>,
-  ): RouteBuilder<Api, Method, Path, Schema, Body, Query, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Schema,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     assertSourceUnset("params", this.state.params);
     assertPathParameters(this.path, schema);
     assertDistinctSources(schema, this.state.input);
@@ -543,7 +592,8 @@ class RouteBuilder<
       Output,
       Permission,
       Middleware,
-      Access
+      Access,
+      Door
     >,
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Query>,
   ): RouteBuilder<
@@ -556,7 +606,8 @@ class RouteBuilder<
     Output,
     Permission,
     Middleware,
-    Access
+    Access,
+    Door
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
@@ -571,7 +622,19 @@ class RouteBuilder<
 
   withQuery<Schema extends z.ZodObject>(
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Body>,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Schema, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Schema,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     assertSourceUnset("query", this.state.query);
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.input, schema);
@@ -584,7 +647,19 @@ class RouteBuilder<
 
   withPermission(
     permission: AuthzPermission,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    true,
+    Middleware,
+    Access,
+    Door
+  > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       permission,
@@ -598,7 +673,19 @@ class RouteBuilder<
    */
   withAccess(
     access: PublicRouteAccess,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, "public"> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    true,
+    Middleware,
+    "public",
+    Door
+  > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       access,
@@ -607,7 +694,19 @@ class RouteBuilder<
 
   withVersion(
     version: DateVersion,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     assertVersionLabel(version);
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -618,7 +717,19 @@ class RouteBuilder<
 
   withDocs(
     docs: RestTransportDocs,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       docs,
@@ -628,7 +739,19 @@ class RouteBuilder<
   /** Marks this one route superseded, whatever the family declared. */
   withDeprecated(
     deprecated: RestDeprecation,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       deprecated,
@@ -637,7 +760,19 @@ class RouteBuilder<
 
   withOutput<Schema extends OutputSchema>(
     schema: Schema,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Schema, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Schema,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     assertSourceUnset("output", this.state.output);
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -648,13 +783,25 @@ class RouteBuilder<
 
   handle<TResult extends RouteResult<Output>>(
     this: RouteReady<Path, Params, Permission> extends true
-      ? RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access>
+      ? RouteBuilder<
+          Api,
+          Method,
+          Path,
+          Params,
+          Body,
+          Query,
+          Output,
+          Permission,
+          Middleware,
+          Access,
+          Door
+        >
       : never,
     handler: (
-      args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api>,
+      args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api, Door>,
       ...facts: MiddlewareFacts<Middleware>
     ) => TResult,
-  ): RestTransportRouter<Api> {
+  ): RestTransportRouter<Api, Door> {
     assertRouteReady({
       method: this.method,
       path: this.path,
@@ -689,7 +836,19 @@ class RouteBuilder<
 
   withStatus(
     status: ContentfulStatusCode,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     if (!Number.isInteger(status) || status < 200 || status > 299) {
       throw new Error(
         "REST JSON success status must be 200–299 except 204; omit output for no content",
@@ -704,7 +863,19 @@ class RouteBuilder<
 
   withBodyLimit(
     limit: Readonly<{ maxBytes: number; onExceeded(): Error }>,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
       throw new Error("REST body limit must be a non-negative safe integer");
 
@@ -726,7 +897,8 @@ class RouteBuilder<
     Output,
     Permission,
     [...Middleware, ...Added],
-    Access
+    Access,
+    Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -735,7 +907,15 @@ class RouteBuilder<
   }
 }
 
-class RestTransportRouter<Api> {
+/** A route just opened on a family's door: nothing declared but its address. */
+type OpenRoute<
+  Api,
+  Method extends HttpMethod,
+  Path extends string,
+  Door extends RestDoorCredential,
+> = RouteBuilder<Api, Method, Path, Missing, Missing, Missing, Missing, false, [], "scoped", Door>;
+
+class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
   private deprecated: RestDeprecation | undefined;
@@ -744,13 +924,39 @@ class RestTransportRouter<Api> {
     private readonly api: FeatureApiWitness<Api>,
     readonly namespace: string,
     readonly version: DateVersion,
+    readonly credential: Door,
   ) {}
+
+  /**
+   * The door this family's routes answer behind. Declared before the first
+   * route, because it decides the scope every handler is handed: a route
+   * declared under it reads `scope.tier` as the credential's own tier.
+   */
+  withCredential<NewDoor extends RestDoorCredential>(
+    credential: NewDoor,
+  ): RestTransportRouter<Api, NewDoor> {
+    if (this.routes.length > 0) {
+      throw new Error(`REST "${this.namespace}" must declare its credential before its routes`);
+    }
+
+    const router = new RestTransportRouter<Api, NewDoor>(
+      this.api,
+      this.namespace,
+      this.version,
+      credential,
+    );
+
+    router.addressing = this.addressing;
+    router.deprecated = this.deprecated;
+
+    return router;
+  }
 
   /**
    * How the family is addressed. Declared before the first route, because it
    * decides which paths every route in the family answers at.
    */
-  withAddressing(addressing: RestAddressing): RestTransportRouter<Api> {
+  withAddressing(addressing: RestAddressing): RestTransportRouter<Api, Door> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
     }
@@ -761,7 +967,7 @@ class RestTransportRouter<Api> {
   }
 
   /** Marks every route of the family superseded by `successor`. */
-  withDeprecated(deprecated: RestDeprecation): RestTransportRouter<Api> {
+  withDeprecated(deprecated: RestDeprecation): RestTransportRouter<Api, Door> {
     this.deprecated = deprecated;
 
     return this;
@@ -779,6 +985,7 @@ class RestTransportRouter<Api> {
       namespace: this.namespace,
       version: this.version,
       addressing: this.addressing,
+      credential: this.credential,
       ...(this.deprecated ? { deprecated: this.deprecated } : {}),
       routes: this.routes,
     };
@@ -786,31 +993,31 @@ class RestTransportRouter<Api> {
     return { protocol: "rest", namespace: this.namespace, router: () => declaration };
   }
 
-  get<Path extends string>(path: Path, operation: string): RouteBuilder<Api, "get", Path> {
+  get<Path extends string>(path: Path, operation: string): OpenRoute<Api, "get", Path, Door> {
     assertSupportedPath(path);
 
     return new RouteBuilder(this, "get", path, operation);
   }
 
-  patch<Path extends string>(path: Path, operation: string): RouteBuilder<Api, "patch", Path> {
+  patch<Path extends string>(path: Path, operation: string): OpenRoute<Api, "patch", Path, Door> {
     assertSupportedPath(path);
 
     return new RouteBuilder(this, "patch", path, operation);
   }
 
-  post<Path extends string>(path: Path, operation: string): RouteBuilder<Api, "post", Path> {
+  post<Path extends string>(path: Path, operation: string): OpenRoute<Api, "post", Path, Door> {
     assertSupportedPath(path);
 
     return new RouteBuilder(this, "post", path, operation);
   }
 
-  put<Path extends string>(path: Path, operation: string): RouteBuilder<Api, "put", Path> {
+  put<Path extends string>(path: Path, operation: string): OpenRoute<Api, "put", Path, Door> {
     assertSupportedPath(path);
 
     return new RouteBuilder(this, "put", path, operation);
   }
 
-  delete<Path extends string>(path: Path, operation: string): RouteBuilder<Api, "delete", Path> {
+  delete<Path extends string>(path: Path, operation: string): OpenRoute<Api, "delete", Path, Door> {
     assertSupportedPath(path);
 
     return new RouteBuilder(this, "delete", path, operation);
@@ -839,10 +1046,15 @@ export function defineRestRouter<Api>(api: FeatureApiWitness<Api>) {
       assertNamespace(namespace);
 
       return {
-        withVersion(version: DateVersion): RestTransportRouter<Api> {
+        withVersion(version: DateVersion): RestTransportRouter<Api, "projectKey"> {
           assertVersionLabel(version);
 
-          return new RestTransportRouter<Api>(api, namespace, version);
+          return new RestTransportRouter<Api, "projectKey">(
+            api,
+            namespace,
+            version,
+            "projectKey",
+          );
         },
       };
     },
@@ -1021,8 +1233,13 @@ export type RestDeprecationLogPort = Readonly<{
 /** What one family's mount states beyond its declaration. */
 export type RestMountOptions<Api> = Readonly<{
   app: () => Api;
-  /** Which credential reaches these routes, as the document names it. */
-  credential: Credential;
+  /**
+   * Which credential reaches these routes, as the document names it. The
+   * declaration names its own door; this states the classes a declaration
+   * cannot name yet — `public`, `session`, `internalSecret` — and naming a
+   * door credential that disagrees with the declaration's is refused at mount.
+   */
+  credential?: Credential;
   /** The family's own error boundary: it renders every refusal these routes raise. */
   onError: ErrorHandler;
   /** Applied under the family's paths before any route: the app container. */
@@ -1055,6 +1272,7 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
       const aliasPath = canonicalV1Path(basePath);
       const scopes = aliasPath ? [`${basePath}/*`, `${aliasPath}/*`] : [`${basePath}/*`];
       const facts = factBindings({ declaration, options });
+      const credential = mountCredential({ declaration, options });
 
       for (const middleware of [
         tracerMiddleware({ name: declaration.namespace }),
@@ -1079,8 +1297,8 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
               facts,
               ...mount.context,
             }),
-            policy: registryPolicy({ route, options }),
-            credentialClass: route.access ? "none" : CREDENTIAL_CLASS[options.credential],
+            policy: registryPolicy({ route, options, credential }),
+            credentialClass: route.access ? "none" : CREDENTIAL_CLASS[credential],
             family: declaration.namespace,
           });
         }
@@ -1214,7 +1432,7 @@ function routeStack<Api>({
       : []),
     ...validators({ route, documented, paramSource }),
     inputMiddleware({ route, paramSource }),
-    handlerMiddleware({ route, ports, options, facts }),
+    handlerMiddleware({ route, credential: declaration.credential, ports, options, facts }),
   ];
 }
 
@@ -1405,11 +1623,13 @@ function mergeInput({
 /** Authenticate, decide, handle, check the answer, respond. */
 function handlerMiddleware<Api>({
   route,
+  credential,
   ports,
   options,
   facts,
 }: {
   route: RestTransportRoute<Api>;
+  credential: RestDoorCredential;
   ports: RestRuntimePorts;
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
@@ -1454,7 +1674,7 @@ function handlerMiddleware<Api>({
         app: options.app(),
         input,
         actor: decision.actor,
-        scope: projectScopeOf(caller.scope),
+        scope: doorScopeOf({ credential, scope: caller.scope }),
         signal: context.req.raw.signal,
       },
       ...(await resolveFacts({ route, facts, context })),
@@ -1505,9 +1725,28 @@ function normalizedActor(actor: Actor | null): (Actor & { id: string }) | null {
     : null;
 }
 
-function projectScopeOf(scope: AuthzDeclaredScopeId) {
-  if (scope.tier !== "project") {
-    throw new Error("REST transport authorization did not establish a project scope");
+/**
+ * The scope the declaration's door promised, or a refusal naming both tiers.
+ *
+ * A plain `Error`: a door that resolved another tier is mis-wired, and no
+ * caller can act on it. The credential-class refusal a CALLER earns — a
+ * project key at an organization family — is the door's own, thrown before
+ * this is ever reached.
+ */
+function doorScopeOf({
+  credential,
+  scope,
+}: {
+  credential: RestDoorCredential;
+  scope: AuthzDeclaredScopeId;
+}) {
+  const tier = DOOR_SCOPE_TIER[credential];
+
+  if (scope.tier !== tier) {
+    throw new Error(
+      `REST transport authorization established a "${scope.tier}" scope for a "${credential}" ` +
+        `door, which resolves a "${tier}" scope`,
+    );
   }
 
   return scope;
@@ -1821,19 +2060,48 @@ const CREDENTIAL_CLASS = {
 function registryPolicy<Api>({
   route,
   options,
+  credential,
 }: {
   route: RestTransportRoute<Api>;
   options: RestMountOptions<Api>;
+  credential: Credential;
 }): AccessPolicy {
   const reason = options.reason ?? HOST_ENFORCED;
 
   if (route.access) return publicEndpoint(route.access.reason);
 
-  if (options.credential === "public") return publicEndpoint(reason);
+  if (credential === "public") return publicEndpoint(reason);
 
   return handlerManagedAuth({
     reason,
-    credential: HANDLER_CREDENTIAL[options.credential],
+    credential: HANDLER_CREDENTIAL[credential],
     permissions: [permissionOf(route.permission)],
   });
+}
+
+/**
+ * Which credential an API consumer presents at this mount. The declaration
+ * names its door; the mount may only widen to a class no door resolves yet,
+ * and a mount naming the OTHER door is refused here rather than serving an
+ * organization family behind a project key.
+ */
+function mountCredential<Api>({
+  declaration,
+  options,
+}: {
+  declaration: RestTransportDeclaration<Api>;
+  options: RestMountOptions<Api>;
+}): Credential {
+  const named = options.credential;
+
+  if (named === void 0) return declaration.credential;
+
+  if (named in DOOR_SCOPE_TIER && named !== declaration.credential) {
+    throw new Error(
+      `REST "${declaration.namespace}" declares the "${declaration.credential}" door and this ` +
+        `mount names "${named}"; the declaration is what types its handlers' scope`,
+    );
+  }
+
+  return named;
 }

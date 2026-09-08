@@ -32,6 +32,7 @@ export {
   type RestCaller,
   type RestDeprecation,
   type RestDeprecationLogPort,
+  type RestDoorCredential,
   type RestMountOptions,
   type RestRuntime,
   type RestRuntimePorts,

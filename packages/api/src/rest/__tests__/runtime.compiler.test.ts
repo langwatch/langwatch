@@ -155,6 +155,46 @@ defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   }
 });
 
+/** @scenario "A handler on an organization door receives the organization scope" */
+it("types the handler's scope from the declared credential, and refuses a door with none", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-credential-"));
+  const fixture = join(directory, "fixture.ts");
+
+  writeFileSync(
+    fixture,
+    `import { z } from "zod";
+import { featureApi } from "@langwatch/runtime-composition";
+import { defineRestRouter } from "../src/rest/runtime.ts";
+const api = featureApi<object>("role");
+const tier = z.object({ tier: z.literal("organization") });
+defineRestRouter(api).withNamespace("roles").withVersion("2026-09-08")
+  .withCredential("organizationKey")
+  .get("/", "listRoles").withPermission("organization:manage").withOutput(tier)
+  .handle(({ scope }) => ({ tier: scope.tier }));
+defineRestRouter(api).withNamespace("secrets").withVersion("2026-09-08")
+  .get("/", "listSecrets").withPermission("secrets:view").withOutput(tier)
+  .handle(({ scope }) => ({ tier: scope.tier }));
+defineRestRouter(api).withNamespace("admin").withVersion("2026-09-08")
+  .withCredential("session");
+`,
+  );
+
+  try {
+    const errors = compile(fixture)
+      .split("\n")
+      .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
+
+    expect(errors).toHaveLength(2);
+    // The project door's own scope: `"project"` where the route promised
+    // `"organization"`, which is the credential typing the handler.
+    expect(errors[0]).toContain('"project"');
+    expect(errors[0]).toContain('"organization"');
+    expect(errors[1]).toContain('"session"');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 function compile(fixture: string): string {
   try {
     execFileSync(

@@ -279,8 +279,11 @@ async function assertScopeLineage({
 }
 
 /**
- * Refuses an input project id that disagrees with the project the credential
- * itself resolved. The credential is the authority; the body is a claim.
+ * Refuses an input scope id that disagrees with the scope the credential
+ * itself resolved. The credential is the authority; the body is a claim. The
+ * field compared is the one the credential's own tier is spelled with, so a
+ * project door reads `projectId` and an organization door reads
+ * `organizationId`.
  */
 function assertInputScope({
   input,
@@ -289,16 +292,17 @@ function assertInputScope({
   input: unknown;
   scope: AuthzDeclaredScopeId | null;
 }): void {
-  if (!scope || scope.tier !== "project") return;
+  if (!scope) return;
 
   if (typeof input !== "object" || input === null) return;
 
-  const named = (input as Record<string, unknown>).projectId;
+  const field = SCOPE_TIER_FIELDS[scope.tier];
+  const named = (input as Record<string, unknown>)[field];
 
   if (typeof named === "string" && named !== scope.id) {
-    // Names the field and nothing else: which project the credential DOES
-    // cover is the question this refusal exists to withhold.
-    throw new ScopeInputMismatchError("projectId");
+    // Names the field and nothing else: which scope the credential DOES cover
+    // is the question this refusal exists to withhold.
+    throw new ScopeInputMismatchError(field);
   }
 }
 

@@ -148,6 +148,55 @@ Feature: Transport declaration split
     And a mount that bound no value for a declared fact is refused, naming the fact and the route
 
   @unit
+  Scenario: A declaration names the credential its routes accept
+    Given a REST declaration built with defineRestRouter
+    When it names the door its routes answer behind, before its first route
+    Then the declaration carries that credential, and one that names none carries the project key
+    And a door named after the first route is refused, because the routes are already typed
+
+  @unit @typecheck
+  Scenario: A handler on an organization door receives the organization scope
+    Given a declaration that names the organization door
+    When a route on it reads the scope it is handed
+    Then the scope is the organization the credential resolved
+    And the same route on a project door does not compile
+    And a door for a credential nothing resolves a scope for does not compile
+
+  @unit
+  Scenario: A mount cannot answer a declaration behind the other door
+    Given a declaration that names the organization door
+    When a process mounts it naming the project credential instead
+    Then the mount is refused, naming the declared door and the one the mount named
+
+  @integration
+  Scenario: An organization id the credential did not resolve is a handled refusal
+    Given a credential that resolved one organization
+    When the request body names a different organization
+    Then the caller is refused as forbidden, with a stable code a client renders copy from
+    And the refusal names the offending field and neither organization
+    And a body naming the organization the credential resolved is served
+
+  @integration
+  Scenario: A door that resolves the wrong tier is a wiring failure, not an answer
+    Given a declaration that names the organization door
+    When the process's own door resolves a project instead
+    Then the request fails rather than handing a project scope to an organization handler
+
+  @integration
+  Scenario: An organization route publishes the organization security scheme
+    Given a route declared behind the organization door
+    When the process mounts it and reads the route registry
+    Then the route records the organization credential class
+    And the class publishes the organization API key scheme in the document
+
+  @unimplemented
+  Scenario: A project key presented to an organization route is refused with the body the family already publishes
+    Given a family declared behind the organization door
+    When a caller presents a project API key
+    Then the door refuses it as a credential class mismatch, naming the key class required
+    And a request carrying no credential at all is refused as missing credentials
+
+  @unit
   Scenario: A project id the credential did not resolve is a handled refusal
     Given a credential that resolved one project
     When the request body names a different project

@@ -160,6 +160,94 @@ describe("defineRestRouter", () => {
     });
   });
 
+  describe("when a family declares the door it answers behind", () => {
+    const OrganizationApi = featureApi<{ listRoles(): Promise<void> }>("role");
+
+    /** @scenario "A declaration names the credential its routes accept" */
+    it("records the declared door, and defaults to the project key", () => {
+      const organization = defineRestRouter(OrganizationApi)
+        .withNamespace("roles")
+        .withVersion("2026-08-07")
+        .withCredential("organizationKey")
+        .get("/", "listRoles")
+        .withPermission("organization:manage")
+        .handle(() => {})
+        .build()
+        .router();
+
+      const project = defineRestRouter(OrganizationApi)
+        .withNamespace("roles")
+        .withVersion("2026-08-07")
+        .get("/", "listRoles")
+        .withPermission("organization:manage")
+        .handle(() => {})
+        .build()
+        .router();
+
+      expect(organization.credential).toBe("organizationKey");
+      expect(project.credential).toBe("projectKey");
+    });
+
+    /** @scenario "A declaration names the credential its routes accept" */
+    it("refuses a door declared after the first route", () => {
+      const router = defineRestRouter(OrganizationApi)
+        .withNamespace("roles")
+        .withVersion("2026-08-07")
+        .get("/", "listRoles")
+        .withPermission("organization:manage")
+        .handle(() => {});
+
+      expect(() => router.withCredential("organizationKey")).toThrow(
+        /must declare its credential before its routes/,
+      );
+    });
+
+    /** @scenario "A declaration names the credential its routes accept" */
+    it("carries an addressing declared before the door", () => {
+      const declaration = defineRestRouter(OrganizationApi)
+        .withNamespace("coding-agent")
+        .withVersion("2026-08-07")
+        .withAddressing("v1-only")
+        .withCredential("organizationKey")
+        .get("/", "listRoles")
+        .withPermission("organization:manage")
+        .handle(() => {})
+        .build()
+        .router();
+
+      expect(declaration).toMatchObject({ addressing: "v1-only", credential: "organizationKey" });
+    });
+
+    /** @scenario "A mount cannot answer a declaration behind the other door" */
+    it("refuses a mount naming the door the declaration did not declare", () => {
+      const declaration = defineRestRouter(OrganizationApi)
+        .withNamespace("roles")
+        .withVersion("2026-08-07")
+        .withCredential("organizationKey")
+        .get("/", "listRoles")
+        .withPermission("organization:manage")
+        .handle(() => {})
+        .build()
+        .router();
+
+      const runtime = createRestRuntime({
+        identity: {
+          authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+        },
+      });
+
+      expect(() =>
+        runtime.mount(declaration, {
+          app: () => ({ listRoles: async () => {} }),
+          credential: "projectKey",
+          onError: (error) => {
+            throw error;
+          },
+        }),
+      ).toThrow(/declares the "organizationKey" door and this mount names "projectKey"/);
+    });
+  });
+
   describe("when a family declares how it is addressed", () => {
     it("refuses an addressing declared after the first route", () => {
       const api = featureApi<{ ping(): Promise<void> }>("ops");

@@ -12,9 +12,9 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { publicRoute } from "../../access/access.ts";
+import { publicRoute, securityRequirement } from "../../access/access.ts";
 import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
-import { documentedResponses } from "../openapi.ts";
+import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import {
   createRestRuntime,
@@ -600,6 +600,245 @@ describe("a route declared public", () => {
     expect(getRoutePolicy("get", "/api/legacy-reports/health")).toMatchObject({
       credentialClass: "none",
       policy: { kind: "public", reason: "liveness probe; reads no project data" },
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A family answering behind the organization door.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface RoleApi {
+  listRoles(input: { organizationId: string }): Promise<{ id: string }[]>;
+  createRole(input: { organizationId: string; name: string }): Promise<{ id: string }>;
+}
+
+const RoleApi = featureApi<RoleApi>("role");
+const roleRestFacts = defineRestMiddleware("roleRestFacts", z.object({ organizationId: z.string() }));
+
+const ORGANIZATION_ID = "organization-1";
+
+const roles = defineRestRouter(RoleApi)
+  .withNamespace("roles")
+  .withVersion(VERSION)
+  .withCredential("organizationKey")
+
+  .get("/", "listRoles")
+  .withPermission("organization:manage")
+  // The literal is the type proof: a handler whose scope were the project tier
+  // could not answer it, so this route would not compile on a project door.
+  .withOutput(
+    z.object({
+      tier: z.literal("organization"),
+      scopeId: z.string(),
+      factOrganizationId: z.string(),
+      roles: z.array(z.string()),
+    }),
+  )
+  .withDocs({ summary: "List the organization's roles", tags: ["Roles"] })
+  .withMiddleware(roleRestFacts)
+  .handle(async ({ app, scope }, organization) => ({
+    tier: scope.tier,
+    scopeId: scope.id,
+    factOrganizationId: organization.organizationId,
+    roles: (await app.listRoles({ organizationId: scope.id })).map((role) => role.id),
+  }))
+
+  .post("/", "createRole")
+  .withInput(z.object({ organizationId: z.string(), name: z.string() }))
+  .withPermission("organization:manage")
+  .withOutput(z.object({ id: z.string() }))
+  .handle(async ({ app, input, scope }) =>
+    app.createRole({ organizationId: scope.id, name: input.name }),
+  )
+
+  .get("/health", "readRolesHealth")
+  .withAccess(publicRoute({ reason: "liveness probe; reads no organization data" }))
+  .withOutput(z.object({ ok: z.literal(true) }))
+  .handle(({ actor, scope }) => ({ ok: actor === null && scope === null }) as { ok: true })
+
+  .get("/legacy", "listLegacyRoles")
+  .withPermission("organization:manage")
+  .withOutput(z.array(z.string()))
+  .withDeprecated({ successor: "/api/roles", notice: "Use /api/roles instead" })
+  .handle(async ({ app, scope }) =>
+    (await app.listRoles({ organizationId: scope.id })).map((role) => role.id),
+  )
+  .build();
+
+const roleApplication: RoleApi = {
+  listRoles: async ({ organizationId }) => [{ id: `role-in-${organizationId}` }],
+  createRole: async ({ name }) => ({ id: name }),
+};
+
+/** The organization door: the process resolved a key, not a project. */
+function rolesApp(
+  scope: { tier: "organization" | "project"; id: string } = {
+    tier: "organization",
+    id: ORGANIZATION_ID,
+  },
+): { app: Hono; authenticate: ReturnType<typeof vi.fn> } {
+  const authenticate = vi.fn(() => ({ actor: null, scope }));
+
+  const runtime = createRestRuntime({ identity: { authenticate } });
+
+  const app = runtime.mount(roles.router(), {
+    app: () => roleApplication,
+    onError: createErrorHandler(),
+    facts: [bindRestMiddleware(roleRestFacts, () => ({ organizationId: ORGANIZATION_ID }))],
+  });
+
+  return { app, authenticate };
+}
+
+describe("a family whose declaration names the organization door", () => {
+  describe("given a caller the door resolved an organization for", () => {
+    /** @scenario "A handler on an organization door receives the organization scope" */
+    it("hands the handler the organization scope, and the fact the mount bound", async () => {
+      const response = await rolesApp().app.request(`/api/roles/${VERSION}`);
+
+      expect(response.status).toBe(200);
+
+      await expect(response.json()).resolves.toEqual({
+        tier: "organization",
+        scopeId: ORGANIZATION_ID,
+        factOrganizationId: ORGANIZATION_ID,
+        roles: [`role-in-${ORGANIZATION_ID}`],
+      });
+    });
+
+    /** @scenario "An organization id the credential did not resolve is a handled refusal" */
+    it("serves a body naming the organization the credential resolved", async () => {
+      const response = await rolesApp().app.request(`/api/roles/${VERSION}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: ORGANIZATION_ID, name: "release-manager" }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ id: "release-manager" });
+    });
+
+    /** @scenario "An organization id the credential did not resolve is a handled refusal" */
+    it("refuses a body naming another organization, naming the field and neither id", async () => {
+      const response = await rolesApp().app.request(`/api/roles/${VERSION}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: "organization-2", name: "release-manager" }),
+      });
+
+      expect(response.status).toBe(403);
+      const body = (await response.json()) as { code: string; meta?: Record<string, unknown> };
+
+      expect(body.code).toBe("scope_input_mismatch");
+      expect(body.meta).toMatchObject({ field: "organizationId" });
+      expect(JSON.stringify(body)).not.toContain(ORGANIZATION_ID);
+    });
+  });
+
+  describe("given the process's door resolved a project instead", () => {
+    /** @scenario "A door that resolves the wrong tier is a wiring failure, not an answer" */
+    it("refuses rather than handing a project scope to an organization handler", async () => {
+      const { app } = rolesApp({ tier: "project", id: "project-1" });
+
+      const response = await app.request(`/api/roles/${VERSION}`);
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe("given the document and the route registry", () => {
+    /** @scenario "An organization route publishes the organization security scheme" */
+    it("records the organization credential class, which publishes the admin key scheme", () => {
+      rolesApp();
+
+      const route = getRoutePolicy("get", `/api/roles/${VERSION}`);
+
+      expect(route).toMatchObject({
+        credentialClass: "organization_api_key",
+        policy: { credential: "apiKey", permissions: ["organization:manage"] },
+      });
+
+      expect(
+        securityForCredentialClass({
+          operationKey: `GET /api/roles/${VERSION}`,
+          credentialClass: route!.credentialClass,
+        }),
+      ).toEqual([{ admin_api_key: [] }]);
+
+      expect(securityRequirement("organizationKey")).toEqual([{ admin_api_key: [] }]);
+    });
+  });
+
+  describe("given the routes an organization family declares beside its scoped ones", () => {
+    /** @scenario "A route that answers without a credential resolves none" */
+    it("answers a public route without resolving the organization credential", async () => {
+      const { app, authenticate } = rolesApp();
+
+      const response = await app.request("/api/roles/health");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(authenticate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Deprecation reaches the document and the wire" */
+    it("carries the deprecation headers of a superseded organization route", async () => {
+      const response = await rolesApp().app.request("/api/roles/legacy");
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Deprecation")).toBe("true");
+      expect(response.headers.get("X-API-Deprecation-Notice")).toBe("Use /api/roles instead");
+    });
+  });
+});
+
+// A v1-only organization family: the generation is its whole contract.
+const codingAgent = defineRestRouter(RoleApi)
+  .withNamespace("coding-agent")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .withCredential("organizationKey")
+  .get("/usage", "readCodingAgentUsage")
+  .withPermission("organization:manage")
+  .withOutput(z.object({ organizationId: z.string() }))
+  .handle(({ scope }) => ({ organizationId: scope.id }))
+  .build();
+
+describe("a v1-only family on the organization door", () => {
+  function codingAgentApp(): Hono {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: null,
+          scope: { tier: "organization", id: ORGANIZATION_ID } as const,
+        }),
+      },
+    });
+
+    return runtime.mount(codingAgent.router(), {
+      app: () => roleApplication,
+      onError: createErrorHandler(),
+    });
+  }
+
+  /** @scenario "A v1-only family answers nowhere else" */
+  it("answers at its /api/v1 path with the organization scope, and nowhere else", async () => {
+    const app = codingAgentApp();
+
+    const answered = await app.request("/api/v1/coding-agent/usage");
+
+    expect(answered.status).toBe(200);
+    await expect(answered.json()).resolves.toEqual({ organizationId: ORGANIZATION_ID });
+    expect((await app.request("/api/coding-agent/usage")).status).toBe(404);
+  });
+
+  /** @scenario "An organization route publishes the organization security scheme" */
+  it("registers the organization credential class at its one address", () => {
+    codingAgentApp();
+
+    expect(getRoutePolicy("get", "/api/v1/coding-agent/usage")).toMatchObject({
+      credentialClass: "organization_api_key",
     });
   });
 });
