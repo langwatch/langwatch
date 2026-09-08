@@ -829,7 +829,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
     });
 
     await harness.admin.insert({
-      table: `${database}.${harness.names.keyMapTable}`,
+      table: `${facts}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [asking, other].map((project) => ({
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),

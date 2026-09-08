@@ -159,170 +159,189 @@ export const DashboardPageBody = ({
 
   return (
     <VStack width="full" gap={0} {...props}>
-      {/* Alert banners */}
-      {publicEnv.data &&
-        (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
-          !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-            borderTopLeftRadius="2xl"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                Please check your environment variables, the following variables
-                are not set which are required for evaluations and workflows:
-              </Text>
-              {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
-                <Text>LANGWATCH_NLP_SERVICE</Text>
-              )}
-              {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
-                <Text>LANGEVALS_ENDPOINT</Text>
-              )}
-            </Alert.Content>
-          </Alert.Root>
-        )}
-      {usage.data?.messageLimitInfo &&
-        usage.data.messageLimitInfo.status !== "ok" && (
-          <Alert.Root
-            status={
-              usage.data.messageLimitInfo.status === "exceeded"
-                ? "error"
-                : "warning"
-            }
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor={
-              usage.data.messageLimitInfo.status === "exceeded"
-                ? "red.300"
-                : "yellow.300"
-            }
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                {usage.data.messageLimitInfo.message}{" "}
-                <Link
-                  href={planManagementUrl}
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook:
-                        usage.data?.messageLimitInfo.status === "exceeded"
-                          ? "messages_limit_reached"
-                          : "messages_limit_warning",
-                    });
-                  }}
-                >
-                  Click here
-                </Link>{" "}
-                to upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-      {usage.data &&
-        usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You reached the limit of{" "}
-                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage
-                cost for this month, evaluations and guardrails will not be
-                processed.{" "}
-                <Link
-                  href="/settings/usage"
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "usage_cost_limit_reached",
-                    });
-                  }}
-                >
-                  Go to settings
-                </Link>{" "}
-                to check your usage spending limit or upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
+      {/* Alert banners.
 
-      <AnnouncementBanner />
-
-      {adminViewingAs && (
-        <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
-      )}
-
-      {ssoStatus?.pendingSsoSetup && (
-        <Alert.Root
-          status="error"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <VStack align="start" gap={0} flex={1}>
-                <Alert.Title fontWeight="bold">
-                  Action Required: Link your SSO account
-                </Alert.Title>
-                <Text fontSize="sm">
-                  Your organization requires SSO login. Please link your account
-                  by logging in via the email input box on the sign-in page.
+          A positioned layer on purpose. Pages are free to paint outside their
+          own box (the home hero's light-mode bloom bleeds upward by almost
+          half its height) and to stack their own containers with a
+          `zIndex`. A static banner loses to both: the bloom washed the
+          "You reached the limit" alert out to a smear a customer could not
+          read. Banners are chrome, so they stack above whatever the page
+          does — `docked` is the lowest token above page-level layering and
+          still under every portaled overlay. */}
+      <VStack
+        width="full"
+        gap={0}
+        position="relative"
+        zIndex="docked"
+        data-part="page-banners"
+      >
+        {publicEnv.data &&
+          (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
+            !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
+            <Alert.Root
+              status="warning"
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor="yellow.300"
+              borderTopLeftRadius="2xl"
+            >
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  Please check your environment variables, the following
+                  variables are not set which are required for evaluations and
+                  workflows:
                 </Text>
-              </VStack>
-              <Button
-                size="sm"
-                colorPalette="red"
-                flexShrink={0}
-                color="white"
-                asChild
-              >
-                <Link href="/settings/authentication">
-                  <KeyRound size={14} />
-                  Link SSO Account
-                </Link>
-              </Button>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
-      )}
+                {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
+                  <Text>LANGWATCH_NLP_SERVICE</Text>
+                )}
+                {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
+                  <Text>LANGEVALS_ENDPOINT</Text>
+                )}
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        {usage.data?.messageLimitInfo &&
+          usage.data.messageLimitInfo.status !== "ok" && (
+            <Alert.Root
+              status={
+                usage.data.messageLimitInfo.status === "exceeded"
+                  ? "error"
+                  : "warning"
+              }
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor={
+                usage.data.messageLimitInfo.status === "exceeded"
+                  ? "red.300"
+                  : "yellow.300"
+              }
+            >
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  {usage.data.messageLimitInfo.message}{" "}
+                  <Link
+                    href={planManagementUrl}
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook:
+                          usage.data?.messageLimitInfo.status === "exceeded"
+                            ? "messages_limit_reached"
+                            : "messages_limit_warning",
+                      });
+                    }}
+                  >
+                    Click here
+                  </Link>{" "}
+                  to upgrade your plan.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        {usage.data &&
+          usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
+            <Alert.Root
+              status="warning"
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor="yellow.300"
+            >
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You reached the limit of{" "}
+                  {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")}{" "}
+                  usage cost for this month, evaluations and guardrails will not
+                  be processed.{" "}
+                  <Link
+                    href="/settings/usage"
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "usage_cost_limit_reached",
+                      });
+                    }}
+                  >
+                    Go to settings
+                  </Link>{" "}
+                  to check your usage spending limit or upgrade your plan.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          )}
 
-      {publicEnv.data?.DEMO_PROJECT_SLUG &&
-        publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
-          <HStack width="full" backgroundColor="orange.400" padding={1}>
-            <Spacer />
-            <Text fontSize="sm">
-              Viewing Demo Project - Go back to yours{" "}
-              <Link href="/" textDecoration="underline">
-                here
-              </Link>
-            </Text>
-            <Spacer />
-          </HStack>
+        <AnnouncementBanner />
+
+        {adminViewingAs && (
+          <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
         )}
+
+        {ssoStatus?.pendingSsoSetup && (
+          <Alert.Root
+            status="error"
+            width="full"
+            border="1px solid"
+            borderColor="colorPalette.muted"
+            marginX={4}
+            marginTop={3}
+            borderRadius="lg"
+            maxWidth="calc(100% - 22px)"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <HStack width="full" gap={4}>
+                <VStack align="start" gap={0} flex={1}>
+                  <Alert.Title fontWeight="bold">
+                    Action Required: Link your SSO account
+                  </Alert.Title>
+                  <Text fontSize="sm">
+                    Your organization requires SSO login. Please link your
+                    account by logging in via the email input box on the sign-in
+                    page.
+                  </Text>
+                </VStack>
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  flexShrink={0}
+                  color="white"
+                  asChild
+                >
+                  <Link href="/settings/authentication">
+                    <KeyRound size={14} />
+                    Link SSO Account
+                  </Link>
+                </Button>
+              </HStack>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+
+        {publicEnv.data?.DEMO_PROJECT_SLUG &&
+          publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
+            <HStack width="full" backgroundColor="orange.400" padding={1}>
+              <Spacer />
+              <Text fontSize="sm">
+                Viewing Demo Project - Go back to yours{" "}
+                <Link href="/" textDecoration="underline">
+                  here
+                </Link>
+              </Text>
+              <Spacer />
+            </HStack>
+          )}
+      </VStack>
 
       <CurrentDrawer />
       {/* v2 trace drawer is mounted globally so cross-page opens

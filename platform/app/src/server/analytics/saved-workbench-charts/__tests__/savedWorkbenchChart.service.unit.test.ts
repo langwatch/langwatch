@@ -656,8 +656,9 @@ describe("placing a saved workbench chart on a dashboard", () => {
         // and row 1 are already taken".
         expect(placed.gridRow).toBe(2);
         expect(placed.gridColumn).toBe(0);
-        expect(placed.colSpan).toBe(1);
-        expect(placed.rowSpan).toBe(1);
+        // The grid's default footprint: half the row wide, three rows tall.
+        expect(placed.colSpan).toBe(4);
+        expect(placed.rowSpan).toBe(3);
       });
     });
   });
@@ -677,11 +678,9 @@ describe("placing a saved workbench chart on a dashboard", () => {
           projectId: PROJECT_ID,
           input: {
             dashboardId: "dashboard-1",
-            // gridColumn 1 + colSpan 1 is the widest column placement the
-            // 2-column grid still accepts at gridColumn 1 (see placementSchema's
-            // cross-field refine) — chosen so gridColumn, gridRow and rowSpan
-            // each start away from their post-unplace default and the
-            // assertions below actually prove they were cleared.
+            // Chosen so gridColumn, gridRow and rowSpan each start away from
+            // their post-unplace default and the assertions below actually
+            // prove they were cleared.
             gridColumn: 1,
             gridRow: 3,
             colSpan: 1,
@@ -818,9 +817,9 @@ describe("running a saved workbench chart", () => {
 
   /** Declares both reserved window bounds and the granularity parameter. */
   const BUCKETED_SQL =
-    "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+    "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
     "count() AS value FROM analytics.traces " +
-    "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+    "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
     "AND TraceName = {name:String} GROUP BY bucket ORDER BY bucket";
 
   async function saveBucketedChart(
@@ -865,9 +864,9 @@ describe("running a saved workbench chart", () => {
           // Saved alongside the query at save time.
           name: "checkout",
           // Injected from the surface at run time.
-          period_start: "2026-02-20 00:00:00",
-          period_end: "2026-02-27 00:00:00",
-          period_granularity_seconds: 3600,
+          dashboard_context_period_start: "2026-02-20 00:00:00",
+          dashboard_context_period_end: "2026-02-27 00:00:00",
+          dashboard_context_granularity_seconds: 3600,
         });
         expect(result.rows).toEqual([{ value: 1 }]);
         expect(result.followsTimeWindow).toBe(true);

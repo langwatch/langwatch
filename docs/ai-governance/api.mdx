@@ -36,14 +36,14 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
 | Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
-| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/ai-governance/audit-log) |
+| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/platform/audit-log) |
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
 | Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
 | Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate` / `revoke`) | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
-| Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
-| Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
+| Members | `/api/governance/members` | [Members and Teams](/platform/members-and-teams) |
+| Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
+| Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
 | AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
 | Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
 | Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
@@ -52,7 +52,7 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 
 ## Verb shape: worked example
 
-The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). The verb set:
+The first surface to ship is `ingestion-templates` (Lane B-1 commit). The verb set:
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
@@ -155,9 +155,9 @@ The `organization:view` caller plus a project-scoped ingest-only RoleBinding is 
 
 **Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
 
-**Surface-spoof rejection regression**: same file as above. Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`.
+**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`, and asserts all three audit rows fall back to `metadata.surface === "hono"`.
 
-The `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` is the defense against external HTTP callers forging in-process surface tags: the only value the Hono surface accepts inbound is `cli`, everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test this pins the umbrella spec's `@audit-uniform` invariant.
+That locks the `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags. The only value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test, this pins the umbrella spec's `@audit-uniform` invariant for v1.
 
 `cli` itself is a hint from an already-authenticated caller rather than a claim the route can verify, since the CLI presents the same credentials any other HTTP client does. Read it as "which client said it did this", never as a permission.
 
@@ -179,8 +179,8 @@ Use these files as the authoritative reference when implementing a CLI command o
 
 - [Governance CLI](/ai-governance/cli): `langwatch governance <resource> <verb>` thin shell
 - [Governance MCP server](/ai-governance/mcp): same surface as MCP tools for agent use
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes that gate each verb
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes that gate each verb
+- [Audit log](/platform/audit-log): where state-change rows land
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)

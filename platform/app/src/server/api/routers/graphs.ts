@@ -3,6 +3,12 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { allocateNextGridRow } from "~/server/analytics/allocateNextGridRow";
 import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "~/server/analytics/chartGrid";
+import {
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
@@ -24,20 +30,40 @@ interface AlertActionParams {
   seriesName?: string;
 }
 
+// A card's column and span pass their own bounds and still overflow the grid
+// together; refused here rather than clipped by the grid that reads it.
+const layoutSchema = chartGridPlacementSchema.refine(fitsChartGridWidth, {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
+});
+
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        name: z.string(),
-        graph: z.string(),
-        filterParams: z.any().optional(),
-        dashboardId: z.string().optional(),
-        gridColumn: z.number().min(0).max(1).optional(),
-        gridRow: z.number().min(0).optional(),
-        colSpan: z.number().min(1).max(2).optional(),
-        rowSpan: z.number().min(1).max(2).optional(),
-      }),
+      z
+        .object({
+          projectId: z.string(),
+          name: z.string(),
+          graph: z.string(),
+          filterParams: z.any().optional(),
+          dashboardId: z.string().optional(),
+          ...chartGridPlacementSchema.partial().shape,
+        })
+        // A card's column and span pass their own bounds and still overflow
+        // the grid together. `create` persists the defaults below when either
+        // is omitted, so the refine validates the SAME effective placement the
+        // row will carry — the identical rule `layoutSchema` enforces.
+        .refine(
+          (value) =>
+            fitsChartGridWidth({
+              gridColumn: value.gridColumn ?? 0,
+              colSpan: value.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+            }),
+          {
+            message: "gridColumn + colSpan must not exceed the grid's columns",
+            path: ["colSpan"],
+          },
+        ),
     )
     .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {
@@ -57,30 +83,34 @@ export const graphsRouter = createTRPCRouter({
         });
       }
 
-      // If no gridRow provided, find the next available row. Shared with
+      // Row computation and write share one interactive transaction so two
+      // concurrent creates cannot read the same free row and then both write
+      // it — the placement is atomic, not last-writer-wins. Shared with
       // `placeChart` so the two writers that can put a chart on this grid
       // never disagree about which row is free.
-      let gridRow = input.gridRow;
-      if (gridRow === undefined && input.dashboardId) {
-        gridRow = await allocateNextGridRow(ctx.prisma, {
-          dashboardId: input.dashboardId,
-          projectId: input.projectId,
-        });
-      }
+      const customGraph = await ctx.prisma.$transaction(async (tx) => {
+        const gridRow =
+          input.gridRow === undefined && input.dashboardId
+            ? await allocateNextGridRow(tx, {
+                dashboardId: input.dashboardId,
+                projectId: input.projectId,
+              })
+            : input.gridRow;
 
-      const customGraph = await ctx.prisma.customGraph.create({
-        data: {
-          id: nanoid(),
-          name: input.name,
-          graph: graph,
-          projectId: input.projectId,
-          filters: input.filterParams?.filters ?? {},
-          dashboardId: input.dashboardId,
-          gridColumn: input.gridColumn ?? 0,
-          gridRow: gridRow ?? 0,
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
-        },
+        return await tx.customGraph.create({
+          data: {
+            id: nanoid(),
+            name: input.name,
+            graph: graph,
+            projectId: input.projectId,
+            filters: input.filterParams?.filters ?? {},
+            dashboardId: input.dashboardId,
+            gridColumn: input.gridColumn ?? 0,
+            gridRow: gridRow ?? 0,
+            colSpan: input.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+            rowSpan: input.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
+          },
+        });
       });
 
       // Alert-writing lives on `automation.upsert` with `customGraphId`
@@ -311,14 +341,12 @@ export const graphsRouter = createTRPCRouter({
 
   updateLayout: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        graphId: z.string(),
-        gridColumn: z.number().min(0).max(1),
-        gridRow: z.number().min(0),
-        colSpan: z.number().min(1).max(2),
-        rowSpan: z.number().min(1).max(2),
-      }),
+      chartGridPlacementSchema
+        .extend({ projectId: z.string(), graphId: z.string() })
+        .refine(fitsChartGridWidth, {
+          message: "gridColumn + colSpan must not exceed the grid's columns",
+          path: ["colSpan"],
+        }),
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
@@ -351,15 +379,7 @@ export const graphsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        layouts: z.array(
-          z.object({
-            graphId: z.string(),
-            gridColumn: z.number().min(0).max(1),
-            gridRow: z.number().min(0),
-            colSpan: z.number().min(1).max(2),
-            rowSpan: z.number().min(1).max(2),
-          }),
-        ),
+        layouts: z.array(z.object({ graphId: z.string() }).and(layoutSchema)),
       }),
     )
     .permission("analytics:update")

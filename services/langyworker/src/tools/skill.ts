@@ -85,8 +85,19 @@ const skillParams = Type.Object({
   ),
 });
 
-export function createSkillExtension(skillsDir: string | undefined): InlineExtension {
-  const skills = listSkills(skillsDir);
+export function createSkillExtension({
+  skillsDir,
+  disabledSkills,
+}: {
+  skillsDir: string | undefined;
+  disabledSkills?: string[];
+}): InlineExtension {
+  const disabled = new Set(disabledSkills);
+  // Filtered before the inventory line and the execute closure both read
+  // `skills`, so a flag-gated-off id is absent from what the model is told
+  // it can call AND from what `execute` will actually load — the model
+  // cannot discover the skill exists, let alone invoke it.
+  const skills = listSkills(skillsDir).filter((s) => !disabled.has(s.name));
   const inventoryLine =
     skills.length > 0
       ? ` Installed: ${skills.map((s) => s.name).join(", ")}.`
