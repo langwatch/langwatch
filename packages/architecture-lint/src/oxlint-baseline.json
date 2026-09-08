@@ -3103,18 +3103,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/user/web/src/screens/personal-workspace/personal-budget-request.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/user/web/src/screens/personal-workspace/personal-overview.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/user/web/src/ui/sections/change-password-dialog.tsx",
       "measured": "2026-09-06"
     },
@@ -4372,14 +4360,6 @@
     },
     {
       "key": "complexity|packages/features/user/web/src/behavior/use-personal-context.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/user/web/src/screens/personal-workspace/personal-budget-request.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6536,10 +6516,6 @@
     },
     {
       "key": "condition-shape|packages/features/user/web/src/model/handled-error.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
       "measured": "2026-09-07"
     },
     {
@@ -9061,22 +9037,6 @@
     {
       "key": "nested-ternary|packages/features/user/server/src/transport/api-trpc/user.api.ts",
       "measured": "2026-09-06"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/personal-configure.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/personal-sessions.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/project-pull-requests.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "nested-ternary|packages/features/user/web/src/screens/personal-workspace/project-sessions.screen.tsx",
-      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/features/user/web/src/ui/sections/devices-panel.tsx",

@@ -591,10 +591,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/suite/web/src",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|packages/features/trace/contract/src",
       "measured": "2026-09-08"
     },

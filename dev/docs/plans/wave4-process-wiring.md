@@ -209,3 +209,33 @@ tables (tasks catalogue) and is not a user repository.
   mode in `packages/api/specs/versioned-routing.feature` (round three). Its evaluate doors answer `400 { error }` from an
   in-handler parse and write raw bodies; `observePayloadSize` and `reportError` are ports no process supplies and should be
   deleted, not ported.
+
+## stored-object (door landed; `/api/files` byte family still on the deleted builders)
+
+- `apps/api/src/app/api-production.composition.ts:175-180`: import `installApiStoredObject` in place of `composeStoredObjectFeature`
+  and `refusingStoredObjectFeature` (keep `DeferredPayloadStagingAdapter`, `LoggedApiStoredObjectAbsence`). Line ~1201
+  `this.composedStoredObject = await this.installStoredObject(options)`; the method (~3294) becomes `async`, uses
+  `this.requireDatabase().connection`, calls `await installApiStoredObject({...same arguments...})`, and the
+  `if (!database) return refusingStoredObjectFeature()` guard goes: the `service_unavailable` refusal now comes from
+  `ApiStoredObjectsClickHouse.resolveClient` when no ClickHouse connection was composed.
+- Four doubles building the refusing twin: `apps/api/src/app/__tests__/api-trpc-record.test-doubles.ts:294`,
+  `apps/api/src/app/__tests__/api-packaged-rest.usage-guard.integration.test.ts:48`,
+  `apps/api/src/app-trpc/__tests__/support/app-trpc-features.ts:188`,
+  `apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts:43,222` → a booted memory installation
+  (`installation().boot({ role: "api" })` over `withPersistence("memory", {})`, as
+  `packages/features/stored-object/server/src/app/__tests__/stored-object-installation.unit.test.ts` does).
+- New binding: `mountStoredObjectRest({ storedObjects: () => this.composedStoredObject.restServices.storedObjects(), credential })`
+  from `apps/api/src/features/stored-object/stored-object-rest.mount.ts`. It publishes
+  `/api/stored-objects/2026-08-22/storedObjects.{confirmUpload,get,delete}` and the dated twins; the deleted family was
+  mounted nowhere, so an unmounted door regresses nothing, but mount it.
+- `apps/tasks/src/platform/object-storage-migrate.composition.ts:4,59-63`: `PostgresObjectStorageMigrationInventoryAdapter` is
+  deleted; the tasks process implements `ObjectStorageMigrationInventoryPort` (from `@langwatch/stored-object-server`) itself.
+  The stored-object lane's report (`/Users/afr/.claude/jobs/eeb488e6/tmp` task a7de211afcf583b9e) carries the verbatim
+  Prisma paging code for `listProjectsPage`, `listStoredObjectsPage`, `listDatasetsPage`. This file is in the 09-07 pile.
+- `apps/api/src/app-rest/app-rest.packaged-families.ts:82,465-479` still builds the `/api/files` family from
+  `createFilesRestApp`; that family cannot move until the runtime has raw responses, a HEAD twin and an in-handler owner
+  resolution (round three). Leave it.
+- Baseline rows removed by the root session: six `stored-object|*`; `legacy-transport-runtime` and `nested-transport` stay
+  for `/api/files`.
+- `StoredObjectApi.readById`, `resolveOwner` and `StoredObjectFileReadPort.tryGetById` keep their HEAD names until the user
+  feature's process adapters (`apps/api/src/features/user/user-avatar-{objects,storage}.adapter.ts`) are in a lane.

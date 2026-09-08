@@ -91,7 +91,7 @@ Say what stays, and why, in a Keep list. These are correct as they are:
 - a hot correctness path already inside its quality ceiling, where the only
   complaint is method length;
 - anything the mechanical half already accepts: `packages/architecture-lint/src/overengineering-policy.mjs`
-  and `packages/architecture-lint/src/port-module-baseline.json` are the rules' own
+  and `packages/architecture-lint/src/oxlint-baseline.json` are the rules' own
   record of what is tolerated. Defer to their output rather than re-litigating it, and
   keep this skill for the reading questions above.
 

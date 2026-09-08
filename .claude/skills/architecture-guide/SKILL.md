@@ -168,7 +168,7 @@ Read the one that matches the layer you are about to touch. Each is short.
 - `packages/architecture-lint/src/feature-shape.ts` (the legacy-shape inventory),
   `feature-app-contract.ts`, `feature-app-factory.ts`, `feature-setup-infrastructure.ts`
   (the app and API shape), `frontend-ui-boundaries.ts` (`UI_LAYER_DEPENDENCIES`),
-  `typed-prisma-seam.ts`, `port-modules.ts`
+  `port-modules.ts` (`typed-prisma-seam` is an oxlint rule with no baseline of its own)
 - `packages/architecture-lint/oxlint-plugin.mjs` and `.oxlintrc.architecture.json`
   (`prisma-containment`, `typed-prisma-seam`, `feature-source-layout`, `-filename`,
   `-subject`, `fallible-result-naming`, `layer-class`, and the rest; rendered in
