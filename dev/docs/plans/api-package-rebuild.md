@@ -339,12 +339,16 @@ and the README sections "Versioned HTTP services", "Compatibility registration m
 ## Left open (for phase 2 / 3, and anything stopped on)
 ```
 
-## Decisions for Alex
+## Decisions (Alex, 2026-09-08)
 
-1. **Two paths during phase 2.** Recommended above; the alternative is folding the legacy
-   builders over the new runtime first.
-2. **`MANAGEMENT_API_VERSION`** (77 importers): stays as one constant in a features-shared
-   place, or each management family names its own date. Recommendation: each family names
-   its own, as annotation does; the constant dies in phase 3.
-3. **`ConnectUpgradeRouterPort`**: stays in `@langwatch/api` (6 importers) or moves to the
-   process. Recommendation: stays; it is the one transport-agnostic port that earns its place.
+1. **Two paths during phase 2.** Confirmed. The legacy builders are not folded over the
+   runtime; they are deleted in phase 3 when the last family converts.
+2. **`MANAGEMENT_API_VERSION`** (77 importers): each management family names its own date,
+   as annotation does; the constant dies in phase 3.
+3. **`ConnectUpgradeRouterPort`**: stays in `@langwatch/api`.
+4. **Dated version addresses are a product promise.** Every endpoint answers at its dated
+   address, its `latest` address and its bare address; naming the version is optional for the
+   caller. The runtime's version guards and dated fallback stay.
+5. **Phase 1 landed** in `123bd57406` (runtime-composition repositories) and `3985d284a0`
+   (runtimes, annotation, agent tRPC mounts). Next wave: the organization door,
+   `dev/docs/plans/api-rest-organization-door.md`.
