@@ -19,6 +19,7 @@ export const FEATURE_SHAPE_LEGACY_KINDS = [
   "legacy-transport-runtime",
   "unregistered-repositories",
   "postgres-without-memory",
+  "memory-twin-untested",
   "no-installer",
   "no-app",
   "installer-not-booted",
@@ -54,6 +55,8 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ postgres, memory }) and select it with .withRepositories() in <feature>.server.ts.",
   "postgres-without-memory":
     "Every Prisma repository has a memory twin under repositories/memory/, bundled by memory.<feature>.repositories.ts, so the app is tested without a database.",
+  "memory-twin-untested":
+    "A memory twin is proven by repositories/__tests__/<x>.repository.contract.test.ts running the same cases against the memory and the Prisma backends; an installation test booting over the twin proves nothing about the twin.",
   "no-installer":
     'The server package is installed through src/<feature>.server.ts: defineFeature("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
   "no-app":
@@ -63,7 +66,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "refusing-composition":
     "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
   "nested-web-entry":
-    "Public web pieces are flat entries src/<id>.ts exported as ./<id>; the screens/ and surfaces/ directories are the older spelling.",
+    "Public web pieces are flat entries src/<id>.ts exported as ./<id>; the screens/ and surfaces/ directories are the older spelling. A flat entry must be declared in apps/ui/src/features/catalogue.json (uses.screens or uses.surfaces) and its package listed as governed there, or frontend-ui-boundaries refuses the import.",
 };
 
 const BOOT_SCAN_ROOTS = [
@@ -232,8 +235,14 @@ function serverFindings(
     if (!registered) add("unregistered-repositories", repositories);
 
     const prisma = join(repositories, "prisma");
-    const memoryTwinMissing = isDirectory(prisma) && !isDirectory(join(repositories, "memory"));
+    const memory = join(repositories, "memory");
+    const memoryTwinMissing = isDirectory(prisma) && !isDirectory(memory);
     if (memoryTwinMissing) add("postgres-without-memory", prisma);
+
+    const contractTested =
+      isDirectory(join(memory, "__tests__")) ||
+      files(join(repositories, "__tests__")).some((name) => name.endsWith(".contract.test.ts"));
+    if (isDirectory(memory) && !contractTested) add("memory-twin-untested", memory);
   }
 
   return findings;

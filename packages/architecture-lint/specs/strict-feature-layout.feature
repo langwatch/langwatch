@@ -50,7 +50,7 @@ Feature: Strict versioned feature source layout
   @unit @architecture
   Scenario: A pre-reference feature shape is inventoried, never admitted
     Given a catalogue feature that still carries a piece the annotation reference has no place for, or lacks a piece the reference has
-    And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, a transport still built on a legacy REST or tRPC builder, unselected repositories, Prisma repositories without memory twins, a nested web entry, a refusing composition twin, a missing installer or app, or an installer no process boots
+    And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, a transport still built on a legacy REST or tRPC builder, unselected repositories, Prisma repositories without memory twins, a memory twin no contract test runs against both backends, a nested web entry, a refusing composition twin, a missing installer or app, or an installer no process boots
     When architecture lint checks the workspace
     Then a piece the feature-shape baseline does not list is reported with the reference shape it should take
     And a baseline entry whose piece is gone is reported as stale

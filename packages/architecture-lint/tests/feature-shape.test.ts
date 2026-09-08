@@ -59,6 +59,9 @@ function referenceFeature(): void {
   write("packages/features/widget/server/src/repositories/widget-repositories.registry.ts");
   write("packages/features/widget/server/src/repositories/prisma/prisma.widget.repository.ts");
   write("packages/features/widget/server/src/repositories/memory/memory.widget.repository.ts");
+  write(
+    "packages/features/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
+  );
   write("packages/features/widget/server/src/transport/widget.rest.ts");
   write("packages/features/widget/server/src/transport/widget.trpc.ts");
   write("packages/features/widget/web/src/widgets.ts");
@@ -248,6 +251,18 @@ describe("feature shape", () => {
       );
 
       expect(findings().map((finding) => finding.kind)).toEqual(["unregistered-repositories"]);
+    });
+
+    it("asks for a contract test when nothing runs the memory twin against Prisma", () => {
+      referenceFeature();
+      rmSync(
+        join(
+          root,
+          "packages/features/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
+        ),
+      );
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["memory-twin-untested"]);
     });
 
     it("asks for the memory twin when only Prisma repositories exist", () => {
