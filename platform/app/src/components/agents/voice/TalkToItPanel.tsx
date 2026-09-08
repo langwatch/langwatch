@@ -348,26 +348,27 @@ async function runStart({
   dispatch,
   setMicLevel,
   endCall,
-  isDisposedRef,
+  isStale,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
   setMicLevel: (level: number) => void;
   endCall: (cutAtLimit: boolean) => void;
-  isDisposedRef: { current: boolean };
+  /** True once a newer start attempt or an unmount superseded this one. */
+  isStale: () => boolean;
 }): Promise<void> {
   dispatch({ type: "START" });
   if (!(await requestMic(dispatch))) return;
   // requestMic already released its own track; an unmount during the
   // permission prompt leaves nothing else to tear down.
-  if (isDisposedRef.current) return;
+  if (isStale()) return;
 
   const mint = await mintSession({ props, refs, dispatch });
   if (!mint) return;
-  // Unmounted while minting: no session or timer exists yet, so returning is
+  // Superseded while minting: no session or timer exists yet, so returning is
   // the whole fix.
-  if (isDisposedRef.current) return;
+  if (isStale()) return;
 
   refs.maxSeconds.current = mint.maxDurationSeconds;
   refs.sessionToken.current = mint.sessionToken;
@@ -405,11 +406,12 @@ async function runStart({
     return;
   }
 
-  if (isDisposedRef.current) {
-    // The panel unmounted while the call was opening: the cleanup effect
-    // already ran (state was never "live", so it skipped its own hang-up) —
-    // hang up this just-arrived session ourselves instead of leaving the
-    // transport connected and the mic open with nobody listening.
+  if (isStale()) {
+    // The panel unmounted (or a newer attempt started) while the call was
+    // opening: the cleanup effect already ran (state was never "live", so it
+    // skipped its own hang-up) — hang up this just-arrived session ourselves
+    // instead of leaving the transport connected and the mic open with nobody
+    // listening.
     void session.hangUp().catch(() => {
       // Best-effort: the panel is already gone, nothing left to report to.
     });
@@ -433,10 +435,12 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   const refsRef = useRef<TalkRefs | null>(null);
   if (!refsRef.current) refsRef.current = createTalkRefs(props.agentRowId);
   const refs = refsRef.current;
-  // Lets an in-flight runStart notice the panel unmounted mid-await (mic
-  // prompt, mint, or openCall) so it never assigns a session or starts the
-  // timer after the fact (#thread 3956091334).
-  const isDisposedRef = useRef(false);
+  // Each start() is one numbered attempt; unmount bumps the counter so an
+  // in-flight runStart notices mid-await (mic prompt, mint, or openCall) and
+  // never assigns a session or starts the timer after the fact. A counter,
+  // not a boolean, so Strict Mode's setup → cleanup → setup replay invalidates
+  // only the first attempt and the replayed start still connects.
+  const attemptRef = useRef(0);
   // Mirrored during render so it is current before any effect (including the
   // provider's onDisconnect, fired outside React) runs finish (#21).
   refs.stateRef.current = state;
@@ -450,11 +454,18 @@ function useTalkToItCall(props: TalkToItPanelProps) {
     (cutAtLimit: boolean) => runEndCall({ refs, dispatch, finish, cutAtLimit }),
     [refs, finish],
   );
-  const start = useCallback(
-    () =>
-      runStart({ props, refs, dispatch, setMicLevel, endCall, isDisposedRef }),
-    [props, refs, endCall],
-  );
+  const start = useCallback(() => {
+    attemptRef.current += 1;
+    const attempt = attemptRef.current;
+    return runStart({
+      props,
+      refs,
+      dispatch,
+      setMicLevel,
+      endCall,
+      isStale: () => attemptRef.current !== attempt,
+    });
+  }, [props, refs, endCall]);
   const saveWithName = useCallback(
     (cutAtLimit: boolean, name: string) => {
       dispatch({ type: "HANG_UP" }); // back to saving
@@ -468,13 +479,13 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   useEffect(() => {
     void start();
     return () => {
-      isDisposedRef.current = true;
+      attemptRef.current += 1;
       stopTick(refs);
       // Unmounting mid-call (Back, or the dialog closing) must not leave the
       // provider session connected with the mic open and the call never
       // ingested — run the same end-of-call path an explicit "End call"
       // uses (#18). A "connecting" unmount has no live session yet — runStart
-      // itself notices isDisposedRef and hangs up once its awaits settle.
+      // itself notices it is stale and hangs up once its awaits settle.
       if (refs.stateRef.current.kind === "live") void endCall(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

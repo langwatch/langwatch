@@ -6,6 +6,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -282,7 +283,7 @@ describe("TalkToItPanel", () => {
     // Cleanup only hangs up a "live" session (#18) — mid-mint there is no
     // session yet, so runStart itself must notice the unmount once its own
     // await (openCall) settles and hang up rather than leaving the mic open.
-    it("hangs up the session that arrives after unmount and never dispatches", async () => {
+    it("hangs up the session that arrives after unmount", async () => {
       Object.defineProperty(navigator, "mediaDevices", {
         configurable: true,
         value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [] })) },
@@ -325,6 +326,54 @@ describe("TalkToItPanel", () => {
       await waitFor(() => {
         expect(hangUp).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("when the panel mounts under React Strict Mode", () => {
+    // Strict Mode replays the mount effect as setup → cleanup → setup. The
+    // cleanup must invalidate only the first start attempt; the replayed one
+    // has to connect exactly one call, or dev would stall on "connecting".
+    it("opens exactly one call and reaches the live view", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [] })) },
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                transport: "elevenlabs_convai",
+                sessionToken: "signed.token",
+                maxDurationSeconds: 300,
+                connect: { signedUrl: "wss://x" },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            ),
+        ),
+      );
+      openCall.mockImplementation(async ({ handlers }) => {
+        handlers.onConnected({ conversationId: "conv_strict" });
+        return { hangUp: vi.fn(async () => {}), getInputVolume: () => 0 };
+      });
+
+      render(
+        <StrictMode>
+          <TalkToItPanel
+            projectId="p1"
+            projectSlug="proj"
+            transport="elevenlabs_convai"
+            agentId="agent_1"
+          />
+        </StrictMode>,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("talk-live")).toBeInTheDocument();
+      });
+      expect(openCall).toHaveBeenCalledTimes(1);
     });
   });
 
