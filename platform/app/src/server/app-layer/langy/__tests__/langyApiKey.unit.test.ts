@@ -510,25 +510,36 @@ describe("mintLangySessionApiKey", () => {
       });
 
       it("keeps the full lease when the service key expires later than the lease would", async () => {
-        const parentExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        apiKeyFindUnique.mockResolvedValue({
-          id: "service-key-1",
-          userId: null,
-          organizationId: "org-1",
-          revokedAt: null,
-          expiresAt: parentExpiry,
-        });
+        // Frozen clock so the assertion pins the six-hour lease exactly; a
+        // shortened default lease would otherwise slip past a bounds check.
+        const now = new Date("2026-09-08T12:00:00.000Z");
+        vi.useFakeTimers({ toFake: ["Date"], now });
+        try {
+          const parentExpiry = new Date(
+            now.getTime() + 30 * 24 * 60 * 60 * 1000,
+          );
+          apiKeyFindUnique.mockResolvedValue({
+            id: "service-key-1",
+            userId: null,
+            organizationId: "org-1",
+            revokedAt: null,
+            expiresAt: parentExpiry,
+          });
 
-        await mintLangySessionApiKey({
-          prisma,
-          session: SERVICE_KEY_SESSION,
-          projectId: "proj-1",
-          organizationId: "org-1",
-        });
+          await mintLangySessionApiKey({
+            prisma,
+            session: SERVICE_KEY_SESSION,
+            projectId: "proj-1",
+            organizationId: "org-1",
+          });
 
-        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        expect(arg.expiresAt.getTime()).toBeGreaterThan(Date.now());
-        expect(arg.expiresAt.getTime()).toBeLessThan(parentExpiry.getTime());
+          const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+          expect(arg.expiresAt).toEqual(
+            new Date(now.getTime() + 6 * 60 * 60 * 1000),
+          );
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       /** @scenario A service key from another organization cannot mint here */

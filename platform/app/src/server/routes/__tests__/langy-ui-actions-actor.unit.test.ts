@@ -16,20 +16,34 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LangyActor } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import { listPageActions } from "~/server/app-layer/langy/ui-actions/pageManifests";
+import { app as uiActionsApp } from "../langy-ui-actions";
 
 // ─── Auth mocks ───────────────────────────────────────────────────────────────
-// The route builds a module-scope `tokenResolver = TokenResolver.create(prisma)`,
-// so TokenResolver must be mocked before the route module is imported.
-const mockResolve = vi.fn();
+// The route builds a module-scope `tokenResolver = TokenResolver.create(prisma)`
+// while it is imported, so every double the mock factories close over has to
+// exist before the static imports above run. Vitest hoists `vi.mock` and
+// `vi.hoisted` blocks above the imports; a plain `const` here would still be in
+// its temporal dead zone when the route module loads.
+const {
+  mockResolve,
+  mockExtractCredentials,
+  mockEnforceApiKeyCeiling,
+  mockResolveLangyKeyIdentity,
+  mockDispatch,
+} = vi.hoisted(() => ({
+  mockResolve: vi.fn(),
+  mockExtractCredentials: vi.fn(),
+  mockEnforceApiKeyCeiling: vi.fn(),
+  mockResolveLangyKeyIdentity: vi.fn(),
+  mockDispatch: vi.fn(),
+}));
 
 vi.mock("~/server/api-key/token-resolver", () => ({
   TokenResolver: {
     create: vi.fn(() => ({ resolve: mockResolve, markUsed: vi.fn() })),
   },
 }));
-
-const mockExtractCredentials = vi.fn();
-const mockEnforceApiKeyCeiling = vi.fn();
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   const actual =
@@ -50,8 +64,6 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 
 // ─── Identity bridge ──────────────────────────────────────────────────────────
-const mockResolveLangyKeyIdentity = vi.fn();
-
 vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
   resolveLangyKeyIdentity: (...args: unknown[]) =>
     mockResolveLangyKeyIdentity(...args),
@@ -60,8 +72,6 @@ vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 // The service is the seam: a refused actor must never reach it, and an
 // admitted one must reach it as the user the key resolved to.
-const mockDispatch = vi.fn();
-
 vi.mock("~/server/app-layer/langy/ui-actions/ui-action.service", () => ({
   // The route `new`s the service, so the double has to be constructible.
   LangyUiActionService: class {
@@ -87,13 +97,6 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 // ─── App under test ───────────────────────────────────────────────────────────
-// Imported AFTER every mock so the module-scope TokenResolver.create(prisma)
-// picks up the mock rather than the real client.
-const { listPageActions } = await import(
-  "~/server/app-layer/langy/ui-actions/pageManifests"
-);
-const { app: uiActionsApp } = await import("../langy-ui-actions");
-
 const testApp = new Hono();
 testApp.route("/", uiActionsApp);
 
@@ -128,7 +131,7 @@ function postAction() {
   });
 }
 
-function admitAs(actor: LangyActor) {
+function admitAs({ actor }: { actor: LangyActor }) {
   mockResolveLangyKeyIdentity.mockResolvedValue({ ok: true, actor });
 }
 
@@ -147,7 +150,7 @@ describe("/api/langy/ui/actions actor", () => {
   describe("given the session key resolves to a service key acting as itself", () => {
     /** @scenario A worker started by a service key cannot drive a page */
     it("refuses the dispatch as 403 before any conversation is looked up", async () => {
-      admitAs({ type: "apiKey", id: "service-key-1" });
+      admitAs({ actor: { type: "apiKey", id: "service-key-1" } });
 
       const res = await postAction();
       const body = JSON.stringify(await res.json());
@@ -158,7 +161,7 @@ describe("/api/langy/ui/actions actor", () => {
     });
 
     it("refuses the action listing the same way", async () => {
-      admitAs({ type: "apiKey", id: "service-key-1" });
+      admitAs({ actor: { type: "apiKey", id: "service-key-1" } });
 
       const res = await testApp.request(ACTIONS_URL, {
         method: "GET",
@@ -174,7 +177,7 @@ describe("/api/langy/ui/actions actor", () => {
 
   describe("given the session key resolves to a user", () => {
     it("dispatches as that user", async () => {
-      admitAs({ type: "user", id: "user-1" });
+      admitAs({ actor: { type: "user", id: "user-1" } });
 
       const res = await postAction();
 
