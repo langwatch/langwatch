@@ -822,9 +822,10 @@ describe("the page header", () => {
 
 describe("sample data", () => {
   describe("when every read has answered and none holds a row", () => {
-    /** @scenario "A page with nobody on it opens on sample people" */
+    /** @scenario "An empty People page shows samples only when requested" */
     it("fills the table with sample people under a banner", () => {
       answerEverythingEmpty();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderPeopleAt(["/governance/people"]);
 
       expect(screen.getByRole("status")).toHaveTextContent(
@@ -839,6 +840,7 @@ describe("sample data", () => {
     /** @scenario "Turning sample data off on an empty page says nobody was active" */
     it("says nobody was active once the reader turns the samples off", async () => {
       answerEverythingEmpty();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderPeopleAt(["/governance/people"]);
 
       await userEvent.click(

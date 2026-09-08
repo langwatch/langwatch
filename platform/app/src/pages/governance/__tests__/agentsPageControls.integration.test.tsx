@@ -164,7 +164,10 @@ const cardNames = () =>
     .getAllByTestId("governance-agent-card")
     .map((card) => card.querySelector("p")?.textContent ?? "");
 
-beforeEach(() => window.sessionStorage.clear());
+beforeEach(() => {
+  window.sessionStorage.clear();
+  window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
+});
 afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
@@ -172,7 +175,7 @@ afterEach(() => {
 
 describe("the agents page sample cards", () => {
   describe("when a governance viewer opens a page with nothing measured on it", () => {
-    /** @scenario "The empty agents page fills itself with sample agents" */
+    /** @scenario "The empty agents page shows samples when requested" */
     it("fills it with sample agent cards under a banner that says so", () => {
       renderAgentsAt();
 

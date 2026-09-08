@@ -101,7 +101,7 @@ export const SampleDataBanner: React.FC<{ children?: ReactNode }> = ({
           — which left the old copy naming marks the reader could not see.
           This wording stands on its own and stays true either way. */}
       {children ??
-        "Nothing here is real — every figure is an illustration of a measurement we do not take yet."}
+        "Viewing sample data. Nothing here is real. Turn samples off to see your organization’s data."}
     </Text>
   </Flex>
 );

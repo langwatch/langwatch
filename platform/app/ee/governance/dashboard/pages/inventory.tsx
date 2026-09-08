@@ -74,7 +74,6 @@ import {
   SampleDataBanner,
   SampleDataToggle,
   useSampleMode,
-  useSettledRealDataState,
 } from "~/components/governance/sample";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
@@ -98,6 +97,7 @@ import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { SAMPLE_INGESTION_SOURCES } from "../components/sampleIngestionSources";
 import {
   type DestinationContext,
   type Source,
@@ -284,6 +284,7 @@ function pendingId(mutation: {
  * the note naming the grant that unlocks the writes.
  */
 function IngestionSourceList({
+  sample = false,
   canRead,
   canManage,
   isLoading,
@@ -296,6 +297,7 @@ function IngestionSourceList({
   onArchive,
   createAction,
 }: {
+  sample?: boolean;
   canRead: boolean;
   canManage: boolean;
   isLoading: boolean;
@@ -363,6 +365,7 @@ function IngestionSourceList({
       {canRead && knowsFleet && sources.length > 0 && (
         <IngestionSourcesTable
           sources={sources}
+          sample={sample}
           canManage={canManage}
           rotatingId={rotatingId}
           archivingId={archivingId}
@@ -372,7 +375,7 @@ function IngestionSourceList({
         />
       )}
 
-      {canRead && !canManage && (
+      {canRead && !canManage && !sample && (
         <PermissionRequiredNotice
           permission="ingestionSources:manage"
           detail="You can read the sources. Adding, editing, rotating a secret, and archiving need this grant."
@@ -508,12 +511,10 @@ function useInventoryPanes({
   orgId,
   canRead,
   canReadActivity,
-  sourcesQuery,
 }: {
   orgId: string;
   canRead: boolean;
   canReadActivity: boolean;
-  sourcesQuery: { data: Source[] | undefined };
 }) {
   /**
    * Per-source volume for the catalog cards' one measured row.
@@ -532,16 +533,7 @@ function useInventoryPanes({
     },
   );
 
-  /**
-   * Sample mode for the whole page. The source list is the only read that
-   * decides it: it is what both the Catalog and the Environments panes are
-   * derived from, so a page with sources on it is a page with something real
-   * to show, and the samples step aside.
-   */
-  const realData = useSettledRealDataState([sourcesQuery.data ?? null]);
-  const sample = useSampleMode({
-    realData,
-  });
+  const sample = useSampleMode();
 
   const [catalogLayout, setCatalogLayout] = useState<ToolCatalogLayout>("grid");
   const [addingEnvironment, setAddingEnvironment] = useState(false);
@@ -610,7 +602,6 @@ function useIngestionSourcesPage() {
     orgId,
     canRead,
     canReadActivity,
-    sourcesQuery,
   });
 
   const utils = api.useUtils();
@@ -894,10 +885,13 @@ function InventorySourcesPane({
   return (
     <IngestionSourceList
       canRead={page.canRead}
-      canManage={page.canManage}
-      isLoading={sourcesQuery.isLoading}
+      sample={page.sample.active}
+      canManage={page.canManage && !page.sample.active}
+      isLoading={!page.sample.active && sourcesQuery.isLoading}
       error={page.sample.active ? null : sourcesQuery.error}
-      sources={sourcesQuery.data}
+      sources={
+        page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data
+      }
       rotatingId={pendingId(mutations.rotate)}
       archivingId={pendingId(mutations.archive)}
       onEdit={page.setEditingSourceId}
@@ -1088,7 +1082,11 @@ function InventoryPage() {
           selectInventoryTab={selectInventoryTab}
           catalogCount={catalogCount}
           environmentCount={environments.length}
-          sourceCount={sourcesQuery.data?.length}
+          sourceCount={
+            page.sample.active
+              ? SAMPLE_INGESTION_SOURCES.length
+              : sourcesQuery.data?.length
+          }
           catalog={<InventoryCatalogPane page={page} />}
           environments={
             <EnvironmentsTab

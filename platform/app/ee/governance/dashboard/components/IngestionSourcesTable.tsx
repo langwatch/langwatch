@@ -118,6 +118,7 @@ export function ConnectorsHeader({
 }
 
 export function IngestionSourcesTable({
+  sample = false,
   sources,
   canManage,
   rotatingId,
@@ -126,6 +127,7 @@ export function IngestionSourcesTable({
   onRotate,
   onArchive,
 }: {
+  sample?: boolean;
   sources: readonly Source[];
   canManage: boolean;
   rotatingId: string | null;
@@ -158,6 +160,7 @@ export function IngestionSourcesTable({
           <SourceTableRow
             key={source.id}
             source={source}
+            sample={sample}
             canManage={canManage}
             isPendingRotate={rotatingId === source.id}
             isPendingArchive={archivingId === source.id}
@@ -172,6 +175,7 @@ export function IngestionSourcesTable({
 }
 
 function SourceTableRow({
+  sample,
   source,
   canManage,
   isPendingRotate,
@@ -180,6 +184,7 @@ function SourceTableRow({
   onRotate,
   onArchive,
 }: {
+  sample: boolean;
   source: Source;
   canManage: boolean;
   isPendingRotate: boolean;
@@ -207,15 +212,21 @@ function SourceTableRow({
         <HStack gap={3} alignItems="center">
           <SourceTypeIconGlyph sourceType={sourceType} size="20px" />
           <VStack align="start" gap={0} minWidth={0}>
-            <Link
-              href={`/governance/inventory/${source.id}`}
-              color="fg"
-              _hover={{ color: "orange.600" }}
-            >
+            {sample ? (
               <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
                 {source.name}
               </Text>
-            </Link>
+            ) : (
+              <Link
+                href={`/governance/inventory/${source.id}`}
+                color="fg"
+                _hover={{ color: "orange.600" }}
+              >
+                <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
+                  {source.name}
+                </Text>
+              </Link>
+            )}
             <Text fontSize="xs" color="fg.muted">
               {typeLabel}
             </Text>
