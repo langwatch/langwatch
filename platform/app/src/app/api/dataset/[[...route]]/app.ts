@@ -322,7 +322,6 @@ secured.access(requires("datasets:create")).post(
 const ATTACHMENT_RATE_LIMIT_WINDOW_SECONDS = 60;
 const ATTACHMENT_RATE_LIMIT_MAX = 30;
 
-/** What an accepted upload answers with. */
 const datasetAttachmentSchema = z.object({
   url: z
     .string()
