@@ -14,6 +14,7 @@ from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
 import httpx
+from langwatch.http_client import create_client
 import json
 from pydantic import BaseModel
 from dspy.predict import Predict
@@ -230,17 +231,17 @@ class LangWatchDSPy:
             return
 
         try:
-            response = httpx.post(
-                f"{langwatch.get_endpoint()}/api/experiment/init",
-                headers=build_auth_headers(langwatch.get_api_key() or ""),
-                json={
-                    "experiment_slug": slug or experiment,
-                    "experiment_type": "DSPY",
-                    "experiment_name": experiment,
-                    "workflow_id": workflow_id,
-                },
-                timeout=60,
-            )
+            with create_client(timeout=60) as client:
+                response = client.post(
+                    f"{langwatch.get_endpoint()}/api/experiment/init",
+                    headers=build_auth_headers(langwatch.get_api_key() or ""),
+                    json={
+                        "experiment_slug": slug or experiment,
+                        "experiment_type": "DSPY",
+                        "experiment_name": experiment,
+                        "workflow_id": workflow_id,
+                    },
+                )
         except Exception as e:
             raise Exception(f"Error initializing LangWatch experiment: {e}")
         if response.status_code == 401:
@@ -462,15 +463,15 @@ class LangWatchDSPy:
             )
             for item in data_list
         ]
-        response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/dspy/log_steps",
-            headers={
-                **build_auth_headers(langwatch.get_api_key() or ""),
-                "Content-Type": "application/json",
-            },
-            data=json.dumps(data),  # type: ignore
-            timeout=60,
-        )
+        with create_client(timeout=60) as client:
+            response = client.post(
+                f"{langwatch.get_endpoint()}/api/dspy/log_steps",
+                headers={
+                    **build_auth_headers(langwatch.get_api_key() or ""),
+                    "Content-Type": "application/json",
+                },
+                content=json.dumps(data),
+            )
         better_raise_for_status(response)
         self.steps_buffer = []
 

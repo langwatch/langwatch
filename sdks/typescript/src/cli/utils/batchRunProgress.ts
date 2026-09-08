@@ -1,3 +1,5 @@
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 /**
  * How far along a batch of simulation runs is.
  *
@@ -97,7 +99,7 @@ export async function fetchBatchRuns({
 		url.searchParams.set("limit", "100");
 		if (cursor) url.searchParams.set("cursor", cursor);
 
-		const response = await fetch(url, { method: "GET", headers });
+		const response = await langwatchFetch(url, { method: "GET", headers });
 		if (!response.ok) {
 			throw new Error(`status endpoint answered ${response.status}`);
 		}

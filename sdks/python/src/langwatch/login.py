@@ -1,6 +1,5 @@
-import httpx
-
 import langwatch
+from langwatch.http_client import create_client
 from langwatch.utils.exceptions import better_raise_for_status
 from .state import get_api_key, get_endpoint
 from getpass import getpass
@@ -19,11 +18,12 @@ def login(relogin=False):
     if not api_key:
         raise ValueError("API key was not set")
 
-    response = httpx.post(
-        f"{get_endpoint()}/api/auth/validate",
-        headers={"X-Auth-Token": api_key or ""},
-        json={},
-    )
+    with create_client() as client:
+        response = client.post(
+            f"{get_endpoint()}/api/auth/validate",
+            headers={"X-Auth-Token": api_key or ""},
+            json={},
+        )
     if response.status_code == 401:
         raise ValueError("API key is not valid, please try to login again")
     better_raise_for_status(response)

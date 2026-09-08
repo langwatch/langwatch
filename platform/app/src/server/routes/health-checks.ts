@@ -17,11 +17,13 @@ import type {
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import crypto from "crypto";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
+import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
 
@@ -529,6 +531,112 @@ secured
       status: response?.status,
       body: await response?.json(),
     });
+  });
+
+// ── GET /scenarios ───────────────────────────────────────────────────
+
+// Authenticated exactly like its siblings: a project API key in `X-Auth-Token`
+// (or `Authorization: Bearer`), resolved by `authenticateProject` BEFORE the
+// run plan is read or any run is queued. The project comes from the key, never
+// from the query string; the plan is looked up scoped to that project (the
+// multitenancy guard rejects an unscoped read) and the plan's own row supplies
+// the scenario and target — a runPlanId that belongs to another project
+// resolves to nothing and reports `run_failed` with no run launched.
+//
+// Every response carries `Cache-Control: no-store` — a monitor must see each
+// run's real result, never a cached one.
+//
+// @see specs/scenarios/scenario-canary-healthcheck.feature
+
+// Neither an id nor a slug is ever this long in practice, so a value past this
+// length is a malformed or hostile request — reject it here, before it ever
+// reaches a DB query, rather than let an oversized param ride all the way down
+// to the multitenancy-scoped `findFirst`.
+const MAX_CANARY_QUERY_PARAM_LENGTH = 128;
+
+// Trims and validates the one required query param in one place so the
+// handler's cognitive complexity stays low; a missing/blank value and an
+// implausibly long one are distinct 400s.
+function readCanaryQuery(
+  c: Context,
+): { runPlanId: string } | { missing: true } | { invalid: true } {
+  const runPlanId = c.req.query("runPlanId")?.trim();
+  if (runPlanId && runPlanId.length > MAX_CANARY_QUERY_PARAM_LENGTH) {
+    return { invalid: true };
+  }
+  if (runPlanId) {
+    return { runPlanId };
+  }
+  return { missing: true };
+}
+
+// Maps the canary's result union to its HTTP response so the handler itself
+// only has to call it — keeps the branching out of the handler's complexity.
+function canaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runScenarioHealthCanary>>;
+}) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, { status: 429 });
+  }
+  if (result.healthy) {
+    return c.json({
+      status: "ok",
+      scenarioRunId: result.scenarioRunId,
+      durationMs: result.durationMs,
+    });
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      scenarioRunId: result.scenarioRunId,
+      durationMs: result.durationMs,
+    },
+    { status: 503 },
+  );
+}
+
+secured
+  .access(publicEndpoint("subsystem health probe"))
+  .get("/scenarios", async (c) => {
+    // A monitor may poll this on an interval; a cached 200/503 would hide the
+    // next run's real result, so no response on any path is cacheable. Set once
+    // before the branches so every return below inherits it.
+    c.header("Cache-Control", "no-store");
+
+    const auth = await authenticateProject(c);
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, { status: auth.status });
+    }
+    const { project } = auth;
+
+    // `runPlanId` (the plan's id or its slug) is the only query param; the
+    // project scoping the lookup comes from the API key. A missing/blank value
+    // is a bad request, distinct from the 503 a plan that does not resolve
+    // reports.
+    const query = readCanaryQuery(c);
+    if ("invalid" in query) {
+      return c.json(
+        { message: "runPlanId query parameter is invalid." },
+        { status: 400 },
+      );
+    }
+    if ("missing" in query) {
+      return c.json(
+        { message: "runPlanId query parameter is required." },
+        { status: 400 },
+      );
+    }
+
+    const result = await runScenarioHealthCanary({
+      projectId: project.id,
+      runPlanId: query.runPlanId,
+    });
+    return canaryResultToResponse({ c, result });
   });
 
 export const app = secured.hono;

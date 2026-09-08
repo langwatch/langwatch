@@ -200,6 +200,9 @@ export async function runUnifiedLoginFlow(
 						console.log(chalk.gray(`  • ${label}`));
 					}
 				}
+				for (const warning of refresh.warnings ?? []) {
+					console.warn(chalk.yellow(`  ${warning}`));
+				}
 			} catch {
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}

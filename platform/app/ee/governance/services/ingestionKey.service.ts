@@ -5,11 +5,13 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { ApiKeyAlreadyRevokedError } from "~/server/api-key/errors";
 import {
   type ApiKeyRevocationCause,
   isApiKeyRevocationCause,
 } from "~/server/api-key/revocation-cause";
 
+import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
 /** What every project-scoped mint needs to know. */
@@ -70,6 +72,23 @@ export class PersonalSourceTypeNotAllowedError extends Error {
   }
 }
 
+/**
+ * A rotation that could not kill every token it replaces, so it minted none.
+ *
+ * Rotation's whole promise is that no previous token survives it. Reporting
+ * success while one is still live would hand the caller a fresh key and a
+ * false statement about the old ones, so the mint is skipped and this is
+ * thrown instead. Retrying is safe: the keys already revoked stay revoked.
+ */
+export class IngestionKeyRotationIncompleteError extends Error {
+  constructor(public readonly survivingApiKeyIds: readonly string[]) {
+    super(
+      `Rotation left ${survivingApiKeyIds.length} prior ingestion key(s) live; no new key was minted.`,
+    );
+    this.name = "IngestionKeyRotationIncompleteError";
+  }
+}
+
 /** The plaintext token, returned exactly once, plus its identifiers. */
 export interface IssuedIngestionKey {
   token: string;
@@ -123,11 +142,13 @@ export class IngestionKeyService {
   private readonly apiKeys: ApiKeyService;
   private readonly apiKeyRepo: ApiKeyRepository;
   private readonly personalWorkspace: PersonalWorkspaceService;
+  private readonly templates: IngestionTemplateRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.apiKeys = ApiKeyService.create(prisma);
     this.apiKeyRepo = ApiKeyRepository.create(prisma);
     this.personalWorkspace = new PersonalWorkspaceService(prisma);
+    this.templates = new IngestionTemplateRepository();
   }
 
   static create(prisma: PrismaClient): IngestionKeyService {
@@ -151,29 +172,55 @@ export class IngestionKeyService {
     ingestionTemplateId = null,
     createdByDeviceLabel = null,
   }: IngestionKeyMintParams): Promise<IssuedIngestionKey> {
-    // Hard-cut rotation: revoke any prior live ingest key for this
-    // (project, sourceType) so the previous token dies immediately and we
-    // never accumulate keys.
-    const prior = await this.apiKeyRepo.findIngestKey({
-      organizationId,
-      projectId,
-      sourceType,
-    });
-    if (prior) {
-      await this.apiKeys.revoke({
-        id: prior.id,
-        callerUserId,
-        callerIsAdmin: true,
+    // Hard-cut rotation: revoke EVERY prior live ingest key for this
+    // (project, sourceType, template) so no previous token survives it.
+    // One key was enough while a project held one key per source; the
+    // create-only mints leave several, and a rotation that kills one of them
+    // hands the user a page saying rotated while two machines keep writing.
+    const prior = (
+      await this.apiKeyRepo.findIngestKeysForProject({
         organizationId,
-        // The prior key is dead the moment its row is revoked, and its
-        // private role is named after that key id, so the mint below never
-        // waits for the name. Holding here for the role deletion to project
-        // only added a fold pickup cycle to a rotation that already waits
-        // for the new key's own writes: the CLI's first `langwatch claude`
-        // after a logout sat well over twenty seconds on this one request.
-        awaitProjection: false,
-        cause: "rotation",
-      });
+        projectId,
+      })
+    ).filter(
+      (key) =>
+        key.ingestSourceType === sourceType &&
+        (key.ingestionTemplateId ?? null) === ingestionTemplateId,
+    );
+    const survivors: string[] = [];
+    for (const key of prior) {
+      try {
+        await this.apiKeys.revoke({
+          id: key.id,
+          callerUserId,
+          callerIsAdmin: true,
+          organizationId,
+          // The prior key is dead the moment its row is revoked, and its
+          // private role is named after that key id, so the mint below never
+          // waits for the name. Holding here for the role deletion to project
+          // only added a fold pickup cycle to a rotation that already waits
+          // for the new key's own writes: the CLI's first `langwatch claude`
+          // after a logout sat well over twenty seconds on this one request.
+          awaitProjection: false,
+          cause: "rotation",
+        });
+      } catch (error) {
+        // Someone else revoking it first is the outcome this loop wanted.
+        if (error instanceof ApiKeyAlreadyRevokedError) continue;
+        logger.warn(
+          { error, apiKeyId: key.id, projectId, sourceType },
+          "could not revoke a prior ingest key during rotation",
+        );
+        survivors.push(key.id);
+      }
+    }
+    // Every prior key gets its attempt before this throws, so a retry has
+    // less left to do. But a rotation that mints while one of them is still
+    // live is the thing rotation exists to prevent: the caller would be
+    // handed a fresh token and told the old ones are dead. Fail instead, and
+    // let the retry finish the job.
+    if (survivors.length > 0) {
+      throw new IngestionKeyRotationIncompleteError(survivors);
     }
 
     return await this.mint({
@@ -298,6 +345,54 @@ export class IngestionKeyService {
     ) {
       throw new PersonalSourceTypeNotAllowedError(sourceType);
     }
+    return this.createForPersonalProject({
+      userId,
+      organizationId,
+      sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+    });
+  }
+
+  /**
+   * Add a key to the caller's personal project without touching the keys
+   * already there.
+   *
+   * Same create-only shape as `issueForPersonalProject`, for the callers
+   * whose source type comes from the product's own catalog rather than from
+   * a device: the /me Trace Ingest tile connecting a source, and the MCP
+   * mint tool. Connecting a source is not a decision about the machines
+   * already exporting, so it must not revoke their keys; the explicit rotate
+   * is `ensureForPersonalProject`.
+   *
+   * The source type is still bounded, because the cap is per source type and
+   * an unbounded set of them is an unbounded set of keys. A tool the CLI
+   * wraps passes on its name; anything else passes by naming a published
+   * template, which is an admin-created row and is what decides the source
+   * type in the first place.
+   */
+  async createForPersonalProject({
+    userId,
+    organizationId,
+    sourceType,
+    ingestionTemplateId = null,
+    createdByDeviceLabel = null,
+  }: {
+    userId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
+  }): Promise<IssuedIngestionKey> {
+    if (
+      !(PERSONAL_INGEST_SOURCE_TYPES as readonly string[]).includes(sourceType)
+    ) {
+      await this.assertTemplateNamesSourceType({
+        organizationId,
+        ingestionTemplateId,
+        sourceType,
+      });
+    }
     const workspace = await this.personalWorkspace.findExisting({
       userId,
       organizationId,
@@ -327,6 +422,38 @@ export class IngestionKeyService {
     });
 
     return issued;
+  }
+
+  /**
+   * Hold a non-wrapped source type to a published template that names it.
+   *
+   * The template is an admin-created row, so the set of source types it can
+   * name is the set the product actually knows, and the per-source cap keeps
+   * meaning something. A caller inventing source types would otherwise get a
+   * fresh 32-key bucket for every string it made up.
+   *
+   * A platform template (`organizationId: null`) counts for every
+   * organization, which is what makes the shipped tiles installable.
+   */
+  private async assertTemplateNamesSourceType({
+    organizationId,
+    ingestionTemplateId,
+    sourceType,
+  }: {
+    organizationId: string;
+    ingestionTemplateId: string | null;
+    sourceType: string;
+  }): Promise<void> {
+    if (!ingestionTemplateId) {
+      throw new PersonalSourceTypeNotAllowedError(sourceType);
+    }
+    const template = await this.templates.findByIdForOrg(this.prisma, {
+      id: ingestionTemplateId,
+      organizationId,
+    });
+    if (template?.sourceType !== sourceType) {
+      throw new PersonalSourceTypeNotAllowedError(sourceType);
+    }
   }
 
   /**
