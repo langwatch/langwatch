@@ -26,6 +26,7 @@ import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port.
 import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port.ts";
 import type { ExperimentConnectedDispatchPort } from "../ports/experiment-connected-dispatch.port.ts";
 import type { ExperimentConnectedAgentOwnershipPort } from "../ports/experiment-connected-agent-ownership.port.ts";
+import type { ExperimentAttachmentPort } from "../ports/experiment-attachment.port.ts";
 import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-dispatch.port.ts";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
@@ -51,6 +52,8 @@ export type ExperimentRunPorts = {
   connectedDispatch: ExperimentConnectedDispatchPort;
   /** Refuses a run against someone else's personal development agent. */
   connectedAgentOwnership: ExperimentConnectedAgentOwnershipPort;
+  /** The bytes behind an attachment a dataset cell references. */
+  attachments: ExperimentAttachmentPort;
 };
 
 /**

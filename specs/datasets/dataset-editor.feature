@@ -198,3 +198,93 @@ Feature: Dataset editor
     Given I am editing a saved dataset
     When I click "Run experiment"
     Then I am taken to a new experiment workbench seeded with this dataset
+
+  # ============================================================================
+  # Files in a cell
+  # ============================================================================
+  # An image or file cell takes a file from the reader's computer as well as a
+  # typed URL. The bytes are stored once and the cell keeps a reference to
+  # them, so the same file can be sent to a model on every run.
+
+  @integration
+  Scenario: An image cell offers an upload and a URL field
+    Given the dataset has a "photo" column of type image
+    When I open the editor on a "photo" cell
+    Then I am offered to upload an image
+    And I am offered to enter a URL instead
+
+  @integration
+  Scenario: A file cell offers an upload and a URL field
+    Given the dataset has a "document" column of type file
+    When I open the editor on a "document" cell
+    Then I am offered to upload a file
+    And I am offered to enter a URL instead
+
+  @integration
+  Scenario: Uploading a picture into an image cell fills the cell with it
+    Given the dataset has a "photo" column of type image
+    When I open the editor on a "photo" cell
+    And I choose a picture from my computer
+    Then the picture is stored
+    And the cell holds the stored picture
+
+  @integration
+  Scenario: Uploading a document into a file cell keeps the file name
+    Given the dataset has a "document" column of type file
+    When I open the editor on a "document" cell
+    And I choose a document from my computer
+    Then the cell holds the stored document under its own name
+
+  @integration
+  Scenario: A file cell shows the file name and opens the file
+    Given a "document" cell holds a stored document
+    When I look at the cell
+    Then I see the name of the document
+    And I can open the document in a new tab
+    And the document is served under the name it was uploaded with
+
+  @integration
+  Scenario: A file larger than the limit is refused
+    Given the dataset has a "document" column of type file
+    When I choose a document larger than the upload limit
+    Then the editor tells me the file is too large
+    And the cell keeps the value it had
+
+  @unit
+  Scenario: A file larger than the limit never leaves the browser
+    When a document larger than the upload limit is picked
+    Then it is refused with dataset_attachment_too_large
+    And nothing is read from the file
+
+  @integration
+  Scenario: A failed upload keeps the value the cell had
+    Given the dataset has a "document" column of type file
+    And storing files fails
+    When I choose a document from my computer
+    Then the editor tells me why the upload did not happen
+    And the cell keeps the value it had
+
+  @integration
+  Scenario: An upload that lands after the edit ends leaves the cell alone
+    Given the dataset has a "photo" column of type image
+    And a picture is being uploaded into a cell
+    When the edit ends before the upload finishes
+    Then the cell keeps the value it had
+    And the finished upload writes nothing
+
+  @unit
+  Scenario: A stored picture is recognised as a picture wherever a cell is drawn
+    Given a cell holds a stored picture
+    Then every place that draws pictures accepts the same value
+
+  @integration
+  Scenario: A stored picture is drawn in an image cell
+    Given a "photo" cell holds a stored picture
+    When I look at the cell
+    Then the picture is drawn in the cell
+
+  @integration
+  Scenario: The column type picker offers Image and File
+    When I choose the type of a column
+    Then File is offered as a type
+    And Image is offered as a type

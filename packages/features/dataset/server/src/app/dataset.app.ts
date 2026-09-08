@@ -33,6 +33,7 @@ import type {
   CreateDatasetFromUploadResult,
   CreateDatasetRecordsInput,
   Dataset,
+  DatasetAttachment,
   DatasetColumns,
   DatasetEntrySelection,
   DatasetHead,
@@ -55,9 +56,12 @@ import type {
   RetryNormalizeInput,
   StagedUploadInput,
   UpdateDatasetRecordInput,
+  UploadDatasetAttachmentInput,
   UploadExistingDatasetInput,
   UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
+
+import type { DatasetAttachmentService } from "../services/dataset-attachment.service.ts";
 
 /**
  * The two experiment reads this feature makes. Declared structurally: Dataset
@@ -78,6 +82,12 @@ export type DatasetExperimentLookup = Readonly<{
 export interface DatasetAppDependencies {
   dataset: DatasetService;
   experiments: DatasetExperimentLookup;
+  /**
+   * Files uploaded into a cell. Present on every process that mounts the
+   * dataset doors: where the deployment keeps no object storage the service is
+   * built over a store that refuses by name, rather than being left out.
+   */
+  attachments: DatasetAttachmentService;
 }
 
 /**
@@ -317,5 +327,12 @@ export class DatasetApp {
     input: Readonly<{ projectId: string; slug: string }>,
   ): Promise<Readonly<{ id: string }> | null> {
     return this.dependencies.experiments.tryGetBySlug(input);
+  }
+
+  // ── Attachments ───────────────────────────────────────────────────
+
+  /** Keeps a file a person dropped into a cell and answers with its reference. */
+  uploadAttachment(input: UploadDatasetAttachmentInput): Promise<DatasetAttachment> {
+    return this.dependencies.attachments.upload(input);
   }
 }

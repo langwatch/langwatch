@@ -11,7 +11,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
-import { ProjectApp } from "@langwatch/project-server";
+import { ProjectApp, type TopicClusteringCommands } from "@langwatch/project-server";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
@@ -64,7 +64,7 @@ export function composeProjectFeature(options: {
             "topic-clustering scheduler, so it cannot start a clustering run",
           ),
         ),
-    } as Parameters<typeof ProjectApp.create>[0]["topicClustering"],
+    } as TopicClusteringCommands,
   });
 
   const ports = projectPorts(options, logger);

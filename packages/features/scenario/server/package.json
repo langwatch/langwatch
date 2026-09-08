@@ -44,6 +44,18 @@
     "./composition/stalled-runs-backfill": {
       "types": "./src/tasks/stalled-runs-backfill.task.ts",
       "default": "./src/tasks/stalled-runs-backfill.task.ts"
+    },
+    "./api-rest/scenario": {
+      "types": "./src/transport/api-rest/scenario.api.ts",
+      "default": "./src/transport/api-rest/scenario.api.ts"
+    },
+    "./api-rest/scenario-event": {
+      "types": "./src/transport/api-rest/scenario-event.api.ts",
+      "default": "./src/transport/api-rest/scenario-event.api.ts"
+    },
+    "./api-rest/simulation-run": {
+      "types": "./src/transport/api-rest/simulation-run.api.ts",
+      "default": "./src/transport/api-rest/simulation-run.api.ts"
     }
   },
   "scripts": {

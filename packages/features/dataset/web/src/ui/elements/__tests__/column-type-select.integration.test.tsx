@@ -36,7 +36,20 @@ describe("ColumnTypeSelect", () => {
 
       const trigger = screen.getByLabelText("Column 1 type");
       expect(trigger).toBeInTheDocument();
-      expect(trigger).toHaveTextContent(/image \(url\)/i);
+      expect(trigger).toHaveTextContent(/^image$/i);
+    });
+  });
+
+  describe("when the reader opens the option list", () => {
+    /** @scenario "The column type picker offers Image and File" */
+    it("offers a column of pictures and a column of files", async () => {
+      const user = userEvent.setup();
+      renderSelect();
+
+      await user.click(screen.getByLabelText("Column 1 type"));
+
+      expect(await screen.findByRole("option", { name: /^file$/i })).toBeInTheDocument();
+      expect(await screen.findByRole("option", { name: /^image$/i })).toBeInTheDocument();
     });
   });
 

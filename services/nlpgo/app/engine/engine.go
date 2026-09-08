@@ -715,7 +715,7 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	// clear error rather than being left as text for the model to guess from.
 	msgInputs := inputs
 	if e.attachments != nil {
-		inlined, aerr := e.attachments.inlineImageInputs(ctx, node, inputs)
+		inlined, aerr := e.attachments.inlineAttachmentInputs(ctx, node, inputs)
 		if aerr != nil {
 			aerr.NodeID = node.ID
 			return nil, aerr
@@ -725,7 +725,7 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 
 	// Re-shape any template-interpolated image data URLs into multimodal
 	// content parts so the model receives actual images, not base64 text.
-	messages := splitMessagesWithImages(buildMessages(node, msgInputs))
+	messages := splitMessagesWithAttachments(buildMessages(node, msgInputs))
 	// Fetch any remote attachment URLs (http/https) referenced in the messages
 	// and deliver them as content the model can open. A failed fetch aborts the
 	// run with a clear, user-facing error instead of a broken provider request.

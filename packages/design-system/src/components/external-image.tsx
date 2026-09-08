@@ -19,6 +19,16 @@ export const getImageUrl = (str: unknown): string | null => {
     return markdownMatch[1] ?? null;
   }
 
+  // A file stored by the product and served back from the same origin. The
+  // reference carries no extension and no host, so none of the heuristics
+  // below would recognise it. Kept as a plain prefix test rather than a shared
+  // parser: the design system is imported by every package and depends on no
+  // feature contract. `packages/features/dataset/web` pins the two detectors
+  // to the same answer.
+  if (/^\/api\/files\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(str_)) {
+    return str_;
+  }
+
   // Check for base64 image
   if (str_.startsWith("data:image/")) {
     const base64Regex = /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;

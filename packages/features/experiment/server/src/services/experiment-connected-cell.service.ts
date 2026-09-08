@@ -114,21 +114,31 @@ export class ExperimentConnectedCellService {
   }
 
   /** The one turn a row sends: the mapped row as a single user message, in its own conversation and trace. */
-  private connectedTurnParams({
+  private async connectedTurnParams({
     cell,
     projectId,
+    datasetColumns,
     agent,
     dispatchAgent,
     traceId,
   }: {
     cell: ExecutionCell;
     projectId: string;
+    datasetColumns: Array<{ id: string; name: string; type: string }>;
     agent: TypedAgent;
     dispatchAgent: DispatchAgent;
     traceId: string;
-  }): Omit<Parameters<ConnectedDispatch>[0], "signal"> {
+  }): Promise<Omit<Parameters<ConnectedDispatch>[0], "signal">> {
+    // An uploaded picture or document reaches the customer's own process as
+    // bytes: it has no session on this deployment, so a reference would be a
+    // path it cannot open.
     const { messages, params } = buildConnectedCall({
-      inputs: ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell }),
+      inputs: await this.cells.inlineAttachments({
+        projectId,
+        cell,
+        datasetColumns,
+        inputs: ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell }),
+      }),
       definitions: connectedParameterDefinitions(agent.config),
     });
 
@@ -276,14 +286,21 @@ export class ExperimentConnectedCellService {
     traceId: string;
     startedAt: number;
   }): Promise<{ ok: true; outcome: CallOutcome } | { ok: false; error: unknown }> {
-    const { cell, projectId, agent, isAborted } = input;
+    const { cell, projectId, datasetColumns = [], agent, isAborted } = input;
     const dispatchAgent = this.dispatchAgentOf(agent);
     try {
       const outcome = await this.dispatchWithBusyRetry({
         isAborted,
         budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
         callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-        params: this.connectedTurnParams({ cell, projectId, agent, dispatchAgent, traceId }),
+        params: await this.connectedTurnParams({
+          cell,
+          projectId,
+          datasetColumns,
+          agent,
+          dispatchAgent,
+          traceId,
+        }),
       });
 
       return { ok: true, outcome };

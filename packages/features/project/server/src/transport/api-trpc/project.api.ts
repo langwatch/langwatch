@@ -240,8 +240,8 @@ export class ProjectTrpcApi {
             )
             .handle(async ({ input, ctx }) => {
               const actor = ctx.actor();
-              const project = await ctx.app.projects.create(
-                {
+              const project = await ctx.app.projects.create({
+                input: {
                   organizationId: input.organizationId,
                   teamId: input.teamId,
                   newTeamName: input.newTeamName,
@@ -249,8 +249,8 @@ export class ProjectTrpcApi {
                   language: input.language,
                   framework: input.framework,
                 },
-                actor,
-              );
+                by: actor,
+              });
 
               // (The eager per-project Langy service key that used to be minted
               // here is gone — Langy now mints a per-turn, per-user session key
@@ -408,7 +408,10 @@ export class ProjectTrpcApi {
             .withPermission("project:update")
             .handle(async ({ ctx, input }) => {
               try {
-                return await ctx.app.projects.requestTopicClustering(input, ctx.actor());
+                return await ctx.app.projects.requestTopicClustering({
+                  input,
+                  by: ctx.actor(),
+                });
               } catch (error) {
                 ports.reportTopicClusteringFailure(error, { projectId: input.projectId });
                 // A refusal the process already named — a deployment that

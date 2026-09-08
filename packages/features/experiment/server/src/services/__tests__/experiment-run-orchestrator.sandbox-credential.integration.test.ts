@@ -67,14 +67,14 @@ describe("given a run that minted a sandbox credential", () => {
     it("carries the credential on the dispatched workflow", async () => {
       const loadedData = { sandboxApiKey: "sandbox-key-123" };
 
-      for await (const _event of ExperimentRunOrchestratorService.executeCell(
-        makeCell(),
-        "p1",
+      for await (const _event of ExperimentRunOrchestratorService.executeCell({
+        cell: makeCell(),
+        projectId: "p1",
         ports,
         datasetColumns,
         loadedData,
         workflows,
-      )) {
+      })) {
         // draining the generator is what triggers the dispatch
       }
 
@@ -90,14 +90,14 @@ describe("given a run that minted a sandbox credential", () => {
     it("dispatches the workflow with no sandbox_api_key field", async () => {
       const loadedData = { sandboxApiKey: undefined };
 
-      for await (const _event of ExperimentRunOrchestratorService.executeCell(
-        makeCell(),
-        "p1",
+      for await (const _event of ExperimentRunOrchestratorService.executeCell({
+        cell: makeCell(),
+        projectId: "p1",
         ports,
         datasetColumns,
         loadedData,
         workflows,
-      )) {
+      })) {
         // draining the generator is what triggers the dispatch
       }
 

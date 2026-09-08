@@ -14,9 +14,9 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
-// TestHTTPBlock_SecretReferenceResolvesAtRequestTime pins
-// specs/nlp-go/http-block.feature "secret references resolve at request
-// time, not at parse time". A bearer token of `{{ secrets.UPSTREAM_TOKEN }}`
+// @scenario "secret references resolve at request time, not at parse time"
+//
+// A bearer token of `{{ secrets.UPSTREAM_TOKEN }}`
 // on the DSL (workflow.secrets, populated upstream by addEnvs.ts) must reach
 // the upstream as the resolved plaintext — and must NOT leak into the sync
 // response / rendered execution events.

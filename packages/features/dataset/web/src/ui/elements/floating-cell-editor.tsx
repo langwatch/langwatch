@@ -10,12 +10,17 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  type AttachmentColumnType,
+  isAttachmentColumnType,
+} from "../../model/dataset-attachment-file.ts";
 import { useDatasetTable } from "../../model/dataset-table-context.tsx";
 import {
   formatJsonCellValue,
   JSON_LIKE_TYPES,
   validateCellValue,
 } from "../../model/editable-cell-value.ts";
+import { DatasetAttachmentPanel } from "./dataset-attachment-panel.tsx";
 
 type FloatingCellEditorProps = {
   value: string;
@@ -72,7 +77,12 @@ export function FloatingCellEditor({
   const [style, setStyle] = useState<CSSProperties>({});
   const [textareaHeight, setTextareaHeight] = useState<number | undefined>(void 0);
   const [validationError, setValidationError] = useState(false);
+  /** An image or file cell opens on the upload panel; "url" is the text field
+   *  the reader reaches through "or enter a URL", and every other type's
+   *  editor. */
+  const [mode, setMode] = useState<"attachment" | "url">("url");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const cancelingRef = useRef(false);
   const intendedPositionRef = useRef<{ top: number; left: number } | null>(null);
   const offsetCorrectedRef = useRef(false);
@@ -84,6 +94,7 @@ export function FloatingCellEditor({
 
     cancelingRef.current = false;
     setValidationError(false);
+    setMode(isAttachmentColumnType(dataType) ? "attachment" : "url");
 
     const isJson = dataType !== void 0 && JSON_LIKE_TYPES.includes(dataType);
     setEditValue(isJson ? formatJsonCellValue(value).formatted : value);
@@ -103,12 +114,21 @@ export function FloatingCellEditor({
     offsetCorrectedRef.current = false;
     setTextareaHeight(position.textareaHeight);
     setStyle(position.style);
+  }, [anchorRef, isEditing]);
 
-    setTimeout(() => {
+  // The URL field takes focus whenever it is what the editor shows, which is on
+  // open for most columns and on "or enter a URL" for an image or file one.
+  useEffect(() => {
+    if (!isEditing || mode !== "url") {
+      return;
+    }
+
+    const focusing = setTimeout(() => {
       textareaRef.current?.focus();
       textareaRef.current?.select();
     }, 0);
-  }, [anchorRef, isEditing]);
+    return () => clearTimeout(focusing);
+  }, [isEditing, mode]);
 
   useLayoutEffect(() => {
     const intended = intendedPositionRef.current;
@@ -116,8 +136,18 @@ export function FloatingCellEditor({
       return;
     }
 
-    const editor = textareaRef.current?.closest<HTMLElement>("[data-floating-cell-editor]");
+    const editor = editorRef.current;
     if (!editor) {
+      return;
+    }
+
+    // The measurement is only meaningful once the intended offsets are on the
+    // element. Reading it while the style is still empty measures the editor
+    // in the flow of its portal container, and correcting from that pushes it
+    // off the viewport for good.
+    const appliedLeft = style.left;
+    const appliedTop = style.top;
+    if (typeof appliedLeft !== "number" || typeof appliedTop !== "number") {
       return;
     }
 
@@ -133,8 +163,8 @@ export function FloatingCellEditor({
     offsetCorrectedRef.current = true;
     setStyle((previous) => ({
       ...previous,
-      left: (typeof previous.left === "number" ? previous.left : 0) - horizontalMiss,
-      top: (typeof previous.top === "number" ? previous.top : 0) - verticalMiss,
+      left: appliedLeft - horizontalMiss,
+      top: appliedTop - verticalMiss,
     }));
   }, [isEditing, style]);
 
@@ -149,6 +179,16 @@ export function FloatingCellEditor({
     setValidationError(false);
     setEditingCell(void 0);
   }, [columnId, dataType, datasetId, editValue, row, setCellValue, setEditingCell]);
+
+  /** Takes the value an upload produced, with no validation to do. */
+  const saveUploaded = useCallback(
+    (uploaded: string) => {
+      setCellValue(datasetId, row, columnId, uploaded);
+      setValidationError(false);
+      setEditingCell(void 0);
+    },
+    [columnId, datasetId, row, setCellValue, setEditingCell],
+  );
 
   const cancel = useCallback(() => {
     cancelingRef.current = true;
@@ -200,16 +240,41 @@ export function FloatingCellEditor({
     return () => window.removeEventListener("keydown", cancelOnEscape, { capture: true });
   }, [cancel, isEditing]);
 
+  // The URL field closes itself on blur. The upload panel has no field to lose
+  // focus, so a click anywhere else closes it instead. Without that it floats
+  // over the table until the reader finds Escape.
+  useEffect(() => {
+    if (!isEditing || mode !== "attachment") {
+      return;
+    }
+
+    const closeOnOutsideClick = (event: globalThis.MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Node && editorRef.current?.contains(target)) {
+        return;
+      }
+      cancel();
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [cancel, isEditing, mode]);
+
   if (!isEditing) {
     return null;
   }
 
   const errorMessage =
     dataType === "boolean" ? "Invalid value. Use: true, false, 1, or 0" : "Invalid number";
+  const attachmentType: AttachmentColumnType | undefined = isAttachmentColumnType(dataType)
+    ? dataType
+    : void 0;
+  const showsPanel = attachmentType !== void 0 && mode === "attachment";
 
   return (
     <Portal container={editorPortalRef ?? void 0}>
       <Box
+        ref={editorRef}
         data-floating-cell-editor
         style={style}
         bg="bg.panel"
@@ -222,50 +287,75 @@ export function FloatingCellEditor({
         overflow="hidden"
         position="relative"
       >
-        <Textarea
-          ref={textareaRef}
-          value={editValue}
-          onChange={(event) => {
-            setEditValue(event.target.value);
-            setValidationError(false);
-          }}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          minHeight={textareaHeight ? `${textareaHeight}px` : "80px"}
-          resize="vertical"
-          border="none"
-          borderRadius="0"
-          fontSize="13px"
-          padding={2}
-          _focus={{ outline: "none", boxShadow: "none" }}
-        />
-        {dataType === "boolean" && (
-          <HStack position="absolute" bottom="32px" left={2} gap={1}>
-            <Button
-              size="xs"
-              variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
-              colorPalette="green"
-              onClick={() => {
-                setCellValue(datasetId, row, columnId, "true");
-                setEditingCell(void 0);
+        {showsPanel && attachmentType ? (
+          <DatasetAttachmentPanel
+            dataType={attachmentType}
+            value={value}
+            minHeight={textareaHeight}
+            onUploaded={saveUploaded}
+            onEnterUrl={() => setMode("url")}
+          />
+        ) : (
+          <>
+            <Textarea
+              ref={textareaRef}
+              value={editValue}
+              onChange={(event) => {
+                setEditValue(event.target.value);
+                setValidationError(false);
               }}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              true
-            </Button>
-            <Button
-              size="xs"
-              variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
-              colorPalette="red"
-              onClick={() => {
-                setCellValue(datasetId, row, columnId, "false");
-                setEditingCell(void 0);
-              }}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              false
-            </Button>
-          </HStack>
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
+              minHeight={textareaHeight ? `${textareaHeight}px` : "80px"}
+              resize="vertical"
+              border="none"
+              borderRadius="0"
+              fontSize="13px"
+              padding={2}
+              _focus={{ outline: "none", boxShadow: "none" }}
+            />
+            {attachmentType ? (
+              <Box paddingX={2} paddingBottom={2}>
+                <Button
+                  size="xs"
+                  variant="plain"
+                  color="fg.muted"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => setMode("attachment")}
+                >
+                  {attachmentType === "image" ? "or upload an image" : "or upload a file"}
+                </Button>
+              </Box>
+            ) : null}
+            {dataType === "boolean" && (
+              <HStack position="absolute" bottom="32px" left={2} gap={1}>
+                <Button
+                  size="xs"
+                  variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
+                  colorPalette="green"
+                  onClick={() => {
+                    setCellValue(datasetId, row, columnId, "true");
+                    setEditingCell(void 0);
+                  }}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  true
+                </Button>
+                <Button
+                  size="xs"
+                  variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
+                  colorPalette="red"
+                  onClick={() => {
+                    setCellValue(datasetId, row, columnId, "false");
+                    setEditingCell(void 0);
+                  }}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  false
+                </Button>
+              </HStack>
+            )}
+          </>
         )}
         <Box
           paddingX={2}
@@ -278,7 +368,9 @@ export function FloatingCellEditor({
         >
           {validationError
             ? errorMessage
-            : "Enter to save • Escape to cancel • Shift+Enter for newline"}
+            : showsPanel
+              ? "Escape to cancel"
+              : "Enter to save • Escape to cancel • Shift+Enter for newline"}
         </Box>
       </Box>
     </Portal>

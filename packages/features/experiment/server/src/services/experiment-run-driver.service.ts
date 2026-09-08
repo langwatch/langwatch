@@ -259,16 +259,16 @@ export class ExperimentRunDriverService {
       });
     }
 
-    return ExperimentRunOrchestratorService.executeCell(
+    return ExperimentRunOrchestratorService.executeCell({
       cell,
       projectId,
       ports,
       datasetColumns,
       loadedData,
       workflows,
-      run.resultMapperConfig,
+      resultMapperConfig: run.resultMapperConfig,
       isAborted,
-    );
+    });
   }
 
   /**

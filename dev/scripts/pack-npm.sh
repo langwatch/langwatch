@@ -420,8 +420,10 @@ fi
 # which JSON.parse rejects outright.
 missing_extends=""
 while IFS= read -r -d '' tsconfig; do
+  # `|| true`: a tsconfig with no `extends` makes grep exit 1, and under
+  # `set -euo pipefail` that ends the script with no message at all.
   extends_target="$(grep -o '"extends"[[:space:]]*:[[:space:]]*"[^"]*"' "$tsconfig" \
-    | head -n1 | sed -E 's/.*"extends"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')"
+    | head -n1 | sed -E 's/.*"extends"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/' || true)"
   [ -n "$extends_target" ] || continue
   # `test -e` resolves the "../.." in a relative extends target itself; no
   # canonicalisation needed.

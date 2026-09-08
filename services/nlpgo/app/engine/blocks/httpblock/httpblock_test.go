@@ -28,6 +28,21 @@ func TestRenderTemplate_StringEscaping(t *testing.T) {
 	assert.JSONEq(t, `{"x":"hello \"world\"\n"}`, out)
 }
 
+// @scenario "A data URL substituted into a JSON body template stays valid JSON"
+func TestRenderTemplate_DataURLStaysValidJSON(t *testing.T) {
+	dataURL := "data:application/pdf;base64,JVBERi0xLjQKaGVsbG8+/w=="
+	out, warns := httpblock.RenderTemplate(`{"document":"{{ document }}"}`, map[string]any{
+		"document": dataURL,
+	})
+	assert.Empty(t, warns)
+
+	var body struct {
+		Document string `json:"document"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &body), "the rendered body must parse as JSON: %s", out)
+	assert.Equal(t, dataURL, body.Document, "the agent must receive the data URL byte for byte")
+}
+
 func TestRenderTemplate_ArrayEmbedding(t *testing.T) {
 	out, _ := httpblock.RenderTemplate(`{"ids": {{ ids }}}`, map[string]any{
 		"ids": []any{float64(1), float64(2), float64(3)},

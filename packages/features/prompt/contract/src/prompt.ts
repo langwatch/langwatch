@@ -1,5 +1,6 @@
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
+import { LlmConfigInputTypes } from "./prompt.field-schemas.ts";
 
 export const PROMPT_FEATURE_ID = "prompt" as const;
 export const promptScopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);
@@ -29,19 +30,7 @@ export type PromptMessage = z.infer<typeof promptMessageSchema>;
 export const promptInputSchema = z
   .object({
     identifier: z.string().min(1),
-    type: z.enum([
-      "str",
-      "float",
-      "bool",
-      "image",
-      "list",
-      "list[str]",
-      "list[float]",
-      "list[int]",
-      "list[bool]",
-      "dict",
-      "chat_messages",
-    ]),
+    type: z.enum(LlmConfigInputTypes),
   })
   .strict();
 export type PromptInput = z.infer<typeof promptInputSchema>;

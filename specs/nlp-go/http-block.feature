@@ -7,13 +7,11 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
 
   See _shared/contract.md §5; Python parity: langwatch_nlp/langwatch_nlp/studio/execute/http_node.py
 
-  # All scenarios are @unimplemented because the TS feature-parity checker only
-  # scans TS test roots, so Go-side HTTP block scenarios in services/nlpgo/
-  # cannot be bound via @scenario JSDoc until the checker grows Go-side support
-  # (or a parallel Go-side binder ships). services/nlpgo/ exists; the gap is
-  # tooling/binding, not service stand-up. Python parity tests:
+  # The parity checker reads `@scenario` annotations from Go tests under
+  # services/nlpgo, so a scenario here is bound by naming it from the Go test
+  # that proves it. The scenarios still tagged @unimplemented have no such test
+  # yet. Python parity tests:
   # langwatch_nlp/tests/studio/test_http_node_integration.py.
-  # Aspirational pending parity-binder coverage.
 
   Background:
     Given nlpgo is listening on :5562
@@ -62,6 +60,15 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       When the engine renders the body
       Then the rendered body equals "{\"ids\": [1,2,3]}"
 
+    @unit
+    Scenario: A data URL substituted into a JSON body template stays valid JSON
+      Given an HTTP node whose JSON body template holds a variable in a string position
+      And the value of that variable is an attachment as a base64 data URL
+      When the engine renders the body
+      Then the body parses as JSON and the agent receives the data URL byte for byte
+      # A workbench row sends an uploaded file to an HTTP agent this way, so a
+      # data URL that broke the body would break every such run.
+
   Rule: JSONPath extracts the configured field from the response
 
     @integration @unimplemented
@@ -106,10 +113,7 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       When the engine invokes the node
       Then the upstream observed header matching `^Authorization: Basic dTpw$`
 
-    # Covered by services/nlpgo/tests/integration/http_block_secrets_test.go,
-    # but kept @unimplemented because the TS feature-parity checker only scans
-    # TS test roots and cannot bind Go-side tests yet (see file header).
-    @integration @unimplemented
+    @integration
     Scenario: secret references resolve at request time, not at parse time
       Given an HTTP node with auth {"type": "bearer", "token": "{{ secrets.UPSTREAM_TOKEN }}"}
       And the project has secret UPSTREAM_TOKEN="rotated-value"

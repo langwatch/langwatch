@@ -89,6 +89,8 @@ export {
 } from "./ports/experiment-run-progress.port.ts";
 export { ExperimentRunErrorReportingPort } from "./ports/experiment-run-error-reporting.port.ts";
 export { ExperimentSandboxCredentialPort } from "./ports/experiment-sandbox-credential.port.ts";
+export { ExperimentAttachmentPort } from "./ports/experiment-attachment.port.ts";
+export { UnavailableExperimentAttachmentAdapter } from "./adapters/unavailable-experiment-attachment.adapter.ts";
 export { ExperimentStudioDispatchPort } from "./ports/experiment-studio-dispatch.port.ts";
 export { ExperimentTargetEntityNamesPort } from "./ports/experiment-target-entity-names.port.ts";
 export { ExperimentWorkflowDslPort } from "./ports/experiment-workflow-dsl.port.ts";

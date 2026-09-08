@@ -30,6 +30,7 @@ import { downloadCsv } from "@langwatch/csv/download";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { datasetApi } from "../../behavior/dataset-api.ts";
+import { useDatasetAttachmentUpload } from "../../behavior/use-dataset-attachment-upload.ts";
 import { useDatasetRecordSync } from "../../behavior/use-dataset-record-sync.ts";
 import {
   createDatasetEditorStore,
@@ -120,6 +121,7 @@ export function DatasetEditorTable({
 }) {
   const host = useDatasetHost();
   const project = host.project();
+  const uploadAttachment = useDatasetAttachmentUpload({ projectId: project?.id });
   const [store] = useState(() => createDatasetEditorStore());
   const editColumnsDrawer = useDisclosure();
   const addRowsFromCSVModal = useDisclosure();
@@ -409,6 +411,7 @@ export function DatasetEditorTable({
       toggleCellExpanded,
       toggleRowSelection,
       renderImage,
+      uploadAttachment,
     }),
     [
       rowHeightMode,
@@ -420,6 +423,7 @@ export function DatasetEditorTable({
       setSelectedCell,
       toggleCellExpanded,
       toggleRowSelection,
+      uploadAttachment,
     ],
   );
 

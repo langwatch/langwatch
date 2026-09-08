@@ -172,6 +172,28 @@ describe("the target variables panel", () => {
     });
   });
 
+  describe("given the active dataset has a file column", () => {
+    describe("when the mapping dropdown opens", () => {
+      /** @scenario A file dataset column is badged as File in the mapping dropdown */
+      it("badges that column as File rather than falling back to Text", async () => {
+        renderPanel({
+          datasets: [
+            {
+              ...datasets[0]!,
+              columns: [...datasets[0]!.columns, { id: "col-4", name: "document", type: "file" }],
+            },
+          ],
+        });
+
+        await openTheUnmappedDropdown();
+
+        const fileOption = await screen.findByTestId("field-option-document");
+        expect(within(fileOption).getByText("File")).toBeInTheDocument();
+        expect(within(fileOption).queryByText("Text")).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given another target this one can chain from", () => {
     describe("when the mapping dropdown opens", () => {
       /** @scenario Chaining one target into another shows the upstream target name */

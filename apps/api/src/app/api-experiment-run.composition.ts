@@ -16,6 +16,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ExperimentService, TargetConfig } from "@langwatch/experiment-contract";
 import {
+  ExperimentAttachmentPort,
   ExperimentEventingAdapter,
   ExperimentConnectedAgentOwnershipPort,
   ExperimentConnectedDispatchPort,
@@ -28,6 +29,7 @@ import {
   ExperimentWorkflowDslPort,
   RedisExperimentRunAbortAdapter,
   RedisExperimentRunProgressAdapter,
+  UnavailableExperimentAttachmentAdapter,
   WorkflowEvaluationService,
   ExperimentWorkbenchTargetNamesService,
   ExperimentPollingRunService,
@@ -212,6 +214,11 @@ export type ApiExperimentRunOptions = Readonly<{
    * token is held under too. Absent means the runs of a project share no key.
    */
   storedSecretEncryptionKey: string | undefined;
+  /**
+   * The bytes behind an attachment a dataset cell references. Absent means
+   * every reference stays the text the cell holds, said once per process.
+   */
+  attachments?: ExperimentAttachmentPort;
   report?: ApiExperimentRunAbsenceReport;
 }>;
 
@@ -356,6 +363,10 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
     }),
     connectedDispatch: ApiExperimentConnectedDispatchAdapter.create(),
     connectedAgentOwnership: ApiExperimentConnectedAgentOwnershipAdapter.create(),
+    // Named rather than passed as `undefined`: a deployment with no object
+    // store leaves every reference as the text the cell holds and says so once,
+    // rather than a run failing over a picture.
+    attachments: options.attachments ?? UnavailableExperimentAttachmentAdapter.create(),
   };
 
   const workflowEvaluation = WorkflowEvaluationService.create({

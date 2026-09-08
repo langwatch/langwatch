@@ -952,3 +952,56 @@ describe("buildCellWorkflow", () => {
     });
   });
 });
+
+describe("given a dataset with an image column and a file column", () => {
+  const attachmentCell = (): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-1",
+    targetConfig: {
+      id: "target-1",
+      type: "prompt",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+      localPromptConfig: {
+        llm: { model: "openai/gpt-5-mini", temperature: 0 },
+        messages: [{ role: "user", content: "{{input}}" }],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as unknown as LocalPromptConfig,
+    } as unknown as TargetConfig,
+    evaluatorConfigs: [],
+    datasetEntry: {
+      _datasetId: "dataset-1",
+      question: "what is this?",
+      photo: "/api/files/project-1/obj_png",
+      document: "[report.pdf](/api/files/project-1/obj_pdf)",
+    },
+  });
+
+  describe("when the run builds the workflow for one cell", () => {
+    /** @scenario "A file dataset column becomes a file field on the run's entry node" */
+    it("declares the attachment columns as image and file, not as text", () => {
+      const { workflow } = buildCellWorkflow(
+        {
+          projectId: "project-1",
+          cell: attachmentCell(),
+          datasetColumns: [
+            { id: "question", name: "question", type: "string" },
+            { id: "photo", name: "photo", type: "image" },
+            { id: "document", name: "document", type: "file" },
+          ],
+        },
+        {},
+      );
+
+      const entry = workflow.nodes.find((node) => node.id === "entry");
+      const typeOf = (identifier: string) =>
+        entry?.data.outputs?.find((output) => output.identifier === identifier)?.type;
+
+      expect(typeOf("question")).toBe("str");
+      expect(typeOf("photo")).toBe("image");
+      expect(typeOf("document")).toBe("file");
+    });
+  });
+});

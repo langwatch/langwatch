@@ -13,6 +13,7 @@ export const datasetColumnTypeSchema = z.enum([
   "annotations",
   "evaluations",
   "image",
+  "file",
 ]);
 export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
 

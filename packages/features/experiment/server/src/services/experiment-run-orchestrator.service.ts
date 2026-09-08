@@ -20,7 +20,10 @@ import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
-import { ExperimentCellPlanService, type SeededTargetOutput } from "./experiment-cell-plan.service.ts";
+import {
+  ExperimentCellPlanService,
+  type SeededTargetOutput,
+} from "./experiment-cell-plan.service.ts";
 import {
   ExperimentComparisonPlanService,
   type VariantEvaluatorScore,
@@ -223,16 +226,25 @@ export class ExperimentRunOrchestratorService {
   };
 
   /** Executes a single cell and yields events. See {@link ExperimentCellExecutionService}. */
-  static async *executeCell(
-    cell: ExecutionCell,
-    projectId: string,
-    ports: ExperimentRunPorts,
-    datasetColumns: Array<{ id: string; name: string; type: string }>,
-    loadedData: LoadedCellData,
-    workflows: WorkflowService,
-    resultMapperConfig?: ResultMapperConfig,
-    isAborted?: () => Promise<boolean>,
-  ): AsyncGenerator<EvaluationV3Event> {
+  static async *executeCell({
+    cell,
+    projectId,
+    ports,
+    datasetColumns,
+    loadedData,
+    workflows,
+    resultMapperConfig,
+    isAborted,
+  }: {
+    cell: ExecutionCell;
+    projectId: string;
+    ports: ExperimentRunPorts;
+    datasetColumns: Array<{ id: string; name: string; type: string }>;
+    loadedData: LoadedCellData;
+    workflows: WorkflowService;
+    resultMapperConfig?: ResultMapperConfig;
+    isAborted?: () => Promise<boolean>;
+  }): AsyncGenerator<EvaluationV3Event> {
     yield* cellExecution(ports, workflows).executeCell({
       cell,
       projectId,

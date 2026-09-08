@@ -41,10 +41,11 @@ const FILES_RATE_LIMIT_MAX = 120;
 
 /**
  * Stored objects are shared by several features, and which permission guards a read depends on what
- * the object IS: trace media requires `traces:view`, scenario media requires `scenarios:view` — the
- * two are separate permission categories and a custom role can hold one without the other.
+ * the object IS: trace media requires `traces:view`, dataset cell attachments require
+ * `datasets:view`, scenario media requires `scenarios:view` — separate permission categories, and a
+ * custom role can hold one without the others.
  */
-const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
+const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view", "datasets:view"] as const;
 
 /**
  * The key's ceiling, satisfied by ANY of the permissions a file read can need.
@@ -66,10 +67,20 @@ async function enforceAnyOf(
   throw refusal;
 }
 
+/**
+ * The purposes that are guarded by something other than the scenario category.
+ * A purpose absent from this map falls back to `scenarios:view`, which is what
+ * every scenario purpose carries.
+ */
+const PURPOSE_VIEW_PERMISSION: Readonly<Record<string, (typeof FILE_VIEW_PERMISSIONS)[number]>> = {
+  trace_content: "traces:view",
+  dataset_attachment: "datasets:view",
+};
+
 export function requiredPermissionForPurpose(
   purpose: string,
 ): (typeof FILE_VIEW_PERMISSIONS)[number] {
-  return purpose === "trace_content" ? "traces:view" : "scenarios:view";
+  return PURPOSE_VIEW_PERMISSION[purpose] ?? "scenarios:view";
 }
 
 /** The codes the permission check raises when it refuses the caller. */

@@ -26,6 +26,7 @@
 
 import type {
   Dataset,
+  DatasetAttachment,
   DatasetColumns,
   DatasetNameResult,
   DatasetPage,
@@ -33,6 +34,7 @@ import type {
   DatasetRecordInput,
   DatasetRecordMutationResult,
   DatasetSummary,
+  UploadDatasetAttachmentInput,
 } from "@langwatch/dataset-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
 
@@ -154,6 +156,18 @@ export type DatasetApiMap = {
         input: DatasetScope & { recordId: string; updatedRecord: Record<string, unknown> };
         output: DatasetRecordMutationResult;
       };
+    };
+
+    /**
+     * Stores a file picked in an image or file cell.
+     *
+     * Record-scoped by mount point rather than by input: the bytes belong to
+     * the project and are addressed by the reference the cell keeps, so the
+     * same upload serves a saved dataset, an in-memory one and the workbench's
+     * inline rows, none of which have a record id yet when the file is chosen.
+     */
+    uploadAttachment: {
+      mutation: { input: UploadDatasetAttachmentInput; output: DatasetAttachment };
     };
 
     /** Removes records by id. The autosave's delete half. */

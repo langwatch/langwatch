@@ -73,6 +73,10 @@ export {
 export { DatasetNormalizeAdapter } from "./adapters/dataset-normalize.adapter.ts";
 export { DatasetNormalizePort } from "./ports/dataset-normalize.port.ts";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service.ts";
+export { DatasetAttachmentService } from "./services/dataset-attachment.service.ts";
+export { DatasetAttachmentStorePort } from "./ports/dataset-attachment-store.port.ts";
+export { UnavailableDatasetAttachmentStore } from "./adapters/unavailable-dataset-attachment-store.adapter.ts";
+export * from "./rules/dataset-attachment.rules.ts";
 export * from "./rules/dataset-chunking.rules.ts";
 export { DatasetChunkService } from "./services/dataset-chunk.service.ts";
 export type {

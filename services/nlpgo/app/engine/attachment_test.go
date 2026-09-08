@@ -312,7 +312,7 @@ func TestInlineImageInputsResolvesRemoteImageToDataURL(t *testing.T) {
 	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 	inputs := map[string]any{"picture": srv.URL + "/cat.png"}
 
-	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
 	require.Nil(t, ne)
 	got, _ := out["picture"].(string)
 	assert.True(t, strings.HasPrefix(got, "data:image/png;base64,"),
@@ -329,7 +329,7 @@ func TestInlineImageInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
 	f := loopbackFetcher()
 	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 
-	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": deadURL})
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"picture": deadURL})
 	require.Nil(t, out)
 	require.NotNil(t, ne, "an explicit image field with an unfetchable URL must fail the run")
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -343,7 +343,7 @@ func TestInlineImageInputsFailsClearlyWhenNotAnImage(t *testing.T) {
 	f := loopbackFetcher()
 	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 
-	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
 	require.Nil(t, out)
 	require.NotNil(t, ne, "an image field pointing at a web page must fail the run")
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -362,7 +362,7 @@ func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
 		"picture": "data:image/png;base64,AAAA",
 		"link":    "http://127.0.0.1:1/skip.png",
 	}
-	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
 	require.Nil(t, ne)
 	assert.Equal(t, "data:image/png;base64,AAAA", out["picture"], "an inline data URL must pass through untouched")
 	assert.Equal(t, "http://127.0.0.1:1/skip.png", out["link"], "a str-typed URL must not be eagerly fetched")
@@ -492,4 +492,57 @@ func TestTrimTrailingPunct(t *testing.T) {
 	url, trailing = trimTrailingPunct("https://x/cat.png")
 	assert.Equal(t, "https://x/cat.png", url)
 	assert.Empty(t, trailing)
+}
+
+// fileTypedNode builds a signature node declaring the given inputs, used to
+// exercise the file-typed-input resolution that runs before message templating.
+func fileTypedNode(fields ...dsl.Field) *dsl.Node {
+	return &dsl.Node{ID: "sig", Type: dsl.ComponentSignature, Data: dsl.Component{Inputs: fields}}
+}
+
+// @scenario "A file-typed field whose URL is a document is fetched and inlined"
+func TestInlineAttachmentInputsResolvesRemoteDocumentToDataURL(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := fileTypedNode(dsl.Field{Identifier: "document", Type: dsl.FieldTypeFile})
+	inputs := map[string]any{"document": srv.URL + "/doc.pdf"}
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
+	require.Nil(t, ne)
+	got, _ := out["document"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:application/pdf;base64,"),
+		"the file-typed URL must inline as a data URL, got %q", got)
+	assert.Equal(t, srv.URL+"/doc.pdf", inputs["document"],
+		"the original inputs map must keep the readable URL, not a base64 blob")
+}
+
+// @scenario "A file-typed field accepts a picture the same way an image field does"
+func TestInlineAttachmentInputsAcceptsImageOnFileField(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := fileTypedNode(dsl.Field{Identifier: "document", Type: dsl.FieldTypeFile})
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"document": srv.URL + "/cat.png"})
+	require.Nil(t, ne)
+	got, _ := out["document"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:image/png;base64,"), "a picture on a file field must inline too, got %q", got)
+}
+
+// @scenario "A file-typed field whose URL serves a type the model cannot read fails the run with a clear error"
+func TestInlineAttachmentInputsFailsClearlyOnUndeliverableType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write([]byte("PK\x03\x04............"))
+	}))
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := fileTypedNode(dsl.Field{Identifier: "document", Type: dsl.FieldTypeFile})
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"document": srv.URL + "/bundle.zip"})
+	require.Nil(t, out)
+	require.NotNil(t, ne, "a file field pointing at an archive must fail the run")
+	assert.Equal(t, "attachment_fetch_error", ne.Type)
+	assert.Contains(t, ne.Message, "file", "the error must explain it could not be loaded as a file")
 }

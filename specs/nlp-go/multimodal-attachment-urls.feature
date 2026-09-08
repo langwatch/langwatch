@@ -157,6 +157,31 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     Then the model receives it as a document to read
 
   # ============================================================================
+  # A file-typed field
+  # ============================================================================
+  # A file variable is the same promise an image variable makes, widened: the
+  # author declared the field an attachment, so its URL is fetched and delivered
+  # rather than passed to the model as link text.
+
+  @integration
+  Scenario: A file-typed field whose URL is a document is fetched and inlined
+    Given a workflow input declared as a file whose value is an http URL to a PDF
+    When I run the workflow
+    Then the model receives the fetched document, not the link text
+
+  @integration
+  Scenario: A file-typed field accepts a picture the same way an image field does
+    Given a workflow input declared as a file whose value is an http URL to a picture
+    When I run the workflow
+    Then the model receives the fetched picture
+
+  @integration
+  Scenario: A file-typed field whose URL serves a type the model cannot read fails the run with a clear error
+    Given a workflow input declared as a file whose URL serves an archive
+    When I run the workflow
+    Then the run fails with a clear error explaining it could not be loaded as a file
+
+  # ============================================================================
   # What the trace records
   # ============================================================================
   # The engine may fetch an attachment far larger than a span can carry: the

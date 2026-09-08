@@ -17,6 +17,13 @@
 import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 import { DatasetApp, type DatasetExperimentLookup } from "../dataset.app.ts";
+import { UnavailableDatasetAttachmentStore } from "../../adapters/unavailable-dataset-attachment-store.adapter.ts";
+import { DatasetAttachmentService } from "../../services/dataset-attachment.service.ts";
+
+/** These surfaces upload nothing: the store refuses if an upload ever appears. */
+function noAttachments(): DatasetAttachmentService {
+  return DatasetAttachmentService.create({ store: UnavailableDatasetAttachmentStore.create() });
+}
 
 const replacing = {
   id: "dataset_existing",
@@ -47,7 +54,11 @@ function harness({
   return {
     dataset: datasetService,
     experiments: experimentLookup,
-    app: DatasetApp.create({ dataset: datasetService, experiments: experimentLookup }),
+    app: DatasetApp.create({
+      dataset: datasetService,
+      experiments: experimentLookup,
+      attachments: noAttachments(),
+    }),
   };
 }
 

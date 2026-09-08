@@ -148,6 +148,10 @@ class StubOrganizationService extends OrganizationServiceContract {
     return Promise.resolve(false);
   }
 
+  memberOrganizationIds(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
   getSettings(): never {
     throw new Error("not used by this test");
   }

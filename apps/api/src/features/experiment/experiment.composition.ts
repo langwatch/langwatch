@@ -43,6 +43,10 @@ import {
   type ApiExperimentRunAbsenceReport,
 } from "../../app/api-experiment-run.composition.ts";
 import { permissiveCoerceMonitorMappings } from "../trace/trace-mappings.ts";
+import {
+  ApiExperimentAttachmentAdapter,
+  type ApiExperimentAttachmentObjectReader,
+} from "./experiment-attachment.adapter.ts";
 import { createExperimentTrpcRouter } from "./experiment-trpc.mount.ts";
 
 /**
@@ -109,6 +113,12 @@ export function composeExperimentFeature(options: {
   broadcast?: ExperimentBroadcast;
   /** The canonicaliser for a monitor's stored mappings, from the trace registry. */
   coerceMonitorMappings?: (mappings: unknown) => unknown;
+  /**
+   * The object store a run reads an uploaded dataset attachment's bytes from,
+   * resolved per read. Absent means every reference reaches the target as the
+   * text the cell holds.
+   */
+  storedObjects?: () => ApiExperimentAttachmentObjectReader | undefined;
   /** Names the run loop's own absences at boot rather than leaving them inferred. */
   runReport?: ApiExperimentRunAbsenceReport;
 }): ComposedExperimentFeature {
@@ -194,6 +204,15 @@ export function composeExperimentFeature(options: {
     evaluators: options.peers.evaluators,
     apiKeys: options.apiKeys,
     storedSecretEncryptionKey: options.storedSecretEncryptionKey,
+    // The SAME content-addressed store the upload wrote the bytes into: a run
+    // reads what the cell editor stored, never a second copy.
+    ...(options.storedObjects
+      ? {
+          attachments: ApiExperimentAttachmentAdapter.create({
+            storedObjects: options.storedObjects,
+          }),
+        }
+      : {}),
     ...(options.runReport ? { report: options.runReport } : {}),
   });
 

@@ -26,6 +26,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DatasetRecordTrpcApi } from "../../transport/api-trpc/dataset-record.api.ts";
 import { DatasetApp } from "../dataset.app.ts";
+import { UnavailableDatasetAttachmentStore } from "../../adapters/unavailable-dataset-attachment-store.adapter.ts";
+import { DatasetAttachmentService } from "../../services/dataset-attachment.service.ts";
+import type { DatasetAttachmentStorePort } from "../../ports/dataset-attachment-store.port.ts";
+
+/** These surfaces upload nothing: the store refuses if an upload ever appears. */
+function noAttachments(): DatasetAttachmentService {
+  return DatasetAttachmentService.create({ store: UnavailableDatasetAttachmentStore.create() });
+}
 
 type TestContext = { app: { dataset: DatasetApp } };
 
@@ -41,7 +49,13 @@ const noExperiments = {
   },
 };
 
-function harness(dataset: Partial<DatasetService> = {}) {
+function harness({
+  dataset = {},
+  attachments,
+}: {
+  dataset?: Partial<DatasetService>;
+  attachments?: DatasetAttachmentService;
+} = {}) {
   const policyCalls: PolicyCall[] = [];
   const declaredPermissions: string[] = [];
 
@@ -76,6 +90,7 @@ function harness(dataset: Partial<DatasetService> = {}) {
         dataset: DatasetApp.create({
           dataset: dataset as DatasetService,
           experiments: noExperiments,
+          attachments: attachments ?? noAttachments(),
         }),
       },
     }),
@@ -97,9 +112,11 @@ describe("DatasetRecordTrpcApi", () => {
         "download",
         "getHead",
         "deleteMany",
+        "uploadAttachment",
       ]);
     });
 
+    /** @scenario "The upload is allowed to a person who may edit the dataset" */
     it("declares the same permission on each procedure as before the move", () => {
       const { router, declaredPermissions } = harness();
 
@@ -118,6 +135,7 @@ describe("DatasetRecordTrpcApi", () => {
         download: "datasets:view",
         getHead: "datasets:view",
         deleteMany: "datasets:delete",
+        uploadAttachment: "datasets:update",
       });
     });
   });
@@ -126,7 +144,9 @@ describe("DatasetRecordTrpcApi", () => {
     /** @scenario "The declared check reads the validated input" */
     it("hands the host policy the parsed input, defaults filled in", async () => {
       const { caller, policyCalls } = harness({
-        getDatasetPage: async () => ({ id: "dataset-1" }) as never,
+        dataset: {
+          getDatasetPage: async () => ({ id: "dataset-1" }) as never,
+        },
       });
 
       await caller.listPaginated(lookup);
@@ -141,6 +161,33 @@ describe("DatasetRecordTrpcApi", () => {
     });
   });
 
+  describe("when a person uploads a file into a cell", () => {
+    /** @scenario "An uploaded file is kept and the cell gets a reference to it" */
+    it("answers with the reference the cell writes", async () => {
+      const storeFromBytes = vi.fn(async () => ({
+        id: "so_1",
+        mediaType: "image/png",
+        isDuplicate: false,
+      }));
+      const { caller } = harness({
+        attachments: DatasetAttachmentService.create({
+          store: { storeFromBytes } as unknown as DatasetAttachmentStorePort,
+        }),
+      });
+
+      const attachment = await caller.uploadAttachment({
+        projectId: "project-1",
+        fileName: "photo.png",
+        dataUrl: `data:image/png;base64,${Buffer.from("a tiny picture").toString("base64")}`,
+      });
+
+      expect(attachment.url).toBe("/api/files/project-1/so_1");
+      expect(storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({ purpose: "dataset_attachment" }),
+      );
+    });
+  });
+
   describe("when the dataset is still preparing", () => {
     /** @scenario "A still-preparing dataset refuses record reads and writes" */
     it("refuses every read and write with PRECONDITION_FAILED, not a 500", async () => {
@@ -148,12 +195,14 @@ describe("DatasetRecordTrpcApi", () => {
         throw new DatasetNotReadyError({ status: "processing" });
       };
       const { caller } = harness({
-        batchCreateRecords: notReady,
-        upsertRecord: notReady,
-        getDatasetWithRecords: notReady,
-        getDatasetPage: notReady,
-        getDatasetHead: notReady,
-        deleteRecords: notReady,
+        dataset: {
+          batchCreateRecords: notReady,
+          upsertRecord: notReady,
+          getDatasetWithRecords: notReady,
+          getDatasetPage: notReady,
+          getDatasetHead: notReady,
+          deleteRecords: notReady,
+        },
       });
 
       const refusals = await Promise.all(
@@ -175,8 +224,10 @@ describe("DatasetRecordTrpcApi", () => {
   describe("when a write or export exceeds a cap", () => {
     it("maps an over-cap export to PAYLOAD_TOO_LARGE", async () => {
       const { caller } = harness({
-        getDatasetWithRecords: () => {
-          throw new DatasetTooLargeToExportError({ sizeBytes: 2, maxBytes: 1 });
+        dataset: {
+          getDatasetWithRecords: () => {
+            throw new DatasetTooLargeToExportError({ sizeBytes: 2, maxBytes: 1 });
+          },
         },
       });
 
@@ -187,8 +238,10 @@ describe("DatasetRecordTrpcApi", () => {
 
     it("maps an over-cap cell edit to BAD_REQUEST", async () => {
       const { caller } = harness({
-        upsertRecord: () => {
-          throw new ChunkTooLargeError({ byteSize: 2, maxBytes: 1 });
+        dataset: {
+          upsertRecord: () => {
+            throw new ChunkTooLargeError({ byteSize: 2, maxBytes: 1 });
+          },
         },
       });
 
@@ -199,8 +252,10 @@ describe("DatasetRecordTrpcApi", () => {
 
     it("maps a duplicate caller-supplied row id to CONFLICT", async () => {
       const { caller } = harness({
-        batchCreateRecords: () => {
-          throw new DuplicateRecordIdError("record-1");
+        dataset: {
+          batchCreateRecords: () => {
+            throw new DuplicateRecordIdError("record-1");
+          },
         },
       });
 
@@ -213,8 +268,10 @@ describe("DatasetRecordTrpcApi", () => {
   describe("when the dataset a paged read names is archived or missing", () => {
     it("reads as null so the editor can say it is no longer available", async () => {
       const { caller } = harness({
-        getDatasetPage: () => {
-          throw new DatasetNotFoundError("gone");
+        dataset: {
+          getDatasetPage: () => {
+            throw new DatasetNotFoundError("gone");
+          },
         },
       });
 
@@ -229,7 +286,7 @@ describe("DatasetRecordTrpcApi", () => {
         records: [{ id: "record-1" }],
         truncated: true,
       })) as unknown as DatasetService["getDatasetWithRecords"];
-      const { caller } = harness({ getDatasetWithRecords });
+      const { caller } = harness({ dataset: { getDatasetWithRecords } });
 
       await expect(caller.getAll(lookup)).resolves.toEqual({
         id: "dataset-1",
@@ -250,7 +307,7 @@ describe("DatasetRecordTrpcApi", () => {
         records: [],
         truncated: false,
       })) as unknown as DatasetService["getDatasetWithRecords"];
-      const { caller } = harness({ getDatasetWithRecords });
+      const { caller } = harness({ dataset: { getDatasetWithRecords } });
 
       await caller.download(lookup);
 

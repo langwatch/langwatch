@@ -17,10 +17,8 @@ export { ProjectMetadataService } from "./services/project-metadata.service.ts";
 export { ProjectCredentialsAdapter } from "./adapters/project-credentials.adapter.ts";
 export {
   ProjectApp,
-  type ProjectAppDependencies,
-  type ProjectCaller,
+  type ProjectInfrastructure,
   type TopicClusteringCommands,
-  type UpdateProjectSettings,
 } from "./app/project.app.ts";
 export {
   ProjectCredentialsPort,

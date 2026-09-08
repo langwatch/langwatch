@@ -4,6 +4,7 @@
  *   create:        new entries appended to a dataset.
  *   update:        one entry replaced by id.
  *   deleteMany:    entries removed by id.
+ *   uploadAttachment: a file put into an image or file cell.
  *   getAll:        the whole dataset for the editor, capped by a byte budget.
  *   listPaginated: one page of the editor's classic page N of M.
  *   getHead:       the first entries plus the authoritative total, for previews.
@@ -20,12 +21,14 @@
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  datasetAttachmentSchema,
   datasetPageSchema,
   datasetRecordEditorReadSchema,
   datasetRecordHeadReadSchema,
   datasetRecordMutationResultSchema,
   datasetRecordSchema,
   newDatasetEntriesSchema,
+  uploadDatasetAttachmentInputSchema,
 } from "@langwatch/dataset-contract";
 // From the server's own error module, not the contract's. Both declare classes
 // with these names; only these are ever thrown — the storage adapters raise
@@ -334,6 +337,22 @@ export class DatasetRecordTrpcApi {
                 return rethrowDatasetNotReadyAsTRPC(error);
               }
             }),
+        )
+        /**
+         * A file a person dropped into an `image` or `file` cell. The bytes go
+         * to the project's object store and the answer carries the reference
+         * the cell writes, so a cell holds a link rather than megabytes of
+         * base64.
+         *
+         * It takes `datasets:update` because writing the reference into the
+         * cell is the edit this upload exists to make.
+         */
+        .mutation("uploadAttachment", (p) =>
+          p
+            .withInput(uploadDatasetAttachmentInputSchema)
+            .withOutput(datasetAttachmentSchema)
+            .withPermission("datasets:update")
+            .handle(async ({ ctx, input }) => await ctx.app.dataset.uploadAttachment(input)),
         )
         .build()
     );

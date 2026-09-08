@@ -26,7 +26,9 @@ import {
   evaluatorTargetNoInputsResult,
   noInputsResolvedResult,
 } from "../processes/experiment-cell-error-events.process.ts";
+import { attachmentInputFields } from "../rules/experiment-attachment.rules.ts";
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import { ExperimentAttachmentInliningService } from "./experiment-attachment-inlining.service.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
@@ -251,10 +253,36 @@ export class ExperimentCellExecutionService {
     return { [outputField]: cell.precomputedTargetOutput };
   }
 
+  /**
+   * The target's inputs with every uploaded attachment the row references
+   * replaced by its bytes. Shared with the other cell executors, which reach it
+   * through the same run ports.
+   */
+  async inlineAttachments({
+    projectId,
+    cell,
+    datasetColumns,
+    inputs,
+  }: {
+    projectId: string;
+    cell: ExecutionCell;
+    datasetColumns: Array<{ id: string; name: string; type: string }>;
+    inputs: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
+    return ExperimentAttachmentInliningService.create({
+      attachments: this.ports.attachments,
+    }).inlineInputs({
+      projectId,
+      inputs,
+      fields: attachmentInputFields({ cell, datasetColumns }),
+    });
+  }
+
   /** Dispatches the target node and yields its mapped events, pricing untariffed tokens. */
   private async *dispatchTarget({
     cell,
     projectId,
+    datasetColumns,
     workflow,
     targetNodeId,
     loadedData,
@@ -265,6 +293,7 @@ export class ExperimentCellExecutionService {
   }: {
     cell: ExecutionCell;
     projectId: string;
+    datasetColumns: Array<{ id: string; name: string; type: string }>;
     workflow: StudioWorkflow;
     targetNodeId: string;
     loadedData: LoadedCellData;
@@ -283,7 +312,12 @@ export class ExperimentCellExecutionService {
         trace_id: traceId,
         workflow: { ...workflow, state: { execution: { status: "idle" as const } } },
         node_id: targetNodeId,
-        inputs: evaluatorInputSvc.buildTargetInputs({ cell }),
+        inputs: await this.inlineAttachments({
+          projectId,
+          cell,
+          datasetColumns,
+          inputs: evaluatorInputSvc.buildTargetInputs({ cell }),
+        }),
         origin: "evaluation",
       },
     };
@@ -401,6 +435,7 @@ export class ExperimentCellExecutionService {
         const result = yield* this.dispatchTarget({
           cell,
           projectId,
+          datasetColumns,
           workflow,
           targetNodeId,
           loadedData,

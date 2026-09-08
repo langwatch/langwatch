@@ -107,14 +107,14 @@ const makeCell = (evaluator: EvaluatorConfig): ExecutionCell => ({
 /** Run one cell to its end and collect every event it produced. */
 const runCell = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.executeCell(
+  for await (const event of ExperimentRunOrchestratorService.executeCell({
     cell,
-    "p1",
+    projectId: "p1",
     ports,
     datasetColumns,
-    {},
+    loadedData: {},
     workflows,
-  )) {
+  })) {
     events.push(event);
   }
   return events;
@@ -234,14 +234,14 @@ describe("given an evaluator run as its own column", () => {
 
   const runColumn = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
     const events: EvaluationV3Event[] = [];
-    for await (const event of ExperimentRunOrchestratorService.executeCell(
+    for await (const event of ExperimentRunOrchestratorService.executeCell({
       cell,
-      "p1",
+      projectId: "p1",
       ports,
       datasetColumns,
-      { evaluators: loadedEvaluators },
+      loadedData: { evaluators: loadedEvaluators },
       workflows,
-    )) {
+    })) {
       events.push(event);
     }
     return events;

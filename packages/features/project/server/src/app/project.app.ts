@@ -64,17 +64,19 @@ export class ProjectApp implements ProjectApiContract {
   }
 
   create(
-    input: Readonly<{
-      organizationId: string;
-      teamId?: string | undefined;
-      newTeamName?: string | undefined;
-      name: string;
-      language: string;
-      framework: string;
+    args: Readonly<{
+      input: Readonly<{
+        organizationId: string;
+        teamId?: string | undefined;
+        newTeamName?: string | undefined;
+        name: string;
+        language: string;
+        framework: string;
+      }>;
+      by: Readonly<{ id: string }>;
     }>,
-    by: Readonly<{ id: string }>,
   ): Promise<Project> {
-    return this.operations.create(input, by);
+    return this.operations.create(args);
   }
 
   updateSettings(input: Readonly<UpdateProjectInput & { projectId: string }>): Promise<Project> {
@@ -90,9 +92,8 @@ export class ProjectApp implements ProjectApiContract {
   }
 
   requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: Readonly<{ id: string }>,
+    args: Readonly<{ input: Readonly<{ projectId: string }>; by: Readonly<{ id: string }> }>,
   ): Promise<TopicClusteringRequest> {
-    return this.operations.requestTopicClustering(input, by);
+    return this.operations.requestTopicClustering(args);
   }
 }

@@ -20,6 +20,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DatasetTrpcApi } from "../../transport/api-trpc/dataset.api.ts";
 import { DatasetApp } from "../dataset.app.ts";
+import { UnavailableDatasetAttachmentStore } from "../../adapters/unavailable-dataset-attachment-store.adapter.ts";
+import { DatasetAttachmentService } from "../../services/dataset-attachment.service.ts";
+
+/** These surfaces upload nothing: the store refuses if an upload ever appears. */
+function noAttachments(): DatasetAttachmentService {
+  return DatasetAttachmentService.create({ store: UnavailableDatasetAttachmentStore.create() });
+}
 
 type TestContext = { app: { dataset: DatasetApp } };
 
@@ -78,6 +85,7 @@ function harness({
       app: {
         dataset: DatasetApp.create({
           dataset: datasetStub(dataset),
+          attachments: noAttachments(),
           experiments: {
             getById,
             tryGetBySlug: async () => {
