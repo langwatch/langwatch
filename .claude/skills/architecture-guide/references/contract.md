@@ -61,7 +61,9 @@ export const AnnotationApi = featureApi<AnnotationApi>("annotation");
 - Operation names use RPC verbs: `get` for one known record, `getMany` for known ids,
   `list` for queries, `create`, `update`, `delete` for mutations; `<verb><Entity>` for
   a second entity (`listScores`, `upsertScore`, `markQueueItemDone`). A method returns a
-  value or throws; absence is a `find*` method returning `undefined`, never `try*`.
+  value or throws; absence is a `find*` method returning `undefined`, never `try*`
+  (`fallible-result-naming` refuses the prefix on the API interface too, and a nullable
+  result on anything not named `find*`).
 - Parameters are one named object, typed from the contract's own schemas.
 
 ## Schemas once, types inferred

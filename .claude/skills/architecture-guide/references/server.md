@@ -74,8 +74,10 @@ repository, rules, service, store, subscriber, task`.
   `.projection.ts`, `.task.ts` export the class of the same name. Concrete runtime
   classes have a private constructor and `static create(...)`.
 - Ordinary methods return a value or throw the domain error. Absence is a `find*` method
-  returning `undefined`. `try*` and `require*` are not part of the vocabulary
-  (`fallible-result-naming`).
+  returning `undefined`, and only a `find*` method may carry a nullable result. `try*`
+  and `require*` are refused by `fallible-result-naming` whatever they return: a
+  `tryGetQueue` becomes `getQueue` that throws `QueueNotFoundError`, and a swallowed
+  catch that returned null becomes the throw it was hiding.
 - Repositories use `findAll` / `findById` / `create` / `update` / `delete` and specific
   reads (`findBySlug`, `listPage`); the app and services use the API's RPC verbs.
 - Parameters are named objects: `fn({ a, b })`. Services parse their input with the

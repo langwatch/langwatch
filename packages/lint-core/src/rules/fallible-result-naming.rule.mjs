@@ -1,6 +1,6 @@
 import { defineRule } from "../define-rule.mjs";
 
-const FALLIBLE_RESULT_MODULE = /\.(?:service|port|repository|store)\.ts$/;
+const FALLIBLE_RESULT_MODULE = /\.(?:api|app|service|port|repository|store)\.ts$/;
 
 function promiseTypeArgument(node) {
   if (node.type !== "TSTypeReference") return undefined;
@@ -19,30 +19,6 @@ function containsNullableType(node) {
   return false;
 }
 
-const NON_NULLABLE_TYPES = new Set([
-  "TSStringKeyword",
-  "TSNumberKeyword",
-  "TSBooleanKeyword",
-  "TSBigIntKeyword",
-  "TSSymbolKeyword",
-  "TSObjectKeyword",
-  "TSVoidKeyword",
-  "TSTypeLiteral",
-  "TSArrayType",
-  "TSTupleType",
-  "TSFunctionType",
-]);
-
-function definitelyNonNullableType(node) {
-  if (!node) return false;
-  if (node.type === "TSParenthesizedType") return definitelyNonNullableType(node.typeAnnotation);
-  if (node.type === "TSUnionType") return node.types.every(definitelyNonNullableType);
-  const promiseArgument = promiseTypeArgument(node);
-  if (promiseArgument) return definitelyNonNullableType(promiseArgument);
-  if (node.type === "TSLiteralType") return node.literal?.type !== "NullLiteral";
-  return NON_NULLABLE_TYPES.has(node.type);
-}
-
 function isFallibleResultModule(file) {
   if (file.role !== "contract" && file.role !== "server") return false;
   if (file.layoutVersion !== 0) return false;
@@ -50,8 +26,9 @@ function isFallibleResultModule(file) {
   return FALLIBLE_RESULT_MODULE.test(file.relative);
 }
 
-function capitalize(name) {
-  return name.charAt(0).toUpperCase() + name.slice(1);
+function withoutPrefix(name, prefix) {
+  const rest = name.slice(prefix.length);
+  return rest.charAt(0).toLowerCase() + rest.slice(1);
 }
 
 export const fallibleResultNamingRule = defineRule({
@@ -59,57 +36,77 @@ export const fallibleResultNamingRule = defineRule({
   kind: "problem",
   applies: isFallibleResultModule,
   messages: {
+    tryPrefix: {
+      what: "`{{name}}` hedges: a `try` method hands the caller a maybe instead of an answer.",
+      fix: "Name it `{{plain}}` and throw the domain error when it cannot answer; if absence is a normal outcome the caller branches on, name it `find*` and return undefined.",
+    },
     requirePrefix: {
       what: "Rename `{{name}}`: drop the `require` prefix; a method already returns or throws.",
       fix: "Rename the method without the `require` prefix.",
     },
     noResultType: {
-      what: "Capability {{name}} has no explicit result type, so its absence contract cannot be enforced.",
+      what: "`{{name}}` has no explicit result type, so its absence contract cannot be enforced.",
       fix: "Add an explicit return type.",
     },
-    untriedAbsence: {
-      what: "`{{name}}` can return null/undefined.",
-      fix: "Rename it `try{{Name}}`, or make it throw and drop the nullable from the type.",
-    },
-    tryWithoutAbsence: {
-      what: "`{{name}}` never returns null/undefined.",
-      fix: "Drop the `try` prefix or widen the return type.",
+    nullableWithoutFind: {
+      what: "`{{name}}` can return null/undefined, but only a `find*` method may answer with absence.",
+      fix: "Throw the domain error and drop the nullable from the type, or name it `find*`.",
     },
   },
   create(context) {
-    const check = (node) => {
-      if (node.kind !== "method" || node.computed) return;
-      if (node.key?.type !== "Identifier") return;
-      if (node.accessibility === "private") return;
-      const name = node.key.name;
-      // `requireById` — the imperative — is the redundant one: an ordinary
-      // method already returns a value or throws. `required` is an adjective
-      // the boolean-name policy allows, so it is not this.
-      if (/^require[A-Z]/.test(name)) {
-        context.report({ node: node.key, messageId: "requirePrefix", data: { name } });
-      }
-      const returnType = node.value?.returnType?.typeAnnotation;
-      if (!returnType) {
-        context.report({ node: node.key, messageId: "noResultType", data: { name } });
-        return;
-      }
-      const optional = name.startsWith("try");
-      if (containsNullableType(returnType) && !optional) {
+    const check = (key, returnType, accessibility, typeStatedElsewhere = false) => {
+      if (!key || key.type !== "Identifier") return;
+      if (accessibility === "private") return;
+      const name = key.name;
+
+      if (/^try[A-Z]/.test(name)) {
         context.report({
-          node: node.key,
-          messageId: "untriedAbsence",
-          data: { name, Name: capitalize(name) },
+          node: key,
+          messageId: "tryPrefix",
+          data: { name, plain: withoutPrefix(name, "try") },
         });
         return;
       }
-      if (!containsNullableType(returnType) && optional && definitelyNonNullableType(returnType)) {
-        context.report({ node: node.key, messageId: "tryWithoutAbsence", data: { name } });
+
+      if (/^require[A-Z]/.test(name)) {
+        context.report({ node: key, messageId: "requirePrefix", data: { name } });
+      }
+
+      if (!returnType) {
+        if (typeStatedElsewhere) return;
+        context.report({ node: key, messageId: "noResultType", data: { name } });
+        return;
+      }
+
+      if (containsNullableType(returnType) && !/^find[A-Z]?/.test(name)) {
+        context.report({ node: key, messageId: "nullableWithoutFind", data: { name } });
       }
     };
 
+    // A class that `implements` an interface already states every result type
+    // there; repeating it on the method would restate the contract.
+    const implementsInterface = (node) => (node.parent?.parent?.implements?.length ?? 0) > 0;
+
+    const checkMethod = (node) => {
+      if (node.kind !== "method" || node.computed) return;
+      check(
+        node.key,
+        node.value?.returnType?.typeAnnotation,
+        node.accessibility,
+        implementsInterface(node),
+      );
+    };
+
     return {
-      MethodDefinition: check,
-      TSAbstractMethodDefinition: check,
+      MethodDefinition: checkMethod,
+      TSAbstractMethodDefinition: checkMethod,
+      TSMethodSignature(node) {
+        if (node.computed) return;
+        check(node.key, node.returnType?.typeAnnotation, undefined);
+      },
+      FunctionDeclaration(node) {
+        check(node.id, node.returnType?.typeAnnotation, undefined);
+      },
     };
   },
 });

@@ -62,7 +62,11 @@ export const ApiKeyApi = featureApi<ApiKeyApi>("api-key");
   returns `undefined` for absence, nothing is `try*`/`require*`, a `{ ok, error }` result
   becomes a thrown `HandledError` from `<f>.errors.ts`.
 - A member that returns another service, a getter, a `tryGetX` lookup: it becomes a plain
-  operation or it is dropped because no caller uses it (say which in the report).
+  operation or it is dropped because no caller uses it (say which in the report). A
+  `tryX` never survives the move: it becomes `getX` that throws the feature's
+  not-found error, and every caller that branched on `undefined` now catches or lets
+  it propagate. `findX` returning `undefined` is only for an absence the caller
+  treats as a normal answer.
 - Inputs that are hand-written types become zod schemas in `<f>.schemas.ts` /
   `<f>-<part>.schemas.ts` (one file per sub-domain: annotation has `annotation-queue`,
   `annotation-review`, `annotation-response`), door-specific shapes in `<f>-trpc.schemas.ts`

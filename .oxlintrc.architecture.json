@@ -48,6 +48,20 @@
         "langwatch/logical-statement-spacing": "error"
       }
     },
+    {
+      // The reference shape reads in paragraphs. Enabled where the shape is
+      // already the annotation one; a feature turns it on as it converts
+      // (the rule auto-fixes: run oxlint --fix over the feature).
+      "files": [
+        "packages/api/src/**/*.ts",
+        "packages/features/annotation/**/*.ts",
+        "packages/features/annotation/**/*.tsx",
+        "apps/api/src/features/annotation/**/*.ts",
+        "apps/ui/src/features/annotation/**/*.ts",
+        "apps/ui/src/features/annotation/**/*.tsx"
+      ],
+      "rules": { "langwatch/logical-statement-spacing": "error" }
+    },
 
     // ------------------------------------------------------------------
     // DEBT REGISTER, langwatch/boolean-wall, packages/architecture-lint/src
