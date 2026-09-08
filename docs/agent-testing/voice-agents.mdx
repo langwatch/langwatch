@@ -9,6 +9,10 @@ description: Scenario tests voice agents end to end over real audio, with the sa
   **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. To do it by hand, follow the steps below.
 </Tip>
 
+<Note>
+  Prefer no code? You can register an ElevenLabs agent and test it from the app, see [Voice Agents in the App](/agent-testing/voice-agents-in-app).
+</Note>
+
 ## How a voice test runs
 
 The user simulator synthesizes a caller, speaks to your agent through its real transport, and reacts to the replies turn after turn. The judge scores the conversation against your criteria, and the run records the audio and a per-segment transcript.
