@@ -95,6 +95,45 @@ function DrawerHarness() {
   );
 }
 
+/**
+ * The longest labels the six real call sites build.
+ *
+ * The rule composer's source picker joins a name the organisation chose to a
+ * source type the code fixed, as `name (source_type)`, and the longest fixed
+ * half is `copilot_studio_dataverse`. So the width of this option is not
+ * something the page controls, and the house wrapper positions the list with
+ * `sameWidth`: the list can never be wider than the trigger, however long the
+ * label. Whether that clips is a question only a real engine can answer.
+ *
+ * The drawer is `lg` here rather than `md` because that is what the composer
+ * actually opens at, and the drawer's width is what the trigger inherits.
+ */
+const SOURCES = [
+  { label: "Audit log (http_custom)", value: "s1" },
+  {
+    label: "Production Copilot Studio for Sales (copilot_studio_dataverse)",
+    value: "s2",
+  },
+];
+
+function SourcesHarness() {
+  const [value, setValue] = useState("s1");
+  return (
+    <Drawer.Root open placement="end" size="lg">
+      <Drawer.Content>
+        <Drawer.Body>
+          <DashboardSelect
+            ariaLabel="Ingestion source"
+            options={SOURCES}
+            value={value}
+            onChange={setValue}
+          />
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
 const mount = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
@@ -184,6 +223,52 @@ describe("given the governance dashboard's choice control in a real browser", ()
       // that matters: if the list were behind the drawer, this click would land
       // on the drawer and the trigger would still read its old value.
       await waitFor(() => expect(trigger()).toHaveTextContent("Every day"));
+    });
+  });
+
+  describe("when an option is longer than the field", () => {
+    const sourcePicker = () =>
+      screen.getByRole("combobox", { name: "Ingestion source" });
+
+    // Deliberately unbound. These two assert that a long label is not clipped,
+    // which is not what the no-native-select scenario says, and no scenario
+    // currently states the rule. Binding them to the nearest title would have
+    // claimed coverage the tests do not provide and left clipping uncovered
+    // while looking covered. A test without a scenario is fine; a scenario
+    // held up by tests that assert something else is the failure.
+    it("shows the whole of a long source label rather than cutting it off", async () => {
+      mount(<SourcesHarness />);
+      await userEvent.click(sourcePicker());
+      const option = await screen.findByRole("option", {
+        name: SOURCES[1]!.label,
+      });
+
+      // Clipping is horizontal overflow, so this is the measurement that
+      // detects it whether the cut is an ellipsis or a hard edge. Wrapping to a
+      // second line is fine and passes here: the label stays readable, which is
+      // the property that matters. Two sources whose names differ only past the
+      // cut would otherwise be indistinguishable at the moment of choosing.
+      expect(option.scrollWidth).toBeLessThanOrEqual(option.clientWidth + 1);
+    });
+
+    // Unbound, for the reason given above.
+    it("shows the whole of the chosen source in the closed field", async () => {
+      mount(<SourcesHarness />);
+      await userEvent.click(sourcePicker());
+      await userEvent.click(
+        await screen.findByRole("option", { name: SOURCES[1]!.label }),
+      );
+      await waitFor(() =>
+        expect(sourcePicker()).toHaveTextContent(SOURCES[1]!.label),
+      );
+
+      // The closed trigger is the state the label spends nearly all its life
+      // in, and it is the narrower of the two: the list is at least as wide as
+      // the trigger, never less. A label readable while the list is open and
+      // cut off once chosen still leaves the person unable to check what they
+      // picked.
+      const label = sourcePicker().firstElementChild ?? sourcePicker();
+      expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth + 1);
     });
   });
 });
