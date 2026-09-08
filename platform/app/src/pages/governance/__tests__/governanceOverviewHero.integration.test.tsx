@@ -16,6 +16,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -191,14 +194,62 @@ function renderPage() {
 const A_SAMPLE_INSIGHT =
   "Three registered agents have run without a named owner since May.";
 
-/** The hero's ways in, in the order they are drawn. */
-const wayInLabels = () =>
+/** The hero's ways in, by label, in the order they are drawn. */
+const WAY_IN_LABELS = ["Add people", "Add agent", "Add tool"] as const;
+
+const wayInLinks = () =>
   screen
     .getAllByRole("link")
-    .map((link) => link.textContent)
-    .filter((label): label is string =>
-      ["Add people", "Add agent", "Add anomaly rule"].includes(label ?? ""),
+    .filter((link) =>
+      (WAY_IN_LABELS as readonly string[]).includes(link.textContent ?? ""),
     );
+
+const wayInLabels = () => wayInLinks().map((link) => link.textContent ?? "");
+
+const wayInHrefs = () =>
+  wayInLinks().map((link) => link.getAttribute("href") ?? "");
+
+/**
+ * The package root. `process.cwd()` rather than the `import.meta.url` walk the
+ * mark-colour scan uses: that scan runs in the node environment, and under
+ * jsdom `import.meta.url` is an http URL that `fileURLToPath` refuses.
+ */
+const PACKAGE_ROOT = process.cwd();
+
+/**
+ * The tab names a governance page honours, read out of the page's own
+ * `X_TABS = [...] as const` tuple — the single list its `isXTab` guard tests
+ * against, so what this returns is what that page will actually accept.
+ *
+ * Read from source rather than imported because these tuples are private to
+ * their pages, and exporting three of them so a chip test can see them would
+ * widen three modules' surface to serve one assertion.
+ */
+async function tabsOfPage(path: string): Promise<string[]> {
+  const name = path.replace("/governance/", "");
+  const candidates = [
+    `src/pages/governance/${name}.tsx`,
+    `ee/governance/dashboard/pages/${name}.tsx`,
+  ];
+  const found = candidates
+    .map((candidate) => join(PACKAGE_ROOT, candidate))
+    .find((candidate) => existsSync(candidate));
+  // Thrown rather than returned empty. An unresolvable page would otherwise
+  // look like a page with no tabs, and the caller's `toContain` would fail
+  // naming the tab instead of naming the page it could not find. Thrown
+  // rather than asserted because an `expect` out here is counted against
+  // whichever test happens to be running.
+  if (found === undefined) throw new Error(`no page source for ${path}`);
+
+  const source = await readFile(found, "utf8");
+  const tuple = /const \w*TABS = \[([^\]]*)\] as const;/.exec(source);
+  if (tuple?.[1] === undefined)
+    throw new Error(`no \`X_TABS = [...] as const\` tuple in ${found}`);
+
+  return [...tuple[1].matchAll(/"([^"]+)"/g)].map(
+    (match) => match[1] as string,
+  );
+}
 
 /** The pill, found by what it does rather than by how it is drawn. */
 const sourcePill = () =>
@@ -242,14 +293,10 @@ afterEach(() => cleanup());
 describe("governance overview", () => {
   describe("when the overview renders", () => {
     /** @scenario "The hero offers three ways in, in the order a surface is set up" */
-    it("offers add people, add agent and add anomaly rule, in that order", () => {
+    it("offers add people, add agent and add tool, in that order", () => {
       renderPage();
 
-      expect(wayInLabels()).toEqual([
-        "Add people",
-        "Add agent",
-        "Add anomaly rule",
-      ]);
+      expect(wayInLabels()).toEqual(["Add people", "Add agent", "Add tool"]);
       expect(screen.getByRole("link", { name: "Add people" })).toHaveAttribute(
         "href",
         "/governance/people?tab=people",
@@ -258,9 +305,31 @@ describe("governance overview", () => {
         "href",
         "/governance/agents?tab=agents&add=1",
       );
-      expect(
-        screen.getByRole("link", { name: "Add anomaly rule" }),
-      ).toHaveAttribute("href", "/governance/inventory?tab=anomaly-rules");
+      expect(screen.getByRole("link", { name: "Add tool" })).toHaveAttribute(
+        "href",
+        "/governance/inventory",
+      );
+    });
+
+    /** @scenario "No shortcut points at a tab the page would not honour" */
+    it("names only tabs the destination page actually has", async () => {
+      renderPage();
+
+      const carried = wayInHrefs().flatMap((href) => {
+        const [path, query] = href.split("?");
+        const tab = new URLSearchParams(query ?? "").get("tab");
+        return tab === null ? [] : [{ path: path ?? "", tab }];
+      });
+
+      // The chips are worth this only because a wrong tab is invisible: the
+      // destination degrades an unknown one to its default pane, so the link
+      // opens a real screen — just not the one its label promised. Asserting
+      // the href alone is what let "Add anomaly rule" keep pointing at a tab
+      // the inventory had already dropped.
+      expect(carried.length).toBeGreaterThan(0);
+      for (const { path, tab } of carried) {
+        expect(await tabsOfPage(path)).toContain(tab);
+      }
     });
   });
 
@@ -313,11 +382,7 @@ describe("governance overview", () => {
 
       expect(sourcePill()).toBeUndefined();
       expect(screen.queryByText("Add Source")).not.toBeInTheDocument();
-      expect(wayInLabels()).toEqual([
-        "Add people",
-        "Add agent",
-        "Add anomaly rule",
-      ]);
+      expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
     });
   });
 
@@ -340,11 +405,7 @@ describe("governance overview", () => {
       renderPage();
 
       expect(harness.placeholder).toBe("Search, or jump to anything");
-      expect(wayInLabels()).toEqual([
-        "Add people",
-        "Add agent",
-        "Add anomaly rule",
-      ]);
+      expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
     });
   });
 
