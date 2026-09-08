@@ -44,7 +44,21 @@ Follow-ups outside this lane: five `@scenario` titles over 100 columns in `specs
 `lwql-langy-authoring.feature` (shorten spec and tests together); the REST scope carries only the project id, so
 `getDashboardLinks` exists — delete it if the runtime ever hands the slug to a REST handler.
 
-## platform-health — pending lane report
+## platform-health (feature landed; family was mounted nowhere before)
+
+`installApiPlatformHealth({ apiKey: config.platformHealth.apiKey, probeApiKey: config.platformHealth.probeApiKey,
+probes })` in `apps/api/src/features/platform-health/platform-health.composition.ts` returns `{ app, rest }`.
+- `apps/api/src/app-rest/app-rest.process-features.ts`: `ApiProcessRestServices.platformHealth?: MountableRestApp | undefined`;
+  after the `healthProbes` push, `if (services.platformHealth) features.push(services.platformHealth);`.
+- `apps/api/src/app/api-production.composition.ts`: field `composedPlatformHealth: ComposedPlatformHealthFeature | undefined`;
+  install in the async compose phase; extract the inline `healthProbes` expression (~lines 2031–2050) into
+  `composeHealthProbes(): HealthProbeRestPorts | undefined` used by both doors; pass
+  `...(this.composedPlatformHealth ? { platformHealth: this.composedPlatformHealth.rest } : {})` to
+  `createApiProcessRestFeatures`. The OpenAPI checker will report two ADDED operations.
+
+Runtime follow-ups (packages/api): a credential door that establishes no tenant scope (`credential: "internalSecret"`),
+so a secret-guarded family is not published as `security: []` with a `public` policy; declared non-2xx success
+statuses (`responds({ 200, 503 })`) so an unhealthy report is an answer, not an error-level log per poll.
 
 ## role — pending lane report
 
