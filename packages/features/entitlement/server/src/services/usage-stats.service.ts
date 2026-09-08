@@ -11,7 +11,7 @@ import type {
   UsageStats,
 } from "@langwatch/entitlement-contract";
 import { USAGE_UNKNOWN, UsageCounterPort } from "../ports/usage-counter.port.ts";
-import type { UsageMembershipPort } from "../ports/usage-membership.port.ts";
+import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
 
 /**
  * The message allowance a plan states when it means "we do not cap this". Stated rather than
@@ -55,7 +55,7 @@ export type UsageStatsCaller = PlanProviderUser;
  */
 export class UsageStatsService {
   static create(options: {
-    membership: UsageMembershipPort;
+    membership: UsageMembershipRepository;
     counter: UsageCounterPort;
     plans: PlanProvider;
   }): UsageStatsService {
@@ -63,7 +63,7 @@ export class UsageStatsService {
   }
 
   private constructor(
-    private readonly membership: UsageMembershipPort,
+    private readonly membership: UsageMembershipRepository,
     private readonly counter: UsageCounterPort,
     private readonly planProvider: PlanProvider,
   ) {}
@@ -119,7 +119,10 @@ export class UsageStatsService {
    * Gets comprehensive usage statistics for an organization.
    * Aggregates data from multiple sources in parallel.
    */
-  async getUsageStats(organizationId: string, user: UsageStatsCaller): Promise<UsageStats> {
+  async getUsageStats(
+    organizationId: string,
+    user: UsageStatsCaller | undefined,
+  ): Promise<UsageStats> {
     const [
       currentMonthMessagesCount,
       currentMonthCost,

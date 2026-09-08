@@ -5323,6 +5323,9 @@ importers:
 
   packages/features/entitlement/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -5369,6 +5372,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -5376,6 +5382,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -8258,6 +8267,9 @@ importers:
 
   packages/features/presence/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -8304,6 +8316,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -8314,6 +8329,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -9322,6 +9340,12 @@ importers:
 
   packages/features/share/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -9356,6 +9380,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability

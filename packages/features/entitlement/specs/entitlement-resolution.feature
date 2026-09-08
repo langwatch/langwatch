@@ -38,6 +38,13 @@ Feature: Provider-neutral entitlement resolution
     Then plan-source selection is unchanged
     And any limitation override is derived from the operator context once
 
+  @unit @authorization
+  Scenario: An impersonating operator is resolved through the user directory
+    Given a request names its caller and the platform operator acting as them
+    When Entitlements resolves the active plan for that request
+    Then the operator's address is read from the user directory before any source sees it
+    And a request with no operator acting as the caller resolves the organization's own limitations
+
   @architecture @typecheck
   Scenario: Provider details do not cross the contract
     Given Billing or Licensing supplies a plan

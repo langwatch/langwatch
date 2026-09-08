@@ -8,8 +8,8 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
-import { UsageMembershipPort } from "../../ports/usage-membership.port.ts";
 import { MemberClassificationService } from "../../services/member-classification.service.ts";
+import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
 
 /** The first instant of the current calendar month, in the process's zone. */
 function getCurrentMonthStart(): Date {
@@ -44,14 +44,12 @@ interface MemberClassificationContext {
  * Repository implementation for counting resources per organization.
  * Pure data access layer - only Prisma queries, no business logic.
  */
-export class PrismaUsageMembershipRepository extends UsageMembershipPort {
+export class PrismaUsageMembershipRepository implements UsageMembershipRepository {
   static create(prisma: PrismaClient | Prisma.TransactionClient): PrismaUsageMembershipRepository {
     return new PrismaUsageMembershipRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {
-    super();
-  }
+  private constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
 
   /**
    * Counts full members: ADMIN/MEMBER role, EXTERNAL role with a non-view custom role, or a
@@ -65,7 +63,8 @@ export class PrismaUsageMembershipRepository extends UsageMembershipPort {
   /**
    * Counts Lite Member users in organization:
    * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - PENDING invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
+   * - PENDING invites (not expired, or no expiration) with EXTERNAL role AND
+   *   (no custom role OR view-only custom role)
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);

@@ -651,14 +651,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/entitlement/contract/src/entitlement.api.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/entitlement/contract/src/entitlement.service.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/entitlement/server/src/entitlement.server.ts"
     },
     {

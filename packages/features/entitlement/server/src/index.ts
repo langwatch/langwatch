@@ -1,23 +1,21 @@
-export { EntitlementApp } from "./app/entitlement.app.ts";
-export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
 export { entitlementServer } from "./entitlement.server.ts";
+export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
+export { planTrpcTransport } from "./transport/plan.trpc.ts";
+export { usageLimitsTrpcTransport } from "./transport/usage-limits.trpc.ts";
+export { organizationSpendTrpcTransport } from "./transport/organization-spend.trpc.ts";
+
+/**
+ * The pieces the api and worker composition roots still build the deployment's
+ * plan sources, usage counters and seat readings from. They leave this file as
+ * those roots move onto the installed feature.
+ */
 export {
   EntitlementService,
   type EntitlementServiceOptions,
 } from "./services/entitlement.service.ts";
-export { PlanTrpcApi, type PlanTrpcContext } from "./transport/api-trpc/plan.api.ts";
-export {
-  LimitsTrpcApi,
-  type LimitsTrpcContext,
-  type LimitsTrpcPorts,
-} from "./transport/api-trpc/limits.api.ts";
-export {
-  CostTrpcApi,
-  type CostTrpcContext,
-  type CostTrpcPorts,
-} from "./transport/api-trpc/cost.api.ts";
 export { USAGE_UNKNOWN, UsageCounterPort, type UsageCount } from "./ports/usage-counter.port.ts";
-export { UsageMembershipPort } from "./ports/usage-membership.port.ts";
+export { UsageWarningPort } from "./ports/usage-warning.port.ts";
+export type { UsageMembershipRepository } from "./repositories/usage-membership.repository.ts";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository.ts";
 export {
   MESSAGE_LIMIT_WARNING_THRESHOLD,
@@ -35,11 +33,6 @@ export {
   UsageMeterPolicyService,
   type MeterDecision,
 } from "./services/usage-meter-policy.service.ts";
-
-/**
- * Enforcement: the plan's allowance measured against the month's real volume.
- * Was `platform/app/src/server/app-layer/usage/`.
- */
 export {
   OrganizationNotFoundForTeamError,
   UsageService,

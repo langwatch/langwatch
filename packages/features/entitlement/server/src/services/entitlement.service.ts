@@ -1,5 +1,4 @@
 import {
-  EntitlementService as EntitlementServiceContract,
   planSchema,
   type AuthorizationContextResolver,
   type BaselinePlanSource,
@@ -20,14 +19,12 @@ export type EntitlementServiceOptions = {
   authorization?: AuthorizationContextResolver;
 };
 
-export class EntitlementService extends EntitlementServiceContract implements PlanProvider {
+export class EntitlementService implements PlanProvider {
   static create(options: EntitlementServiceOptions): EntitlementService {
     return new EntitlementService(options);
   }
 
-  private constructor(private readonly options: EntitlementServiceOptions) {
-    super();
-  }
+  private constructor(private readonly options: EntitlementServiceOptions) {}
 
   async getActivePlan(input: ResolvePlanInput): Promise<Plan> {
     let plan = await this.resolvePlan(input);

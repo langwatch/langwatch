@@ -6,7 +6,7 @@
 import { usageStatsSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
 import { UsageCounterPort, type UsageCount } from "../../ports/usage-counter.port.ts";
-import { UsageMembershipPort } from "../../ports/usage-membership.port.ts";
+import type { UsageMembershipRepository } from "../../repositories/usage-membership.repository.ts";
 import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
 
 const UNLIMITED_MESSAGES = 999_999_999;
@@ -25,7 +25,7 @@ function planWith(maxMessagesPerMonth: number): Plan {
   };
 }
 
-class StubMembership extends UsageMembershipPort {
+class StubMembership implements UsageMembershipRepository {
   async getMemberCount(): Promise<number> {
     return 3;
   }
