@@ -4,10 +4,7 @@
  * the session's active scope — no graph fetched for this page.
  */
 
-import {
-  TopicHostProvider,
-  type TopicHostPort,
-} from "@langwatch/topic-web/screens/topic-clustering";
+import { TopicHostProvider, type TopicHostPort } from "@langwatch/topic-web/topic-clustering";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

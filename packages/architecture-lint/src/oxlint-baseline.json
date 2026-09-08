@@ -2690,7 +2690,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/topic/web/src/screens/topic-clustering/topic-clustering.screen.tsx",
+      "key": "cognitive-complexity|packages/features/topic/web/src/ui/sections/topic-clustering.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6514,7 +6514,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/features/topic/web/src/screens/topic-clustering/topic-clustering.screen.tsx",
+      "key": "condition-shape|packages/features/topic/web/src/ui/sections/topic-clustering.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7755,10 +7755,6 @@
     },
     {
       "key": "namespace-class|packages/features/suite/server/src/services/connected-target.service.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "namespace-class|packages/features/topic/server/src/adapters/postgres.topic.adapter.ts",
       "measured": "2026-09-08"
     },
     {
@@ -9058,7 +9054,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/topic/web/src/screens/topic-clustering/topic-clustering.screen.tsx",
+      "key": "nested-ternary|packages/features/topic/web/src/ui/sections/topic-clustering.screen.tsx",
       "measured": "2026-09-06"
     },
     {

@@ -1,5 +1,5 @@
 import type { EventSourcing } from "@langwatch/eventing";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import { TopicServerInstallerAdapter } from "@langwatch/topic-server";
 import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 
@@ -21,7 +21,7 @@ export class TopicApiFeature {
     private readonly traceAssignments: TraceTopicAssignmentPort,
   ) {}
 
-  get service(): TopicService {
+  get service(): TopicApi {
     return this.installer.service;
   }
 

@@ -3,7 +3,6 @@ import {
   topicClusteringRunHistoryEntrySchema,
   topicNamesInputSchema,
   topicProjectInputSchema,
-  TopicService as TopicServiceContract,
   type Topic,
   type TopicClusteringRunHistoryEntry,
   type TopicClusteringStatus,
@@ -14,7 +13,7 @@ import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import type { TopicRepository } from "../repositories/topic.repository.ts";
 import type { TopicClusteringSchedulePort } from "../ports/topic-clustering-schedule.port.ts";
 
-export class TopicService extends TopicServiceContract {
+export class TopicService {
   static create(options: {
     repository: TopicRepository;
     schedule: TopicClusteringSchedulePort;
@@ -27,9 +26,7 @@ export class TopicService extends TopicServiceContract {
     private readonly repository: TopicRepository,
     private readonly schedule: TopicClusteringSchedulePort,
     private readonly now: () => number,
-  ) {
-    super();
-  }
+  ) {}
 
   getAll(input: TopicProjectInput): Promise<Topic[]> {
     return this.repository.findAll(topicProjectInputSchema.parse(input));

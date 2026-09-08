@@ -8,9 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/topic-clustering": {
-      "types": "./dist/screens/topic-clustering/index.d.ts",
-      "default": "./src/screens/topic-clustering/index.ts"
+    "./topic-clustering": {
+      "langwatch-declaration-source": "./src/topic-clustering.ts",
+      "types": "./dist/topic-clustering.d.ts",
+      "default": "./src/topic-clustering.ts"
     }
   },
   "scripts": {

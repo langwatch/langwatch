@@ -25,11 +25,9 @@ export interface TopicClusteringStatusRecord {
 }
 
 /** Private persistence capability for the Topic service. */
-export abstract class TopicRepository {
-  abstract findAll(input: TopicProjectInput): Promise<Topic[]>;
-  abstract findNamesByIds(input: TopicNamesInput): Promise<Map<string, string>>;
-  abstract findClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatusRecord>;
-  abstract findClusteringRunHistory(
-    input: TopicProjectInput,
-  ): Promise<TopicClusteringRunHistoryEntry[]>;
+export interface TopicRepository {
+  findAll(input: TopicProjectInput): Promise<Topic[]>;
+  findNamesByIds(input: TopicNamesInput): Promise<Map<string, string>>;
+  findClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatusRecord>;
+  findClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
 }

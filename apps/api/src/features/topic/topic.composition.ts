@@ -1,65 +1,37 @@
 /**
- * The topic tree a project's traces are labelled by, composed as its own feature.
+ * The topic tree a project's traces are labelled by, installed over this
+ * process's own graph.
  */
-import { HandledError } from "@langwatch/handled-error";
-import type { TopicService } from "@langwatch/topic-contract";
-import { PostgresTopicAdapter, TopicClusteringSchedulePort } from "@langwatch/topic-server";
+import { createApp } from "@langwatch/runtime-composition";
+import { TopicClusteringSchedulePort, topicServer } from "@langwatch/topic-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createTopicTrpcRouter } from "./topic-trpc.mount.ts";
 
 import type { ComposedTopicFeature } from "./topic.composition.types.ts";
 
-/** Composes the topic tree over this process's own connection. */
-export function composeTopicFeature(options: {
+/** Installs the topic read surface over this process's own connection. */
+export async function installApiTopic(options: {
   infrastructure: ApiTrpcInfrastructure;
-}): ComposedTopicFeature {
-  const service = PostgresTopicAdapter.create({
-    database: options.infrastructure.prisma,
+}): Promise<ComposedTopicFeature> {
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma: options.infrastructure.prisma })
     // The next clustering wake is an eventing schedule read, and this process
     // starts no scheduler. `null` is the status panel's own "not scheduled",
     // which is what a process that never schedules should say.
-    schedule: new UnscheduledTopicClustering(),
-  });
+    .withInfrastructure({ schedule: new UnscheduledTopicClustering() })
+    .withFeature(topicServer)
+    .boot({ role: "api" });
 
-  return { service, router: (mount) => createTopicTrpcRouter(mount) };
-}
-
-/**
- * The topic tree on a process that composed no database. The namespace still mounts and
- * every call refuses by name, so the topics page says the deployment cannot answer rather
- * than reporting a project with no topics, which reads as "clustering found nothing".
- */
-export function refusingTopicFeature(): ComposedTopicFeature {
-  const service = new Proxy(
-    {},
-    {
-      get: () => (): never => {
-        throw new ApiTopicUnavailableError("The topic tree");
-      },
-      has: () => true,
-    },
-  ) as TopicService;
-
-  return { service, router: (mount) => createTopicTrpcRouter(mount) };
+  return {
+    app: runtime.feature(topicServer).provided,
+    router: (mount) => createTopicTrpcRouter(mount.runtime),
+  };
 }
 
 /** A process that never schedules clustering: the status panel reads "not scheduled". */
 class UnscheduledTopicClustering extends TopicClusteringSchedulePort {
   tryGetNextWakeAt() {
     return Promise.resolve(null);
-  }
-}
-
-/** A capability this deployment did not compose, refused by name. */
-class ApiTopicUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} is not available on this deployment.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiTopicUnavailableError";
   }
 }

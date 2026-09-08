@@ -1,3 +1,4 @@
+import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   topicClusteringRunHistoryEntrySchema,
@@ -8,7 +9,7 @@ import {
   type TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { z } from "zod";
-import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
+import type { TopicClusteringStatusRecord, TopicRepository } from "../topic.repository.ts";
 
 const projectionSchema = z.object({
   LastRequestedAt: z.number().nullable(),
@@ -30,30 +31,27 @@ const projectionSchema = z.object({
 const runsSchema = z.array(topicClusteringRunHistoryEntrySchema);
 
 /**
- * The Prisma capability Topic's read repository consumes.
- *
- * A `Pick` rather than the whole client, so a composition root can hand this
- * package the process's one client without every consumer of the type having
- * to BE a `PrismaClient` — the client still is one, and the narrowing is what
- * lets a background process name its database once and pass it to every
- * feature.
+ * The three delegates the topic read touches, named rather than taken whole so
+ * a process can hand this package its one client without the client's exact
+ * generated shape becoming part of the package's contract.
  */
 export type TopicDatabase = Pick<
   PrismaClient,
   "topic" | "topicClusteringRunProjection" | "topicClusteringRunHistoryProjection"
 >;
 
-export class PrismaTopicRepository extends TopicRepository {
-  static create(database: TopicDatabase): PrismaTopicRepository {
-    return new PrismaTopicRepository(database);
-  }
-
-  private constructor(private readonly database: TopicDatabase) {
-    super();
-  }
+export class PrismaTopicRepository
+  extends PrismaRepository.for(
+    "Topic",
+    "TopicClusteringRunProjection",
+    "TopicClusteringRunHistoryProjection",
+  )
+  implements TopicRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaTopicRepository(prisma));
 
   async findAll(input: TopicProjectInput): Promise<Topic[]> {
-    const rows = await this.database.topic.findMany({
+    const rows = await this.prisma.topic.findMany({
       where: { projectId: input.projectId },
       select: {
         id: true,
@@ -67,7 +65,7 @@ export class PrismaTopicRepository extends TopicRepository {
 
   async findNamesByIds(input: TopicNamesInput): Promise<Map<string, string>> {
     if (input.ids.length === 0) return new Map();
-    const rows = await this.database.topic.findMany({
+    const rows = await this.prisma.topic.findMany({
       where: { projectId: input.projectId, id: { in: input.ids } },
       select: { id: true, name: true },
     });
@@ -80,7 +78,7 @@ export class PrismaTopicRepository extends TopicRepository {
   }
 
   async findClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatusRecord> {
-    const projection = await this.database.topicClusteringRunProjection.findUnique({
+    const projection = await this.prisma.topicClusteringRunProjection.findUnique({
       where: { projectId: input.projectId },
     });
 
@@ -110,7 +108,7 @@ export class PrismaTopicRepository extends TopicRepository {
   async findClusteringRunHistory(
     input: TopicProjectInput,
   ): Promise<TopicClusteringRunHistoryEntry[]> {
-    const row = await this.database.topicClusteringRunHistoryProjection.findUnique({
+    const row = await this.prisma.topicClusteringRunHistoryProjection.findUnique({
       where: { projectId: input.projectId },
       select: { Runs: true },
     });

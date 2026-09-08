@@ -10,10 +10,8 @@ export {
   type TopicModelData,
 } from "./adapters/eventing.topic-clustering.adapter.ts";
 export { TopicClusteringProcessingProducerAdapter } from "./adapters/topic-clustering-processing-producer.adapter.ts";
-export {
-  PostgresTopicAdapter,
-  type TopicClusteringPersistence,
-} from "./adapters/postgres.topic.adapter.ts";
+export { TopicApp, type TopicInfrastructure } from "./app/topic.app.ts";
+export { topicServer } from "./topic.server.ts";
 export {
   TopicServerInstallerAdapter,
   type TopicClusteringExecutionDependencies,
@@ -99,4 +97,4 @@ export {
   TopicClusteringProcess,
   type TopicClusteringProcessState,
 } from "./processes/topic-clustering.process.ts";
-export { TopicTrpcApi, type TopicTrpcContext } from "./transport/api-trpc/topic.api.ts";
+export { topicTrpcTransport } from "./transport/topic.trpc.ts";

@@ -1319,10 +1319,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/topic/contract/src/topic.service.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/topic/server/src/topic.server.ts"
     },
     {

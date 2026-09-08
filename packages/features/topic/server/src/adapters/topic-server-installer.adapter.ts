@@ -1,6 +1,7 @@
 import type { ProcessStore } from "@langwatch/eventing";
 import { EventSourcing } from "@langwatch/eventing";
-import type { TopicClusteringModelsPort, TopicService } from "@langwatch/topic-contract";
+import type { StateProjectionStore } from "@langwatch/eventing";
+import type { TopicApi, TopicClusteringModelsPort } from "@langwatch/topic-contract";
 import { type AssignTopicCommandData, TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import {
@@ -12,7 +13,6 @@ import {
   createTopicClusteringProcessingPipeline,
   type TopicClusteringProcessingPipelineDeps,
 } from "./eventing.topic-clustering.adapter.ts";
-import { PostgresTopicAdapter, type TopicClusteringPersistence } from "./postgres.topic.adapter.ts";
 import { RedisTopicClusteringBootstrapAdapter } from "./redis.topic-clustering-bootstrap.adapter.ts";
 import {
   classifyClusteringError,
@@ -30,8 +30,29 @@ import type {
   TopicClusteringLangevalsPort,
 } from "../ports/topic-clustering-langevals.port.ts";
 import type { TopicClusteringCommandsPort } from "../ports/topic-clustering-commands.port.ts";
-import type { TopicClusteringDatabase } from "../repositories/prisma/prisma.topic-clustering.repository.ts";
+import {
+  PrismaTopicClusteringRepository,
+  type TopicClusteringDatabase,
+} from "../repositories/prisma/prisma.topic-clustering.repository.ts";
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-history-projection.repository.ts";
+import { PrismaTopicClusteringRunProjectionRepository } from "../repositories/prisma/prisma.topic-clustering-run-projection.repository.ts";
+import { PrismaTopicModelProjectionRepository } from "../repositories/prisma/prisma.topic-model-projection.repository.ts";
+import { PrismaTopicRepository } from "../repositories/prisma/prisma.topic.repository.ts";
+import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import type { TopicClusteringRunHistoryData } from "../projections/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunStatusData } from "../projections/topic-clustering-run-status.projection.ts";
+import type { TopicModelData } from "../projections/topic-model.projection.ts";
+import { TopicService } from "../services/topic.service.ts";
 import { nowInstant } from "@langwatch/time";
+
+/** The clustering pipeline's Postgres persistence, keyed as the registry expects it. */
+export interface TopicClusteringPersistence {
+  topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
+  topicClusteringRunHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
+  topicModel: StateProjectionStore<TopicModelData>;
+  /** The runner's and boot migration's private repository. */
+  repository: TopicClusteringRepository;
+}
 
 /** Technical dependencies supplied by API/worker composition for Topic execution. */
 export interface TopicClusteringExecutionDependencies {
@@ -56,7 +77,7 @@ export class TopicServerInstallerAdapter {
     return new TopicServerInstallerAdapter(options);
   }
 
-  readonly service: TopicService;
+  readonly service: TopicApi;
   readonly persistence: TopicClusteringPersistence;
   readonly runPort: TopicClusteringRunPort;
 
@@ -67,11 +88,17 @@ export class TopicServerInstallerAdapter {
   private installed = false;
 
   private constructor(private readonly dependencies: TopicServerInstallerDependencies) {
-    this.persistence = PostgresTopicAdapter.createClusteringPersistence({
-      database: dependencies.database,
-    });
-    this.service = PostgresTopicAdapter.create({
-      database: dependencies.database,
+    const database = dependencies.database;
+    this.persistence = {
+      topicClusteringRunStatus: PrismaTopicClusteringRunProjectionRepository.create({ database }),
+      topicClusteringRunHistory: PrismaTopicClusteringRunHistoryProjectionRepository.create({
+        database,
+      }),
+      topicModel: PrismaTopicModelProjectionRepository.create({ database }),
+      repository: PrismaTopicClusteringRepository.create({ database }),
+    };
+    this.service = TopicService.create({
+      repository: PrismaTopicRepository.create({ prisma: database }),
       schedule: EventingTopicClusteringScheduleAdapter.create({
         processStore: dependencies.processStore,
       }),

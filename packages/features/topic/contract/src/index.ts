@@ -4,4 +4,5 @@ export * from "./topic-clustering.errors.ts";
 export * from "./topic-clustering.events.ts";
 export * from "./topic-clustering.types.ts";
 export * from "./topic-clustering-models.ts";
-export * from "./topic.service.ts";
+export * from "./topic.api.ts";
+export * from "./topic.trpc.ts";

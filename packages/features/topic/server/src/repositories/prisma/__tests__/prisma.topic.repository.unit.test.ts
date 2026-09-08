@@ -42,7 +42,7 @@ describe("PrismaTopicRepository", () => {
   /** @scenario "list topics for a project" */
   it("preserves the database order of topics and the legacy read selection", async () => {
     const { database, topicFindMany } = makeDatabase();
-    const repository = PrismaTopicRepository.create(database);
+    const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(repository.findAll({ projectId: "project-1" })).resolves.toEqual(topicRows);
     expect(topicFindMany).toHaveBeenCalledWith({
@@ -58,7 +58,7 @@ describe("PrismaTopicRepository", () => {
 
   it("does not query for an empty name lookup", async () => {
     const { database, topicFindMany } = makeDatabase();
-    const repository = PrismaTopicRepository.create(database);
+    const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(repository.findNamesByIds({ projectId: "project-1", ids: [] })).resolves.toEqual(
       new Map(),
@@ -71,7 +71,7 @@ describe("PrismaTopicRepository", () => {
     const { database, topicFindMany } = makeDatabase({
       topicRows: [{ id: "topic-2", name: "Payments" }],
     });
-    const repository = PrismaTopicRepository.create(database);
+    const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(
       repository.findNamesByIds({ projectId: "project-1", ids: ["topic-2", "topic-absent"] }),
@@ -103,7 +103,7 @@ describe("PrismaTopicRepository", () => {
         LastRunError: "provider secret must never cross this boundary",
       },
     });
-    const repository = PrismaTopicRepository.create(database);
+    const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(repository.findClusteringStatus({ projectId: "project-1" })).resolves.toEqual({
       projection: {
@@ -131,7 +131,7 @@ describe("PrismaTopicRepository", () => {
   /** @scenario "tolerate an unavailable history projection" */
   it("returns an empty history when the projection row is missing", async () => {
     const { database, historyFindUnique } = makeDatabase();
-    const repository = PrismaTopicRepository.create(database);
+    const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(repository.findClusteringRunHistory({ projectId: "project-1" })).resolves.toEqual(
       [],
@@ -145,7 +145,7 @@ describe("PrismaTopicRepository", () => {
   /** @scenario "tolerate an unavailable history projection" */
   it("returns an empty history for malformed projection JSON", async () => {
     const { database } = makeDatabase({ history: "not an array" });
-    const repository = PrismaTopicRepository.create(database);
+    const repository = PrismaTopicRepository.create({ prisma: database });
 
     await expect(repository.findClusteringRunHistory({ projectId: "project-1" })).resolves.toEqual(
       [],

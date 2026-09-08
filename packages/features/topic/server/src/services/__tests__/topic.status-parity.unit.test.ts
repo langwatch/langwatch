@@ -5,8 +5,11 @@ import type {
 import { describe, expect, it } from "vitest";
 import { Temporal, type Instant } from "@langwatch/time";
 import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port.ts";
-import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository.ts";
-import { TopicService } from "../../services/topic.service.ts";
+import type {
+  TopicClusteringStatusRecord,
+  TopicRepository,
+} from "../../repositories/topic.repository.ts";
+import { TopicService } from "../topic.service.ts";
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 
 const NOW = 1_800_000_000_000;
@@ -34,13 +37,11 @@ function projection(
   };
 }
 
-class FakeTopicRepository extends TopicRepository {
+class FakeTopicRepository implements TopicRepository {
   constructor(
     private readonly status: TopicClusteringStatusRecord["projection"] = null,
     private readonly history: TopicClusteringRunHistoryEntry[] = [],
-  ) {
-    super();
-  }
+  ) {}
 
   findAll() {
     return Promise.resolve([]);
