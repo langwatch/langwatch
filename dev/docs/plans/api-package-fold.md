@@ -2,6 +2,11 @@
 
 **Date:** 2026-09-08 · **Ruling:** Alex, "get rid of both and we put them inside the API" · **Owner lane:** one Opus agent, reviewed by Fable
 
+**Landed:** `a0e6374877` (273 files) and `75b713c020` (the seven browser files another lane had
+already moved in the working tree, the CI typecheck step, one spec comment). At HEAD no source,
+manifest or workflow names either old path. Left as records: `dev/docs/adr/130-*.md`,
+`dev/docs/plans/api-transport-split.md`. Phase 3 still owes the authz-contract cycle.
+
 ## Target
 
 ```
