@@ -1,8 +1,8 @@
 # Grow the REST runtime, round two: doors without a permission, route-scoped checks, addressing, credentials
 
 **Date:** 2026-09-08 · **Owner lane:** one Opus agent in `packages/api` only, reviewed by Fable
-**Follows:** `api-rest-runtime-gaps.md` (`864a7151df`: facts, v1-only, deprecation, public routes) and
-`api-rest-organization-door.md` (`5080220f88`: `withCredential("organizationKey")`, `DoorScope`, `doorScopeOf`).
+**Follows:** round one (`864a7151df`: facts, v1-only, deprecation, public routes) and the
+organization door (`5080220f88`: `withCredential("organizationKey")`, `DoorScope`, `doorScopeOf`).
 `packages/api/specs/*.feature` is the oracle; each item lands with its unit test in the folded `__tests__/<file>` and a
 retagged or new scenario bound by `@scenario`. No new file under `rest/` or `trpc/`.
 

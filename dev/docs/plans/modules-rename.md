@@ -1,7 +1,7 @@
 # Rename "features" to "modules"
 
 **Date:** 2026-09-08 · **Ruling:** Alex ("features is just kind of an annoying name, it's modules of the
-code") · **Runs after:** `dev/docs/plans/api-package-fold.md` has landed · **Owner lane:** one agent,
+code") · **Runs after:** the `@langwatch/api` fold (landed `a0e6374877`) · **Owner lane:** one agent,
 TS-LSP for the import rewrites, reviewed by Fable
 
 ## Target tree (assumed reading of Alex's words, confirm before the lane starts)

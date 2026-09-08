@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-08 · **Owner lane:** one Opus agent after the wave-3 lane (`882ebfa479`) · **Reviewed by:** Fable
 
-Same rules as `wave3-process-wiring.md` (Read/Edit/Write only, no git writes, no baselines, HEAD-variant blobs for
+Same rules as waves 1 to 3 (`strict-feature-layout.md` section 8: Read/Edit/Write only, no git writes, no baselines, HEAD-variant blobs for
 files carrying other lanes' hunks, ONE tsc per application as oracle filtered to touched files, manual-pick list for
 files whose block only exists in yesterday's uncommitted pile).
 
@@ -74,7 +74,7 @@ this.resolvePlanProvider(options) })` (async, not optional; the enclosing block 
 - `apps/api/src/app-trpc/app-trpc.composed.ts:85-89`: drop the doc sentence about `ctx.app.authzApp` and the role service.
 - `apps/api/src/index.ts:274`: delete `export { createRolesRestApp } from "@langwatch/role-server";`.
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:65-66,581-593`: the `roles` family entry and `RoleService` import go;
-  the family returns when the organization door lands (`dev/docs/plans/api-rest-organization-door.md`) as
+  the family returns now that the organization door has landed (`5080220f88`, `strict-feature-layout.md` section 5) as
   `apps/api/src/features/role/role-rest.mount.ts` binding `roleRestFacts`.
 - Test doubles calling `refusingRoleFeature()`: `app-trpc/__tests__/support/app-trpc-features.ts`,
   `app/__tests__/api-packaged-rest.usage-guard.integration.test.ts`, `app/__tests__/api-trpc-record.test-doubles.ts`,

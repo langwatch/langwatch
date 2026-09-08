@@ -1,16 +1,24 @@
 # Strict feature layout: the one plan
 
 Branch `feat/strict-feature-layout-v0` to `main`. Everything live about the
-migration is in this document. Findings logs stay as separate files and are
-linked in section 7. Retired documents and where their content went are in
-section 8.
+migration is in this document: what is done, what is running, what is queued,
+what is blocked, and what only Alex can decide. Findings logs stay as separate
+files and are linked in section 13. Retired documents and where their content
+went are in section 14. Live lane briefs (work orders a running or queued lane
+reads) are listed in section 8; every one of them is subordinate to this file.
 
-Consolidated 2026-09-06 from the plan sweep
-(`/Users/afr/.claude/jobs/eeb488e6/tmp/plan-sweep/report.md`).
+Consolidated 2026-09-06 from the plan sweep; rewritten 2026-09-08 23:30 to fold
+in the API rebuild, the feature conversion drive, the process wiring waves and
+the architecture-lint rebuild. HEAD `74d8aeae66`, 492 commits since
+`771069e998`, 68 of them on 2026-09-08.
+
+Status words used below: **DONE** (committed, hash given), **RUNNING** (an
+Opus lane holds it now), **QUEUED** (brief written, no lane yet), **BLOCKED**
+(waits on a named thing), **DECISION** (only Alex can move it).
 
 ## 1. Goal and definition of done
 
-Four processes compose 44 feature packages:
+Four processes compose the feature packages:
 
 ```
   apps/ui        the browser application (Vite SPA)
@@ -24,26 +32,47 @@ Four processes compose 44 feature packages:
   packages/enterprise/features/* the same grammar, enterprise licence
 ```
 
-### The eight clauses of the exit plan
+### The eight clauses of the exit plan (2026-09-06)
 
-1. `apps/api` owns the request lifecycle. **Done.**
-2. `apps/worker` owns the background lifecycle. **Done.**
-3. `apps/ui` boots the browser with no `platform/app` imports. **Done.**
+1. `apps/api` owns the request lifecycle. **DONE.**
+2. `apps/worker` owns the background lifecycle. **DONE.**
+3. `apps/ui` boots the browser with no `platform/app` imports. **DONE.**
 4. Every catalogue feature has one canonical contract, service and repository
-   graph. **Done**, except the layout burn-down in section 4 item 12.
+   graph. **DONE**, except the layout burn-down (section 10 item 12).
 5. No production code uses global `App`, `getApp`, `tryGetApp`, global Prisma,
-   package-level environment access or import-time registration. **Done.**
+   package-level environment access or import-time registration. **DONE.**
    `global-app-access` stays as a permanent tripwire.
 6. Public REST, internal tRPC, SDK, MCP, webhook, ingestion and generated
    OpenAPI and client contracts have explicit parity proof. **Not done.**
-   See section 4 items 9 and 30.
+   Section 10 items 9 and 30.
 7. Migrations, tasks, assets, E2E suites, scripts, instrumentation, CI and
-   deployment definitions no longer assume `platform/app`. **Done**, except
-   the haven binary release note (section 4 item 31).
-8. `platform/app` and every reference to it are deleted. **Done**
+   deployment definitions no longer assume `platform/app`. **DONE**, except
+   the haven binary release note (section 10 item 31).
+8. `platform/app` and every reference to it are deleted. **DONE**
    (`faaa9ec333`).
 
-### The five clauses added after the exit
+### The clauses added 2026-09-07 and 2026-09-08 (the shape drive)
+
+9. **Annotation is the shape.** Every feature is `defineFeature(...)
+   .withRepositories(registry).withApp(App).withTransports(...)`, one
+   `<Feature>Api` token in the contract, procedures declared once with
+   `defineTrpcContract` / `defineRestRouter`, mounted by the process with
+   `runtime.mount`, Prisma and memory repository twins behind
+   `defineRepositories` and proven by a contract test, flat web entries. Done
+   means `feature-shape-baseline.json` has no rows. **In progress: 280 rows
+   across 41 features, 30 still on the deleted transport builders** (section 4).
+10. **One runtime per transport in `@langwatch/api`**, nine transport files,
+    the legacy builders deleted (`1dfbc5dcf1`). Done means every family runs on
+    it and the remaining gaps in section 5 are closed. **In progress.**
+11. **A folder is one concept, a file one readable part.** `source-folder-shape`
+    (12 files per folder, 20-line fragment floor) and the review messages that
+    read as the instruction an agent should have followed. **Lint DONE
+    (`64322961e3`); 360 baselined rows to burn.**
+12. **`packages/features` becomes `modules`**, with `enterprise/{packages,modules}`.
+    **DECISION on the tree shape, then QUEUED** (section 9, D-a).
+13. **The linter is rebuilt** to the same discipline (section 7).
+
+### The five clauses added after the exit (unchanged)
 
 - 0 unbound scenarios on the parity summary line.
 - oxlint errors 0, with no debt registers used as a baseline.
@@ -59,139 +88,283 @@ Where an ADR states one, the ADR is the authority and this list is the index.
 - `apps/api`, `apps/worker`, `apps/ui` and `apps/tasks` are the physical
   composition roots. `apps/server` is local orchestration only.
 - A feature owns its contract, its canonical server implementation and its
-  reusable web behaviour. A process installs those surfaces. A process never
+  reusable web behaviour. A process installs those surfaces and never
   reimplements them.
 - Preserve URLs, procedure names, OpenAPI shapes, response fields, auth,
   errors, ordering, pagination, time and money units, effects, retries and
-  idempotency, unless an explicit decision changes them.
+  idempotency, unless an explicit decision changes them. Dated version
+  addresses are a product promise.
 - A package never reads an environment module. Each process parses and
-  validates configuration once through `packages/config`, then injects typed
-  values.
+  validates configuration once, then injects typed values.
 - The api and the worker each construct one process-owned logger and tracer
-  graph from `@langwatch/observability/node`. The ui uses browser-safe
-  observability only.
-- Generated Prisma stays private to strict Prisma repository adapters.
+  graph. The ui uses browser-safe observability only.
+- Generated Prisma stays private to strict Prisma repository adapters. A
+  repository claims only tables its feature owns; a read into another feature's
+  tables is a port or that feature's API.
 - Core never imports an enterprise implementation. Role-specific enterprise
   composition stays under `packages/enterprise/composition/**`.
+- A knowable failure a caller can act on is a `HandledError` with a stable
+  code and presentation copy; no `TRPCError` or `HTTPException` outside a
+  transport file. The spec wins over the code: a test is never rewritten to
+  match a changed refusal.
 - A shared worktree is never staged wholesale. Stage exact paths. Commit
-  coherent slices.
+  coherent slices. Lanes never run git write commands.
 
 ## 2. Counters, and how each is measured
 
-| Counter | Command | Value (2026-09-06) | Target |
-| --- | --- | --- | --- |
-| Unbound scenarios | `pnpm check:feature-parity`, then read the summary line `THIS RUN FAILS: N unbound`. Never `grep -c`: a per-line count reads about 50 percent low | 1 unbound, 13 unknown annotations | 0 |
-| oxlint errors | `pnpm lint:oxlint` | 44 | 0, with no register used as a baseline |
-| architecture-lint hard findings | `pnpm --filter @langwatch/architecture-lint lint`. A hard violation is an entry followed by an `  allowed:` line. Diff the violation list, never the total | red, five baseline files still present | 0, and all five baseline files deleted |
-| Typecheck | `pnpm typecheck:all 2>&1 \| sed 's/\x1b\[[0-9;]*m//g' \| grep -E 'error TS'`. Strip the colour first: `tsc` puts escape codes between `error` and the code, so a raw grep matches nothing | not clean | prints nothing |
-| Boot smoke | `PORT=5640 pnpm dev:api` logs `API HTTP listener started`. The same for `pnpm dev:worker`. Run after every composition edit | passes | passes |
-| Browser journey | `pnpm test:e2e` | 9 of 13 legs green | 13 of 13 |
-| SDK and CLI journeys | `pnpm --filter langwatch test:e2e sdk-app cli-journey` | 27 of 32 green | 32 of 32 |
-| Visual diff | `tools/visualdiff`, main against the branch, every route | not run: blocked on the migrations | no unexplained row |
-| Composition files | `find apps -name '*.composition.ts' \| wc -l` | 136. `api-production.composition.ts` is 4,608 lines, `worker-production.composition.ts` is 2,247 | 0 under `apps/**` after the composition design lands |
-| Comment blocks over the limit | `packages/architecture-lint/src/comment-block-roots.json` | 2,550 blocks on `apps/*` roots, expiry 2026-09-17 | swept, or the dates moved on purpose |
+| Counter | Command | Value 2026-09-06 | Value 2026-09-08 23:30 | Target |
+| --- | --- | --- | --- | --- |
+| Feature-shape rows | `node -e` over `packages/architecture-lint/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **280 rows, 41 features, 30 on the legacy transport** (user's three closed rows and platform-health's are still listed: baseline edits paused while lint L2 migrates the shape) | 0 |
+| Fully converted features | rows = 0 | 1 (annotation) | **14**: annotation, api-key (Kimi), dashboard, data-privacy, data-retention, entitlement, feature-flag, notification, platform-health, secret, share, sso, suite, topic | every feature |
+| Source-folder-shape rows | same file family | 431 (09-08 17:50) | **360** | 0 |
+| Unbound scenarios | `pnpm --filter @langwatch/architecture-lint check:feature-parity`, read `THIS RUN FAILS: N unbound` | 1 | **140** (rose with the restored legacy specs and the lanes' new scenarios; every converted feature's own specs are `✓ all bound`) | 0 |
+| `apps/api` typecheck | `tsc --noEmit -p apps/api/tsconfig.test.json`, colour stripped | not clean | **1,432 errors, red by design** until every family converts | prints nothing |
+| `apps/worker` typecheck | same for the worker | not clean | **742** | prints nothing |
+| architecture-lint findings | `pnpm --filter @langwatch/architecture-lint lint` (summary first since `111eb16bf2`) | red, five baselines | **2,990 findings, 36 policies**, 9 stale rows; 14 baseline files in 8 shapes (L2 running) | 0, no baseline files |
+| Handled-error codes added tonight | `packages/handled-error/src/app-codes.ts` | — | **15** (data-privacy 5, data-retention 8, platform-health 2) | every knowable failure |
+| Uncommitted paths in the worktree | `git status --porcelain \| wc -l` | — | **~1,400**, almost all the 09-07 pile (section 6) | 0 |
+| Disk free | `df -h /` | — | 22 GiB (was 40 at 16:00; lane transcripts and declaration caches) | keep above 15 |
 
-Every whole-repository check takes a machine-wide slot. Run the per-package
-form while a lane is open. Run the whole-repository form once, before a push.
+Every whole-repository check takes a machine-wide slot. Lanes run the
+per-package form; the whole-repository form runs once before a push.
 
 ## 3. Decisions taken
 
-- **2026-09-01. The migration is not gradual.** `platform/app` did not have to
-  compile, boot or serve during the move. The only permitted edit there was a
-  deletion.
-- **2026-09-02. Lift and shift, not redesign.** Move a module into the package
-  that owns it and keep its shape. Fix the moved code's imports. Leave every
-  other `platform/app` importer broken. Delete what the move made unreachable.
-  Redesign only at a seam.
-- **2026-09-03. Merge main directly on the feature branch.** Never rebase: a
-  rebase drops the merge resolutions.
-- **2026-09-03. Physical extraction is real.** `Capability`,
-  `CapabilityRegistry`, `FeatureDefinition`, `FeatureRuntimeBuilder` and
-  `RuntimeBoot` were never adopted and are deleted. Both processes compose by
-  hand in their `*-production.composition.ts` roots (ADR-102 amendment).
-- **2026-09-04. Decision 1 (R7).** `rules/<subject>.rules.ts` is a layout kind.
-  A rules file declares no class and no `new` expression, and its value imports
-  reach only `node:*`, another rules file, a contract package, or a package
-  whose own closure never reaches Prisma, ClickHouse or another package's
-  implementation directories.
-- **2026-09-04. Decision 2 (R8).** The boundary-edge baseline expires and only
-  shrinks. An unlisted edge fails. An expired entry fails as
-  `boundary-edge-expired`. A stale entry fails as
-  `boundary-edge-baseline-stale`.
-- **2026-09-04. Decision 3.** The tRPC flatten proceeds; steps C and D landed.
-- **2026-09-04. Decisions 4 and 5.** The run-plans and test-suites families
-  answer under `/api/v1` only.
-- **2026-09-04. Decision 6.** Producer pipelines land as one shape
-  (`9c368cf4f6`).
-- **2026-09-04. Decision 7.** langwatch-saas keeps one task as a plugin. The
-  other five move into this repository.
-- **2026-09-04. Decision 9.** saas-only behaviour ships as plugins.
-- **2026-09-04. Decision 15b.** `global-app-access-baseline.json` and
-  `legacy-application-boundary-baseline.json` are deleted outright. Both were
-  drained to zero, and each rule reads a missing baseline as an empty one.
-- **2026-09-04. Decision 16.** `experiment-run-orchestrator.service.ts` splits
-  from 3,956 lines to 385 lines plus 27 sibling services.
-- **2026-09-04. Decision 18.** `ParsedCustomModels` and the picker are the one
-  shape.
-- **2026-09-04. Decision 20.** Every REST family answers at `/api/v1` and at
-  `/api`. `/api/v1` is canonical. Four families are v1-only and carry
-  `v1Alias: false`.
-- **2026-09-05. Restore everything.** No behaviour that main has may be lost on
-  this branch. The only admitted retirements are rows whose behaviour main
-  itself already replaced or already executed.
-- **2026-09-05. A web surface is a door.** `surfaces/<id>/index.ts` is the
-  package's public entry. It may reach its own directory, `src/model/**`,
-  `src/behavior/**` and `src/ui/**`, and nothing else. Private code still may
-  not import a surface.
-- **2026-09-05. The UI slot seam is built.** A core screen asks the composition
-  for a block by name and renders the fallback when nothing came back. Only
-  `apps/ui` names both halves. See `best_practices/ui-install.md`.
-- **2026-09-05. Flatten the tRPC groups.** One root, one policy chain.
-- **2026-09-06. Spec rulings.** `runtime-composition.feature`: the 8 unbound
-  scenarios are deleted. `typescript-7.feature`: reworded to a root tsconfig
-  every package extends. `memory-footprint.feature`: the production-mode
-  scenario is deleted. `api-reference`: reworded to "answers only under
-  `/api/v1`". `licensing`: the license-router and getLicenseHandler scenarios
-  are deleted.
-- **2026-09-06. apidiff is not approved.** The REST body-shape drift survey on
-  about 253 mounted operations stays unfunded. The Fable review is pending at
-  the root session.
+2026-09-01 to 2026-09-06 (unchanged from the 09-06 plan):
 
-## 4. Open items
+- **09-01. The migration is not gradual.** `platform/app` did not have to compile during the move.
+- **09-02. Lift and shift, not redesign.** Move a module into the package that owns it and keep its shape. Redesign only at a seam.
+- **09-03. Merge main directly on the feature branch.** Never rebase.
+- **09-03. Physical extraction is real.** `Capability`, `CapabilityRegistry`, `FeatureDefinition`, `FeatureRuntimeBuilder`, `RuntimeBoot` deleted; both processes compose by hand (ADR-102 amendment).
+- **09-04. Decisions 1 to 20** as recorded on 09-06: `rules/` is a layout kind; the boundary-edge baseline expires and only shrinks; the tRPC flatten; run-plans and test-suites answer under `/api/v1` only; producer pipelines one shape (`9c368cf4f6`); saas tasks and plugins; two drained baselines deleted; the orchestrator split (3,956 → 385 + 27); `ParsedCustomModels`; every REST family at `/api/v1` and `/api`, four v1-only.
+- **09-05. Restore everything.** No behaviour main has may be lost.
+- **09-05. A web surface is a door**; the UI slot seam; flatten the tRPC groups.
+- **09-06. Spec rulings** (runtime-composition, typescript-7, memory-footprint, api-reference, licensing). **apidiff is not approved.**
 
-Size: S is under 2 hours, M is half a day, L is a day or more, XL is
-multi-day. Kind: U is user-visible, Sec is security, Perf is performance, H is
-hygiene. RB marks an item that blocks the merge to main. Owner is blank until
-a person takes the row.
+2026-09-07 and 2026-09-08 (this rewrite):
 
-Release-blocking rows come first.
+- **09-07. Configuration is schema-driven.** Each feature's config is a zod schema parsed at boot; `process.env` only in the boot file.
+- **09-07. `try*` methods are refused.** Absence is a nullable return on `find*` only.
+- **09-08. Annotation is the shape** (clause 9). The feature-convert skill is the procedure; the feature-shape lint is the ratchet.
+- **09-08. Rebuild `@langwatch/api` around one path per transport.** Two paths during phase 2; `MANAGEMENT_API_VERSION` dies in phase 3; `ConnectUpgradeRouterPort` stays; dated addresses are a promise (`api-package-rebuild.md`, decisions 1 to 5).
+- **09-08. Fold `@langwatch/platform-api-client` and `@langwatch/runtime-composition/contract` into `@langwatch/api`** (`./web`, `./contract`). DONE `a0e6374877`.
+- **09-08. Rename features to modules** after the fold, one agent, TS-LSP, mostly `git mv`; `featureApi` and kin take module names in the same lane. Tree shape unconfirmed (section 9).
+- **09-08. "Just delete legacy."** The legacy transport builders are deleted, not retired gradually; 44 features and `apps/api` go red and convert or do not build. DONE `1dfbc5dcf1`.
+- **09-08. "Add lint so it can't happen again, not targeted but intent, with errors that are prompts."** `source-folder-shape`. DONE `64322961e3`.
+- **09-08. The audit log sits behind one port**, OSS null recorder, enterprise recorder. DONE `008a5cd882`.
+- **09-08. Full review of the architecture-lint package**, then rebuild it (section 7).
+- **09-08. Every finding from a review becomes a fix, a lint rule or a skill line.** Tonight's sample review produced `memory-twin-untested`, the mount and installer fragment exemptions, two false-positive fixes, four skill rules and a fix lane.
+
+## 4. The conversion board
+
+One row per feature. "Open" lists the feature-shape kinds still on the baseline
+for it (after the pending row removals named in section 2). A feature is done
+when its row reads 0.
+
+| Feature | State | Landed | Open kinds | Blocked on / note |
+| --- | --- | --- | --- | --- |
+| annotation | DONE (reference) | 09-07 | `refusing-composition` (Kimi's api-key twin, leaves with api-key) | |
+| api-key | Kimi's lane | — | 8 | Kimi; not touched by these lanes |
+| audit-log (ent) | DONE behind a port | `008a5cd882` | `memory-twin-untested` | contract test |
+| dashboard | DONE | `56b01cb75d` | 0 | 35-operation door: DECISION D-f |
+| data-privacy | DONE | `77f4346117` | 0 | nullable redaction in the API: DECISION D-c |
+| data-retention | DONE | `1b99fb790c` + `ef107474de` | 0 | |
+| entitlement | DONE | `1b20a34b78` | 0 | `costs.*` unused: DECISION D-g |
+| feature-flag | DONE | `b96cf81b47` | 0 | worker must provide authz/project/organization to boot flags: DECISION D-h |
+| log | DONE bar registry | 09-08 | `unregistered-repositories` | ClickHouse persistence per feature: DECISION D-i |
+| metric | DONE bar registry | `16b2707e2a` | `unregistered-repositories` | same; the OTLP metrics sink is composed by nothing |
+| notification | DONE | 09-08 | 0 | |
+| platform-health | DONE | `e9670fd13e` | 0 (rows pending removal) | needs `internalSecret` door + non-2xx statuses (runtime round two) |
+| presence | DONE | `d7d5ea94c0` | `memory-twin-untested` | contract test; actor identity cache: DECISION D-j |
+| role | DONE bar REST mount | `84ae292008` + `cccfe396b0` | `memory-twin-untested` | mount waits on the door port (section 6) |
+| secret | DONE | `9d279eef12` | 0 | |
+| share | DONE | `403a40bd2a` | 0 | `PinnedToActiveShareError` still raw |
+| sso (ent) | DONE | `c1363cbb99` | 0 | ledger is a port until identity has an API token |
+| suite | DONE | `814620f1bf` + `cba1e5bd02` | 0 | web package governed |
+| topic | DONE | `a8508cf3c7` | 0 | |
+| authz | 3 of 8 | `7540100bd5` | `contract-service`, `persistence-adapter`, `postgres-without-memory`, `unregistered-repositories`, `nested-web-entry` (scope-picker) | `AuthzService` rename across ~150 files + `PostgresAuthzAdapter` in three processes: QUEUED for a quiet tree; vocabulary package cycle: DECISION D-k |
+| user | 3 of 8 | `1c795cfe76` | `contract-service`, `persistence-adapter`, `nested-transport`, `legacy-transport-runtime`, `refusing-composition` | tRPC runtime: anonymous procedure, session row id, caller address (runtime round three); Better Auth directory typed `UserService`: DECISION D-l |
+| dataset | RUNNING | | 9 | |
+| evaluation | RUNNING | | 7 | |
+| evaluator | RUNNING | | 9 | |
+| monitor | RUNNING | | 9 | |
+| stored-object | RUNNING | | 8 | |
+| hosted-mcp | BLOCKED | | 3 | OPTIONS preflight, raw OAuth bodies |
+| webhook | BLOCKED | | 6 | `v1-in-path` addressing (round two), raw request bytes for signatures |
+| gateway | BLOCKED | | 9 | `v1-in-path`, raw bytes (elevenlabs webhook) |
+| project, organization | QUEUED | | 8, 9 | route-scoped permission, `dated { v1Twin: false }` (round two) |
+| scim (ent) | BLOCKED | | 7 | `scimToken` door (round two) |
+| experiment, trace | BLOCKED | | 8, 8 | any-method pass-through routes |
+| ops | BLOCKED | | 8 | optional credential (bug-report) |
+| auth | BLOCKED | | 9 | BetterAuth any-method handshake |
+| coding-agent | BLOCKED | | 9 | `anyAuthenticated` door (round two) |
+| agent | QUEUED | | 10 | `agent-call.rest.ts` binds a fact under `middleware:` (move to `facts:`); agent server clean-up brief |
+| prompt, model-provider, workflow, github, langy, analytics, automation | QUEUED | | 9 to 11 each | by size; langy and automation last |
+| billing, governance, licensing (ent) | QUEUED | | 9 each | enterprise; billing's `createTrpcService` blocks `enterprise-api` declarations |
+| identity | QUEUED | | 6 | ADR-115 plan; no API token yet |
+| managed-provider (ent) | ORPHAN | | 3 | carries the 09-07 pile's uncommitted work |
+| navigation, onboarding | QUEUED | | `nested-web-entry` | web only |
+
+The nineteen per-feature cleanup reviews under `dev/docs/plans/feature-cleanup/`
+(2026-08-28 to 09-04, stages review/verify/enact) are the findings logs for this
+board. Fifteen features were reviewed and seven partly enacted before the shape
+drive replaced enactment with conversion; a conversion lane reads
+`feature-cleanup/<feature>.md` when it exists and its open findings ride the
+conversion. The README's own status table is retired; this board is the one.
+
+## 5. The API runtime (`@langwatch/api`)
+
+Nine transport files (`rest/{runtime,request,credential,response,openapi,security}.ts`,
+`trpc/{runtime,policy,audit}.ts`), one `__tests__/<file>` each. `runtime.ts` is
+2,107 lines and its split is a lane of its own (round two reports the cut).
+
+Landed tonight:
+
+| Capability | Commit |
+| --- | --- |
+| Legacy builders deleted; idempotency ledger, personal caller, management audit, deprecation, capabilities, hand-written docs absorbed | `1dfbc5dcf1` |
+| Body limit before validators (413), `ScopeInputMismatchError` 403, docs `tags`, no trailing slash on collection dated addresses | `e7631f0318` |
+| Bound facts on `rest.mount` (`projectRestFacts`, `bindRestHeader`), `.withAddressing("v1-only")`, `withDeprecated` + `documentedResponses` + `RestDeprecationLogPort`, `publicRoute({ reason })` | `864a7151df` |
+| Organization door: `.withCredential("organizationKey")`, `DoorScope`, `doorScopeOf`, mount refuses the other door by name | `5080220f88` |
+
+Running: **round two** (`api-rest-runtime-gaps-2.md`): `anyAuthenticated`
+door (coding-agent, `POST /api/projects`), route-scoped permission
+(projects, teams), `v1-in-path` and `dated { v1Twin: false }` addressing
+(webhooks, gateway, projects), `internalSecret` door (platform-health),
+declared non-2xx statuses, `scimToken` door.
+
+Still open after round two (round three, QUEUED): raw request bytes
+(github and elevenlabs webhooks), any-method pass-through (trace OTLP alias,
+experiment v3, BetterAuth), raw responses (image-proxy, rum), an optional
+credential (ops bug-report), the 405 method guard (automation), rate limit and
+response cache (2 users), `registerJsonProtocol` (1), `assertEveryRouteDeclared`
+wired; and for tRPC: an anonymous procedure kind, the browser session's row id
+on the Actor or as a fact, the caller's address as a fact (user's `user.*`
+family). `packages/api/README.md` still documents the deleted builders.
+`apps/api/src/features/discovery/openapi-document.json` and
+`docs/api-reference/openapiLangWatch.json` regenerate once `apps/api` compiles.
+
+## 6. Process wiring
+
+Feature lanes never touch `apps/api/src/app/*`, `app-trpc/*`, `app-rest/*` or
+`apps/worker/src/app/*`; their reports carry the exact lines and one wiring
+lane per wave applies them with HEAD-variant blobs for files that carry other
+lanes' hunks.
+
+| Wave | Features | State |
+| --- | --- | --- |
+| 1 | entitlement, presence, share | DONE `f445a8a470` (one broadcast fabric composed first, no proxy) |
+| 2 | secret, feature-flag, data-retention | DONE `94513f717e` (deferred `LocalFeatureApis` references break the flag → eventing → authz → tenancy ring; secret slice moves onto the feature record; nobody-key write refusal restored as `authenticated_actor_required`) |
+| 3 | topic, data-privacy, sso, metric | DONE `882ebfa479` (enterprise-api resolves from source; stale `dist/` deleted) |
+| 4 | dashboard, platform-health, role (incl. REST mount + `ApiOrganizationDoorPort`), suite, authz, user | QUEUED, brief `wave4-process-wiring.md`; run when the wave-2 style HEAD-variant technique still fits |
+
+**BLOCKED by the 09-07 pile.** Six wiring files could not be committed
+because their changed blocks exist only in about 1,400 uncommitted paths left
+by the stopped 09-07 lane: `apps/worker/src/app/{worker-tenancy,worker-production,worker-telemetry-read,worker-observability-apps}.composition.ts`,
+`apps/worker/src/__tests__/codex-coding-defaults.integration.test.ts`,
+`apps/api/src/app/api-trace-read-stack.composition.ts`,
+`apps/api/src/features/trace/__tests__/api-key-cost-protections.unit.test.ts`.
+The worker cannot land cleanly until the pile has an owner: **DECISION D-b.**
+
+## 7. The architecture-lint rebuild
+
+Review: `architecture-lint-review-2026-09-08.md` (`55c5ac8bd0`). Verdict: the
+policies are mostly right (91/91 spec scenarios bound); the package around them
+is not (55 files flat in `src`, six over 700 lines, 14 baselines in 8 shapes,
+six empty ratchets still carrying loaders and flags, one run printed 30,645
+lines of which the first 18,522 were a comment inventory, nine tree walkers,
+two import parsers, 99 policy ids registered in three places, 37 of 71 tests
+guarding things outside the package, 29 failing, 17 policies untested).
+
+| Lane | Scope | State |
+| --- | --- | --- |
+| fixes | `memory-twin-untested` kind; `*.server.ts` and `*.mount.ts` exempt from the fragment rule; type-only imports no longer make a reader; `.d.ts` package exports are not runtime entrypoints | DONE `a3a8f40a92`, `c1363cbb99`, `f6ea1c26f1` |
+| L1 report and CLI | summary first, 25 per policy, `--all`, `--review-comment-blocks`, exit 0/1/2 pinned, lint queue removed | DONE `111eb16bf2` |
+| L2 one baseline shape | `{ version, policy, entries[{ key, measured, expires? }] }`, stale rows everywhere, six empty baselines deleted; D2 kept per policy behind a flag | RUNNING (root session pauses its own baseline edits meanwhile) |
+| L3 workspace snapshot | one tree walk, module graph through the TS AST, under 10 s | QUEUED |
+| L4 frontend grammar | governed = discovered, flat entries the only spelling, `frontend-ui-boundaries.ts` split four ways | QUEUED (D7) |
+| L5 registry and folders | `policies/index.ts` with `definePolicy`, package passes its own folder rule | QUEUED |
+| L6 parity out | own tool; `@inert` tag replaces `LEGACY_INERT` | QUEUED (D1) |
+| L7 repo guards home | 37 tests to the code they guard, 29 failing fixed or deleted | QUEUED (D5) |
+| L8 messages | 289 sites against the contract, `allowed` on every finding | QUEUED |
+
+## 8. Lanes live now, and their work orders
+
+| Lane | Brief | Started |
+| --- | --- | --- |
+| stored-object conversion | feature-convert skill | 22:4x |
+| evaluation conversion | feature-convert skill | 23:0x |
+| monitor conversion | feature-convert skill | 23:0x |
+| dataset conversion | feature-convert skill | 23:1x |
+| evaluator conversion | feature-convert skill | 23:2x |
+| lint L2 | `architecture-lint-review-2026-09-08.md` §Lanes | 23:2x |
+| REST runtime round two | `api-rest-runtime-gaps-2.md` | 23:2x |
+
+Live briefs kept as work orders: `wave4-process-wiring.md` (QUEUED),
+`api-rest-runtime-gaps-2.md` (RUNNING), `api-package-rebuild.md` (phase 3
+deletion list, QUEUED for after the last family converts),
+`modules-rename.md` (DECISION then QUEUED), `agent-server-cleanup.md` (QUEUED
+with the agent conversion), `architecture-lint-review-2026-09-08.md` (L3 to
+L8). Every landed brief is retired in section 14.
+
+Rules every lane runs under: Opus only; Read/Edit/Write, no scripted rewrites,
+read before delete, `mv` not `git mv`; no git writes; no root typecheck, lint or
+format; no baseline edits (the root session does them); the spec wins; a
+memory twin ships with a contract test; `source-folder-shape` applies; one
+`pnpm install` per package.json change; report in the skill's shape with exact
+wiring lines for the root session.
+
+## 9. Decisions open for Alex
+
+Ordered by what they unblock.
+
+- **D-a. The modules tree shape.** Repo-root `modules/` and `enterprise/{packages,modules}` (my reading of "in the root we have packages, modules, enterprise") or `packages/modules/*`. Also: run before or after Kimi lands api-key. Unblocks clause 12.
+- **D-b. The 09-07 pile.** About 1,400 uncommitted paths from the stopped lane (worker-tenancy rewrite, api-trace-read-stack, catalogue rewrites, ~890 files yesterday). Adopt by slice, hand to an owner, or discard. Unblocks the worker side of wave 4.
+- **D-c. data-privacy redaction in the API process.** Nullable collaborator throwing a plain `Error` (only log and metric call it, worker-only) versus a record-redaction port owned by log and metric.
+- **D-d. `Claude-Session` commit trailer.** The harness requires it; your older rule was no attribution trailers.
+- **D-e. A test database.** `LANGWATCH_TEST_DATABASE_URL` is set neither by haven (no stack registered for this worktree) nor in the root `.env`. Every Prisma half of the five contract test suites skips until it is. Set it once and run the five `test:integration src/repositories/__tests__` commands.
+- **D-f. `DashboardApi` carries 35 operations** (dashboards, graphs, saved workbench charts, saved views). Keep one door or split saved views and workbench charts back out.
+- **D-g. entitlement `costs.*`** is read by no UI: delete.
+- **D-h. api-role-scoped dependencies in runtime-composition.** `static dependencies` resolve in every role, so the worker provides authz, project and organization just to boot feature flags.
+- **D-i. Per-feature persistence.** `defineRepositories` keys on the application's one `withPersistence` backend, so a ClickHouse feature booted in a Postgres graph (log, metric) cannot register. Proposed `withFeature(x, { persistence: "clickhouse" })`.
+- **D-j. Presence actor identity.** The tRPC actor carries only an id, so presence pays a directory read per cursor tick at 15 Hz. A short-lived cache, or email on the actor.
+- **D-k. The authz vocabulary cycle.** `@langwatch/api` depends on `@langwatch/authz-contract` for the permission vocabulary, so authz's contract cannot declare its tRPC procedures. Split the vocabulary into its own package (phase-3 cycle). Also: `AuthzApi` has 54 operations.
+- **D-l. Better Auth's user directory** is typed `UserService` and calls operations `UserApi` does not offer. `UserApi` grows them, or auth owns a port.
+- **D-m. Role behaviour changes to confirm.** Custom-role create/update/assign answered 503 on every deployment (no plan gate was ever composed) and now work under the Enterprise gate; `removeExclusiveApiKeyRoles` deleted as uncalled (Kimi's api-key retirement may want it).
+- **D-n. `AuditLogApi` widening, OSS audit log, ClickHouse persistence, the feature-catalogue split, org-door and agent-server brief pastes** (the five from 09-08 morning, still open).
+- **Lint D1 to D7** (section 7's review): parity tool Go or TS; `expires` enforced or shrink-only; the 26 web-package cycles; comment-block ratchet beside the oxlint rule; the 17 untested policies; where the oxlint baseline check lives; refuse `screens/*` spellings now or after the drive.
+
+## 10. Open items carried from 2026-09-06
+
+Size: S under 2 hours, M half a day, L a day or more, XL multi-day. RB marks a
+merge blocker. Where 09-08 changed an item, the note is at the end of its text.
 
 | # | Item | Size | RB | Kind | Owner | Lane |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Feature-transport security Highs with no closing commit. C1: `project:view` mints a full-access legacy project key through the MCP OAuth approval (`api-production.composition.ts:1994`, `mcp-authorize.api.ts`). H6: a legacy key reads any organisation's OTTL rules by id. H9: `workflows:view` escalates to a run through a legacy-key self-fetch. H12: gateway budget and cache-rule REST mutations check the project and act organisation-wide. H14: a licence key carries no organisation binding (`license-generation.service.ts:71`). Verify each against the tree first. The pass predates six security commits | XL | yes | Sec | | security |
-| 2 | Fail-open shapes in `@langwatch/api`. `handlerManagedAuth` declares and nothing verifies (42 routes; `langy-local.api.ts:49` enforces key ownership only). `SecuredApp.hono` is public. Legacy project keys skip every `requires()` gate. `internalSecret` without `verifySecret` is an empty chain. The tRPC chain has no type-level scope coupling. The eight-point design is in the authz audit report | XL | yes | Sec | | authz |
+| 2 | Fail-open shapes in `@langwatch/api`. `handlerManagedAuth` declares and nothing verifies (42 routes; `langy-local.api.ts:49` enforces key ownership only). `SecuredApp.hono` is public. Legacy project keys skip every `requires()` gate. `internalSecret` without `verifySecret` is an empty chain. The tRPC chain has no type-level scope coupling. The eight-point design is in the authz audit report. 09-08: the legacy builders are deleted; `publicRoute`, doors and facts replace `handlerManagedAuth`; the tRPC scope coupling is `serviceAuthorized` + declared access. | XL | yes | Sec | | authz |
 | 3 | Journey defects with no fix commit. D13: a trace read waits on ClickHouse for ever. D17: a span evaluation never reaches the trace read. D11: "Create Online Evaluation" is intermittently inert and silent. D19: the worker outbox drain stalls ingestion with `P2028` (a boot-window transient on the 09-04 walk). D20: the agent-testing run drawer crashes when turns render | XL | yes | U | | e2e |
 | 4 | Lint rulings only Alex can give, then the burn. `ui-screen-closure`, `ui-surface-closure`, `ui-web-public-entry` and `ui-feature-implementation-import` (46, 38, 30, 8): may a screen import another package's `surfaces/<id>` door? `enterprise-composition` (19): seven governance adapters shared by both compositions have no admitted home. `comment-block-size` (1,265): raise the cap, scope it to production code, or make it advisory. `application-boundary` (1): `apps/ui` names `AppRouter`, which waits on ADR-130 stage 2. `feature-source-layout` (1): the langy delivered-calls set. `apps/api/src/features/agent-cache/` was never extracted | XL | yes | H | | lint |
 | 5 | Comment-block roots expire 2026-09-17 and fail the run that day: `apps/api` 1,281, `apps/ui` 671, `apps/worker` 499, `apps/server` 93, `apps/tasks` 6. Sweep each application, or move the dates on purpose. The sweep remainder is the rest of `trace/server` plus about 35 feature server packages, 726 blocks | L | yes | H | | comment-sweep |
 | 6 | PR #7536 is still a draft, so no gate in any plan has run in CI. Drafts skip the build and race jobs. Mark it ready and read the first full run as the baseline | S | yes | H | | ci |
 | 7 | langwatch-saas does not build against this branch. Delete the five moved tasks. Keep `backfillInviteUsersToCio` as a `@langwatch/task` plugin. Drop the submodule. Build `FROM` the public image. Repoint `sync-model-registry.yaml`. Other repository | L | yes | U | | saas |
 | 8 | Visual diff of every route, main against the branch, with no unexplained row. `tools/visualdiff` exists (`d3d8a930a6`). Blocked on applying the three 2026-09-04 additive migrations to the shared dev database | M | yes | U | | visual-diff |
-| 9 | `GET /api/traces/{traceId}/transcript` is a documented operation and is still unmounted. It waits on a composed `LogService`. `1c180c7204` only names the absence | M | yes | U | | api |
+| 9 | `GET /api/traces/{traceId}/transcript` is a documented operation and is still unmounted. It waits on a composed `LogService`. `1c180c7204` only names the absence. 09-08: still unmounted; waits on log's ClickHouse registry (D-i). | M | yes | U | | api |
 | 10 | Wire `oxlint-tsgolint`. It restores `noFloatingPromises`, `noMisusedPromises`, `useOptionalChain` and `useLiteralKeys`, all lost with Biome. Only a comment in `.oxlintrc.architecture.json:3511` names it | M | no | H | | lint |
 | 11 | ADR-130 stages 2 to 4: move 38 procedure maps to contracts, declare `AppApiMap`, annotate `ApiApplication.trpc`, add the conformance test. Then the api-map lane: 39 `createFeatureApi<` sites become `trpcReact`, and `feature-api.ts` and `use-invalidate-procedure.ts` are deleted. No `AppApiMap` is in the tree yet; `04ba1ac99d` moved 22 entries | XL | no | Perf/H | | api-map |
-| 12 | Architecture-lint burn-down slices still open. A1 and A2: `apps/api` and `apps/worker` stop importing enterprise feature packages. A3: plan-gate rename, agent-cache move, `custom-evaluators.ts` port. A5a to A5c: adapter doors for about 56 consumed private exports. A6a to A6c: `PrismaClient` outside the seam, with `typed-prisma-seam-baseline.json` still present. A7: Prisma enums in contracts. A9: `try*` renames. L1 to L6: 303 layout moves. W1 and W3. A12 to A19. Every count predates R1 to R6. Re-derive first | XL | no | H | | burn-down |
+| 12 | Architecture-lint burn-down slices still open. A1 and A2: `apps/api` and `apps/worker` stop importing enterprise feature packages. A3: plan-gate rename, agent-cache move, `custom-evaluators.ts` port. A5a to A5c: adapter doors for about 56 consumed private exports. A6a to A6c: `PrismaClient` outside the seam, with `typed-prisma-seam-baseline.json` still present. A7: Prisma enums in contracts. A9: `try*` renames. L1 to L6: 303 layout moves. W1 and W3. A12 to A19. Every count predates R1 to R6. Re-derive first. 09-08: superseded by the feature-shape ratchet (section 4) and the lint rebuild (section 7). | XL | no | H | | burn-down |
 | 13 | Tasks lane. `topic-clustering-run` is still unregistered and needs its runner's collaborator graph (3 days). Fix 16: lazy handle composition on `TasksHost`, because `prisma-migrate` opens ClickHouse and Redis it never reads. Fix 18: audit the `stored-object/server` index exports | L | no | H | | tasks |
 | 14 | `NlpLambdaRuntimeService` is restored in workflow-server and composed by nothing: the Lambda invoke port has no adapter. The S3 round-trip scenario needs a dogfood bucket lane | M | no | U | | nlp |
 | 15 | Parked behaviour needing a UI decision. The prompt editor standalone Inputs section (3 scenarios, `@unimplemented`). The workspace-switcher tooltip and auto-focus (3, parked). `sdk-scenario-set-limit.feature` (14 `@unimplemented`, written ahead of the feature: build it or delete it) | M | no | U | | product |
 | 16 | The one unbound scenario: `shared-section-navigation-layout.feature` narrow viewport needs a real browser lane, because jsdom cannot evaluate a media query. Plus 13 unknown annotations to reconcile | S | no | H | | parity |
 | 17 | `worker: null` is still in `apps/api/src/features/langy/langy.composition.ts:211`. Nobody probed whether a browser turn-start can reach the API-side refusal | S | no | U | | langy |
-| 18 | Two rulings due at merge. Legacy `/api/secrets` write-actor and duplicate-error byte compatibility. Which single SDK or OTel entry owns api, worker and Eventing instrumentation | S | no | H | | decisions |
+| 18 | Two rulings due at merge. Legacy `/api/secrets` write-actor and duplicate-error byte compatibility. Which single SDK or OTel entry owns api, worker and Eventing instrumentation. 09-08: the `/api/secrets` write actor is settled (a key bound to nobody is refused, `authenticated_actor_required`); the alias is deprecated with the successor named. | S | no | H | | decisions |
 | 19 | Unverified walk findings. F2: a failed `organization.getAll` renders an empty document with no error state. F5: one REST request writes up to 21 identical log lines. F7: `system.backup_log` collection is on by default and warns every boot. F8: `apps/ui/vite.config.ts:35` loads `.env.portless` with `override: true` while the api and the worker do not | M | no | U/H | | e2e |
 | 20 | The extracted full-read path trusts a stale storage-anchor hint. It was never verified against the legacy mapper characterisation | M | no | U | | trace |
 | 21 | Exit-ledger remainders. `modelProvider.getAllForProjectForFrontend` no longer returns `modelMetadata`, so the settings page may render none. `MODERN_API_METHODS` still lists `register` (`api-transport-boundaries.ts:23`). Of the five unwired pipelines, `identity` and `join-request` installers are now imported by the worker composition; `sso-connections`, `scim-sync` and `agent_sandbox_maintenance` are unverified | M | no | U/H | | api |
 | 22 | Run the seam review. Fable reads seams 1a to 1d once. Sample the `trace` and `governance` packages. Sonnet lanes write findings per package to `seam-review-2026-09-06/<pkg>.md`. Turn on "Require review from Code Owners" for `main` | L | no | H | | review |
 | 23 | Product ruling on the web host. `@langwatch/workflow-web/studio-host/api` has 79 importers from other features' screens. The studio drawer and dialog supersets move to the design system. `model/prisma-types` moves to `workflow-contract`. `member-seat-usage.tsx:7` still imports the enterprise `resource-limits` surface directly | L | no | H | | ui |
-| 24 | Fourteen narratives cut from comments need their ADR homes written: the idempotency ledger ADR, the tRPC chain ADR, five ADR-129 appendices, an ADR-127 appendix, an ADR-060 appendix, an error-handling security note, and the trace storage-anchor history. The full table is in section 4a | M | no | H | | adr |
+| 24 | Fourteen narratives cut from comments need their ADR homes written: the idempotency ledger ADR, the tRPC chain ADR, five ADR-129 appendices, an ADR-127 appendix, an ADR-060 appendix, an error-handling security note, and the trace storage-anchor history. The full table is in section 10a | M | no | H | | adr |
 | 25 | Memory repositories for every service unit test, and a chdb spike for repository tests (2 days, go or no-go) | L | no | H | | test |
 | 26 | `caseFiling.integration.test.tsx` is skipped. Run-plan folder grouping lives in `PlanScopeField.CaseChoices`, which has no test | S | no | H | | test |
 | 27 | Agent-testing web modules still compose Scenario, Prompt, Agent and Suite behaviour together. Inventory the mixed modules and separate them around named browser responsibilities: scenario case editing, agent and prompt target selection, suite plan editing, and the small `apps/ui` composition layer. Do not replace the mixture with one large shared context | L | no | H | | ui |
@@ -200,7 +373,8 @@ Release-blocking rows come first.
 | 30 | Residual unknowns. Body-shape drift on about 253 mounted REST operations (apidiff's job, not approved). Procedure-level gaps inside mounted namespaces. haven `migrations failed: context canceled` | M | no | H | | api |
 | 31 | Release note: run `make haven install` after the merge. A binary built before the removal hard-refuses at boot | S | no | H | | release |
 
-### 4a. ADR homes still to write
+
+### 10a. ADR homes still to write
 
 The comment sweeps cut every block to the reason alone. The narrative below was
 too long for a comment and too valuable to lose. Recover the original text with
@@ -225,12 +399,12 @@ too long for a comment and too valuable to lose. Recover the original text with
 | `packages/features/trace/server/src/projections/trace-derived.projection.ts` | Storage-anchor split history, the always-write-row fix for the store-miss ambiguity, and the accumulator keys coupled to `FOLD_ACCUMULATOR_KEYS` | ADR-066 and ADR-071 appendices |
 | `packages/observability/src/logger.ts` | The logger factory cache keyed by name and `disableContext`. A fresh `pino()` measured 2.3 percent of production wall time. Per-request fields arrive through the mixin, so sharing is safe | New ADR: observability logger factory caching |
 | `packages/observability/src/logger.ts` | Pretty-console transport options must survive `structuredClone`, because they cross a worker-thread boundary. Building the pretty stream on this thread kills the OTel log transport silently | Appendix to the same ADR |
-| `apps/api/src/features/enterprise/enterprise-webhook.composition.ts` | The webhook entitlement gate is a plan read, not an enterprise capability, so a deployment with no governance app answers a 403 instead of a 503 | Best practice: composition roots |
-| `packages/enterprise/features/webhook/server/src/app/webhook.app.ts` | Why `WebhookApp` is a holder rather than a restatement of endpoint-store operations | `best_practices/service-repository-adapter-port.md` |
+| `apps/api/src/features/enterprise/webhook.composition.ts` | The webhook entitlement gate is a plan read, not an enterprise capability, so a deployment with no governance app answers a 403 instead of a 503 | Best practice: composition roots |
+| `packages/features/webhook/server/src/app/webhook.app.ts` | Why `WebhookApp` is a holder rather than a restatement of endpoint-store operations | `best_practices/service-repository-adapter-port.md` |
 | `apps/api/src/features/trace/trace-rest.mount.ts` | Named absence: the coding-agent transcript join is not supplied, because `composeApiTraceReadStack` refuses `LogService.getLogsByTraceId` by name | Best practice: composition roots |
 | `apps/ui/e2e/langy/local-control-fixture.ts` | The CLI API key mint is read back before use. `apiKey.create` answering 200 has left the binding unwritten under load | ADR-129 appendix |
 
-## 5. Deferred to post-release
+## 11. Deferred to post-release
 
 - **Decision 21: the canonical error envelope.** The flat REST error body
   becomes one envelope. It needs its own ADR, a dated version, about 20
@@ -241,9 +415,9 @@ too long for a comment and too valuable to lose. Recover the original text with
 - **ADR-009 retirement**, with `otel-trace-context-propagation.feature`
   (10 `@unimplemented` scenarios). ADR-097 supersedes the platform span
   collection.
-- **Agent-testing web decomposition** (section 4 item 27), after the move.
+- **Agent-testing web decomposition** (section 10 item 27), after the move.
 
-## 6. The diff-drive gate
+## 12. The diff-drive gate
 
 Nothing counts as done on this branch until all of the following hold, in this
 order. Report the counters only after them.
@@ -350,7 +524,7 @@ These govern every architecture-lint slice.
    test command named per slice and nothing wider. No `git stash`, `restore`,
    `checkout --`, `reset` or `clean`. Commit by explicit pathspec.
 
-## 7. Reference material
+## 13. Reference material
 
 Findings logs kept as separate files:
 
@@ -378,7 +552,7 @@ under `/Users/afr/.claude/jobs/eeb488e6/tmp/`:
 | This plan sweep | `plan-sweep/report.md` |
 
 The composition ADR draft is the successor of the three superseded composition
-documents named in section 8. Copy it into `dev/docs/adr/` when Alex accepts
+documents named in section 14. Copy it into `dev/docs/adr/` when Alex accepts
 it.
 
 Architecture Decision Records that govern this work: ADR-101 (feature package
@@ -392,10 +566,11 @@ Best practices written out of the retired plans:
 `best_practices/zod.md`, `best_practices/error-handling.md`,
 `best_practices/service-repository-adapter-port.md`.
 
-## 8. Retired plans
+## 14. Retired plans
 
-Every document below was deleted on 2026-09-06. Each line names what the
-document was for, what it decided or found, and where its remainder went.
+Every document below was deleted on 2026-09-06 or 2026-09-08. Each line names
+what the document was for, what it decided or found, and where its remainder went.
+
 
 | Document | What it was for | What it decided or found | Remainder |
 | --- | --- | --- | --- |
@@ -403,38 +578,38 @@ document was for, what it decided or found, and where its remainder went.
 | `worker-consumer-cutover-plan.md` | How the deployed worker becomes the one consumer of the eventing jobs | Registry handoff: the App eventing instance is producer-only on the worker role, and the packaged composition is the only consumer | ADR-102 amendment (2026-09-06) |
 | `core-application-feature-extraction-handoff.md` | An operational restart note, 2026-08-28 | Nothing durable | Deleted. Git history |
 | `api-transport-extraction-handoff.md` | An operational restart note, 2026-08-28 | Nothing durable | Deleted. Git history |
-| `core-application-feature-extraction-future-work.md` | Structural work outside the behaviour-preserving extraction | Agent-testing web modules mix four domains and must be separated after the move | Section 4 item 27 |
+| `core-application-feature-extraction-future-work.md` | Structural work outside the behaviour-preserving extraction | Agent-testing web modules mix four domains and must be separated after the move | Section 10 item 27 |
 | `core-application-feature-extraction-plan.md` | The platform application exit plan | The eight definition-of-done clauses, the invariants, and seven resolved decisions | Sections 1 and 3. It is the seed of this document |
 | `connected-agents-restore-plan.md` | The 134 KB restore plan for connected agents | The runtime shape, the WebSocket hosting decision and the slice order. ADR-128 holds the contract | ADR-128 "Consequences" (the named absences). The rest is git history |
-| `core-application-exit-decisions-for-review.md` | The 366 KB exit ledger, 167 sections | Almost every section closed | Sections 70, 125 and 167 are section 4 item 21. The rest is git history |
+| `core-application-exit-decisions-for-review.md` | The 366 KB exit ledger, 167 sections | Almost every section closed | Sections 70, 125 and 167 are section 10 item 21. The rest is git history |
 | `suite-restore-review.md` | Review of the suite run-plan restore | The suites are restored and bound against Postgres and ClickHouse (2026-09-06) | Closed. Section 3 (decisions 4 and 5) |
-| `tasks-lane-review.md` | Review of the `apps/tasks` lane | Three fixes stayed open | Section 4 item 13 |
-| `tasks-launch-interface-and-saas.md` | The tasks launch interface and the langwatch-saas split | Five saas tasks move into this repository. `backfillInviteUsersToCio` stays a private `@langwatch/task` plugin, because it repairs one incident rather than a repeatable operation. `onboarding-completion-rate` is blocked on an onboarding server package | ADR-102 amendment (the plugin mechanism). Section 4 item 7 (the saas steps) |
+| `tasks-lane-review.md` | Review of the `apps/tasks` lane | Three fixes stayed open | Section 10 item 13 |
+| `tasks-launch-interface-and-saas.md` | The tasks launch interface and the langwatch-saas split | Five saas tasks move into this repository. `backfillInviteUsersToCio` stays a private `@langwatch/task` plugin, because it repairs one incident rather than a repeatable operation. `onboarding-completion-rate` is blocked on an onboarding server package | ADR-102 amendment (the plugin mechanism). Section 10 item 7 (the saas steps) |
 | `trpc-flatten-design.md` | The tRPC group flatten | Steps A to D. All landed | Section 3 (2026-09-05) |
 | `trpc-flatten-review.md` | The review of that flatten | Steps C and D landed | Section 3 (2026-09-05) |
-| `install-composition-review-2026-09-03.md` | Install and composition review of the platform-api packages | Sections A and B landed in `268eb2ed83`. The api-map lane is step E and stayed open | Section 4 item 11 |
-| `composition-simplification-options.md` | Options A to J for simplifying composition | Superseded | The composition design ADR draft, section 7 |
-| `feature-application-and-typed-transports.md` | A typed feature-application transport shape | Superseded | The composition design ADR draft, section 7 |
-| `typed-rest-context-design.md` | A typed REST context | Superseded | The composition design ADR draft, section 7 |
-| `architecture-lint-burn-down-plan.md` | The burn-down of 2,946 architecture-lint violations | The seven ground rules, R1 to R9 landed, and the open code slices | Section 6 (the ground rules). Section 4 item 12 (the open slices) |
-| `architecture-lint-review-2026-09-03.md` | Companion review of the lint rules | Folded into the lint review lane | The lint review report, section 7 |
+| `install-composition-review-2026-09-03.md` | Install and composition review of the platform-api packages | Sections A and B landed in `268eb2ed83`. The api-map lane is step E and stayed open | Section 10 item 11 |
+| `composition-simplification-options.md` | Options A to J for simplifying composition | Superseded | The composition design ADR draft, section 13 |
+| `feature-application-and-typed-transports.md` | A typed feature-application transport shape | Superseded | The composition design ADR draft, section 13 |
+| `typed-rest-context-design.md` | A typed REST context | Superseded | The composition design ADR draft, section 13 |
+| `architecture-lint-burn-down-plan.md` | The burn-down of 2,946 architecture-lint violations | The seven ground rules, R1 to R9 landed, and the open code slices | Section 12 (the ground rules). Section 10 item 12 (the open slices) |
+| `architecture-lint-review-2026-09-03.md` | Companion review of the lint rules | Folded into the lint review lane | The lint review report, section 13 |
 | `experiment-orchestrator-split-plan.md` | The split of an 88 KB orchestrator service | Done: 3,956 lines became 385 lines plus 27 sibling services | Section 3 (decision 16) |
 | `ui-family-move-manifests.md` | Eighteen manifests for the UI family moves | The drawer registry mechanism moves, not the drawers. `@langwatch/ui-drawer` owns the address vocabulary, the navigation stack, the stores, the lazy registry and `CurrentDrawer` | `best_practices/drawers.md`, section "The drawer registry" |
 | `ui-subscription-transport.md` | The tRPC subscription wire for the browser | All nine live procedures resolve on the api root and stream over `/api/sse/*`. The wire is ours, not tRPC's | ADR-128 (public REST and internal tRPC) amendment |
 | `ui-install-surface-2026-09-05.md` | One install surface for the browser application | `uiFeature` and `installUiFeatures`. A duplicate page key or drawer name is refused by name | `best_practices/ui-install.md` |
-| `ui-slots-2026-09-05.md` | The core-to-enterprise UI slot seam | A core screen asks for a block by name and renders its fallback. Only `apps/ui` fills a slot | `best_practices/ui-install.md`. The open ruling is section 4 item 23 |
-| `ui-host-capabilities-2026-09-05.md` | The browser host ports in `packages/ui-host` | Router, toaster, error presenter and link move to `@langwatch/ui-host` | `best_practices/ui-install.md`. The product ruling is section 4 item 23 |
-| `rest-chain-extensions-2026-09-05.md` | The REST chain gap survey, G1 to G12 | All twelve are built. The remaining unknowns are the better-auth pass-through and multipart | `packages/api/adrs/005-rest-chain-extensions.md`. Section 4 item 29 |
+| `ui-slots-2026-09-05.md` | The core-to-enterprise UI slot seam | A core screen asks for a block by name and renders its fallback. Only `apps/ui` fills a slot | `best_practices/ui-install.md`. The open ruling is section 10 item 23 |
+| `ui-host-capabilities-2026-09-05.md` | The browser host ports in `packages/ui-host` | Router, toaster, error presenter and link move to `@langwatch/ui-host` | `best_practices/ui-install.md`. The product ruling is section 10 item 23 |
+| `rest-chain-extensions-2026-09-05.md` | The REST chain gap survey, G1 to G12 | All twelve are built. The remaining unknowns are the better-auth pass-through and multipart | `packages/api/adrs/005-rest-chain-extensions.md`. Section 10 item 29 |
 | `trpc-fluent-chain-2026-09-05.md` | The tRPC fluent chain | The chain is one argument and terminates in `.handle(fn)`. `withOutput` never reaches tRPC's `.output()` | `packages/api/adrs/006-trpc-fluent-chain.md` |
 | `e2e-walk-2026-09-03.md` | The first end-to-end walk | It boots and it cannot be used: `/api/auth` was mounted by no process | ADR-010 amendment (2026-09-06) |
 | `e2e-platform-plan-2026-09-04.md` | The plan for the four end-to-end suites | Eight decisions, including "the evaluator was hit is proven through a monitor" and "known platform gaps fail by name" | ADR-010 amendment (2026-09-06) |
-| `why-so-many-bugs-2026-09-04.md` | Why the branch shipped so many bugs | Five causes and the six-point gate | Section 6 (the gate and the causes). `TESTING_PHILOSOPHY.md` (the pieces-against-product cause) |
-| `open-decisions-2026-09-03.md` | Every decision needing Alex | 19 of 21 decisions resolved | Section 3 (resolved). Section 4 items 5, 6, 11, 17 and 18 (unresolved) |
-| `binding-gaps-2026-09-04.md` | The unbound-scenario census, written at 1,333 unbound | Superseded by the restore-or-retire rows and the parity run | Section 4 items 15 and 16 |
-| `restore-or-retire-2026-09-05.md` | Behaviour the lift left behind, row by row | Ruled 2026-09-05: restore everything. No behaviour main has may be lost | Section 3 (the ruling). Section 4 items 4, 14, 15, 16 and 28 |
-| `restructure-bug-hunt-2026-09-03.md` | The hunt for unserved surfaces and restored bugs | 22 documented REST operations were unmounted | Section 4 items 9 and 30 |
-| `unmounted-surfaces-audit-2026-09-04.md` | The unmounted-surface audit | Platform-era. Superseded by the route-coverage gate `2653514dfd` | Section 4 item 9 |
-| `openapi-parity-2026-09-04.md` | OpenAPI parity, 78 KB | Platform-era. The generator landed in `60ca74941a` | Section 4 item 30 |
+| `why-so-many-bugs-2026-09-04.md` | Why the branch shipped so many bugs | Five causes and the six-point gate | Section 12 (the gate and the causes). `TESTING_PHILOSOPHY.md` (the pieces-against-product cause) |
+| `open-decisions-2026-09-03.md` | Every decision needing Alex | 19 of 21 decisions resolved | Section 3 (resolved). Section 10 items 5, 6, 11, 17 and 18 (unresolved) |
+| `binding-gaps-2026-09-04.md` | The unbound-scenario census, written at 1,333 unbound | Superseded by the restore-or-retire rows and the parity run | Section 10 items 15 and 16 |
+| `restore-or-retire-2026-09-05.md` | Behaviour the lift left behind, row by row | Ruled 2026-09-05: restore everything. No behaviour main has may be lost | Section 3 (the ruling). Section 10 items 4, 14, 15, 16 and 28 |
+| `restructure-bug-hunt-2026-09-03.md` | The hunt for unserved surfaces and restored bugs | 22 documented REST operations were unmounted | Section 10 items 9 and 30 |
+| `unmounted-surfaces-audit-2026-09-04.md` | The unmounted-surface audit | Platform-era. Superseded by the route-coverage gate `2653514dfd` | Section 10 item 9 |
+| `openapi-parity-2026-09-04.md` | OpenAPI parity, 78 KB | Platform-era. The generator landed in `60ca74941a` | Section 10 item 30 |
 | `ownerless-ui-surfaces-census.md` | A census of UI surfaces with no owner | Platform-era | Deleted. Git history |
 | `platform-reachability-census.md` | A census of reachable platform modules | Platform-era | Deleted. Git history |
 | `api-and-worker-surface-audit.md` | An audit of the api and worker surfaces | Platform-era | Deleted. Git history |
@@ -445,14 +620,24 @@ document was for, what it decided or found, and where its remainder went.
 | `ingestion-sources-router-is-half-migrated.md` | One finding: a half-migrated router | Closed | Deleted. Git history |
 | `zod-4-migration-misses.md` | What the zod 4 upgrade broke quietly | An inspected schema type-checks and still answers wrong. A test for code that inspects a library's data structures must get those structures from the library | `best_practices/zod.md` |
 | `head-routes-cannot-be-served.md` | `.head()` registers a handler Hono can never reach | Hono answers HEAD from the GET route before routing, so a HEAD handler never runs and `c.req.method` reads `"GET"` | `packages/api/adrs/007-head-is-answered-from-get.md` |
-| `span-referenced-payloads-are-not-in-the-event-union.md` | `makeId` is typed for events it cannot name | A subscriber has two types, not one: the event it is delivered and the payload its own `stage` returns. Separating them is an eventing framework change | The eventing design ADR draft, section 7 |
+| `span-referenced-payloads-are-not-in-the-event-union.md` | `makeId` is typed for events it cannot name | A subscriber has two types, not one: the event it is delivered and the payload its own `stage` returns. Separating them is an eventing framework change | The eventing design ADR draft, section 13 |
 | `test-doubles-drift-because-the-check-that-would-catch-them-is-drowned.md` | Why test doubles drift | The check exists (`typecheck:tests`) and is red for unrelated reasons. Drive the count down; do not claim tests are unchecked. A "does this exist" sweep must match declaration forms, not the export keyword | `TESTING_PHILOSOPHY.md`, section "Test doubles drift" |
 | `automatic-migration-enrolment-gap.md` | One finding: an enrolment gap | Closed | Deleted. Git history |
 | `gateway-budget-check-is-unguarded.md` | One finding: an unguarded budget check | Closed | Deleted. Git history |
 | `api-boot-gaps-durable-append-rate-limit.md` | Boot gaps: durable append and rate limit, 53 KB | Closed | Deleted. Git history |
-| `package-move-capability-gaps.md` | Capability gaps left by the package moves | When a move re-authors rather than renames, diff the two files by behaviour. A constant or a state field that travelled without the control that drove it is the tell | `TESTING_PHILOSOPHY.md`, section "A move that re-authors". Section 4 item 26 |
-| `seam-review-2026-09-06.md` | How to review the branch | Machines review the bulk, Fable reads the seams once, Sonnet lanes emit findings | Section 6 (the seam review method). Section 4 item 22 |
-| `adr-candidates-from-comment-sweeps-2026-09-06.md` | Fourteen narratives cut from comments | Each needs an ADR home | Section 4a |
+| `package-move-capability-gaps.md` | Capability gaps left by the package moves | When a move re-authors rather than renames, diff the two files by behaviour. A constant or a state field that travelled without the control that drove it is the tell | `TESTING_PHILOSOPHY.md`, section "A move that re-authors". Section 10 item 26 |
+| `seam-review-2026-09-06.md` | How to review the branch | Machines review the bulk, Fable reads the seams once, Sonnet lanes emit findings | Section 12 (the seam review method). Section 10 item 22 |
+| `adr-candidates-from-comment-sweeps-2026-09-06.md` | Fourteen narratives cut from comments | Each needs an ADR home | Section 10a |
+| `api-transport-split.md` | Phase 1 of the API rebuild: one path per transport, the annotation reference on it | Landed `123bd57406` + `3985d284a0` | Section 5. `api-package-rebuild.md` keeps the phase-3 list |
+| `api-package-fold.md` | Fold `platform-api-client` and `runtime-composition/contract` into `@langwatch/api` | Landed `a0e6374877`, `75b713c020` | Section 3 (09-08) |
+| `api-legacy-delete.md` | Delete the legacy transport builders and fold `@langwatch/api` to nine files | Landed `1dfbc5dcf1`; four specs kept `@unimplemented` | Sections 3 and 5 |
+| `api-runtime-defects.md` | Four REST runtime defects the secret conversion exposed | Landed `e7631f0318` | Section 5 |
+| `api-rest-runtime-gaps.md` | Facts, v1-only families, deprecation with documented responses, public routes | Landed `864a7151df` | Section 5 |
+| `api-rest-organization-door.md` | The organization credential door on the declared REST path | Landed `5080220f88`; role declares it `cccfe396b0` | Section 5; the mount is in `wave4-process-wiring.md` |
+| `wave1-process-wiring.md` | entitlement, presence, share into the api | Landed `f445a8a470` | Section 6 |
+| `wave2-process-wiring.md` | secret, feature-flag, data-retention into api and worker | Landed `94513f717e` | Section 6 |
+| `wave3-process-wiring.md` | topic, data-privacy, sso, metric into api and worker | Landed `882ebfa479`; six files blocked by the pile | Section 6, D-b |
+| `audit-log-port.md` | The audit log behind one port, OSS null recorder | Landed `008a5cd882` | Section 3 (09-08) |
 
 Thirty-nine comments in source files still name a retired document, most of them
 `ui-family-move-manifests.md`. Each is a historical pointer, not a link a
@@ -464,6 +649,7 @@ carry the fact, because that turns a stale pointer into a false statement.
 
 Two directories were kept. `dev/docs/plans/main-merge-ledger/` holds eight
 generated path lists from the 2026-09-03 merge. `dev/docs/plans/feature-cleanup/`
-holds nineteen per-feature cleanup reviews and a README. Neither is empty and
-neither holds only retired documents, so both stay until their own owner
-retires them.
+holds nineteen per-feature cleanup reviews and a README whose working rules (the
+fold procedure, the six rewrite hazards, the divergence pattern) still apply;
+its status table now points here. Neither is empty and neither holds only
+retired documents, so both stay.

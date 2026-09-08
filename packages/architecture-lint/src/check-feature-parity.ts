@@ -270,7 +270,7 @@ const LEGACY_INERT: string[] = [
   // 2026-09-08 api-legacy-delete: the builder this was bound through is gone
   // and the new runtime has not earned SSE back yet. Each scenario is
   // @unimplemented; the requirement stands. Remove the entry with its first
-  // real binding (dev/docs/plans/api-legacy-delete.md).
+  // real binding (dev/docs/plans/strict-feature-layout.md, section 5).
   "packages/api/specs/sse-streaming.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-lint's unspecced-core report),

@@ -350,5 +350,6 @@ and the README sections "Versioned HTTP services", "Compatibility registration m
    address, its `latest` address and its bare address; naming the version is optional for the
    caller. The runtime's version guards and dated fallback stay.
 5. **Phase 1 landed** in `123bd57406` (runtime-composition repositories) and `3985d284a0`
-   (runtimes, annotation, agent tRPC mounts). Next wave: the organization door,
-   `dev/docs/plans/api-rest-organization-door.md`.
+   (runtimes, annotation, agent tRPC mounts). The organization door landed in
+   `5080220f88`; the runtime's status and remaining gaps are section 5 of
+   `dev/docs/plans/strict-feature-layout.md`.
