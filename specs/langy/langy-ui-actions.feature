@@ -79,6 +79,13 @@ Feature: Langy drives the open page through typed UI actions
     Then the dispatch answers not found, the same as for no conversation at all
 
   @unit
+  Scenario: A worker started by a service key cannot drive a page
+    Given a conversation that a service key, an API key issued to no user, started
+    When its worker dispatches a page action with its session key
+    Then the dispatch is refused before any conversation is looked up
+    And the refusal says page actions run as a person
+
+  @unit
   Scenario: An unclaimed action deletes its pending record before answering
     Given nothing claimed the action inside the claim window
     When the dispatch gives up on the page

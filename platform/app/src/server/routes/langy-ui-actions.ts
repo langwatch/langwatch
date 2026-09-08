@@ -87,7 +87,9 @@ const dispatchBodySchema = z.object({
  * Authenticate the key, open the flag, and resolve the owning user. Mirrors
  * `authorizeLangyApiKey` in `app-layer/langy/langyApiKeyAuthorization.ts`
  * including the dark-404 contract; the permission ceiling is enforced by the
- * caller once the action names it.
+ * caller once the action names it. Unlike the turn surface, this one is
+ * user-only: a service key's worker is refused at the door, same as on the
+ * local-control surface (`langy-local.ts`).
  */
 async function authorizeUiRequest(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
@@ -116,6 +118,19 @@ async function authorizeUiRequest(c: Context) {
         ? "langy_api_key_unowned"
         : "langy_api_key_no_langy_access",
       identity.message,
+    );
+  }
+  // A page action runs as the person whose conversation it drives: the
+  // visibility check matches the conversation's owner and the backend
+  // fallback persists the actor as a User. The session key a service key's
+  // worker holds is itself ownerless, so it resolves to a key actor whose id
+  // names neither the conversation's owner (the parent key) nor a User row.
+  // Refuse it here with the reason spelled out, rather than letting the
+  // visibility check answer not-found for a conversation that exists.
+  if (identity.actor.type !== "user") {
+    throw new LangyApiIdentityDeniedError(
+      "langy_api_key_unowned",
+      "Page actions run as the person whose key started the conversation. A conversation started by a service key has no person to act as, so its worker cannot drive a page; use a personal API key for turns that need one.",
     );
   }
 
