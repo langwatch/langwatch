@@ -103,17 +103,22 @@ function usePersonalWorkspace(): {
   features: PersonalWorkspaceFeatures | undefined;
 } {
   const session = useRequiredSession();
-  const { organizations } = useOrganizationTeamProject({
+  const { organizations, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  // Scoped to the organization the chrome is showing: a personal workspace
+  // exists per organization, and linking to another one's navigates out of the
+  // current organization, which the header then reflects by re-deriving the
+  // organization from the project slug in the URL.
   const personalProject = useMemo(
     () =>
       findPersonalProject({
         organizations,
         userId: session.data?.user?.id,
+        organizationId: organization?.id,
       }),
-    [organizations, session.data?.user?.id],
+    [organizations, session.data?.user?.id, organization?.id],
   );
   const personalProjectId = personalProject?.id ?? null;
   const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
