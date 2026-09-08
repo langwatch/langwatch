@@ -18,10 +18,14 @@
  * @see specs/experiments-v3/attachment-inputs.feature
  */
 
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { DatasetAttachmentTooLargeError } from "~/server/datasets/attachments";
+import {
+  DATASET_ATTACHMENT_PURPOSE,
+  DatasetAttachmentTooLargeError,
+} from "~/server/datasets/attachments";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
   attachmentDisplayName,
@@ -56,6 +60,8 @@ export type StoredAttachmentReader = (args: {
 /** Reads one address on the public internet. */
 export type ExternalAttachmentReader = (args: {
   url: string;
+  /** The dataset column type the value comes from, when the run knows it. */
+  columnType?: string;
 }) => Promise<AttachmentBytes>;
 
 /**
@@ -105,7 +111,14 @@ const readStreamCapped = async ({
   return Buffer.concat(chunks);
 };
 
-/** The production reader of a LangWatch attachment. */
+/**
+ * The production reader of a LangWatch attachment.
+ *
+ * Only an object stored as a dataset attachment is read. The object store
+ * holds trace media and scenario media too, and each of those asks for its own
+ * permission on the read route. A cell that names one of them therefore reads
+ * as gone here, so a run can never carry bytes the person could not open.
+ */
 export const storedAttachmentReader: StoredAttachmentReader = async ({
   projectId,
   objectId,
@@ -113,13 +126,29 @@ export const storedAttachmentReader: StoredAttachmentReader = async ({
   const service = createStoredObjectsService({ projectId });
   const found = await service.getById({ projectId, id: objectId });
   if (!found || "status" in found) return null;
+  if (found.row.purpose !== DATASET_ATTACHMENT_PURPOSE) {
+    found.stream.destroy?.();
+    logger.warn(
+      { projectId, objectId, purpose: found.row.purpose },
+      "Dataset attachment reference names an object of another purpose",
+    );
+    return null;
+  }
   const bytes = await readStreamCapped({ stream: found.stream });
   return { mediaType: found.row.media_type, bytes };
 };
 
-/** The production reader of an address on the public internet. */
+/**
+ * The production reader of an address on the public internet.
+ *
+ * The address belongs to whoever wrote the cell, so the answer is never
+ * trusted: a declared length over the ceiling is refused before a byte is
+ * read, the body is read as a stream and cut at the same ceiling, and an image
+ * column only accepts a picture.
+ */
 export const externalAttachmentReader: ExternalAttachmentReader = async ({
   url,
+  columnType,
 }) => {
   const controller = new AbortController();
   const timeout = setTimeout(
@@ -131,15 +160,36 @@ export const externalAttachmentReader: ExternalAttachmentReader = async ({
     if (!response.ok) {
       throw new DatasetAttachmentUnavailableError(attachmentDisplayName(url));
     }
-    const body = Buffer.from(await response.arrayBuffer());
-    if (body.length > MAX_ATTACHMENT_BYTES) {
+
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (
+      Number.isFinite(declaredLength) &&
+      declaredLength > MAX_ATTACHMENT_BYTES
+    ) {
       throw new DatasetAttachmentTooLargeError(MAX_ATTACHMENT_BYTES);
     }
+
+    const mediaType =
+      response.headers.get("content-type")?.split(";")[0]?.trim() ??
+      "application/octet-stream";
+    if (columnType === "image" && !mediaType.startsWith("image/")) {
+      logger.warn(
+        { url, mediaType },
+        "Image column address answered with something other than a picture",
+      );
+      throw new DatasetAttachmentUnavailableError(attachmentDisplayName(url));
+    }
+
+    if (!response.body) {
+      throw new DatasetAttachmentUnavailableError(attachmentDisplayName(url));
+    }
+    const bytes = await readStreamCapped({
+      stream: Readable.fromWeb(response.body as WebReadableStream),
+    });
+
     return {
-      mediaType:
-        response.headers.get("content-type")?.split(";")[0]?.trim() ??
-        "application/octet-stream",
-      bytes: body,
+      mediaType,
+      bytes,
       name: attachmentDisplayName(url),
     };
   } finally {
@@ -202,7 +252,7 @@ export const resolveAttachmentInputs = async ({
     }
 
     resolved[field] = attachmentDataUrl(
-      await readExternalAttachment({ url: value }),
+      await readExternalAttachment({ url: value, columnType }),
     );
     changed = true;
   }

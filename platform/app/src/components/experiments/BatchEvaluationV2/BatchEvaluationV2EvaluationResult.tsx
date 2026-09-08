@@ -21,12 +21,26 @@ import {
 } from "react";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
+import { isDatasetAttachmentRef } from "~/shared/datasets/attachment-ref";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";
 import { ExpandedTextDialog, HoverableBigText } from "../../HoverableBigText";
 import { getEvaluationColumns } from "./utils";
+
+/**
+ * Where a cell's picture is read from, or null when the cell holds no picture.
+ *
+ * An uploaded picture is a reference relative to this origin, which
+ * `getImageUrl` does not recognize, so it is taken as it is.
+ */
+const imageSourceOf = (value: string): string | null => {
+  const fromUrl = getImageUrl(value);
+  if (fromUrl) return fromUrl;
+  const trimmed = value.trim();
+  return isDatasetAttachmentRef(trimmed) ? trimmed : null;
+};
 
 type EvaluationRowData = {
   rowNumber: number;
@@ -118,7 +132,7 @@ export function BatchEvaluationV2EvaluationResult({
     for (const column of Array.from(datasetColumns)) {
       const mightHaveImages =
         typeof firstEntry?.entry?.[column] === "string" &&
-        getImageUrl(firstEntry.entry[column]!);
+        imageSourceOf(firstEntry.entry[column]!) !== null;
       cols.push({
         id: `dataset_${column}`,
         header: `Dataset Input (${column})`,
@@ -126,7 +140,7 @@ export function BatchEvaluationV2EvaluationResult({
         render: (row) => {
           const val = row.datasetEntry?.entry?.[column];
           if (mightHaveImages) {
-            const img = getImageUrl((val as string) ?? "");
+            const img = imageSourceOf((val as string) ?? "");
             if (img) {
               return (
                 <ExternalImage

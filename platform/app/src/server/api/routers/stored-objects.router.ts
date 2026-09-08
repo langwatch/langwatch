@@ -27,12 +27,11 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
  *
  * Auth: session user must have `traces:view`, `scenarios:view` OR
  * `datasets:view` on `projectId`, mirroring the `/api/files/:id` route's own
- * gate. The same
- * stored object is trace media for one viewer and scenario media for another,
- * and the two permissions are separate categories a custom role can hold one
- * of. A probe narrower than the read it describes leaves a viewer who can
- * fetch the bytes unable to find out why the player failed, which strands the
- * renderer in its loading state.
+ * gate. The same stored object is trace media for one viewer and scenario
+ * media for another, and the permissions are separate categories a custom
+ * role can hold one of. A probe narrower than the read it describes leaves a
+ * viewer who can fetch the bytes unable to find out why the player failed,
+ * which strands the renderer in its loading state.
  */
 export const storedObjectsRouter = createTRPCRouter({
   headById: protectedProcedure

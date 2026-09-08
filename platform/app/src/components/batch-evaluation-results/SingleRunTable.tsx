@@ -17,6 +17,7 @@ import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { isDatasetAttachmentRef } from "~/shared/datasets/attachment-ref";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
 import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
@@ -155,9 +156,13 @@ const buildColumns = ({
         cell: ({ getValue }) => {
           const value = getValue();
 
-          // Check each cell for image URLs regardless of column type
+          // Check each cell for image URLs regardless of column type. An
+          // uploaded picture is a reference relative to this origin, which
+          // `getImageUrl` does not recognize, so it is taken as it is.
           if (typeof value === "string") {
-            const imageUrl = getImageUrl(value);
+            const imageUrl =
+              getImageUrl(value) ??
+              (isDatasetAttachmentRef(value.trim()) ? value.trim() : null);
             if (imageUrl) {
               return (
                 <ExternalImage

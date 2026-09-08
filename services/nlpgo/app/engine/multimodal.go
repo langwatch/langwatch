@@ -232,13 +232,20 @@ func isInlineTextMediaType(mediaType string) bool {
 	return strings.HasPrefix(mediaType, "text/") || mediaType == "application/json"
 }
 
+// maxInlineTextBytes is the largest text attachment that is read into the
+// prompt. A larger one goes to the provider as a file instead: inlining it
+// would spend the whole context window on one attachment, and every provider
+// that accepts a file part reads such a document itself.
+const maxInlineTextBytes = 1 << 20
+
 // decodeTextPayload decodes a base64 payload that a media type declares to be
 // text. It reports false when the bytes are not valid UTF-8, because the
 // declared media type can be wrong and unreadable characters must not go into
-// the prompt; the caller then sends the attachment as a file instead.
+// the prompt, and false for a document over maxInlineTextBytes; the caller
+// then sends the attachment as a file instead.
 func decodeTextPayload(payload string) (string, bool) {
 	data, err := decodeBase64(payload)
-	if err != nil || !utf8.Valid(data) {
+	if err != nil || !utf8.Valid(data) || len(data) > maxInlineTextBytes {
 		return "", false
 	}
 	return string(data), true

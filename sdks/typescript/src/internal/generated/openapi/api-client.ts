@@ -1239,7 +1239,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Upload a file for an image or file column and get the reference a cell holds */
+        /** @description Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. */
         post: operations["postApiDatasetAttachments"];
         delete?: never;
         options?: never;

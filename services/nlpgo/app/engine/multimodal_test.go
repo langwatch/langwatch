@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -207,6 +208,30 @@ func TestSplitMessagesWithAttachmentsInlinesTextFile(t *testing.T) {
 	text, _ := block["text"].(string)
 	assert.True(t, strings.HasPrefix(text, "sales.csv\n\n"), "the file name heads the text, got %q", text)
 	assert.Contains(t, text, "acme,10", "the decoded file content must reach the model")
+}
+
+// @scenario "A text file over the inline ceiling is delivered as a file part"
+func TestSplitMessagesWithAttachmentsInlinesTextOnlyUpToTheCeiling(t *testing.T) {
+	tests := []struct {
+		name     string
+		size     int
+		wantType string
+	}{
+		{name: "at the ceiling", size: maxInlineTextBytes, wantType: "text"},
+		{name: "one byte over the ceiling", size: maxInlineTextBytes + 1, wantType: "file"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("a", tt.size)))
+			msgs := splitMessagesWithAttachments([]app.ChatMessage{
+				{Role: "user", Content: "data:text/plain;name=notes.txt;base64," + payload},
+			})
+			parts := contentParts(t, msgs[0])
+			require.Len(t, parts, 1)
+			typ, _ := partType(t, parts[0])
+			assert.Equal(t, tt.wantType, typ)
+		})
+	}
 }
 
 // @scenario "A text file with bytes that are not valid text is delivered as a file part"

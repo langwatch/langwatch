@@ -45,7 +45,7 @@ const FILES_RATE_LIMIT_MAX = 120;
  * Stored objects are shared by several features, and which permission guards
  * a read depends on what the object IS: trace media requires `traces:view`,
  * scenario media requires `scenarios:view`, and a file attached to a dataset
- * cell requires `datasets:view` — separate permission categories, and a custom
+ * cell requires `datasets:view`. They are separate permission categories, and a custom
  * role can hold one without the others.
  */
 const FILE_VIEW_PERMISSIONS = [
@@ -376,7 +376,7 @@ async function handleFileRead(
   });
 }
 
-// Named routes — the file name is the last segment of a dataset attachment
+// Named routes. The file name is the last segment of a dataset attachment
 // reference, so the browser downloads the file under its own name instead of
 // the object id. The name only sets `Content-Disposition`; the bytes served
 // are the same as on the two-segment route below.

@@ -69,6 +69,44 @@ Feature: An image or a file cell reaches the target as an attachment
     And the platform does not read the address
 
   @unit
+  Scenario: A fixed address in a file input is read as an attachment
+    Given an agent target with a file input set to a fixed public address
+    When the row runs
+    Then the platform reads the address and sends the bytes
+    # No dataset column stands behind a fixed value, so the field the target
+    # declares says what the value is.
+
+  @unit
+  Scenario: An address in an image input that serves something else fails the cell
+    Given an agent target with an image input holding a public address
+    And the address answers with a web page, not a picture
+    When the row runs
+    Then the cell fails with the attachment unavailable error code
+
+  @unit
+  Scenario: An address that declares a size over the ceiling is refused before it is read
+    Given an agent target with a file input holding a public address
+    And the address declares a size over the attachment ceiling
+    When the row runs
+    Then the cell fails with the attachment too large error code
+    And the body is never read
+
+  @unit
+  Scenario: An address that keeps sending past the ceiling is cut
+    Given an agent target with a file input holding a public address
+    And the address declares no size and sends more than the ceiling allows
+    When the row runs
+    Then the cell fails with the attachment too large error code
+
+  @unit
+  Scenario: A stored object of another purpose is not readable as an attachment
+    Given a cell that names a stored object kept as trace media
+    When the row runs
+    Then the cell fails with the attachment unavailable error code
+    # Each purpose asks for its own permission on the read route, so a run must
+    # not carry bytes the person could not open themselves.
+
+  @unit
   Scenario: A connected agent receives the attachment beside the text
     Given a connected agent column with "input" mapped to a text column
     And "attachment" mapped to "screenshot"

@@ -374,4 +374,23 @@ describe("AttachmentCell", () => {
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
     });
   });
+
+  describe("given a file cell that holds the bytes inline", () => {
+    /** @scenario A data URL opens only for a type the browser shows */
+    it("links to a document the browser shows", () => {
+      const pdf = "data:application/pdf;base64,JVBERi0=";
+      renderCell({ dataType: "file", value: pdf });
+
+      expect(screen.getByRole("link")).toHaveAttribute("href", pdf);
+    });
+
+    it("renders any other type as plain text, with no link", () => {
+      renderCell({
+        dataType: "file",
+        value: "data:text/html;base64,PGI+eDwvYj4=",
+      });
+
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+  });
 });

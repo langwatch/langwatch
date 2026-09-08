@@ -349,16 +349,24 @@ function readFilledValue({
   return href ? { kind: "file", href } : null;
 }
 
+/** The media types a `data:` cell value is allowed to open as a link. */
+const OPENABLE_DATA_URL_RE =
+  /^data:(?:image\/|audio\/|video\/|application\/pdf\b)/i;
+
 /**
- * Where the chip points. A LangWatch reference, a data URL and an address on
- * another site all open as they are. Anything else has no file behind it, so
- * it gets no chip.
+ * Where the chip points. A LangWatch reference and an address on another site
+ * open as they are. A data URL opens only for a media type the browser shows
+ * as a document, because opening one of another type navigates the person to
+ * content of our own origin that the read route never served. Anything else
+ * has no file behind it, so the chip is drawn as plain text.
  */
 function attachmentHref(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   if (isDatasetAttachmentRef(trimmed)) return trimmed;
-  if (trimmed.startsWith("data:")) return trimmed;
+  if (trimmed.startsWith("data:")) {
+    return OPENABLE_DATA_URL_RE.test(trimmed) ? trimmed : null;
+  }
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   return null;
 }

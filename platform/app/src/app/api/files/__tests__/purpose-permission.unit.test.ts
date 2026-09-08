@@ -4,7 +4,7 @@
  * The stored-objects read route authorizes by the OBJECT's purpose, not by a
  * single hardwired permission: trace media guards on `traces:view`, scenario
  * media on `scenarios:view`, and a file attached to a dataset cell on
- * `datasets:view` — separate permission categories that custom roles can grant
+ * `datasets:view`. They are separate permission categories that custom roles grant
  * independently. This pins the mapping the route's post-read gate
  * (`authorizeFilePurpose`) applies.
  */

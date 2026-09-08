@@ -2731,13 +2731,19 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
 };
 
 /**
- * The dataset column type an input field is mapped from, or nothing.
+ * The type an input field reads its value as, or nothing.
  *
- * A fixed value, and a mapping onto another target's output, name no column,
- * so they have no type. The resolver reads that as "not an attachment column"
- * and leaves the value alone.
+ * A mapping onto a dataset column takes the column's type. A fixed value, and
+ * a mapping onto another target's output, name no column, so the field the
+ * target declares answers instead: an address typed into an image or file
+ * field is an attachment the run reads, and every other field keeps its value
+ * as text.
+ *
+ * Exported for unit testing: this is what decides whether a value is read as
+ * an attachment or left as text, and a wrong answer sends an agent a link it
+ * cannot open.
  */
-const columnTypeOfInputFor =
+export const columnTypeOfInputFor =
   ({
     cell,
     datasetColumns,
@@ -2747,14 +2753,41 @@ const columnTypeOfInputFor =
   }) =>
   (inputField: string): string | undefined => {
     const datasetId = cell.datasetEntry._datasetId as string | undefined;
-    if (!datasetId) return undefined;
-    const mapping = cell.targetConfig.mappings[datasetId]?.[inputField];
-    if (mapping?.type !== "source" || mapping.source !== "dataset") {
-      return undefined;
+    const mapping = datasetId
+      ? cell.targetConfig.mappings[datasetId]?.[inputField]
+      : undefined;
+
+    if (mapping?.type === "source" && mapping.source === "dataset") {
+      return datasetColumns.find(
+        (column) => column.name === mapping.sourceField,
+      )?.type;
     }
-    return datasetColumns.find((column) => column.name === mapping.sourceField)
-      ?.type;
+
+    // A fixed value carries no column behind it, so the field the target
+    // declares says what the value is. An address typed into an image or file
+    // field is still an attachment and is read as one; every other field type
+    // keeps its value as text.
+    return declaredAttachmentFieldType({ cell, inputField });
   };
+
+/**
+ * The target's own field type for an input, when it is image or file.
+ *
+ * A connected agent writes its declared inputs onto the target config when the
+ * column is built, so this one list covers every target kind.
+ */
+const declaredAttachmentFieldType = ({
+  cell,
+  inputField,
+}: {
+  cell: ExecutionCell;
+  inputField: string;
+}): string | undefined => {
+  const declared = cell.targetConfig.inputs?.find(
+    (field) => field.identifier === inputField,
+  )?.type;
+  return declared === "image" || declared === "file" ? declared : undefined;
+};
 
 /**
  * The inputs a target is dispatched with, attachments included.

@@ -22,7 +22,9 @@ import {
   datasetColumnTypeSchema,
   datasetConfirmColumnsSchema,
 } from "../../../../server/datasets/types";
+import { rateLimit } from "../../../../server/rateLimit";
 import { bodyLimit } from "../../../../server/routes/_lib/body-limit";
+import { rateLimitedResponse } from "../../../../server/stored-objects/media-response";
 import {
   DATASET_ATTACHMENT_MAX_BYTES,
   DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
@@ -309,14 +311,28 @@ secured.access(requires("datasets:create")).post(
   },
 );
 
+/**
+ * Per-project rate limit on the attachment upload route.
+ *
+ * 30 uploads a minute is well above the pace a person fills cells at, and it
+ * caps how much storage and how many object rows one set of credentials can
+ * write in a burst.
+ */
+const ATTACHMENT_RATE_LIMIT_WINDOW_SECONDS = 60;
+const ATTACHMENT_RATE_LIMIT_MAX = 30;
+
 // ── Upload a file into a dataset cell ──────────────────────────
 // Registered before /:slugOrId so "attachments" is not matched as a slug.
 // Session-cookie (or API-key) authenticated in-handler, and gated on
-// `datasets:manage` — the same grain that a dataset record change asks for.
+// `datasets:manage`, the same grain that a dataset record change asks for.
 //
 // The body cap sits above the file cap by the multipart framing allowance, so
 // a file of exactly the maximum size is not refused for its envelope. Both
 // refusals answer with the same handled error, so the caller reads one code.
+//
+// The project is named in the query string only, so the caller is authorized
+// and rate limited before the multipart body is parsed. Parsing first would
+// let an anonymous caller spend the server's memory on a 21 MB envelope.
 secured.access(directUploadSessionAuth).post(
   "/attachments",
   bodyLimit({
@@ -327,20 +343,13 @@ secured.access(directUploadSessionAuth).post(
   }),
   describeRoute({
     description:
-      "Upload a file for an image or file column and get the reference a cell holds",
+      "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",
   }),
   async (c) => {
-    const body = await c.req.parseBody();
-
-    // The project comes from the request because there is no `authMiddleware`
-    // to set `c.get("project")` on this route. The query param is what the
-    // editor sends; the form field keeps a plain multipart caller working.
-    const projectIdValue = c.req.query("projectId") ?? body.projectId;
-    if (
-      !projectIdValue ||
-      typeof projectIdValue !== "string" ||
-      projectIdValue.trim() === ""
-    ) {
+    // The project comes from the query string because there is no
+    // `authMiddleware` to set `c.get("project")` on this route.
+    const projectIdValue = c.req.query("projectId");
+    if (!projectIdValue || projectIdValue.trim() === "") {
       throw new UnprocessableEntityError("projectId is required");
     }
     const auth = await authorizeDirectUpload(c, projectIdValue.trim());
@@ -350,6 +359,17 @@ secured.access(directUploadSessionAuth).post(
       // handled error behind them.
       return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
+
+    const limit = await rateLimit({
+      key: `dataset-attachments:project:${auth.projectId}`,
+      windowSeconds: ATTACHMENT_RATE_LIMIT_WINDOW_SECONDS,
+      max: ATTACHMENT_RATE_LIMIT_MAX,
+    });
+    if (!limit.allowed) {
+      return rateLimitedResponse(limit.resetAt);
+    }
+
+    const body = await c.req.parseBody();
 
     const file = body.file;
     if (!file || !(file instanceof File)) {

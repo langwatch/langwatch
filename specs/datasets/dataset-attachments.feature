@@ -66,6 +66,20 @@ Feature: Attach files to dataset cells
     And no file is stored
 
   @integration
+  Scenario: An unauthenticated caller is refused before the body is read
+    Given I send no credentials
+    When I post a body to the upload route
+    Then the upload is refused
+    And the body is never read
+
+  @integration
+  Scenario: An upload burst past the ceiling is rate limited
+    Given I have uploaded as many files in this minute as the ceiling allows
+    When I upload one more file
+    Then the upload is refused as rate limited
+    And I am told how long to wait
+
+  @integration
   Scenario: An API key caller can upload
     Given I use a project API key that can manage datasets
     When I upload a file to my project

@@ -7,7 +7,8 @@
  * The object store is real: a `StoredObjectsService` wired to the local
  * filesystem driver over a per-test temp directory, with an in-memory row
  * store standing in for ClickHouse. So the bytes are written, deduplicated and
- * streamed back for real; only the row table and the rate limiter are stubs.
+ * streamed back for real; only the row table is a stub. The rate limiter is
+ * the real one, which keeps its counters in process memory here.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -36,6 +37,8 @@ import {
 } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
 import { DATASET_ATTACHMENT_MAX_BYTES } from "~/shared/datasets/attachment-policy";
+import { app as filesApp } from "../../files/[[...route]]/app";
+import { app as datasetApp } from "../[[...route]]/app";
 
 // ---------------------------------------------------------------------------
 // Hoisted state and mocks
@@ -44,12 +47,14 @@ import { DATASET_ATTACHMENT_MAX_BYTES } from "~/shared/datasets/attachment-polic
 const {
   rows,
   insertedRowCount,
+  storedObjectsServiceCount,
   mockGetServerAuthSession,
   mockProbeProjectPermission,
   storageRoot,
 } = vi.hoisted(() => ({
   rows: new Map<string, unknown>(),
   insertedRowCount: { value: 0 },
+  storedObjectsServiceCount: { value: 0 },
   mockGetServerAuthSession: vi.fn(),
   mockProbeProjectPermission: vi.fn(),
   storageRoot: { path: "" },
@@ -71,6 +76,7 @@ const mintStorageUri: MintStorageUri = async ({ projectId, sha256 }) =>
 
 vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
   createStoredObjectsService: () => {
+    storedObjectsServiceCount.value += 1;
     const driver = new LocalFilesystemDriver();
     return new StoredObjectsService(
       repository,
@@ -99,19 +105,8 @@ vi.mock(
   }),
 );
 
-// Redis is not part of what these cases exercise; the read route's per-caller
-// limiter always allows so the read path itself is what is under test.
-vi.mock("~/server/rateLimit", () => ({
-  rateLimit: vi.fn().mockResolvedValue({
-    allowed: true,
-    remaining: 119,
-    resetAt: Date.now() + 60_000,
-  }),
-}));
-
-// Imported after the mocks so both apps resolve the stubbed factory.
-const { app: datasetApp } = await import("../[[...route]]/app");
-const { app: filesApp } = await import("../../files/[[...route]]/app");
+/** The upload route's own ceiling, per project, per minute. */
+const ATTACHMENT_UPLOADS_PER_MINUTE = 30;
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -136,6 +131,7 @@ describe("Feature: Attach files to dataset cells", () => {
   beforeEach(async () => {
     rows.clear();
     insertedRowCount.value = 0;
+    storedObjectsServiceCount.value = 0;
     mockGetServerAuthSession.mockResolvedValue(null);
     mockProbeProjectPermission.mockResolvedValue(true);
 
@@ -315,6 +311,61 @@ describe("Feature: Attach files to dataset cells", () => {
 
         expect(response.status).toBe(403);
         expect(insertedRowCount.value).toBe(0);
+      });
+    });
+  });
+
+  describe("given no credentials at all", () => {
+    describe("when I post a body to the upload route", () => {
+      /** @scenario "An unauthenticated caller is refused before the body is read" */
+      it("refuses the request without parsing the body", async () => {
+        // The body is not a valid multipart envelope, so a route that parsed
+        // it before authorizing would fail on the parse instead of answering
+        // 401.
+        const response = await datasetApp.request(
+          `/api/dataset/attachments?projectId=${project.id}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "multipart/form-data; boundary=x" },
+            body: "not-a-multipart-body",
+          },
+        );
+
+        expect(response.status).toBe(401);
+        expect(storedObjectsServiceCount.value).toBe(0);
+        expect(insertedRowCount.value).toBe(0);
+      });
+    });
+  });
+
+  describe("given a caller uploading in a burst", () => {
+    describe("when the upload ceiling for the minute is passed", () => {
+      /** @scenario "An upload burst past the ceiling is rate limited" */
+      it("answers the upload past the ceiling with 429", async () => {
+        for (let index = 0; index < ATTACHMENT_UPLOADS_PER_MINUTE; index++) {
+          const allowed = await upload(
+            attachmentForm({
+              content: `notes-${index}`,
+              fileName: "notes.txt",
+              mediaType: "text/plain",
+            }),
+          );
+          expect(allowed.status).toBe(200);
+        }
+
+        const refused = await upload(
+          attachmentForm({
+            content: "one-too-many",
+            fileName: "notes.txt",
+            mediaType: "text/plain",
+          }),
+        );
+
+        expect(refused.status).toBe(429);
+        expect(refused.headers.get("Retry-After")).toBeTruthy();
+        const body = (await refused.json()) as { error: string };
+        expect(body.error).toBe("rate_limited");
+        expect(insertedRowCount.value).toBe(ATTACHMENT_UPLOADS_PER_MINUTE);
       });
     });
   });

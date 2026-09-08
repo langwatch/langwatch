@@ -52,6 +52,14 @@ Feature: File attachments reach the LLM as the content part their type calls for
     # it, so there is no reason to send it as an opaque attachment.
 
   @unit
+  Scenario: A text file over the inline ceiling is delivered as a file part
+    Given a user message whose text carries a text/plain data URL over one mebibyte
+    When the engine builds the LLM messages
+    Then the message content carries a file part, not a text part
+    # A document that size would take the whole context window if it were read
+    # into the prompt, and a provider that accepts a file part reads it itself.
+
+  @unit
   Scenario: A text file with bytes that are not valid text is delivered as a file part
     Given a user message whose text carries a data URL of type text/plain whose bytes are not valid UTF-8
     When the engine builds the LLM messages

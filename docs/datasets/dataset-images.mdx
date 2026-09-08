@@ -77,7 +77,7 @@ A connected agent column also has an optional **attachment** input. See [Connect
 
 ## Upload from the REST API
 
-`POST /api/dataset/attachments` stores one file and returns the reference a cell holds. Send the file as multipart form data in the `file` field. The `datasetId` field is optional and records which dataset owns the file. Authenticate with a project API key or with a session.
+`POST /api/dataset/attachments` stores one file and returns the reference a cell holds. Name the project in the `projectId` query parameter, and send the file as multipart form data in the `file` field. The `datasetId` field is optional and records which dataset owns the file. Authenticate with a project API key or with a session. The route accepts 30 uploads a minute per project.
 
 ```bash
 curl -X POST "https://app.langwatch.ai/api/dataset/attachments?projectId=$PROJECT_ID" \

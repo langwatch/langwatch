@@ -100,3 +100,12 @@ Feature: Image and file cells in the dataset grid
     Given I look at a file cell that holds a stored document
     When I click the name of the document
     Then the file opens in a new tab
+
+  @integration
+  Scenario: A data URL opens only for a type the browser shows
+    Given I look at a file cell that holds the bytes of a PDF inline
+    Then the cell offers a link that opens the document
+    When I look at a file cell that holds inline bytes of any other type
+    Then the cell shows the value as plain text, with no link
+    # The link goes to our own origin, so it must only open the kinds of file
+    # the read route itself serves back.
