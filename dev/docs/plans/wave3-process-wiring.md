@@ -59,4 +59,39 @@ tests); `guardOutput` now always validates outputs where the old mount honoured 
 
 ## sso — pending lane report
 
-## data-privacy — pending lane report
+## data-privacy (feature landed `77f4346117`)
+
+`DataPrivacyService` → `DataPrivacyApi`; `composeDataPrivacyFeature`/`refusingDataPrivacyFeature` →
+`await installApiDataPrivacy({ infrastructure, peers: { projects, organizations, permissions } })`;
+`ComposedDataPrivacyFeature.service` → `.app`; `dropsAnyContent(projectId)` → `app.dropsAnyContent({ projectId })`;
+`DataPrivacyInfrastructure` is `{ directory, ttlMs?, now? } & ({ redaction: … | null } | { pii })` — the API passes
+`redaction: null`, the worker passes its `pii` block. `PrismaDataPrivacyResolutionAdapter`, `PrismaDataPrivacyAdapter`,
+`DataPrivacyPermissionsPort`, `@langwatch/data-privacy-server/testing` are gone.
+
+`apps/api/src/app/api-production.composition.ts`: import `installApiDataPrivacy`; field `ComposedDataPrivacyFeature |
+undefined`; compose `infrastructure ? await installApiDataPrivacy({ infrastructure, peers: { projects:
+tenancy.projects, organizations: tenancy.organizations, permissions: this.composedAuthz.app } }) : undefined`; join the
+no-refusing-twin guard (`const dataPrivacy = this.composedDataPrivacy;`, `|| !dataPrivacy`, `&& dataPrivacy`,
+`dataPrivacy,` in the composed literal); `collaborators.application` gains `dataPrivacy: dataPrivacy.app,`;
+`hasContentDropRules: (projectId) => dataPrivacy.app.dropsAnyContent({ projectId })`; the trace-read stack takes
+`this.composedDataPrivacy.app`.
+
+`apps/api/src/app-trpc/app-trpc.context.ts`: `ApiTrpcFeatureApplication.dataPrivacy: DataPrivacyApi` (import type from
+`@langwatch/data-privacy-contract`). `apps/api/src/app/api-trace-read-stack.composition.ts`: `DataPrivacyService` →
+`DataPrivacyApi` (two sites). `apps/api/src/features/analytics/analytics.composition.ts`: drop the
+`PrismaDataPrivacyResolutionAdapter.create(...)` at ~line 188 and thread the booted `DataPrivacyApi` in (the consumer type
+is already `{ getResolvedForProject }`). Test doubles: `api-trpc-record.test-doubles.ts` drops
+`refusingDataPrivacyFeature` and the `dataPrivacy:` stub entry; `stubApplicationSlices` gains `dataPrivacy`.
+
+Worker: `apps/worker/src/app/worker-telemetry-read.composition.ts` — `database: DataPrivacyDirectoryDatabase` and
+`dataPrivacy: { directory: PrismaDataPrivacyDirectoryRepository.create(options.database), pii: {…unchanged} }`.
+`apps/worker/src/app/worker-trace-capability-services.composition.ts` — take `dataPrivacy: DataPrivacyResolutionPort`
+as an option instead of building the deleted adapter (drop `dataPrivacyTtlMs`, the `& DataPrivacyResolutionDatabase`
+term); caller `worker-production.composition.ts` ~line 726 passes the booted app (`observability.dataPrivacy`) — the
+observability runtime must boot first, or the argument is `() => DataPrivacyApi`; eight worker tests pass `{ database }`
+today and each needs a `dataPrivacy` stub (`worker-trace-capability-services.composition.unit.test.ts` ×7,
+`worker-trace-processing-mount`, `worker-record-span`, `worker-automation-graph`).
+`worker-automation-settlement-reads.composition.ts:20` moves from `DataRetentionResolutionService` to
+`DataPrivacyResolutionPort`.
+
+Decision for Alex recorded: nullable `redaction` in the API vs a record-redaction port owned by log and metric.
