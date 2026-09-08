@@ -235,13 +235,13 @@ Landed tonight:
 registry into `security.ts`, idempotency out of `request.ts`. That is ten files
 where the fold promised nine: **DECISION D-o.**
 
-Running: **round three, part A** (`api-rest-runtime-gaps-3.md`): raw request
-bytes, raw responses, HEAD twin and any-method routes, the 405 guard, a union
-output. Parts B (optional credential, instance-admin door, shared-prefix family
-for evaluation's legacy paths, `v2` in path, rate limit and cache,
-`registerJsonProtocol`, `assertEveryRouteDeclared`, in-handler owner
-resolution) and C (tRPC: anonymous procedure, session row id, caller address,
-AND-composed permission) follow one at a time. `anyAuthenticated` exists twice
+| Round three A: `withRawBody`, `withRawResponse({ produces })`, `.methods([...])` with a HEAD twin, `.anyMethod()` + `declined()`, the 405 guard with `Allow`, discriminated-union outputs | `6789a94a1d` |
+
+`runtime.ts` is 3,105 lines after round three A; D-o is now blocking.
+Running: **round three, part B** (`api-rest-runtime-gaps-3.md`): item 8 (a
+literal-path family) gates the trace OTLP alias, experiment v3's alias and
+evaluation's legacy family, which have every other capability they need. Part C (tRPC: anonymous procedure, session row id, caller address,
+AND-composed permission) follows. `anyAuthenticated` exists twice
 until coding-agent and project convert: the old no-argument `AccessPolicy` from
 `@langwatch/api` and the new door from `@langwatch/api/access`.
 `packages/api/README.md` still documents the deleted builders.
@@ -297,7 +297,7 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | Lane | Brief | Started |
 | --- | --- | --- |
 | evaluator conversion | feature-convert skill | 09-08 23:2x |
-| REST runtime round three A | `api-rest-runtime-gaps-3.md` | 09-09 00:5x |
+| REST runtime round three B | `api-rest-runtime-gaps-3.md` | 09-09 01:3x |
 | lint L3 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 00:5x |
 | wave-4 process wiring | `wave4-process-wiring.md` (dashboard, platform-health, role, suite, authz, user, evaluation, stored-object, monitor) | 09-09 00:5x |
 

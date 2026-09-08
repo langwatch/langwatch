@@ -9,7 +9,7 @@ noun and report where the split should cut).
 
 Three parts, run as three lanes in this order, one at a time, since they share `runtime.ts`.
 
-## Part A: bytes and methods (this lane)
+## Part A: bytes and methods (LANDED; hash in `strict-feature-layout.md` section 5)
 
 1. **Raw request bytes.** `scim-webhook-intake.api.ts` computes an HMAC over the exact characters; github and elevenlabs
    webhooks (gateway) verify signatures the same way. Add `.withRawBody("text" | "bytes")` on a route: the body limit still
@@ -29,7 +29,13 @@ Three parts, run as three lanes in this order, one at a time, since they share `
    ZodVoid | ZodUndefined`; widen it to a discriminated union whose members are objects, and publish `oneOf` with the
    discriminator.
 
-## Part B: doors and addressing (next lane)
+## Part B: doors and addressing (this lane)
+
+Notes from Part A for item 8: `mountMethodGuards` registers `app.all(<address>)` per family, which is safe while every family
+owns `/api/<namespace>` but would answer 405 ahead of a sibling's route for a literal-path family sharing a prefix, so a
+literal family installs guards only on the exact paths it declares, never wildcarded. Item 12 also blocks stored-object's
+id-only `/api/files/:id`. Item 10 should reuse the `RouteState` record and the `assertSourceUnset` family rather than a
+parallel mechanism.
 
 6. **An optional credential.** ops bug-report answers with or without a key: `.withAccess(optionalCredential({ reason }))`,
    handler gets `caller | null`, registry records it, the document publishes the scheme as optional.
