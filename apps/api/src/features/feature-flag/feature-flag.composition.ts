@@ -1,73 +1,66 @@
 /**
- * The deployment's rollout flags, composed once for the whole process.
+ * The deployment's rollout flags, installed once for the whole process:
+ * before every feature that gates on a flag, and after the three directories
+ * a tenant-targeted read is authorized against.
  */
-import type { FeatureFlagConfig, FeatureFlagService } from "@langwatch/feature-flag-contract";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import type { FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import {
   FeatureFlagCachePort,
-  PostgresFeatureFlagAdapter,
+  featureFlagServer,
   type FeatureFlagCacheSlot,
 } from "@langwatch/feature-flag-server";
-import { HandledError } from "@langwatch/handled-error";
+import {
+  OrganizationApi,
+  type OrganizationApi as OrganizationApiContract,
+} from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
+import { createApp } from "@langwatch/runtime-composition";
 
 import { createFeatureFlagTrpcRouter } from "./feature-flag-trpc.mount.ts";
-
 import type { ComposedFeatureFlagFeature } from "./feature-flag.composition.types.ts";
 
-/** Composes the flag store over this process's own connection. */
-export function composeFeatureFlagFeature(options: {
+/** The directories a tenant-targeted flag read is authorized against. */
+export type FeatureFlagPeers = Readonly<{
+  permissions: AuthzApiContract;
+  projects: ProjectApiContract;
+  organizations: OrganizationApiContract;
+}>;
+
+/** Installs the rollout flags over this process's own connection. */
+export async function installApiFeatureFlag(options: {
   prisma: PrismaClient;
-  /** This deployment's environment overrides, as the service reads them. */
+  /** This deployment's environment overrides, as the app reads them. */
   config: FeatureFlagConfig;
-}): ComposedFeatureFlagFeature {
-  return {
-    router: (mount) => createFeatureFlagTrpcRouter(mount),
-    service: PostgresFeatureFlagAdapter.create({
-      database: options.prisma,
-      cache: new UncachedApiFeatureFlags(),
-      config: options.config,
-      now: () => Date.now(),
-    }),
-  };
-}
-
-/**
- * The flag store on a process with no database. The namespace still mounts and every read
- * refuses by name.
- */
-export function refusingFeatureFlagFeature(): ComposedFeatureFlagFeature {
-  return {
-    router: (mount) => createFeatureFlagTrpcRouter(mount),
-    service: new Proxy(
-      {},
-      {
-        get: () => (): never => {
-          throw new ApiFeatureFlagUnavailableError();
-        },
-        has: () => true,
+  peers: FeatureFlagPeers;
+}): Promise<ComposedFeatureFlagFeature> {
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma: options.prisma })
+    .withInfrastructure({})
+    .withProvided(AuthzApi, options.peers.permissions)
+    .withProvided(ProjectApi, options.peers.projects)
+    .withProvided(OrganizationApi, options.peers.organizations)
+    .withFeature(featureFlagServer, {
+      infrastructure: {
+        cache: new UncachedApiFeatureFlags(),
+        config: options.config,
       },
-    ) as FeatureFlagService,
+    })
+    .boot({ role: "api" });
+
+  return {
+    app: runtime.feature(featureFlagServer).provided,
+    router: (mount) => createFeatureFlagTrpcRouter(mount.runtime),
   };
 }
 
-/** The rollout store reached on a process that composed none. */
-class ApiFeatureFlagUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super("service_unavailable", "This deployment cannot read its rollout flags.", {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiFeatureFlagUnavailableError";
-  }
-}
-
 /**
- * The flag cache, absent. Every read goes to Postgres.
+ * The flag cache, absent. Every read goes to Postgres, behind the app's own
+ * five-second per-process window.
  */
 class UncachedApiFeatureFlags extends FeatureFlagCachePort {
-  tryGet(_key: string): Promise<FeatureFlagCacheSlot | undefined> {
+  findSlot(_key: string): Promise<FeatureFlagCacheSlot | undefined> {
     return Promise.resolve(undefined);
   }
 

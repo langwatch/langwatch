@@ -15,11 +15,9 @@ type LocalEntry = { row: FeatureFlagRow | null; expiresAt: number };
 
 /**
  * Two-tier read of one operator row: per-process map, then the shared
- * cache, then the repository.
- *
- * A repository failure degrades to "no row" and is logged, so an unhealthy
- * database makes flags resolve to their registry defaults rather than
- * failing the caller.
+ * cache, then the repository. A repository failure degrades to "no row" and
+ * is logged, so an unhealthy database resolves flags to their registry
+ * defaults rather than failing the caller.
  */
 export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
   private readonly logger = createLogger("langwatch:feature-flag-store");
@@ -41,7 +39,7 @@ export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
     return new CachedFeatureFlagRowAdapter(options.repository, options.cache, options.now);
   }
 
-  async tryGetRow(key: string): Promise<FeatureFlagRow | null> {
+  async findRow(key: string): Promise<FeatureFlagRow | null> {
     const now = this.now();
     const localHit = this.local.get(key);
     if (localHit) {
@@ -49,14 +47,14 @@ export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
       this.local.delete(key);
     }
 
-    const cached = await this.cache.tryGet(key);
+    const cached = await this.cache.findSlot(key);
     if (cached !== undefined) {
       this.writeLocal(key, cached.row, now);
       return cached.row;
     }
 
     try {
-      const row = await this.repository.tryFindByKey(key);
+      const row = await this.repository.findByKey(key);
       await this.cache.set(key, { row });
       this.writeLocal(key, row, now);
       return row;

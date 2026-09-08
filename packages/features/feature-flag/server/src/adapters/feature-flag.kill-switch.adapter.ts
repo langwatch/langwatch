@@ -1,5 +1,5 @@
 import { generateKillSwitchKey, KillSwitchPort, type KillSwitchQuery } from "@langwatch/eventing";
-import type { FeatureFlagKey, FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi, FeatureFlagKey } from "@langwatch/feature-flag-contract";
 
 /**
  * The event-sourcing kill switches, read from the operator flag store.
@@ -7,11 +7,11 @@ import type { FeatureFlagKey, FeatureFlagService } from "@langwatch/feature-flag
  * and what an event-sourcing tenant id IS here.
  */
 export class EventingKillSwitchAdapter extends KillSwitchPort {
-  private constructor(private readonly featureFlags: FeatureFlagService) {
+  private constructor(private readonly featureFlags: FeatureFlagApi) {
     super();
   }
 
-  static create(featureFlags: FeatureFlagService): EventingKillSwitchAdapter {
+  static create(featureFlags: FeatureFlagApi): EventingKillSwitchAdapter {
     return new EventingKillSwitchAdapter(featureFlags);
   }
 

@@ -1,75 +1,21 @@
 /**
- * Store-level resolution of a registered flag, with the database as the only faked hop.
+ * Resolution against the operator store: the registry default when no row
+ * exists, the row as a fleet-wide kill switch, per-project rules, and the
+ * store read failing.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PostgresFeatureFlagAdapter } from "../postgres.feature-flag.adapter.ts";
-import type { FeatureFlagService } from "../../services/feature-flag.service.ts";
-import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
-import { MemoryFeatureFlagCache } from "../../testing.ts";
-
-type FakeRow = {
-  key: string;
-  enabled: boolean;
-  rules: unknown;
-  lastEditedBy: string | null;
-  updatedAt: Date;
-};
+import { describe, expect, it, vi } from "vitest";
+import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const BLOB_OFFLOAD = "release_trace_blob_offload";
 const MEDIA_EXTRACTION = "release_trace_media_extraction";
 const PROJECT_ID = "project-abc";
 const OPTED_OUT_PROJECT_ID = "project-opted-out";
 
-const table = new Map<string, FakeRow>();
-
-const findUnique = vi.fn(
-  async ({ where }: { where: { key: string } }) => table.get(where.key) ?? null,
-);
-const findMany = vi.fn(async () => [...table.values()]);
-const upsert = vi.fn(
-  async ({
-    where,
-    create,
-    update,
-  }: {
-    where: { key: string };
-    create: Record<string, unknown>;
-    update: Record<string, unknown>;
-  }) => {
-    const existing = table.get(where.key);
-    const row = existing
-      ? { ...existing, ...update }
-      : ({ updatedAt: new Date(0), ...create } as FakeRow);
-    table.set(where.key, row);
-    return row;
-  },
-);
-const deleteMany = vi.fn(async ({ where }: { where: { key: string } }) => {
-  table.delete(where.key);
-  return { count: 1 };
-});
-
-// No experiment ships yet, so the experiment delegate is never reached on
-// these paths; it is present because the adapter takes one database.
-const experimentDelegate = {
-  findMany: vi.fn(async () => []),
-  upsert: vi.fn(async () => ({})),
-  deleteMany: vi.fn(async () => ({})),
-};
-
-function buildService(): FeatureFlagService {
-  return PostgresFeatureFlagAdapter.create({
-    database: {
-      featureFlag: { findUnique, findMany, upsert, deleteMany },
-      featureFlagExperimentSetting: experimentDelegate,
-    },
-    cache: new MemoryFeatureFlagCache(),
-    config: resolveFeatureFlagConfig({}),
-    now: () => 0,
-  });
+function buildGraph() {
+  return createFeatureFlagTestService({ now: () => 0 });
 }
 
-async function writeOptOutRule(service: FeatureFlagService): Promise<void> {
+async function writeOptOutRule(service: ReturnType<typeof buildGraph>["service"]): Promise<void> {
   await service.setRules({
     key: BLOB_OFFLOAD,
     rules: [{ match: { projectId: OPTED_OUT_PROJECT_ID }, enabled: false }],
@@ -77,16 +23,11 @@ async function writeOptOutRule(service: FeatureFlagService): Promise<void> {
   });
 }
 
-beforeEach(() => {
-  table.clear();
-  vi.clearAllMocks();
-});
-
 describe("given no operator row exists for the trace blob offload flag", () => {
   describe("when the ingestion edge resolves the flag for a project", () => {
     /** @scenario "Oversized span content survives ingestion wherever storage is available" */
     it("resolves to the registry default of on", async () => {
-      const service = buildService();
+      const { service } = buildGraph();
 
       await expect(
         service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
@@ -98,7 +39,7 @@ describe("given no operator row exists for the trace blob offload flag", () => {
 describe("given an operator switched the trace blob offload flag off fleet-wide", () => {
   describe("when the ingestion edge resolves the flag", () => {
     it("returns false, so the row keeps working as a kill switch over the default", async () => {
-      const service = buildService();
+      const { service } = buildGraph();
       await service.setEnabled({
         key: BLOB_OFFLOAD,
         enabled: false,
@@ -116,7 +57,7 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
   describe("when the ingestion edge resolves the flag for the targeted project", () => {
     /** @scenario "Oversized span content survives ingestion wherever storage is available" */
     it("returns false for that project", async () => {
-      const service = buildService();
+      const { service } = buildGraph();
       await writeOptOutRule(service);
 
       await expect(
@@ -131,7 +72,7 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
   describe("when the ingestion edge resolves the flag for a project the rule does not name", () => {
     /** @scenario "Oversized span content survives ingestion wherever storage is available" */
     it("stays enabled, so one project's opt-out never turns the fleet off", async () => {
-      const service = buildService();
+      const { service } = buildGraph();
       await writeOptOutRule(service);
 
       await expect(
@@ -140,10 +81,10 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
     });
 
     it("seeds the created row's fallback from the registry default rather than false", async () => {
-      const service = buildService();
+      const { service, repository } = buildGraph();
       await writeOptOutRule(service);
 
-      expect(table.get(BLOB_OFFLOAD)?.enabled).toBe(true);
+      await expect(repository.findByKey(BLOB_OFFLOAD)).resolves.toMatchObject({ enabled: true });
     });
   });
 });
@@ -151,7 +92,7 @@ describe("given an operator wrote a single per-project opt-out rule and no row e
 describe("given a rule-only write for a flag whose registry default is off", () => {
   describe("when the ingestion edge resolves the flag for an unnamed project", () => {
     it("stays off, so an org-scoped enable cannot flip the flag on fleet-wide", async () => {
-      const service = buildService();
+      const { service } = buildGraph();
       await service.setRules({
         key: MEDIA_EXTRACTION,
         rules: [{ match: { organizationId: "org-early-access" }, enabled: true }],
@@ -165,12 +106,12 @@ describe("given a rule-only write for a flag whose registry default is off", () 
   });
 });
 
-describe("given the database read fails", () => {
+describe("given the store read fails", () => {
   describe("when the ingestion edge resolves the flag", () => {
     /** @scenario "A database failure resolves the flag to its registry default" */
     it("falls back to the registry default rather than propagating the error", async () => {
-      findUnique.mockRejectedValueOnce(new Error("connection terminated"));
-      const service = buildService();
+      const { service, repository } = buildGraph();
+      vi.spyOn(repository, "findByKey").mockRejectedValueOnce(new Error("connection terminated"));
 
       await expect(
         service.isEnabled(BLOB_OFFLOAD, { kind: "project", projectId: PROJECT_ID }),
@@ -182,7 +123,7 @@ describe("given the database read fails", () => {
 describe("given an operator clears a flag", () => {
   describe("when the flag is resolved again", () => {
     it("returns to the registry default", async () => {
-      const service = buildService();
+      const { service } = buildGraph();
       await service.setEnabled({
         key: BLOB_OFFLOAD,
         enabled: false,

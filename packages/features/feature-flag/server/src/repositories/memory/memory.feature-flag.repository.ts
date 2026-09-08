@@ -1,7 +1,7 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
-import type { FeatureFlagRow } from "../../ports/feature-flag-cache.port.ts";
 import { Temporal, nowInstant, type Instant } from "@langwatch/time";
-import { FeatureFlagRepository } from "../feature-flag.repository.ts";
+import type { FeatureFlagRow } from "../../ports/feature-flag-cache.port.ts";
+import type { FeatureFlagRepository } from "../feature-flag.repository.ts";
 
 type MemoryRecord = {
   enabled: boolean;
@@ -14,17 +14,10 @@ type MemoryRecord = {
  * Operator rows held in process. Composition and resolver tests run the
  * real service graph against this instead of a database.
  */
-export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
+export class MemoryFeatureFlagRepository implements FeatureFlagRepository {
   private readonly records = new Map<string, MemoryRecord>();
-  private readonly organizations = new Map<string, Instant>();
-  /** How many times an age rule sent this repository to the organizations. */
-  organizationReads = 0;
-  /** Set to make the next organization read fail, the way a blip does. */
-  private failNextOrganizationRead = false;
 
-  private constructor(private readonly now: () => number) {
-    super();
-  }
+  private constructor(private readonly now: () => number) {}
 
   static create(
     now: () => number = () => nowInstant().epochMilliseconds,
@@ -32,7 +25,7 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
     return new MemoryFeatureFlagRepository(now);
   }
 
-  async tryFindByKey(key: string): Promise<FeatureFlagRow | null> {
+  async findByKey(key: string): Promise<FeatureFlagRow | null> {
     const record = this.records.get(key);
     if (!record) return null;
 
@@ -85,30 +78,5 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
 
   async deleteByKey(key: string): Promise<void> {
     this.records.delete(key);
-  }
-
-  /** Seeds an organization a "new organizations" rule can be measured against. */
-  rememberOrganization({
-    organizationId,
-    createdAt,
-  }: {
-    organizationId: string;
-    createdAt: Instant;
-  }): void {
-    this.organizations.set(organizationId, createdAt);
-  }
-
-  failNextOrganizationLookup(): void {
-    this.failNextOrganizationRead = true;
-  }
-
-  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Instant | null> {
-    this.organizationReads += 1;
-    if (this.failNextOrganizationRead) {
-      this.failNextOrganizationRead = false;
-      throw new Error("connection reset");
-    }
-
-    return this.organizations.get(organizationId) ?? null;
   }
 }

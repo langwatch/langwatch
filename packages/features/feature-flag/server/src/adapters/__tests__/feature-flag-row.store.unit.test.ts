@@ -3,14 +3,14 @@ import {
   FeatureFlagCachePort,
   type FeatureFlagCacheSlot,
 } from "../../ports/feature-flag-cache.port.ts";
-import { MemoryFeatureFlagRepository } from "../../repositories/memory/feature-flag.repository.ts";
+import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.feature-flag.repository.ts";
 import { CachedFeatureFlagRowAdapter } from "../cached.feature-flag-row.adapter.ts";
 
 class RecordingCache extends FeatureFlagCachePort {
   readonly values = new Map<string, FeatureFlagCacheSlot>();
   readonly deleted: string[] = [];
 
-  async tryGet(key: string): Promise<FeatureFlagCacheSlot | undefined> {
+  async findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined> {
     return this.values.get(key);
   }
 
@@ -52,61 +52,61 @@ describe("CachedFeatureFlagRowAdapter", () => {
   it("holds a repository row locally for five seconds, then reads it again", async () => {
     const harness = createHarness();
     await writeRow(harness.repository, "flag", false);
-    const find = vi.spyOn(harness.repository, "tryFindByKey");
+    const find = vi.spyOn(harness.repository, "findByKey");
 
-    await expect(harness.store.tryGetRow("flag")).resolves.toMatchObject({ enabled: false });
+    await expect(harness.store.findRow("flag")).resolves.toMatchObject({ enabled: false });
     await writeRow(harness.repository, "flag", true);
     harness.cache.values.clear();
-    await expect(harness.store.tryGetRow("flag")).resolves.toMatchObject({ enabled: false });
+    await expect(harness.store.findRow("flag")).resolves.toMatchObject({ enabled: false });
 
     harness.advanceBy(5_000);
-    await expect(harness.store.tryGetRow("flag")).resolves.toMatchObject({ enabled: true });
+    await expect(harness.store.findRow("flag")).resolves.toMatchObject({ enabled: true });
     expect(find).toHaveBeenCalledTimes(2);
   });
 
   it("uses a shared-cache hit without reading the repository", async () => {
     const harness = createHarness();
     harness.cache.values.set("flag", { row: { enabled: true, rules: [] } });
-    const find = vi.spyOn(harness.repository, "tryFindByKey");
+    const find = vi.spyOn(harness.repository, "findByKey");
 
-    await expect(harness.store.tryGetRow("flag")).resolves.toMatchObject({ enabled: true });
+    await expect(harness.store.findRow("flag")).resolves.toMatchObject({ enabled: true });
     expect(find).not.toHaveBeenCalled();
   });
 
   it("falls back to an absent row when the repository read fails", async () => {
     const harness = createHarness();
-    vi.spyOn(harness.repository, "tryFindByKey").mockRejectedValueOnce(new Error("offline"));
+    vi.spyOn(harness.repository, "findByKey").mockRejectedValueOnce(new Error("offline"));
 
-    await expect(harness.store.tryGetRow("flag")).resolves.toBeNull();
+    await expect(harness.store.findRow("flag")).resolves.toBeNull();
   });
 
   /** @scenario "An operator write is visible to the next resolution" */
   it("invalidates both cache tiers before the next read", async () => {
     const harness = createHarness();
     await writeRow(harness.repository, "flag", false);
-    await harness.store.tryGetRow("flag");
+    await harness.store.findRow("flag");
     await writeRow(harness.repository, "flag", true);
 
     await harness.store.invalidate("flag");
 
-    await expect(harness.store.tryGetRow("flag")).resolves.toMatchObject({ enabled: true });
+    await expect(harness.store.findRow("flag")).resolves.toMatchObject({ enabled: true });
     expect(harness.cache.deleted).toEqual(["flag"]);
   });
 
   it("prunes the oldest local row when the process cache exceeds its bound", async () => {
     const harness = createHarness();
-    const find = vi.spyOn(harness.repository, "tryFindByKey");
+    const find = vi.spyOn(harness.repository, "findByKey");
 
     for (let index = 0; index <= 5_000; index += 1) {
       const key = `flag-${index}`;
       await writeRow(harness.repository, key, true);
-      await harness.store.tryGetRow(key);
+      await harness.store.findRow(key);
     }
     harness.cache.values.clear();
     find.mockClear();
 
-    await harness.store.tryGetRow("flag-5000");
-    await harness.store.tryGetRow("flag-0");
+    await harness.store.findRow("flag-5000");
+    await harness.store.findRow("flag-0");
 
     expect(find).toHaveBeenCalledOnce();
     expect(find).toHaveBeenCalledWith("flag-0");

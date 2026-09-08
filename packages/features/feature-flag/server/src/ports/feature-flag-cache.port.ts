@@ -20,7 +20,8 @@ export type FeatureFlagCacheSlot = { row: FeatureFlagRow | null };
  * serves every tenant and targeting stays a per-call computation.
  */
 export abstract class FeatureFlagCachePort {
-  abstract tryGet(key: string): Promise<FeatureFlagCacheSlot | undefined>;
+  /** `undefined` is a miss; a slot holding `row: null` is a cached absence. */
+  abstract findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined>;
   abstract set(key: string, slot: FeatureFlagCacheSlot): Promise<void>;
   abstract delete(key: string): Promise<void>;
 }

@@ -38,7 +38,7 @@ export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
     super();
   }
 
-  async tryGet(key: string): Promise<FeatureFlagCacheSlot | undefined> {
+  async findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined> {
     if (this.redis) {
       try {
         const value = await this.redis.get(`${CACHE_PREFIX}${key}`);
@@ -48,11 +48,11 @@ export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
 
         return cacheSlotSchema.parse(JSON.parse(value));
       } catch {
-        return this.tryGetFromMemory(key);
+        return this.findSlotInMemory(key);
       }
     }
 
-    return this.tryGetFromMemory(key);
+    return this.findSlotInMemory(key);
   }
 
   async set(key: string, slot: FeatureFlagCacheSlot): Promise<void> {
@@ -89,7 +89,7 @@ export class RedisFeatureFlagCacheAdapter extends FeatureFlagCachePort {
     }
   }
 
-  private tryGetFromMemory(key: string): FeatureFlagCacheSlot | undefined {
+  private findSlotInMemory(key: string): FeatureFlagCacheSlot | undefined {
     const entry = this.memory.get(key);
     if (!entry) {
       return void 0;

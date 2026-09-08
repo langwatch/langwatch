@@ -1,7 +1,6 @@
 import {
   isExperimentVisibleToTarget,
   evaluateRules,
-  FeatureFlagService as FeatureFlagServiceContract,
   ruleContextForTarget,
   resolveExperimentDecision,
   resolveEffectiveForListing,
@@ -33,21 +32,18 @@ import type {
 import { toDate } from "@langwatch/time";
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
 import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store.ts";
-import { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
+import type { OrganizationCreatedAtCacheService } from "./organization-created-at-cache.service.ts";
 
-export class FeatureFlagService extends FeatureFlagServiceContract {
-  private readonly organizationAges: OrganizationCreatedAtCacheService;
-
+/** Resolution, experiments and the operator store, over this feature's own repositories. */
+export class FeatureFlagService {
   private constructor(
     private readonly rows: FeatureFlagRowStore,
     private readonly repository: FeatureFlagRepository,
     private readonly experiments: FeatureFlagExperimentRepository,
     private readonly config: FeatureFlagConfig,
     private readonly registry: FeatureFlagRegistry,
-  ) {
-    super();
-    this.organizationAges = OrganizationCreatedAtCacheService.create({ repository });
-  }
+    private readonly organizationAges: OrganizationCreatedAtCacheService,
+  ) {}
 
   static create(options: {
     rows: FeatureFlagRowStore;
@@ -55,6 +51,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     experiments: FeatureFlagExperimentRepository;
     config: FeatureFlagConfig;
     registry: FeatureFlagRegistry;
+    organizationAges: OrganizationCreatedAtCacheService;
   }): FeatureFlagService {
     return new FeatureFlagService(
       options.rows,
@@ -62,6 +59,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
       options.experiments,
       options.config,
       options.registry,
+      options.organizationAges,
     );
   }
 
@@ -80,7 +78,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
       return true;
     }
 
-    const stored = await this.tryResolveStoredValue(flagKey, ruleContextForTarget(target));
+    const stored = await this.resolveStoredValue(flagKey, ruleContextForTarget(target));
     if (stored !== null) {
       return stored;
     }
@@ -349,11 +347,11 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     };
   }
 
-  private async tryResolveStoredValue(
+  private async resolveStoredValue(
     flagKey: string,
     context: RuleEvaluationContext = {},
   ): Promise<boolean | null> {
-    const row = await this.rows.tryGetRow(flagKey);
+    const row = await this.rows.findRow(flagKey);
     if (row === null) {
       return null;
     }
@@ -390,7 +388,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
 
     return {
       ...context,
-      organizationCreatedAt: await this.organizationAges.tryGetCreatedAt(context.organizationId),
+      organizationCreatedAt: await this.organizationAges.findCreatedAt(context.organizationId),
     };
   }
 

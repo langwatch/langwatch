@@ -15,7 +15,7 @@
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Temporal } from "@langwatch/time";
-import { createInMemoryFeatureFlagService } from "../testing.ts";
+import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const FLAG = "ops_es_causality_loop_guard_disabled";
 const ROLLOUT_START = "2026-06-01";
@@ -23,12 +23,12 @@ const NEW_ORGANIZATION = "organization_new";
 const OLD_ORGANIZATION = "organization_old";
 
 function buildService() {
-  const graph = createInMemoryFeatureFlagService();
-  graph.repository.rememberOrganization({
+  const graph = createFeatureFlagTestService();
+  graph.organizations.rememberOrganization({
     organizationId: NEW_ORGANIZATION,
     createdAt: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
   });
-  graph.repository.rememberOrganization({
+  graph.organizations.rememberOrganization({
     organizationId: OLD_ORGANIZATION,
     createdAt: Temporal.Instant.from("2024-02-01T00:00:00.000Z"),
   });
@@ -64,7 +64,7 @@ describe("given an operator rolled a flag out to organizations created from a da
       await writeRules(graph, NEW_ORGANIZATIONS_RULE);
 
       await expect(graph.service.isEnabled(FLAG, readFor(NEW_ORGANIZATION))).resolves.toBe(true);
-      expect(graph.repository.organizationReads).toBe(1);
+      expect(graph.organizations.organizationReads).toBe(1);
     });
   });
 
@@ -86,7 +86,7 @@ describe("given an operator rolled a flag out to organizations created from a da
         await graph.service.isEnabled(FLAG, readFor(NEW_ORGANIZATION));
       }
 
-      expect(graph.repository.organizationReads).toBe(1);
+      expect(graph.organizations.organizationReads).toBe(1);
     });
   });
 
@@ -94,7 +94,7 @@ describe("given an operator rolled a flag out to organizations created from a da
     /** @scenario "a stored rule whose date cannot be read never matches" */
     it("matches no age rule, so a database blip never widens a rollout", async () => {
       await writeRules(graph, NEW_ORGANIZATIONS_RULE);
-      graph.repository.failNextOrganizationLookup();
+      graph.organizations.failNextOrganizationLookup();
 
       await expect(graph.service.isEnabled(FLAG, readFor(NEW_ORGANIZATION))).resolves.toBe(false);
     });
@@ -106,7 +106,7 @@ describe("given an operator rolled a flag out to organizations created from a da
       await writeRules(graph, NEW_ORGANIZATIONS_RULE);
 
       await expect(graph.service.isEnabled(FLAG, { kind: "system" })).resolves.toBe(false);
-      expect(graph.repository.organizationReads).toBe(0);
+      expect(graph.organizations.organizationReads).toBe(0);
     });
   });
 });
@@ -119,7 +119,7 @@ describe("given a flag whose rules name only organizations and projects", () => 
 
       await graph.service.isEnabled(FLAG, readFor(NEW_ORGANIZATION));
 
-      expect(graph.repository.organizationReads).toBe(0);
+      expect(graph.organizations.organizationReads).toBe(0);
     });
   });
 });
@@ -134,7 +134,7 @@ describe("given a flag whose rules put an everyone rule above a New organization
       ]);
 
       await expect(graph.service.isEnabled(FLAG, readFor(NEW_ORGANIZATION))).resolves.toBe(true);
-      expect(graph.repository.organizationReads).toBe(0);
+      expect(graph.organizations.organizationReads).toBe(0);
     });
   });
 });
@@ -149,7 +149,7 @@ describe("given a flag whose rules name this organization above a New organizati
       ]);
 
       await expect(graph.service.isEnabled(FLAG, readFor(NEW_ORGANIZATION))).resolves.toBe(true);
-      expect(graph.repository.organizationReads).toBe(0);
+      expect(graph.organizations.organizationReads).toBe(0);
     });
   });
 });

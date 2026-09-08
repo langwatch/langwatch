@@ -2,7 +2,7 @@
  * Creation dates of organizations named by an age rule, memoised per process. Keyed by
  * organization rather than by flag, and outliving a flag-row cache window.
  */
-import type { FeatureFlagRepository } from "../repositories/feature-flag.repository.ts";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 /**
@@ -13,8 +13,8 @@ const ORGANIZATION_CREATED_AT_TTL_MS = 10 * 60_000;
 const ORGANIZATION_CREATED_AT_MAX_KEYS = 10_000;
 
 export class OrganizationCreatedAtCacheService {
-  static create(options: { repository: FeatureFlagRepository }): OrganizationCreatedAtCacheService {
-    return new OrganizationCreatedAtCacheService(options.repository);
+  static create(options: { organizations: OrganizationApi }): OrganizationCreatedAtCacheService {
+    return new OrganizationCreatedAtCacheService(options.organizations);
   }
 
   private readonly organizationCreatedAt = new Map<
@@ -22,14 +22,14 @@ export class OrganizationCreatedAtCacheService {
     { createdAt: Instant | null; expiresAt: number }
   >();
 
-  private constructor(private readonly repository: FeatureFlagRepository) {}
+  private constructor(private readonly organizations: OrganizationApi) {}
 
   /**
    * Reads an organization's creation date, memoised per process. A failed read resolves to
    * null, which matches no age rule — the same fail-closed choice the matcher makes for an
    * unknown date, so a database blip cannot hand a rollout to organizations it excludes.
    */
-  async tryGetCreatedAt(organizationId: string): Promise<Instant | null> {
+  async findCreatedAt(organizationId: string): Promise<Instant | null> {
     const now = nowInstant().epochMilliseconds;
     const cached = this.organizationCreatedAt.get(organizationId);
     if (cached && cached.expiresAt > now) {
@@ -37,7 +37,8 @@ export class OrganizationCreatedAtCacheService {
     }
 
     try {
-      const createdAt = await this.repository.tryFindOrganizationCreatedAt(organizationId);
+      const summary = await this.organizations.tryGetProvisioningSummary(organizationId);
+      const createdAt = summary?.createdAt ?? null;
       this.rememberOrganizationCreatedAt({ organizationId, createdAt, now });
 
       return createdAt;

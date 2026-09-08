@@ -22,7 +22,7 @@ describe("RedisFeatureFlagCacheAdapter", () => {
     const cache = RedisFeatureFlagCacheAdapter.create(redisReturning("not-json"));
     await cache.set("flag", { row: { enabled: true, rules: [] } });
 
-    await expect(cache.tryGet("flag")).resolves.toEqual({
+    await expect(cache.findSlot("flag")).resolves.toEqual({
       row: { enabled: true, rules: [] },
     });
   });
@@ -32,7 +32,7 @@ describe("RedisFeatureFlagCacheAdapter", () => {
       redisReturning(JSON.stringify({ row: { enabled: "yes", rules: [] } })),
     );
 
-    await expect(cache.tryGet("flag")).resolves.toBeUndefined();
+    await expect(cache.findSlot("flag")).resolves.toBeUndefined();
   });
 
   it("expires the memory fallback at the configured cache TTL", async () => {
@@ -40,8 +40,8 @@ describe("RedisFeatureFlagCacheAdapter", () => {
     const cache = RedisFeatureFlagCacheAdapter.create(null);
     await cache.set("flag", { row: null });
 
-    await expect(cache.tryGet("flag")).resolves.toEqual({ row: null });
+    await expect(cache.findSlot("flag")).resolves.toEqual({ row: null });
     await vi.advanceTimersByTimeAsync(KILL_SWITCH_CACHE_TTL_MS);
-    await expect(cache.tryGet("flag")).resolves.toBeUndefined();
+    await expect(cache.findSlot("flag")).resolves.toBeUndefined();
   });
 });

@@ -18,15 +18,15 @@ export interface ExperimentSetting extends ExperimentSubject {
  * differ per person, so caching them behind one key per flag is exactly the
  * per-context fan-out the flag cache exists to avoid.
  */
-export abstract class FeatureFlagExperimentRepository {
+export interface FeatureFlagExperimentRepository {
   /** Every setting among `flagKeys` for any of `subjects`. */
-  abstract findForSubjects(input: {
+  findForSubjects(input: {
     flagKeys: readonly string[];
     subjects: readonly ExperimentSubject[];
   }): Promise<ExperimentSetting[]>;
 
-  abstract upsert(input: ExperimentSetting & { changedByUserId: string | null }): Promise<void>;
+  upsert(input: ExperimentSetting & { changedByUserId: string | null }): Promise<void>;
 
   /** Removing the row is how a tenant scope returns to `inherit`. */
-  abstract remove(input: { flagKey: string } & ExperimentSubject): Promise<void>;
+  remove(input: { flagKey: string } & ExperimentSubject): Promise<void>;
 }

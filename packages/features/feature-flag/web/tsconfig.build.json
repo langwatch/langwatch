@@ -13,9 +13,9 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/surfaces/anonymous-id.ts",
-    "./src/surfaces/experiment-catalogue.ts",
-    "./src/surfaces/rule-editing.ts"
+    "./src/anonymous-id.ts",
+    "./src/experiment-catalogue.ts",
+    "./src/rule-editing.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

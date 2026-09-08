@@ -755,14 +755,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/feature-flag/contract/src/feature-flag.api.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/feature-flag/contract/src/feature-flag.app.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/feature-flag/server/src/feature-flag.server.ts"
     },
     {

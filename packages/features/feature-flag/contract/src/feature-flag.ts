@@ -7,7 +7,7 @@
  * behaviour.
  *
  * Adding a flag: append an entry below, then call
- * `FeatureFlagService.isEnabled(<key>, ...)`. The key is checked against
+ * `FeatureFlagApi.isEnabled(<key>, ...)`. The key is checked against
  * `FeatureFlagKey`, so typos and unregistered references fail to compile.
  * Operators toggle it from /ops/feature-flags without a redeploy.
  *

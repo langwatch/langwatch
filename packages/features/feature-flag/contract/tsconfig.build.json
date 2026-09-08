@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../../handled-error/tsconfig.build.json"
     }
   ]

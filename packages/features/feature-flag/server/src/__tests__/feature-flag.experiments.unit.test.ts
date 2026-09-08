@@ -10,7 +10,7 @@ import {
   type FeatureFlagExperiment,
 } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
-import { createInMemoryFeatureFlagService } from "../testing.ts";
+import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const FLAG = "release_ui_agent_testing_v2_enabled";
 const NOT_AN_EXPERIMENT = "release_ui_ai_gateway_menu_enabled";
@@ -55,7 +55,7 @@ function harness({ experiment = EXPERIMENT }: { experiment?: FeatureFlagExperime
     browserVisibleKeys: [FLAG, NOT_AN_EXPERIMENT],
     publicAnonymousKeys: experiment.publicAnonymous ? [FLAG] : [],
   });
-  const built = createInMemoryFeatureFlagService({ registry });
+  const built = createFeatureFlagTestService({ registry });
   const makeAvailable = () =>
     built.service.setEnabled({ key: FLAG, enabled: true, lastEditedBy: "operator" });
 

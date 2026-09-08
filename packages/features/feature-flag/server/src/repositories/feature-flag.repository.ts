@@ -1,15 +1,18 @@
 import type { FeatureFlagRules, StoredFeatureFlag } from "@langwatch/feature-flag-contract";
-import type { Instant } from "@langwatch/time";
 import type { FeatureFlagRow } from "../ports/feature-flag-cache.port.ts";
 
-export abstract class FeatureFlagRepository {
+/**
+ * The operator rows. The FeatureFlag table is cluster-wide and carries no
+ * project column, so every query here is keyed by flag key alone.
+ */
+export interface FeatureFlagRepository {
   /** `null` when no operator row exists for the key. */
-  abstract tryFindByKey(key: string): Promise<FeatureFlagRow | null>;
+  findByKey(key: string): Promise<FeatureFlagRow | null>;
 
   /** Every row, registered or not, ordered by key. */
-  abstract findAll(): Promise<StoredFeatureFlag[]>;
+  findAll(): Promise<StoredFeatureFlag[]>;
 
-  abstract upsertEnabled(input: {
+  upsertEnabled(input: {
     key: string;
     enabled: boolean;
     lastEditedBy: string | null;
@@ -21,20 +24,12 @@ export abstract class FeatureFlagRepository {
    * operator's first targeting rule cannot shadow that default for every
    * context the rule does not name.
    */
-  abstract upsertRules(input: {
+  upsertRules(input: {
     key: string;
     rules: FeatureFlagRules;
     seedEnabled: boolean;
     lastEditedBy: string | null;
   }): Promise<void>;
 
-  abstract deleteByKey(key: string): Promise<void>;
-
-  /**
-   * When an organization was created, for a rule that targets new signups by
-   * date. `null` when the organization is unknown, when the read failed, or
-   * when this repository has no organization table to ask — all three fail
-   * closed, because an age rule that cannot compare must not match.
-   */
-  abstract tryFindOrganizationCreatedAt(organizationId: string): Promise<Instant | null>;
+  deleteByKey(key: string): Promise<void>;
 }

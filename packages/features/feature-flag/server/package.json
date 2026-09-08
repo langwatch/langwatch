@@ -13,10 +13,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -25,17 +21,21 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/time": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@trpc/server": "^11.18.0",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@langwatch/api": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }

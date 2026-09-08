@@ -27,10 +27,10 @@ The singular `feature-flag` feature owns:
 - experiment catalogue, enrolment and tenant policy;
 - the browser-safe anonymous identifier and experiment UI.
 
-Its contract exposes portable schemas, values, errors and one abstract
-`FeatureFlagService`. Processes construct one concrete service and inject it
-through the application graph. Callers do not import a store or construct a
-service per request.
+Its contract exposes portable schemas, values, errors and one callable
+`FeatureFlagApi` token. A process installs the feature once and every caller
+receives that app through the application graph. Callers do not import a
+store or construct a service per request.
 
 Resolution order is fixed: validated boot override, force-enable list,
 matching operator rule, operator row, then registry default. An unknown key
@@ -118,9 +118,16 @@ adapters; it contains no feature-flag business logic.
 
 ## Runtime and registration
 
-Boot composes one service instance over Postgres and the process-owned cache,
-then exposes it through `app.featureFlags`. Hono, tRPC, workers and other
-features receive that instance; none register or construct it on demand.
+A process installs `featureFlagServer` once — `createApp(...).withPersistence(
+"postgres", { prisma }).withFeature(featureFlagServer)` — and exposes the app
+it provides as `app.featureFlag`. Hono, tRPC, workers and other features
+receive that instance; none register or construct it on demand.
+
+The app authorises a browser-supplied tenant target itself, so it names
+`AuthzApi`, `ProjectApi` and `OrganizationApi` in `static dependencies` and
+every process that installs it supplies all three. That is what orders the API
+root: the three directories are composed before the flags, and the flags
+before Eventing and every feature that gates on one.
 
 ## Errors
 

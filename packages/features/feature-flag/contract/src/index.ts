@@ -84,19 +84,37 @@ export {
   SYSTEM_DISTINCT_ID,
 } from "./feature-flag-target.ts";
 export type {
-  FrontendFeatureFlagMap,
+  ExperimentEnrolmentForCaller,
+  ExperimentTenantPolicyForCaller,
+  FeatureFlagCaller,
+  FeatureFlagReadForCaller,
+  FeatureFlagTargetRequestForCaller,
   FeatureFlagWrite,
+  FrontendFeatureFlagMap,
   OperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
   OperatorFeatureFlagFamily,
+  OrganizationFeatureFlagsForCaller,
   StoredFeatureFlag,
-} from "./feature-flag.service.ts";
+} from "./feature-flag.schemas.ts";
 export {
-  FeatureFlagService,
+  experimentEnrolmentInputSchema,
+  experimentTenantPolicyInputSchema,
+  featureFlagReadInputSchema,
+  featureFlagTargetRequestSchema,
   operatorFeatureFlagCatalogueSchema,
   operatorFeatureFlagFamilySchema,
   operatorFeatureFlagSchema,
-} from "./feature-flag.service.ts";
+  organizationFeatureFlagsInputSchema,
+} from "./feature-flag.schemas.ts";
+export {
+  enabledByOrganizationOutputSchema,
+  enabledOutputSchema,
+  experimentsOutputSchema,
+  experimentWriteOutputSchema,
+  featureFlagTrpc,
+  resolvedFlagsOutputSchema,
+} from "./feature-flag.trpc.ts";
 export type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 export {
   frontendFeatureFlagMapSchema,
@@ -111,5 +129,4 @@ export {
   publicAnonymousFlagMapSchema,
 } from "./public-anonymous-feature-flags.ts";
 export { FRONTEND_FEATURE_FLAGS } from "./frontend-feature-flags.ts";
-export * from "./feature-flag.app.ts";
 export * from "./feature-flag.api.ts";

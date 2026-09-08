@@ -5,12 +5,12 @@
  */
 import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createInMemoryFeatureFlagService } from "../testing.ts";
+import { createFeatureFlagTestService } from "../app/__tests__/feature-flag.fixture.ts";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const SYSTEM_TARGET = { kind: "system" } as const;
 function buildService(source: Readonly<Record<string, unknown>> = {}) {
-  return createInMemoryFeatureFlagService({
+  return createFeatureFlagTestService({
     config: resolveFeatureFlagConfig(source),
   });
 }

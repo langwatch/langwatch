@@ -1,7 +1,7 @@
-import {
+import type {
+  ExperimentSetting,
+  ExperimentSubject,
   FeatureFlagExperimentRepository,
-  type ExperimentSetting,
-  type ExperimentSubject,
 } from "../feature-flag-experiment-setting.repository.ts";
 
 function keyOf({
@@ -13,7 +13,7 @@ function keyOf({
 }
 
 /** Experiment settings held in process, for tests. */
-export class MemoryFeatureFlagExperimentRepository extends FeatureFlagExperimentRepository {
+export class MemoryFeatureFlagExperimentRepository implements FeatureFlagExperimentRepository {
   private readonly settings = new Map<string, ExperimentSetting>();
 
   static create(): MemoryFeatureFlagExperimentRepository {
