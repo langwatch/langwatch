@@ -7,9 +7,9 @@ import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /**
- * Agent types - code, workflow, or http.
- * Note: "signature" (prompt) agents have been removed.
- * Use the Prompts feature directly for LLM-based prompts.
+ * The kinds of agent the selector can create — one per entry in the
+ * `agentTypes` list below. Prompt ("signature") agents were removed; use
+ * the Prompts feature directly for LLM-based prompts.
  */
 export type AgentType = "code" | "workflow" | "http" | "voice";
 
@@ -54,9 +54,9 @@ const agentTypes: Array<{
 ];
 
 /**
- * Drawer for selecting the type of agent to create.
- * Shows cards for Code and Workflow agent types.
- * Note: Prompt-based agents have been removed - use Prompts directly instead.
+ * Drawer for selecting the type of agent to create: one card per entry in the
+ * `agentTypes` list, with the voice card hidden unless the project's flag is
+ * on. Prompt-based agents were removed — use Prompts directly instead.
  */
 export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();

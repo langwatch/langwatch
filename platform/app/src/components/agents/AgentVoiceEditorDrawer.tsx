@@ -489,11 +489,6 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
 // ============================================================================
 
 /**
- * Drawer for creating/editing a voice agent. The credential comes from the
- * project's ElevenLabs provider row — the agent stores no secret — so the drawer
- * only says whether that key is present.
- */
-/**
  * What the drawer shows while the project's `release_voice_agents_enabled`
  * flag is off (AC29): the same frame, one sentence, no form.
  */
@@ -526,6 +521,11 @@ function VoiceAgentsDisabledDrawer({
   );
 }
 
+/**
+ * Drawer for creating/editing a voice agent. The credential comes from the
+ * project's ElevenLabs provider row — the agent stores no secret — so the drawer
+ * only says whether that key is present.
+ */
 export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
   const editor = useVoiceAgentEditor(props);
   const { form } = editor;

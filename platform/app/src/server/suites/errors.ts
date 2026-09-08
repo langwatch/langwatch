@@ -13,6 +13,7 @@ import {
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents";
 
 /**
  * Base class for suite domain errors.
@@ -175,7 +176,7 @@ export class SuiteScopeNotAllowedError extends SuiteDomainError {
 export class VoiceAgentsDisabledError extends SuiteDomainError {
   declare readonly code: "voice_agents_disabled";
 
-  constructor(message = "Voice agents are not enabled for this project") {
+  constructor(message = VOICE_AGENTS_DISABLED_MESSAGE) {
     super(message, { code: "voice_agents_disabled", httpStatus: 403 });
     this.name = "VoiceAgentsDisabledError";
   }

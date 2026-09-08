@@ -10,9 +10,10 @@ import {
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
 import type { ConnectedAgentSelectability } from "~/server/connected-agents/selectable";
-import { featureFlagService } from "~/server/featureFlag";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
-import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import {
+  isVoiceAgentsEnabledForProject,
+  VOICE_AGENTS_DISABLED_MESSAGE,
+} from "~/server/featureFlag/voiceAgents";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
   type AgentComponentConfig,
@@ -40,18 +41,11 @@ import {
  * the API cannot register a voice agent behind the UI's own gate.
  */
 async function assertVoiceAgentsEnabled(projectId: string): Promise<void> {
-  const enabled = await featureFlagService.isEnabled(
-    "release_voice_agents_enabled",
-    {
-      distinctId: projectId,
-      projectId,
-      organizationId: (await resolveOrganizationId(projectId)) ?? NOT_TARGETED,
-    },
-  );
+  const enabled = await isVoiceAgentsEnabledForProject({ projectId });
   if (!enabled) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: "Voice agents are not enabled for this project",
+      message: VOICE_AGENTS_DISABLED_MESSAGE,
     });
   }
 }

@@ -537,7 +537,7 @@ async function spawnScenarioChildProcess(
       // and transcription clients through the child env. Narrowed here so no
       // other target ever receives them.
       callerEnv:
-        childProcessData.adapterData.type === "voice"
+        childProcessData.adapterData?.type === "voice"
           ? childProcessData.adapterData.callerEnv
           : undefined,
     });

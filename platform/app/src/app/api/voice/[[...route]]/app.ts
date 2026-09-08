@@ -28,13 +28,11 @@ import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { isVoiceAgentsEnabledForProject } from "~/server/featureFlag/voiceAgents";
 import {
   findElevenLabsProviderForProject,
   getElevenLabsApiCredential,
 } from "~/server/gateway/elevenLabsCredential.service";
-import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
 import { scenarioRunIdForConversation } from "~/server/scenarios/voice/call-record";
@@ -150,14 +148,7 @@ async function requireProject(
   // The whole door is behind the product flag: a project without it turned
   // on gets the same 404 the drawer and the run dialog render for, not a
   // 403 that would leak that the door exists at all (AC29).
-  const voiceEnabled = await featureFlagService.isEnabled(
-    "release_voice_agents_enabled",
-    {
-      distinctId: projectId,
-      projectId,
-      organizationId: (await resolveOrganizationId(projectId)) ?? NOT_TARGETED,
-    },
-  );
+  const voiceEnabled = await isVoiceAgentsEnabledForProject({ projectId });
   if (!voiceEnabled) return { ok: false, status: 404, disabled: true };
   return { ok: true };
 }

@@ -19,7 +19,7 @@ import type {
   SuiteRunResult,
   SuiteRunService,
 } from "~/server/app-layer/suites/suite-run.service";
-import { featureFlagService } from "~/server/featureFlag";
+import { isVoiceAgentsEnabledForProject } from "~/server/featureFlag/voiceAgents";
 import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import { slugify } from "~/utils/slugify";
 import {
@@ -1376,14 +1376,10 @@ export class SuiteService {
     organizationId: string;
   }): Promise<void> {
     if (!params.targets.some((target) => target.type === "voice")) return;
-    const voiceEnabled = await featureFlagService.isEnabled(
-      "release_voice_agents_enabled",
-      {
-        distinctId: params.projectId,
-        projectId: params.projectId,
-        organizationId: params.organizationId,
-      },
-    );
+    const voiceEnabled = await isVoiceAgentsEnabledForProject({
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+    });
     if (!voiceEnabled) {
       throw new VoiceAgentsDisabledError();
     }

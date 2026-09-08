@@ -30,11 +30,15 @@ import {
 } from "./talkToItMachine";
 import {
   type VoiceCallSession,
+  type VoiceTurn,
   voiceTransportClientRegistry,
 } from "./voice-transport-client.registry";
 
 /** The settings route that adds a model provider key (mirrors the drawer). */
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
+
+/** Placeholder cap before minting; the session mint response replaces it. */
+const PRE_MINT_MAX_SECONDS_PLACEHOLDER = 300;
 
 interface MintResponse {
   transport: VoiceTransport;
@@ -90,7 +94,7 @@ function createTalkRefs(agentRowId: string | undefined): TalkRefs {
     startedAt: { current: 0 },
     conversationId: { current: undefined },
     sessionToken: { current: undefined },
-    maxSeconds: { current: 300 },
+    maxSeconds: { current: PRE_MINT_MAX_SECONDS_PLACEHOLDER },
     runSetId: { current: undefined },
     tick: { current: null },
     createdRowId: { current: agentRowId },
@@ -538,6 +542,22 @@ function ErrorView({
   );
 }
 
+/** The turn-by-turn transcript, shared by the live and done views. */
+function Transcript({ turns }: { turns: VoiceTurn[] }) {
+  return (
+    <>
+      {turns.map((turn, index) => (
+        <Text key={index} fontSize="sm">
+          <Text as="span" fontWeight="bold">
+            {turn.role === "agent" ? "Agent" : "You"}:
+          </Text>{" "}
+          {turn.text}
+        </Text>
+      ))}
+    </>
+  );
+}
+
 function LiveView({
   state,
   micLevel,
@@ -579,14 +599,7 @@ function LiveView({
         </Progress.Track>
       </Progress.Root>
       <VStack align="stretch" gap={1} data-testid="talk-transcript">
-        {state.transcript.map((turn, index) => (
-          <Text key={index} fontSize="sm">
-            <Text as="span" fontWeight="bold">
-              {turn.role === "agent" ? "Agent" : "You"}:
-            </Text>{" "}
-            {turn.text}
-          </Text>
-        ))}
+        <Transcript turns={state.transcript} />
       </VStack>
     </VStack>
   );
@@ -612,14 +625,7 @@ function DoneView({
         </Text>
       )}
       <VStack align="stretch" gap={1}>
-        {state.transcript.map((turn, index) => (
-          <Text key={index} fontSize="sm">
-            <Text as="span" fontWeight="bold">
-              {turn.role === "agent" ? "Agent" : "You"}:
-            </Text>{" "}
-            {turn.text}
-          </Text>
-        ))}
+        <Transcript turns={state.transcript} />
       </VStack>
       {state.audioUrl && (
         <Box data-testid="talk-play">
