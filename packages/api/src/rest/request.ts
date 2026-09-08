@@ -32,6 +32,7 @@ import { validator as openApiValidator } from "hono-openapi";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
+import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import {
   DECLARED_ANSWER,
@@ -322,6 +323,161 @@ function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
  * type the package doesn't export.
  */
 export const validator = build as unknown as typeof openApiValidator;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The two capabilities a route declares and a process supplies the store for.
+// The framework owns both keys — family, operation, version, principal — so a
+// store never decides who is being limited or what an entry describes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** What a rate-limited route declares: the bucket its calls are counted in. */
+export type RestRateLimitPolicy = Readonly<{ bucket?: string }>;
+
+/** What a cached route declares: how long an answer stands, and under what tag. */
+export type RestCachePolicy = Readonly<{ ttlSeconds: number; tag: string }>;
+
+/** One caller's calls of one operation of one version of one family. */
+export function restRateLimitKey({
+  family,
+  operation,
+  version,
+  principal,
+}: {
+  family: string;
+  operation: string;
+  version: string;
+  principal: string;
+}): string {
+  return `${family}:${operation}:${version}:${principal}`;
+}
+
+/** One complete call: the operation, the version, and the input it was given. */
+export function restCacheKey({
+  family,
+  operation,
+  version,
+  input,
+}: {
+  family: string;
+  operation: string;
+  version: string;
+  input: unknown;
+}): string {
+  return `${family}:${operation}:${version}:${fingerprintJson(input ?? null)}`;
+}
+
+/**
+ * The answer a previous identical call left, if the store still holds it. A
+ * store that fails answers nothing: a cache is an accelerator, and a caller
+ * waiting on the handler is served either way.
+ */
+export async function cachedRestAnswer({
+  cache,
+  key,
+  logger,
+}: {
+  cache: ResponseCache;
+  key: string;
+  logger: Logger;
+}): Promise<Uint8Array | null> {
+  try {
+    return await cache.get(key);
+  } catch (error) {
+    logger.warn({ error }, "the response cache could not be read; running the handler");
+
+    return null;
+  }
+}
+
+/** The same store, written to. A failed write is a miss next time, and no more. */
+export async function storeRestAnswer({
+  cache,
+  key,
+  policy,
+  body,
+  logger,
+}: {
+  cache: ResponseCache;
+  key: string;
+  policy: RestCachePolicy;
+  body: Uint8Array;
+  logger: Logger;
+}): Promise<void> {
+  try {
+    await cache.set(key, policy.tag, body, policy.ttlSeconds);
+  } catch (error) {
+    logger.warn({ error }, "the response cache could not be written");
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The multipart body: the one request kind whose parts are not all text, so a
+// declaration names the fields it parses and the file parts it takes delivery
+// of, and the runtime hands the files over beside the parsed input.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One file part a route names, and whether a request must carry it. */
+export type RestMultipartFile = Readonly<{ required: boolean }>;
+
+/** Every file part a route names, by the field name each arrives under. */
+export type RestMultipartFiles = Readonly<Record<string, RestMultipartFile>>;
+
+/** What a route that reads a multipart body declares: its fields, its files. */
+export type RestMultipart = Readonly<{
+  fields: z.ZodObject;
+  files: RestMultipartFiles;
+}>;
+
+/**
+ * Reads one multipart body: the declared file parts are taken as files, and
+ * everything else is parsed by the schema the route named for its fields.
+ * Both halves are refused the way every other source is.
+ */
+export function multipartMiddleware({
+  multipart,
+  fieldsKey,
+  filesKey,
+}: {
+  multipart: RestMultipart;
+  fieldsKey: string;
+  filesKey: string;
+}): MiddlewareHandler {
+  return async (context, next) => {
+    const form = await context.req.parseBody({ all: false });
+    const files: Record<string, File> = {};
+    const violations: FieldViolation[] = [];
+
+    for (const [name, part] of Object.entries(multipart.files)) {
+      const value = form[name];
+
+      if (value instanceof File) files[name] = value;
+      else if (value !== undefined) violations.push(notAFile(name));
+      else if (part.required) violations.push(missingFile(name));
+    }
+
+    if (violations.length > 0) throw new RequestValidationError({ target: "form", violations });
+
+    const declared = Object.entries(form).filter(([name]) => !(name in multipart.files));
+    const fields = Object.fromEntries(declared);
+    const parsed = multipart.fields.safeParse(fields);
+
+    if (!parsed.success) {
+      throw requestValidationErrorFrom({ target: "form", error: parsed.error, input: fields });
+    }
+
+    context.set(fieldsKey, parsed.data);
+    context.set(filesKey, files);
+    await next();
+  };
+}
+
+function missingFile(field: string): FieldViolation {
+  return { field, type: "missing_file", message: `The file part "${field}" is required.` };
+}
+
+function notAFile(field: string): FieldViolation {
+  return { field, type: "invalid_file", message: `The part "${field}" must be an uploaded file.` };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The wire-size cap every ingestion family carries.

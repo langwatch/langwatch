@@ -11,8 +11,10 @@ import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi
 import { z, type ZodType } from "zod";
 
 import type { CredentialClass } from "../access-policy.ts";
+import { securityRequirement } from "../access/access.ts";
+import type { RestMultipart } from "./request.ts";
 import type { EndpointDocs, RouteResponse } from "./response.ts";
-import type { RestDeprecation, RestTransportRoute } from "./runtime.ts";
+import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./runtime.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a declared REST route publishes: its operation id and the answer the
@@ -44,10 +46,13 @@ export function restRouteDocumentation({
   route,
   suffix,
   deprecated,
+  credential,
 }: {
   route: RestTransportRoute<unknown>;
   suffix?: string | undefined;
   deprecated?: RestDeprecation | undefined;
+  /** The family's door, for the scheme an optional credential publishes. */
+  credential?: RestDoorCredential | undefined;
 }): DescribeRouteOptions {
   const options: DescribeRouteOptions = {
     responses: { ...declaredAnswers(route), ...route.docs?.responses },
@@ -66,11 +71,26 @@ export function restRouteDocumentation({
     options.requestBody = { required: true, content: { [route.rawBody.mediaType]: {} } };
   }
 
+  // The fields and the file parts a multipart route names. The files publish
+  // as binary strings, which is how OpenAPI 3.1 spells an uploaded file.
+  if (route.multipart) {
+    options.requestBody = {
+      required: true,
+      content: { "multipart/form-data": { schema: multipartSchema(route.multipart) } },
+    };
+  }
+
   // An empty requirement list is the document's way of saying "no credential",
   // which is exactly what a public route is; it also overrides the document's
   // own default requirement, which every other operation inherits. A route the
   // door still authenticates keeps its family's scheme.
   if (route.access?.kind === "public") options.security = [];
+
+  // An optional credential publishes both alternatives: the empty requirement
+  // for the caller who presents none, and the family's own scheme beside it.
+  if (route.access?.kind === "optional" && credential) {
+    options.security = [{}, ...securityRequirement(credential)];
+  }
 
   if (deprecated) {
     options.deprecated = true;
@@ -87,8 +107,28 @@ export function documentRoute(input: {
   route: RestTransportRoute<unknown>;
   suffix?: string | undefined;
   deprecated?: RestDeprecation | undefined;
+  credential?: RestDoorCredential | undefined;
 }): MiddlewareHandler {
   return describeRoute(restRouteDocumentation(input));
+}
+
+/**
+ * The published shape of a multipart body: the fields the route parses, and
+ * one binary property per file part it named, required where the declaration
+ * said the request must carry it.
+ */
+function multipartSchema(multipart: RestMultipart): Record<string, unknown> {
+  const { $schema: _draft, ...fields } = z.toJSONSchema(multipart.fields, { io: "input" });
+  const properties = { ...(fields.properties as Record<string, unknown> | undefined) };
+  const required = [...((fields.required as string[] | undefined) ?? [])];
+
+  for (const [name, part] of Object.entries(multipart.files)) {
+    properties[name] = { type: "string", format: "binary" };
+
+    if (part.required) required.push(name);
+  }
+
+  return { ...fields, type: "object", properties, ...(required.length > 0 ? { required } : {}) };
 }
 
 /**
@@ -129,16 +169,18 @@ function rawAnswer(route: RestTransportRoute<unknown>): Record<string, RouteResp
  * its members are converted here and the discriminator written beside them.
  */
 function answerSchema(schema: RestTransportRoute<unknown>["output"]): unknown {
-  if (!(schema instanceof z.ZodDiscriminatedUnion)) return resolver(schema);
+  if (schema instanceof z.ZodDiscriminatedUnion) {
+    return {
+      oneOf: schema.options.map((option) => publishedMember(option)),
+      discriminator: { propertyName: schema.def.discriminator },
+    };
+  }
 
-  return {
-    oneOf: schema.options.map((option) => publishedMember(option)),
-    discriminator: { propertyName: schema.def.discriminator },
-  };
+  return resolver(schema);
 }
 
 /** One member of a published union, without the draft the document declares. */
-function publishedMember(option: z.ZodObject): Record<string, unknown> {
+function publishedMember(option: z.core.$ZodType): Record<string, unknown> {
   const { $schema: _draft, ...member } = z.toJSONSchema(option, { io: "output" });
 
   return member;

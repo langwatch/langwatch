@@ -288,13 +288,22 @@ describe("defineRestRouter", () => {
     });
 
     /** @scenario "An endpoint that declares several answers may not also declare one" */
-    it("refuses a map with no success status, or with more than one", () => {
-      expect(() => route().responds({ 503: report })).toThrow(/exactly one 2xx answer/);
-      expect(() => route().responds({ 200: report, 201: report })).toThrow(
-        /exactly one 2xx answer/,
+    it("refuses a map with no success status, or with more than two", () => {
+      expect(() => route().responds({ 503: report })).toThrow(/one or two 2xx answers/);
+      expect(() => route().responds({ 200: report, 201: report, 202: report })).toThrow(
+        /one or two 2xx answers/,
       );
       expect(() => route().responds({})).toThrow(/no answers/);
       expect(() => route().responds({ 700: report })).toThrow(/outside 200–599/);
+    });
+
+    /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
+    it("takes two successes carrying one body, and refuses two carrying different ones", () => {
+      expect(() => route().responds({ 200: report, 201: report })).not.toThrow();
+
+      expect(() =>
+        route().responds({ 200: report, 201: z.object({ other: z.string() }) }),
+      ).toThrow(/two successes carrying different bodies/);
     });
   });
 
@@ -313,11 +322,11 @@ describe("defineRestRouter", () => {
     /** @scenario "A handler is given the exact request bytes" */
     it("refuses a route that declares both a raw body and a parsed one", () => {
       expect(() => hook().withRawBody("bytes").withInput(z.object({ a: z.number() }))).toThrow(
-        /both a raw body and a parsed input/,
+        /declares its body twice/,
       );
 
       expect(() => hook().withInput(z.object({ a: z.number() })).withRawBody("bytes")).toThrow(
-        /both a raw body and a parsed input/,
+        /declares its body twice/,
       );
 
       expect(() => hook().withRawBody("bytes").withRawBody("text")).toThrow(

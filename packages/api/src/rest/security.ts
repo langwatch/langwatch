@@ -142,31 +142,40 @@ function isUnenumerableMount(method: string, path: string): boolean {
 }
 
 /**
- * Every address a registered route answers at: its own path and, when it has
- * one, the canonical `/api/v1` twin the runtime recorded alongside it.
+ * Every address a registered route answers at, and every path it answers at,
+ * each including the canonical `/api/v1` twin the runtime recorded with it.
  */
-function registeredAddresses(registry: readonly RegisteredRoute[]): Set<string> {
+function registeredAddresses(registry: readonly RegisteredRoute[]): {
+  addresses: Set<string>;
+  paths: Set<string>;
+} {
   const addresses = new Set<string>();
+  const paths = new Set<string>();
   for (const route of registry) {
-    addresses.add(`${route.method.toUpperCase()} ${route.path}`);
-    if (route.canonicalPath) {
-      addresses.add(`${route.method.toUpperCase()} ${route.canonicalPath}`);
+    for (const path of [route.path, route.canonicalPath ?? route.path]) {
+      addresses.add(`${route.method.toUpperCase()} ${path}`);
+      paths.add(path);
     }
   }
-  return addresses;
+  return { addresses, paths };
 }
 
-/** Every mounted endpoint with no entry in the route registry, sorted. */
+/**
+ * Every mounted endpoint with no entry in the route registry, sorted. A method
+ * guard — `ALL` on a path the registry knows — answers 405 for the methods
+ * that path does not serve, so it is no more an endpoint than a sub-app mount.
+ */
 export function undeclaredRoutes(options: {
   app: MountedRouteTable | Hono<any, any, any>;
   registry: readonly RegisteredRoute[];
 }): string[] {
-  const declared = registeredAddresses(options.registry);
+  const { addresses, paths } = registeredAddresses(options.registry);
   const undeclared = new Set<string>();
   for (const route of options.app.routes) {
     if (isUnenumerableMount(route.method, route.path)) continue;
     const address = `${route.method.toUpperCase()} ${route.path}`;
-    if (!declared.has(address)) undeclared.add(address);
+    const guard = route.method.toUpperCase() === "ALL" && paths.has(route.path);
+    if (!addresses.has(address) && !guard) undeclared.add(address);
   }
   return [...undeclared].sort();
 }

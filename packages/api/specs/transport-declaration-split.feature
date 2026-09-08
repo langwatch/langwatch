@@ -238,7 +238,39 @@ Feature: Transport declaration split
     When it names that door
     Then its handlers are handed the organization the token resolved
     And the registry records the SCIM credential class, which publishes the SCIM bearer scheme
-    And the instance administrator key stays out, because no door resolves a scope for it
+
+  @integration
+  Scenario: A family behind the instance administrator's own key names no tenant
+    Given a family that creates the first organization of a deployment
+    When it names the instance administrator key as its door
+    Then its handlers are handed no scope, because the key names no tenant
+    And the registry records the instance administrator credential class
+    And the document publishes that key's own scheme for it
+
+  @integration
+  Scenario: A family behind a browser session serves the person the cookie identified
+    Given a family whose callers are the application's own pages
+    When it names the session door
+    Then the door resolves the person and the project scope, and the handler reads both
+    And an answer the handler streams is written as it opened it
+    And the family publishes no operation, because no API client can present a cookie
+
+  @integration
+  Scenario: A route answers with or without the family's credential
+    Given a route declared to take the family's credential optionally, with the written reason
+    When a caller reaches it presenting nothing
+    Then the handler is handed no actor and no scope, and answers
+    And a caller presenting the credential is resolved as any other, scope and all
+    And the published document offers the operation both the empty requirement and the family's scheme
+    And a mount that cannot open the door for an absent credential is refused, naming the route
+
+  @integration
+  Scenario: A route whose resource names its own owner resolves the scope in its handler
+    Given a route declared to defer its scope, with the written reason the handler resolves it
+    When a caller the door authenticates reaches it
+    Then the handler is handed the caller and no scope, and the owner is its own to resolve
+    And the registry records the family's credential class and the reason the route gave
+    And a mount that cannot open the door without a permission is refused, naming the route
 
   @unimplemented
   Scenario: A project key presented to an organization route is refused with the body the family already publishes

@@ -13,9 +13,19 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { anyAuthenticated, publicRoute, securityRequirement } from "../../access/access.ts";
+import {
+  anyAuthenticated,
+  deferredScope,
+  optionalCredential,
+  publicRoute,
+  securityRequirement,
+} from "../../access/access.ts";
 import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
-import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
+import {
+  documentedResponses,
+  restRouteDocumentation,
+  securityForCredentialClass,
+} from "../openapi.ts";
 import { declined } from "../response.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import {
@@ -1739,5 +1749,802 @@ describe("a route whose answer takes one of several shapes", () => {
     expect(schema?.oneOf?.[0]?.properties?.status?.const).toBe("existing");
     expect(schema?.oneOf?.[1]?.properties?.url?.type).toBe("string");
     expect(schema?.oneOf?.[0]?.$schema).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Round three B: the doors and the addressing. A family that shares a prefix
+// rather than owning one, a protocol whose generation is not v1, the two doors
+// that answer for nobody in particular, and a body that carries files.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface EvaluationsApi {
+  list(): Promise<{ evaluators: string[] }>;
+  evaluate(input: { evaluator: string }): Promise<{ status: string }>;
+}
+
+const EvaluationsApi = featureApi<EvaluationsApi>("evaluation");
+
+// The shape of evaluation's legacy family: six paths under two prefixes it
+// shares with everything else at `/api`, and a namespace of its own for the
+// registry alone.
+const evaluationsLegacy = defineRestRouter(EvaluationsApi)
+  .withNamespace("evaluations-legacy")
+  .withVersion(VERSION)
+  .withAddressing("literal")
+  .get("/api/evaluations/list", "listEvaluators")
+  .withAccess(publicRoute({ reason: "the evaluator catalogue is the same for every caller" }))
+  .withOutput(z.object({ evaluators: z.string().array() }))
+  .handle(async ({ app }) => app.list())
+
+  .post("/api/guardrails/:evaluator/evaluate", "runGuardrail")
+  .withParams(z.object({ evaluator: z.string() }))
+  .withPermission("evaluations:manage")
+  .withOutput(z.object({ status: z.string() }))
+  .handle(async ({ app, input }) => app.evaluate({ evaluator: input.evaluator }))
+  .build();
+
+/** A sibling family under the same prefix, mounted after the literal one. */
+function evaluationsHost(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+  });
+
+  const family = runtime.mount(evaluationsLegacy.router(), {
+    app: () => ({
+      list: async () => ({ evaluators: ["exact_match"] }),
+      evaluate: async ({ evaluator }: { evaluator: string }) => ({ status: evaluator }),
+    }),
+    onError: createErrorHandler(),
+  });
+
+  const host = new Hono();
+
+  host.route("/", family);
+  host.get("/api/evaluations/anything-else", (c) => c.json({ sibling: true }));
+
+  return host;
+}
+
+describe("a family whose published paths are its whole contract", () => {
+  /** @scenario "A family at a shared prefix mounts its own paths and their canonical address" */
+  it("answers at each literal path and at the /api/v1 address of that same path", async () => {
+    const app = evaluationsHost();
+
+    await expect((await app.request("/api/evaluations/list")).json()).resolves.toEqual({
+      evaluators: ["exact_match"],
+    });
+    await expect((await app.request("/api/v1/evaluations/list")).json()).resolves.toEqual({
+      evaluators: ["exact_match"],
+    });
+
+    const guardrail = await app.request("/api/guardrails/jailbreak/evaluate", { method: "POST" });
+
+    await expect(guardrail.json()).resolves.toEqual({ status: "jailbreak" });
+  });
+
+  /** @scenario "A family at a shared prefix mounts its own paths and their canonical address" */
+  it("mounts no dated namespace and no version guard, and names itself in the registry", () => {
+    const app = evaluationsHost();
+
+    expect(addresses(app).some((address) => address.includes("apiVersion"))).toBe(false);
+    expect(addresses(app).some((address) => address.includes(VERSION))).toBe(false);
+    expect(getRoutePolicy("get", "/api/evaluations/list")).toMatchObject({
+      family: "evaluations-legacy",
+      canonicalPath: "/api/v1/evaluations/list",
+    });
+  });
+
+  /** @scenario "A family at a shared prefix mounts its own paths and their canonical address" */
+  it("leaves a sibling under the same prefix answering as it always did", async () => {
+    const response = await evaluationsHost().request("/api/evaluations/anything-else");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ sibling: true });
+  });
+
+  /** @scenario "A family at a shared prefix mounts its own paths and their canonical address" */
+  it("refuses a route of such a family whose path is not a whole address", () => {
+    const family = () =>
+      defineRestRouter(EvaluationsApi)
+        .withNamespace("evaluations-legacy")
+        .withVersion(VERSION)
+        .withAddressing("literal");
+
+    expect(() => family().get("/list", "listEvaluators")).toThrow(/must be the whole address/);
+    expect(() => family().get("list", "listEvaluators")).toThrow(/must be the whole address/);
+    // The alias an exporter's misconfiguration lands on is root-level, and is
+    // a whole address like any other.
+    expect(() => family().get("/v1/traces", "aliasTraces")).not.toThrow();
+  });
+});
+
+interface DirectoryApi {
+  listUsers(): Promise<{ Resources: string[] }>;
+}
+
+const DirectoryApi = featureApi<DirectoryApi>("scim");
+
+// `/api/scim/v2` IS the SCIM 2.0 contract: the generation the path names is
+// the protocol's, not ours to date.
+const scimV2 = defineRestRouter(DirectoryApi)
+  .withNamespace("scim")
+  .withVersion(VERSION)
+  .withAddressing("v1-in-path", { generation: "v2" })
+  .withCredential("scimToken")
+  .get("/Users", "listScimUsers")
+  .withPermission("organization:manage")
+  .withOutput(z.object({ Resources: z.string().array() }))
+  .handle(async ({ app }) => app.listUsers())
+  .build();
+
+function scimV2App(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({
+        actor: null,
+        scope: { tier: "organization", id: ORGANIZATION_ID } as const,
+      }),
+    },
+  });
+
+  return runtime.mount(scimV2.router(), {
+    app: () => ({ listUsers: async () => ({ Resources: [] }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a family whose protocol fixes the generation its path names", () => {
+  /** @scenario "A family names a generation other than v1 in its own path" */
+  it("answers under that generation and under no other", async () => {
+    const app = scimV2App();
+
+    expect((await app.request("/api/scim/v2/Users")).status).toBe(200);
+    expect((await app.request("/api/scim/v1/Users")).status).toBe(404);
+    expect((await app.request("/api/v1/scim/Users")).status).toBe(404);
+    expect(addresses(app).filter((address) => address.startsWith("GET "))).toEqual([
+      "GET /api/scim/v2/Users",
+    ]);
+  });
+
+  /** @scenario "A family names a generation other than v1 in its own path" */
+  it("refuses a generation named by a family that carries none in its path", () => {
+    const family = () =>
+      defineRestRouter(DirectoryApi).withNamespace("scim").withVersion(VERSION);
+
+    expect(() => family().withAddressing("dated", { generation: "v2" })).toThrow(
+      /names no generation in its own path/,
+    );
+    expect(() => family().withAddressing("v1-in-path", { generation: "two" })).toThrow(
+      /spelled v1, v2/,
+    );
+  });
+});
+
+
+interface FilesApi {
+  read(input: { id: string }): Promise<{ ownerProjectId: string; bytes: string }>;
+}
+
+const FilesApi = featureApi<FilesApi>("stored-object");
+
+const OWNER_IN_HANDLER =
+  "the object is addressed by id alone, so only a cross-tenant read of the row knows " +
+  "which project owns it";
+
+// The shape of `/api/files/:id` behind the browser session the upload pages
+// carry: the person is the door's, the owning project is the handler's, and
+// the answer is a stream the handler opened.
+const files = defineRestRouter(FilesApi)
+  .withNamespace("stored-object")
+  .withVersion(VERSION)
+  .withCredential("session")
+  .withAddressing("dated", { v1Twin: false })
+  .get("/:id/content", "readStoredObject")
+  .withParams(z.object({ id: z.string() }))
+  .withAccess(deferredScope({ reason: OWNER_IN_HANDLER }))
+  .withRawResponse({ produces: "application/octet-stream" })
+  .handle(async ({ app, actor, scope, input }) => {
+    // The literals are the proof the scope was deferred: a handler on a
+    // resolved door could not answer these.
+    expect(scope).toBeNull();
+    expect(actor).toEqual({ type: "user", id: "user-1" });
+
+    const row = await app.read({ id: input.id });
+
+    return {
+      status: 200,
+      headers: { "Content-Type": "application/octet-stream", "X-Owner": row.ownerProjectId },
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(row.bytes));
+          controller.close();
+        },
+      }),
+    } as const;
+  })
+  .build();
+
+const fileApplication: FilesApi = {
+  read: async ({ id }) => ({ ownerProjectId: "project-9", bytes: `bytes-of-${id}` }),
+};
+
+function filesApp(options: { identified?: boolean } = {}): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("A deferred route asks no permission of its credential.");
+      },
+      // The session door: the process resolves the person the cookie names,
+      // and the project stays for the handler to look up.
+      ...(options.identified === false
+        ? {}
+        : { identify: () => ({ actor: { type: "user", id: "user-1" } as const, scope: null }) }),
+    },
+  });
+
+  return runtime.mount(files.router(), {
+    app: () => fileApplication,
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a family behind a browser session", () => {
+  /** @scenario "A family behind a browser session serves the person the cookie identified" */
+  it("hands the handler the person the door identified and streams the answer it opened", async () => {
+    const response = await filesApp().request("/api/stored-object/object-1/content");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Owner")).toBe("project-9");
+    await expect(response.text()).resolves.toBe("bytes-of-object-1");
+  });
+
+  /** @scenario "A family behind a browser session serves the person the cookie identified" */
+  it("publishes no operation, because no API client can present a cookie", async () => {
+    const published = await generateSpecs(filesApp(), SPEC_OPTIONS);
+
+    expect(Object.keys(published.paths ?? {})).toEqual([]);
+  });
+
+  /** @scenario "A route whose resource names its own owner resolves the scope in its handler" */
+  it("records the family's credential class and the reason the route gave", () => {
+    filesApp();
+
+    const route = getRoutePolicy("get", "/api/stored-object/:id/content");
+
+    expect(route).toMatchObject({ credentialClass: "session", family: "stored-object" });
+    expect(route?.policy).toMatchObject({ kind: "handlerManaged", reason: OWNER_IN_HANDLER });
+  });
+
+  /** @scenario "A route whose resource names its own owner resolves the scope in its handler" */
+  it("refuses a mount that cannot open the door without a permission", () => {
+    expect(() => filesApp({ identified: false })).toThrow(/supplied no identity.identify/);
+  });
+});
+
+interface UploadsApi {
+  store(input: { name: string; bytes: string }): Promise<{ id: string }>;
+  upsert(input: { id: string; bytes: string }): Promise<{ created: boolean }>;
+}
+
+const UploadsApi = featureApi<UploadsApi>("dataset");
+
+/** One schema for both successes: the status says only whether it created. */
+const datasetRecord = z.object({ id: z.string() });
+
+// The shape of dataset's uploads: a multipart body on the way in, and a record
+// upsert whose status says only whether the entry was created.
+const datasetUploads = defineRestRouter(UploadsApi)
+  .withNamespace("dataset")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/upload", "uploadDataset")
+  .withMultipart({ fields: z.object({ name: z.string() }), files: { file: { required: true } } })
+  .withPermission("datasets:manage")
+  .withOutput(z.object({ id: z.string(), name: z.string(), size: z.number() }))
+  .withDocs({ summary: "Upload a dataset file" })
+  .handle(async ({ app, input, files: parts, scope }) => {
+    const bytes = await parts.file.text();
+    const stored = await app.store({ name: input.name, bytes });
+
+    return { id: stored.id, name: `${scope.id}:${input.name}`, size: bytes.length };
+  })
+
+  .patch("/records/:recordId", "replaceDatasetRecord")
+  .withParams(z.object({ recordId: z.string() }))
+  .withInput(z.object({ bytes: z.string() }))
+  .withPermission("datasets:manage")
+  .responds({ 200: datasetRecord, 201: datasetRecord })
+  .withDocs({ summary: "Create or replace one dataset record" })
+  .handle(async ({ app, input }) => {
+    const { created } = await app.upsert({ id: input.recordId, bytes: input.bytes });
+
+    return { status: created ? 201 : 200, body: { id: input.recordId } } as const;
+  })
+  .build();
+
+function datasetApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+  });
+
+  return runtime.mount(datasetUploads.router(), {
+    app: () => ({
+      store: async ({ name }: { name: string }) => ({ id: `stored-${name}` }),
+      upsert: async ({ id }: { id: string }) => ({ created: id === "new" }),
+    }),
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a request that carries files beside its fields", () => {
+  async function upload(body: FormData): Promise<Response> {
+    return datasetApp().request("/api/v1/dataset/upload", { method: "POST", body });
+  }
+
+  /** @scenario "A request carries files beside its fields" */
+  it("hands the fields to the handler as input and the files beside it", async () => {
+    const body = new FormData();
+
+    body.set("name", "report.csv");
+    body.set("file", new File(["a,b,c"], "report.csv", { type: "text/csv" }));
+
+    const response = await upload(body);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      id: "stored-report.csv",
+      name: "project-1:report.csv",
+      size: 5,
+    });
+  });
+
+  /** @scenario "A request carries files beside its fields" */
+  it("refuses a request missing a file part the endpoint requires, naming that part", async () => {
+    const body = new FormData();
+
+    body.set("name", "report.csv");
+
+    const response = await upload(body);
+
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).toContain("file");
+  });
+
+  /** @scenario "A request carries files beside its fields" */
+  it("describes the body as multipart, with each file part as binary", async () => {
+    const published = await generateSpecs(datasetApp(), SPEC_OPTIONS);
+    const schema = (published.paths?.["/api/v1/dataset/upload"] as any)?.post?.requestBody?.content?.[
+      "multipart/form-data"
+    ]?.schema;
+
+    expect(schema?.properties?.file).toEqual({ type: "string", format: "binary" });
+    expect(schema?.properties?.name?.type).toBe("string");
+    expect(schema?.required).toEqual(["name", "file"]);
+  });
+
+  /** @scenario "A request carries files beside its fields" */
+  it("refuses a multipart body declared beside a JSON or a raw one", () => {
+    const route = () =>
+      defineRestRouter(UploadsApi)
+        .withNamespace("dataset")
+        .withVersion(VERSION)
+        .post("/upload", "uploadDataset");
+    const multipart = {
+      fields: z.object({ a: z.string() }),
+      files: { file: { required: true } },
+    } as const;
+
+    expect(() => route().withInput(z.object({ name: z.string() })).withMultipart(multipart)).toThrow(
+      /declares its body twice/,
+    );
+    expect(() => route().withMultipart(multipart).withRawBody("bytes")).toThrow(
+      /declares its body twice/,
+    );
+    expect(() =>
+      route().withMultipart({ fields: z.object({ a: z.string() }), files: {} }),
+    ).toThrow(/names no file part/);
+  });
+});
+
+describe("an upsert whose status says only whether it created", () => {
+  async function replace(recordId: string): Promise<Response> {
+    return datasetApp().request(`/api/v1/dataset/records/${recordId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bytes: "x" }),
+    });
+  }
+
+  /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
+  it("answers 201 for the record it created and 200 for the one it replaced", async () => {
+    const created = await replace("new");
+    const replaced = await replace("old");
+
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toEqual({ id: "new" });
+    expect(replaced.status).toBe(200);
+    await expect(replaced.json()).resolves.toEqual({ id: "old" });
+  });
+
+  /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
+  it("lists both successes in the document it publishes", async () => {
+    const published = await generateSpecs(datasetApp(), SPEC_OPTIONS);
+    const answers = (published.paths?.["/api/v1/dataset/records/{recordId}"] as any)?.patch
+      ?.responses;
+
+    expect(Object.keys(answers ?? {})).toEqual(["200", "201"]);
+    expect(answers?.["201"]?.content?.["application/json"]?.schema).toBeDefined();
+  });
+});
+
+interface BugReportApi {
+  submit(input: { title: string; projectId: string | null }): Promise<{ id: string }>;
+}
+
+const BugReportApi = featureApi<BugReportApi>("ops");
+
+const KEY_ONLY_ENRICHES =
+  "reporters may have no working credentials; an API key only links the report to a project";
+
+// The shape of the agent issue-report intake: it answers with or without a
+// key, and the key it was given only tells it whose project to file under.
+const bugReports = defineRestRouter(BugReportApi)
+  .withNamespace("bug-reports")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/", "submitBugReport")
+  .withInput(z.object({ title: z.string() }))
+  .withAccess(optionalCredential({ reason: KEY_ONLY_ENRICHES }))
+  .withOutput(z.object({ id: z.string(), filedUnder: z.string() }))
+  .withStatus(201)
+  .withDocs({ summary: "File an issue report" })
+  .handle(async ({ app, input, scope, actor }) => {
+    const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
+
+    return { id: report.id, filedUnder: scope?.id ?? (actor ? "an-actor-without-a-scope" : "none") };
+  })
+  .build();
+
+function bugReportsApp(
+  options: { caller?: "none" | "project"; optional?: boolean } = {},
+): { app: Hono; identifyOptional: ReturnType<typeof vi.fn> } {
+  const identifyOptional = vi.fn(() =>
+    options.caller === "project"
+      ? { actor: { type: "user", id: "user-1" } as const, scope: { tier: "project", id: "project-7" } as const }
+      : null,
+  );
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("An optional-credential route asks no permission of its credential.");
+      },
+      ...(options.optional === false ? {} : { identifyOptional }),
+    },
+  });
+
+  const app = runtime.mount(bugReports.router(), {
+    app: () => ({ submit: async () => ({ id: "report-1" }) }),
+    onError: createErrorHandler(),
+  });
+
+  return { app, identifyOptional };
+}
+
+async function fileReport(app: Hono): Promise<Response> {
+  return app.request("/api/v1/bug-reports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "the upload page hangs" }),
+  });
+}
+
+describe("a route the family's credential reaches optionally", () => {
+  /** @scenario "A route answers with or without the family's credential" */
+  it("answers a caller who presented nothing, with no actor and no scope", async () => {
+    const { app, identifyOptional } = bugReportsApp();
+    const response = await fileReport(app);
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "none" });
+    expect(identifyOptional).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A route answers with or without the family's credential" */
+  it("resolves a caller who presented the credential, scope and all", async () => {
+    const response = await fileReport(bugReportsApp({ caller: "project" }).app);
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "report-1", filedUnder: "project-7" });
+  });
+
+  /** @scenario "A route answers with or without the family's credential" */
+  it("publishes both the empty requirement and the family's own scheme", async () => {
+    const published = await generateSpecs(bugReportsApp().app, SPEC_OPTIONS);
+    const security = (published.paths?.["/api/v1/bug-reports"] as any)?.post?.security;
+
+    expect(security).toEqual([{}, { project_api_key: [] }]);
+  });
+
+  /** @scenario "A route answers with or without the family's credential" */
+  it("refuses a mount that cannot open the door for an absent credential", () => {
+    expect(() => bugReportsApp({ optional: false })).toThrow(
+      /supplied no identity.identifyOptional/,
+    );
+  });
+});
+
+interface InstanceApi {
+  createOrganization(input: { name: string }): Promise<{ id: string }>;
+}
+
+const InstanceApi = featureApi<InstanceApi>("organization");
+
+// The shape of the self-hosted setup door: the operator's own key, which
+// creates the first organization and so names no tenant of its own.
+const instanceSetup = defineRestRouter(InstanceApi)
+  .withNamespace("instance")
+  .withVersion(VERSION)
+  .withCredential("instanceAdminKey")
+  .withAddressing("v1-only")
+  .post("/organizations", "createFirstOrganization")
+  .withInput(z.object({ name: z.string() }))
+  .withAccess(anyAuthenticated({ reason: "the instance administrator key is the whole gate" }))
+  .withOutput(z.object({ id: z.string(), scope: z.null() }))
+  .handle(async ({ app, input, scope, actor }) => {
+    // The literals are the proof the key named no tenant.
+    expect(actor).toBeNull();
+
+    const created = await app.createOrganization({ name: input.name });
+
+    return { id: created.id, scope };
+  })
+  .build();
+
+function instanceSetupApp(options: { tenanted?: boolean } = {}): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("The instance setup door asks no permission of its key.");
+      },
+      identify: () =>
+        options.tenanted
+          ? { actor: null, scope: { tier: "organization", id: ORGANIZATION_ID } as const }
+          : { actor: { type: "api_key", id: "instance-admin" } as const, scope: null },
+    },
+  });
+
+  return runtime.mount(instanceSetup.router(), {
+    app: () => ({ createOrganization: async () => ({ id: "organization-9" }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+async function createOrganization(app: Hono): Promise<Response> {
+  return app.request("/api/v1/instance/organizations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Acme" }),
+  });
+}
+
+describe("a family behind the instance administrator's own key", () => {
+  /** @scenario "A family behind the instance administrator's own key names no tenant" */
+  it("hands the handler no scope, because the key names no tenant", async () => {
+    const response = await createOrganization(instanceSetupApp());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: "organization-9", scope: null });
+  });
+
+  /** @scenario "A family behind the instance administrator's own key names no tenant" */
+  it("records the instance administrator credential class and publishes its scheme", () => {
+    instanceSetupApp();
+
+    const route = getRoutePolicy("post", "/api/v1/instance/organizations");
+
+    expect(route).toMatchObject({ credentialClass: "instance_admin_api_key" });
+    expect(
+      securityForCredentialClass({
+        operationKey: "POST /api/v1/instance/organizations",
+        credentialClass: route!.credentialClass,
+      }),
+    ).toEqual([{ instance_admin_key: [] }]);
+    expect(securityRequirement("instanceAdminKey")).toEqual([{ instance_admin_key: [] }]);
+  });
+
+  /** @scenario "A family behind the instance administrator's own key names no tenant" */
+  it("fails rather than answering when the door resolved a tenant scope for it", async () => {
+    const response = await createOrganization(instanceSetupApp({ tenanted: true }));
+
+    expect(response.status).toBe(500);
+  });
+});
+
+interface CatalogueApi {
+  read(input: { id: string }): Promise<{ id: string; evaluators: number }>;
+}
+
+const CatalogueApi = featureApi<CatalogueApi>("evaluator");
+
+// The two capabilities the public stored-object family declared: how often one
+// caller may ask, and how long the answer stands.
+const catalogue = defineRestRouter(CatalogueApi)
+  .withNamespace("catalogue")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .get("/:id", "readCatalogue")
+  .withParams(z.object({ id: z.string() }))
+  .withPermission("evaluations:view")
+  .withRateLimit()
+  .withCache({ ttlSeconds: 60, tag: "catalogue" })
+  .withOutput(z.object({ id: z.string(), evaluators: z.number() }))
+  .handle(async ({ app, input }) => app.read({ id: input.id }))
+  .build();
+
+function catalogueApp(
+  options: { allowed?: boolean; ported?: boolean } = {},
+): {
+  app: Hono;
+  reads: ReturnType<typeof vi.fn>;
+  entries: Map<string, { tag: string; body: Uint8Array }>;
+  keys: string[];
+} {
+  const entries = new Map<string, { tag: string; body: Uint8Array }>();
+  const keys: string[] = [];
+  const reads = vi.fn(async ({ id }: { id: string }) => ({ id, evaluators: 41 }));
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+    ...(options.ported === false
+      ? {}
+      : {
+          rateLimiter: {
+            check: async (key: string) => {
+              keys.push(key);
+
+              return options.allowed === false
+                ? { allowed: false, retryAfterSeconds: 30 }
+                : { allowed: true };
+            },
+          },
+          cache: {
+            get: async (key: string) => entries.get(key)?.body ?? null,
+            set: async (key: string, tag: string, body: Uint8Array) => {
+              entries.set(key, { tag, body });
+            },
+            invalidateTag: async (tag: string) => {
+              for (const [key, entry] of entries) if (entry.tag === tag) entries.delete(key);
+            },
+          },
+        }),
+  });
+
+  const app = runtime.mount(catalogue.router(), {
+    app: () => ({ read: reads }),
+    onError: createErrorHandler(),
+  });
+
+  return { app, reads, entries, keys };
+}
+
+describe("a route that declares how often one caller may ask", () => {
+  /** @scenario "The rate-limit key names service, endpoint, version and principal" */
+  it("counts the call under this family, operation, version and principal", async () => {
+    const { app, keys } = catalogueApp();
+
+    await app.request("/api/v1/catalogue/one");
+
+    expect(keys).toEqual([`catalogue:readCatalogue:${VERSION}:project-1`]);
+  });
+
+  /** @scenario "Rate limiting runs after the door and before the handler" */
+  it("refuses a caller past the limit with the wait the counter named, and runs no handler", async () => {
+    const { app, reads } = catalogueApp({ allowed: false });
+    const response = await app.request("/api/v1/catalogue/one");
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(reads).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A capability declared without its port fails the build" */
+  it("refuses a mount whose process supplied neither store, naming the port", () => {
+    expect(() => catalogueApp({ ported: false })).toThrow(/supplied no rateLimiter port/);
+  });
+});
+
+describe("a route whose answer stands for a while", () => {
+  /** @scenario "A cache hit serves the validated bytes without the handler" */
+  it("serves the stored bytes on the second identical call, without the handler", async () => {
+    const { app, reads } = catalogueApp();
+
+    const first = await app.request("/api/v1/catalogue/one");
+    const second = await app.request("/api/v1/catalogue/one");
+
+    await expect(first.json()).resolves.toEqual({ id: "one", evaluators: 41 });
+    await expect(second.json()).resolves.toEqual({ id: "one", evaluators: 41 });
+    expect(reads).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "The cache key is the complete call" */
+  it("keys the entry on the whole call, so a different input is a different entry", async () => {
+    const { app, reads, entries } = catalogueApp();
+
+    await app.request("/api/v1/catalogue/one");
+    await app.request("/api/v1/catalogue/two");
+
+    expect(reads).toHaveBeenCalledTimes(2);
+    expect(entries.size).toBe(2);
+  });
+
+  /** @scenario "Tag invalidation drops a family's entries" */
+  it("drops the family's entries when the application invalidates its tag", async () => {
+    const { app, reads, entries } = catalogueApp();
+
+    await app.request("/api/v1/catalogue/one");
+
+    for (const [key, entry] of entries) if (entry.tag === "catalogue") entries.delete(key);
+
+    await app.request("/api/v1/catalogue/one");
+
+    expect(reads).toHaveBeenCalledTimes(2);
+  });
+
+  /** @scenario "A cache failure degrades to a handler call" */
+  it("runs the handler and serves the caller when the store cannot be read", async () => {
+    const reported = vi
+      .spyOn(createLogger("langwatch:api:endpoint-capabilities"), "warn")
+      .mockImplementation(() => {});
+    const { app } = catalogueApp();
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+      },
+      rateLimiter: { check: async () => ({ allowed: true }) },
+      cache: {
+        get: async () => {
+          throw new Error("the store is down");
+        },
+        set: async () => {},
+        invalidateTag: async () => {},
+      },
+    });
+
+    const degraded = runtime.mount(catalogue.router(), {
+      app: () => ({ read: async ({ id }: { id: string }) => ({ id, evaluators: 41 }) }),
+      onError: createErrorHandler(),
+    });
+
+    expect((await app.request("/api/v1/catalogue/one")).status).toBe(200);
+    expect((await degraded.request("/api/v1/catalogue/one")).status).toBe(200);
+    expect(reported).toHaveBeenCalled();
+    reported.mockRestore();
+  });
+
+  /** @scenario "An endpoint without output is never cached" */
+  it("refuses a cache on a route with no answer of its own, and a policy that stores nothing", () => {
+    const route = () =>
+      defineRestRouter(CatalogueApi)
+        .withNamespace("catalogue")
+        .withVersion(VERSION)
+        .get("/:id", "readCatalogue")
+        .withParams(z.object({ id: z.string() }))
+        .withPermission("evaluations:view");
+
+    expect(() =>
+      route()
+        .withCache({ ttlSeconds: 60, tag: "catalogue" })
+        .handle(async () => {}),
+    ).toThrow(/no answer of its own/);
+    expect(() => route().withCache({ ttlSeconds: 0, tag: "catalogue" })).toThrow(/no time at all/);
+    expect(() => route().withCache({ ttlSeconds: 60, tag: " " })).toThrow(/under no tag/);
   });
 });

@@ -111,15 +111,23 @@ const annotations = rest.mount(annotationRest.router(), {
 });
 ```
 
-The declaration names its own door, and the handler's `scope` follows it. Four
+The declaration names its own door, and the handler's `scope` follows it. Six
 doors exist, each declared with `.withCredential(...)` before the family's first
-route: `projectKey`, which every declaration gets without asking and which
-resolves `{ tier: "project", id }`; `organizationKey` and `scimToken`, which
-resolve `{ tier: "organization", id }`; and `internalSecret`, a deployment's own
-shared secret, which names no tenant at all and hands its handlers
-`scope: null` and `actor: null`. A mount that names a different door is refused.
-`public` and `session` are still named on the mount, because no door resolves a
-declared scope for them.
+route: `projectKey`, which every declaration gets without asking, and `session`,
+the browser cookie the application's own pages carry, both resolving
+`{ tier: "project", id }`; `organizationKey` and `scimToken`, which resolve
+`{ tier: "organization", id }`; and `internalSecret` and `instanceAdminKey`,
+which name no tenant at all and hand their handlers `scope: null`. A mount that
+names a different door is refused. `public` is named on the mount alone, because
+no door resolves a declared scope for it, and a family behind `session`
+publishes no operation, since no API client can present a cookie.
+
+A route may declare how it is reached instead of naming a permission:
+`publicRoute` resolves no credential, `anyAuthenticated` opens the door and asks
+nothing of it, `optionalCredential` answers with or without one (the handler
+reads a nullable actor and scope), and `deferredScope` authenticates the caller
+and leaves the owning scope for the handler, for a resource addressed by an id
+that names its own owner. Each takes the written reason the registry records.
 
 ```ts
 const roleRest = defineRestRouter(RoleApi)
@@ -165,9 +173,14 @@ A declared REST route answers at three addresses — its dated namespace,
 `latest`, and the family's bare path — plus the `/api/v1` twin of each, and any
 real date the caller pins is served by the latest registration on or before it.
 `.withAddressing(...)` before the first route says otherwise: `"v1-only"` serves
-`/api/v1/<namespace>/...` alone, `"v1-in-path"` serves `/api/<namespace>/v1/...`
-alone, and `("dated", { v1Twin: false })` keeps the three dated addresses with
-no twin beside them.
+`/api/v1/<namespace>/...` alone, `"v1-in-path"` serves
+`/api/<namespace>/<generation>/...` alone — `("v1-in-path", { generation: "v2" })`
+for a protocol whose generation is not ours to choose, such as SCIM 2.0 —
+`("dated", { v1Twin: false })` keeps the three dated addresses with no twin
+beside them, and `"literal"` publishes exactly the paths its routes write, each
+with its `/api/v1` twin, for a family sharing `/api` with everything else rather
+than owning a namespace of its own. A literal family's routes name their whole
+address, and it claims no wildcard under the prefix it shares.
 
 A route names either a permission or an access kind. `.withPermission(p)` asks
 `p` at the scope the credential resolved; `.withPermission(p, { at: "route",

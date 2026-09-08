@@ -131,7 +131,7 @@ Feature: Explicit compatibility version namespaces
     And the same holds at the dated address, at latest, at the bare path and at the /api/v1 twin
     And a path the family serves with that method answers as it always did
 
-  @unimplemented
+  @integration
   Scenario: A family at a shared prefix mounts its own paths and their canonical address
     Given a family declares that its published paths are its whole contract
     When it is built
@@ -139,3 +139,14 @@ Feature: Explicit compatibility version namespaces
     And each route also answers at the /api/v1 address of that same path
     And no dated namespace and no version guard is mounted
     And the route registry names the family for itself rather than for the shared prefix
+    And nothing it mounts answers for a path it never declared, so a sibling under the
+      same prefix answers as it always did
+    And a route of such a family whose path is not a whole address is refused at declaration
+
+  @integration
+  Scenario: A family names a generation other than v1 in its own path
+    Given a family whose protocol fixes the generation its path names
+    When it declares that generation
+    Then its routes answer under that generation and under no other
+    And no dated namespace, latest alias or /api/v1 twin is mounted beside them
+    And a generation named by a family that carries none in its path is refused

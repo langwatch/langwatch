@@ -39,16 +39,26 @@ import {
   type Credential,
   type RouteAccess,
 } from "../access/access.ts";
-import { ApiVersionConflictError, InvalidApiVersionError } from "../errors.ts";
+import { ApiVersionConflictError, InvalidApiVersionError, RateLimitedError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import type { RateLimiter, ResponseCache } from "../ports.ts";
 import type { RestResolvedInternalCredential } from "./credential.ts";
 import { deprecatedAlias, deprecationNotice, documentRoute } from "./openapi.ts";
 import {
   bodyLimit,
+  cachedRestAnswer,
   defineRestMiddleware,
   loggerMiddleware,
+  multipartMiddleware,
   requestValidationErrorFrom,
+  restCacheKey,
+  restRateLimitKey,
+  storeRestAnswer,
   tracerMiddleware,
+  type RestCachePolicy,
+  type RestMultipart,
+  type RestMultipartFiles,
+  type RestRateLimitPolicy,
   type RestTransportMiddleware,
   type RestTransportMiddlewareBinding,
 } from "./request.ts";
@@ -345,7 +355,7 @@ export type FeatureApiWitness<Api> = FeatureApiToken<Api>;
 
 type SourceSchema = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
 type Missing = undefined;
-type RouteSource = SourceSchema | RestRawBodyDeclared | Missing;
+type RouteSource = SourceSchema | RestRawBodyDeclared | RestMultipartDeclared | Missing;
 type PathParameterNames<Path extends string> = Path extends `${string}:${infer Tail}`
   ? Tail extends `${infer Name}/${infer Rest}`
     ? Name | PathParameterNames<`/${Rest}`>
@@ -369,8 +379,16 @@ type DistinctSchema<
 type SourceInput<Schema extends RouteSource> = Schema extends SourceSchema
   ? z.output<Schema>
   : unknown;
-/** A raw body is read, never parsed, so it contributes nothing to the input. */
-type ParsedBody<Body extends RouteSource> = Body extends RestRawBodyDeclared ? Missing : Body;
+/**
+ * A raw body is read, never parsed, so it contributes nothing to the input; a
+ * multipart body contributes the fields it declared, and its files arrive
+ * beside the input rather than inside it.
+ */
+type ParsedBody<Body extends RouteSource> = Body extends RestRawBodyDeclared
+  ? Missing
+  : Body extends RestMultipartDeclared<infer Fields, RestMultipartFiles>
+    ? Fields
+    : Body;
 type RouteInput<Params extends RouteSource, Query extends RouteSource, Body extends RouteSource> = [
   Params,
   Query,
@@ -403,19 +421,19 @@ export type RestTransportDocs = Readonly<{
 }>;
 
 /**
- * How a family is addressed. `dated` publishes the namespace's dated, latest
- * and bare paths with their `/api/v1` twins; `v1-only` publishes exactly
- * `/api/v1/<namespace>/...` and `v1-in-path` exactly `/api/<namespace>/v1/...`,
- * both for a surface whose published generation is its whole contract.
+ * How a family is addressed: `dated` publishes its dated, latest and bare
+ * paths with their `/api/v1` twins; `v1-only` and `v1-in-path` publish one
+ * generation, which is their whole contract; `literal` publishes exactly the
+ * paths its routes write, for a family sharing a prefix rather than owning it.
  */
-export type RestAddressing = "dated" | "v1-only" | "v1-in-path";
+export type RestAddressing = "dated" | "v1-only" | "v1-in-path" | "literal";
 
 /**
- * What a `dated` family may say about its twin. A family whose published paths
- * were never aliased sets `v1Twin: false` and answers at its own addresses
- * alone; the two generation-in-the-path addressings have no twin to speak of.
+ * What a family may say about its addresses: `v1Twin: false` for one whose
+ * paths were never aliased, and the `generation` a `v1-in-path` family names
+ * in its own path, for a protocol whose generation is not ours to choose.
  */
-export type RestAddressingOptions = Readonly<{ v1Twin?: boolean }>;
+export type RestAddressingOptions = Readonly<{ v1Twin?: boolean; generation?: string }>;
 
 /**
  * What a project-scoped door knows about the caller beyond the request's own
@@ -440,14 +458,14 @@ export type RestDeprecation = Readonly<{
 }>;
 
 /**
- * The credentials a declaration may choose a door for. `session` and `public`
- * are absent on purpose: no door resolves either, so a declaration naming one
- * would type its handler's scope as a value nothing establishes. A family
- * serving a session names it on the mount instead.
+ * The credentials a declaration may choose a door for. `public` is absent on
+ * purpose: nothing is resolved for it, so a declaration naming it would type
+ * its handler's scope as a value no door establishes. A route answering
+ * without a credential declares `publicRoute` access instead.
  */
 export type RestDoorCredential = Extract<
   Credential,
-  "projectKey" | "organizationKey" | "scimToken" | "internalSecret"
+  "projectKey" | "organizationKey" | "scimToken" | "internalSecret" | "instanceAdminKey" | "session"
 >;
 
 /**
@@ -460,7 +478,9 @@ const DOOR_SCOPE_TIER = {
   projectKey: "project",
   organizationKey: "organization",
   scimToken: "organization",
+  session: "project",
   internalSecret: null,
+  instanceAdminKey: null,
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
@@ -487,6 +507,27 @@ type PublicHandlerArguments<Input, App> = Omit<
   readonly scope: null;
   readonly target: null;
 };
+/**
+ * A route the door answers with or without a credential: both halves of the
+ * caller are nullable together, so a handler cannot read one and assume the
+ * other.
+ */
+type OptionalHandlerArguments<Input, App, Door extends RestDoorCredential> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "actor" | "scope"
+> & {
+  readonly actor: Actor | null;
+  readonly scope: DoorScope<Door> | null;
+  readonly target: null;
+};
+type DeferredHandlerArguments<Input, App> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "actor" | "scope"
+> & {
+  readonly actor: Actor | null;
+  readonly scope: null;
+  readonly target: null;
+};
 type HandlerArgumentsFor<
   Access extends RouteAccessKind,
   Input,
@@ -494,8 +535,12 @@ type HandlerArgumentsFor<
   Door extends RestDoorCredential,
 > = Access extends "public"
   ? PublicHandlerArguments<Input, App>
-  : ScopedHandlerArguments<Input, App, Door>;
-type RouteAccessKind = "scoped" | "public" | "authenticated";
+  : Access extends "optional"
+    ? OptionalHandlerArguments<Input, App, Door>
+    : Access extends "deferred"
+      ? DeferredHandlerArguments<Input, App>
+      : ScopedHandlerArguments<Input, App, Door>;
+type RouteAccessKind = "scoped" | "public" | "authenticated" | "optional" | "deferred";
 /**
  * What a stored handler is invoked with, once the declaration's own types are
  * gone: every door's arguments widened to one shape. The `handle` signature is
@@ -511,6 +556,8 @@ type StoredHandlerArguments<Api> = Readonly<{
   signal: AbortSignal | undefined;
   /** Read once, only for a route that declared it; undefined everywhere else. */
   raw: string | Uint8Array | undefined;
+  /** The file parts a multipart route named; undefined everywhere else. */
+  files: Readonly<Record<string, File>> | undefined;
   request: Request;
 }>;
 type StoredHandler<Api> = {
@@ -548,6 +595,12 @@ type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text" ? string :
 export type RestRawBodyDeclared<Form extends RestRawBodyForm = RestRawBodyForm> = Readonly<{
   rawBody: Form;
 }>;
+
+/** The `Body` slot of a route whose request carries files beside its fields. */
+export type RestMultipartDeclared<
+  Fields extends z.ZodObject = z.ZodObject,
+  Files extends RestMultipartFiles = RestMultipartFiles,
+> = Readonly<{ multipartFields: Fields; multipartFiles: Files }>;
 
 /** What a route that writes its own body publishes, and nothing of its shape. */
 export type RestRawResponse = Readonly<{ produces: readonly string[] }>;
@@ -603,6 +656,23 @@ type RawBodyArguments<Body extends RouteSource> = Body extends RestRawBodyDeclar
   : unknown;
 
 /**
+ * The files a multipart route is handed, beside its input: each part it named,
+ * present for certain when the declaration said the request must carry it.
+ */
+type MultipartArguments<Body extends RouteSource> = Body extends RestMultipartDeclared<
+  z.ZodObject,
+  infer Files
+>
+  ? Readonly<{
+      files: {
+        readonly [Name in keyof Files]: Files[Name]["required"] extends true
+          ? File
+          : File | undefined;
+      };
+    }>
+  : unknown;
+
+/**
  * The request a route that writes its own bytes reads for itself: the method an
  * any-method route dispatches on, and the whole `Request` an alias forwards.
  */
@@ -639,6 +709,12 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly answers?: RestRouteAnswers;
   /** Present exactly when the route reads its own body instead of parsing one. */
   readonly rawBody?: RestRawBody;
+  /** Present exactly when the route's request carries files beside its fields. */
+  readonly multipart?: RestMultipart;
+  /** Present exactly when the route counts how often one caller may ask. */
+  readonly rateLimit?: RestRateLimitPolicy;
+  /** Present exactly when the route's answer stands for a while. */
+  readonly cache?: RestCachePolicy;
   /** Present exactly when the route writes its own body instead of a schema's. */
   readonly rawResponse?: RestRawResponse;
   /** Every method this one declaration answers; the declared method alone by default. */
@@ -662,6 +738,8 @@ export type RestTransportDeclaration<Api> = Readonly<{
   readonly addressing: RestAddressing;
   /** Whether the family's `dated` addresses also answer under `/api/v1`. */
   readonly v1Twin: boolean;
+  /** The generation a `v1-in-path` family names in its own path. */
+  readonly generation: string;
   /**
    * The door these routes are answered behind, and so the scope every handler
    * is handed. Declared, not mounted: the handler's own type follows it.
@@ -680,6 +758,9 @@ type RouteState = Readonly<{
   output?: OutputSchema;
   answers?: RestRouteAnswers;
   rawBody?: RestRawBody;
+  multipart?: RestMultipart;
+  rateLimit?: RestRateLimitPolicy;
+  cache?: RestCachePolicy;
   rawResponse?: RestRawResponse;
   methods?: readonly HttpMethod[];
   anyMethod?: boolean;
@@ -836,6 +917,109 @@ class RouteBuilder<
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       rawBody: { form, mediaType: options.mediaType ?? DEFAULT_RAW_MEDIA_TYPE[form] },
+    });
+  }
+
+  /**
+   * The request carries files beside its fields, so one schema cannot describe
+   * it: the fields are parsed and merged into the input as any other source is,
+   * and each file part the route named is handed over beside it.
+   */
+  withMultipart<Fields extends z.ZodObject, const Files extends RestMultipartFiles>(
+    this: RouteBuilder<
+      Api,
+      Exclude<HttpMethod, "get" | "head">,
+      Path,
+      Params,
+      Body,
+      Query,
+      Output,
+      Permission,
+      Middleware,
+      Access,
+      Door
+    >,
+    multipart: Readonly<{ fields: Fields; files: Files }>,
+  ): RouteBuilder<
+    Api,
+    Exclude<HttpMethod, "get" | "head">,
+    Path,
+    Params,
+    RestMultipartDeclared<Fields, Files>,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertBodyMethod(this.method, this.path);
+    assertSourceUnset("multipart", this.state.multipart);
+    assertParsedBodyFree({ operation: this.operation, state: this.state });
+    assertDeclaredFiles({ operation: this.operation, files: multipart.files });
+    assertDistinctSources(this.state.params, multipart.fields);
+    assertDistinctSources(this.state.query, multipart.fields);
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      multipart: { fields: multipart.fields, files: multipart.files },
+    });
+  }
+
+  /**
+   * How often one caller may ask. The framework owns the key — this family,
+   * this operation, this version and the principal the door resolved — so the
+   * store the process supplies never decides who is being limited.
+   */
+  withRateLimit(
+    policy: RestRateLimitPolicy = {},
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertSourceUnset("rateLimit", this.state.rateLimit);
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      rateLimit: policy,
+    });
+  }
+
+  /**
+   * How long this route's answer stands, and the tag a family drops its own
+   * entries under. Only the validated bytes are stored, so a route that writes
+   * its own answer, or declares none, cannot be cached.
+   */
+  withCache(
+    policy: RestCachePolicy,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertSourceUnset("cache", this.state.cache);
+    assertCachePolicy({ operation: this.operation, policy });
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      cache: policy,
     });
   }
 
@@ -1147,6 +1331,7 @@ class RouteBuilder<
     handler: (
       args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api, Door> &
         RawBodyArguments<Body> &
+        MultipartArguments<Body> &
         RawResponseArguments<Output>,
       ...facts: MiddlewareFacts<Middleware>
     ) => TResult,
@@ -1182,9 +1367,7 @@ class RouteBuilder<
               : {}),
           }),
       output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
-      ...(this.state.answers ? { answers: this.state.answers } : {}),
-      ...(this.state.rawBody ? { rawBody: this.state.rawBody } : {}),
-      ...(this.state.rawResponse ? { rawResponse: this.state.rawResponse } : {}),
+      ...declaredParts(this.state),
       methods: this.state.methods ?? [this.method],
       ...(this.state.anyMethod ? { anyMethod: true } : {}),
       ...(this.state.status === void 0 ? {} : { status: this.state.status }),
@@ -1270,6 +1453,21 @@ class RouteBuilder<
   }
 }
 
+/**
+ * What the route declared about its body, its answer and its two capabilities,
+ * as the fields a declared route carries: present exactly when declared.
+ */
+function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
+  return {
+    ...(state.answers ? { answers: state.answers } : {}),
+    ...(state.rawBody ? { rawBody: state.rawBody } : {}),
+    ...(state.multipart ? { multipart: state.multipart } : {}),
+    ...(state.rateLimit ? { rateLimit: state.rateLimit } : {}),
+    ...(state.cache ? { cache: state.cache } : {}),
+    ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
+  };
+}
+
 /** A route just opened on a family's door: nothing declared but its address. */
 type OpenRoute<
   Api,
@@ -1282,6 +1480,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
   private v1Twin = true;
+  private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
 
   constructor(
@@ -1312,6 +1511,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
 
     router.addressing = this.addressing;
     router.v1Twin = this.v1Twin;
+    router.generation = this.generation;
     router.deprecated = this.deprecated;
 
     return router;
@@ -1319,8 +1519,8 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
 
   /**
    * How the family is addressed. Declared before the first route, because it
-   * decides which paths every route in the family answers at. `v1Twin: false`
-   * is for a `dated` family whose paths were never aliased under `/api/v1`.
+   * decides which paths every route in the family answers at, and what it may
+   * say about its twin and its generation.
    */
   withAddressing(
     addressing: RestAddressing,
@@ -1330,15 +1530,11 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
       throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
     }
 
-    if (options.v1Twin !== void 0 && addressing !== "dated") {
-      throw new Error(
-        `REST "${this.namespace}" addresses itself "${addressing}", which names its ` +
-          "generation in the path and so has no /api/v1 twin to declare",
-      );
-    }
+    assertAddressingOptions({ namespace: this.namespace, addressing, options });
 
     this.addressing = addressing;
     this.v1Twin = options.v1Twin ?? true;
+    this.generation = options.generation ?? DEFAULT_GENERATION;
 
     return this;
   }
@@ -1363,6 +1559,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
       version: this.version,
       addressing: this.addressing,
       v1Twin: this.v1Twin,
+      generation: this.generation,
       credential: this.credential,
       ...(this.deprecated ? { deprecated: this.deprecated } : {}),
       routes: this.routes,
@@ -1372,31 +1569,31 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
   }
 
   get<Path extends string>(path: Path, operation: string): OpenRoute<Api, "get", Path, Door> {
-    assertSupportedPath(path);
+    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
 
     return new RouteBuilder(this, "get", path, operation);
   }
 
   patch<Path extends string>(path: Path, operation: string): OpenRoute<Api, "patch", Path, Door> {
-    assertSupportedPath(path);
+    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
 
     return new RouteBuilder(this, "patch", path, operation);
   }
 
   post<Path extends string>(path: Path, operation: string): OpenRoute<Api, "post", Path, Door> {
-    assertSupportedPath(path);
+    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
 
     return new RouteBuilder(this, "post", path, operation);
   }
 
   put<Path extends string>(path: Path, operation: string): OpenRoute<Api, "put", Path, Door> {
-    assertSupportedPath(path);
+    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
 
     return new RouteBuilder(this, "put", path, operation);
   }
 
   delete<Path extends string>(path: Path, operation: string): OpenRoute<Api, "delete", Path, Door> {
-    assertSupportedPath(path);
+    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
 
     return new RouteBuilder(this, "delete", path, operation);
   }
@@ -1460,9 +1657,70 @@ function assertPathParameters(path: string, schema: z.ZodObject): void {
   }
 }
 
-function assertSupportedPath(path: string): void {
+function assertSupportedPath({
+  path,
+  addressing,
+  namespace,
+}: {
+  path: string;
+  addressing: RestAddressing;
+  namespace: string;
+}): void {
   if (/:[A-Za-z0-9_]+[?+*]/.test(path)) {
     throw new Error(`REST path "${path}" uses unsupported optional or repeated parameters`);
+  }
+
+  if (addressing !== "literal") return;
+
+  // A literal family owns no prefix, so its routes ARE their addresses. A path
+  // of one segment is the relative one a namespaced family would have written,
+  // and here it would hang the route off the root of the process.
+  const segments = path.split("/").filter((segment) => segment.length > 0);
+
+  if (!path.startsWith("/") || segments.length < 2) {
+    throw new Error(
+      `REST "${namespace}" publishes its paths literally, so "${path}" must be the whole ` +
+        "address it answers at, from the root",
+    );
+  }
+}
+
+/** The generation a family names in its own path, when it names one: `v2`. */
+const DEFAULT_GENERATION = "v1";
+
+/** What each addressing lets a family say about its own addresses. */
+function assertAddressingOptions({
+  namespace,
+  addressing,
+  options,
+}: {
+  namespace: string;
+  addressing: RestAddressing;
+  options: RestAddressingOptions;
+}): void {
+  const twinless = addressing === "v1-only" || addressing === "v1-in-path";
+
+  if (options.v1Twin !== void 0 && twinless) {
+    throw new Error(
+      `REST "${namespace}" addresses itself "${addressing}", which names its ` +
+        "generation in the path and so has no /api/v1 twin to declare",
+    );
+  }
+
+  if (options.generation === void 0) return;
+
+  if (addressing !== "v1-in-path") {
+    throw new Error(
+      `REST "${namespace}" addresses itself "${addressing}", which names no generation ` +
+        "in its own path",
+    );
+  }
+
+  if (!VERSION_SEGMENT.test(options.generation)) {
+    throw new Error(
+      `REST "${namespace}" names the generation "${options.generation}" in its path; a ` +
+        "generation is spelled v1, v2 and so on",
+    );
   }
 }
 
@@ -1539,6 +1797,7 @@ function assertRouteReady({
   }
 
   assertMethodsCarryTheirBody({ operation, state });
+  assertCacheableAnswer({ operation, state });
 
   if (/:([A-Za-z0-9_]+)/.test(path) && !state.params) {
     throw new Error(`REST ${method.toUpperCase()} ${path} must declare withParams()`);
@@ -1546,8 +1805,8 @@ function assertRouteReady({
 }
 
 /**
- * A body is read once: a route that named a schema for it cannot also ask for
- * the exact bytes, and one that asked for the bytes cannot also name a schema.
+ * A body is read once, so exactly one declaration describes it: a JSON schema,
+ * the exact bytes, or the fields and files of a multipart form.
  */
 function assertParsedBodyFree({
   operation,
@@ -1556,11 +1815,63 @@ function assertParsedBodyFree({
   operation: string;
   state: RouteState;
 }): void {
-  if (!state.input && !state.rawBody) return;
+  if (!state.input && !state.rawBody && !state.multipart) return;
+
+  throw new Error(`REST ${operation} declares its body twice; the body is read once`);
+}
+
+/** Only validated bytes are stored, so a route with no answer has none to store. */
+function assertCacheableAnswer({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  if (!state.cache || state.output || state.answers) return;
 
   throw new Error(
-    `REST ${operation} declares both a raw body and a parsed input; the body is read once`,
+    `REST ${operation} declares a cache and no answer of its own; only validated bytes are ` +
+      "stored, and there are none to store",
   );
+}
+
+/** What a cached route says about its entries: a real life, and a written tag. */
+function assertCachePolicy({
+  operation,
+  policy,
+}: {
+  operation: string;
+  policy: RestCachePolicy;
+}): void {
+  if (!Number.isSafeInteger(policy.ttlSeconds) || policy.ttlSeconds <= 0) {
+    throw new Error(`REST ${operation} declares a cache whose entries live no time at all`);
+  }
+
+  if (policy.tag.trim() === "") {
+    throw new Error(`REST ${operation} declares a cache under no tag, so nothing can drop it`);
+  }
+}
+
+/** The file parts a multipart route names: at least one, each of them written. */
+function assertDeclaredFiles({
+  operation,
+  files,
+}: {
+  operation: string;
+  files: RestMultipartFiles;
+}): void {
+  const names = Object.keys(files);
+
+  if (names.length === 0) {
+    throw new Error(`REST ${operation} reads a multipart body and names no file part in it`);
+  }
+
+  const blank = names.find((name) => name.trim() === "");
+
+  if (blank !== undefined) {
+    throw new Error(`REST ${operation} names a file part with a blank field name`);
+  }
 }
 
 /** A route answers with a schema or with its own bytes, never with both. */
@@ -1633,7 +1944,7 @@ function assertMethodsCarryTheirBody({
   operation: string;
   state: RouteState;
 }): void {
-  if (!state.input && !state.rawBody) return;
+  if (!state.input && !state.rawBody && !state.multipart) return;
 
   if (state.anyMethod) {
     throw new Error(`REST ${operation} answers every method, and a body reaches only some of them`);
@@ -1690,7 +2001,11 @@ function assertPermissionTarget({
   }
 }
 
-/** The several answers a route declared: at least one, and exactly one success. */
+/**
+ * The several answers a route declared: at least one, and one success — or the
+ * two an upsert gives, which say only whether the resource was created, and so
+ * must carry the very same body.
+ */
 function assertDeclaredAnswers({
   operation,
   answers,
@@ -1710,8 +2025,17 @@ function assertDeclaredAnswers({
     throw new Error(`REST ${operation} declared an answer outside 200–599`);
   }
 
-  if (statuses.filter((status) => status < 300).length !== 1) {
-    throw new Error(`REST ${operation} must declare exactly one 2xx answer in responds()`);
+  const successes = statuses.filter((status) => status < 300);
+
+  if (successes.length === 0 || successes.length > 2) {
+    throw new Error(`REST ${operation} must declare one or two 2xx answers in responds()`);
+  }
+
+  if (successes.length === 2 && answers[successes[0]!] !== answers[successes[1]!]) {
+    throw new Error(
+      `REST ${operation} declares two successes carrying different bodies; two are for one ` +
+        "answer whose status says only whether it created what it returned",
+    );
   }
 }
 
@@ -1775,6 +2099,8 @@ const ROUTE_PARAMS = "routeParams" as const;
 const VERSION_REQUEST = "apiVersionRequest" as const;
 const ROUTE_INPUT = "endpointInput" as const;
 const ROUTE_RAW_BODY = "endpointRawBody" as const;
+const ROUTE_FORM_FIELDS = "endpointFormFields" as const;
+const ROUTE_FILES = "endpointFiles" as const;
 
 /** Who the family's own door authenticated, and what its credential resolved. */
 export type RestCaller = Readonly<{
@@ -1801,6 +2127,14 @@ export type RestRuntimePorts = Readonly<{
      */
     identify?(input: { request: Request }): Promise<RestCaller> | RestCaller;
     /**
+     * The same door, opened for a caller who may have presented nothing: it
+     * answers `null` for a request carrying no credential at all, and refuses
+     * one carrying a credential it will not accept.
+     */
+    identifyOptional?(input: {
+      request: Request;
+    }): Promise<RestCaller | null> | RestCaller | null;
+    /**
      * Whether the caller holds `permission` at the scope a route's own path
      * named. Only a declaration carrying such a route needs it, and a mount
      * that supplies none is refused by name.
@@ -1813,6 +2147,10 @@ export type RestRuntimePorts = Readonly<{
   }>;
   /** Only a family whose routes carry a check of their own supplies these. */
   authorization?: Readonly<{ forRequest(request: Request): AuthorizePort }>;
+  /** The counter behind every route that declared how often one caller may ask. */
+  rateLimiter?: RateLimiter;
+  /** The store behind every route that declared how long its answer stands. */
+  cache?: ResponseCache;
   denials?: AccessDenialPort;
   /** Where the first call of each deprecated route is recorded. */
   deprecationLog?: RestDeprecationLogPort;
@@ -1837,9 +2175,9 @@ export type RestMountOptions<Api> = Readonly<{
   app: () => Api;
   /**
    * Which credential reaches these routes, as the document names it. The
-   * declaration names its own door; this states the classes a declaration
-   * cannot name yet — `public`, `session`, `internalSecret` — and naming a
-   * door credential that disagrees with the declaration's is refused at mount.
+   * declaration names its own door; this states the one class no door resolves
+   * a scope for — `public` — and naming a door credential that disagrees with
+   * the declaration's is refused at mount.
    */
   credential?: Credential;
   /** The family's own error boundary: it renders every refusal these routes raise. */
@@ -1869,8 +2207,7 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
       const dated = declaration.addressing === "dated";
       const basePath = basePathOf(declaration);
       const app = new Hono();
-      const aliasPath = declaration.v1Twin ? canonicalV1Path(basePath) : null;
-      const scopes = aliasPath ? [`${basePath}/*`, `${aliasPath}/*`] : [`${basePath}/*`];
+      const scopes = middlewareScopesOf(declaration);
       const facts = factBindings({ declaration, options });
       const credential = mountCredential({ declaration, options });
 
@@ -1927,10 +2264,41 @@ function basePathOf(declaration: RestTransportDeclaration<unknown>): string {
     case "v1-only":
       return `${V1_PREFIX}/${declaration.namespace}`;
     case "v1-in-path":
-      return `/api/${declaration.namespace}/v1`;
+      return `/api/${declaration.namespace}/${declaration.generation}`;
     case "dated":
       return `/api/${declaration.namespace}`;
+    // A family sharing a prefix owns none of it: each route's own path is the
+    // whole address, so there is no base to hang them off.
+    case "literal":
+      return "";
   }
+}
+
+/**
+ * Where the family's own middleware applies. A family owning a prefix claims
+ * it whole; a literal family claims exactly the addresses it declares, because
+ * a wildcard would run ahead of a sibling family sharing the prefix.
+ */
+function middlewareScopesOf(declaration: RestTransportDeclaration<unknown>): string[] {
+  const basePath = basePathOf(declaration);
+
+  if (declaration.addressing !== "literal") {
+    const aliasPath = declaration.v1Twin ? canonicalV1Path(basePath) : null;
+
+    return aliasPath ? [`${basePath}/*`, `${aliasPath}/*`] : [`${basePath}/*`];
+  }
+
+  const scopes = new Set<string>();
+
+  for (const route of declaration.routes) {
+    scopes.add(route.path);
+
+    const alias = declaration.v1Twin ? canonicalV1Path(route.path) : null;
+
+    if (alias) scopes.add(alias);
+  }
+
+  return [...scopes];
 }
 
 /**
@@ -1957,12 +2325,48 @@ function assertPortsBound<Api>({
       );
     }
 
-    if (route.access?.kind === "authenticated" && !ports.identity.identify) {
+    const identified = route.access?.kind === "authenticated" || route.access?.kind === "deferred";
+
+    if (identified && !ports.identity.identify) {
       throw new Error(
         `REST ${address} answers behind the family's door with no permission, and this runtime ` +
           "supplied no identity.identify",
       );
     }
+
+    assertCapabilityPorts({ address, route, ports });
+
+    if (route.access?.kind === "optional" && !ports.identity.identifyOptional) {
+      throw new Error(
+        `REST ${address} answers with or without the family's credential, and this runtime ` +
+          "supplied no identity.identifyOptional",
+      );
+    }
+  }
+}
+
+/** The store behind each capability a route declared, named when it is missing. */
+function assertCapabilityPorts({
+  address,
+  route,
+  ports,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+}): void {
+  if (route.rateLimit && !ports.rateLimiter) {
+    throw new Error(
+      `REST ${address} declares how often one caller may ask, and this runtime supplied no ` +
+        "rateLimiter port to count with",
+    );
+  }
+
+  if (route.cache && !ports.cache) {
+    throw new Error(
+      `REST ${address} declares how long its answer stands, and this runtime supplied no ` +
+        "cache port to store it in",
+    );
   }
 }
 
@@ -2014,8 +2418,9 @@ function addressesOf({
   const suffix = route.path === "/" ? "" : route.path;
 
   // A family that names its generation in the path has that generation as its
-  // whole contract: one address, no dated namespace, no latest alias, and
-  // nothing for a date to fall back to.
+  // whole contract, and a literal family's route path IS its address: one
+  // address either way, no dated namespace, no latest alias, and nothing for a
+  // date to fall back to.
   if (declaration.addressing !== "dated") {
     return [{ path: suffix || "/", context: { version, status: "stable" } }];
   }
@@ -2065,12 +2470,24 @@ function routeStack<Api>({
   const family = declaration.namespace;
   const deprecated = route.deprecated ?? declaration.deprecated;
   // An any-method route publishes no operation, because it has none: one
-  // handler stands behind every method the path can be sent.
-  const documents = documented && route.anyMethod !== true;
+  // handler stands behind every method the path can be sent. A family behind a
+  // browser session publishes none either — no API client can present a
+  // cookie, so an advertised operation would be one nothing can call.
+  const publishable = route.anyMethod !== true && declaration.credential !== "session";
+  const documents = documented && publishable;
 
   return [
     versionContext({ route, family, version, status }),
-    ...(documents ? [documentRoute({ route, suffix, ...(deprecated ? { deprecated } : {}) })] : []),
+    ...(documents
+      ? [
+          documentRoute({
+            route,
+            suffix,
+            credential: declaration.credential,
+            ...(deprecated ? { deprecated } : {}),
+          }),
+        ]
+      : []),
     // Ahead of everything that can refuse: a deprecated endpoint's answer says
     // so whether it succeeded or not.
     ...(deprecated
@@ -2091,9 +2508,26 @@ function routeStack<Api>({
     // After the cap and before the validators, which never see a raw body: the
     // bytes are read once, exactly as they were sent.
     ...(route.rawBody ? [rawBodyMiddleware(route.rawBody)] : []),
+    ...(route.multipart
+      ? [
+          multipartMiddleware({
+            multipart: route.multipart,
+            fieldsKey: ROUTE_FORM_FIELDS,
+            filesKey: ROUTE_FILES,
+          }),
+        ]
+      : []),
     ...validators({ route, documented: documents, paramSource }),
     inputMiddleware({ route, paramSource }),
-    handlerMiddleware({ route, credential: declaration.credential, ports, options, facts }),
+    handlerMiddleware({
+      route,
+      credential: declaration.credential,
+      ports,
+      options,
+      facts,
+      family,
+      version,
+    }),
   ];
 }
 
@@ -2250,7 +2684,8 @@ function inputMiddleware({
     const params = route.params ? matched : undefined;
 
     const query = route.query ? context.req.valid("query" as never) : undefined;
-    const body = route.input ? context.req.valid("json" as never) : undefined;
+    const json = route.input ? context.req.valid("json" as never) : undefined;
+    const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : json;
 
     context.set(ROUTE_INPUT, mergeInput({ params, query, body }));
     await next();
@@ -2300,12 +2735,16 @@ function handlerMiddleware<Api>({
   ports,
   options,
   facts,
+  family,
+  version,
 }: {
   route: RestTransportRoute<Api>;
   credential: RestDoorCredential;
   ports: RestRuntimePorts;
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  family: string;
+  version: string;
 }): MiddlewareHandler {
   return async (context, next) => {
     const input = context.get(ROUTE_INPUT);
@@ -2330,10 +2769,18 @@ function handlerMiddleware<Api>({
     }
 
     const permission = route.access ? void 0 : permissionOf(route.permission);
+    const caller = await callerOf({ route, ports, request: context.req.raw });
 
-    const caller = await (permission === void 0
-      ? requireIdentify(ports)({ request: context.req.raw })
-      : ports.identity.authenticate({ request: context.req.raw, permission }));
+    // An optional door the caller presented nothing at: the handler is told
+    // there is no one behind the request rather than handed a guess.
+    if (!caller) {
+      const anonymous = await route.handler(
+        handlerArguments({ context, route, options, input, actor: null, scope: null, target: null }),
+        ...(await resolveFacts({ route, facts, context })),
+      );
+
+      return answerWith({ context, next, route, result: anonymous });
+    }
 
     const decision = await decide({
       declaration: {
@@ -2350,6 +2797,15 @@ function handlerMiddleware<Api>({
     });
 
     const target = await checkRouteScope({ route, caller, ports, input });
+    const capabilities = { route, ports, context, family, version, caller, input } as const;
+
+    await countCall(capabilities);
+
+    // After the door, never before it: a caller who may not read this cannot
+    // be handed the bytes an entitled one left behind.
+    const stored = await storedAnswer(capabilities);
+
+    if (stored) return stored;
 
     const result = await route.handler(
       handlerArguments({
@@ -2358,7 +2814,7 @@ function handlerMiddleware<Api>({
         options,
         input,
         actor: doorActorOf({ credential, actor: decision.actor }),
-        scope: doorScopeOf({ credential, caller }),
+        scope: handlerScopeOf({ route, credential, caller }),
         target,
       }),
       ...(await resolveFacts({ route, facts, context })),
@@ -2366,8 +2822,122 @@ function handlerMiddleware<Api>({
 
     caller.markUsed?.();
 
-    return answerWith({ context, next, route, result });
+    const answer = await answerWith({ context, next, route, result });
+
+    return keepAnswer({ ...capabilities, answer });
   };
+}
+
+/** The logger both capabilities report a store's own failure through. */
+const capabilityLogger = createLogger("langwatch:api:endpoint-capabilities");
+
+/**
+ * The call, counted. The key is the framework's — this family, this operation,
+ * this version, this principal — and a caller past the limit is refused with
+ * the wait the counter named, before the handler is reached.
+ */
+async function countCall({
+  route,
+  ports,
+  context,
+  family,
+  version,
+  caller,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  context: Context;
+  family: string;
+  version: string;
+  caller: RestCaller;
+}): Promise<void> {
+  if (!route.rateLimit || !ports.rateLimiter) return;
+
+  const key = restRateLimitKey({
+    family: route.rateLimit.bucket ?? family,
+    operation: route.operation,
+    version,
+    principal: principalOf(caller),
+  });
+
+  const verdict = await ports.rateLimiter.check(key);
+
+  if (verdict.allowed) return;
+
+  if (verdict.retryAfterSeconds !== undefined) {
+    context.header("Retry-After", String(verdict.retryAfterSeconds));
+  }
+
+  throw new RateLimitedError();
+}
+
+/** Who the counter counts: the scope the door resolved, or the caller itself. */
+function principalOf(caller: RestCaller): string {
+  if (caller.scope) return caller.scope.id;
+
+  const actor = normalizedActor(caller.actor);
+
+  return actor?.id ?? caller.internal?.secretName ?? "anonymous";
+}
+
+/** The bytes an identical call left behind, served without the handler. */
+async function storedAnswer({
+  route,
+  ports,
+  context,
+  family,
+  version,
+  input,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  context: Context;
+  family: string;
+  version: string;
+  input: unknown;
+}): Promise<Response | undefined> {
+  if (!route.cache || !ports.cache) return undefined;
+
+  const body = await cachedRestAnswer({
+    cache: ports.cache,
+    key: restCacheKey({ family, operation: route.operation, version, input }),
+    logger: capabilityLogger,
+  });
+
+  if (!body) return undefined;
+
+  context.header("Content-Type", "application/json");
+
+  return context.body(body as never, (route.status ?? 200) as ContentfulStatusCode);
+}
+
+/** The same store, written with the bytes this call answered. */
+async function keepAnswer({
+  route,
+  ports,
+  family,
+  version,
+  input,
+  answer,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  family: string;
+  version: string;
+  input: unknown;
+  answer: Response | undefined;
+}): Promise<Response | undefined> {
+  if (!route.cache || !ports.cache || !answer?.ok) return answer;
+
+  await storeRestAnswer({
+    cache: ports.cache,
+    key: restCacheKey({ family, operation: route.operation, version, input }),
+    policy: route.cache,
+    body: new Uint8Array(await answer.clone().arrayBuffer()),
+    logger: capabilityLogger,
+  });
+
+  return answer;
 }
 
 /** What every handler is called with, whichever door let the request in. */
@@ -2397,6 +2967,9 @@ function handlerArguments<Api>({
     signal: context.req.raw.signal,
     request: context.req.raw,
     raw: route.rawBody ? (context.get(ROUTE_RAW_BODY) as string | Uint8Array) : undefined,
+    files: route.multipart
+      ? (context.get(ROUTE_FILES) as Readonly<Record<string, File>>)
+      : undefined,
   };
 }
 
@@ -2462,6 +3035,58 @@ async function checkRouteScope({
   });
 
   return target;
+}
+
+/**
+ * Which question this route's access kind asks of the family's door: the
+ * permission the route named, the door alone, or the door for a caller who may
+ * have presented nothing — the one question that can answer with nobody.
+ */
+async function callerOf({
+  route,
+  ports,
+  request,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  request: Request;
+}): Promise<RestCaller | null> {
+  const kind = route.access?.kind;
+
+  if (kind === "optional") return requireIdentifyOptional(ports)({ request });
+
+  if (kind === "authenticated" || kind === "deferred") return requireIdentify(ports)({ request });
+
+  return ports.identity.authenticate({ request, permission: permissionOf(route.permission) });
+}
+
+/**
+ * The scope the handler reads. A deferred route is handed none on purpose: the
+ * resource names its own owner, and resolving it is the handler's own work.
+ */
+function handlerScopeOf({
+  route,
+  credential,
+  caller,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+  caller: RestCaller;
+}): AuthzDeclaredScopeId | null {
+  if (route.access?.kind === "deferred") return null;
+
+  return doorScopeOf({ credential, caller });
+}
+
+/** @see assertPortsBound, which refuses these before a request arrives. */
+function requireIdentifyOptional(
+  ports: RestRuntimePorts,
+): NonNullable<RestRuntimePorts["identity"]["identifyOptional"]> {
+  const identifyOptional = ports.identity.identifyOptional;
+
+  if (!identifyOptional) throw new Error("REST runtime supplied no identity.identifyOptional");
+
+  return identifyOptional.bind(ports.identity);
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
@@ -2544,9 +3169,12 @@ function doorScopeOf({
   const scope = caller.scope;
 
   // A deployment's own secret names no tenant, so the door has to prove it
-  // resolved none — and to name which secret let the request in.
+  // resolved none — and, for the shared secret, to name which one let the
+  // request in. The instance administrator's key names itself.
   if (tier === null) {
-    if (scope !== null || !caller.internal) {
+    const named = credential === "internalSecret" ? caller.internal !== undefined : true;
+
+    if (scope !== null || !named) {
       throw new Error(
         `REST transport authorization established a tenant scope for a "${credential}" door, ` +
           "which names no tenant and must resolve a named deployment secret instead",
@@ -2931,7 +3559,8 @@ function mountRoute({
   family: string;
   served: Map<string, Set<HttpMethod>>;
 }): void {
-  const absolute = mergePath(basePath, path);
+  // A literal family has no base to merge: its route path is the address.
+  const absolute = basePath === "" ? path : mergePath(basePath, path);
   const alias = v1Twin ? canonicalV1Path(absolute) : null;
   const methods = route.methods ?? [route.method];
   const addresses = alias ? [absolute, alias] : [absolute];
@@ -3034,6 +3663,7 @@ const HANDLER_CREDENTIAL = {
   projectKey: "apiKey",
   organizationKey: "apiKey",
   scimToken: "apiKey",
+  instanceAdminKey: "apiKey",
   session: "session",
   internalSecret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;
@@ -3043,6 +3673,7 @@ const CREDENTIAL_CLASS = {
   projectKey: "project_api_key",
   organizationKey: "organization_api_key",
   scimToken: "scim_token",
+  instanceAdminKey: "instance_admin_api_key",
   session: "session",
   internalSecret: "internal_secret",
   public: "none",

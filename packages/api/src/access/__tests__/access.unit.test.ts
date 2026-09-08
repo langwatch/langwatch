@@ -12,6 +12,8 @@ import {
   AccessWiringError,
   AuthenticationRequiredError,
   decide,
+  deferredScope,
+  optionalCredential,
   securityRequirement,
   type AccessDenialPort,
   type AuthorizePort,
@@ -243,5 +245,34 @@ describe("the security requirement one credential publishes", () => {
 
   it("refuses a credential no API client can present", () => {
     expect(() => securityRequirement("session")).toThrow(/no security scheme/);
+  });
+});
+
+describe("the two access kinds that answer for nobody in particular", () => {
+  /** @scenario "A route answers with or without the family's credential" */
+  it("declares an optional credential with the written reason it is safe either way", () => {
+    expect(optionalCredential({ reason: "a key only links the report to a project" })).toEqual({
+      kind: "optional",
+      reason: "a key only links the report to a project",
+    });
+
+    expect(() => optionalCredential({ reason: "  " })).toThrow(/needs a written reason/);
+  });
+
+  /** @scenario "A route whose resource names its own owner resolves the scope in its handler" */
+  it("declares a deferred scope with the written reason the handler resolves it", () => {
+    expect(deferredScope({ reason: "only the row knows which project owns it" })).toEqual({
+      kind: "deferred",
+      reason: "only the row knows which project owns it",
+    });
+
+    expect(() => deferredScope({ reason: "" })).toThrow(/needs a written reason/);
+  });
+});
+
+describe("the security requirement the instance administrator's key publishes", () => {
+  /** @scenario "A family behind the instance administrator's own key names no tenant" */
+  it("names the scheme the operator presents", () => {
+    expect(securityRequirement("instanceAdminKey")).toEqual([{ instance_admin_key: [] }]);
   });
 });

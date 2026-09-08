@@ -43,6 +43,7 @@ export type Credential =
   | "organizationKey"
   | "scimToken"
   | "internalSecret"
+  | "instanceAdminKey"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -115,8 +116,44 @@ export function anyAuthenticated({ reason }: { reason: string }): AuthenticatedR
   return Object.freeze({ kind: "authenticated", reason });
 }
 
+/**
+ * A route the door answers with or without a credential: a caller presenting
+ * one is resolved as ever, one presenting none is handed a null actor and a
+ * null scope. `reason` is why the answer is safe to give either way.
+ */
+export type OptionalCredentialAccess = Readonly<{ kind: "optional"; reason: string }>;
+
+/** Declares one route answerable with or without the family's credential. */
+export function optionalCredential({ reason }: { reason: string }): OptionalCredentialAccess {
+  if (reason.trim() === "") {
+    throw new Error("optionalCredential needs a written reason for answering without a credential");
+  }
+
+  return Object.freeze({ kind: "optional", reason });
+}
+
+/**
+ * A route whose door authenticates the caller and resolves no scope, because
+ * the resource names its own owner and only the handler can look it up.
+ * `reason` is why it is deferred; the handler owes the check the door skipped.
+ */
+export type DeferredScopeAccess = Readonly<{ kind: "deferred"; reason: string }>;
+
+/** Declares one route's scope resolved by its handler rather than by the door. */
+export function deferredScope({ reason }: { reason: string }): DeferredScopeAccess {
+  if (reason.trim() === "") {
+    throw new Error("deferredScope needs a written reason for resolving its scope in the handler");
+  }
+
+  return Object.freeze({ kind: "deferred", reason });
+}
+
 /** What a route may declare instead of a permission. */
-export type RouteAccess = PublicRouteAccess | AuthenticatedRouteAccess;
+export type RouteAccess =
+  | PublicRouteAccess
+  | AuthenticatedRouteAccess
+  | OptionalCredentialAccess
+  | DeferredScopeAccess;
 
 /**
  * The scope a route's own path named, read off the parsed input. The parameter
@@ -248,6 +285,10 @@ export function securityRequirement(credential: Credential): readonly Record<str
     // us, so it has a scheme for the same reason the SCIM token does.
     case "internalSecret":
       return [{ internal_secret: [] }];
+    // The self-hosted operator's own key. It creates the first organization,
+    // before any organization key exists to be presented instead.
+    case "instanceAdminKey":
+      return [{ instance_admin_key: [] }];
     case "public":
       return [];
     case "session":

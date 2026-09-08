@@ -14,21 +14,22 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
   Background:
     Given a service created with in-memory rate limiter and cache ports
 
-  @unimplemented
-  Scenario: Rate limiting runs after auth and before validation
+  @integration
+  Scenario: Rate limiting runs after the door and before the handler
     Given an endpoint declaring withRateLimit
-    When an over-limit caller posts a body that would fail validation
-    Then the answer is 429, not 422
+    When an over-limit caller reaches it
+    Then the answer is 429, and the handler never runs
     And the response carries Retry-After when the limiter supplies one
 
-  @unimplemented
+  @integration
   Scenario: The rate-limit key names service, endpoint, version and principal
-    Given two endpoints with withRateLimit on the same service
-    When both are called by the same principal
-    Then the limiter sees distinct keys per endpoint
-    And the keys differ across version namespaces
+    Given an endpoint declaring withRateLimit
+    When a caller reaches it
+    Then the limiter is asked about a key naming the family, the operation, the version and the principal
+    And that principal is the one the door resolved, so the count is taken after it
+    And the framework builds the key, so the store never decides who is being limited
 
-  @unimplemented
+  @integration
   Scenario: A cache hit serves the validated bytes without the handler
     Given an endpoint declaring withOutput and withCache
     And a previous call cached the response
@@ -36,26 +37,26 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Then the handler does not run
     And the cached bytes are served
 
-  @unimplemented
+  @integration
   Scenario: The cache key is the complete call
-    Given a POST endpoint with withCache
+    Given an endpoint with withCache
     When two calls differ only in one input field
-    Then they are distinct cache entries
-    And the same call under a different version namespace is distinct too
+    Then they are distinct cache entries, and each runs the handler once
 
-  @unimplemented
+  @integration
   Scenario: Tag invalidation drops a family's entries
-    Given endpoints caching under the tag "things"
-    When the application invalidates "things"
+    Given an endpoint caching under a tag of its family's own
+    When the application drops that tag's entries
     Then the next call runs the handler again
 
-  @unimplemented
+  @integration
   Scenario: An endpoint without output is never cached
-    Given an endpoint declaring withCache but no output
-    When the service is built
-    Then the build fails, because unvalidated bytes may not be cached
+    Given an endpoint declaring withCache but no answer of its own
+    When it is declared
+    Then the declaration is refused, because unvalidated bytes may not be cached
+    And a cache whose entries live no time, or carry no tag, is refused too
 
-  @unimplemented
+  @integration
   Scenario: A cache failure degrades to a handler call
     Given a cache port whose get rejects
     When a call arrives
@@ -89,8 +90,24 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Given an endpoint declaring the statuses it answers with
     When it also declares a single output, or a fixed success status
     Then the declaration is refused
-    And a map with no success status, or with more than one, is refused too
+    And a map with no success status, or with more than two, is refused too
     And a handler answering a status the map never named fails rather than reaching the caller
+
+  @unit @integration
+  Scenario: An endpoint answers 201 when it created what it returned and 200 when it replaced it
+    Given an upsert whose status says only whether the record was created
+    When it declares both successes carrying the one body
+    Then each is served with that body, and the document lists both
+    And two successes carrying different bodies are refused, because they are two answers
+
+  @integration
+  Scenario: A request carries files beside its fields
+    Given an endpoint declares the fields it parses and the file parts it takes
+    When a caller sends a multipart request
+    Then the fields reach the handler as its input, and the files beside it
+    And a request missing a file part the endpoint requires is refused, naming that part
+    And the published document describes the body as multipart, with each file as binary
+    And a route declaring a multipart body beside a JSON or raw one refuses to build
 
   @unimplemented
   Scenario: A service-level default applies until re-declared or opted out
@@ -137,9 +154,9 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     When a retry is answered from the stored bytes
     Then the pre-flight ran again, because a replay must not trust a grant the caller has since lost
 
-  @unimplemented
+  @integration
   Scenario: A capability declared without its port fails the build
-    Given an endpoint declares a capability the service has no port for
+    Given an endpoint declares a capability the process has no port for
     When the family is built
     Then it refuses, naming the port to pass
 

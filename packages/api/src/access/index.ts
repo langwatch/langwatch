@@ -8,6 +8,8 @@ export {
   anyAuthenticated,
   assertRouteScopePermission,
   decide,
+  deferredScope,
+  optionalCredential,
   publicRoute,
   routeScopeOf,
   SCOPE_INPUT_FIELDS,
@@ -20,6 +22,8 @@ export {
   type AuthorizePort,
   type Caller,
   type Credential,
+  type DeferredScopeAccess,
+  type OptionalCredentialAccess,
   type PublicRouteAccess,
   type RouteAccess,
 } from "./access.ts";
