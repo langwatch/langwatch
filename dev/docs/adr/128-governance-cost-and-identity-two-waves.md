@@ -259,7 +259,7 @@ The screen never talks to providers and never merges numbers itself:
 ```text
 event_log ── gateway-spend events ──┬─(existing projections)──► gateway_spend / budget ledger  (sibling tables)
           ├─ pulled-usage events  ──┴─(rollup fold projection)──► governance_cost_rollup_1d ──┐
-          └─ roster count events ─────(seat count projection)───► governance_seat_count_1d ───┤
+          └─ roster count events ─────(seat count projection)───► governance_seat_count_1d ───┤   ← designed only, not built (v3.12)
                                                                                               ├──► thin cost service ──► screen
                                                       Postgres (names, seat price list) ──────┘
 ```
@@ -389,7 +389,8 @@ added when a lane actually ships, never reserved ahead of one.
 - **`seat` is never a value** — seat money is computed at read, never
   stored as rows (§6). The roster *counts* it is computed from live in
   their own sibling table, `governance_seat_count_1d` (Schema, §16), not
-  in this one.
+  in this one. **[NOT BUILT — see revision v3.12]** — shipped counts are read from the latest
+  seat-report rows in `governance_ocsf_events`, not from a projection.
 - **`trace` is not a value** — trace cost stays a separate system
   (per-request `Float64` in `trace_summaries`), and no pipeline carrying
   trace cost registers this fold, so no row can carry a trace source. If
@@ -403,7 +404,7 @@ added when a lane actually ships, never reserved ahead of one.
 Each day the roster puller writes an event: *"provider reported N seats of
 type X."* Like every other pulled event it lands on the log and is folded
 into a projection the screen can read — `governance_seat_count_1d`
-(Schema), the counts half of §16's wave-1 aggregate. Money is the
+(Schema), the counts half of §16's wave-1 aggregate. **[NOT BUILT — see revision v3.12]** Money is the
 multiplication, done at read: count-event × dated
 price list (which **we maintain** — no API publishes seat prices, proven
 for Copilot). The price list follows the llmcost pattern already in the
@@ -1422,7 +1423,7 @@ drift apart).
 | Nano scale | 1 unit = 10⁻⁹ of one currency unit; $1 = 1,000,000,000 units | exact integer money math; matches `CostNanoUSD`/`AmountNanoUSD` |
 | `cost_source` values | `gateway`, `pulled` (`GOVERNANCE_COST_SOURCE`) | which lane the money came from, in one filterable column; the provider is the `Provider` column; `seat` and `trace` never appear |
 | Rollup table | `governance_cost_rollup_1d` | the one summed table charts read |
-| Seat count table | `governance_seat_count_1d` | roster counts (§6) for the wave-1 idle-seat aggregate; counts only, never money |
+| Seat count table | `governance_seat_count_1d` | roster counts (§6) for the wave-1 idle-seat aggregate; counts only, never money. **[NOT BUILT — see revision v3.12]** |
 | Rollup grain | 1 day (`toDate`) | matches bill grain; volume is thousands/day |
 | Idle-seat default | 30 days without activity, per-org adjustable | FR3 wave-2 listing |
 | Permission verbs | `governance_cost:view`, `governance_identity:manage` (registry names final at implementation) | ADR-092 registry entries gating the screens |
@@ -1753,6 +1754,9 @@ seats of type X on day D") — the roster puller appends them like every
 other pull. Their *read* path is a sibling projection output, not the
 rollup above, because `seat` is never a `cost_source` (§5):
 
+> **[NOT BUILT — see revision v3.12]** No such table exists; the seat lane reads the latest
+> seat-report rows straight from `governance_ocsf_events`.
+
 ```sql
 -- ClickHouse: roster counts, the wave-1 seat aggregate's N (§6, §16).
 CREATE TABLE governance_seat_count_1d (
@@ -1905,7 +1909,12 @@ money tables, only the identity tables and read paths.
     had already used v3.3–v3.11. Its §16 seat-aggregate text (the
     `countDistinct(RawActorId)` active count and `governance_seat_count_1d`)
     lost the merge to the shipped bought/assigned lane, which moves the
-    active count to wave 2; the §9 wave-split paragraph is kept.*
+    active count to wave 2; the §9 wave-split paragraph is kept. The
+    `governance_seat_count_1d` passages this entry added (§4 diagram, §5,
+    §6, Constants, Schema) are marked NOT BUILT rather than deleted: the
+    shipped service reads `N` from the latest seat-report rows in
+    `governance_ocsf_events` at request time, so the "never reads the
+    event log at request time" claim above does not hold for seats.*
 - **v3.11 (2026-09-06, captain: Sergio Esteban).** Documentation caught up with
   what actually shipped. No decision is taken here; five statements the ADR made
   are corrected or marked as reversed, and the prose they correct is left
