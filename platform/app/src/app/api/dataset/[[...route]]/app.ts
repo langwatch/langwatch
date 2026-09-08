@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import {
@@ -321,6 +322,59 @@ secured.access(requires("datasets:create")).post(
 const ATTACHMENT_RATE_LIMIT_WINDOW_SECONDS = 60;
 const ATTACHMENT_RATE_LIMIT_MAX = 30;
 
+/** What an accepted upload answers with. */
+const datasetAttachmentSchema = z.object({
+  url: z
+    .string()
+    .describe(
+      "The value to write into the cell, and the address the file is served from.",
+    ),
+  name: z.string().describe("The file name the reference carries."),
+  mediaType: z.string().describe("The media type the file is stored under."),
+  sizeBytes: z.number().describe("The size of the stored file, in bytes."),
+});
+
+/**
+ * Authorizes the caller and spends the rate limit before the body is read.
+ *
+ * The project is named in the query string only, so this runs with nothing
+ * read off the wire. It sits ahead of `bodyLimit`, which drains a chunked
+ * request into memory to measure it: an anonymous caller must not be able to
+ * spend 21 MB of the server's memory per request, and a caller past the
+ * per-minute ceiling must not spend it either.
+ *
+ * The project it resolves travels on the context so the handler does not
+ * authorize a second time.
+ */
+const authorizeAttachmentUpload: MiddlewareHandler<{
+  Variables: { attachmentProjectId: string };
+}> = async (c, next) => {
+  const projectIdValue = c.req.query("projectId");
+  if (!projectIdValue || projectIdValue.trim() === "") {
+    throw new UnprocessableEntityError("projectId is required");
+  }
+
+  const auth = await authorizeDirectUpload(c, projectIdValue.trim());
+  if (!auth.ok) {
+    // `auth.body` is the full handled payload (code, meta, tips). Falling
+    // back to `{ error }` keeps the shape for the failures that have no
+    // handled error behind them.
+    return c.json(auth.body ?? { error: auth.error }, auth.status);
+  }
+
+  const limit = await rateLimit({
+    key: `dataset-attachments:project:${auth.projectId}`,
+    windowSeconds: ATTACHMENT_RATE_LIMIT_WINDOW_SECONDS,
+    max: ATTACHMENT_RATE_LIMIT_MAX,
+  });
+  if (!limit.allowed) {
+    return rateLimitedResponse(limit.resetAt);
+  }
+
+  c.set("attachmentProjectId", auth.projectId);
+  await next();
+};
+
 // ── Upload a file into a dataset cell ──────────────────────────
 // Registered before /:slugOrId so "attachments" is not matched as a slug.
 // Session-cookie (or API-key) authenticated in-handler, and gated on
@@ -329,12 +383,9 @@ const ATTACHMENT_RATE_LIMIT_MAX = 30;
 // The body cap sits above the file cap by the multipart framing allowance, so
 // a file of exactly the maximum size is not refused for its envelope. Both
 // refusals answer with the same handled error, so the caller reads one code.
-//
-// The project is named in the query string only, so the caller is authorized
-// and rate limited before the multipart body is parsed. Parsing first would
-// let an anonymous caller spend the server's memory on a 21 MB envelope.
 secured.access(directUploadSessionAuth).post(
   "/attachments",
+  authorizeAttachmentUpload,
   bodyLimit({
     maxSize: DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
     onError: () => {
@@ -344,31 +395,70 @@ secured.access(directUploadSessionAuth).post(
   describeRoute({
     description:
       "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",
+    parameters: [
+      {
+        name: "projectId",
+        in: "query",
+        required: true,
+        description: "The project the file is stored for.",
+        schema: { type: "string" },
+      },
+    ],
+    requestBody: {
+      required: true,
+      content: {
+        "multipart/form-data": {
+          schema: {
+            type: "object",
+            required: ["file"],
+            properties: {
+              file: {
+                type: "string",
+                format: "binary",
+                description: "The file to store.",
+              },
+              datasetId: {
+                type: "string",
+                description:
+                  "The dataset that owns the file. Omit it while the dataset is still a draft.",
+              },
+            },
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "The reference the cell holds, and the file's metadata.",
+        content: {
+          "application/json": {
+            schema: resolver(datasetAttachmentSchema),
+          },
+        },
+      },
+      ...baseResponses,
+      413: {
+        description: "The file is larger than the upload limit.",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+      415: {
+        description: "The media type is not accepted.",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+      429: {
+        description: "Too many uploads for this project in one minute.",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+    },
   }),
   async (c) => {
-    // The project comes from the query string because there is no
-    // `authMiddleware` to set `c.get("project")` on this route.
-    const projectIdValue = c.req.query("projectId");
-    if (!projectIdValue || projectIdValue.trim() === "") {
-      throw new UnprocessableEntityError("projectId is required");
-    }
-    const auth = await authorizeDirectUpload(c, projectIdValue.trim());
-    if (!auth.ok) {
-      // `auth.body` is the full handled payload (code, meta, tips). Falling
-      // back to `{ error }` keeps the shape for the failures that have no
-      // handled error behind them.
-      return c.json(auth.body ?? { error: auth.error }, auth.status);
-    }
-
-    const limit = await rateLimit({
-      key: `dataset-attachments:project:${auth.projectId}`,
-      windowSeconds: ATTACHMENT_RATE_LIMIT_WINDOW_SECONDS,
-      max: ATTACHMENT_RATE_LIMIT_MAX,
-    });
-    if (!limit.allowed) {
-      return rateLimitedResponse(limit.resetAt);
-    }
-
+    const projectId = c.get("attachmentProjectId");
     const body = await c.req.parseBody();
 
     const file = body.file;
@@ -382,7 +472,7 @@ secured.access(directUploadSessionAuth).post(
     }
 
     const stored = await storeDatasetAttachment({
-      projectId: auth.projectId,
+      projectId,
       datasetId: datasetId?.trim() === "" ? undefined : datasetId,
       fileName: file.name,
       declaredMediaType: file.type,

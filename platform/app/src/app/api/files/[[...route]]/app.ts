@@ -4,7 +4,6 @@ import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
 import { requireProjectPermission } from "~/server/auth/permissions";
-import { DATASET_ATTACHMENT_PURPOSE } from "~/server/datasets/attachments";
 import { rateLimit } from "~/server/rateLimit";
 import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
@@ -13,6 +12,10 @@ import {
   safeMediaType,
   sanitizeFilenameSegment,
 } from "~/server/stored-objects/media-response";
+import {
+  FILE_VIEW_PERMISSIONS,
+  requiredPermissionForPurpose,
+} from "~/server/stored-objects/purpose-permission";
 import {
   resolveStoredObjectOwner,
   StoredObjectOwnerLookupUnavailableError,
@@ -40,27 +43,6 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
  */
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
-
-/**
- * Stored objects are shared by several features, and which permission guards
- * a read depends on what the object IS: trace media requires `traces:view`,
- * scenario media requires `scenarios:view`, and a file attached to a dataset
- * cell requires `datasets:view`. They are separate permission categories, and a custom
- * role can hold one without the others.
- */
-const FILE_VIEW_PERMISSIONS = [
-  "traces:view",
-  "scenarios:view",
-  "datasets:view",
-] as const;
-
-export function requiredPermissionForPurpose(
-  purpose: string,
-): (typeof FILE_VIEW_PERMISSIONS)[number] {
-  if (purpose === "trace_content") return "traces:view";
-  if (purpose === DATASET_ATTACHMENT_PURPOSE) return "datasets:view";
-  return "scenarios:view";
-}
 
 /** The codes `requireProjectPermission` raises when it refuses the caller. */
 const DENIAL_CODES: ReadonlySet<string> = new Set([

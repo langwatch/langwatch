@@ -122,6 +122,32 @@ Feature: An image or a file cell reaches the target as an attachment
     Then the call carries the parameter "document" with the base64 data URL
 
   @unit
+  Scenario: A text column that holds a LangWatch reference is not read
+    Given a text column "notes" that holds a LangWatch reference
+    And an HTTP agent target with an input mapped to "notes"
+    When the row runs
+    Then the reference is sent as it is
+    And the platform does not read the object
+    # The column type decides for every value shape, not only for an address.
+
+  @unit
+  Scenario: A recording in a format a model names travels as an audio part
+    Given a connected agent column with an input mapped to a file column
+    And the cell holds a recording as WAV, MP3, Ogg, FLAC, WebM, MP4 or AAC
+    When the row runs
+    Then the message carries an audio part
+    And the format names the encoding of the bytes
+
+  @unit
+  Scenario: A recording in a format no model names travels as a file part
+    Given a connected agent column with an input mapped to a file column
+    And the cell holds a recording in a format no model names
+    When the row runs
+    Then the message carries a file part with the file name
+    # Labeling the bytes with a format they are not fails at the provider,
+    # far from the cell that holds the file.
+
+  @unit
   Scenario: A missing stored object fails the cell
     Given the "report" cell holds a LangWatch reference that no longer resolves
     And a prompt target with a file input mapped to "report"

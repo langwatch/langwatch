@@ -104,8 +104,10 @@ Feature: Image and file cells in the dataset grid
   @integration
   Scenario: A data URL opens only for a type the browser shows
     Given I look at a file cell that holds the bytes of a PDF inline
-    Then the cell offers a link that opens the document
+    Then the cell offers a chip that opens the document in a new tab
+    And the chip hands the browser the bytes, not the data URL
     When I look at a file cell that holds inline bytes of any other type
-    Then the cell shows the value as plain text, with no link
-    # The link goes to our own origin, so it must only open the kinds of file
-    # the read route itself serves back.
+    Then the cell shows the value as plain text, with no chip
+    # The tab lands on our own origin, so it must only open the kinds of file
+    # the read route itself serves back. A browser refuses a top-level
+    # navigation to a data: URL, so the chip cannot simply link to one.

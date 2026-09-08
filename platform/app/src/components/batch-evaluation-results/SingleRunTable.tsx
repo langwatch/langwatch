@@ -84,6 +84,20 @@ type BuildColumnsOptions = {
 /**
  * Build columns for single run mode
  */
+/**
+ * The address a cell renders as a picture, or nothing.
+ *
+ * An uploaded picture is a reference relative to this origin, which
+ * `getImageUrl` does not recognize, so it is taken as it is.
+ */
+const cellPictureUrl = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return (
+    getImageUrl(value) ?? (isDatasetAttachmentRef(trimmed) ? trimmed : null)
+  );
+};
+
 const buildColumns = ({
   datasetColumns,
   targetColumns,
@@ -156,25 +170,19 @@ const buildColumns = ({
         cell: ({ getValue }) => {
           const value = getValue();
 
-          // Check each cell for image URLs regardless of column type. An
-          // uploaded picture is a reference relative to this origin, which
-          // `getImageUrl` does not recognize, so it is taken as it is.
-          if (typeof value === "string") {
-            const imageUrl =
-              getImageUrl(value) ??
-              (isDatasetAttachmentRef(value.trim()) ? value.trim() : null);
-            if (imageUrl) {
-              return (
-                <ExternalImage
-                  src={imageUrl}
-                  minWidth="24px"
-                  minHeight="24px"
-                  maxHeight="80px"
-                  maxWidth="100%"
-                  expandable
-                />
-              );
-            }
+          // Check each cell for a picture regardless of column type.
+          const imageUrl = cellPictureUrl(value);
+          if (imageUrl) {
+            return (
+              <ExternalImage
+                src={imageUrl}
+                minWidth="24px"
+                minHeight="24px"
+                maxHeight="80px"
+                maxWidth="100%"
+                expandable
+              />
+            );
           }
 
           // Use expandable cell for text content

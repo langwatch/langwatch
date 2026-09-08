@@ -42,7 +42,15 @@ const storedReader = (
   bytes: { mediaType: string; bytes: Buffer } | null,
 ): StoredAttachmentReader => vi.fn(async () => bytes);
 
-const externalReader = (mediaType: string, bytes: Buffer, name?: string) =>
+const externalReader = ({
+  mediaType,
+  bytes,
+  name,
+}: {
+  mediaType: string;
+  bytes: Buffer;
+  name?: string;
+}) =>
   vi.fn(async () => ({ mediaType, bytes, name })) as ExternalAttachmentReader;
 
 const refusingExternalReader = vi.fn(async () => {
@@ -57,7 +65,7 @@ describe("given a row with a stored attachment", () => {
         projectId: PROJECT_ID,
         inputs: { picture: `/api/files/${PROJECT_ID}/obj-1/shot.png` },
         columnTypeOfInput: columnTypes({ picture: "image" }),
-        fetchExternal: false,
+        shouldFetchExternal: false,
         readStoredAttachment: storedReader({
           mediaType: "image/png",
           bytes: PNG_BYTES,
@@ -80,7 +88,7 @@ describe("given a row with a stored attachment", () => {
           document: `/api/files/${PROJECT_ID}/obj-2/quarter%20one.pdf`,
         },
         columnTypeOfInput: columnTypes({ document: "file" }),
-        fetchExternal: false,
+        shouldFetchExternal: false,
         readStoredAttachment: storedReader({
           mediaType: "application/pdf",
           bytes: PDF_BYTES,
@@ -101,7 +109,7 @@ describe("given a row with a stored attachment", () => {
         projectId: PROJECT_ID,
         inputs: { document: `/api/files/${PROJECT_ID}/obj-2/quarter.pdf` },
         columnTypeOfInput: columnTypes({ document: "file" }),
-        fetchExternal: true,
+        shouldFetchExternal: true,
         readStoredAttachment: storedReader({
           mediaType: "application/pdf",
           bytes: PDF_BYTES,
@@ -122,7 +130,7 @@ describe("given a row with a stored attachment", () => {
           document: `/api/files/${PROJECT_ID}/obj-2/quarter.pdf`,
         },
         columnTypeOfInput: columnTypes({ input: "string", document: "file" }),
-        fetchExternal: true,
+        shouldFetchExternal: true,
         readStoredAttachment: storedReader({
           mediaType: "application/pdf",
           bytes: PDF_BYTES,
@@ -146,7 +154,7 @@ describe("given a row with a stored attachment", () => {
         projectId: PROJECT_ID,
         inputs: { document: `/api/files/${PROJECT_ID}/obj-3/quarter.pdf` },
         columnTypeOfInput: columnTypes({ document: "file" }),
-        fetchExternal: false,
+        shouldFetchExternal: false,
         readStoredAttachment: storedReader(null),
         readExternalAttachment: refusingExternalReader,
       }).catch((error: unknown) => error);
@@ -169,7 +177,7 @@ describe("given a row with a stored attachment", () => {
         projectId: PROJECT_ID,
         inputs: { document: "/api/files/project-2/obj-4/quarter.pdf" },
         columnTypeOfInput: columnTypes({ document: "file" }),
-        fetchExternal: false,
+        shouldFetchExternal: false,
         readStoredAttachment: read,
         readExternalAttachment: refusingExternalReader,
       }).catch((error: unknown) => error);
@@ -186,13 +194,16 @@ describe("given a row with an address on the public internet", () => {
   describe("when the target is an agent", () => {
     /** @scenario "An agent receives base64 for an address on the public internet" */
     it("reads the address and sends the bytes", async () => {
-      const read = externalReader("image/jpeg", PNG_BYTES);
+      const read = externalReader({
+        mediaType: "image/jpeg",
+        bytes: PNG_BYTES,
+      });
 
       const resolved = await resolveAttachmentInputs({
         projectId: PROJECT_ID,
         inputs: { picture: "https://example.com/shot.jpg" },
         columnTypeOfInput: columnTypes({ picture: "image" }),
-        fetchExternal: true,
+        shouldFetchExternal: true,
         readStoredAttachment: storedReader(null),
         readExternalAttachment: read,
       });
@@ -216,7 +227,7 @@ describe("given a row with an address on the public internet", () => {
         projectId: PROJECT_ID,
         inputs,
         columnTypeOfInput: columnTypes({ picture: "image" }),
-        fetchExternal: false,
+        shouldFetchExternal: false,
         readStoredAttachment: storedReader(null),
         readExternalAttachment: refusingExternalReader,
       });
@@ -235,13 +246,38 @@ describe("given a row with an address on the public internet", () => {
         projectId: PROJECT_ID,
         inputs,
         columnTypeOfInput: columnTypes({ notes: "string" }),
-        fetchExternal: true,
+        shouldFetchExternal: true,
         readStoredAttachment: storedReader(null),
         readExternalAttachment: refusingExternalReader,
       });
 
       expect(resolved.notes).toBe("see https://example.com/report.pdf");
       expect(refusingExternalReader).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a text column that holds a LangWatch reference", () => {
+  describe("when the inputs are resolved", () => {
+    /** @scenario "A text column that holds a LangWatch reference is not read" */
+    it("keeps the reference as the sentence it is", async () => {
+      const read = storedReader({
+        mediaType: "application/pdf",
+        bytes: PDF_BYTES,
+      });
+      const inputs = { notes: `/api/files/${PROJECT_ID}/obj-9/quarter.pdf` };
+
+      const resolved = await resolveAttachmentInputs({
+        projectId: PROJECT_ID,
+        inputs,
+        columnTypeOfInput: columnTypes({ notes: "string" }),
+        shouldFetchExternal: true,
+        readStoredAttachment: read,
+        readExternalAttachment: refusingExternalReader,
+      });
+
+      expect(resolved).toBe(inputs);
+      expect(read).not.toHaveBeenCalled();
     });
   });
 });
@@ -255,7 +291,7 @@ describe("given a row with no attachment", () => {
         projectId: PROJECT_ID,
         inputs,
         columnTypeOfInput: () => undefined,
-        fetchExternal: true,
+        shouldFetchExternal: true,
         readStoredAttachment: storedReader(null),
         readExternalAttachment: refusingExternalReader,
       });

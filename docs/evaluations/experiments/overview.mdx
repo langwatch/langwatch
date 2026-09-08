@@ -53,7 +53,9 @@ The workbench autosaves. **History** lists the saved versions, and **Restore** w
 
 ## Map image and file columns
 
-A dataset column of type `image` or `file` maps to a prompt input of type **Image** or **File**, and to an agent input. A prompt gets the file as an image, an audio or a document content part. An agent gets the file as a base64 data URL, so it never has to open a LangWatch address. A connected agent column also has an optional **attachment** input for the same columns. See [Images and files in datasets](/datasets/dataset-images).
+A dataset column of type `image` or `file` maps to a prompt input of type **Image** or **File**, and to an agent input. A connected agent column also has an optional **attachment** input for the same columns.
+
+A prompt gets the file as an image, an audio or a document content part. A plain text or JSON file is different: LangWatch reads it and sends its text inline, under the file name, rather than as a file content part. An agent gets the file as a base64 data URL, so it never has to open a LangWatch address. See [Images and files in datasets](/datasets/dataset-images).
 
 ## Map evaluator inputs
 

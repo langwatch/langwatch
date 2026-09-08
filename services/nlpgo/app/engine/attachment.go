@@ -409,7 +409,13 @@ const (
 )
 
 // traceAttachmentBudget is the per-message-set allowance described above.
-type traceAttachmentBudget struct{ remaining int }
+// remainingText is the separate allowance small text parts ride on, so
+// ordinary prompt text never spends the attachment budget and a message set
+// that inlines many small text files still has a ceiling.
+type traceAttachmentBudget struct {
+	remaining     int
+	remainingText int
+}
 
 // admit reports whether an attachment with this base64 payload is carried into
 // the trace, spending the budget when it is.
@@ -427,10 +433,26 @@ func (b *traceAttachmentBudget) admitBytes(n int) bool {
 	return true
 }
 
+// admitText carries a text part. A small part rides the free text allowance,
+// which bounds how much text one message set carries without touching the
+// attachment budget. A larger part, or one past that allowance, is charged
+// like an attachment, so a prompt that inlines many text files can never make
+// the traced body unbounded.
+func (b *traceAttachmentBudget) admitText(n int) bool {
+	if n <= smallTracedTextBytes && n <= b.remainingText {
+		b.remainingText -= n
+		return true
+	}
+	return b.admitBytes(n)
+}
+
 // messagesForTracing returns the copy of messages handed to the span. The model
 // always receives the originals, so nothing here changes what it sees.
 func messagesForTracing(messages []app.ChatMessage) []app.ChatMessage {
-	budget := &traceAttachmentBudget{remaining: maxTracedAttachmentBudgetBytes}
+	budget := &traceAttachmentBudget{
+		remaining:     maxTracedAttachmentBudgetBytes,
+		remainingText: maxTracedFreeTextBytes,
+	}
 	out := make([]app.ChatMessage, len(messages))
 	for i, m := range messages {
 		out[i] = m
@@ -468,17 +490,25 @@ func partForTracing(p any, budget *traceAttachmentBudget) any {
 	}
 }
 
-// smallTracedTextBytes is the size under which a text part is always carried.
-// Ordinary prompt text sits far below it, so only a text file the engine
-// decoded into the prompt can ever spend the shared budget.
-const smallTracedTextBytes = 8 << 10
+// smallTracedTextBytes is the size under which one text part rides the free
+// text allowance rather than the attachment budget. Ordinary prompt text sits
+// far below it.
+//
+// maxTracedFreeTextBytes is how much text the whole message set may carry that
+// way. A prompt spends a few kilobytes of it; a prompt that inlines a hundred
+// small text files spends it all and the rest is charged like an attachment,
+// which is what keeps the traced body bounded whatever the part count.
+const (
+	smallTracedTextBytes   = 8 << 10
+	maxTracedFreeTextBytes = 256 << 10
+)
 
 // textForTracing carries a text part into the trace, summarizing it only when
-// it is a decoded text attachment large enough to threaten the collector's
-// body limit.
+// neither the free text allowance nor the shared attachment budget has room
+// for it.
 func textForTracing(p any, block map[string]any, budget *traceAttachmentBudget) any {
 	text, _ := block["text"].(string)
-	if len(text) <= smallTracedTextBytes || budget.admitBytes(len(text)) {
+	if budget.admitText(len(text)) {
 		return p
 	}
 	return map[string]any{"type": "text", "text": fmt.Sprintf("[text, %d bytes]", len(text))}

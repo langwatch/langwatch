@@ -179,12 +179,15 @@ describe("Feature: Attach files to dataset cells", () => {
     return form;
   }
 
-  /** Uploads as a project API key caller unless `session` is asked for. */
-  async function upload(
-    form: FormData,
-    options: { session?: boolean } = {},
-  ): Promise<Response> {
-    const headers: Record<string, string> = options.session
+  /** Uploads as a project API key caller unless `isSession` is asked for. */
+  async function upload({
+    form,
+    isSession = false,
+  }: {
+    form: FormData;
+    isSession?: boolean;
+  }): Promise<Response> {
+    const headers: Record<string, string> = isSession
       ? { "sec-fetch-site": "same-origin" }
       : { "X-Auth-Token": apiKey };
     return await datasetApp.request(
@@ -203,7 +206,7 @@ describe("Feature: Attach files to dataset cells", () => {
           mediaType: "image/png",
         });
 
-        const response = await upload(form);
+        const response = await upload({ form });
         expect(response.status).toBe(200);
 
         const body = (await response.json()) as {
@@ -220,13 +223,13 @@ describe("Feature: Attach files to dataset cells", () => {
         expect(body.sizeBytes).toBe("a-small-picture".length);
         expect(insertedRowCount.value).toBe(1);
 
-        const again = await upload(
-          attachmentForm({
+        const again = await upload({
+          form: attachmentForm({
             content: "a-small-picture",
             fileName: "receipt.png",
             mediaType: "image/png",
           }),
-        );
+        });
         const againBody = (await again.json()) as { url: string };
         expect(againBody.url).toBe(body.url);
         expect(insertedRowCount.value).toBe(1);
@@ -234,13 +237,13 @@ describe("Feature: Attach files to dataset cells", () => {
 
       /** @scenario "The reference carries the file name and serves the file with its media type" */
       it("serves the file back under its own name and media type", async () => {
-        const response = await upload(
-          attachmentForm({
+        const response = await upload({
+          form: attachmentForm({
             content: "a-small-picture",
             fileName: "receipt.png",
             mediaType: "image/png",
           }),
-        );
+        });
         const { url } = (await response.json()) as { url: string };
 
         const read = await filesApp.request(url, {
@@ -257,13 +260,13 @@ describe("Feature: Attach files to dataset cells", () => {
 
       /** @scenario "An API key caller can upload" */
       it("accepts a project API key", async () => {
-        const response = await upload(
-          attachmentForm({
+        const response = await upload({
+          form: attachmentForm({
             content: "notes",
             fileName: "notes.txt",
             mediaType: "text/plain",
           }),
-        );
+        });
 
         expect(response.status).toBe(200);
         expect(insertedRowCount.value).toBe(1);
@@ -279,9 +282,9 @@ describe("Feature: Attach files to dataset cells", () => {
         ["logo.svg", "image/svg+xml"],
         ["script.js", "application/javascript"],
       ])("refuses %s", async (fileName, mediaType) => {
-        const response = await upload(
-          attachmentForm({ content: "<b>x</b>", fileName, mediaType }),
-        );
+        const response = await upload({
+          form: attachmentForm({ content: "<b>x</b>", fileName, mediaType }),
+        });
 
         expect(response.status).toBe(415);
         const body = (await response.json()) as { error: string };
@@ -300,14 +303,14 @@ describe("Feature: Attach files to dataset cells", () => {
         });
         mockProbeProjectPermission.mockResolvedValue(false);
 
-        const response = await upload(
-          attachmentForm({
+        const response = await upload({
+          form: attachmentForm({
             content: "notes",
             fileName: "notes.txt",
             mediaType: "text/plain",
           }),
-          { session: true },
-        );
+          isSession: true,
+        });
 
         expect(response.status).toBe(403);
         expect(insertedRowCount.value).toBe(0);
@@ -343,23 +346,23 @@ describe("Feature: Attach files to dataset cells", () => {
       /** @scenario "An upload burst past the ceiling is rate limited" */
       it("answers the upload past the ceiling with 429", async () => {
         for (let index = 0; index < ATTACHMENT_UPLOADS_PER_MINUTE; index++) {
-          const allowed = await upload(
-            attachmentForm({
+          const allowed = await upload({
+            form: attachmentForm({
               content: `notes-${index}`,
               fileName: "notes.txt",
               mediaType: "text/plain",
             }),
-          );
+          });
           expect(allowed.status).toBe(200);
         }
 
-        const refused = await upload(
-          attachmentForm({
+        const refused = await upload({
+          form: attachmentForm({
             content: "one-too-many",
             fileName: "notes.txt",
             mediaType: "text/plain",
           }),
-        );
+        });
 
         expect(refused.status).toBe(429);
         expect(refused.headers.get("Retry-After")).toBeTruthy();

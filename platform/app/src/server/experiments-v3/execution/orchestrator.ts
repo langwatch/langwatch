@@ -1632,7 +1632,7 @@ export async function* executeCell(
             cell,
             projectId,
             datasetColumns,
-            fetchExternal: targetReadsExternalAttachments(cell),
+            shouldFetchExternal: targetReadsExternalAttachments(cell),
           }),
           origin: "evaluation",
         },
@@ -1779,7 +1779,7 @@ export async function* executeWorkflowCell({
       cell,
       projectId,
       datasetColumns,
-      fetchExternal: true,
+      shouldFetchExternal: true,
     });
 
     // The workflow's own evaluator nodes carry the scores we surface per row.
@@ -2048,7 +2048,7 @@ const connectedTurnParams = async ({
       cell,
       projectId,
       datasetColumns,
-      fetchExternal: true,
+      shouldFetchExternal: true,
     }),
     definitions: connectedParameterDefinitions(agent.config),
   });
@@ -2221,6 +2221,26 @@ const connectedTurn = async ({
   } = input;
   const dispatchAgent = dispatchAgentOf(agent);
   try {
+    const params = await connectedTurnParams({
+      cell,
+      projectId,
+      agent,
+      dispatchAgent,
+      datasetColumns,
+      traceId,
+    });
+
+    // Building the turn reads the row's attachments, which can take as long as
+    // the files are large. A run stopped while that read was in flight must
+    // send nothing, so the stop is read once more before the first dispatch.
+    if (isAborted && (await isAborted())) {
+      logger.debug(
+        { cell: cell.rowIndex, targetId: cell.targetId },
+        "Cell aborted before the connected agent was called",
+      );
+      return { ok: false, error: new Error("Execution aborted") };
+    }
+
     const outcome = await dispatchWithBusyRetry({
       dispatch,
       sleep,
@@ -2228,14 +2248,7 @@ const connectedTurn = async ({
       isAborted,
       budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
       callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-      params: await connectedTurnParams({
-        cell,
-        projectId,
-        agent,
-        dispatchAgent,
-        datasetColumns,
-        traceId,
-      }),
+      params,
     });
     return { ok: true, outcome };
   } catch (error) {
@@ -2794,7 +2807,7 @@ const declaredAttachmentFieldType = ({
  *
  * Every target kind goes through here, because none of them can open a
  * LangWatch file reference: the engine is another service and an agent is
- * another company's process. `fetchExternal` is what separates the two
+ * another company's process. `shouldFetchExternal` is what separates the two
  * remaining cases. An agent also needs an address on the public internet read
  * for it; a prompt does not, because the engine reads that address itself and
  * reports its own copy for a bad one.
@@ -2807,18 +2820,18 @@ const buildDispatchInputs = async ({
   cell,
   projectId,
   datasetColumns,
-  fetchExternal,
+  shouldFetchExternal,
 }: {
   cell: ExecutionCell;
   projectId: string;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
-  fetchExternal: boolean;
+  shouldFetchExternal: boolean;
 }): Promise<Record<string, unknown>> =>
   resolveAttachmentInputs({
     projectId,
     inputs: buildTargetInputs(cell),
     columnTypeOfInput: columnTypeOfInputFor({ cell, datasetColumns }),
-    fetchExternal,
+    shouldFetchExternal,
   });
 
 /**

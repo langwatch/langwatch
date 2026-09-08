@@ -57,7 +57,7 @@ LangWatch delivers the file to the model by its media type:
 | Plain text and JSON | The text of the file, with the file name as a heading |
 | Everything else, for example PDF | A `file` content part with the file name and the file data in base64 |
 
-A **File** input that holds an `http(s)` URL is read by LangWatch first, under the same 20 MB and 30 second limits, and is then delivered by its content type. An **Image** input keeps the behavior it had before: LangWatch reads the address and sends the picture bytes, so the model provider does not have to open the link.
+A **File** input that holds an `http(s)` URL is read by LangWatch first, under the same 20 MB and 30-second limits, and is then delivered by its content type. An **Image** input keeps the behavior it had before: LangWatch reads the address and sends the picture bytes, so the model provider does not have to open the link.
 
 Provider support for file content parts is not the same everywhere. A provider that refuses the part fails the cell, and the cell shows the message of the provider.
 
@@ -96,6 +96,10 @@ The response holds the value to write into the cell:
   "sizeBytes": 184320
 }
 ```
+
+Write the `url` string into the cell, not the whole object. `name`, `mediaType`
+and `sizeBytes` are there for your own bookkeeping; a cell that holds the object
+does not resolve as an attachment.
 
 See [Create Attachments](/api-reference/datasets/create-attachments) for the full reference, and [Programmatic access](/datasets/programmatic-access) to write the value into a row.
 

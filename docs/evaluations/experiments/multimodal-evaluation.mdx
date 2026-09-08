@@ -35,7 +35,9 @@ Images can be provided in any of these formats:
 | **Uploaded file** | `/api/files/{projectId}/{objectId}/{fileName}` |
 | **Markdown image** | `![alt text](https://example.com/photo.png)` |
 
-Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.tiff`
+
+SVG is not accepted for an uploaded file: an SVG runs script in the browser, so the upload refuses `image/svg+xml`. A legacy `svg` URL a row already holds is still read as an image address.
 
 <Note>
 Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.

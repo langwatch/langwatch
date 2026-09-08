@@ -27,27 +27,18 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { ImageIcon, Paperclip, Trash2, Upload } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
 
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { resolveErrorCopy } from "~/features/errors";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   attachmentDisplayName,
   isDatasetAttachmentRef,
 } from "~/shared/datasets/attachment-ref";
 
-import { uploadDatasetAttachment } from "../services/attachmentUpload";
+import { useAttachmentUpload } from "./useAttachmentUpload";
 
 /** The column types this cell renders. */
 export type AttachmentColumnType = "image" | "file";
-
-/**
- * Dataset ids the shared grid passes when it is not backed by a saved dataset
- * (the mapping preview, and an editor over a draft). The upload takes no owner
- * in that case.
- */
-const UNSAVED_DATASET_IDS = new Set(["preview", "in-memory"]);
 
 /** What a filled cell shows: the picture itself, or a chip for the file. */
 type FilledAttachment =
@@ -77,44 +68,14 @@ export function AttachmentCell({
   onChange,
   onOpenEditor,
 }: AttachmentCellProps) {
-  const { project } = useOrganizationTeamProject();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [uploadingName, setUploadingName] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<unknown>(null);
-
-  const pickFile = useCallback(() => {
-    inputRef.current?.click();
-  }, []);
-
-  const handleFileChosen = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      // The same file picked twice in a row must fire the change event again.
-      event.target.value = "";
-      if (!file || !project?.id) return;
-
-      setUploadError(null);
-      setUploadingName(file.name);
-      try {
-        const attachment = await uploadDatasetAttachment({
-          projectId: project.id,
-          datasetId: UNSAVED_DATASET_IDS.has(datasetId) ? undefined : datasetId,
-          file,
-        });
-        onChange(attachment.url);
-      } catch (error) {
-        setUploadError(error);
-      } finally {
-        setUploadingName(null);
-      }
-    },
-    [datasetId, onChange, project?.id],
-  );
-
-  const clear = useCallback(() => {
-    setUploadError(null);
-    onChange("");
-  }, [onChange]);
+  const {
+    inputRef,
+    uploadingName,
+    uploadError,
+    pickFile,
+    handleFileChosen,
+    clear,
+  } = useAttachmentUpload({ datasetId, onChange });
 
   return (
     <Box
@@ -284,31 +245,116 @@ function FilledActions({
   );
 }
 
-/** The chip a filled file cell shows. Opens the file in a new tab. */
+/**
+ * The chip a filled file cell shows. Opens the file in a new tab.
+ *
+ * A browser refuses a top-level navigation to a `data:` URL, so a cell that
+ * holds one opens a blob of the same bytes instead. Everything else is a plain
+ * link, which keeps the middle click and the context menu a link has.
+ */
 function AttachmentChip({ href, name }: { href: string; name: string }) {
+  const body = (
+    <Box
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
+      maxWidth="100%"
+      paddingX={1.5}
+      paddingY={0.5}
+      borderRadius="sm"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      bg="bg.subtle"
+      fontSize="12px"
+      _hover={{ bg: "bg.muted" }}
+    >
+      <Paperclip size={12} />
+      <Text lineClamp={1}>{name}</Text>
+    </Box>
+  );
+
+  if (href.startsWith("data:")) {
+    return (
+      <Box asChild>
+        <button
+          type="button"
+          data-testid="attachment-chip"
+          onClick={() => {
+            openDataUrl({ dataUrl: href, name });
+          }}
+        >
+          {body}
+        </button>
+      </Box>
+    );
+  }
+
   return (
     <Box asChild>
-      <a href={href} target="_blank" rel="noopener noreferrer">
-        <Box
-          display="inline-flex"
-          alignItems="center"
-          gap={1}
-          maxWidth="100%"
-          paddingX={1.5}
-          paddingY={0.5}
-          borderRadius="sm"
-          borderWidth="1px"
-          borderColor="border.emphasized"
-          bg="bg.subtle"
-          fontSize="12px"
-          _hover={{ bg: "bg.muted" }}
-        >
-          <Paperclip size={12} />
-          <Text lineClamp={1}>{name}</Text>
-        </Box>
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="attachment-chip"
+      >
+        {body}
       </a>
     </Box>
   );
+}
+
+/**
+ * Opens the bytes of a `data:` cell value in a new tab.
+ *
+ * The bytes are handed to the browser as a blob of the same media type. The
+ * media type was already narrowed by `attachmentHref`, so nothing the browser
+ * runs is opened this way. The address is released once the tab has it, so a
+ * cell the person clicks many times holds no memory.
+ */
+function openDataUrl({ dataUrl, name }: { dataUrl: string; name: string }) {
+  const blob = blobFromDataUrl(dataUrl);
+  if (!blob) return;
+
+  const objectUrl = URL.createObjectURL(blob);
+  const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    // A blocked pop-up leaves the person with nothing, so the file is saved
+    // under its own name instead.
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = name;
+    link.click();
+  }
+  setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, 60_000);
+}
+
+/** The bytes of a base64 or percent-encoded `data:` URL, or nothing. */
+function blobFromDataUrl(dataUrl: string): Blob | null {
+  const commaIndex = dataUrl.indexOf(",");
+  if (commaIndex === -1) return null;
+
+  const header = dataUrl.slice("data:".length, commaIndex);
+  const isBase64 = header.endsWith(";base64");
+  const mediaType =
+    (isBase64 ? header.slice(0, -";base64".length) : header).split(";")[0] ||
+    "application/octet-stream";
+  const payload = dataUrl.slice(commaIndex + 1);
+
+  try {
+    if (!isBase64) {
+      return new Blob([decodeURIComponent(payload)], { type: mediaType });
+    }
+    const binary = atob(payload);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index++) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new Blob([bytes], { type: mediaType });
+  } catch {
+    return null;
+  }
 }
 
 /** The words a refused upload shows, under the controls. */

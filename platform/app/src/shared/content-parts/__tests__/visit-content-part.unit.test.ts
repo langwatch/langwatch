@@ -136,26 +136,28 @@ describe("visitContentPart", () => {
   });
 
   describe("given a data URL that carries a file name parameter", () => {
-    /**
-     * A dataset attachment travels as `data:<type>;name=<file>;base64,<bytes>`
-     * (specs/experiments-v3/attachment-inputs.feature). The span pipeline reads
-     * the same string to move the bytes back out into a stored object, so the
-     * parameter between the type and `;base64` must not hide the payload.
-     */
-    it("reads the bare media type and the payload", () => {
-      expect(
-        decode({
-          type: "file",
-          file: {
-            filename: "quarter.pdf",
-            file_data: `data:application/pdf;name=quarter%20one.pdf;base64,${PNG_B64}`,
-          },
-        }),
-      ).toMatchObject({
-        branch: "binary",
-        mimeType: "application/pdf",
-        data: PNG_B64,
-        filename: "quarter.pdf",
+    describe("when the part is decoded", () => {
+      /**
+       * A dataset attachment travels as `data:<type>;name=<file>;base64,<bytes>`
+       * (specs/experiments-v3/attachment-inputs.feature). The span pipeline reads
+       * the same string to move the bytes back out into a stored object, so the
+       * parameter between the type and `;base64` must not hide the payload.
+       */
+      it("reads the bare media type and the payload", () => {
+        expect(
+          decode({
+            type: "file",
+            file: {
+              filename: "quarter.pdf",
+              file_data: `data:application/pdf;name=quarter%20one.pdf;base64,${PNG_B64}`,
+            },
+          }),
+        ).toMatchObject({
+          branch: "binary",
+          mimeType: "application/pdf",
+          data: PNG_B64,
+          filename: "quarter.pdf",
+        });
       });
     });
   });

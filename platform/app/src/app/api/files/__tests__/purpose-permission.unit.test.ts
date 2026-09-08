@@ -9,7 +9,7 @@
  * (`authorizeFilePurpose`) applies.
  */
 import { describe, expect, it } from "vitest";
-import { requiredPermissionForPurpose } from "../[[...route]]/app";
+import { requiredPermissionForPurpose } from "~/server/stored-objects/purpose-permission";
 
 describe("requiredPermissionForPurpose", () => {
   describe("given a trace-content object", () => {

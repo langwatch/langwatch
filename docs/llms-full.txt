@@ -35331,7 +35331,7 @@ LangWatch delivers the file to the model by its media type:
 | Plain text and JSON | The text of the file, with the file name as a heading |
 | Everything else, for example PDF | A `file` content part with the file name and the file data in base64 |
 
-A **File** input that holds an `http(s)` URL is read by LangWatch first, under the same 20 MB and 30 second limits, and is then delivered by its content type. An **Image** input keeps the behavior it had before: LangWatch reads the address and sends the picture bytes, so the model provider does not have to open the link.
+A **File** input that holds an `http(s)` URL is read by LangWatch first, under the same 20 MB and 30-second limits, and is then delivered by its content type. An **Image** input keeps the behavior it had before: LangWatch reads the address and sends the picture bytes, so the model provider does not have to open the link.
 
 Provider support for file content parts is not the same everywhere. A provider that refuses the part fails the cell, and the cell shows the message of the provider.
 
@@ -35370,6 +35370,10 @@ The response holds the value to write into the cell:
   "sizeBytes": 184320
 }
 ```
+
+Write the `url` string into the cell, not the whole object. `name`, `mediaType`
+and `sizeBytes` are there for your own bookkeeping; a cell that holds the object
+does not resolve as an attachment.
 
 See [Create Attachments](/api-reference/datasets/create-attachments) for the full reference, and [Programmatic access](/datasets/programmatic-access) to write the value into a row.
 
@@ -35478,7 +35482,7 @@ Column names must be unique and cannot be `id` or `selected`. Each column has on
 | `list` | A list of strings, for example retrieved contexts. |
 | `json` | Any JSON value. |
 | `image` | A picture. The cell takes an uploaded file, a URL or a data URL, and the grid renders it as a thumbnail. See [Images and files in datasets](/datasets/dataset-images). |
-| `file` | Any other document, for example a PDF, an audio clip or a CSV. The cell takes an uploaded file or a URL. See [Images and files in datasets](/datasets/dataset-images). |
+| `file` | Any other document, for example a PDF, an audio clip or a CSV. The cell takes an uploaded file, a URL or a data URL. See [Images and files in datasets](/datasets/dataset-images). |
 | `json chat messages (OpenAI format)` | A list of chat messages with `role` and `content`. |
 | `json spans` | The spans of a trace, as JSON. |
 
@@ -40507,7 +40511,9 @@ Images can be provided in any of these formats:
 | **Uploaded file** | `/api/files/{projectId}/{objectId}/{fileName}` |
 | **Markdown image** | `![alt text](https://example.com/photo.png)` |
 
-Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.tiff`
+
+SVG is not accepted for an uploaded file: an SVG runs script in the browser, so the upload refuses `image/svg+xml`. A legacy `svg` URL a row already holds is still read as an image address.
 
 <Note>
 Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
@@ -40829,7 +40835,9 @@ The workbench autosaves. **History** lists the saved versions, and **Restore** w
 
 ## Map image and file columns
 
-A dataset column of type `image` or `file` maps to a prompt input of type **Image** or **File**, and to an agent input. A prompt gets the file as an image, an audio or a document content part. An agent gets the file as a base64 data URL, so it never has to open a LangWatch address. A connected agent column also has an optional **attachment** input for the same columns. See [Images and files in datasets](/datasets/dataset-images).
+A dataset column of type `image` or `file` maps to a prompt input of type **Image** or **File**, and to an agent input. A connected agent column also has an optional **attachment** input for the same columns.
+
+A prompt gets the file as an image, an audio or a document content part. A plain text or JSON file is different: LangWatch reads it and sends its text inline, under the file name, rather than as a file content part. An agent gets the file as a base64 data URL, so it never has to open a LangWatch address. See [Images and files in datasets](/datasets/dataset-images).
 
 ## Map evaluator inputs
 

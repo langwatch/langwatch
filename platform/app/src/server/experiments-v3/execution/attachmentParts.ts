@@ -98,10 +98,11 @@ export const parseAttachmentDataUrl = (
 /**
  * The attachment as a content part of the message the agent reads.
  *
- * An image and an audio clip have their own parts, because a model reads them
- * as media rather than as a document. Everything else is a file part, which
- * carries the name so the model can say which document it answered from.
- * A value that is not a base64 data URL is no attachment and yields nothing.
+ * An image and an audio clip in a format a model names have their own parts,
+ * because a model reads them as media rather than as a document. Everything
+ * else is a file part, which carries the name so the model can say which
+ * document it answered from. A value that is not a base64 data URL is no
+ * attachment and yields nothing.
  */
 export const attachmentContentPart = (
   value: string,
@@ -113,13 +114,11 @@ export const attachmentContentPart = (
     return { type: "image_url", image_url: { url: value } };
   }
 
-  if (parsed.mediaType.startsWith("audio/")) {
+  const audio = audioFormat(parsed.mediaType);
+  if (audio) {
     return {
       type: "input_audio",
-      input_audio: {
-        data: parsed.base64,
-        format: audioFormat(parsed.mediaType),
-      },
+      input_audio: { data: parsed.base64, format: audio },
     };
   }
 
@@ -132,11 +131,35 @@ export const attachmentContentPart = (
   };
 };
 
-/** The format name a model reads an audio clip under. */
-const audioFormat = (mediaType: string): string => {
-  const subtype = mediaType.slice("audio/".length);
-  return subtype.includes("mpeg") || subtype.includes("mp3") ? "mp3" : "wav";
+/**
+ * The format name a model reads an audio clip under, or nothing.
+ *
+ * The token names the encoding of the bytes, and the bytes travel unchanged,
+ * so it is read off the media type rather than defaulted. A recording whose
+ * type is not in this list travels as a file part instead: a wrong token
+ * tells the model to read Ogg or FLAC bytes as WAV, which fails at the
+ * provider rather than at the cell.
+ */
+const AUDIO_FORMATS: Record<string, string> = {
+  "audio/wav": "wav",
+  "audio/wave": "wav",
+  "audio/x-wav": "wav",
+  "audio/vnd.wave": "wav",
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/x-mp3": "mp3",
+  "audio/ogg": "ogg",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/webm": "webm",
+  "audio/mp4": "m4a",
+  "audio/m4a": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/aac": "aac",
 };
+
+const audioFormat = (mediaType: string): string | undefined =>
+  AUDIO_FORMATS[mediaType.toLowerCase()];
 
 /** A name as it was written, with a bad escape left alone. */
 const decodeName = (name: string): string => {

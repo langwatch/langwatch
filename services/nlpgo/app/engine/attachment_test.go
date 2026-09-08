@@ -559,6 +559,32 @@ func TestMessagesForTracingSummarizesOversizedTextAttachment(t *testing.T) {
 	assert.Equal(t, big, kept["text"], "the model still receives the whole text")
 }
 
+// @scenario "Many small inlined text files are bounded too"
+func TestMessagesForTracingBoundsManySmallTextAttachments(t *testing.T) {
+	// Each part rides free on its own, so only an aggregate ceiling can stop
+	// the run of them.
+	part := strings.Repeat("a", smallTracedTextBytes)
+	count := (maxTracedFreeTextBytes+maxTracedAttachmentBudgetBytes)/len(part) + 8
+	parts := make([]any, 0, count)
+	for range count {
+		parts = append(parts, map[string]any{"type": "text", "text": part})
+	}
+
+	traced := messagesForTracing([]app.ChatMessage{{Role: "user", Content: parts}})
+	tracedParts, ok := traced[0].Content.([]any)
+	require.True(t, ok)
+
+	summarized := 0
+	for _, p := range tracedParts {
+		_, block := partType(t, p)
+		if text, _ := block["text"].(string); text != part {
+			assert.Equal(t, fmt.Sprintf("[text, %d bytes]", len(part)), text)
+			summarized++
+		}
+	}
+	assert.Positive(t, summarized, "the text past both allowances keeps a summary")
+}
+
 func TestDataURLWithNameSurvivesPunctuationInTheFileName(t *testing.T) {
 	// A semicolon, a comma or a space would end the parameter early and hide
 	// the whole data URL from the splitter.

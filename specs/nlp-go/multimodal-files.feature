@@ -133,3 +133,13 @@ Feature: File attachments reach the LLM as the content part their type calls for
     When the span records the messages
     Then the recorded text is a summary naming its byte count
     And the model still receives the whole text
+
+  @unit
+  Scenario: Many small inlined text files are bounded too
+    Given a message set carrying more small text attachments than the free text
+      allowance holds
+    When the span records the messages
+    Then the parts past the allowance are charged against the shared budget
+    And the ones past that keep a summary naming their byte count
+    # A part small enough to ride for free is still counted, so a prompt that
+    # inlines a hundred text files cannot make the recorded body unbounded.

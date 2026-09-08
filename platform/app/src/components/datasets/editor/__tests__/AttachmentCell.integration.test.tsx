@@ -105,7 +105,13 @@ function renderCell({
 const fileInput = (): HTMLInputElement =>
   screen.getByTestId("attachment-file-input");
 
-const respondWith = (body: unknown, status = 200) => {
+const respondWith = ({
+  body,
+  status = 200,
+}: {
+  body: unknown;
+  status?: number;
+}) => {
   fetchMock.mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -143,6 +149,7 @@ describe("AttachmentCell", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   describe("given an empty image cell", () => {
@@ -201,7 +208,7 @@ describe("AttachmentCell", () => {
     /** @scenario Uploading a picture fills the image cell */
     it("uploads it and shows the stored picture", async () => {
       const user = userEvent.setup();
-      respondWith(storedPicture);
+      respondWith({ body: storedPicture });
       renderCell({ dataType: "image" });
 
       await user.upload(fileInput(), pictureFile());
@@ -230,7 +237,7 @@ describe("AttachmentCell", () => {
     /** @scenario Uploading a document fills the file cell */
     it("uploads it and shows the name of the document", async () => {
       const user = userEvent.setup();
-      respondWith(storedDocument);
+      respondWith({ body: storedDocument });
       renderCell({ dataType: "file" });
 
       await user.upload(fileInput(), documentFile());
@@ -251,13 +258,13 @@ describe("AttachmentCell", () => {
     /** @scenario A refused upload states the reason and keeps the cell editable */
     it("states the reason and keeps the upload button", async () => {
       const user = userEvent.setup();
-      respondWith(
-        {
+      respondWith({
+        body: {
           error: "dataset_attachment_type_refused",
           message: "This file type is not accepted",
         },
-        415,
-      );
+        status: 415,
+      });
       renderCell({ dataType: "file" });
 
       await user.upload(fileInput(), documentFile());
@@ -305,7 +312,7 @@ describe("AttachmentCell", () => {
     /** @scenario A filled cell can be replaced */
     it("replaces the picture with a new upload", async () => {
       const user = userEvent.setup();
-      respondWith(storedPicture);
+      respondWith({ body: storedPicture });
       renderCell({ dataType: "image", value: "https://example.com/cat.png" });
 
       await user.click(screen.getByRole("button", { name: "Replace image" }));
@@ -377,20 +384,45 @@ describe("AttachmentCell", () => {
 
   describe("given a file cell that holds the bytes inline", () => {
     /** @scenario A data URL opens only for a type the browser shows */
-    it("links to a document the browser shows", () => {
-      const pdf = "data:application/pdf;base64,JVBERi0=";
-      renderCell({ dataType: "file", value: pdf });
+    it("opens a document the browser shows, as a blob rather than a link", async () => {
+      const user = userEvent.setup();
+      const objectUrl = "blob:https://app.langwatch.test/attachment-1";
+      const createObjectURL = vi.fn(() => objectUrl);
+      const revokeObjectURL = vi.fn();
+      const open = vi.fn(() => ({}) as Window);
+      vi.stubGlobal("URL", {
+        ...URL,
+        createObjectURL,
+        revokeObjectURL,
+      });
+      vi.spyOn(window, "open").mockImplementation(open);
 
-      expect(screen.getByRole("link")).toHaveAttribute("href", pdf);
+      renderCell({
+        dataType: "file",
+        value: "data:application/pdf;base64,JVBERi0=",
+      });
+
+      // A browser refuses a top-level navigation to a data: URL, so the chip
+      // must not be a link that carries one.
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      await user.click(screen.getByTestId("attachment-chip"));
+
+      expect(createObjectURL).toHaveBeenCalledOnce();
+      expect(open).toHaveBeenCalledWith(
+        objectUrl,
+        "_blank",
+        "noopener,noreferrer",
+      );
     });
 
-    it("renders any other type as plain text, with no link", () => {
+    it("renders any other type as plain text, with no chip", () => {
       renderCell({
         dataType: "file",
         value: "data:text/html;base64,PGI+eDwvYj4=",
       });
 
       expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("attachment-chip")).not.toBeInTheDocument();
     });
   });
 });

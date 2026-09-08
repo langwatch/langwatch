@@ -210,7 +210,7 @@ export const resolveAttachmentInputs = async ({
   projectId,
   inputs,
   columnTypeOfInput,
-  fetchExternal,
+  shouldFetchExternal,
   readStoredAttachment = storedAttachmentReader,
   readExternalAttachment = externalAttachmentReader,
 }: {
@@ -219,7 +219,7 @@ export const resolveAttachmentInputs = async ({
   /** The dataset column type the input field is mapped from. */
   columnTypeOfInput: (inputField: string) => string | undefined;
   /** Whether an address on the public internet is read here too. */
-  fetchExternal: boolean;
+  shouldFetchExternal: boolean;
   readStoredAttachment?: StoredAttachmentReader;
   readExternalAttachment?: ExternalAttachmentReader;
 }): Promise<Record<string, unknown>> => {
@@ -229,35 +229,63 @@ export const resolveAttachmentInputs = async ({
   for (const [field, value] of Object.entries(inputs)) {
     if (typeof value !== "string" || value === "") continue;
 
-    const ref = parseDatasetAttachmentRef(value);
-    if (ref) {
-      resolved[field] = await readStoredAttachmentInput({
-        projectId,
-        ref,
-        value,
-        readStoredAttachment,
-      });
-      changed = true;
-      continue;
-    }
-
+    // The column type decides first, for every value shape. A text cell that
+    // holds a reference or an address is the sentence the person wrote, so it
+    // is never read as bytes.
     const columnType = columnTypeOfInput(field);
-    if (
-      !fetchExternal ||
-      !columnType ||
-      !ATTACHMENT_COLUMN_TYPES.has(columnType) ||
-      !isExternalUrl(value)
-    ) {
-      continue;
-    }
+    if (!columnType || !ATTACHMENT_COLUMN_TYPES.has(columnType)) continue;
 
-    resolved[field] = attachmentDataUrl(
-      await readExternalAttachment({ url: value, columnType }),
-    );
+    const attachment = await readAttachmentValue({
+      projectId,
+      value,
+      columnType,
+      shouldFetchExternal,
+      readStoredAttachment,
+      readExternalAttachment,
+    });
+    if (attachment === null) continue;
+
+    resolved[field] = attachment;
     changed = true;
   }
 
   return changed ? resolved : inputs;
+};
+
+/**
+ * One value of an attachment column, as the data URL the target receives, or
+ * nothing when the value carries no bytes the run reads.
+ */
+const readAttachmentValue = async ({
+  projectId,
+  value,
+  columnType,
+  shouldFetchExternal,
+  readStoredAttachment,
+  readExternalAttachment,
+}: {
+  projectId: string;
+  value: string;
+  columnType: string;
+  shouldFetchExternal: boolean;
+  readStoredAttachment: StoredAttachmentReader;
+  readExternalAttachment: ExternalAttachmentReader;
+}): Promise<string | null> => {
+  const ref = parseDatasetAttachmentRef(value);
+  if (ref) {
+    return await readStoredAttachmentInput({
+      projectId,
+      ref,
+      value,
+      readStoredAttachment,
+    });
+  }
+
+  if (!shouldFetchExternal || !isExternalUrl(value)) return null;
+
+  return attachmentDataUrl(
+    await readExternalAttachment({ url: value, columnType }),
+  );
 };
 
 /** One LangWatch attachment, as the data URL the target receives. */
