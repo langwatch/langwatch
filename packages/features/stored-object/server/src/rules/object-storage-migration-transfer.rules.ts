@@ -14,6 +14,8 @@ import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-
 import type {
   MigrationDataset,
   MigrationPageRequest,
+} from "../ports/object-storage-migration-inventory.port.ts";
+import type {
   MigrationProvider,
   MigrationStorageEndpoint,
 } from "../services/object-storage-migration.service.ts";

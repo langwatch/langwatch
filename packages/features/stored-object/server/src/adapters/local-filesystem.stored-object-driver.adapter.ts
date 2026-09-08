@@ -32,7 +32,8 @@ function parseFileUri(uri: string): string {
   // keep each segment a single component; this is the backstop that makes a mistake there fail loudly instead of writing outside the object root. The check is on `..` segments specifically, NOT on "is the decoded path already canonical". Those are
   // not the same test, and the stricter one is wrong: a storage root configured with a trailing slash mints `file:///root//project/object`, whose decoded form is non-canonical and completely harmless. Refusing it would break every local-filesystem
   // write (dataset uploads, scenario media, the queue's durable blob tier) on those installs, none of which is what this guard is here for. A redundant separator is sloppy; only `..` escapes.
-  if (decoded.split("/").includes("..")) {
+  const hasParentSegment = decoded.split("/").includes("..");
+  if (hasParentSegment) {
     throw new Error(
       `LocalFilesystemStoredObjectDriverAdapter refuses a file: URI whose decoded path contains a ".." segment — ` +
         `it resolves outside the location it names. Keep every path segment a single component.`,

@@ -16,9 +16,9 @@ import {
   storedObjectsCreateUploadInputSchema,
   storedObjectsInternalRpc,
   storedObjectsPublicRpc,
+  type StoredObjectApi,
   type StoredObjectByteSource,
   type StoredObjectReference,
-  type StoredObjectService,
 } from "../index.ts";
 
 const SHA256 = "a".repeat(64);
@@ -228,7 +228,7 @@ describe("Stored Objects errors and portable service capability", () => {
   it("exposes only portable byte primitives", () => {
     expectTypeOf<StoredObjectByteSource>().toEqualTypeOf<Uint8Array | AsyncIterable<Uint8Array>>();
     expectTypeOf<
-      Awaited<ReturnType<StoredObjectService["storeFromBytes"]>>["reference"]
+      Awaited<ReturnType<StoredObjectApi["storeFromBytes"]>>["reference"]
     >().toEqualTypeOf<StoredObjectReference>();
   });
 });

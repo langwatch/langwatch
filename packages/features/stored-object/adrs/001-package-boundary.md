@@ -213,14 +213,24 @@ The import is idempotent. A row already represented by equal or newer Postgres
 state is unchanged. Invalid input parks the tenant with a bounded report; it
 does not create an event or a second quarantine store.
 
-The rollout is intentionally simple. Existing ClickHouse-backed behaviour stays
-authoritative while the migration runs. Old writers are drained, a final pass
-proves every latest legacy row is represented in Postgres, and only then is the
-Postgres-backed service enabled for that tenant. That finalization requires
-operator confirmation. The migration remains inactive on self-hosted installs
-until the cloud rollout has soaked and a later release explicitly enables it.
-Supporting indefinite
-mixed-version writes or automatic bidirectional reconciliation is out of scope.
+The rollout uses the startup mode required by ADR-133. The process validates the
+migration configuration and declarations, imports every latest legacy row while
+preserving its object ID, storage location and metadata, and keeps all replicas
+out of readiness until durable finalization succeeds. Before the final scan,
+all old writers must stop or be fenced. The final scan then proves that every
+latest legacy row is represented in Postgres; only after that proof may the
+Postgres-backed service be constructed and traffic start.
+
+A missing writer drain, an import failure, an incomplete final scan, or an
+operator intervention blocks readiness and leaves the migration unfinished.
+Completion is durable and shared across replicas, so a second replica observes
+the same finalized state rather than serving from a partial import. There is no
+cloud-only rollout, soak period, operator confirmation step, second migration,
+indefinite dual-write period or bidirectional reconciliation.
+
+The migration helper exists, but process startup wiring and the readiness gate
+remain pending; this ADR records the required contract rather than claiming
+that cutover is implemented.
 
 ### Environment and configuration
 
@@ -246,6 +256,8 @@ this is operational rather than analytical state.
 - Existing provider code remains the only provider implementation.
 - Postgres becomes ordinary read and lifecycle authority after migration.
 - ClickHouse migration requires an explicit old-writer drain before cutover.
+- Startup readiness stays blocked until durable finalization is visible to every replica.
+- The existing migration helper is present; process wiring and readiness integration remain work to do.
 - Pending upload and deletion cleanup are bounded scans of the same table.
 - The design accepts ordinary retry and compensation rather than distributed
   exactly-once guarantees.

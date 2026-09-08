@@ -1,53 +1,60 @@
 /**
- * A project's own object store, composed as its own feature. `storedObjects.*` answers
- * one question — whether an externalized blob's ROW and its BYTES are both still there —
- * so a renderer can tell "the file is gone" from "that id never existed".
+ * A project's own object store, installed over this process's own graph.
+ * `storedObjects.*` answers whether an externalized blob's ROW and its BYTES
+ * are both still there, so a renderer tells "gone" from "never existed".
  */
+import { S3Client } from "@aws-sdk/client-s3";
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp } from "@langwatch/runtime-composition";
 import {
   mintStoredObjectUri,
   StoredObjectOwnerResolver,
-  StoredObjectService,
+  type StoredObjectDeliveryCapability,
+  type StoredObjectUploadTokenClaims,
 } from "@langwatch/stored-object-contract";
-import { S3Client } from "@aws-sdk/client-s3";
 import {
   AbsentPayloadStagingAdapter,
+  AzureBlobCredentialsAdapter,
   AzureBlobStoredObjectDriverAdapter,
   LocalFilesystemStoredObjectDriverAdapter,
+  PayloadStagingPort,
+  PayloadStagingS3TargetPort,
   PrometheusStoredObjectsTelemetryAdapter,
+  S3PayloadStagingAdapter,
   S3StoredObjectDriverAdapter,
-  StoredObjectApp,
+  StoredObjectDeliveryPort,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectOwnerInstanceDirectoryPort,
   StoredObjectOwnerLookupRuntimeAdapter,
   StoredObjectOwnerLookupTelemetryPort,
   StoredObjectProjectS3ConfigPort,
   StoredObjectS3TargetPort,
+  StoredObjectStoragePortAdapter,
   StoredObjectStorageRegistryAdapter,
   StoredObjectStorageRuntimeAdapter,
+  StoredObjectUploadTokenPort,
   StoredObjectsClickHousePort,
   StoredObjectsService,
-  PayloadStagingPort,
-  PayloadStagingS3TargetPort,
-  S3PayloadStagingAdapter,
+  deriveStoredObjectId,
+  storedObjectServer,
   type PayloadStagingS3Target,
-  type StoredObjectStorageDriver,
   type StoredObjectOwnerClickHouseClient,
   type StoredObjectOwnerClickHouseInstance,
   type StoredObjectS3Target,
+  type StoredObjectStorageDriver,
   type StoredObjectsClickHouseClient,
-  AzureBlobCredentialsAdapter,
 } from "@langwatch/stored-object-server";
 import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
 
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiStoredObjectsConfigResolution } from "../../platform/config/api.config.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createStoredObjectTrpcRouter } from "./stored-object-trpc.mount.ts";
+import type { ComposedStoredObjectFeature } from "./stored-object.composition.types.ts";
 
-/** Reports the one capability this feature can be composed without. */
+/** Reports the one capability this feature can be installed without. */
 export abstract class ApiStoredObjectAbsenceReport {
   abstract absent(capability: "clickhouse"): void;
 }
@@ -70,7 +77,7 @@ export class LoggedApiStoredObjectAbsence extends ApiStoredObjectAbsenceReport {
   }
 }
 
-/** Everything the object store is composed from. */
+/** Everything the object store is installed from. */
 export type StoredObjectFeatureCollaborators = Readonly<{
   prisma: ApiTrpcInfrastructure["prisma"];
   /**
@@ -89,88 +96,22 @@ export type StoredObjectFeatureCollaborators = Readonly<{
   report?: ApiStoredObjectAbsenceReport;
 }>;
 
-import type { ComposedStoredObjectFeature } from "./stored-object.composition.types.ts";
+/**
+ * The byte ceiling and upload window the lifecycle service is built with.
+ * Stated rather than configured: this deployment composes no direct-upload
+ * target, so the ceremony they bound is unreachable.
+ */
+const MAXIMUM_UPLOAD_BYTES = 100 * 1024 * 1024;
+const UPLOAD_EXPIRY_MS = 300_000;
 
-/** Composes the object store over this process's own graph. */
-export function composeStoredObjectFeature(
+/** The documented single-replica fallback root, when no other is configured. */
+const DEFAULT_LOCAL_FILESYSTEM_ROOT = "/var/lib/langwatch/objects";
+
+/** Installs the object store over this process's own graph. */
+export async function installApiStoredObject(
   options: StoredObjectFeatureCollaborators,
-): ComposedStoredObjectFeature {
-  const composed = composeStoredObjects(options, createLogger("langwatch:api:stored-object"));
-
-  return {
-    router: (mount) => createStoredObjectTrpcRouter(mount),
-    app: composed.app,
-    bytes: composed.bytes,
-    payloadStaging: composed.payloadStaging,
-    storage: composed.storage,
-    close: () => composed.close(),
-  };
-}
-
-/**
- * The object store on a process that composed no backend to address bytes in.
- */
-export function refusingStoredObjectFeature(): ComposedStoredObjectFeature {
-  const refuse = <T>(): T =>
-    new Proxy(
-      {},
-      {
-        get: () => (): never => {
-          throw new ApiStoredObjectUnavailableError("The object store");
-        },
-        has: () => true,
-      },
-    ) as T;
-
-  return {
-    router: (mount) => createStoredObjectTrpcRouter(mount),
-    app: refuse<StoredObjectApp>(),
-    bytes: refuse<StoredObjectsService>(),
-    // Named rather than absent: a payload over the staging threshold refuses
-    // with a code the caller can act on instead of being posted inline.
-    payloadStaging: AbsentPayloadStagingAdapter.create(),
-    close: async () => undefined,
-  };
-}
-
-/**
- * A capability this deployment did not compose, refused by name. One class rather than
- * one per entry: the customer-facing distinction is WHICH capability is missing, and that
- * is the `capability` the message carries.
- */
-class ApiStoredObjectUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} is not available on this deployment.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiStoredObjectUnavailableError";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stored objects
-// ---------------------------------------------------------------------------
-
-/**
- * The content-addressed object store, over this process's routed ClickHouse connection
- * and its own byte backend.
- */
-function composeStoredObjects(
-  options: StoredObjectFeatureCollaborators,
-  logger: Pick<Logger, "warn">,
-): {
-  app: StoredObjectApp;
-  bytes: StoredObjectsService;
-  payloadStaging: PayloadStagingPort;
-  storage: Readonly<{
-    runtime: StoredObjectStorageRuntimeAdapter;
-    aws: AwsClientProcessRuntime;
-  }>;
-  close(): Promise<void>;
-} {
+): Promise<ComposedStoredObjectFeature> {
+  const logger = createLogger("langwatch:api:stored-object");
   const { storage } = options;
   if (!options.resolveClickHouseClient) options.report?.absent("clickhouse");
 
@@ -178,11 +119,11 @@ function composeStoredObjects(
   const targets = ApiStoredObjectS3Targets.create(options.prisma, storage);
   const destinations = StoredObjectDestinationPolicyAdapter.create({
     selection: {
-      // The `azure` selection now has a driver behind it, so a write to an
-      // Azure destination reaches Azure Blob rather than refusing at the byte
-      // layer. It is still a SELECTION and not a fallback: a deployment that
-      // named `azure` resolves to Azure, and a misconfigured Azure block
-      // refuses by name rather than landing in the shared S3 bucket.
+      // The `azure` selection has a driver behind it, so a write to an Azure
+      // destination reaches Azure Blob rather than refusing at the byte layer.
+      // It is still a SELECTION and not a fallback: a deployment that named
+      // `azure` resolves to Azure, and a misconfigured Azure block refuses by
+      // name rather than landing in the shared S3 bucket.
       backend: storage.backend === "azure" ? "azure" : "s3",
       ...(storage.s3.bucket ? { globalS3Bucket: storage.s3.bucket } : {}),
       localFilesystemRoot: storage.localFilesystemRoot ?? DEFAULT_LOCAL_FILESYSTEM_ROOT,
@@ -221,7 +162,7 @@ function composeStoredObjects(
     azureForProject,
   });
 
-  const service = StoredObjectsService.create({
+  const bytes = StoredObjectsService.create({
     repository: ClickHouseStoredObjectsRepository.create(
       ApiStoredObjectsClickHouse.create(options.resolveClickHouseClient),
     ),
@@ -239,16 +180,30 @@ function composeStoredObjects(
     telemetry: PrometheusStoredObjectsTelemetryAdapter.create(),
   });
 
-  return {
-    app: StoredObjectApp.create({
-      // The byte reads are the moved service's; the PORTABLE capability — the upload
-      // ceremony, the delivery capability, the metadata read — is the canonical Postgres
-      // store's, which this process composes no token signer or delivery policy for.
-      storedObjects: ApiStoredObjectPortableAbsence.create(),
-      files: service,
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma: options.prisma })
+    .withInfrastructure({
+      storage: StoredObjectStoragePortAdapter.create({ runtime: storageRuntime, aws }),
+      delivery: ApiStoredObjectDelivery.create(),
+      uploadTokens: ApiStoredObjectUploadTokens.create(),
+      idDeriver: { fromDigest: deriveStoredObjectId },
+      maximumUploadBytes: MAXIMUM_UPLOAD_BYTES,
+      uploadExpiryMs: UPLOAD_EXPIRY_MS,
+      // The byte reads are the content-addressed store's: an avatar written
+      // through it is an avatar this app's `readById` finds.
+      files: bytes,
       owners: composeOwnerResolver(options, logger),
-    }),
-    bytes: service,
+    })
+    .withFeature(storedObjectServer)
+    .boot({ role: "api" });
+
+  const app = runtime.feature(storedObjectServer).provided;
+
+  return {
+    router: (mount) => createStoredObjectTrpcRouter(mount.runtime),
+    app,
+    restServices: { storedObjects: () => app },
+    bytes,
     storage: { runtime: storageRuntime, aws },
     payloadStaging: storage.s3.bucket
       ? S3PayloadStagingAdapter.create({
@@ -259,8 +214,79 @@ function composeStoredObjects(
           }),
         })
       : AbsentPayloadStagingAdapter.create(),
-    close: () => aws.close(),
+    close: async () => {
+      await runtime.stop();
+      await aws.close();
+    },
   };
+}
+
+/**
+ * A capability this deployment did not compose, refused by name. One class rather than
+ * one per entry: the customer-facing distinction is WHICH capability is missing, and that
+ * is the `capability` the message carries.
+ */
+class ApiStoredObjectUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `${capability} is not available on this deployment.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiStoredObjectUnavailableError";
+  }
+}
+
+/**
+ * The delivery capability, absent. Minting one signs a URL against a policy
+ * this process composes no signer for, so the operation refuses by name rather
+ * than answering a link nothing honours.
+ */
+class ApiStoredObjectDelivery extends StoredObjectDeliveryPort {
+  static create(): ApiStoredObjectDelivery {
+    return new ApiStoredObjectDelivery();
+  }
+
+  async mint(): Promise<StoredObjectDeliveryCapability> {
+    throw new ApiStoredObjectUnavailableError("Stored-object delivery");
+  }
+}
+
+/** The upload-token codec, absent for the same reason the delivery policy is. */
+class ApiStoredObjectUploadTokens extends StoredObjectUploadTokenPort {
+  static create(): ApiStoredObjectUploadTokens {
+    return new ApiStoredObjectUploadTokens();
+  }
+
+  async encode(): Promise<string> {
+    throw new ApiStoredObjectUnavailableError("The stored-object upload ceremony");
+  }
+
+  async decode(): Promise<StoredObjectUploadTokenClaims> {
+    throw new ApiStoredObjectUnavailableError("The stored-object upload ceremony");
+  }
+}
+
+/**
+ * The staging port a caller composed BEFORE the object store gets. The
+ * execution graph is built ahead of the byte store, so the port is handed over
+ * at composition time and resolved on first use rather than captured early.
+ */
+export class DeferredPayloadStagingAdapter extends PayloadStagingPort {
+  static create(resolve: () => PayloadStagingPort): DeferredPayloadStagingAdapter {
+    return new DeferredPayloadStagingAdapter(resolve);
+  }
+
+  private constructor(private readonly resolve: () => PayloadStagingPort) {
+    super();
+  }
+
+  stage(
+    input: Parameters<PayloadStagingPort["stage"]>[0],
+  ): ReturnType<PayloadStagingPort["stage"]> {
+    return this.resolve().stage(input);
+  }
 }
 
 /** One configured endpoint, as this process hands it to the owner lookup. */
@@ -325,9 +351,6 @@ class ApiStoredObjectOwnerLookupTelemetry extends StoredObjectOwnerLookupTelemet
     return operation({ setAttribute: () => undefined });
   }
 }
-
-/** The documented single-replica fallback root, when no other is configured. */
-const DEFAULT_LOCAL_FILESYSTEM_ROOT = "/var/lib/langwatch/objects";
 
 /**
  * No outbound proxy for this process's object storage. Stated rather than read: the API
@@ -413,27 +436,6 @@ class ApiStoredObjectS3Targets extends StoredObjectS3TargetPort {
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return null;
     return this.storage.routes.get(organizationId) ?? null;
-  }
-}
-
-/**
- * The staging port a caller composed BEFORE the object store gets. The
- * execution graph is built ahead of the byte store, so the port is handed over
- * at composition time and resolved on first use rather than captured early.
- */
-export class DeferredPayloadStagingAdapter extends PayloadStagingPort {
-  static create(resolve: () => PayloadStagingPort): DeferredPayloadStagingAdapter {
-    return new DeferredPayloadStagingAdapter(resolve);
-  }
-
-  private constructor(private readonly resolve: () => PayloadStagingPort) {
-    super();
-  }
-
-  stage(
-    input: Parameters<PayloadStagingPort["stage"]>[0],
-  ): ReturnType<PayloadStagingPort["stage"]> {
-    return this.resolve().stage(input);
   }
 }
 
@@ -534,53 +536,5 @@ class ApiStoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
       "API process composed no stored-object owner directory: an id-only stored-object reference cannot be resolved to a project here.",
     );
     return null;
-  }
-}
-
-/**
- * The PORTABLE stored-object capability, absent. The upload ceremony, the delivery
- * capability and the metadata read belong to the canonical Postgres store, and this
- * process composes neither the token signer nor the delivery policy that store takes.
- */
-class ApiStoredObjectPortableAbsence extends StoredObjectService {
-  static create(): ApiStoredObjectPortableAbsence {
-    return new ApiStoredObjectPortableAbsence();
-  }
-
-  private refuse(capability: string): never {
-    throw new ApiStoredObjectUnavailableError(
-      `${capability}, because this deployment composed no portable stored-object store,`,
-    );
-  }
-
-  storeFromBytes(): never {
-    return this.refuse("Storing an object from bytes");
-  }
-  createUpload(): never {
-    return this.refuse("Beginning a stored-object upload");
-  }
-  confirmUpload(): never {
-    return this.refuse("Confirming a stored-object upload");
-  }
-  getMetadata(): never {
-    return this.refuse("Reading a stored object's metadata");
-  }
-  getById(): never {
-    return this.refuse("Reading a stored object");
-  }
-  resolveDelivery(): never {
-    return this.refuse("Resolving a stored object's delivery capability");
-  }
-  streamForDelivery(): never {
-    return this.refuse("Streaming a stored object for delivery");
-  }
-  delete(): never {
-    return this.refuse("Deleting a stored object");
-  }
-  getStorageUsageByProject(): never {
-    return this.refuse("Reading a project's stored-object usage");
-  }
-  deleteOwnedBy(): never {
-    return this.refuse("Deleting a project's stored objects");
   }
 }

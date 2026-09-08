@@ -6,7 +6,7 @@ import {
   StoredObjectLegacyWriterDrainPort,
   StoredObjectProjectSourcePort,
 } from "../index.ts";
-import { InMemoryStoredObjectStore } from "../testing.ts";
+import { MemoryStoredObjectRecordRepository } from "../repositories/memory/memory.stored-object-record.repository.ts";
 import { Temporal } from "@langwatch/time";
 
 class OneProject extends StoredObjectProjectSourcePort {
@@ -76,7 +76,7 @@ function newMigration() {
     legacy: new OneLegacyObject(),
     locations: new LegacyLocations(),
     drain: new ProvedDrain(),
-    store: InMemoryStoredObjectStore.create(),
+    records: MemoryStoredObjectRecordRepository.create(),
   });
 }
 
@@ -94,20 +94,22 @@ describe("ClickHouseImportStoredObjectMigration", () => {
   });
 
   it("imports directly into the one row store through system migrations", async () => {
-    const store = InMemoryStoredObjectStore.create();
+    const records = MemoryStoredObjectRecordRepository.create();
     const migration = ClickHouseImportStoredObjectMigration.create({
       projects: new OneProject(),
       legacy: new OneLegacyObject(),
       locations: new LegacyLocations(),
       drain: new ProvedDrain(),
-      store,
+      records,
     });
 
     await expect(migration.migrateTenant({ tenantId: "organization_1" })).resolves.toMatchObject({
       status: "finalized",
       report: { imported: 1, drainProved: true },
     });
-    await expect(store.tryFind({ tenantId: "project_1", id: "so_legacy" })).resolves.toMatchObject({
+    await expect(
+      records.findById({ tenantId: "project_1", id: "so_legacy" }),
+    ).resolves.toMatchObject({
       status: "available",
       source: "imported",
       audiences: ["traces:view"],
@@ -124,7 +126,7 @@ describe("ClickHouseImportStoredObjectMigration", () => {
       legacy: new OneLegacyObject(),
       locations: new LegacyLocations(),
       drain: new DrainBecomesValidAfterFirstScan(),
-      store: InMemoryStoredObjectStore.create(),
+      records: MemoryStoredObjectRecordRepository.create(),
     });
     const first = await migration.migrateTenant({ tenantId: "org_1" });
     expect(first.status).toBe("migrated");

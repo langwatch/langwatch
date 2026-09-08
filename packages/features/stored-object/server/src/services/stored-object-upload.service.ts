@@ -23,7 +23,7 @@ import {
 } from "@langwatch/stored-object-contract";
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadTokenClaims } from "../ports/stored-object.port.ts";
-import type { StoredObjectRecord } from "../stores/stored-object.store.ts";
+import type { StoredObjectRecord } from "../repositories/stored-object-record.repository.ts";
 import type { StoredObjectServiceOptions } from "./stored-object.service.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
@@ -93,14 +93,14 @@ export class StoredObjectUploadService {
       projectId: input.projectId,
       sha256,
     });
-    const existing = await this.options.store.tryFind({
+    const existing = await this.options.records.findById({
       tenantId: input.projectId,
       id,
     });
     if (existing?.status === "available") {
       StoredObjectUploadService.assertByteFacts(existing, bytes.byteLength);
       if (!existing.audiences.includes(input.audience)) {
-        await this.options.store.save({
+        await this.options.records.upsert({
           ...existing,
           audiences: [...existing.audiences, input.audience],
           updatedAt: this.now(),
@@ -143,7 +143,7 @@ export class StoredObjectUploadService {
       updatedAt: now,
     };
     try {
-      await this.options.store.save(record);
+      await this.options.records.upsert(record);
     } catch (error) {
       await StoredObjectUploadService.ignoreStorageFailure(() =>
         this.options.storage.delete({ projectId: input.projectId, address }),
@@ -166,7 +166,7 @@ export class StoredObjectUploadService {
       projectId: input.projectId,
       sha256: input.sha256,
     });
-    const existing = await this.options.store.tryFind({
+    const existing = await this.options.records.findById({
       tenantId: input.projectId,
       id,
     });
@@ -195,7 +195,7 @@ export class StoredObjectUploadService {
 
     const record = pendingUploadRecord({ input, id, upload, expiresAt, now, existing });
     try {
-      await this.options.store.save(record);
+      await this.options.records.upsert(record);
     } catch (error) {
       await StoredObjectUploadService.ignoreStorageFailure(() =>
         this.options.storage.delete({
@@ -232,7 +232,7 @@ export class StoredObjectUploadService {
       throw new UploadTokenInvalidError();
     }
 
-    const value = await this.options.store.tryFind({
+    const value = await this.options.records.findById({
       tenantId: claims.projectId,
       id: claims.objectId,
     });
@@ -244,7 +244,9 @@ export class StoredObjectUploadService {
       throw new UploadIncompleteError(claims.operationId);
     }
 
-    if (value.expiresAt === null || Temporal.Instant.compare(value.expiresAt, this.now()) <= 0) {
+    const isExpired =
+      value.expiresAt === null || Temporal.Instant.compare(value.expiresAt, this.now()) <= 0;
+    if (isExpired) {
       throw new UploadExpiredError(claims.operationId);
     }
 
@@ -273,7 +275,7 @@ export class StoredObjectUploadService {
       availableAt: now,
       updatedAt: now,
     };
-    await this.options.store.save(available);
+    await this.options.records.upsert(available);
 
     return storedObjectReferenceOf(available);
   }

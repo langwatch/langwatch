@@ -1,11 +1,15 @@
+/**
+ * The canonical stored-object row, as its readers see it. One row per object
+ * per tenant; `tenantId` IS the project, and every read carries it.
+ */
 import type {
   StoredObjectDeliveryAudience,
   StoredObjectId,
   StoredObjectLifecycleStatus,
   StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageAddress } from "../ports/stored-object.port.ts";
 import type { Instant } from "@langwatch/time";
+import type { StoredObjectStorageAddress } from "../ports/stored-object.port.ts";
 
 export type StoredObjectSource = "canonical" | "imported";
 
@@ -33,25 +37,26 @@ export type StoredObjectRecord = Readonly<{
   updatedAt: Instant;
 }>;
 
-/** One persistence boundary for the single StoredObject table. */
-export abstract class StoredObjectStore {
-  abstract tryFind(input: {
+export type StoredObjectRecordPageQuery = Readonly<{
+  tenantId: StoredObjectProjectId;
+  afterId?: StoredObjectId;
+  status?: StoredObjectLifecycleStatus;
+  expiresBefore?: Instant;
+  limit: number;
+}>;
+
+export interface StoredObjectRecordRepository {
+  findById(input: {
     tenantId: StoredObjectProjectId;
     id: StoredObjectId;
   }): Promise<StoredObjectRecord | null>;
 
-  abstract save(value: StoredObjectRecord): Promise<void>;
+  upsert(value: StoredObjectRecord): Promise<void>;
 
-  abstract getUsage(input: {
+  countActive(input: {
     tenantId: StoredObjectProjectId;
     purpose?: string;
   }): Promise<{ activeObjectCount: number; activeByteLength: number }>;
 
-  abstract findPage(input: {
-    tenantId: StoredObjectProjectId;
-    afterId?: StoredObjectId;
-    status?: StoredObjectLifecycleStatus;
-    expiresBefore?: Instant;
-    limit: number;
-  }): Promise<StoredObjectRecord[]>;
+  findPage(input: StoredObjectRecordPageQuery): Promise<StoredObjectRecord[]>;
 }

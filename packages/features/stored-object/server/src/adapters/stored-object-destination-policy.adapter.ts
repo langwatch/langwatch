@@ -44,8 +44,9 @@ export class StoredObjectDestinationPolicyAdapter extends StoredObjectProjectDes
       return { kind: "azure", ...azure };
     }
 
-    if (this.selection.globalS3Bucket?.trim()) {
-      return { kind: "s3", bucket: this.selection.globalS3Bucket.trim() };
+    const globalS3Bucket = this.selection.globalS3Bucket?.trim();
+    if (globalS3Bucket) {
+      return { kind: "s3", bucket: globalS3Bucket };
     }
     return { kind: "file", root: this.selection.localFilesystemRoot };
   }

@@ -138,7 +138,8 @@ function assertSovereignAuthority({
   } catch {
     return;
   }
-  if (hostname.toLowerCase().endsWith(PUBLIC_CLOUD_SUFFIX)) return;
+  const isPublicCloudHost = hostname.toLowerCase().endsWith(PUBLIC_CLOUD_SUFFIX);
+  if (isPublicCloudHost) return;
   if (isLocalEmulatorHost(hostname)) return;
   if (authorityHost) return;
 

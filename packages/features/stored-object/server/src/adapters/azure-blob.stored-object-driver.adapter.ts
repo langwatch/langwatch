@@ -76,6 +76,13 @@ function isPathStyleEndpoint(endpointBaseUrl: string | undefined, accountName: s
   }
 }
 
+/** Ordinal (byte) comparison — never localeCompare, which is locale-sensitive. */
+function compareByteOrder(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 /**
  * Builds the canonicalised resource path Azure uses for the shared-key
  * authorization signature. See:
@@ -108,7 +115,7 @@ function withCanonicalisedQuery(resource: string, queryParams: Record<string, st
   // produce a signature Azure computes differently and rejects with a 403.
   const lines = Object.entries(queryParams)
     .map(([k, v]) => [k.toLowerCase(), v] as const)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort(([a], [b]) => compareByteOrder(a, b))
     .map(([k, v]) => `${k}:${v}`);
   return lines.length > 0 ? [resource, ...lines].join("\n") : resource;
 }
@@ -123,7 +130,7 @@ function canonicalisedHeaders(headers: Record<string, string>): string {
     .map(([k, v]) => [k.toLowerCase(), v.trim()] as const)
     // Ordinal, not localeCompare: the spec compares bytes, and a
     // locale-aware collation can order the same two names differently.
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    .sort(([a], [b]) => compareByteOrder(a, b));
 
   return xMsHeaders.map(([k, v]) => `${k}:${v}`).join("\n");
 }
@@ -367,12 +374,12 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     // an unbounded upload past the check.
     const rawContentLength = response.headers.get("content-length");
     const contentLength = Number(rawContentLength);
-    if (
+    const hasUnusableContentLength =
       rawContentLength === null ||
       rawContentLength.trim() === "" ||
       !Number.isFinite(contentLength) ||
-      contentLength < 0
-    ) {
+      contentLength < 0;
+    if (hasUnusableContentLength) {
       throw new Error(
         `Azure Blob HEAD returned no usable Content-Length for ${redactStoredObjectStorageUri(uri)}`,
       );

@@ -9,10 +9,12 @@ import {
   type StoredObject,
   type StoredObjectStorageDriver,
 } from "@langwatch/stored-object-server";
+import type {
+  MigrationDataset,
+  MigrationProject,
+  ObjectStorageMigrationInventoryPort,
+} from "../../ports/object-storage-migration-inventory.port.ts";
 import {
-  type MigrationDataset,
-  type MigrationInventory,
-  type MigrationProject,
   ObjectStorageMigrationService,
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service.ts";
@@ -113,7 +115,7 @@ const setup = ({
       current.map((candidate) => (candidate.id === row.id ? row : candidate)),
     );
   };
-  const inventory: MigrationInventory = {
+  const inventory: ObjectStorageMigrationInventoryPort = {
     listProjectsPage: vi.fn(async (request) => pageById(projects, request)),
     listStoredObjectsPage: vi.fn(async (projectId, request) =>
       pageById(rows.get(projectId) ?? [], request),

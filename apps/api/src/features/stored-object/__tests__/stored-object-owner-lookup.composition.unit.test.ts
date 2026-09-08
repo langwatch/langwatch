@@ -6,7 +6,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config.ts";
-import { composeStoredObjectFeature } from "../stored-object.composition.ts";
+import { installApiStoredObject } from "../stored-object.composition.ts";
 
 const STORED_OBJECT_ID = "stored-object-1";
 
@@ -38,7 +38,7 @@ function endpoint(target: string, rows: Array<{ project_id: string }>) {
 }
 
 function compose(instances: (() => readonly { target: string; client: unknown }[]) | null) {
-  return composeStoredObjectFeature({
+  return installApiStoredObject({
     prisma: { project: { findUnique: vi.fn(async () => null) } } as unknown as PrismaClient,
     resolveClickHouseClient: null,
     clickHouseInstances: instances,
@@ -52,22 +52,30 @@ describe("given the API process composes the object store", () => {
     it("finds the owner on whichever endpoint holds the row", async () => {
       const shared = endpoint("shared", []);
       const byoc = endpoint("org_byoc", [{ project_id: "project-7" }]);
-      const feature = compose(() => [shared.instance, byoc.instance]);
+      const feature = await compose(() => [shared.instance, byoc.instance]);
 
-      const owner = await feature.app.resolveOwner({ id: STORED_OBJECT_ID });
+      try {
+        const owner = await feature.app.resolveOwner({ id: STORED_OBJECT_ID });
 
-      expect(owner).toEqual({ projectId: "project-7" });
-      expect(shared.asked).toHaveLength(1);
-      expect(byoc.asked[0]).toContain("FROM stored_objects");
+        expect(owner).toEqual({ projectId: "project-7" });
+        expect(shared.asked).toHaveLength(1);
+        expect(byoc.asked[0]).toContain("FROM stored_objects");
+      } finally {
+        await feature.close();
+      }
     });
   });
 
   describe("when this deployment opened no ClickHouse endpoint", () => {
     /** @scenario "An id-only URL on a deployment with no owner directory resolves to nothing" */
     it("resolves to nothing rather than claiming a project", async () => {
-      const feature = compose(null);
+      const feature = await compose(null);
 
-      await expect(feature.app.resolveOwner({ id: STORED_OBJECT_ID })).resolves.toBeNull();
+      try {
+        await expect(feature.app.resolveOwner({ id: STORED_OBJECT_ID })).resolves.toBeNull();
+      } finally {
+        await feature.close();
+      }
     });
   });
 });

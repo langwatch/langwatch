@@ -20,9 +20,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+function hasChartsDirectory(directory: string): boolean {
+  return fs.existsSync(path.join(directory, "charts", "langwatch"));
+}
+
 const REPO_ROOT = (() => {
   let directory = path.dirname(fileURLToPath(import.meta.url));
-  while (!fs.existsSync(path.join(directory, "charts", "langwatch"))) {
+  while (!hasChartsDirectory(directory)) {
     const parent = path.dirname(directory);
     if (parent === directory) {
       throw new Error("could not find the repository root holding charts/langwatch");

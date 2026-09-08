@@ -1,24 +1,22 @@
 /**
- * The stored-object feature's application: what its doors call.
- *
- * Four surfaces reach stored objects — the public RPC family, the `/api/files`
- * byte reader, the tRPC existence probe, and the internal dashboard adapter —
- * and each declared its own bag: `StoredObjectsPublicApp`, a pair of resolver
- * functions on the files family, `StoredObjectApplication` with a
- * deliberately-narrow probe, and a constructor argument. One object now holds
- * the union.
- *
- * The operations are the service's own and are reached through it. What this
- * object adds is that they are reached through ONE thing, and that the file
- * surface's byte read is finally NAMED: it consumes a row and a stream, which
- * `StoredObjectService.getById` does not answer with, and the mismatch had
- * been carried by an annotation that said otherwise.
+ * The stored-object feature's application. Two shapes of read reach an object
+ * and they are not one operation: the portable capability answers metadata and
+ * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
 import type { Readable } from "node:stream";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type {
+  DeleteProjectStoredObjectsResult,
+  ReadStoredObjectResult,
+  StoreStoredObjectFromBytesInput,
+  StoreStoredObjectFromBytesResult,
+  StoredObjectFileRow,
   StoredObjectHead,
+  StoredObjectIdDeriver,
+  StoredObjectMetadata,
   StoredObjectOwnerResolver,
-  StoredObjectService,
+  StoredObjectReference,
   StoredObjectsConfirmUploadInput,
   StoredObjectsCreateUploadInput,
   StoredObjectsCreateUploadOutput,
@@ -26,109 +24,150 @@ import type {
   StoredObjectsDeleteOutput,
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
-  StoredObjectReference,
 } from "@langwatch/stored-object-contract";
+import type {
+  StoredObjectDeliveryPort,
+  StoredObjectStoragePort,
+  StoredObjectUploadTokenPort,
+} from "../ports/stored-object.port.ts";
+import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
+import { StoredObjectService } from "../services/stored-object.service.ts";
 
 /**
- * The row the file surface builds its response from.
- *
- * `purpose` and `owner_kind` are BOTH here because they are both gates rather
- * than description. `/api/files` picks the permission category from the
- * purpose; `/api/user-avatar` is readable by any authenticated caller on the
- * platform and is safe only because it refuses every object whose owner kind is
- * not the avatar one. The columns exist on the row and the repository already
- * selects them — projecting only `purpose` here is what left the avatar family
- * unmountable, because a broad read that cannot see the owner kind cannot
- * refuse another tenant's trace media.
+ * The contract's byte read, narrowed to the Node stream this process's byte
+ * backends hand over: `Readable` is an `AsyncIterable<Uint8Array>`, so the
+ * narrower answer still satisfies the contract's `readById`.
  */
-export interface StoredObjectFileRow {
-  id: string;
-  purpose: string;
-  owner_kind: string;
-  media_type: string;
-  size_bytes: number;
-}
-
-/** What a byte read answers with when the row exists. */
-export type StoredObjectFileRead =
+export type StoredObjectFileStreamRead =
   | { row: StoredObjectFileRow; stream: Readable }
   | { row: StoredObjectFileRow; status: "missing" };
 
 /**
- * The stored-object reads the file surface and the probe perform.
- *
- * Separate from {@link StoredObjectService} because it is shaped differently,
- * not merely narrower: the file surface streams bytes and needs the ROW — its
- * purpose gates the read, its size and media type build the response — where
- * the portable service answers `tryGetById` with metadata and an async iterable.
- * The process's own stored-object service satisfies both, which is why one
- * object can be passed for both keys; naming the difference is what stops the
- * two being confused for each other again.
+ * The stored-object reads the byte surface and the probe perform, as the
+ * process supplies them. Separate from the portable capability because it is
+ * shaped differently rather than merely narrower.
  */
 export interface StoredObjectFileReadPort {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
   tryGetById(
     input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileRead | null>;
+  ): Promise<StoredObjectFileStreamRead | null>;
 }
 
-/** What the process composes this feature's application from. */
-export interface StoredObjectAppDependencies {
-  /** The portable capability: uploads, delivery capabilities, deletion. */
-  storedObjects: StoredObjectService;
-  /** The row-and-stream reads the file surface and the probe perform. */
+export type StoredObjectInfrastructure = Readonly<{
+  storage: StoredObjectStoragePort;
+  delivery: StoredObjectDeliveryPort;
+  uploadTokens: StoredObjectUploadTokenPort;
+  idDeriver: StoredObjectIdDeriver;
+  maximumUploadBytes: number;
+  uploadExpiryMs: number;
+  /** The row-and-stream reads the byte surface and the probe perform. */
   files: StoredObjectFileReadPort;
   /** Which project owns an object, when the URL does not say. */
   owners: StoredObjectOwnerResolver;
-}
+}>;
 
-export class StoredObjectApp {
-  static create(dependencies: StoredObjectAppDependencies): StoredObjectApp {
-    return new StoredObjectApp(dependencies);
+type StoredObjectSetup = FeatureSetup<
+  Record<never, never>,
+  StoredObjectInfrastructure,
+  undefined,
+  StoredObjectRepositories
+>;
+
+export class StoredObjectApp implements StoredObjectApi {
+  static readonly contract = StoredObjectApi;
+  static readonly dependencies = {};
+
+  static create(setup: StoredObjectSetup): StoredObjectApp {
+    return new StoredObjectApp(
+      StoredObjectService.create({
+        records: setup.repositories.records,
+        storage: setup.infrastructure.storage,
+        delivery: setup.infrastructure.delivery,
+        uploadTokens: setup.infrastructure.uploadTokens,
+        idDeriver: setup.infrastructure.idDeriver,
+        maximumUploadBytes: setup.infrastructure.maximumUploadBytes,
+        uploadExpiryMs: setup.infrastructure.uploadExpiryMs,
+      }),
+      setup.infrastructure.files,
+      setup.infrastructure.owners,
+    );
   }
 
-  private constructor(private readonly dependencies: StoredObjectAppDependencies) {}
+  #storedObjects: StoredObjectService;
+  #files: StoredObjectFileReadPort;
+  #owners: StoredObjectOwnerResolver;
+
+  private constructor(
+    storedObjects: StoredObjectService,
+    files: StoredObjectFileReadPort,
+    owners: StoredObjectOwnerResolver,
+  ) {
+    this.#storedObjects = storedObjects;
+    this.#files = files;
+    this.#owners = owners;
+  }
 
   /** Begins an upload and answers where to put the bytes. */
   createUpload(input: StoredObjectsCreateUploadInput): Promise<StoredObjectsCreateUploadOutput> {
-    return this.dependencies.storedObjects.createUpload(input);
+    return this.#storedObjects.createUpload(input);
   }
 
   /** Completes an upload the caller has finished writing. */
   confirmUpload(input: StoredObjectsConfirmUploadInput): Promise<StoredObjectReference> {
-    return this.dependencies.storedObjects.confirmUpload(input);
+    return this.#storedObjects.confirmUpload(input);
   }
 
   /** A fresh delivery capability for one object. */
   resolveDelivery(input: StoredObjectsGetInput): Promise<StoredObjectsGetOutput> {
-    return this.dependencies.storedObjects.resolveDelivery(input);
+    return this.#storedObjects.resolveDelivery(input);
   }
 
   /** Removes one object. Idempotent from the caller's side. */
   delete(input: StoredObjectsDeleteInput): Promise<StoredObjectsDeleteOutput> {
-    return this.dependencies.storedObjects.delete(input);
+    return this.#storedObjects.delete(input);
   }
 
   /** Whether an object's row AND its bytes exist. */
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead> {
-    return this.dependencies.files.headById(input);
+    return this.#files.headById(input);
   }
 
   /** One object's row and, when the bytes are there, a stream of them. */
   readById(
     input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileRead | null> {
-    return this.dependencies.files.tryGetById(input);
+  ): Promise<StoredObjectFileStreamRead | null> {
+    return this.#files.tryGetById(input);
   }
 
   /**
-   * Which project owns an object, for a URL that does not say.
-   *
-   * The lookup fans out across every configured instance, so a transient
-   * outage on one of them raises rather than answering "no owner" — a
-   * degraded instance must not read as a deleted object.
+   * Which project owns an object, for a URL that does not say. A transient
+   * outage on one instance raises rather than answering "no owner": a degraded
+   * instance must not read as a deleted object.
    */
   resolveOwner(input: { id: string }): Promise<{ projectId: string } | null> {
-    return this.dependencies.owners.tryResolve(input);
+    return this.#owners.tryResolve(input);
+  }
+
+  storeFromBytes(
+    input: StoreStoredObjectFromBytesInput,
+  ): Promise<StoreStoredObjectFromBytesResult> {
+    return this.#storedObjects.storeFromBytes(input);
+  }
+
+  getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {
+    return this.#storedObjects.getMetadata(input);
+  }
+
+  getById(input: { projectId: string; id: string }): Promise<ReadStoredObjectResult> {
+    return this.#storedObjects.getById(input);
+  }
+
+  getStorageUsageByProject(input: { projectId: string; purpose?: string }) {
+    return this.#storedObjects.getStorageUsageByProject(input);
+  }
+
+  deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
+    return this.#storedObjects.deleteOwnedBy(input);
   }
 }

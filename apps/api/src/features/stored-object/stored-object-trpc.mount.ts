@@ -1,18 +1,15 @@
-/**
- * App-process transport mount for the stored-object probe surface.
- *
- * Behaviour is package-owned (`@langwatch/stored-object-server`); this supplies
- * the process's root, authenticated procedure and policy chain.
- */
-import { createTrpcApiService, type TrpcApiMount } from "@langwatch/api/trpc";
-import { StoredObjectTrpcApi, type StoredObjectTrpcContext } from "@langwatch/stored-object-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+/** Binds the feature's declared procedures to this process's execution path. */
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { storedObjectTrpcTransport } from "@langwatch/stored-object-server";
 
-/** Mounts `storedObjects.*` on the app process's tRPC root. */
-export function createStoredObjectTrpcRouter<
-  TContext extends StoredObjectTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
-  return StoredObjectTrpcApi.create(mount.root, createTrpcApiService(mount));
+/** The one slice of the process context this namespace reads. */
+export interface StoredObjectHostContext {
+  app: Readonly<{ storedObjectApp: StoredObjectApi }>;
+}
+
+export function createStoredObjectTrpcRouter<TContext extends StoredObjectHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(storedObjectTrpcTransport, (ctx) => ctx.app.storedObjectApp);
 }

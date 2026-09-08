@@ -3,7 +3,6 @@ import {
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
   StoredObjectNotFoundError,
-  StoredObjectService as StoredObjectServiceContract,
   StoredObjectUnavailableError,
   type ConfirmStoredObjectUploadInput,
   type CreateStoredObjectUploadInput,
@@ -28,13 +27,16 @@ import {
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
 } from "../ports/stored-object.port.ts";
-import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store.ts";
+import type {
+  StoredObjectRecord,
+  StoredObjectRecordRepository,
+} from "../repositories/stored-object-record.repository.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
 import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export type StoredObjectServiceOptions = Readonly<{
-  store: StoredObjectStore;
+  records: StoredObjectRecordRepository;
   storage: StoredObjectStoragePort;
   delivery: StoredObjectDeliveryPort;
   uploadTokens: StoredObjectUploadTokenPort;
@@ -47,7 +49,7 @@ export type StoredObjectServiceOptions = Readonly<{
 }>;
 
 /** The feature's only lifecycle/orchestration class. */
-export class StoredObjectService extends StoredObjectServiceContract {
+export class StoredObjectService {
   static create(options: StoredObjectServiceOptions): StoredObjectService {
     if (!Number.isSafeInteger(options.maximumUploadBytes) || options.maximumUploadBytes < 0) {
       throw new RangeError("maximumUploadBytes must be a non-negative safe integer");
@@ -65,7 +67,6 @@ export class StoredObjectService extends StoredObjectServiceContract {
   private readonly uploads: StoredObjectUploadService;
 
   private constructor(private readonly options: StoredObjectServiceOptions) {
-    super();
     this.now = options.now ?? nowInstant;
     this.operationId = options.operationId ?? (() => `upload_${randomUUID()}`);
     this.uploads = StoredObjectUploadService.create({
@@ -160,14 +161,14 @@ export class StoredObjectService extends StoredObjectServiceContract {
       deletedAt,
       updatedAt: deletedAt,
     };
-    await this.options.store.save(deleted);
+    await this.options.records.upsert(deleted);
     if (deleted.storage) {
       const cleaned = await this.deleteStorageBestEffort({
         projectId: input.projectId,
         address: deleted.storage,
       });
       if (cleaned) {
-        await this.options.store.save({ ...deleted, storage: null });
+        await this.options.records.upsert({ ...deleted, storage: null });
       }
     }
 
@@ -189,7 +190,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       query.purpose = input.purpose;
     }
 
-    const usage = await this.options.store.getUsage(query);
+    const usage = await this.options.records.countActive(query);
     const result: StoredObjectStorageUsage = {
       projectId: input.projectId,
       ...usage,
@@ -219,7 +220,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
         query.afterId = afterId;
       }
 
-      const page = await this.options.store.findPage(query);
+      const page = await this.options.records.findPage(query);
       for (const value of page) {
         if (value.status !== "deleted") {
           await this.delete({
@@ -253,7 +254,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
   /** Bounded retry for pending uploads that have expired. */
   async cleanupExpiredUploads(input: { projectId: string; limit?: number }): Promise<number> {
     const now = this.now();
-    const page = await this.options.store.findPage({
+    const page = await this.options.records.findPage({
       tenantId: input.projectId,
       status: "pending",
       expiresBefore: now,
@@ -271,7 +272,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
         continue;
       }
 
-      await this.options.store.save({
+      await this.options.records.upsert({
         ...value,
         status: "failed",
         storage: null,
@@ -286,7 +287,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
   /** Bounded retry for provider deletion after logical deletion won. */
   async cleanupDeletedObjects(input: { projectId: string; limit?: number }): Promise<number> {
     const now = this.now();
-    const page = await this.options.store.findPage({
+    const page = await this.options.records.findPage({
       tenantId: input.projectId,
       status: "deleted",
       limit: input.limit ?? this.options.cleanupBatchSize ?? 100,
@@ -306,7 +307,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
         continue;
       }
 
-      await this.options.store.save({
+      await this.options.records.upsert({
         ...value,
         storage: null,
         updatedAt: now,
@@ -337,7 +338,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     projectId: string;
     id: string;
   }): Promise<StoredObjectRecord> {
-    const value = await this.options.store.tryFind({
+    const value = await this.options.records.findById({
       tenantId: input.projectId,
       id: input.id,
     });

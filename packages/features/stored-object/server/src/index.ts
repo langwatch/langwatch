@@ -1,14 +1,18 @@
 /**
- * The feature's application: the one typed thing its transports are given.
- * Every door reaches the same object, so a rule written on it is the rule
- * every door gets.
+ * The installer and the transport declarations the process mounts, beside the
+ * ports and adapters the processes that own the byte backends compose.
  */
+export { storedObjectServer } from "./stored-object.server.ts";
+export {
+  STORED_OBJECTS_PUBLIC_API_VERSION,
+  storedObjectRest,
+} from "./transport/stored-object.rest.ts";
+export { storedObjectTrpcTransport } from "./transport/stored-object.trpc.ts";
 export {
   StoredObjectApp,
-  type StoredObjectAppDependencies,
-  type StoredObjectFileRead,
   type StoredObjectFileReadPort,
-  type StoredObjectFileRow,
+  type StoredObjectFileStreamRead,
+  type StoredObjectInfrastructure,
 } from "./app/stored-object.app.ts";
 export {
   createFilesRestApp,
@@ -30,33 +34,28 @@ export {
   type StoredObjectStorageDriver,
   type StoredObjectStorageDriverFactory,
 } from "./adapters/stored-object-storage-registry.adapter.ts";
+export { StoredObjectStoragePortAdapter } from "./adapters/stored-object-storage.port.adapter.ts";
 export { AzureBlobStoredObjectDriverAdapter } from "./adapters/azure-blob.stored-object-driver.adapter.ts";
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
   AzureBackendMisconfiguredError,
+  AzureBlobCredentialsAdapter,
   type AzureBlobCredentialsConfig,
   type AzureCredentials,
   type AzureInjectedIdentity,
   type AzureTokenAuthMode,
 } from "./adapters/azure-blob-credentials.adapter.ts";
-export { AzureBlobCredentialsAdapter } from "./adapters/azure-blob-credentials.adapter.ts";
 export {
+  AzureBlobTokenProviderAdapter,
   AzureTokenExchangeError,
   type TokenModeCredentials,
 } from "./adapters/azure-blob-token-provider.adapter.ts";
-export { AzureBlobTokenProviderAdapter } from "./adapters/azure-blob-token-provider.adapter.ts";
 export {
   StoredObjectProjectDestinationResolverPort,
   StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageProject,
   type StoredObjectStorageRuntimeOptions,
 } from "./adapters/stored-object-storage-runtime.adapter.ts";
-export {
-  StoredObjectsPublicApi,
-  STORED_OBJECTS_PUBLIC_API_VERSION,
-  type StoredObjectsPublicApp,
-  type StoredObjectsPublicApiOptions,
-} from "./transport/public-rest/stored-object.api.ts";
 export {
   ClickHouseImportStoredObjectMigration,
   STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME,
@@ -83,15 +82,6 @@ export {
   StoredObjectOwnerLookupTelemetryPort,
   type StoredObjectOwnerLookupSpan,
 } from "./ports/stored-object-owner-lookup-telemetry.port.ts";
-export {
-  StoredObjectService,
-  type StoredObjectServiceOptions,
-} from "./services/stored-object.service.ts";
-export { PostgresStoredObjectAdapter } from "./adapters/postgres.stored-object.adapter.ts";
-export {
-  StoredObjectTrpcApi,
-  type StoredObjectTrpcContext,
-} from "./transport/api-trpc/stored-object.api.ts";
 /**
  * The CONTENT-ADDRESSED store, moved here whole from the platform application.
  */
@@ -127,17 +117,18 @@ export {
   type MigrationTaskConfig,
   type MigrationTaskPhase,
 } from "./tasks/object-storage-migrate.task.ts";
-export { PostgresObjectStorageMigrationInventoryAdapter } from "./adapters/postgres.object-storage-migration-inventory.adapter.ts";
+export {
+  ObjectStorageMigrationInventoryPort,
+  type MigrationDataset,
+  type MigrationPageRequest,
+  type MigrationProject,
+} from "./ports/object-storage-migration-inventory.port.ts";
 export {
   MigrationBlockedError,
   ObjectStorageMigrationService,
   type MigrationCopyReport,
-  type MigrationDataset,
   type MigrationFinalizeReport,
-  type MigrationInventory,
-  type MigrationPageRequest,
   type MigrationPlan,
-  type MigrationProject,
   type MigrationProvider,
   type MigrationStorageEndpoint,
   type QueueMigrationBlocker,

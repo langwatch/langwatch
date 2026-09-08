@@ -408,10 +408,6 @@ const LEGACY_INERT: string[] = [
   "packages/eventing/specs/pipeline-model.feature",
   "packages/eventing/specs/process-roles.feature",
   "packages/eventing/specs/redis-fold-cache.feature",
-  // The reduced Stored Objects package foundation ships before runtime binding.
-  // Remove this entry with the first app binding, drop the feature-level
-  // @unimplemented tag, and park only any remaining rollout scenarios.
-  "packages/features/stored-object/specs/stored-objects.feature",
   "packages/group-queue/specs/payload-envelope.feature",
   "specs/automations/dispatch-error-contract.feature",
   "specs/billing/global-projections.feature",

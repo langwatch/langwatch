@@ -4,6 +4,12 @@
 import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
+import type {
+  MigrationDataset,
+  MigrationPageRequest,
+  MigrationProject,
+  ObjectStorageMigrationInventoryPort,
+} from "#ports/object-storage-migration-inventory.port";
 import {
   assertUriDigest,
   copyVerified,
@@ -27,41 +33,10 @@ function newerVersionTimestamp(previous: Instant, candidate: Instant): Instant {
 
 export type MigrationProvider = "s3" | "azure";
 
-export type MigrationProject = {
-  id: string;
-  /** A tenant-owned bucket is never included in a global provider migration. */
-  privateS3: boolean;
-};
-
-export type MigrationDataset = {
-  id: string;
-  projectId: string;
-  contentLayout: string;
-  status: string;
-  chunkCount: number | null;
-};
-
 export type QueueMigrationBlocker = {
   queueName: string;
   kind: "pending" | "delayed" | "active" | "blocked" | "staged-durable-ref";
   count: number;
-};
-
-export interface MigrationInventory {
-  listProjectsPage(request: MigrationPageRequest): Promise<MigrationProject[]>;
-  /** Returns a stable id-ordered page of latest ReplacingMergeTree versions. */
-  listStoredObjectsPage(projectId: string, request: MigrationPageRequest): Promise<StoredObject[]>;
-  /**
-   * Includes archived datasets: they remain recoverable customer data. Per-project like the
-   * stored-objects page: the Prisma multitenancy middleware rejects any Dataset query without a
-   * projectId, so a global page shape is unimplementable against the real database.
-   */
-  listDatasetsPage(projectId: string, request: MigrationPageRequest): Promise<MigrationDataset[]>;
-}
-
-export type MigrationPageRequest = {
-  afterId?: string;
-  limit: number;
 };
 
 export type MigrationStorageEndpoint = {
@@ -120,7 +95,7 @@ export class MigrationBlockedError extends Error {
 export type ObjectStorageMigrationDeps = {
   source: MigrationStorageEndpoint;
   destination: MigrationStorageEndpoint;
-  inventory: MigrationInventory;
+  inventory: ObjectStorageMigrationInventoryPort;
   /**
    * Must append a newer stored_objects version. It must never ALTER UPDATE or
    * delete the prior version.
@@ -183,7 +158,10 @@ export class ObjectStorageMigrationService {
 
     for await (const row of this.eligibleStoredObjects(scope)) {
       const destinationUri = this.deps.destination.storedObjectUri(row.project_id, row.sha256);
-      if (row.storage_uri.startsWith(`${this.deps.destination.scheme}://`)) {
+      const isAlreadyDestinationScheme = row.storage_uri.startsWith(
+        `${this.deps.destination.scheme}://`,
+      );
+      if (isAlreadyDestinationScheme) {
         if (row.storage_uri !== destinationUri) {
           // This aborts the whole run, so it has to say WHICH row. The two addresses themselves
           // cannot go in the message: they differ only in the bucket / storage account, which is
@@ -244,7 +222,8 @@ export class ObjectStorageMigrationService {
     sourceUri,
     destinationUri,
   }: DatasetChunkUris): Promise<"copied" | "repaired" | "skippedVerified"> {
-    if (!(await this.deps.source.driver.exists(sourceUri))) {
+    const hasSourceCopy = await this.deps.source.driver.exists(sourceUri);
+    if (!hasSourceCopy) {
       return this.acceptDestinationOnlyChunk({ sourceUri, destinationUri });
     }
 
@@ -261,7 +240,8 @@ export class ObjectStorageMigrationService {
     sourceUri,
     destinationUri,
   }: DatasetChunkUris): Promise<"skippedVerified"> {
-    if (await this.deps.destination.driver.exists(destinationUri)) {
+    const hasDestinationCopy = await this.deps.destination.driver.exists(destinationUri);
+    if (hasDestinationCopy) {
       return "skippedVerified";
     }
 
@@ -340,7 +320,8 @@ export class ObjectStorageMigrationService {
       // Mirror of the copy loop's already-at-destination tolerance: a chunk
       // with no source copy has no digest to compare, so presence at the
       // destination is the strongest check available (#6323).
-      if (!(await this.deps.source.driver.exists(chunk.sourceUri))) {
+      const hasSourceCopy = await this.deps.source.driver.exists(chunk.sourceUri);
+      if (!hasSourceCopy) {
         await this.acceptDestinationOnlyChunk(chunk);
         continue;
       }
@@ -429,7 +410,9 @@ export class ObjectStorageMigrationService {
         this.deps.inventory.listStoredObjectsPage(projectId, request),
       )) {
         const scheme = row.storage_uri.slice(0, row.storage_uri.indexOf(":"));
-        if (scheme === this.deps.source.scheme || scheme === this.deps.destination.scheme) {
+        const isMigrationScheme =
+          scheme === this.deps.source.scheme || scheme === this.deps.destination.scheme;
+        if (isMigrationScheme) {
           yield row;
         } else {
           onForeignScheme?.(scheme);

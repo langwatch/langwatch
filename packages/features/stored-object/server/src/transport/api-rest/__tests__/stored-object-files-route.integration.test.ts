@@ -11,7 +11,7 @@ import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { StoredObjectApp, StoredObjectFileRead } from "#app/stored-object.app";
+import type { StoredObjectApp, StoredObjectFileStreamRead } from "#app/stored-object.app";
 import {
   createFilesRestApp,
   type FilesProjectPermissionCheck,
@@ -34,7 +34,7 @@ class ApiKeyPermissionDeniedTestError extends HandledError {
   }
 }
 
-function availableRead(): StoredObjectFileRead {
+function availableRead(): StoredObjectFileStreamRead {
   return {
     row: {
       id: OBJECT_ID,
@@ -48,7 +48,7 @@ function availableRead(): StoredObjectFileRead {
 }
 
 /** The same row as `availableRead`, carrying the purpose that maps to `traces:view`. */
-function traceContentRead(): StoredObjectFileRead {
+function traceContentRead(): StoredObjectFileStreamRead {
   return {
     row: {
       id: OBJECT_ID,
@@ -61,7 +61,7 @@ function traceContentRead(): StoredObjectFileRead {
   };
 }
 
-function missingRead(): StoredObjectFileRead {
+function missingRead(): StoredObjectFileStreamRead {
   return {
     row: {
       id: OBJECT_ID,
@@ -320,7 +320,7 @@ describe("given the /api/files family", () => {
 
 /** The family over one process's stored-object application. */
 function mount(options: {
-  read?: () => Promise<StoredObjectFileRead | null>;
+  read?: () => Promise<StoredObjectFileStreamRead | null>;
   owner?: () => Promise<{ projectId: string } | null>;
   caller?: { apiKeyProjectId?: string; userId?: string };
   apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;

@@ -7,9 +7,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+function hasChartsDirectory(directory: string): boolean {
+  return existsSync(path.join(directory, "charts", "langwatch"));
+}
+
+function isNonTestSourceFile(name: string): boolean {
+  return name.endsWith(".ts") && !name.includes(".test.");
+}
+
 const REPO_ROOT = (() => {
   let directory = path.dirname(fileURLToPath(import.meta.url));
-  while (!existsSync(path.join(directory, "charts", "langwatch"))) {
+  while (!hasChartsDirectory(directory)) {
     const parent = path.dirname(directory);
     if (parent === directory) {
       throw new Error("could not find the repository root holding charts/langwatch");
@@ -32,7 +40,7 @@ function sourceFilesUnder(root: string): string[] {
       if (entry.name === "node_modules" || entry.name === "__tests__") continue;
       const full = path.join(directory, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".ts") && !entry.name.includes(".test.")) found.push(full);
+      else if (isNonTestSourceFile(entry.name)) found.push(full);
     }
   };
   walk(path.join(REPO_ROOT, root));

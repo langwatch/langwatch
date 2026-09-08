@@ -15,6 +15,7 @@ export interface StoredObjectByteStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   get(uri: string): Promise<Readable>;
   delete(uri: string): Promise<void>;
+  exists(uri: string): Promise<boolean>;
 }
 
 export abstract class StoredObjectProjectDestinationResolverPort {

@@ -17,7 +17,10 @@ import {
   StoredObjectProjectSourcePort,
   type LegacyStoredObjectRow,
 } from "../ports/stored-object.port.ts";
-import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store.ts";
+import type {
+  StoredObjectRecord,
+  StoredObjectRecordRepository,
+} from "../repositories/stored-object-record.repository.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
@@ -28,7 +31,7 @@ export type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
   legacy: StoredObjectLegacySourcePort;
   locations: StoredObjectLegacyLocationPort;
   drain: StoredObjectLegacyWriterDrainPort;
-  store: StoredObjectStore;
+  records: StoredObjectRecordRepository;
   pageSize?: number;
   now?: () => Instant;
 }>;
@@ -147,12 +150,12 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
       storageUri: row.storageUri,
     });
     const fingerprint = this.fingerprint(row);
-    const current = await this.options.store.tryFind({ tenantId: projectId, id });
+    const current = await this.options.records.findById({ tenantId: projectId, id });
     if (current?.source === "canonical" || current?.legacyFingerprint === fingerprint) {
       return "unchanged";
     }
     const now = this.now();
-    await this.options.store.save(
+    await this.options.records.upsert(
       this.importedRecord({
         row,
         projectId,

@@ -5,24 +5,20 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { createDataRetentionTrpcRouter } from "../../data-retention/data-retention-trpc.mount.ts";
 import type { ComposedDataRetentionFeature } from "../../data-retention/data-retention.composition.types.ts";
 import { composeMonitorFeature } from "../../monitor/monitor.composition.ts";
-import {
-  composeStoredObjectFeature,
-  refusingStoredObjectFeature,
-} from "../stored-object.composition.ts";
+import { installApiStoredObject } from "../stored-object.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
@@ -343,7 +339,7 @@ function azureStorageConfig(): ApiStoredObjectsConfigResolution {
 /** The organization's plan, as every retention gate reads it. */
 const PAID_PLAN = { free: false, type: "LAUNCH" } as never;
 
-function composeHalf(
+async function composeHalf(
   options: {
     plans?: undefined;
     storage?: ApiStoredObjectsConfigResolution;
@@ -365,7 +361,7 @@ function composeHalf(
     ...("plans" in rest ? { plans: rest.plans } : {}),
   };
 
-  const storedObject = composeStoredObjectFeature({
+  const storedObject = await installApiStoredObject({
     prisma: prisma.client,
     resolveClickHouseClient:
       "resolveClickHouseClient" in rest ? rest.resolveClickHouseClient! : clickHouse.resolveClient,
@@ -410,20 +406,14 @@ function composeHalf(
   };
 }
 
-function composeApplication(
+async function composeApplication(
   options: {
     plans?: undefined;
     storage?: ApiStoredObjectsConfigResolution;
     resolveClickHouseClient?: null;
-    /** Composes the object store as absent, leaving the other two real. */
-    withoutStoredObject?: true;
   } = {},
 ) {
-  const { withoutStoredObject, ...rest } = options;
-  const real = composeHalf(rest);
-  const composed = withoutStoredObject
-    ? { ...real, storedObject: refusingStoredObjectFeature() }
-    : real;
+  const composed = await composeHalf(options);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: {
@@ -441,7 +431,7 @@ function composeApplication(
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({
@@ -478,7 +468,7 @@ async function callTrpc(
 describe("given an API process composed with the object store, retention and monitor features", () => {
   describe("when the renderer probes a stored object it holds an id for", () => {
     it("reports the object available, having read the row and the bytes", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "storedObjects.headById", {
         projectId: PROJECT_ID,
@@ -493,7 +483,7 @@ describe("given an API process composed with the object store, retention and mon
 
     describe("and the row is there but the bytes are gone", () => {
       it("reports it missing rather than not found, which is what the placeholder renders", async () => {
-        const { application } = composeApplication();
+        const { application } = await composeApplication();
 
         const { body } = await callTrpc(application, "storedObjects.headById", {
           projectId: PROJECT_ID,
@@ -527,7 +517,7 @@ describe("given an API process composed with the object store, retention and mon
           }),
         );
         try {
-          const { application } = composeApplication({ storage: azureStorageConfig() });
+          const { application } = await composeApplication({ storage: azureStorageConfig() });
 
           const { status, body } = await callTrpc(application, "storedObjects.headById", {
             projectId: PROJECT_ID,
@@ -557,7 +547,7 @@ describe("given an API process composed with the object store, retention and mon
        * files it cannot reach, not files that were deleted.
        */
       it("refuses rather than reporting the file missing", async () => {
-        const { application } = composeApplication();
+        const { application } = await composeApplication();
 
         const { body } = await callTrpc(application, "storedObjects.headById", {
           projectId: PROJECT_ID,
@@ -571,7 +561,7 @@ describe("given an API process composed with the object store, retention and mon
 
     describe("and no row answers to the id", () => {
       it("reports it not found, so the renderer shows an error rather than a placeholder", async () => {
-        const { application } = composeApplication();
+        const { application } = await composeApplication();
 
         const { body } = await callTrpc(application, "storedObjects.headById", {
           projectId: PROJECT_ID,
@@ -585,7 +575,7 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when the retention settings page is opened", () => {
     it("offers only the scopes the caller may write, and lists no rule they may not read", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "dataRetention.getRules", {
         projectId: PROJECT_ID,
@@ -616,7 +606,7 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when the storage card reads an organization-wide scope", () => {
     it("sums only the projects the caller may view", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "dataRetention.getScopeStorageUsage", {
         projectId: PROJECT_ID,
@@ -634,7 +624,7 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when the monitors page lists a project's evaluations", () => {
     it("answers from the same monitor service the experiment application writes through", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "monitors.getAllForProject", {
         projectId: PROJECT_ID,
@@ -652,7 +642,7 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when the monitors page charts a project's seven-day trend", () => {
     it("answers it off the routed ClickHouse rather than refusing by name", async () => {
-      const { application, clickHouse } = composeApplication();
+      const { application, clickHouse } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "monitors.getPerformanceForProject", {
         projectId: PROJECT_ID,
@@ -674,7 +664,7 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when a capability this deployment did not compose is reached", () => {
     it("refuses the performance trend by name on a deployment with no ClickHouse", async () => {
-      const { application } = composeApplication({ resolveClickHouseClient: null });
+      const { application } = await composeApplication({ resolveClickHouseClient: null });
 
       const { body } = await callTrpc(application, "monitors.getPerformanceForProject", {
         projectId: PROJECT_ID,
@@ -688,7 +678,7 @@ describe("given an API process composed with the object store, retention and mon
     });
 
     it("refuses a retention plan gate rather than passing one it cannot evaluate", async () => {
-      const { application } = composeApplication({ plans: undefined });
+      const { application } = await composeApplication({ plans: undefined });
 
       const { status, body } = await callTrpc(
         application,
@@ -704,7 +694,7 @@ describe("given an API process composed with the object store, retention and mon
     });
 
     it("refuses to keep data indefinitely for a caller who is not a platform administrator", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(
         application,
@@ -725,13 +715,14 @@ describe("given an API process composed with the object store, retention and mon
     });
   });
 
-  describe("when the object store did not compose", () => {
+  describe("when the deployment composed no byte backend", () => {
     /**
-     * A process holding no byte backend composed none of the record: the
-     * retention settings and the monitors page went with the object store.
+     * A process installs a feature or it does not, so the refusal comes from
+     * the capability genuinely missing: with no ClickHouse connection the
+     * probe cannot read a row, and says so by name.
      */
     it("refuses the object probe by name", async () => {
-      const { application } = composeApplication({ withoutStoredObject: true });
+      const { application } = await composeApplication({ resolveClickHouseClient: null });
 
       const { status, body } = await callTrpc(application, "storedObjects.headById", {
         projectId: PROJECT_ID,
@@ -743,7 +734,7 @@ describe("given an API process composed with the object store, retention and mon
     });
 
     it("still answers the retention settings, which never read a byte", async () => {
-      const { application } = composeApplication({ withoutStoredObject: true });
+      const { application } = await composeApplication({ resolveClickHouseClient: null });
 
       const { status } = await callTrpc(application, "dataRetention.getRules", {
         projectId: PROJECT_ID,
@@ -753,7 +744,7 @@ describe("given an API process composed with the object store, retention and mon
     });
 
     it("still lists the project's monitors", async () => {
-      const { application } = composeApplication({ withoutStoredObject: true });
+      const { application } = await composeApplication({ resolveClickHouseClient: null });
 
       const { status } = await callTrpc(application, "monitors.getAllForProject", {
         projectId: PROJECT_ID,

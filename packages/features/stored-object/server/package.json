@@ -20,14 +20,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./public-api": {
-      "types": "./dist/transport/public-rest/stored-object.api.d.ts",
-      "default": "./src/transport/public-rest/stored-object.api.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
-    },
     "./composition/stored-objects": {
       "types": "./dist/repositories/clickhouse/stored-objects.repository.d.ts",
       "default": "./src/repositories/clickhouse/stored-objects.repository.ts"
@@ -52,6 +44,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
