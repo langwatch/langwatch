@@ -119,7 +119,7 @@ export function CostLanePanel({
               color="fg.muted"
               fontVariantNumeric="tabular-nums"
               data-testid={`${testId}-trend`}
-              title="The later half of this window against the earlier half."
+              title="An average period in the later half of this window against an average period in the earlier half."
             >
               {badge}
             </Text>
