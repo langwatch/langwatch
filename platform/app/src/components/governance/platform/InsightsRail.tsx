@@ -58,6 +58,15 @@ const FOLDERS: Array<{
   { id: "notifications", label: "Notifications", icon: Mail, stream: true },
 ];
 
+type Folder = (typeof FOLDERS)[number];
+
+/** Streams sit under a rule: they are not folders of the brief, they ride on top of it. */
+function opensStreamGroup({ index }: { index: number }): boolean {
+  const folder = FOLDERS[index];
+  const previous = FOLDERS[index - 1];
+  return Boolean(folder?.stream) && previous !== undefined && !previous.stream;
+}
+
 export function InsightsRail({
   selected,
   counts,
@@ -77,67 +86,83 @@ export function InsightsRail({
       fontSize="12.5px"
       flexShrink={0}
     >
-      {FOLDERS.map((folder, index) => {
-        const active = folder.id === selected;
-        const count = counts[folder.id];
-        const Icon = folder.icon;
-        return (
-          <VStack key={folder.id} align="stretch" gap={0.5}>
-            {/* The streams sit under a rule: they are not folders of the
-                brief, they ride on top of it. */}
-            {index > 0 && folder.stream && !FOLDERS[index - 1]?.stream ? (
-              <Separator marginY={1.5} />
-            ) : null}
-            <chakra.button
-              type="button"
-              aria-current={active ? "true" : undefined}
-              onClick={() => onSelect(folder.id)}
-              display="flex"
-              alignItems="center"
-              gap={2.5}
-              width="full"
-              paddingX="10px"
-              paddingY="6px"
-              borderRadius="lg"
-              textAlign="left"
-              fontWeight={active ? "medium" : "normal"}
-              color={active ? "fg" : "fg.muted"}
-              background={active ? "bg.muted" : "transparent"}
-              cursor="pointer"
-              _hover={{ background: "bg.muted/60" }}
-            >
-              <Icon size={15} />
-              <Text as="span" flex={1}>
-                {folder.label}
-              </Text>
-              {/* The count is plain text in the row, so the button's own
-                  name carries it ("Inbox 0"): no label on a generic box,
-                  which assistive tech would ignore (see RunsSidebarEntry). */}
-              {folder.stream ? (
-                <Badge
-                  size="sm"
-                  borderRadius="full"
-                  variant={count > 0 ? "solid" : "subtle"}
-                  colorPalette={count > 0 ? "orange" : "gray"}
-                  minWidth="22px"
-                  justifyContent="center"
-                >
-                  {count}
-                </Badge>
-              ) : (
-                <Text
-                  as="span"
-                  fontSize="10.5px"
-                  fontWeight="500"
-                  color="fg.subtle"
-                >
-                  {count}
-                </Text>
-              )}
-            </chakra.button>
-          </VStack>
-        );
-      })}
+      {FOLDERS.map((folder, index) => (
+        <VStack key={folder.id} align="stretch" gap={0.5}>
+          {opensStreamGroup({ index }) ? <Separator marginY={1.5} /> : null}
+          <FolderRow
+            folder={folder}
+            active={folder.id === selected}
+            count={counts[folder.id]}
+            onSelect={onSelect}
+          />
+        </VStack>
+      ))}
     </VStack>
+  );
+}
+
+function FolderRow({
+  folder,
+  active,
+  count,
+  onSelect,
+}: {
+  folder: Folder;
+  active: boolean;
+  count: number;
+  onSelect: (folder: InsightsFolder) => void;
+}) {
+  const Icon = folder.icon;
+  return (
+    <chakra.button
+      type="button"
+      aria-current={active ? "true" : undefined}
+      onClick={() => onSelect(folder.id)}
+      display="flex"
+      alignItems="center"
+      gap={2.5}
+      width="full"
+      paddingX="10px"
+      paddingY="6px"
+      borderRadius="lg"
+      textAlign="left"
+      fontWeight={active ? "medium" : "normal"}
+      color={active ? "fg" : "fg.muted"}
+      background={active ? "bg.muted" : "transparent"}
+      cursor="pointer"
+      _hover={{ background: "bg.muted/60" }}
+    >
+      <Icon size={15} />
+      <Text as="span" flex={1}>
+        {folder.label}
+      </Text>
+      {/* The count is plain text in the row, so the button's own name
+          carries it ("Inbox 0"): no label on a generic box, which
+          assistive tech would ignore (see RunsSidebarEntry). */}
+      <FolderCount stream={folder.stream} count={count} />
+    </chakra.button>
+  );
+}
+
+/** Streams wear a badge; folders a quiet number. */
+function FolderCount({ stream, count }: { stream: boolean; count: number }) {
+  if (stream) {
+    return (
+      <Badge
+        size="sm"
+        borderRadius="full"
+        variant={count > 0 ? "solid" : "subtle"}
+        colorPalette={count > 0 ? "orange" : "gray"}
+        minWidth="22px"
+        justifyContent="center"
+      >
+        {count}
+      </Badge>
+    );
+  }
+  return (
+    <Text as="span" fontSize="10.5px" fontWeight="500" color="fg.subtle">
+      {count}
+    </Text>
   );
 }
