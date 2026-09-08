@@ -28,8 +28,9 @@ const DefaultLangyInternalSecret = "langy-local-development-secret"
 // survives (see the seed:retention step).
 const DefaultRetentionDays = 7
 
-// svc looks a service up by name; a zero value is fine for the string formatting
-// below when a stack is partial.
+// svc looks a service up by name; a zero value (no port, no URL) is expected
+// when a stack is partial, and OverlayEnv below skips the lines that depend on
+// it rather than emitting empty or :0 values.
 func (s Stack) svc(name string) Service {
 	for _, x := range s.Services {
 		if x.Name == name {
@@ -52,27 +53,53 @@ func (s Stack) OverlayEnv() []string {
 	// Server-to-server callers (Vite's /api proxy, the Go gateway's control-plane
 	// client, langy) dial that loopback port directly — robust, no TLS/CA, no
 	// second public hostname to confuse anyone.
-	apiInternal := fmt.Sprintf("http://127.0.0.1:%d", s.APIPort)
+	//
+	// Every URL and port line below is emitted ONLY when it has a real value.
+	// An explicitly empty variable (BASE_HOST=) is still "set" to the Node
+	// loaders, and this overlay loads with override:true, so an empty line does
+	// not fall through to .env — it clobbers .env's value with "" and env.mjs
+	// validation fails on the URL keys. A zero port is the same hazard in
+	// disguise: http://127.0.0.1:0 is a value nobody can dial. `up` always
+	// plans every service before writing the overlay, so this never bit there;
+	// `db reset` / `db seed` on a worktree with no registered stack build a bare
+	// Stack (slug + databases, no services) and must inherit .env for the rest.
 	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
-		fmt.Sprintf("LANGWATCH_APP_PORT=%d", app.Port),
-		fmt.Sprintf("LANGWATCH_API_PORT=%d", s.APIPort),
-		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
-		fmt.Sprintf("LANGWATCH_NLP_PORT=%d", nlp.Port),
-		fmt.Sprintf("WORKER_METRICS_PORT=%d", s.WorkerMetricsPort),
-		"BASE_HOST=" + app.URL,
-		"NEXTAUTH_URL=" + app.URL,
-		"LANGWATCH_ENDPOINT=" + app.URL,
-		"LANGWATCH_API_URL=" + apiInternal,
-		"LANGWATCH_NLP_SERVICE=" + nlp.URL,
-		"GATEWAY_CONTROL_PLANE_URL=" + apiInternal,
-		"LW_GATEWAY_BASE_URL=" + apiInternal,
-		"LW_GATEWAY_PUBLIC_URL=" + gw.URL,
-		// Same loopback principle as LANGWATCH_API_URL above: the control
-		// plane's server-side gateway calls (codex assists) must not depend
-		// on Node trusting the portless CA.
-		fmt.Sprintf("LW_GATEWAY_INTERNAL_URL=http://127.0.0.1:%d", gw.Port),
+	}
+	port := func(key string, n int) {
+		if n != 0 {
+			env = append(env, fmt.Sprintf("%s=%d", key, n))
+		}
+	}
+	url := func(key, u string) {
+		if u != "" {
+			env = append(env, key+"="+u)
+		}
+	}
+	loopback := func(key string, n int) {
+		if n != 0 {
+			env = append(env, fmt.Sprintf("%s=http://127.0.0.1:%d", key, n))
+		}
+	}
+	port("LANGWATCH_APP_PORT", app.Port)
+	port("LANGWATCH_API_PORT", s.APIPort)
+	port("LANGWATCH_GATEWAY_PORT", gw.Port)
+	port("LANGWATCH_NLP_PORT", nlp.Port)
+	port("WORKER_METRICS_PORT", s.WorkerMetricsPort)
+	url("BASE_HOST", app.URL)
+	url("NEXTAUTH_URL", app.URL)
+	url("LANGWATCH_ENDPOINT", app.URL)
+	loopback("LANGWATCH_API_URL", s.APIPort)
+	url("LANGWATCH_NLP_SERVICE", nlp.URL)
+	loopback("GATEWAY_CONTROL_PLANE_URL", s.APIPort)
+	loopback("LW_GATEWAY_BASE_URL", s.APIPort)
+	url("LW_GATEWAY_PUBLIC_URL", gw.URL)
+	// Same loopback principle as LANGWATCH_API_URL above: the control
+	// plane's server-side gateway calls (codex assists) must not depend
+	// on Node trusting the portless CA.
+	loopback("LW_GATEWAY_INTERNAL_URL", gw.Port)
+	env = append(env,
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
 		// Pretty, human-readable console logging for the Go services (clog reads
 		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
@@ -87,7 +114,7 @@ func (s Stack) OverlayEnv() []string {
 		// in prod, where the platform default is fixed. Seeding overrides it with a
 		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
-	}
+	)
 	// The IdP simulator is an opt-in lane; only a worktree actually running (or
 	// falling back to) one gets the pointer, so nothing reads a dead URL.
 	if idp := s.svc("idp"); idp.Port != 0 && idp.URL != "" {
