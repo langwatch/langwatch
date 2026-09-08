@@ -42,14 +42,27 @@ Feature: The governance overview opens with a hero and nothing else
     Then no "Add Source" control is offered, because the add flow would refuse me
     And the three shortcuts are offered just the same
 
+  # The third shortcut used to read "Add anomaly rule" and point at
+  # /governance/inventory?tab=anomaly-rules. Anomaly rules stopped being an
+  # inventory tab, so that address degraded to the inventory's default pane
+  # and the shortcut quietly delivered the catalog under a rule's name. The
+  # test asserted the href and so never saw it. The shortcut now says what it
+  # actually opens.
   @integration
   Scenario: The hero offers three ways in, in the order a surface is set up
     When the overview renders
-    Then the hero offers "Add people", "Add agent" and "Add anomaly rule", in that order
+    Then the hero offers "Add people", "Add agent" and "Add tool", in that order
     And "Add people" leads to the people page
     And "Add agent" leads to the agents page ready to add one
-    And "Add anomaly rule" leads to the inventory anomaly rules tab
+    And "Add tool" leads to the inventory, which opens on its catalog
     And no other shortcut is offered beside them
+
+  @integration
+  Scenario: No shortcut points at a tab the page would not honour
+    When the overview renders
+    Then every shortcut carrying a tab in its address names a tab that page has
+    And a shortcut naming a tab that no longer exists is a broken shortcut,
+      because the page degrades it to the default pane rather than refusing it
 
   @integration
   Scenario: The field offers Langy to whoever may ask
