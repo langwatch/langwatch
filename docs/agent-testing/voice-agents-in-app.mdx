@@ -59,9 +59,9 @@ Add both under **Settings > Model Providers**. Never from environment variables.
     The agent must live in the same ElevenLabs workspace as the key. A wrong workspace shows as agent not found.
   </Step>
   <Step title="OpenAI key">
-    Required for every voice run. The simulated caller's speech is synthesized with OpenAI text-to-speech (`gpt-4o-mini-tts`), and the agent's audio is transcribed with OpenAI for the judge.
+    Required only for a simulated scenario run. The simulated caller's speech is synthesized with OpenAI text-to-speech (`gpt-4o-mini-tts`), and the agent's audio is transcribed with OpenAI for the judge. **Talk to it** and **Call it myself** use ElevenLabs only and need no OpenAI key.
 
-    Without it a run fails with "The caller voice needs an OpenAI key. Add one in Settings > Model Providers."
+    Without it a simulated run fails with "The caller voice needs an OpenAI key. Add one in Settings > Model Providers."
   </Step>
 </Steps>
 
@@ -84,7 +84,7 @@ Set these as app environment variables.
 | Variable | Default | Effect |
 |---|---|---|
 | `VOICE_CALL_MAX_SECONDS` | 300 | A call is cut at the limit. The run is marked "Cut at the call limit" and the judge still scores what was said. |
-| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Per pod, per project. More voice runs queue instead of failing. Text runs are unaffected. On a multi-pod deployment the effective ceiling for a project is this number times the pod count, since each pod tracks its own count. |
+| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Per execution process, per project. More voice runs queue instead of failing. Text runs are unaffected. Enforcement is local to each process and not shared across processes or pods, so the effective ceiling on a multi-process deployment is higher than this number. |
 
 `VOICE_CALL_MAX_SECONDS` is enforced by the server and governs a scenario run: the simulated caller, the judge and the recorded transcript all stop at that limit. A **Talk to it** or **Call it myself** call in the browser is bounded by the browser tab instead, up to ElevenLabs' own maximum call length: closing or reloading the tab, or losing the connection, ends the call at whatever point that happens, not at `VOICE_CALL_MAX_SECONDS`.
 
@@ -100,7 +100,7 @@ Set these as app environment variables.
 - LangWatch never sends prompt overrides. Enabling overrides on the agent has no effect on these calls: the agent's own ElevenLabs prompt is what gets tested.
 - The recording can be unavailable for a short while after hang-up while ElevenLabs processes it. The run shows "Recording unavailable"; reload later.
 - The browser needs HTTPS or localhost and microphone permission. Autoplay policy can keep the agent silent until the page has been clicked.
-- Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes and OpenAI audio tokens on your accounts.
+- Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes on your account. A simulated run also consumes OpenAI audio tokens.
 - Only one browser call per tab.
 - Self-hosted: voice turns carry audio, and audio is written to stored objects. If the stored-objects path is not writable (or no S3 bucket is configured), every voice message fails to ingest and the run shows "No response" even though the call happened. Check the api log for `EACCES` on the stored-objects directory.
 

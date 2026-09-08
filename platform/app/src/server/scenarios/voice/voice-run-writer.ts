@@ -97,13 +97,13 @@ export async function writeVoiceCallRun({
       targetType: "voice" as const,
       targetReferenceId: agentRowId,
       callerKind: HUMAN_CALLER_KIND,
+      cutAtLimit: record.cutAtLimit,
     },
     callerKind: HUMAN_CALLER_KIND,
     source: record.source,
     transport: record.transport,
     conversationId: record.conversationId,
     agentId: agentRowId,
-    cutAtLimit: record.cutAtLimit,
     ...(record.audioUrl ? { audioUrl: record.audioUrl } : {}),
   };
 

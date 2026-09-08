@@ -345,6 +345,26 @@ describe("Feature: Voice session HTTP door", () => {
       expect(res.headers.get("cache-control")).toBe("no-store");
       vi.unstubAllGlobals();
     });
+
+    it("fetches with redirect: error so the api key cannot be forwarded", async () => {
+      getScenarioRunData.mockResolvedValue({ id: "run_1" });
+      const upstreamFetch = vi.fn(async () => ({
+        ok: true,
+        body: new ReadableStream(),
+        headers: new Headers({ "content-type": "audio/mpeg" }),
+      }));
+      vi.stubGlobal("fetch", upstreamFetch);
+
+      await app.request(
+        `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+      );
+
+      expect(upstreamFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ redirect: "error" }),
+      );
+      vi.unstubAllGlobals();
+    });
   });
 
   describe("given the project's release_voice_agents_enabled flag is off", () => {

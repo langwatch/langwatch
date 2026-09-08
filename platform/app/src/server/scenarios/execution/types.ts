@@ -253,9 +253,6 @@ export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
  * project has no key, so the child fails the run with a named reason rather
  * than reaching the vendor with an empty credential — the same way the http
  * data carries its secrets to the child.
- *
- * Slice 1 only prepares this; the "voice" adapter factory that consumes it
- * lands in a later slice.
  */
 export const VoiceTargetSchema = z.object({
   transport: z.literal("elevenlabs_convai"),

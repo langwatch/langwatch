@@ -168,7 +168,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
       const fetchMock = vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => ({ signed_url: "wss://signed/abc" }),
+        json: async () => ({ signed_url: "wss://api.elevenlabs.io/abc" }),
         text: async () => "",
       }));
       vi.stubGlobal("fetch", fetchMock);
@@ -178,7 +178,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
         credential: CREDENTIAL,
       });
 
-      expect(result).toEqual({ signedUrl: "wss://signed/abc" });
+      expect(result).toEqual({ signedUrl: "wss://api.elevenlabs.io/abc" });
       const [, init] = fetchMock.mock.calls[0] as unknown as [
         string,
         RequestInit,
@@ -242,6 +242,70 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
       ).rejects.toThrow(
         `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: The API key you used is missing the permission convai_write to execute this operation.`,
       );
+    });
+  });
+
+  describe("when ElevenLabs returns a signed URL on a non-wss scheme", () => {
+    it("rejects it", async () => {
+      mockFetchOnce({
+        json: () => ({ signed_url: "ws://api.elevenlabs.io/abc" }),
+      });
+
+      await expect(
+        elevenLabsConvaiTransport.mintSession({
+          agentId: "agent_1",
+          credential: CREDENTIAL,
+        }),
+      ).rejects.toThrow(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`,
+      );
+    });
+  });
+
+  describe("when ElevenLabs returns a signed URL on an unrelated host", () => {
+    it("rejects it", async () => {
+      mockFetchOnce({ json: () => ({ signed_url: "wss://evil.example/abc" }) });
+
+      await expect(
+        elevenLabsConvaiTransport.mintSession({
+          agentId: "agent_1",
+          credential: CREDENTIAL,
+        }),
+      ).rejects.toThrow(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`,
+      );
+    });
+  });
+
+  describe("when the signed URL is on api.elevenlabs.io", () => {
+    it("accepts it", async () => {
+      mockFetchOnce({
+        json: () => ({ signed_url: "wss://api.elevenlabs.io/v1/convai/abc" }),
+      });
+
+      const result = await elevenLabsConvaiTransport.mintSession({
+        agentId: "agent_1",
+        credential: CREDENTIAL,
+      });
+
+      expect(result).toEqual({
+        signedUrl: "wss://api.elevenlabs.io/v1/convai/abc",
+      });
+    });
+  });
+
+  describe("when the signed URL matches the credential's configured base host", () => {
+    it("accepts it", async () => {
+      mockFetchOnce({
+        json: () => ({ signed_url: "wss://regional.example.com/abc" }),
+      });
+
+      const result = await elevenLabsConvaiTransport.mintSession({
+        agentId: "agent_1",
+        credential: { ...CREDENTIAL, baseUrl: "https://regional.example.com" },
+      });
+
+      expect(result).toEqual({ signedUrl: "wss://regional.example.com/abc" });
     });
   });
 });

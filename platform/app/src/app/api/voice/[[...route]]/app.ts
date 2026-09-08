@@ -395,6 +395,9 @@ export const route = secured
           {
             headers: { "xi-api-key": credential.apiKey },
             signal: timeoutController.signal,
+            // A followed redirect would forward the credentialed header to
+            // whatever host answered it.
+            redirect: "error",
           },
         );
       } finally {

@@ -10,9 +10,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { z } from "zod";
 
 import {
   VOICE_CALL_SCENARIO_SET_ID,
+  VOICE_TRANSPORTS,
   type VoiceTransport,
 } from "~/server/agents/voice/voice-agent.config";
 import {
@@ -46,12 +48,18 @@ const MINT_FETCH_TIMEOUT_MS = 15_000;
 /** Finish uploads a transcript and waits on the verdict; longer than mint. */
 const FINISH_FETCH_TIMEOUT_MS = 30_000;
 
-interface MintResponse {
-  transport: VoiceTransport;
-  sessionToken: string;
-  maxDurationSeconds: number;
-  connect: { signedUrl: string };
-}
+// Validated because it crosses the network boundary: a malformed field here
+// (a missing duration, say) must fail loudly at the mint call site rather
+// than surface later as a NaN timer or an unhandled undefined deep in the
+// call lifecycle.
+const mintResponseSchema = z.object({
+  transport: z.enum(VOICE_TRANSPORTS),
+  sessionToken: z.string(),
+  maxDurationSeconds: z.number().positive(),
+  connect: z.object({ signedUrl: z.string() }),
+});
+
+type MintResponse = z.infer<typeof mintResponseSchema>;
 
 export interface TalkToItPanelProps {
   projectId: string;
@@ -314,7 +322,16 @@ async function mintSession({
       });
       return null;
     }
-    return data as unknown as MintResponse;
+    const parsed = mintResponseSchema.safeParse(data);
+    if (!parsed.success) {
+      dispatch({
+        type: "MINT_FAILED",
+        code: "mint_failed",
+        message: "The session response was incomplete",
+      });
+      return null;
+    }
+    return parsed.data;
   } catch (error) {
     dispatch({
       type: "MINT_FAILED",

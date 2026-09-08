@@ -428,19 +428,13 @@ function useSaveVoiceAgent({
   form: { name: string; transport: VoiceTransport; voiceAgentId: string };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
-}): () => void {
-  return useCallback(
-    () =>
-      submitVoiceAgent({
-        projectId,
-        isValid,
-        agentId,
-        createdAgentRowId,
-        form,
-        createMutation,
-        updateMutation,
-      }),
-    [
+}): { handleSave: () => void; hasAttemptedSubmit: boolean } {
+  // Save is never disabled by validity (guidelines.md#213) — instead a failed
+  // submit flips this so the invalid fields show their inline error.
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const handleSave = useCallback(() => {
+    setHasAttemptedSubmit(true);
+    submitVoiceAgent({
       projectId,
       isValid,
       agentId,
@@ -448,8 +442,17 @@ function useSaveVoiceAgent({
       form,
       createMutation,
       updateMutation,
-    ],
-  );
+    });
+  }, [
+    projectId,
+    isValid,
+    agentId,
+    createdAgentRowId,
+    form,
+    createMutation,
+    updateMutation,
+  ]);
+  return { handleSave, hasAttemptedSubmit };
 }
 
 /**
@@ -500,7 +503,7 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isValid = isVoiceFormValid(form);
 
-  const handleSave = useSaveVoiceAgent({
+  const { handleSave, hasAttemptedSubmit } = useSaveVoiceAgent({
     projectId,
     isValid,
     agentId,
@@ -526,6 +529,7 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
     hasElevenLabsKey,
     isSaving,
     isValid,
+    hasAttemptedSubmit,
     isLoading: agentQuery.isLoading,
     talkOpen,
     setTalkOpen,
@@ -636,6 +640,7 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
               voiceAgentId={form.voiceAgentId}
               setVoiceAgentId={form.setVoiceAgentId}
               hasElevenLabsKey={editor.hasElevenLabsKey}
+              hasAttemptedSubmit={editor.hasAttemptedSubmit}
             />
           )}
         </Drawer.Body>
@@ -644,7 +649,6 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
           createdAgentRowId={editor.createdAgentRowId}
           voiceAgentId={form.voiceAgentId}
           hasElevenLabsKey={editor.hasElevenLabsKey}
-          isValid={editor.isValid}
           isSaving={editor.isSaving}
           onCancel={editor.handleClose}
           onTalk={() => editor.setTalkOpen(true)}
@@ -754,6 +758,7 @@ function VoiceAgentForm({
   voiceAgentId,
   setVoiceAgentId,
   hasElevenLabsKey,
+  hasAttemptedSubmit,
 }: {
   name: string;
   setName: (value: string) => void;
@@ -762,7 +767,11 @@ function VoiceAgentForm({
   voiceAgentId: string;
   setVoiceAgentId: (value: string) => void;
   hasElevenLabsKey: boolean;
+  hasAttemptedSubmit: boolean;
 }) {
+  const nameInvalid = hasAttemptedSubmit && name.trim().length === 0;
+  const voiceAgentIdInvalid =
+    hasAttemptedSubmit && voiceAgentId.trim().length === 0;
   const transportOptionsDisabled = VOICE_TRANSPORTS.length <= 1;
   return (
     <VStack
@@ -773,7 +782,7 @@ function VoiceAgentForm({
       paddingX={6}
       paddingY={4}
     >
-      <Field.Root required>
+      <Field.Root required invalid={nameInvalid}>
         <Field.Label>Name</Field.Label>
         <Input
           value={name}
@@ -781,6 +790,7 @@ function VoiceAgentForm({
           placeholder="Enter agent name"
           data-testid="voice-agent-name-input"
         />
+        {nameInvalid && <Field.ErrorText>Name is required</Field.ErrorText>}
       </Field.Root>
 
       <Field.Root>
@@ -801,7 +811,7 @@ function VoiceAgentForm({
         </NativeSelect.Root>
       </Field.Root>
 
-      <Field.Root required>
+      <Field.Root required invalid={voiceAgentIdInvalid}>
         <Field.Label>Agent id</Field.Label>
         <Input
           value={voiceAgentId}
@@ -812,6 +822,9 @@ function VoiceAgentForm({
         <Field.HelperText>
           From the ElevenLabs dashboard: Agents, your agent, Agent ID
         </Field.HelperText>
+        {voiceAgentIdInvalid && (
+          <Field.ErrorText>Agent id is required</Field.ErrorText>
+        )}
       </Field.Root>
 
       <CredentialsLine hasElevenLabsKey={hasElevenLabsKey} />
@@ -847,7 +860,6 @@ function VoiceAgentFooter({
   createdAgentRowId,
   voiceAgentId,
   hasElevenLabsKey,
-  isValid,
   isSaving,
   onCancel,
   onTalk,
@@ -857,7 +869,6 @@ function VoiceAgentFooter({
   createdAgentRowId: string | undefined;
   voiceAgentId: string;
   hasElevenLabsKey: boolean;
-  isValid: boolean;
   isSaving: boolean;
   onCancel: () => void;
   onTalk: () => void;
@@ -895,7 +906,7 @@ function VoiceAgentFooter({
         <Button
           colorPalette="blue"
           onClick={onSave}
-          disabled={!isValid || isSaving}
+          disabled={isSaving}
           loading={isSaving}
           data-testid="save-agent-button"
         >

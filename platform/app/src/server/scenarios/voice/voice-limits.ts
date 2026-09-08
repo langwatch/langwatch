@@ -4,12 +4,12 @@
  * Two knobs, both with the defaults the AC names:
  *   - VOICE_CALL_MAX_SECONDS   (default 300): the wall-clock a single call may
  *     run before LangWatch ends it and the run is judged on what was said.
- *   - VOICE_RUNS_MAX_CONCURRENT (default 2, per pod per project): how many
- *     voice runs a project may execute at once on a single execution pod; the
- *     rest wait in the queue. The gate is an in-memory map inside that pod's
- *     execution pool (see `voice-concurrency-gate.ts`), so it does not see
- *     other pods — the effective ceiling for a project is this number times
- *     the pod count, not this number alone.
+ *   - VOICE_RUNS_MAX_CONCURRENT (default 2, per execution process per project):
+ *     how many voice runs a project may execute at once in a single execution
+ *     process; the rest wait in the queue. The gate is an in-memory map local
+ *     to that process's execution pool (see `voice-concurrency-gate.ts`), so
+ *     it is not shared across processes or pods — the effective ceiling on a
+ *     multi-process deployment is higher than this number.
  *
  * Read from `process.env` directly (with a tolerant parse) rather than the
  * validated env schema so the child process and the worker pool can both reach
@@ -19,6 +19,11 @@
 
 export const VOICE_CALL_MAX_SECONDS_DEFAULT = 300;
 export const VOICE_RUNS_MAX_CONCURRENT_DEFAULT = 2;
+
+/** Node clamps any `setTimeout` delay above this to 1ms (the delay is a
+ *  32-bit signed int internally), so a call-limit timer armed with the raw
+ *  env value would fire almost immediately instead of never. */
+export const VOICE_CALL_MAX_SECONDS_CEILING = 2_147_483;
 
 /** Bounded timeout for the voice HTTP calls that must not hang forever: the
  *  mint request and the call-record fetch. Long enough for the provider's
@@ -40,10 +45,11 @@ export function parsePositiveIntEnv(
 export function voiceCallMaxSeconds(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
-  return parsePositiveIntEnv(
+  const parsed = parsePositiveIntEnv(
     env.VOICE_CALL_MAX_SECONDS,
     VOICE_CALL_MAX_SECONDS_DEFAULT,
   );
+  return Math.min(parsed, VOICE_CALL_MAX_SECONDS_CEILING);
 }
 
 export function voiceRunsMaxConcurrent(

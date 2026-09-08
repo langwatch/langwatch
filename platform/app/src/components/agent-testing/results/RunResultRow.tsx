@@ -194,7 +194,6 @@ function RowMetrics({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   );
 }
 
-/** The caller cell: "Simulated" or "You" for a voice run, blank otherwise. */
 function RowCaller({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const kind = runCallerKind(scenarioRun);
   if (!kind) return null;

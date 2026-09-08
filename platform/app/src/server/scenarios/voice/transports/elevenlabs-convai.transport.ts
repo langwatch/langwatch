@@ -167,6 +167,36 @@ function authHeaders(credential: VoiceTransportCredential): HeadersInit {
   return { [API_KEY_HEADER]: credential.apiKey, accept: "application/json" };
 }
 
+/**
+ * A malicious or compromised upstream could hand back a `signed_url` pointing
+ * anywhere; the browser connects to it directly with no further checks, so it
+ * is validated here before it ever reaches the client. Accepts only a secure
+ * websocket on ElevenLabs' own domain, or the project's configured (regional)
+ * base host.
+ */
+export function isAcceptableSignedUrl({
+  signedUrl,
+  baseUrl,
+}: {
+  signedUrl: string;
+  baseUrl: string;
+}): boolean {
+  let url: URL;
+  let base: URL;
+  try {
+    url = new URL(signedUrl);
+    base = new URL(baseUrl);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "wss:") return false;
+  return (
+    url.hostname === "elevenlabs.io" ||
+    url.hostname.endsWith(".elevenlabs.io") ||
+    url.hostname === base.hostname
+  );
+}
+
 /** Map an ElevenLabs transcript entry to a neutral turn. `agent` → agent,
  *  anything else (`user`) → the human caller. */
 function toTurn(entry: ElevenLabsTranscriptEntry): CallTurn {
@@ -211,6 +241,16 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     if (!body.signed_url) {
       throw new Error(
         `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: no signed URL returned`,
+      );
+    }
+    if (
+      !isAcceptableSignedUrl({
+        signedUrl: body.signed_url,
+        baseUrl: credential.baseUrl,
+      })
+    ) {
+      throw new Error(
+        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`,
       );
     }
     return { signedUrl: body.signed_url };

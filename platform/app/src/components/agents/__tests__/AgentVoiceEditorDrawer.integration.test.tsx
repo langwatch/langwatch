@@ -194,17 +194,17 @@ describe("AgentVoiceEditorDrawer", () => {
       expect(screen.getByTestId("voice-agent-id-input")).toBeInTheDocument();
     });
 
-    it("keeps Save disabled until Name and Agent id are non-empty", async () => {
+    it("shows inline errors and does not save when Name and Agent id are empty", async () => {
       const user = userEvent.setup();
       renderVoiceDrawer();
       const save = await screen.findByTestId("save-agent-button");
-      expect(save).toBeDisabled();
-
-      await user.type(screen.getByTestId("voice-agent-name-input"), "Support");
-      expect(save).toBeDisabled();
-
-      await user.type(screen.getByTestId("voice-agent-id-input"), "agent_1");
       expect(save).toBeEnabled();
+
+      await user.click(save);
+
+      expect(screen.getByText("Name is required")).toBeInTheDocument();
+      expect(screen.getByText("Agent id is required")).toBeInTheDocument();
+      expect(createMock).not.toHaveBeenCalled();
     });
 
     it("creates with type voice and a trimmed agent id", async () => {

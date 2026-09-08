@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  VOICE_CALL_MAX_SECONDS_CEILING,
   VOICE_CALL_MAX_SECONDS_DEFAULT,
   VOICE_RUNS_MAX_CONCURRENT_DEFAULT,
   voiceCallMaxSeconds,
@@ -34,6 +35,16 @@ describe("voiceCallMaxSeconds", () => {
           } as NodeJS.ProcessEnv),
         ).toBe(VOICE_CALL_MAX_SECONDS_DEFAULT);
       }
+    });
+  });
+
+  describe("when the env var exceeds the setTimeout ceiling", () => {
+    it("clamps to the ceiling", () => {
+      expect(
+        voiceCallMaxSeconds({
+          VOICE_CALL_MAX_SECONDS: "2147484",
+        } as NodeJS.ProcessEnv),
+      ).toBe(VOICE_CALL_MAX_SECONDS_CEILING);
     });
   });
 });

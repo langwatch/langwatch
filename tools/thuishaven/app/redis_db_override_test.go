@@ -104,6 +104,7 @@ func TestPublicURLFromEnvParsing(t *testing.T) {
 		{"unset", "", ""},
 		{"trims a trailing slash", "https://h:1/", "https://h:1"},
 		{"rejects a non-http(s) scheme", "ftp://h", ""},
+		{"accepts http", "http://h:1", "http://h:1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("LANGWATCH_HAVEN_PUBLIC_URL", tc.value)

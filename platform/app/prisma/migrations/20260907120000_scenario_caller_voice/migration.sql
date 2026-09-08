@@ -10,5 +10,5 @@
 
 ALTER TABLE "Scenario" ADD COLUMN "callerVoice" JSONB;
 
--- Down (manual rollback; uncomment and run):
+-- To roll back, uncomment and run manually.
 -- ALTER TABLE "Scenario" DROP COLUMN "callerVoice";

@@ -1030,9 +1030,6 @@ async function fetchConnectedAgentData({
  * resolved from the provider row. The agent stores no secret; the key comes
  * from the ElevenLabs model provider, and is `null` when the project has none,
  * which the child surfaces as a named failure.
- *
- * Slice 1 only prepares this — the "voice" adapter factory that consumes it
- * lands in a later slice.
  */
 async function fetchVoiceAgentData({
   projectId,

@@ -129,6 +129,38 @@ describe("TalkToItPanel", () => {
     });
   });
 
+  describe("when the mint response is missing a required field", () => {
+    it("shows the mint failure instead of connecting", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: vi.fn(async () => ({ getTracks: () => [] })),
+        },
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                transport: "elevenlabs_convai",
+                sessionToken: "signed.token",
+                // maxDurationSeconds omitted
+                connect: { signedUrl: "wss://x" },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            ),
+        ),
+      );
+
+      renderPanel();
+
+      const error = await screen.findByTestId("talk-error");
+      expect(error).toHaveTextContent("The session response was incomplete");
+      expect(openCall).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the provider disconnects after several transcript turns", () => {
     it("posts the full transcript to finish, not an empty one", async () => {
       Object.defineProperty(navigator, "mediaDevices", {

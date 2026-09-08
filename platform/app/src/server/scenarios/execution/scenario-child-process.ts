@@ -253,49 +253,52 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     adapter,
   });
 
-  const result = await ScenarioRunner.run(
-    {
-      id: scenario.id,
-      name: scenario.name,
-      description: scenario.situation,
-      setId: context.setId,
-      agents: cast.agents,
-      ...(cast.script ? { script: cast.script } : {}),
-      verbose,
-      // An http target's own spans land in the trace each turn propagates,
-      // so the judge fetches them back from the platform's trace API before
-      // any verdict. The wait budget comes from the prefetcher's per-project
-      // ingest-lag measurement.
-      ...buildRemoteTraceRunConfig({
-        targetType: target.type,
-        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
-        langwatchEndpoint,
-        langwatchApiKey,
-      }),
-      ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
-      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
-      metadata: {
-        langwatch: {
-          targetReferenceId: target.referenceId,
+  // The timer must clear on a rejected run too, or it stays armed and can
+  // fire after this process has moved on to reporting the failure.
+  let result: Awaited<ReturnType<typeof ScenarioRunner.run>>;
+  try {
+    result = await ScenarioRunner.run(
+      {
+        id: scenario.id,
+        name: scenario.name,
+        description: scenario.situation,
+        setId: context.setId,
+        agents: cast.agents,
+        ...(cast.script ? { script: cast.script } : {}),
+        verbose,
+        // An http target's own spans land in the trace each turn propagates,
+        // so the judge fetches them back from the platform's trace API before
+        // any verdict. The wait budget comes from the prefetcher's per-project
+        // ingest-lag measurement.
+        ...buildRemoteTraceRunConfig({
           targetType: target.type,
-          ...voiceMetadata,
+          traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+          langwatchEndpoint,
+          langwatchApiKey,
+        }),
+        ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+        ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
+        metadata: {
+          langwatch: {
+            targetReferenceId: target.referenceId,
+            targetType: target.type,
+            ...voiceMetadata,
+          },
+          ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
         },
-        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       },
-    },
-    {
-      batchRunId: context.batchRunId,
-      runId: jobData.scenarioRunId,
-      langwatch: {
-        endpoint: langwatchEndpoint,
-        apiKey: langwatchApiKey,
+      {
+        batchRunId: context.batchRunId,
+        runId: jobData.scenarioRunId,
+        langwatch: {
+          endpoint: langwatchEndpoint,
+          apiKey: langwatchApiKey,
+        },
       },
-    },
-  );
-
-  // The call finished on its own (or the run returned) — stop the limit timer
-  // so it cannot fire after the fact.
-  callLimitTimer?.clear();
+    );
+  } finally {
+    callLimitTimer?.clear();
+  }
 
   // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
