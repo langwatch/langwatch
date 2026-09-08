@@ -546,6 +546,11 @@ export class CliLoginKeyService {
         callerIsAdmin: false,
         organizationId,
         cause,
+        // This path runs its own cascade below, which is the one that counts
+        // the children for the caller and retries the ones an earlier attempt
+        // left behind. The primitive's cascade is for the revoke paths that
+        // have none of their own.
+        cascadeToChildren: false,
       });
     } catch (err) {
       if (ApiKeyNotFoundError.is(err)) {

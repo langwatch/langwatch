@@ -252,6 +252,25 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     But never past the organization's max session duration from the session start
 
   @unit @ingest-api-key @session
+  Scenario: Revoking a login key from the API keys page retires its ingest keys
+    Given a login key with two ingest keys minted under it
+    When the login key is revoked through the ordinary API-key revoke
+    Then both ingest keys are revoked with cause "session"
+    # The cascade belongs to the primitive, not to one caller. The API-keys
+    # page, the REST route and the tRPC mutation reach the same row as a
+    # logout does, and a cascade living in the logout path is one the other
+    # three skip.
+
+  @unit @ingest-api-key @session
+  Scenario: A key whose session is gone does not authenticate
+    Given an ingest key whose login key was revoked, or ran out, or is gone
+    When a request presents that key
+    Then it is refused
+    # The row may still read live: a cascade can fail, and a credential must
+    # not depend on one having run. The parent is the authority, so the token
+    # check asks it.
+
+  @unit @ingest-api-key @session
   Scenario: A cascade that fails does not fail the logout
     Given a login key whose ingest keys cannot be revoked
     When the login key is revoked

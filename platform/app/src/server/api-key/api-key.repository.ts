@@ -196,6 +196,44 @@ export class ApiKeyRepository {
     });
   }
 
+  /**
+   * The live keys minted under one key, inside its organization.
+   *
+   * Bounded by `organizationId` so it goes through the ordinary tenancy
+   * guard rather than a cross-tenant hatch: a cascade always knows whose
+   * organization it is retiring keys in.
+   */
+  async findLiveChildren({
+    parentApiKeyId,
+    organizationId,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>> {
+    return this.prisma.apiKey.findMany({
+      where: { organizationId, parentApiKeyId, revokedAt: null },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Whether one key is still usable, by id, without its bindings.
+   *
+   * The auth path asks this about a key's parent on every request that
+   * presents a session-minted key, so it reads the two columns that decide it
+   * and nothing else.
+   */
+  async findLivenessById({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ revokedAt: Date | null; expiresAt: Date | null } | null> {
+    return this.prisma.apiKey.findUnique({
+      where: { id },
+      select: { revokedAt: true, expiresAt: true },
+    });
+  }
+
   async findById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.prisma.apiKey.findUnique({
       where: { id },
