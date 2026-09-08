@@ -27,7 +27,7 @@ const attachments: ExperimentAttachmentPort = {
 
     return null;
   },
-} as unknown as ExperimentAttachmentPort;
+};
 
 const ports = {
   attachments,
