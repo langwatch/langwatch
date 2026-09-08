@@ -51,9 +51,7 @@ import {
   type SpenderRow,
 } from "~/components/governance/costs/CostSpenderPanel";
 import {
-  declinedAsEmpty,
   isRefusedRead,
-  refusedAsEmpty,
   summaryAsRead,
 } from "~/components/governance/costs/costSampleMode";
 import {
@@ -96,8 +94,7 @@ import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import {
   SampleDataBanner,
   SampleDataToggle,
-  useSampleMode as useGovernanceSampleMode,
-  useSettledRealDataState,
+  useSampleMode,
 } from "~/components/governance/sample";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -236,59 +233,6 @@ function useSpenderRows({
   };
 }
 
-/**
- * Whether the invented sample panels are on. `optIn` stays `null` until the
- * reader picks a side, which is what lets the default follow the data.
- * Deliberately not persisted: the same rule the trace explorer applies to its
- * sample traces — opting in is a decision about this sitting, not a
- * preference that follows you back tomorrow.
- *
- * Adoption counts as real data even with no spend behind it yet: showing a
- * measured headcount beside invented money is the confusion this toggle
- * exists to prevent. So does the headline summary: a pulled bill with no
- * activity behind it is still real money, and must keep the invented panels
- * off the screen it heads.
- */
-function useSampleMode(
-  breakdowns: ReturnType<typeof useBreakdownQueries>,
-  // The read itself, not its data: whether it was DECLINED is half the answer
-  // here, and that only lives on the error.
-  summary: {
-    data: GovernanceCostSummaryDto | undefined;
-    error: { data?: { code?: string | null } | null } | null;
-  },
-) {
-  const summaryData = summary.data;
-  const summaryError = summary.error;
-  // The choice itself is the section's, not this page's: whichever governance
-  // screen the reader last pressed the toggle on is the answer here too. Only
-  // the reads below are the page's own.
-  const { active, toggle } = useGovernanceSampleMode({
-    realData: useSettledRealDataState([
-      // A refused read has answered — with nothing. Left as `null` it read as
-      // "still unknown", which held the sample panels off the one screen they
-      // are for: an organization whose plan or grants do not open this page at
-      // all, which is every organization on its first visit. See
-      // `isRefusedRead`.
-      refusedAsEmpty(summaryAsRead(summaryData), summaryError),
-      // The same treatment for the activity reads, which are refused by the
-      // same gate. A first visit has every one of these declined at once, and
-      // it was that whole-screen silence that kept the invented panels off.
-      declinedAsEmpty(breakdowns.departmentRows, breakdowns.refused),
-      declinedAsEmpty(breakdowns.userRows, breakdowns.refused),
-      declinedAsEmpty(breakdowns.overTime, breakdowns.refused),
-      declinedAsEmpty(breakdowns.modelOverTime, breakdowns.refused),
-      declinedAsEmpty(
-        breakdowns.activeUsers === null
-          ? null
-          : { length: breakdowns.activeUsers },
-        breakdowns.refused,
-      ),
-    ]),
-  });
-  return { showSample: active, toggleSample: toggle };
-}
-
 function CostsPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -336,7 +280,7 @@ function CostsPage() {
     enabled: !!organizationId && hasAnyPermission("governance:view"),
   });
 
-  const { showSample, toggleSample } = useSampleMode(breakdowns, summary);
+  const { active: showSample, toggle: toggleSample } = useSampleMode();
   const samplePeriods = useSamplePeriods(filters.frame);
 
   useDepartmentSelectionReset({ filters, breakdowns, setFilters, showSample });
@@ -486,11 +430,8 @@ function CostsBody({
   showSample: boolean;
   samplePeriods: string[];
 }) {
-  // Sample mode exists to fill a blank screen — the same test the panels below
-  // apply to themselves, asked once for all three lanes. See
-  // `summaryHoldsFigures` for why the adoption card asks it too.
   const holdsFigures = summaryHoldsFigures(data, isError);
-  if (showSample && !holdsFigures) {
+  if (showSample) {
     return (
       <CostLanes
         data={sampleCostSummary(samplePeriods)}
@@ -782,12 +723,6 @@ interface Breakdowns {
   activeUsers: number | null;
   overTime: DailyBucket[] | null;
   modelOverTime: DailyBucket[] | null;
-  /**
-   * The activity reads were declined rather than broken — the plan gate or a
-   * missing `activityMonitor:view`. Distinct from the rows being null, which
-   * on its own cannot tell a refusal from a read still in flight.
-   */
-  refused: boolean;
 }
 
 /** Wire buckets carry money as strings; the charts want numbers. */
@@ -866,16 +801,6 @@ function useBreakdownQueries({
     departments,
     userRows: byUser.data ?? null,
     activeUsers: summary.data?.activeUsersThisWindow ?? null,
-    // One flag for the group: the activity monitor sits behind a single plan
-    // gate and a single grant, so these five reads are refused together or not
-    // at all. The sample decision needs it because a declined read is an
-    // answer of nothing, and left as `null` it read as "still waiting".
-    refused:
-      isRefusedRead(summary.error) ||
-      isRefusedRead(byDepartment.error) ||
-      isRefusedRead(byUser.error) ||
-      isRefusedRead(overTime.error) ||
-      isRefusedRead(byModel.error),
     // `.buckets`, not the result object: the read answers a wrapper, and
     // handing the wrapper to a function that maps over an array throws the
     // moment a real answer arrives.
@@ -1027,10 +952,8 @@ function SpenderPanelSlot({
 }) {
   const measured =
     spenders.rows !== null && spenders.rows.length > 0 ? spenders.rows : null;
-  // Sample fills a panel holding nothing and never displaces measured rows —
-  // the same rule the breakdown grid applies to every panel in it.
-  const invented = measured === null && showSample;
-  const rows = measured ?? (invented ? sampleSpenderRows() : null);
+  const invented = showSample;
+  const rows = showSample ? sampleSpenderRows() : measured;
 
   return (
     <CostPanel title={BILLED_BY_KEY} sample={invented}>
@@ -1131,9 +1054,7 @@ function SampleHeadlinePanels({
  * The breakdown grid: four measured panels, the spender list, and the invented
  * ones interleaved in the prototype's order.
  *
- * `fillWithSample` is the one rule the grid applies throughout — sample mode
- * fills a panel that has nothing and never displaces one holding real figures,
- * so a badge on this grid always means the panel beneath it is invented.
+ * Sample mode replaces every measured series in the grid.
  */
 function BreakdownGrid({
   interval,
@@ -1149,12 +1070,8 @@ function BreakdownGrid({
   showSample: boolean;
   spenders: SpenderReadState;
 }) {
-  /** Whether sample figures stand in for this panel's own. */
-  const invented = (measured: unknown[] | null) =>
-    showSample && (measured === null || measured.length === 0);
-  /** Those sample figures, or the measured ones when there are any. */
-  const orSample = <T,>(measured: T[] | null, invented_: T[]): T[] | null =>
-    invented(measured) ? invented_ : measured;
+  const orSample = <T,>(measured: T[] | null, samples: T[]): T[] | null =>
+    showSample ? samples : measured;
 
   return (
     <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
@@ -1163,10 +1080,7 @@ function BreakdownGrid({
           <CostDonut rows={sample.agents} />
         </CostPanel>
       )}
-      <CostPanel
-        title="Cost over time · by team"
-        sample={invented(rows.byTeam)}
-      >
+      <CostPanel title="Cost over time · by team" sample={showSample}>
         <CostStackedBars
           buckets={orSample(rows.byTeam, sample.overTime)}
           interval={interval}
@@ -1178,10 +1092,7 @@ function BreakdownGrid({
           })}
         />
       </CostPanel>
-      <CostPanel
-        title="Cost by department"
-        sample={invented(rows.byDepartment)}
-      >
+      <CostPanel title="Cost by department" sample={showSample}>
         <CostRankList
           rows={orSample(rows.byDepartment, sample.departments)}
           empty={costPanelEmpty({
@@ -1198,7 +1109,7 @@ function BreakdownGrid({
           <CostRankList rows={sample.agents} />
         </CostPanel>
       )}
-      <CostPanel title="Cost by model" sample={invented(rows.byModel)}>
+      <CostPanel title="Cost by model" sample={showSample}>
         <CostRankList
           rows={orSample(rows.byModel, sample.models)}
           empty={costPanelEmpty({
@@ -1214,7 +1125,7 @@ function BreakdownGrid({
           the traffic measured as it was served, that one is what the provider
           put on the invoice. They disagree routinely, so each title has to
           name its lane or the pair reads as the same list rendered twice. */}
-      <CostPanel title="Metered spend by person" sample={invented(rows.byUser)}>
+      <CostPanel title="Metered spend by person" sample={showSample}>
         <CostRankList
           rows={orSample(rows.byUser, sample.users)}
           empty={costPanelEmpty({
@@ -1468,13 +1379,8 @@ function AdoptionRow({
   showSample: boolean;
   sourcesConnected: boolean;
 }) {
-  // Nobody is a measurement of nothing, the same way an empty list is. The
-  // check used to be `=== null`, so an activity read that answered with zero
-  // active users left this panel reading "0" in the middle of a screen full of
-  // invented figures — one card claiming to have measured an organization that
-  // the fifteen around it were busy inventing.
   const measured = breakdowns.activeUsers;
-  const invented = showSample && !measured;
+  const invented = showSample;
 
   return (
     <CostPanel title="Adoption" sample={invented}>

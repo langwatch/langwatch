@@ -63,7 +63,7 @@ function GovernanceOverviewPage() {
   // the inventory refuses without it.
   const canManageSources = hasAnyPermission("ingestionSources:manage");
 
-  const sample = useSampleMode({ realData: "absent" });
+  const sample = useSampleMode();
 
   // The Insights screen rides the billed-cost flag, the same way the section
   // rail decides whether to list it (`useVisibleSectionNavItems`). Offering
@@ -108,7 +108,9 @@ function GovernanceOverviewPage() {
             />
           </HStack>
 
-          {orgId && <QuarantineFillAlert organizationId={orgId} />}
+          {orgId && !sample.active && (
+            <QuarantineFillAlert organizationId={orgId} />
+          )}
 
           <GovernanceHeroGround>
             <Box paddingTop={{ base: 2, md: 4 }}>

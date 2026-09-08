@@ -410,6 +410,7 @@ describe("governance overview", () => {
   });
 
   describe("when the sections under the hero have nothing in them", () => {
+    beforeEach(() => writeSampleChoice(true));
     /** @scenario "Insights and recent activity wait under the hero" */
     it("names both sections and says what will appear in each", () => {
       // The overview measures nothing, so its lists open filled with samples.
@@ -430,7 +431,7 @@ describe("governance overview", () => {
       expect(screen.queryAllByText("sample")).toHaveLength(0);
     });
 
-    /** @scenario "The two lists open filled with samples" */
+    /** @scenario "The two lists fill when samples are enabled" */
     it("opens both lists filled in, each badged as sample", () => {
       renderPage();
 
@@ -588,7 +589,7 @@ describe("governance overview", () => {
       // The grant that draws the vendor pill, so the menu below is reachable.
       harness.permissions = [...VIEWER, "ingestionSources:manage"];
 
-      // As it opens, samples on.
+      writeSampleChoice(true);
       renderPage();
       expect(findNativeSelects(document.body)).toHaveLength(0);
 

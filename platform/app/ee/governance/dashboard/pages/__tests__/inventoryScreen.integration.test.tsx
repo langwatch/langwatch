@@ -406,18 +406,44 @@ describe("given an admin on the Inventory page", () => {
       ).toBeGreaterThan(0);
     });
 
-    /** @scenario "Sample rows never push a discovered environment off the screen" */
-    it("keeps discovered environments and shows no sample rows when samples are on", async () => {
+    /** @scenario "Sample environments replace discovered environments until disabled" */
+    it("replaces discovered environments and restores them when samples are off", async () => {
       renderScreen();
       await userEvent.click(
         screen.getByRole("button", { name: "See sample data" }),
       );
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
+      expect(within(table).getByText("Production")).toBeInTheDocument();
+      expect(within(table).queryByText("example-env.crm.test")).toBeNull();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Hide sample data" }),
+      );
       expect(
         within(table).getByText("example-env.crm.test"),
       ).toBeInTheDocument();
       expect(within(table).queryByText("Production")).toBeNull();
+    });
+
+    /** @scenario "Sample sources replace real sources without offering real actions" */
+    it("replaces real sources with read-only samples until disabled", async () => {
+      renderScreen();
+      await openTab(/Sources/);
+      expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
+      await userEvent.click(
+        screen.getByRole("button", { name: "See sample data" }),
+      );
+      expect(screen.queryByTestId("source-row-src-genie")).toBeNull();
+      const rows = screen.getAllByTestId(/^source-row-/);
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(within(row).queryByRole("link")).toBeNull();
+        expect(within(row).queryByRole("button")).toBeNull();
+      }
+      await userEvent.click(
+        screen.getByRole("button", { name: "Hide sample data" }),
+      );
+      expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
     });
 
     /** @scenario "The catalog is offered as a grid or as a list" */
@@ -453,7 +479,9 @@ describe("given an admin on the Inventory page", () => {
     /** @scenario "Adding a tool opens the same menu that adds a source" */
     it("offers the Add source menu's own tools behind Add tool", async () => {
       renderScreen();
-      await userEvent.click(screen.getByRole("button", { name: /Add tool/ }));
+      await userEvent.click(
+        screen.getAllByRole("button", { name: /Add tool/ })[0]!,
+      );
       expect(
         await screen.findByRole("menuitem", {
           name: /Databricks AI\/BI Genie/,
@@ -473,7 +501,8 @@ describe("given an admin on the Inventory page", () => {
     });
   });
 
-  describe("when sample mode is on because nothing is connected", () => {
+  describe("when sample mode is explicitly enabled", () => {
+    beforeEach(() => window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true"));
     /** @scenario "Every sample card says it is a sample" */
     /** @scenario "Every invented panel is marked, by a badge or by a banner above it" */
     it("badges every card as a sample", () => {
@@ -533,6 +562,7 @@ describe("given an admin on the Inventory page", () => {
 
     /** @scenario "A failed read raises no alert while sample mode is on" */
     it("raises no error alert when the source read failed", async () => {
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       harness.sources = {
         data: undefined,
         isLoading: false,
@@ -559,6 +589,7 @@ describe("given an admin on the Inventory page", () => {
   describe("when nothing is connected and samples are turned off", () => {
     /** @scenario "An organization with no environments is told where they come from" */
     it("says where environments come from instead of listing none", async () => {
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderScreen();
       await userEvent.click(
         screen.getByRole("button", { name: "Hide sample data" }),
@@ -633,7 +664,7 @@ describe("given an admin on the Inventory page", () => {
       const sampleToggle = screen.getByRole("button", {
         name: "See sample data",
       });
-      const addTool = screen.getByRole("button", { name: /Add tool/ });
+      const addTool = screen.getAllByRole("button", { name: /Add tool/ })[0]!;
       expect(actions?.contains(sampleToggle)).toBe(true);
       expect(actions?.contains(addTool)).toBe(true);
 
@@ -851,7 +882,9 @@ describe("given an admin on the Inventory page", () => {
     it("renders no native select in the source drawer, cadence field and all", async () => {
       connectTools();
       renderScreen();
-      await userEvent.click(screen.getByRole("button", { name: /Add tool/ }));
+      await userEvent.click(
+        screen.getAllByRole("button", { name: /Add tool/ })[0]!,
+      );
       await userEvent.click(
         await screen.findByRole("menuitem", { name: /Anthropic Admin API/ }),
       );

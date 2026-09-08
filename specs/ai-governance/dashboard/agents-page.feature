@@ -35,8 +35,9 @@ Feature: The AI Governance Agents page
   # ===========================================================================
 
   @integration
-  Scenario: The empty agents page fills itself with sample agents
+  Scenario: The empty agents page shows samples when requested
     Given no organization-wide agent read exists
+    And the viewer has enabled sample data
     When a governance viewer opens the Agents page
     Then sample agent cards are on screen
     And the banner says nothing on the page is real

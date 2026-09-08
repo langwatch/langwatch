@@ -1,103 +1,9 @@
 /**
- * Whether the governance section is currently showing its sample panels.
- *
- * Lifted out of the Costs page so every governance screen answers the question
- * the same way. The rule is the trace explorer's (`usePreviewTracesActive`):
- * sample data fills an empty screen, gets out of the way once the screen has
- * something real on it, and an explicit choice by the reader beats both.
- *
- * "Off" means the sample panels are removed, not emptied. They illustrate
- * measurements the platform does not take yet, so there is nothing to swap in
- * for them — a permanently blank panel would imply we looked and found nothing.
- *
- * The choice is ONE choice for the whole section, not one per page. A reader
- * who turns the samples off is telling us they want to see their own screens,
- * and having to say it again on each of the six pages — then again on the way
- * back — reads as the product not listening. The page-specific half — how a
- * page's own reads become a `RealDataState` — stays with the page, so an
- * organization with real spend and no registered agents still meets figures on
- * Costs and samples on Agents. Only the reader's own answer is shared.
- *
- * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
+ * One explicit sample choice for the whole governance module.
+ * Defaults to the organization's own data, including empty and loading states.
+ * Pages replace their displayed datasets while samples are enabled.
  */
-import { useCallback, useRef, useSyncExternalStore } from "react";
-
-/**
- * What the real reads have told us so far. `unknown` is a distinct answer
- * rather than a pessimistic `absent`, because defaulting to sample-on while a
- * read is still in flight would flash the sample panels up and then pull them
- * away the moment the data landed.
- */
-export type RealDataState = "unknown" | "present" | "absent";
-
-/**
- * Resolve the three states from a page's real reads. A read that has not
- * answered is `null`; one that answered with no rows is an empty array.
- *
- * Any read holding a row means the page has something to show, so samples stay
- * out of the way. Only once *every* read has answered, and all of them are
- * empty, is the screen known to be empty — a single unanswered read is enough
- * to keep the answer `unknown`, since it might be the one holding the data.
- */
-export function resolveRealDataState(
-  reads: ReadonlyArray<{ length: number } | null>,
-): RealDataState {
-  if (reads.some((read) => read !== null && read.length > 0)) return "present";
-  if (reads.some((read) => read === null)) return "unknown";
-  return "absent";
-}
-
-/**
- * Hold the last real answer across a gap in the reads.
- *
- * Changing a filter chip re-keys every query, and until the new window lands
- * they all read as unanswered again. Recomputing the default from that gap
- * would take a page we already know is empty, decide we no longer know, and
- * pull the sample panels off the screen until the new reads arrive — a flicker
- * on every filter change. An answer we have already had stands until a later
- * one replaces it.
- */
-export function settleRealDataState(
-  previous: RealDataState,
-  current: RealDataState,
-): RealDataState {
-  return current === "unknown" ? previous : current;
-}
-
-/**
- * `settleRealDataState` applied across renders. Writing the ref during render
- * is safe because the result depends only on the arguments, so a repeated
- * render reaches the same answer.
- */
-export function useSettledRealDataState(
-  reads: ReadonlyArray<{ length: number } | null>,
-): RealDataState {
-  const settled = useRef<RealDataState>("unknown");
-  settled.current = settleRealDataState(
-    settled.current,
-    resolveRealDataState(reads),
-  );
-  return settled.current;
-}
-
-/**
- * Whether the sample panels render.
- *
- * `optIn` is the reader's own choice — `null` until they touch the toggle,
- * which is what lets the default follow the data underneath them. Once they
- * have chosen, the data no longer overrides it: a reader who turned samples
- * off does not want them back when a read comes back empty.
- */
-export function sampleModeActive({
-  optIn,
-  realData,
-}: {
-  optIn: boolean | null;
-  realData: RealDataState;
-}): boolean {
-  if (optIn !== null) return optIn;
-  return realData === "absent";
-}
+import { useCallback, useSyncExternalStore } from "react";
 
 // ---- The one shared choice ----------------------------------------------
 
@@ -178,7 +84,7 @@ const serverSampleChoice = (): boolean | null => null;
 export interface SampleMode {
   /** Whether the sample panels, banner and badges render right now. */
   active: boolean;
-  /** Whether `active` came from the reader rather than from the data. */
+  /** Whether `active` came from the reader rather than the default. */
   explicit: boolean;
   /** Turn the sample panels on, and remember that the reader asked. */
   show: () => void;
@@ -188,24 +94,14 @@ export interface SampleMode {
   toggle: () => void;
 }
 
-/**
- * The section's shared choice, applied to one page's data.
- *
- * Every governance page calls this with its own `realData` and gets the same
- * `optIn` back, so the toggle a reader presses on the overview is the toggle
- * they pressed on People.
- */
-export function useSampleMode({
-  realData,
-}: {
-  realData: RealDataState;
-}): SampleMode {
+/** The shared choice, independent of each page's reads. */
+export function useSampleMode(): SampleMode {
   const optIn = useSyncExternalStore(
     subscribeToSampleChoice,
     readSampleChoice,
     serverSampleChoice,
   );
-  const active = sampleModeActive({ optIn, realData });
+  const active = optIn ?? false;
 
   const show = useCallback(() => writeSampleChoice(true), []);
   const hide = useCallback(() => writeSampleChoice(false), []);

@@ -34,7 +34,6 @@ import {
   SampleDataBanner,
   SampleDataToggle,
   useSampleMode,
-  useSettledRealDataState,
 } from "~/components/governance/sample";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -66,12 +65,6 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 const AGENTS_TABS = ["agents", "applications"] as const;
 type AgentsTab = (typeof AGENTS_TABS)[number];
 const DEFAULT_TAB: AgentsTab = "agents";
-
-/**
- * The page has no reads. Held as one constant rather than a fresh literal per
- * render so the settled-state hook is not handed a new array every time.
- */
-const NO_READS: ReadonlyArray<{ length: number } | null> = [];
 
 const isAgentsTab = (value: string | null): value is AgentsTab =>
   AGENTS_TABS.some((tab) => tab === value);
@@ -214,10 +207,7 @@ function AgentsPane({
 function AgentsPage() {
   const { agentsTab, selectAgentsTab } = useAgentsTab();
   const { open: registerOpen, setOpen: setRegisterOpen } = useRegisterDialog();
-  const realData = useSettledRealDataState(NO_READS);
-  const sample = useSampleMode({
-    realData,
-  });
+  const sample = useSampleMode();
   const { filters, setFilter, clearFilters } = useAgentFilters();
   const rows = sample.active ? SAMPLE_AGENT_ROWS : [];
   // Gated on the unfiltered set, never the visible one: a reader who filters
