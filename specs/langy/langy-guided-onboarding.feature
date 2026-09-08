@@ -499,7 +499,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: Step 2 is a checklist Langy keeps
       When the compiled guided-onboarding skill is read
-      Then before the branch and the first edit Langy writes the step 2 items into the plan tool, in fixed words and order: the code read, the branch, the tracing edit, the connect adapter, the credentials, the agent started, the agent online, the commit, the push and pull request or the no-remote line, and the three lines said
+      Then before the branch and the first edit Langy writes the step 2 items into the plan tool, in fixed words and order: the code read, the branch, the package installed, the tracing edit, the connect adapter, the credentials, the agent started, the agent online, the commit, the push and pull request or the no-remote line, and the three lines said
       And a turn never ends with an open item
       And the bare question of step 3 is asked only when every item is done
 
@@ -512,6 +512,25 @@ Feature: Langy guides the first setup after sign-up
       And the branch line names the branch that git branch --show-current printed after the commit
       And no brace is ever filled with a fallback, and no branch, commit or pull request a command did not make is ever named
       And the three lines are said right after the pull request command answered, before the question
+
+    # A run wrote the import and the connect decorator and started the agent
+    # without ever installing the package: the process died at import and the
+    # wait ran its full two minutes. The install is a checklist item.
+    @unit
+    Scenario: The langwatch package is installed before the tracing edit
+      When the compiled guided-onboarding skill is read
+      Then the checklist carries the package install between the branch and the tracing edit
+      And the install runs from the project root through the package manager the lockfile names
+      And the item is done when the manifest names the package
+      And the commit stages the manifest and the lockfile the install changed
+
+    # The same run gave the wait a 120 second shell timeout, the CLI's own
+    # wait, so the shell cut the command first and the CLI's line was lost.
+    @unit
+    Scenario: The wait for the agent gets more room than it takes
+      When the compiled guided-onboarding skill is read
+      Then the agent list --wait-online command runs with the shell timeout set to 150 seconds
+      And the line Langy reads when the agent never comes online is the CLI's own, naming the agent, the wait and the credentials
 
     # A film said "All ready!" between the first run and the suite. The line
     # closes the path, so it waits for the suite run and its open run.
@@ -641,6 +660,15 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then an agent that is not online after two minutes is explained by the last lines of its own log, the exception when there is one
       And never by a guess about the CLI, the login or the project
+
+    # The log of that run said in one line that the module was not
+    # installed, and Langy ended the turn instead of installing it.
+    @unit
+    Scenario: A wait that fails gets one repair round
+      When the compiled guided-onboarding skill is read
+      Then a log naming a cause in Langy's own work of the step, a missing module, an import or syntax error in a file it edited or a name the adapter got wrong, is fixed, the agent is started again and the wait runs once more
+      And a second failed wait, or a cause outside those edits, stops the path with the log's line as the reason
+      And the repair never touches the env file and never reads the key
 
     @unit
     Scenario: LangWatch initialises after the project's environment is loaded

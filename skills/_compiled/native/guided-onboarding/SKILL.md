@@ -70,43 +70,45 @@ and call `code_access` again, this time without `offer_describe`. Keep their des
 
 ### 2. Read the code and wire it
 
-With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7. The file it names is one you read with `local_read` in this step, and the framework is what that file imports: a docs page is never a source for the line, and a framework no file of theirs shows was not found.
+With the workspace facts from `code_access`, follow the `code-changes` skill to explore: the manifest, the entry point, the file that creates the LLM client or the graph. Detect the framework (LangGraph, OpenAI Agents, Vercel AI SDK, plain OpenAI, and so on) and the language, then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 8. The file it names is one you read with `local_read` in this step, and the framework is what that file imports: a docs page is never a source for the line, and a framework no file of theirs shows was not found.
 
 Before the branch and the first edit, write this list into `todowrite`, in this order and these words, every item pending:
 
 1. Read the code and name the framework
 2. The langy branch checked out
-3. The tracing edit
-4. The connect adapter
-5. Credentials written and checked
-6. The agent started in the background
-7. The agent online, through agent list --wait-online
-8. The commit
-9. The push and the pull request, or the no-remote line
-10. The three step 2 lines said
+3. The langwatch package added through the project's own package manager
+4. The tracing edit
+5. The connect adapter
+6. Credentials written and checked
+7. The agent started in the background
+8. The agent online, through agent list --wait-online
+9. The commit
+10. The push and the pull request, or the no-remote line
+11. The three step 2 lines said
 
 Mark each item done as you finish it, and read the list before you end a turn: **a turn never ends with an open item**, unless a command answered an error (see "When a step fails"). The bare question of step 3 is asked only when every item of this list is done, never with one open: an item skipped is a step skipped, whatever the lines say.
 
 Work on a branch of your own, never on the branch the user has checked out: `git checkout -b langy/<slug> origin/<default>` (a worktree when the tree is dirty), as step 2 of `code-changes` says. On that branch, load the `tracing` and `connect-agent` skills with the `skill` tool, then, in this order:
 
-1. `tracing` for the detected framework. Read one docs page, `langwatch docs integration/<python|typescript>/integrations/<framework>` (for example `integration/python/integrations/langgraph`), and no other. Keep the order the tracing skill pins: the environment loads first and LangWatch initialises after it, so `langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file.
-2. `connect-agent`: the connect call with a stable agent name and the environment the process runs in. The skill carries the whole pattern and there is no docs page for it: never search `langwatch docs` for one. The connect function is an adapter you write beside the startup code: it calls the app's own function and returns the reply text, or one message, or a list of messages. Never put the decorator on a function the app already has that returns its own result: the SDK cannot turn a dict into a reply, and every turn of the run times out.
-3. Call `local_langwatch_env` once, with the env file the app loads (`.env` next to the manifest unless the code loads another). It writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT there with the user's own login. The key never reaches you: never ask for it, never write it yourself and never read the file back for it.
-4. Run the tracing skill's key check once, copied as written for the language, from the project root, through the project's own runner. It is the first and only check, and it prints only whether the key is set. One run: never a second try with another path or another loader, and no probe of your own before it. For Python that is this command, with `-c` and never `python -` with a heredoc (the loader fails on standard input):
+1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager: `uv add langwatch` when the project has a `uv.lock`, `pip install langwatch` otherwise; `npm install langwatch` or `pnpm add langwatch` by the lockfile present. The item is done when the manifest (`pyproject.toml` or `package.json`) names the package. An import of a package that was never installed kills the agent at start, and the wait of item 6 runs its full two minutes for nothing.
+2. `tracing` for the detected framework. Read one docs page, `langwatch docs integration/<python|typescript>/integrations/<framework>` (for example `integration/python/integrations/langgraph`), and no other. Keep the order the tracing skill pins: the environment loads first and LangWatch initialises after it, so `langwatch.setup()` sits below the import that loads the env file, never at the top of the entry file.
+3. `connect-agent`: the connect call with a stable agent name and the environment the process runs in. The skill carries the whole pattern and there is no docs page for it: never search `langwatch docs` for one. The connect function is an adapter you write beside the startup code: it calls the app's own function and returns the reply text, or one message, or a list of messages. Never put the decorator on a function the app already has that returns its own result: the SDK cannot turn a dict into a reply, and every turn of the run times out.
+4. Call `local_langwatch_env` once, with the env file the app loads (`.env` next to the manifest unless the code loads another). It writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT there with the user's own login. The key never reaches you: never ask for it, never write it yourself and never read the file back for it.
+5. Run the tracing skill's key check once, copied as written for the language, from the project root, through the project's own runner. It is the first and only check, and it prints only whether the key is set. One run: never a second try with another path or another loader, and no probe of your own before it. For Python that is this command, with `-c` and never `python -` with a heredoc (the loader fails on standard input):
 
    ```bash
    uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"
    ```
 
-   `False` is not a failed step: fix the load order of step 1 and run the same command again.
-5. Start the agent from that branch the way the repo starts it (the `local_*` tools run the process), then run `langwatch agent list --wait-online <agent name> --format json` once: it prints the list as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Every `--target` below is `connected:<that name>`.
-6. Commit the instrumentation on that branch, in one command: stage the files you edited or wrote, by name (the manifest, the tracing edit, the connect adapter, a lockfile the repository tracks), never the env file and never `git add -A`, with this message and no trailer:
+   `False` is not a failed step: fix the load order of item 2 and run the same command again.
+6. Start the agent from that branch the way the repo starts it (the `local_*` tools run the process), then run `langwatch agent list --wait-online <agent name> --format json` once, with the `timeout` parameter of the shell tool set to 150: it prints the list as soon as the row's `status` is `online`, and it fails after two minutes when the row never does. The wait takes up to 120 seconds, so a shell limit at or under that cuts the command before the CLI prints its line, and what you read is the shell's limit instead of the line naming the agent, the wait and the credentials: the wait always gets more room than it takes. Never write a loop of your own around `agent list`. Nothing runs against an agent that is not online: no scenario, no suite. Every `--target` below is `connected:<that name>`.
+7. Commit the instrumentation on that branch, in one command: stage the files you edited or wrote, by name (the manifest and the lockfile the install of item 1 changed, the tracing edit, the connect adapter), never the env file and never `git add -A`, with this message and no trailer:
 
 ```bash
 git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"
 ```
 
-7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. Then run `git branch --show-current`: its output is the name the lines below carry. The pull request line is this, verbatim, with the brace filled with the address `gh pr create` printed, and said only when it printed one:
+8. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`. Then run `git branch --show-current`: its output is the name the lines below carry. The pull request line is this, verbatim, with the brace filled with the address `gh pr create` printed, and said only when it printed one:
 
 I opened a pull request with the tracing change: {link}. You can merge it already.
 
@@ -215,7 +217,7 @@ All ready! Let me know if there is anything I can help with.
 
 ### When a step fails
 
-A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file: say in one line, with `say`, what is not done and what the error names as the cause, and end the turn with the open items left open. One exception to the reads: when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named (`local_read` on the path its result printed) and report its last lines, the exception if there is one, as the reason. Never a guess about the CLI, the login or the project in its place. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
+A step fails when a command answers an error, never when a judge answers a verdict: a scenario or suite run that comes back failed is a finding about the agent, and step 5 goes on with the explanation, the two-things line and the suite. The credentials call answers that the key was refused, the tracing edit cannot be applied, the agent is not online after two minutes, or a scenario or suite run answers an error instead of a verdict (a 422, a target it cannot find, a run that never starts, a connected agent call that times out): stop there, without diagnosing. No further reads or commands, and never the env file: say in one line, with `say`, what is not done and what the error names as the cause, and end the turn with the open items left open. One exception to the reads, with one repair in it: when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named (`local_read` on the path its result printed). When its last lines name a cause in your own work of this step, a module that is not installed, an import or syntax error in a file you edited, a name the adapter got wrong, fix that cause, start the agent again the same way and run the wait once more, with the same timeout. The repair happens once and never touches the env file or reads the key: a second failed wait, or a cause outside those edits, stops there as this section says, and you report its last lines, the exception if there is one, as the reason. Never a guess about the CLI, the login or the project in its place. Nothing later in the script happens: no scenario or suite runs against an agent that is not online, the why-a-scenario line, the two-things line and the closing line are not said, and `langwatch onboarding complete-path` does not run. When the credentials call was refused, the line says that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT go into the env file by hand, from the project's settings page.
 
 ## coding: Coding agents
 

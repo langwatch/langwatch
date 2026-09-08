@@ -449,7 +449,7 @@ describe("the guided-onboarding skill", () => {
         'git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"',
       );
       const push = rendered.indexOf(
-        "7. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`.",
+        "8. Push the branch and open the pull request, as steps 5 and 6 of `code-changes` say, with the title `Add LangWatch tracing and the connect endpoint`.",
       );
       const sentence = rendered.indexOf(VERBATIM_LINES["the pull request line"]);
       const noRemote = rendered.indexOf(
@@ -469,14 +469,15 @@ describe("the guided-onboarding skill", () => {
       const items = [
         "1. Read the code and name the framework",
         "2. The langy branch checked out",
-        "3. The tracing edit",
-        "4. The connect adapter",
-        "5. Credentials written and checked",
-        "6. The agent started in the background",
-        "7. The agent online, through agent list --wait-online",
-        "8. The commit",
-        "9. The push and the pull request, or the no-remote line",
-        "10. The three step 2 lines said",
+        "3. The langwatch package added through the project's own package manager",
+        "4. The tracing edit",
+        "5. The connect adapter",
+        "6. Credentials written and checked",
+        "7. The agent started in the background",
+        "8. The agent online, through agent list --wait-online",
+        "9. The commit",
+        "10. The push and the pull request, or the no-remote line",
+        "11. The three step 2 lines said",
       ];
       const positions = items.map((item) => rendered.indexOf(item));
       for (const [index, position] of positions.entries()) {
@@ -488,7 +489,7 @@ describe("the guided-onboarding skill", () => {
       const branch = rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`");
       expect(list).toBeGreaterThan(-1);
       expect(positions[0]).toBeGreaterThan(list);
-      expect(branch).toBeGreaterThan(positions[9]!);
+      expect(branch).toBeGreaterThan(positions[10]!);
       expect(rendered).toContain(
         "The bare question of step 3 is asked only when every item of this list is done, never with one open: an item skipped is a step skipped, whatever the lines say.",
       );
@@ -517,6 +518,50 @@ describe("the guided-onboarding skill", () => {
       // One brace each, and only the one the commands fill.
       expect(VERBATIM_LINES["the no-remote line"].match(/\{[a-z]+\}/g)).toEqual(["{branch}"]);
       expect(VERBATIM_LINES["the branch line"].match(/\{[a-z]+\}/g)).toEqual(["{branch}"]);
+    });
+
+    /** @scenario "The langwatch package is installed before the tracing edit" */
+    it("installs the package through the project's own package manager, as a checklist item between the branch and the tracing edit", () => {
+      const branch = rendered.indexOf("2. The langy branch checked out");
+      const install = rendered.indexOf("3. The langwatch package added through the project's own package manager");
+      const tracingItem = rendered.indexOf("4. The tracing edit");
+      expect(install).toBeGreaterThan(branch);
+      expect(tracingItem).toBeGreaterThan(install);
+      const how = rendered.indexOf(
+        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager: `uv add langwatch` when the project has a `uv.lock`, `pip install langwatch` otherwise; `npm install langwatch` or `pnpm add langwatch` by the lockfile present.",
+      );
+      const tracingStep = rendered.indexOf("2. `tracing` for the detected framework.");
+      expect(how).toBeGreaterThan(-1);
+      expect(tracingStep).toBeGreaterThan(how);
+      expect(rendered).toContain(
+        "The item is done when the manifest (`pyproject.toml` or `package.json`) names the package.",
+      );
+      expect(rendered).toContain(
+        "the manifest and the lockfile the install of item 1 changed, the tracing edit, the connect adapter",
+      );
+    });
+
+    /** @scenario "The wait for the agent gets more room than it takes" */
+    it("runs the wait with a shell timeout above the wait itself, so the CLI's own line is what it reads", () => {
+      expect(rendered).toContain(
+        "run `langwatch agent list --wait-online <agent name> --format json` once, with the `timeout` parameter of the shell tool set to 150:",
+      );
+      expect(rendered).toContain(
+        "The wait takes up to 120 seconds, so a shell limit at or under that cuts the command before the CLI prints its line",
+      );
+      expect(rendered).toContain("the wait always gets more room than it takes");
+    });
+
+    /** @scenario "A wait that fails gets one repair round" */
+    it("repairs its own step once when the agent never comes online, and stops on the second failed wait", () => {
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain(
+        "When its last lines name a cause in your own work of this step, a module that is not installed, an import or syntax error in a file you edited, a name the adapter got wrong, fix that cause, start the agent again the same way and run the wait once more, with the same timeout.",
+      );
+      expect(section).toContain(
+        "The repair happens once and never touches the env file or reads the key: a second failed wait, or a cause outside those edits, stops there as this section says",
+      );
     });
 
     /** @scenario "The closing line waits for the suite run" */
@@ -577,7 +622,10 @@ describe("the guided-onboarding skill", () => {
         "run `langwatch agent list --wait-online <agent name> --format json` once",
       );
       expect(rendered).toContain(
-        "it fails after two minutes when the row never does. Never write a loop of your own around `agent list`.",
+        "it fails after two minutes when the row never does.",
+      );
+      expect(rendered).toContain(
+        "the wait always gets more room than it takes. Never write a loop of your own around `agent list`.",
       );
       expect(rendered).toContain(
         "Nothing runs against an agent that is not online: no scenario, no suite.",
@@ -630,7 +678,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "Langy names the framework it found" */
     it("says one line naming the framework and the file before the first edit", () => {
       expect(rendered).toContain(
-        'then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 7.',
+        'then keep one line naming what you found, in this shape: "I found a LangGraph agent in app/graph.py." That is the framework line: it is said with `say` right before the question of step 3, with the two lines of item 8.',
       );
       const report = rendered.indexOf("keep one line naming what you found");
       const branch = rendered.indexOf("`git checkout -b langy/<slug> origin/<default>`");
@@ -661,7 +709,7 @@ describe("the guided-onboarding skill", () => {
         `uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`,
       );
       expect(rendered).toContain("never `python -` with a heredoc");
-      expect(rendered).toContain("`False` is not a failed step: fix the load order of step 1 and run the same command again.");
+      expect(rendered).toContain("`False` is not a failed step: fix the load order of item 2 and run the same command again.");
     });
 
     /** @scenario "The connect endpoint comes from the connect-agent skill" */

@@ -142,17 +142,40 @@ export function branchNamedInSaidLines(
   return null;
 }
 
+/** The manifests a package manager writes the dependency into. */
+const MANIFEST_NAMES = ["pyproject.toml", "package.json"];
+
+/**
+ * Does this diff add langwatch to a manifest? The diff is split at its file
+ * headers, and only the hunks of a manifest count: an import in the code is
+ * not an install.
+ */
+export function diffAddsLangwatchToManifest(diff: string): boolean {
+  return diff
+    .split(/^diff --git /m)
+    .filter((section) =>
+      MANIFEST_NAMES.some((name) => section.split("\n")[0]?.endsWith(name)),
+    )
+    .some((section) => /^\+.*langwatch/m.test(section));
+}
+
 /**
  * Layer 2: every branch, commit and pull request the said lines name is a
- * thing a command made. A run once pasted the no-remote sentence into the
- * brace of the pull request line and named a branch no command had created.
+ * thing a command made, and the branch carries the install. A run once pasted
+ * the no-remote sentence into the brace of the pull request line and named a
+ * branch no command had created; another wrote the import without ever
+ * installing the package, so the agent died at import.
  */
 export function expectSaidLinesMatchRepo({
   lines,
   repo,
 }: {
   lines: readonly string[];
-  repo: { branches: () => string[]; log: () => string[] };
+  repo: {
+    branches: () => string[];
+    log: () => string[];
+    diffAgainstMain: (branch: string) => string;
+  };
 }): void {
   const branch = branchNamedInSaidLines(lines);
   expect(branch, "the branch line names a branch").not.toBeNull();
@@ -163,6 +186,10 @@ export function expectSaidLinesMatchRepo({
   expect(
     repo.log().some((entry) => /Add LangWatch tracing/.test(entry)),
     "the tracing commit exists",
+  ).toBe(true);
+  expect(
+    diffAddsLangwatchToManifest(repo.diffAgainstMain(branch!)),
+    "the branch adds langwatch to the manifest",
   ).toBe(true);
   const pullRequest = lines.find((line) =>
     line.includes(GUIDED_LINES.pullRequestOpened),
