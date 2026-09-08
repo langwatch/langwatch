@@ -149,7 +149,8 @@
                 ]
               },
               "agent-testing/voice-agents",
-              "agent-testing/red-teaming"
+              "agent-testing/red-teaming",
+              "agent-testing/agent-diagnostics-playbook"
             ]
           },
           {

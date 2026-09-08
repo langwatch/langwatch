@@ -62,6 +62,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
 - [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
+- [Agent Diagnostics Playbook](https://langwatch.ai/docs/agent-testing/agent-diagnostics-playbook.md): A seven-dimension, cheapest-first playbook for diagnosing WHY an agent misbehaves or a scenario keeps failing, from rubric hygiene to model strength
 
 ## Observability
 

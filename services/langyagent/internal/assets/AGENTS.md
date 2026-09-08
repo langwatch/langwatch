@@ -56,6 +56,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | --- | --- | --- |
 | "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only --origin application` (errors live on spans), `langwatch trace get <id>` |
 | "cost", "latency", "stats", "usage", "pass rate" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
+| "why is my agent misbehaving", "diagnose my agent", "my scenario keeps failing — why" | `agent-diagnostics` | `langwatch trace search --origin application`, `langwatch trace export --format jsonl --origin application` — structural root-cause verdict first; hand off to `agent-improve` for the fix |
 | "what should I do next", "improve my agent", "why does this keep failing", all from live traffic | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
 | "test my agent", "batch eval", "compare models", "benchmark" | `experiments` | `langwatch experiment list`, `langwatch experiment run <slug>`, `langwatch evaluator types` |
 | "optimize this prompt", "bad answers", "answer better" | `prompt-optimization` | `langwatch workbench get-state`, then its loop |
