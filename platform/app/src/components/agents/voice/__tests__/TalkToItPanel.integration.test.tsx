@@ -8,7 +8,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { VoiceTransportClient } from "../voice-transport-client.registry";
+import type {
+  VoiceCallHandlers,
+  VoiceTransportClient,
+} from "../voice-transport-client.registry";
 
 // Mock the transport client registry so no vendor SDK is loaded in the test.
 const { openCall } = vi.hoisted(() => ({
@@ -166,15 +169,7 @@ describe("TalkToItPanel", () => {
 
       let disconnect: (() => void) | undefined;
       openCall.mockImplementationOnce(
-        async ({
-          handlers,
-        }: {
-          handlers: {
-            onConnected: (i: { conversationId: string }) => void;
-            onTranscript: (turn: { role: string; text: string }) => void;
-            onDisconnect: () => void;
-          };
-        }) => {
+        async ({ handlers }: { handlers: VoiceCallHandlers }) => {
           handlers.onConnected({ conversationId: "conv_1" });
           handlers.onTranscript({
             role: "agent",
