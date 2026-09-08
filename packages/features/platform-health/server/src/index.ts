@@ -16,6 +16,6 @@ export {
 export { SubsystemProbePort, type SubsystemProbeResult } from "./ports/subsystem-probe.port.ts";
 export { httpStatusForReport, rollUpStatus } from "./rules/platform-health-report.rules.ts";
 export {
-  createPlatformHealthRestApp,
-  type PlatformHealthRestPorts,
-} from "./transport/api-rest/platform-health.api.ts";
+  platformHealthAuthorization,
+  platformHealthRest,
+} from "./transport/platform-health.rest.ts";

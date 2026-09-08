@@ -1,60 +1,55 @@
 /**
- * This process's composition of the monitoring-keyed platform-health family
- * (`@langwatch/platform-health-server`).
+ * Binds the monitoring-keyed platform-health declaration to this process. The
+ * family resolves no credential — a monitor is not a tenant — so the route
+ * compares this deployment's key itself.
  */
-import { PlatformHealthApp, type PlatformHealthRestPorts } from "@langwatch/platform-health-server";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
-import { fromDate } from "@langwatch/time";
+import { createErrorHandler } from "@langwatch/api";
+import {
+  bindRestHeader,
+  createRestRuntime,
+  type MountableRestApp,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
+import {
+  type PlatformHealthApi,
+  PlatformHealthSubsystemNotFoundError,
+  PlatformHealthUnhealthyError,
+} from "@langwatch/platform-health-contract";
+import { platformHealthAuthorization, platformHealthRest } from "@langwatch/platform-health-server";
 
-import type { HealthProbeRestPorts } from "../health/health-probe-rest.ts";
-
-/** What this process brings to the platform-health family. */
-export type ApiPlatformHealthRestOptions = Readonly<{
-  /** `PLATFORM_HEALTH_API_KEY`, blank-is-unconfigured. */
-  apiKey: string | undefined;
-  /** `PLATFORM_HEALTH_PROBE_API_KEY`, blank-is-unconfigured. */
-  probeApiKey: string | undefined;
-  /**
-   * The SAME collaborators the project-keyed `/api/health/*` probes run on, so
-   * the two doors cannot disagree about what a subsystem's health is.
-   */
-  probes: HealthProbeRestPorts | undefined;
-  resources: ResourceOwnership;
-}>;
-
-/**
- * Composes the family, or answers nothing. Nothing is structural: no
- * monitoring key cannot tell a monitor from anyone else, no probe credential
- * cannot author a canary, and no collaborators have no boundary to dial.
- */
-export function composeApiPlatformHealthRest(
-  options: ApiPlatformHealthRestOptions,
-): PlatformHealthRestPorts | undefined {
-  const apiKey = options.apiKey?.trim();
-  const probeApiKey = options.probeApiKey?.trim();
-  const probes = options.probes;
-  if (!apiKey || !probeApiKey || !probes) return undefined;
-
-  const app = PlatformHealthApp.create({
-    infrastructure: {
-      publicBaseUrl: probes.publicBaseUrl,
-      automation: () => {
-        const automation = probes.automation();
-        return {
-          findById: (input) => automation.tryGetById(input),
-          getRecentFires: async (input) =>
-            (await automation.getRecentFires(input)).map((fire) => ({
-              firedAt: fromDate(fire.createdAt),
-            })),
-        };
+/** `/api/v1/platform-health` and `/api/v1/platform-health/:check`. */
+export function mountPlatformHealthRest(options: {
+  platformHealth: () => PlatformHealthApi;
+}): MountableRestApp {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("A platform-health route answers with no credential resolved.");
       },
-      workflowExists: (input) => probes.workflowExists(input),
-      resolveProjectByApiKey: (token) => probes.resolveProjectByApiKey(token),
     },
-    config: { apiKey, probeApiKey },
-    dependencies: {},
-    resources: options.resources,
   });
 
-  return { platformHealth: () => app };
+  return runtime.mount(platformHealthRest.router(), {
+    app: options.platformHealth,
+    credential: "public",
+    onError: platformHealthErrors,
+    facts: [bindRestHeader(platformHealthAuthorization, "authorization")],
+  });
 }
+
+const canonicalErrors = createErrorHandler();
+
+/**
+ * A failing platform answers its report at 503, and an unknown subsystem the
+ * sentence this family has always answered; every other refusal, the monitoring
+ * key's included, is the canonical envelope.
+ */
+const platformHealthErrors: RestErrorHandler = (error, context) => {
+  if (error instanceof PlatformHealthUnhealthyError) return context.json(error.report, 503);
+
+  if (error instanceof PlatformHealthSubsystemNotFoundError) {
+    return context.json({ message: error.message }, 404);
+  }
+
+  return canonicalErrors(error, context);
+};

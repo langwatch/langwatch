@@ -54,7 +54,9 @@ export const platformHealthReportSchema = z.strictObject({
 export type PlatformHealthReport = z.infer<typeof platformHealthReportSchema>;
 
 /** What a monitor may narrow a report to, where it asks for one subsystem. */
-export type PlatformHealthQuery = Readonly<{
-  triggerId?: string | undefined;
-  workflowId?: string | undefined;
-}>;
+export const platformHealthQuerySchema = z.object({
+  triggerId: z.string().optional(),
+  workflowId: z.string().optional(),
+});
+
+export type PlatformHealthQuery = z.infer<typeof platformHealthQuerySchema>;

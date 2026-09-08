@@ -2357,10 +2357,20 @@ const presentations = {
     title: "Ingestion template not found",
     describe: () => "It may have been archived or removed. Reload to see the current list.",
   },
+  platform_health_subsystem_not_found: {
+    title: "No such subsystem",
+    describe: () =>
+      "Ask for one of the subsystems this platform reports on, or drop the name to get the whole platform.",
+  },
   platform_health_unauthorized: {
     title: "That platform health key was not accepted",
     describe: () =>
       "Send the monitoring key this deployment was configured with as a bearer token. Check it is current and copied in full.",
+  },
+  platform_health_unhealthy: {
+    title: "The platform is not healthy",
+    describe: () =>
+      "At least one subsystem did not answer. The report lists every subsystem and what each one said.",
   },
   platform_template_immutable: {
     title: "This template can't be edited directly",

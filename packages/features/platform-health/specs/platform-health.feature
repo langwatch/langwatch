@@ -38,6 +38,12 @@ Feature: One platform health answer for an external monitor
     And the answer names it
 
   @integration
+  Scenario: A subsystem this platform does not have is not found
+    Given a deployment that configured a platform health key
+    When a monitor asks for a subsystem name this platform does not have
+    Then the answer says there is no such subsystem
+
+  @integration
   Scenario: The aggregate runs every subsystem
     Given a deployment that configured a platform health key
     When a monitor asks for the platform health

@@ -934,14 +934,6 @@
       "path": "packages/features/platform-health/contract/src/platform-health.config.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/platform-health/contract/src/platform-health.errors.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/platform-health/contract/src/platform-health.service.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/presence/web/src"
     },
