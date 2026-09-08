@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const ROLE_FEATURE_ID = "role" as const;
 
+/** The identifier prefix a newly defined custom role is written under. */
+export const ROLE_KSUID_RESOURCE = "customrole";
+
 export const ROLE_KIND = {
   CUSTOM: "custom",
   SYSTEM_API_KEY: "system_api_key",

@@ -34,12 +34,13 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "hono": "^4.12.27",
-    "nanoid": "^5.1.5",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }

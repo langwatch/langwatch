@@ -1,21 +1,10 @@
 /**
- * The inputs the `role.*` tRPC surface publishes.
- *
- * They live in the contract rather than beside the router so the wire shape a
- * client is typed against is stated once, in the package both sides may import.
- *
- * The two write schemas are factories: the permission vocabulary a custom role
- * is written in spans every feature, so the process owns it and hands it in.
- * This surface only says that a permission is a validated string.
+ * The inputs `role.*` publishes, stated once in the package both sides import.
+ * Permissions parse against the authorization registry's own vocabulary, so a
+ * role the decision engine could not read is refused here.
  */
+import { authzPermissionSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
-
-/**
- * The permission vocabulary a custom role is written in. It spans every
- * feature, so the process owns it and hands it in — the role surface only
- * says that a permission is a validated string.
- */
-export type CustomRolePermissionSchema = z.ZodType<string, string>;
 
 /** One organization, for the read that lists its custom roles. */
 export const roleApiOrganizationInputSchema = z.object({ organizationId: z.string() });
@@ -30,26 +19,24 @@ export const roleApiUserRoleAssignmentInputSchema = z.object({
   customRoleId: z.string(),
 });
 
-/** Defining a custom role. `customRolePermission` is the process's vocabulary. */
-export function roleApiCreateInputSchema(customRolePermission: CustomRolePermissionSchema) {
-  return z.object({
-    organizationId: z.string(),
-    name: z.string().min(1).max(50),
-    description: z.string().optional(),
-    permissions: z.array(customRolePermission),
-  });
-}
+/** Defining a custom role. */
+export const roleApiCreateInputSchema = z.object({
+  organizationId: z.string(),
+  name: z.string().min(1).max(50),
+  description: z.string().optional(),
+  permissions: z.array(authzPermissionSchema),
+});
 
-/** Editing a custom role. `customRolePermission` is the process's vocabulary. */
-export function roleApiUpdateInputSchema(customRolePermission: CustomRolePermissionSchema) {
-  return z.object({
-    roleId: z.string(),
-    name: z.string().min(1).max(50).optional(),
-    description: z.string().optional(),
-    permissions: z.array(customRolePermission).optional(),
-  });
-}
+/** Editing a custom role. */
+export const roleApiUpdateInputSchema = z.object({
+  roleId: z.string(),
+  name: z.string().min(1).max(50).optional(),
+  description: z.string().optional(),
+  permissions: z.array(authzPermissionSchema).optional(),
+});
 
 export type RoleApiOrganizationInput = z.infer<typeof roleApiOrganizationInputSchema>;
 export type RoleApiRoleInput = z.infer<typeof roleApiRoleInputSchema>;
 export type RoleApiUserRoleAssignmentInput = z.infer<typeof roleApiUserRoleAssignmentInputSchema>;
+export type RoleApiCreateInput = z.infer<typeof roleApiCreateInputSchema>;
+export type RoleApiUpdateInput = z.infer<typeof roleApiUpdateInputSchema>;

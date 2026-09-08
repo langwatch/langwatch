@@ -11,8 +11,14 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "files": [
+    "./src/index.ts"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -33,13 +39,19 @@
       "path": "../../../api/tsconfig.build.json"
     },
     {
+      "path": "../../../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../prisma-client/tsconfig.build.json"
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

@@ -47,26 +47,46 @@ export class RoleReservedNameError extends HandledError {
   }
 }
 
-export class RoleNotAssignableError extends Error {
-  name = "RoleNotAssignableError" as const;
-}
-export class RoleOrganizationMismatchError extends Error {
-  name = "RoleOrganizationMismatchError" as const;
-}
-export class TeamNotFoundError extends Error {
-  name = "TeamNotFoundError" as const;
-}
-export class UserNotTeamMemberError extends Error {
-  name = "UserNotTeamMemberError" as const;
+/**
+ * The role belongs to another organization than the team it was offered to, so
+ * it cannot be assigned there. The customer reads the same sentence as for a
+ * role their organization simply may not hand out.
+ */
+export class RoleNotAssignableError extends HandledError {
+  declare readonly code: "custom_role_not_assignable";
+  constructor(message = "That role cannot be assigned here") {
+    super("custom_role_not_assignable", message, { httpStatus: 422 });
+    this.name = "RoleNotAssignableError";
+  }
 }
 
-export class OrgExclusivePermissionScopeError extends Error {
-  name = "OrgExclusivePermissionScopeError" as const;
-  readonly permission: string;
-  readonly scopeType: string;
+/** The team an assignment names does not exist. */
+export class RoleTeamNotFoundError extends NotFoundError {
+  declare readonly code: "team_not_found";
+  constructor(teamId: string) {
+    super("team_not_found", "Team", teamId, { meta: { teamId } });
+    this.name = "RoleTeamNotFoundError";
+  }
+}
+
+/** The person is not on the team the role was offered to. */
+export class RoleUserNotTeamMemberError extends HandledError {
+  declare readonly code: "team_membership_not_found";
+  constructor(message = "That person is not a member of this team") {
+    super("team_membership_not_found", message, { httpStatus: 404 });
+    this.name = "RoleUserNotTeamMemberError";
+  }
+}
+
+/** An organization-exclusive permission was bound at TEAM or PROJECT scope. */
+export class OrgExclusivePermissionScopeError extends HandledError {
+  declare readonly code: "org_exclusive_permission_scope";
   constructor(permission: string, scopeType: string) {
-    super(`${permission} can only be granted at organization scope`);
-    this.permission = permission;
-    this.scopeType = scopeType;
+    super(
+      "org_exclusive_permission_scope",
+      "That permission only takes effect at organization scope",
+      { httpStatus: 422, meta: { permission, scopeType } },
+    );
+    this.name = "OrgExclusivePermissionScopeError";
   }
 }

@@ -73,3 +73,26 @@ API Key, Organization and Invite can share one definition of an assignable
 custom role. Existing Role REST and tRPC names remain compatibility transports.
 The legacy Role service, repository, and characterization tests have been
 removed; the package server tests exercise the canonical service boundary.
+
+## Amendment (2026-09-08): the annotation shape
+
+The boundary above stands; where it lands has moved to the shape ADR-133
+describes, and the names in this document are read as history.
+
+- `RoleApi` replaces the abstract `RoleService`. The callable operations are
+  the same behaviour; a caller arrives as an argument.
+- `RoleApp` is the one application. It owns the peer calls the services and the
+  Postgres adapter used to make: authorization (`AuthzApi`), the team directory
+  (`OrganizationApi`) and the caller's display identity (`UserApi`).
+- The Postgres adapter is gone. `RoleRepository` reads `CustomRole` and counts
+  `TeamUser` assignments, with a Prisma backend and a memory twin chosen at
+  boot by `defineRepositories`.
+- Every tRPC procedure is declared once in the contract and bound in
+  `transport/role.trpc.ts` and `transport/role-binding.trpc.ts`; REST is
+  `transport/role.rest.ts`. Names, paths, schemas and versions are unchanged.
+- Three ports remain, all technical: the personal-workspace fence, the
+  Enterprise plan gate and the binding identifier format. Each is supplied by
+  the process that composes the ledger, the plan and the workspace rows.
+- `getById`, `update` and `delete` resolve the role's organization and run the
+  authorization check in the application, because no request names it. Their
+  procedures declare `serviceAuthorized` with the permission each enforces.

@@ -9,21 +9,22 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
+import { AuthzApp } from "@langwatch/authz-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { EventEmitter } from "node:events";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeDatasetFeature } from "../../dataset/dataset.composition.ts";
 import { composeEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
 import { composePromptFeature } from "../../prompt/prompt.composition.ts";
 import { composeHomeFeature } from "../../project/home.composition.ts";
-import { composeRoleFeature } from "../role.composition.ts";
+import { installApiRole } from "../role.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
@@ -167,7 +168,7 @@ function testOrganizationApp() {
   };
 }
 
-function composeApplication(options: { customRolePlan?: undefined } = {}) {
+async function composeApplication(options: { planType?: string } = {}) {
   const prisma = testPrisma();
   const authz = testAuthz();
   const organizations = testOrganizationApp();
@@ -213,13 +214,22 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   });
   const prompt = composePromptFeature({ infrastructure, peers: { projects } });
 
-  const role = composeRoleFeature({
+  const grants = {
+    attachBindings: vi.fn(async () => undefined),
+    invalidateOrganization: vi.fn(async () => undefined),
+  } as unknown as AuthzGrantsService;
+  const authzApp = AuthzApp.fromServices({ permissions: authz, grants });
+  // The role feature over the SAME authorization application the process
+  // exposes as `ctx.app.authzApp`, and the one plan provider every allowance
+  // is read through.
+  const role = await installApiRole({
     infrastructure,
-    grants: {
-      attachBindings: vi.fn(async () => undefined),
-      invalidateOrganization: vi.fn(async () => undefined),
-    } as unknown as AuthzGrantsService,
-    ...options,
+    peers: {
+      permissions: authzApp,
+      organizations: organizations as never,
+      users: createApiFixture<UserApi>(),
+    },
+    plans: { getActivePlan: async () => ({ type: options.planType ?? "FREE" }) as never },
   });
   const home = composeHomeFeature({ infrastructure });
 
@@ -240,7 +250,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
         dataset: dataset.app,
         evaluatorApp: evaluator.app,
         prompts: prompt.app,
-        authzApp: role.authzApp,
+        authzApp,
         permissions: authz,
         roles: role.app,
       },
@@ -250,7 +260,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({
@@ -287,7 +297,7 @@ async function callTrpc(
 describe("given an API process composed with the role, team and home features", () => {
   describe("when the caller asks what they may do at a scope", () => {
     it("answers from the same AuthZ service the declared check ran on", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "authz.effectivePermissions", {
         projectId: PROJECT_ID,
@@ -307,7 +317,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when the browser asks whether a rollout is on for a project", () => {
     it("resolves the project's organization and reads the flag row through the composed adapter", async () => {
-      const { application, projects } = composeApplication();
+      const { application, projects } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "featureFlag.isEnabled", {
         flag: "release_ui_ai_gateway_menu_enabled",
@@ -323,7 +333,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when a project lists its datasets", () => {
     it("answers from the same dataset service the execution half composed", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "dataset.getAll", {
         projectId: PROJECT_ID,
@@ -338,7 +348,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when the experiments page asks for its batch-evaluation rollup", () => {
     it("reads the table off this process's own connection", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(
         application,
@@ -358,7 +368,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when the home screen asks for what this person recently touched", () => {
     it("walks the process's own audit trail and hydrates each entity it names", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "home.getRecentItems", {
         projectId: PROJECT_ID,
@@ -390,7 +400,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when a personal workspace asks which features it may switch on", () => {
     it("reads the organization application the identity half composed", async () => {
-      const { application, organizations } = composeApplication();
+      const { application, organizations } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "personalWorkspaceFeatures.get", {
         projectId: PROJECT_ID,
@@ -407,7 +417,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when a project reads its organization's prompt tag catalogue", () => {
     it("answers through the composed prompt application", async () => {
-      const { application, projects } = composeApplication();
+      const { application, projects } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "promptTags.getAll", {
         projectId: PROJECT_ID,
@@ -421,7 +431,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when the evaluators screen lists a project's evaluators", () => {
     it("answers from the same evaluator service the execution half composed", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "evaluators.getAll", {
         projectId: PROJECT_ID,
@@ -436,7 +446,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when a workflow evaluator is replicated without a saved graph version", () => {
     it("refuses rather than writing a structurally broken replica", async () => {
-      const { evaluator } = composeApplication();
+      const { evaluator } = await composeApplication();
 
       await expect(
         evaluator.ports.replicateEvaluatorWorkflow({} as never, {
@@ -450,7 +460,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when the roles screen lists an organization's custom roles", () => {
     it("answers through the composed role application", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "role.getAll", {
         organizationId: ORGANIZATION_ID,
@@ -463,25 +473,25 @@ describe("given an API process composed with the role, team and home features", 
     });
   });
 
-  describe("when no Enterprise plan gate is composed and a custom role is defined", () => {
+  describe("when the organization's plan does not carry custom roles", () => {
     it("refuses by name rather than storing a role the plan does not carry", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication({ planType: "FREE" });
 
       const { body } = await callTrpc(
         application,
         "role.create",
-        { organizationId: ORGANIZATION_ID, name: "Auditor", permissions: [] },
+        { organizationId: ORGANIZATION_ID, name: "Auditor", permissions: ["traces:view"] },
         "mutation",
       );
 
-      expect(JSON.stringify(body)).toContain("service_unavailable");
+      expect(JSON.stringify(body)).toContain("Enterprise plan");
       expect(prisma.client.customRole.create).not.toHaveBeenCalled();
     });
   });
 
   describe("when the team screen lists an organization's teams", () => {
     it("passes the caller's administration standing to the service that widens each row", async () => {
-      const { application, organizations, authz } = composeApplication();
+      const { application, organizations, authz } = await composeApplication();
 
       const { status } = await callTrpc(application, "team.getTeamsWithMembers", {
         organizationId: ORGANIZATION_ID,
@@ -500,7 +510,7 @@ describe("given an API process composed with the role, team and home features", 
 
   describe("when no Enterprise plan gate is composed", () => {
     it("refuses a member list that assigns a custom role, by name", async () => {
-      const { application, organizations } = composeApplication();
+      const { application, organizations } = await composeApplication();
 
       const { body } = await callTrpc(
         application,
@@ -518,7 +528,7 @@ describe("given an API process composed with the role, team and home features", 
     });
 
     it("leaves a member list carrying only built-in roles alone", async () => {
-      const { application, organizations } = composeApplication();
+      const { application, organizations } = await composeApplication();
 
       const { status } = await callTrpc(
         application,

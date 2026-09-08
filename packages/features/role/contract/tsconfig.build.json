@@ -11,8 +11,14 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "files": [
+    "./src/index.ts"
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.json"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -25,13 +31,13 @@
   ],
   "references": [
     {
-      "path": "../../../actor/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../../../api/tsconfig.build.json"
     },
     {
       "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
     }
   ]
 }

@@ -8861,9 +8861,9 @@ importers:
 
   packages/features/role/contract:
     dependencies:
-      '@langwatch/actor':
+      '@langwatch/api':
         specifier: workspace:*
-        version: link:../../../actor
+        version: link:../../../api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -8910,19 +8910,19 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
-      '@trpc/server':
-        specifier: ^11.18.0
-        version: 11.18.0(typescript@7.0.2)
-      hono:
-        specifier: '>=4.12.34'
-        version: 4.13.1
-      nanoid:
-        specifier: ^5.1.5
-        version: 5.1.16
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -9526,6 +9526,9 @@ importers:
 
   packages/features/stored-object/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
