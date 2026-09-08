@@ -19,19 +19,14 @@
 // AuthZ terms through the chain, and a role enum in a transport file is a
 // second, unreviewable gate.
 
-// Not-yet-converted files sit in the allowlist, which only shrinks: an entry
-// naming a file that no longer offends is itself a violation, so a conversion
-// that leaves its line behind fails.
-
 import { readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const POLICY = "api-transport-through-framework";
-const ALLOWLIST_FILE = "api-transport-framework-allowlist.json";
 
 const HONO_OPENAPI_DOOR = new Set(["describeRoute", "validator", "resolver"]);
 const RAW_APP_CONSTRUCTORS = new Set(["Hono", "OpenAPIHono"]);
@@ -192,13 +187,13 @@ function featureBindingAnalysis(
 
 function isProductionSource(file: string): boolean {
   return (
-    file.endsWith(".api.ts") &&
+    /\.(?:api|rest|trpc)\.ts$/.test(file) &&
     !file.includes(`${sep}__tests__${sep}`) &&
     !/\.(?:test|spec)\.ts$/.test(file)
   );
 }
 
-/** Every `*.api.ts` under a strict feature package's two transport surfaces. */
+/** Every nested or direct transport declaration under a strict feature package. */
 function transportFiles(
   packages: readonly ClassifiedPackage[],
 ): { file: string; surface: Surface }[] {
@@ -211,6 +206,12 @@ function transportFiles(
       if (!existsSync(root)) continue;
 
       for (const file of walkFiles(root, isProductionSource)) found.push({ file, surface });
+    }
+
+    const root = join(pkg.root, "src", "transport");
+    for (const surface of ["rest", "trpc"] as const) {
+      const direct = join(root, `${pkg.feature}.${surface}.ts`);
+      if (existsSync(direct)) found.push({ file: direct, surface });
     }
   }
 
@@ -665,92 +666,19 @@ export function apiTransportFrameworkFindings(
   return findings.sort((left, right) => left.line - right.line);
 }
 
-type Allowlist = { readonly files: readonly string[] };
-
-function allowlistPath(root: string): string {
-  return join(root, "packages/architecture-lint/src", ALLOWLIST_FILE);
-}
-
-export function readApiTransportFrameworkAllowlist(path: string): {
-  allowlist: Allowlist;
-  violations: ArchitectureViolation[];
-} {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    return {
-      allowlist: { files: [] },
-      violations: [
-        {
-          policy: POLICY,
-          file: path,
-          message: `The allowlist must be valid JSON: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-          allowed: "Repair the file; it is the ratchet's only record of what is not converted yet.",
-        },
-      ],
-    };
-  }
-
-  const files = (raw as { files?: unknown }).files;
-  if (!Array.isArray(files) || files.some((entry) => typeof entry !== "string")) {
-    return {
-      allowlist: { files: [] },
-      violations: [
-        {
-          policy: POLICY,
-          file: path,
-          message: 'The allowlist must be an object with a "files" array of workspace paths.',
-          allowed: "Repair the file; it is the ratchet's only record of what is not converted yet.",
-        },
-      ],
-    };
-  }
-
-  const violations: ArchitectureViolation[] = [];
-  const sorted = [...(files as string[])].sort();
-  if (sorted.some((entry, index) => entry !== files[index])) {
-    violations.push({
-      policy: POLICY,
-      file: path,
-      message: "The allowlist must be sorted, so two conversions never conflict on the same line.",
-      allowed: "Sort the entries.",
-    });
-  }
-
-  if (new Set(files as string[]).size !== files.length) {
-    violations.push({
-      policy: POLICY,
-      file: path,
-      message: "The allowlist names a file twice.",
-      allowed: "Remove the duplicate entry.",
-    });
-  }
-
-  return { allowlist: { files: files as string[] }, violations };
-}
-
-/** The ratchet: only a shrinking list of unconverted transport files may offend. */
+/** Every transport declares its endpoints through the framework; nothing is excused. */
 export function lintApiTransportFramework(
   root: string,
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
-  const path = allowlistPath(root);
-  const { allowlist, violations } = readApiTransportFrameworkAllowlist(path);
-  const allowed = new Set(allowlist.files);
-  const offending = new Set<string>();
+  const violations: ArchitectureViolation[] = [];
 
   for (const { file, surface } of transportFiles(packages)) {
-    const findings = apiTransportFrameworkFindings(file, readFileSync(file, "utf8"), surface);
-    if (findings.length === 0) continue;
-
-    const workspaceFile = relative(root, file);
-    offending.add(workspaceFile);
-    if (allowed.has(workspaceFile)) continue;
-
-    for (const finding of findings) {
+    for (const finding of apiTransportFrameworkFindings(
+      file,
+      readFileSync(file, "utf8"),
+      surface,
+    )) {
       violations.push({
         policy: POLICY,
         file: finding.file,
@@ -771,20 +699,6 @@ export function lintApiTransportFramework(
         allowed: finding.allowed,
       });
     }
-  }
-
-  // The half that makes the list shrink on its own: a converted file whose
-  // entry was left behind reads, to the next author, as a file still waiting
-  // to be converted.
-  for (const entry of allowlist.files) {
-    if (offending.has(entry)) continue;
-
-    violations.push({
-      policy: POLICY,
-      file: path,
-      message: `The allowlist still names ${entry}, which no longer defines its transport outside the framework.`,
-      allowed: "Delete the entry. The list only shrinks.",
-    });
   }
 
   return violations;

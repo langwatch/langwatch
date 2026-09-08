@@ -51,7 +51,7 @@ function apiApplication(): ClassifiedPackage {
 }
 
 function violations(packages: readonly ClassifiedPackage[]): ArchitectureViolation[] {
-  return lintApiTransportBoundaries(root, packages);
+  return lintApiTransportBoundaries(packages);
 }
 
 function policy(
@@ -185,6 +185,26 @@ describe("strict feature API transport boundaries", () => {
     expect(policy("api-transport-construction")).toEqual([
       expect.objectContaining({ message: "Endpoint handler constructs WidgetRepository." }),
       expect.objectContaining({ message: "Endpoint handler constructs WidgetService." }),
+    ]);
+  });
+
+  it("rejects legacy registerRoute handlers through the same global boundary", () => {
+    write(
+      "packages/features/widget/server/src/transport/api-rest/widget.api.ts",
+      `
+        declare const service: { registerRoute(...args: unknown[]): void };
+        const handler = async (context: { req: Request }) => context.req;
+        service.registerRoute("get", "/widgets", "2026-08-28", handler, () => undefined);
+      `,
+    );
+
+    expect(policy("api-transport-handler-boundary")).toEqual([
+      expect.objectContaining({
+        message: "Handler reaches raw request context through context.req (ADR-133).",
+      }),
+      expect.objectContaining({
+        message: "Legacy registerRoute handler bypasses the fluent endpoint boundary.",
+      }),
     ]);
   });
 

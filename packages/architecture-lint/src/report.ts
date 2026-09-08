@@ -27,11 +27,11 @@ export type LintReport = {
 
 /**
  * A stale baseline row is a finding saying an allowance no longer applies.
- * Until L2 gives every baseline one shape, the emitting policies say it in the
- * message rather than in a field, so this reads both spellings.
+ * Every ratchet reports one through `baseline.ts`, which sets the field; the
+ * report never reads the prose to guess.
  */
 export function isStaleBaselineRow(finding: ArchitectureViolation): boolean {
-  return finding.policy.endsWith("-stale") || /\bstale\b/i.test(finding.message);
+  return finding.stale === true;
 }
 
 /** `[policy] file:line`, the message, and the way out when the policy names one. */
@@ -132,7 +132,10 @@ function groupLines(group: PolicyGroup, all: boolean): string[] {
   ];
 
   if (hidden > 0) {
-    lines.push("", `  ${plural(hidden, "further finding")} from ${group.policy}, hidden by the cap`);
+    lines.push(
+      "",
+      `  ${plural(hidden, "further finding")} from ${group.policy}, hidden by the cap`,
+    );
   }
 
   return lines;

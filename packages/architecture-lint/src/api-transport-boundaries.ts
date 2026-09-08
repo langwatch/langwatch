@@ -286,6 +286,13 @@ function handlerForEndpoint(
     return resolveHandler(call.arguments[0], functions);
   }
 
+  if (
+    ts.isPropertyAccessExpression(call.expression) &&
+    call.expression.name.text === "registerRoute"
+  ) {
+    return resolveHandler(call.arguments[3], functions);
+  }
+
   if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "register") {
     return null;
   }
@@ -300,6 +307,10 @@ function handlerRegistration(
 
   if (call.expression.name.text === "handle" && call.arguments[0] && isFluentEndpointHandle(call)) {
     return { candidate: call.arguments[0], fluent: true };
+  }
+
+  if (call.expression.name.text === "registerRoute" && call.arguments[3]) {
+    return { candidate: call.arguments[3], fluent: false };
   }
 
   return null;
@@ -527,7 +538,13 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       const registration = handlerRegistration(node);
       if (registration) {
         const inline = unwrapHandlerExpression(registration.candidate);
-        if (!ts.isArrowFunction(inline) && !ts.isFunctionExpression(inline)) {
+        if (!registration.fluent) {
+          report(
+            registration.candidate,
+            "Legacy registerRoute handler bypasses the fluent endpoint boundary.",
+            "Declare the endpoint with the fluent API so verb, input, output, permissions and the inline handler form one typed chain.",
+          );
+        } else if (!ts.isArrowFunction(inline) && !ts.isFunctionExpression(inline)) {
           report(
             registration.candidate,
             "Fluent endpoint handler must be an inline function.",
@@ -1021,29 +1038,6 @@ const CREDENTIAL_CONTEXT_KEYS = new Set([
   "orgResolvedToken",
 ]);
 
-const CREDENTIAL_CONTEXT_BASELINE_FILE = "api-transport-credential-context-baseline.json";
-
-/**
- * The transports that still read a credential off the bag, frozen so no new
- * one may. Read once per root: the rule asks per file, and re-parsing the
- * list for each of several hundred transports is the whole cost of the check.
- */
-const credentialContextBaselines = new Map<string, ReadonlySet<string>>();
-
-function credentialContextBaseline(root: string): ReadonlySet<string> {
-  const cached = credentialContextBaselines.get(root);
-  if (cached) return cached;
-
-  const file = join(root, "packages/architecture-lint/src", CREDENTIAL_CONTEXT_BASELINE_FILE);
-  // Absent means nothing is excused, not that the rule is off: a root without
-  // the file (a fixture tree, say) is one where every transport is new code.
-  const raw = existsSync(file) ? readFileSync(file, "utf8") : '{"files":[]}';
-  const parsed = JSON.parse(raw) as { files?: readonly string[] };
-  const baseline: ReadonlySet<string> = new Set(parsed.files ?? []);
-  credentialContextBaselines.set(root, baseline);
-  return baseline;
-}
-
 /** `<something>.get("<credential key>")` anywhere in a transport source. */
 function credentialContextViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
@@ -1076,7 +1070,7 @@ function credentialContextViolations(file: string, source: ts.SourceFile): Archi
   return violations;
 }
 
-function lintSource(root: string, transport: TransportSource): ArchitectureViolation[] {
+function lintSource(transport: TransportSource): ArchitectureViolation[] {
   const source = ts.createSourceFile(
     transport.file,
     readFileSync(transport.file, "utf8"),
@@ -1101,10 +1095,7 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
     });
   }
 
-  if (!credentialContextBaseline(root).has(relativeFile(root, transport.file))) {
-    violations.push(...credentialContextViolations(transport.file, source));
-  }
-
+  violations.push(...credentialContextViolations(transport.file, source));
   violations.push(...handlerConstructionViolations(transport.file, source));
   violations.push(...handlerShapeViolations(transport.file, source));
   violations.push(...handlerBoundaryViolations(transport.file, source));
@@ -1122,18 +1113,12 @@ function lintSource(root: string, transport: TransportSource): ArchitectureViola
   return violations;
 }
 
-/** The baseline names files the way a violation report does: repo-relative, forward slashes. */
-function relativeFile(root: string, file: string): string {
-  return relative(root, file).split(sep).join("/");
-}
-
 /** Fast structural checks for strict feature APIs and the API process transport surface. */
 export function lintApiTransportBoundaries(
-  root: string,
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
   return transportSources(packages)
-    .flatMap((source) => lintSource(root, source))
+    .flatMap((source) => lintSource(source))
     .sort((left, right) =>
       `${left.file}:${left.line ?? 0}:${left.policy}`.localeCompare(
         `${right.file}:${right.line ?? 0}:${right.policy}`,

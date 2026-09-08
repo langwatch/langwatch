@@ -5,10 +5,12 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   changedSourceFiles,
-  compareCommentBlockRoots,
+  COMMENT_BLOCK_ROOTS_BASELINE,
   lintCommentBlockRoots,
   lintCommentBlocks,
+  shrinkCheck,
 } from "../src/index.ts";
+import type { BaselineEntry } from "../src/index.ts";
 import { Temporal } from "@langwatch/time";
 
 function lineComments(lines: number): string {
@@ -110,20 +112,27 @@ describe("oversized comment blocks", () => {
   });
 
   describe("comment-block-roots.json (R1)", () => {
-    function writeRootsFile(root: string, contents: unknown): void {
+    function rootsDocument(entries: readonly unknown[]): unknown {
+      return { version: 1, policy: "comment-block-root", entries };
+    }
+
+    /** The root has to be a real directory: a row naming a deleted one is stale. */
+    function writeRootsFile(root: string, entries: readonly BaselineEntry[]): void {
+      for (const entry of entries) mkdirSync(join(root, entry.key), { recursive: true });
+
       writeFixture(
         root,
         "packages/architecture-lint/src/comment-block-roots.json",
-        JSON.stringify(contents),
+        JSON.stringify(rootsDocument(entries)),
       );
     }
 
+    const legacy = { key: "packages/legacy", measured: "2026-09-08" };
+
+    /** @scenario "An expired row is refused where the policy enforces its date" */
     it("reports an expired entry", () => {
       const root = mkdtempSync(join(tmpdir(), "comment-block-roots-expired-"));
-      writeRootsFile(root, {
-        version: 0,
-        roots: [{ root: "packages/legacy", blocks: 10, expires: "2020-01-01" }],
-      });
+      writeRootsFile(root, [{ ...legacy, expires: "2020-01-01", count: 10 }]);
 
       const check = lintCommentBlockRoots(
         root,
@@ -136,10 +145,7 @@ describe("oversized comment blocks", () => {
 
     it("stays quiet for an entry that has not expired", () => {
       const root = mkdtempSync(join(tmpdir(), "comment-block-roots-fresh-"));
-      writeRootsFile(root, {
-        version: 0,
-        roots: [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
-      });
+      writeRootsFile(root, [{ ...legacy, expires: "2099-01-01", count: 10 }]);
 
       const check = lintCommentBlockRoots(
         root,
@@ -148,27 +154,39 @@ describe("oversized comment blocks", () => {
       );
 
       expect(check.violations).toEqual([]);
-      expect(check.entries).toEqual([
-        { root: "packages/legacy", blocks: 10, expires: "2099-01-01" },
+      expect(check.entries).toEqual([{ ...legacy, expires: "2099-01-01", count: 10 }]);
+    });
+
+    /** @scenario "A row no live finding matches is reported as stale" */
+    it("reports a row naming a directory that is gone", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-block-roots-stale-"));
+      writeFixture(
+        root,
+        "packages/architecture-lint/src/comment-block-roots.json",
+        JSON.stringify(rootsDocument([{ ...legacy, expires: "2099-01-01", count: 10 }])),
+      );
+
+      const check = lintCommentBlockRoots(
+        root,
+        void 0,
+        Temporal.Instant.from("2026-01-01T00:00:00Z"),
+      );
+
+      expect(check.violations).toMatchObject([
+        { policy: "comment-block-root-baseline", stale: true },
       ]);
     });
 
     it("rejects growth against a merge-base reference: a raised block count, a later expiry, or a new root", () => {
       const root = mkdtempSync(join(tmpdir(), "comment-block-roots-growth-"));
-      writeRootsFile(root, {
-        version: 0,
-        roots: [
-          { root: "packages/legacy", blocks: 20, expires: "2099-02-01" },
-          { root: "packages/new", blocks: 5, expires: "2099-01-01" },
-        ],
-      });
+      writeRootsFile(root, [
+        { ...legacy, expires: "2099-02-01", count: 20 },
+        { key: "packages/new", measured: "2026-09-08", expires: "2099-01-01", count: 5 },
+      ]);
       writeFixture(
         root,
         "reference/comment-block-roots.json",
-        JSON.stringify({
-          version: 0,
-          roots: [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
-        }),
+        JSON.stringify(rootsDocument([{ ...legacy, expires: "2099-01-01", count: 10 }])),
       );
 
       const check = lintCommentBlockRoots(root, "reference/comment-block-roots.json");
@@ -193,20 +211,16 @@ describe("oversized comment blocks", () => {
 
     it("accepts shrinking the allowlist against a reference: a lower count, an earlier expiry, or a dropped root", () => {
       const root = mkdtempSync(join(tmpdir(), "comment-block-roots-shrink-"));
-      writeRootsFile(root, {
-        version: 0,
-        roots: [{ root: "packages/legacy", blocks: 5, expires: "2099-01-01" }],
-      });
+      writeRootsFile(root, [{ ...legacy, expires: "2099-01-01", count: 5 }]);
       writeFixture(
         root,
         "reference/comment-block-roots.json",
-        JSON.stringify({
-          version: 0,
-          roots: [
-            { root: "packages/legacy", blocks: 10, expires: "2099-02-01" },
-            { root: "packages/gone", blocks: 3, expires: "2099-01-01" },
-          ],
-        }),
+        JSON.stringify(
+          rootsDocument([
+            { key: "packages/gone", measured: "2026-09-08", expires: "2099-01-01", count: 3 },
+            { ...legacy, expires: "2099-02-01", count: 10 },
+          ]),
+        ),
       );
 
       const check = lintCommentBlockRoots(root, "reference/comment-block-roots.json");
@@ -214,12 +228,14 @@ describe("oversized comment blocks", () => {
       expect(check.violations).toEqual([]);
     });
 
+    /** @scenario "A shrink check refuses a raised count and a postponed date" */
     it("compares reference and proposed allowlists directly", () => {
-      const violations = compareCommentBlockRoots(
-        [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
-        [{ root: "packages/legacy", blocks: 11, expires: "2099-01-01" }],
-        "comment-block-roots.json",
-      );
+      const violations = shrinkCheck({
+        reference: [{ ...legacy, expires: "2099-01-01", count: 10 }],
+        current: [{ ...legacy, expires: "2099-01-01", count: 11 }],
+        policy: COMMENT_BLOCK_ROOTS_BASELINE,
+        file: "comment-block-roots.json",
+      });
 
       expect(violations).toMatchObject([{ policy: "comment-block-root-baseline-growth" }]);
     });

@@ -1,6 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { z } from "zod";
+import {
+  type BaselineEntry,
+  type BaselinePolicy,
+  baselinePath,
+  collectBaseline,
+  emptyBaselineRows,
+  liveKeys,
+  readBaseline,
+  staleRows,
+} from "./baseline.ts";
 import { walkFiles } from "./files.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
@@ -36,8 +45,6 @@ export type SourceFolderShapeFinding = {
   message: string;
   allowed: string;
 };
-
-type SourceFolderShapeBaselineEntry = { kind: SourceFolderShapeKind; path: string };
 
 const SCANNED_ROOTS = ["apps", "packages", "tools/dev-runtime"];
 
@@ -194,13 +201,11 @@ export function collectSourceFolderShapeFindings(root: string): SourceFolderShap
     findings.push(fragmentFileFinding(relative(root, file), lines, readers));
   }
 
-  return findings.sort(compareEntries);
+  return findings.sort(comparePathThenKind);
 }
 
-function compareEntries(
-  a: SourceFolderShapeBaselineEntry,
-  b: SourceFolderShapeBaselineEntry,
-): number {
+/** Report order: a reader walks the tree by path, and a folder before its files. */
+function comparePathThenKind(a: SourceFolderShapeFinding, b: SourceFolderShapeFinding): number {
   if (a.path !== b.path) return a.path < b.path ? -1 : 1;
 
   if (a.kind === b.kind) return 0;
@@ -208,119 +213,53 @@ function compareEntries(
   return a.kind < b.kind ? -1 : 1;
 }
 
-function entryKey(entry: SourceFolderShapeBaselineEntry): string {
+/** The key of a source-folder-shape row: `<kind>|<path>`. */
+function entryKey(entry: { kind: SourceFolderShapeKind; path: string }): string {
   return `${entry.kind}|${entry.path}`;
 }
 
-export function collectSourceFolderShapeBaseline(root: string): SourceFolderShapeBaselineEntry[] {
-  return collectSourceFolderShapeFindings(root).map(({ kind, path }) => ({ kind, path }));
+export const SOURCE_FOLDER_SHAPE_BASELINE: BaselinePolicy = {
+  id: "source-folder-shape",
+  file: BASELINE_FILE,
+  label: "Source folder shape baseline",
+  keyRule: "A key is `<kind>|<path>`, kind one of crowded-folder, fragment-file.",
+  enforceExpiry: false,
+  refuseEmpty: true,
+  stale: (entry) => ({
+    message: `Source folder shape baseline entry ${entry.key.split("|").join(" ")} no longer matches anything and must be removed.`,
+  }),
+};
+
+export function collectSourceFolderShapeBaseline({
+  root,
+  previous = [],
+}: {
+  root: string;
+  previous?: readonly BaselineEntry[];
+}): BaselineEntry[] {
+  const found = collectSourceFolderShapeFindings(root).map(entryKey);
+
+  return collectBaseline({ policy: SOURCE_FOLDER_SHAPE_BASELINE, found, previous });
 }
-
-export function formatSourceFolderShapeBaseline(
-  entries: readonly SourceFolderShapeBaselineEntry[],
-): string {
-  const sorted = [...entries].sort(compareEntries).map(({ kind, path }) => ({ kind, path }));
-
-  return `${JSON.stringify({ version: 0, entries: sorted }, null, 2)}\n`;
-}
-
-const baselineSchema = z
-  .object({
-    version: z.literal(0),
-    entries: z.array(
-      z.object({ kind: z.enum(SOURCE_FOLDER_SHAPE_KINDS), path: z.string() }).strict(),
-    ),
-  })
-  .strict();
 
 function baselineFile(root: string): string {
-  return join(root, "packages", "architecture-lint", "src", BASELINE_FILE);
-}
-
-function baselineViolation(file: string, message: string, allowed?: string): ArchitectureViolation {
-  return { policy: "source-folder-shape-baseline", file, message, allowed };
-}
-
-export function readSourceFolderShapeBaselineFile(file: string): {
-  exists: boolean;
-  entries: SourceFolderShapeBaselineEntry[];
-  violations: ArchitectureViolation[];
-} {
-  if (!existsSync(file)) return { exists: false, entries: [], violations: [] };
-
-  let raw: unknown;
-
-  try {
-    raw = JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-
-    return {
-      exists: true,
-      entries: [],
-      violations: [
-        baselineViolation(file, `Source folder shape baseline must be valid JSON: ${reason}`),
-      ],
-    };
-  }
-
-  const parsed = baselineSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return {
-      exists: true,
-      entries: [],
-      violations: [
-        baselineViolation(
-          file,
-          "Source folder shape baseline must contain version 0 and entries of {kind, path}.",
-        ),
-      ],
-    };
-  }
-
-  const entries = parsed.data.entries;
-  const sorted = [...entries].sort(compareEntries);
-  const unique = new Set(entries.map(entryKey)).size === entries.length;
-  const inOrder = entries.every((entry, index) => entryKey(entry) === entryKey(sorted[index]!));
-
-  if (!unique || !inOrder) {
-    return {
-      exists: true,
-      entries,
-      violations: [
-        baselineViolation(
-          file,
-          "Source folder shape baseline entries must be unique and sorted by path, then kind.",
-        ),
-      ],
-    };
-  }
-
-  return { exists: true, entries, violations: [] };
+  return baselinePath({ root, policy: SOURCE_FOLDER_SHAPE_BASELINE });
 }
 
 export function lintSourceFolderShape(root: string): ArchitectureViolation[] {
   const file = baselineFile(root);
-  const baseline = readSourceFolderShapeBaselineFile(file);
-  const violations = [...baseline.violations];
-
-  if (baseline.exists && baseline.entries.length === 0 && baseline.violations.length === 0) {
-    violations.push(
-      baselineViolation(
-        file,
-        "An empty source folder shape baseline must be deleted rather than kept as an exception surface.",
-      ),
-    );
-  }
+  const baseline = readBaseline({ policy: SOURCE_FOLDER_SHAPE_BASELINE, file });
+  const violations = [
+    ...baseline.violations,
+    ...emptyBaselineRows({ read: baseline, policy: SOURCE_FOLDER_SHAPE_BASELINE, file }),
+  ];
 
   const findings = collectSourceFolderShapeFindings(root);
-  const baselined = new Set(baseline.entries.map(entryKey));
-  const current = new Set(findings.map(entryKey));
+  const baselined = liveKeys({ entries: baseline.entries });
+  const found = new Set(findings.map(entryKey));
 
   for (const finding of findings) {
-    const listed = baselined.has(entryKey(finding));
-    if (listed) continue;
+    if (baselined.has(entryKey(finding))) continue;
 
     violations.push({
       policy: "source-folder-shape",
@@ -330,17 +269,14 @@ export function lintSourceFolderShape(root: string): ArchitectureViolation[] {
     });
   }
 
-  for (const entry of baseline.entries) {
-    const stillHolds = current.has(entryKey(entry));
-    if (stillHolds) continue;
-
-    violations.push(
-      baselineViolation(
-        file,
-        `Source folder shape baseline entry ${entry.kind} ${entry.path} no longer matches anything and must be removed.`,
-      ),
-    );
-  }
+  violations.push(
+    ...staleRows({
+      entries: baseline.entries,
+      found,
+      policy: SOURCE_FOLDER_SHAPE_BASELINE,
+      file,
+    }),
+  );
 
   return violations;
 }

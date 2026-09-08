@@ -124,25 +124,42 @@ export const guard = () => checkUserPermissionForProject(TeamRoleGroup.PROJECT_V
     });
   });
 
-  describe("given a file that was converted but left its allowlist entry behind", () => {
-    /** @scenario "The allowlist of unconverted files only shrinks" */
-    it("reports the stale entry, so the list can only shrink", () => {
+  describe("given no transport package at all", () => {
+    /** @scenario "The allowlist reached zero and the policy became a plain refusal" */
+    it("reports nothing, because the allowlist that once excused files is gone", () => {
       const root = mkdtempSync(join(tmpdir(), "api-transport-framework-"));
       mkdirSync(join(root, "packages/architecture-lint/src"), { recursive: true });
-      writeFileSync(
-        join(root, "packages/architecture-lint/src/api-transport-framework-allowlist.json"),
-        JSON.stringify({
-          files: ["packages/features/gone/server/src/transport/api-rest/a.api.ts"],
-        }),
-      );
 
-      const violations = lintApiTransportFramework(root, []);
+      expect(lintApiTransportFramework(root, [])).toEqual([]);
+    });
+  });
 
-      expect(violations).toHaveLength(1);
-      expect(violations[0]?.message).toContain(
-        "still names packages/features/gone/server/src/transport/api-rest/a.api.ts",
+  describe("given a direct REST transport declaration", () => {
+    it("inspects it with the same framework rule", () => {
+      const root = mkdtempSync(join(tmpdir(), "api-transport-framework-"));
+      const packageRoot = join(root, "packages/features/agent/server");
+      const transport = join(packageRoot, "src/transport/agent.rest.ts");
+      mkdirSync(join(packageRoot, "src/transport"), { recursive: true });
+      writeFileSync(transport, 'import { Hono } from "hono";\nexport const app = new Hono();\n');
+
+      const violations = lintApiTransportFramework(root, [
+        {
+          name: "@langwatch/agent-server",
+          root: packageRoot,
+          manifestPath: join(packageRoot, "package.json"),
+          manifest: { name: "@langwatch/agent-server" },
+          kind: "server",
+          feature: "agent",
+          featureRoot: join(root, "packages/features/agent"),
+          layoutVersion: 0,
+          subjects: ["agent"],
+          enterprise: false,
+        },
+      ]);
+
+      expect(violations.map((violation) => violation.message)).toContain(
+        "REST transport constructs Hono of its own.",
       );
-      expect(violations[0]?.allowed).toBe("Delete the entry. The list only shrinks.");
     });
   });
 });

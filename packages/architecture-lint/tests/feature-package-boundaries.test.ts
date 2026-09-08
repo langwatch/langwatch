@@ -8,11 +8,6 @@ let root = "";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "langwatch-architecture-lint-"));
-  // The api-transport-through-framework ratchet reads this allowlist off
-  // every workspace root it lints, fixture or real. An empty one keeps
-  // fixtures free of that policy's findings so they can assert on the
-  // policy under test instead.
-  write("packages/architecture-lint/src/api-transport-framework-allowlist.json", '{"files":[]}');
 });
 
 afterEach(() => {

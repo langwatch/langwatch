@@ -9,7 +9,10 @@ let root = "";
 function writeBaseline(directory: string, entries: { key: string; measured: string }[]): void {
   const dir = join(directory, "packages/architecture-lint/src");
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "oxlint-baseline.json"), JSON.stringify({ version: 0, entries }));
+  writeFileSync(
+    join(dir, "oxlint-baseline.json"),
+    JSON.stringify({ version: 1, policy: "oxlint", entries }),
+  );
 }
 
 describe("oxlint baseline", () => {
@@ -70,12 +73,23 @@ describe("oxlint baseline", () => {
     writeFileSync(
       join(dir, "oxlint-baseline.json"),
       JSON.stringify({
-        version: 0,
+        version: 1,
+        policy: "oxlint",
         entries: [{ key: "cognitive-complexity|apps/api/src/foo.ts" }],
       }),
     );
 
     expect(lintOxlintBaseline(root).violations).toMatchObject([{ policy: "oxlint-baseline" }]);
+  });
+
+  /** @scenario "The oxlint baseline is shrink-only and every entry carries a measured date" */
+  it("bootstraps rather than calling every row an addition when the merge base has no copy", () => {
+    root = mkdtempSync(join(tmpdir(), "oxlint-baseline-"));
+    writeBaseline(root, [
+      { key: "cognitive-complexity|apps/api/src/foo.ts", measured: "2026-09-06" },
+    ]);
+
+    expect(lintOxlintBaseline(root, join(root, "absent-reference.json")).violations).toEqual([]);
   });
 
   /** @scenario "The oxlint baseline is shrink-only and every entry carries a measured date" */

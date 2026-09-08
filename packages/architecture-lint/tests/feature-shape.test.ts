@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  FEATURE_SHAPE_BASELINE,
   collectFeatureShapeBaseline,
   collectFeatureShapeFindings,
-  formatFeatureShapeBaseline,
+  formatBaseline,
   lintFeatureShape,
   type ClassifiedPackage,
   type FeatureCatalogueEntry,
@@ -83,10 +84,15 @@ function violations() {
   return lintFeatureShape(root, catalogue, everyPackage());
 }
 
-function baseline(entries: readonly { feature: string; kind: string }[]): void {
+/** Rows keyed `<feature>|<kind>`, sorted the way the reader validates them. */
+function baseline(pieces: readonly { feature: string; kind: string }[]): void {
+  const entries = pieces
+    .map((piece) => ({ key: `${piece.feature}|${piece.kind}`, measured: "2026-09-08" }))
+    .sort((a, b) => (a.key === b.key ? 0 : a.key < b.key ? -1 : 1));
+
   write(
     "packages/architecture-lint/src/feature-shape-baseline.json",
-    JSON.stringify({ version: 0, entries }),
+    JSON.stringify({ version: 1, policy: "feature-shape", entries }),
   );
 }
 
@@ -199,24 +205,26 @@ describe("feature shape", () => {
       ]);
     });
 
-    it("collects and formats the inventory as one sorted entry per feature and kind", () => {
-      const entries = collectFeatureShapeBaseline(root, catalogue, everyPackage());
+    /** @scenario "A collected baseline keeps the date an existing row carries" */
+    it("collects and formats the inventory as one sorted row per feature and kind", () => {
+      const entries = collectFeatureShapeBaseline({
+        root,
+        catalogue,
+        packages: everyPackage(),
+        previous: [{ key: "widget|nested-transport", measured: "2020-01-01" }],
+      });
 
-      expect(entries.map((entry) => entry.kind)).toEqual([
-        "contract-service",
-        "fixtures-directory",
-        "legacy-transport-runtime",
-        "nested-transport",
-        "persistence-adapter",
-        "testing-entry",
+      expect(entries.map((entry) => entry.key)).toEqual([
+        "widget|contract-service",
+        "widget|fixtures-directory",
+        "widget|legacy-transport-runtime",
+        "widget|nested-transport",
+        "widget|persistence-adapter",
+        "widget|testing-entry",
       ]);
-      expect(formatFeatureShapeBaseline(entries)).toBe(
-        `{\n  "version": 0,\n  "entries": [\n${entries
-          .map(
-            (entry, index) =>
-              `    ${JSON.stringify(entry)}${index + 1 === entries.length ? "" : ","}`,
-          )
-          .join("\n")}\n  ]\n}\n`,
+      expect(entries[3]?.measured).toBe("2020-01-01");
+      expect(formatBaseline({ policy: FEATURE_SHAPE_BASELINE, entries })).toBe(
+        `${JSON.stringify({ version: 1, policy: "feature-shape", entries }, null, 2)}\n`,
       );
     });
   });
@@ -355,14 +363,22 @@ describe("feature shape", () => {
       ]);
     });
 
+    /** @scenario "An out-of-order or duplicated file is refused before it is read" */
     it("refuses an unsorted or duplicated inventory", () => {
       referenceFeature();
       write("packages/features/widget/server/src/testing.ts");
       write("packages/features/widget/contract/src/widget.service.ts");
-      baseline([
-        { feature: "widget", kind: "testing-entry" },
-        { feature: "widget", kind: "contract-service" },
-      ]);
+      write(
+        "packages/architecture-lint/src/feature-shape-baseline.json",
+        JSON.stringify({
+          version: 1,
+          policy: "feature-shape",
+          entries: [
+            { key: "widget|testing-entry", measured: "2026-09-08" },
+            { key: "widget|contract-service", measured: "2026-09-08" },
+          ],
+        }),
+      );
 
       expect(violations()).toMatchObject([
         { policy: "feature-shape-baseline", message: expect.stringContaining("sorted") },

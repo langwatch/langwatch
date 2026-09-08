@@ -45,6 +45,7 @@ packages/features/<feature>/
 ├── contract/
 │   └── src/
 │       ├── index.ts
+│       ├── <feature>.app.ts
 │       ├── <subject>.service.ts
 │       ├── <subject>.commands.ts
 │       ├── <subject>.queries.ts
@@ -54,6 +55,8 @@ packages/features/<feature>/
 │   └── src/
 │       ├── index.ts
 │       ├── testing.ts
+│       ├── <feature>.server.ts
+│       ├── app/<feature>.app.ts
 │       ├── services/<subject>.service.ts
 │       ├── repositories/<subject>.repository.ts
 │       ├── repositories/<adapter>/<adapter>.<subject>.repository.ts
@@ -66,7 +69,9 @@ packages/features/<feature>/
 │       ├── intents/<subject>.intent.ts
 │       ├── ports/<subject>.port.ts
 │       ├── adapters/<adapter>.<subject>.adapter.ts
-│       ├── api/<surface>/<subject>.api.ts
+│       ├── transport/<surface>/<subject>.api.ts
+│       ├── transport/<feature>.rest.ts
+│       ├── transport/<feature>.trpc.ts
 │       └── migrations/<source>-import.<subject>.migration.ts
 ├── web/                                  # optional
 ├── adrs/
@@ -82,7 +87,14 @@ hyphens remain part of a qualifier or domain name. Thus
 Contract domain directories may organize portable values and schemas. They may
 not contain server artifact suffixes such as `repository`, `store`, `adapter`,
 `projection`, `migration`, or `api`. A contract service module exports the
-abstract service capability. Commands, queries, errors, and schemas remain
+abstract service capability. The canonical `<Feature>App` contract groups the
+feature's cohesive public services as abstract readonly properties. It exposes no
+forwarding methods, repositories, transport objects, or service lookup API.
+[ADR-133](../../../dev/docs/adr/133-composition-spec.md) defines installer adoption:
+a strict feature adopting `serverFeature` supplies its own app exactly once,
+without a selector, from one canonical `<feature>.server.ts` declaration.
+Unconverted features retain their existing service composition until adoption.
+Commands, queries, errors, and schemas remain
 transport-neutral.
 
 Server source has no catch-all architecture folders. `composition`,
@@ -112,7 +124,7 @@ links its behavioural specification. Review remains responsible for whether
 the prose is useful and feature-specific; the fast structural command does not
 attempt semantic similarity or minimum-word analysis.
 
-Files ending in `.service.ts`, `.store.ts`, `.projection.ts`, `.api.ts`, and
+Files ending in `.app.ts`, `.service.ts`, `.store.ts`, `.projection.ts`, `.api.ts`, and
 `.migration.ts` export the correspondingly named class. Concrete runtime
 classes expose `static create`. Repository and store ports are abstract classes;
 technology-specific implementations are concrete classes. Pure schemas, value

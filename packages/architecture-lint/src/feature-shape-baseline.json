@@ -1,285 +1,1126 @@
 {
-  "version": 0,
+  "version": 1,
+  "policy": "feature-shape",
   "entries": [
-    {"feature":"agent","kind":"contract-service"},
-    {"feature":"agent","kind":"installer-not-booted"},
-    {"feature":"agent","kind":"legacy-transport-runtime"},
-    {"feature":"agent","kind":"nested-transport"},
-    {"feature":"agent","kind":"nested-web-entry"},
-    {"feature":"agent","kind":"persistence-adapter"},
-    {"feature":"agent","kind":"postgres-without-memory"},
-    {"feature":"agent","kind":"refusing-composition"},
-    {"feature":"agent","kind":"testing-entry"},
-    {"feature":"agent","kind":"unregistered-repositories"},
-    {"feature":"analytics","kind":"contract-service"},
-    {"feature":"analytics","kind":"fixtures-directory"},
-    {"feature":"analytics","kind":"installer-not-booted"},
-    {"feature":"analytics","kind":"legacy-transport-runtime"},
-    {"feature":"analytics","kind":"nested-transport"},
-    {"feature":"analytics","kind":"nested-web-entry"},
-    {"feature":"analytics","kind":"refusing-composition"},
-    {"feature":"analytics","kind":"testing-entry"},
-    {"feature":"analytics","kind":"unregistered-repositories"},
-    {"feature":"annotation","kind":"refusing-composition"},
-    {"feature":"api-key","kind":"contract-service"},
-    {"feature":"api-key","kind":"legacy-transport-runtime"},
-    {"feature":"api-key","kind":"nested-transport"},
-    {"feature":"api-key","kind":"nested-web-entry"},
-    {"feature":"api-key","kind":"persistence-adapter"},
-    {"feature":"api-key","kind":"postgres-without-memory"},
-    {"feature":"api-key","kind":"refusing-composition"},
-    {"feature":"api-key","kind":"unregistered-repositories"},
-    {"feature":"audit-log","kind":"memory-twin-untested"},
-    {"feature":"auth","kind":"contract-service"},
-    {"feature":"auth","kind":"legacy-transport-runtime"},
-    {"feature":"auth","kind":"nested-transport"},
-    {"feature":"auth","kind":"nested-web-entry"},
-    {"feature":"auth","kind":"no-installer"},
-    {"feature":"auth","kind":"persistence-adapter"},
-    {"feature":"auth","kind":"postgres-without-memory"},
-    {"feature":"auth","kind":"refusing-composition"},
-    {"feature":"auth","kind":"unregistered-repositories"},
-    {"feature":"authz","kind":"contract-service"},
-    {"feature":"authz","kind":"nested-web-entry"},
-    {"feature":"authz","kind":"persistence-adapter"},
-    {"feature":"authz","kind":"postgres-without-memory"},
-    {"feature":"authz","kind":"unregistered-repositories"},
-    {"feature":"automation","kind":"contract-service"},
-    {"feature":"automation","kind":"fixtures-directory"},
-    {"feature":"automation","kind":"installer-not-booted"},
-    {"feature":"automation","kind":"legacy-transport-runtime"},
-    {"feature":"automation","kind":"nested-transport"},
-    {"feature":"automation","kind":"nested-web-entry"},
-    {"feature":"automation","kind":"persistence-adapter"},
-    {"feature":"automation","kind":"postgres-without-memory"},
-    {"feature":"automation","kind":"refusing-composition"},
-    {"feature":"automation","kind":"testing-entry"},
-    {"feature":"automation","kind":"unregistered-repositories"},
-    {"feature":"billing","kind":"contract-service"},
-    {"feature":"billing","kind":"legacy-transport-runtime"},
-    {"feature":"billing","kind":"nested-transport"},
-    {"feature":"billing","kind":"nested-web-entry"},
-    {"feature":"billing","kind":"no-app"},
-    {"feature":"billing","kind":"no-installer"},
-    {"feature":"billing","kind":"persistence-adapter"},
-    {"feature":"billing","kind":"postgres-without-memory"},
-    {"feature":"billing","kind":"unregistered-repositories"},
-    {"feature":"coding-agent","kind":"contract-service"},
-    {"feature":"coding-agent","kind":"fixtures-directory"},
-    {"feature":"coding-agent","kind":"installer-not-booted"},
-    {"feature":"coding-agent","kind":"legacy-transport-runtime"},
-    {"feature":"coding-agent","kind":"nested-transport"},
-    {"feature":"coding-agent","kind":"nested-web-entry"},
-    {"feature":"coding-agent","kind":"refusing-composition"},
-    {"feature":"coding-agent","kind":"testing-entry"},
-    {"feature":"coding-agent","kind":"unregistered-repositories"},
-    {"feature":"dataset","kind":"contract-service"},
-    {"feature":"dataset","kind":"installer-not-booted"},
-    {"feature":"dataset","kind":"legacy-transport-runtime"},
-    {"feature":"dataset","kind":"nested-transport"},
-    {"feature":"dataset","kind":"nested-web-entry"},
-    {"feature":"dataset","kind":"persistence-adapter"},
-    {"feature":"dataset","kind":"postgres-without-memory"},
-    {"feature":"dataset","kind":"refusing-composition"},
-    {"feature":"dataset","kind":"unregistered-repositories"},
-    {"feature":"evaluation","kind":"contract-service"},
-    {"feature":"evaluation","kind":"legacy-transport-runtime"},
-    {"feature":"evaluation","kind":"nested-transport"},
-    {"feature":"evaluation","kind":"persistence-adapter"},
-    {"feature":"evaluation","kind":"refusing-composition"},
-    {"feature":"evaluation","kind":"testing-entry"},
-    {"feature":"evaluation","kind":"unregistered-repositories"},
-    {"feature":"evaluator","kind":"contract-service"},
-    {"feature":"evaluator","kind":"legacy-transport-runtime"},
-    {"feature":"evaluator","kind":"nested-transport"},
-    {"feature":"evaluator","kind":"nested-web-entry"},
-    {"feature":"evaluator","kind":"no-installer"},
-    {"feature":"evaluator","kind":"persistence-adapter"},
-    {"feature":"evaluator","kind":"postgres-without-memory"},
-    {"feature":"evaluator","kind":"refusing-composition"},
-    {"feature":"evaluator","kind":"unregistered-repositories"},
-    {"feature":"experiment","kind":"contract-service"},
-    {"feature":"experiment","kind":"installer-not-booted"},
-    {"feature":"experiment","kind":"legacy-transport-runtime"},
-    {"feature":"experiment","kind":"nested-transport"},
-    {"feature":"experiment","kind":"nested-web-entry"},
-    {"feature":"experiment","kind":"persistence-adapter"},
-    {"feature":"experiment","kind":"refusing-composition"},
-    {"feature":"experiment","kind":"unregistered-repositories"},
-    {"feature":"gateway","kind":"contract-service"},
-    {"feature":"gateway","kind":"installer-not-booted"},
-    {"feature":"gateway","kind":"legacy-transport-runtime"},
-    {"feature":"gateway","kind":"nested-transport"},
-    {"feature":"gateway","kind":"nested-web-entry"},
-    {"feature":"gateway","kind":"persistence-adapter"},
-    {"feature":"gateway","kind":"postgres-without-memory"},
-    {"feature":"gateway","kind":"testing-entry"},
-    {"feature":"gateway","kind":"unregistered-repositories"},
-    {"feature":"github","kind":"contract-service"},
-    {"feature":"github","kind":"fixtures-directory"},
-    {"feature":"github","kind":"installer-not-booted"},
-    {"feature":"github","kind":"legacy-transport-runtime"},
-    {"feature":"github","kind":"nested-transport"},
-    {"feature":"github","kind":"nested-web-entry"},
-    {"feature":"github","kind":"persistence-adapter"},
-    {"feature":"github","kind":"postgres-without-memory"},
-    {"feature":"github","kind":"refusing-composition"},
-    {"feature":"github","kind":"unregistered-repositories"},
-    {"feature":"governance","kind":"contract-service"},
-    {"feature":"governance","kind":"legacy-transport-runtime"},
-    {"feature":"governance","kind":"nested-transport"},
-    {"feature":"governance","kind":"nested-web-entry"},
-    {"feature":"governance","kind":"no-installer"},
-    {"feature":"governance","kind":"persistence-adapter"},
-    {"feature":"governance","kind":"postgres-without-memory"},
-    {"feature":"governance","kind":"testing-entry"},
-    {"feature":"governance","kind":"unregistered-repositories"},
-    {"feature":"hosted-mcp","kind":"installer-not-booted"},
-    {"feature":"hosted-mcp","kind":"legacy-transport-runtime"},
-    {"feature":"hosted-mcp","kind":"nested-transport"},
-    {"feature":"identity","kind":"no-app"},
-    {"feature":"identity","kind":"no-installer"},
-    {"feature":"identity","kind":"persistence-adapter"},
-    {"feature":"identity","kind":"postgres-without-memory"},
-    {"feature":"identity","kind":"testing-entry"},
-    {"feature":"identity","kind":"unregistered-repositories"},
-    {"feature":"langy","kind":"contract-service"},
-    {"feature":"langy","kind":"installer-not-booted"},
-    {"feature":"langy","kind":"legacy-transport-runtime"},
-    {"feature":"langy","kind":"nested-transport"},
-    {"feature":"langy","kind":"nested-web-entry"},
-    {"feature":"langy","kind":"persistence-adapter"},
-    {"feature":"langy","kind":"postgres-without-memory"},
-    {"feature":"langy","kind":"refusing-composition"},
-    {"feature":"langy","kind":"testing-entry"},
-    {"feature":"langy","kind":"unregistered-repositories"},
-    {"feature":"licensing","kind":"fixtures-directory"},
-    {"feature":"licensing","kind":"installer-not-booted"},
-    {"feature":"licensing","kind":"legacy-transport-runtime"},
-    {"feature":"licensing","kind":"nested-transport"},
-    {"feature":"licensing","kind":"nested-web-entry"},
-    {"feature":"licensing","kind":"persistence-adapter"},
-    {"feature":"licensing","kind":"postgres-without-memory"},
-    {"feature":"licensing","kind":"testing-entry"},
-    {"feature":"licensing","kind":"unregistered-repositories"},
-    {"feature":"log","kind":"unregistered-repositories"},
-    {"feature":"managed-provider","kind":"contract-service"},
-    {"feature":"managed-provider","kind":"installer-not-booted"},
-    {"feature":"managed-provider","kind":"nested-web-entry"},
-    {"feature":"metric","kind":"unregistered-repositories"},
-    {"feature":"model-provider","kind":"contract-service"},
-    {"feature":"model-provider","kind":"legacy-transport-runtime"},
-    {"feature":"model-provider","kind":"nested-transport"},
-    {"feature":"model-provider","kind":"nested-web-entry"},
-    {"feature":"model-provider","kind":"no-installer"},
-    {"feature":"model-provider","kind":"persistence-adapter"},
-    {"feature":"model-provider","kind":"postgres-without-memory"},
-    {"feature":"model-provider","kind":"refusing-composition"},
-    {"feature":"model-provider","kind":"testing-entry"},
-    {"feature":"model-provider","kind":"unregistered-repositories"},
-    {"feature":"monitor","kind":"contract-service"},
-    {"feature":"monitor","kind":"installer-not-booted"},
-    {"feature":"monitor","kind":"legacy-transport-runtime"},
-    {"feature":"monitor","kind":"nested-transport"},
-    {"feature":"monitor","kind":"nested-web-entry"},
-    {"feature":"monitor","kind":"persistence-adapter"},
-    {"feature":"monitor","kind":"postgres-without-memory"},
-    {"feature":"monitor","kind":"refusing-composition"},
-    {"feature":"monitor","kind":"unregistered-repositories"},
-    {"feature":"navigation","kind":"nested-web-entry"},
-    {"feature":"onboarding","kind":"nested-web-entry"},
-    {"feature":"ops","kind":"contract-service"},
-    {"feature":"ops","kind":"legacy-transport-runtime"},
-    {"feature":"ops","kind":"nested-transport"},
-    {"feature":"ops","kind":"nested-web-entry"},
-    {"feature":"ops","kind":"persistence-adapter"},
-    {"feature":"ops","kind":"postgres-without-memory"},
-    {"feature":"ops","kind":"refusing-composition"},
-    {"feature":"ops","kind":"unregistered-repositories"},
-    {"feature":"organization","kind":"contract-service"},
-    {"feature":"organization","kind":"installer-not-booted"},
-    {"feature":"organization","kind":"legacy-transport-runtime"},
-    {"feature":"organization","kind":"nested-transport"},
-    {"feature":"organization","kind":"nested-web-entry"},
-    {"feature":"organization","kind":"persistence-adapter"},
-    {"feature":"organization","kind":"postgres-without-memory"},
-    {"feature":"organization","kind":"refusing-composition"},
-    {"feature":"organization","kind":"unregistered-repositories"},
-    {"feature":"presence","kind":"memory-twin-untested"},
-    {"feature":"project","kind":"contract-service"},
-    {"feature":"project","kind":"legacy-transport-runtime"},
-    {"feature":"project","kind":"nested-transport"},
-    {"feature":"project","kind":"nested-web-entry"},
-    {"feature":"project","kind":"persistence-adapter"},
-    {"feature":"project","kind":"postgres-without-memory"},
-    {"feature":"project","kind":"refusing-composition"},
-    {"feature":"project","kind":"unregistered-repositories"},
-    {"feature":"prompt","kind":"contract-service"},
-    {"feature":"prompt","kind":"legacy-transport-runtime"},
-    {"feature":"prompt","kind":"nested-transport"},
-    {"feature":"prompt","kind":"nested-web-entry"},
-    {"feature":"prompt","kind":"no-installer"},
-    {"feature":"prompt","kind":"persistence-adapter"},
-    {"feature":"prompt","kind":"postgres-without-memory"},
-    {"feature":"prompt","kind":"refusing-composition"},
-    {"feature":"prompt","kind":"unregistered-repositories"},
-    {"feature":"role","kind":"memory-twin-untested"},
-    {"feature":"scenario","kind":"contract-service"},
-    {"feature":"scenario","kind":"legacy-transport-runtime"},
-    {"feature":"scenario","kind":"memory-twin-untested"},
-    {"feature":"scenario","kind":"nested-transport"},
-    {"feature":"scenario","kind":"nested-web-entry"},
-    {"feature":"scenario","kind":"no-installer"},
-    {"feature":"scenario","kind":"persistence-adapter"},
-    {"feature":"scenario","kind":"refusing-composition"},
-    {"feature":"scenario","kind":"testing-entry"},
-    {"feature":"scenario","kind":"unregistered-repositories"},
-    {"feature":"scim","kind":"contract-service"},
-    {"feature":"scim","kind":"legacy-transport-runtime"},
-    {"feature":"scim","kind":"nested-transport"},
-    {"feature":"scim","kind":"nested-web-entry"},
-    {"feature":"scim","kind":"no-installer"},
-    {"feature":"scim","kind":"postgres-without-memory"},
-    {"feature":"scim","kind":"unregistered-repositories"},
-    {"feature":"stored-object","kind":"contract-service"},
-    {"feature":"stored-object","kind":"installer-not-booted"},
-    {"feature":"stored-object","kind":"legacy-transport-runtime"},
-    {"feature":"stored-object","kind":"nested-transport"},
-    {"feature":"stored-object","kind":"persistence-adapter"},
-    {"feature":"stored-object","kind":"refusing-composition"},
-    {"feature":"stored-object","kind":"testing-entry"},
-    {"feature":"stored-object","kind":"unregistered-repositories"},
-    {"feature":"trace","kind":"contract-service"},
-    {"feature":"trace","kind":"legacy-transport-runtime"},
-    {"feature":"trace","kind":"nested-transport"},
-    {"feature":"trace","kind":"nested-web-entry"},
-    {"feature":"trace","kind":"postgres-without-memory"},
-    {"feature":"trace","kind":"refusing-composition"},
-    {"feature":"trace","kind":"testing-entry"},
-    {"feature":"trace","kind":"unregistered-repositories"},
-    {"feature":"user","kind":"contract-service"},
-    {"feature":"user","kind":"legacy-transport-runtime"},
-    {"feature":"user","kind":"nested-transport"},
-    {"feature":"user","kind":"nested-web-entry"},
-    {"feature":"user","kind":"persistence-adapter"},
-    {"feature":"user","kind":"postgres-without-memory"},
-    {"feature":"user","kind":"refusing-composition"},
-    {"feature":"user","kind":"unregistered-repositories"},
-    {"feature":"webhook","kind":"contract-service"},
-    {"feature":"webhook","kind":"installer-not-booted"},
-    {"feature":"webhook","kind":"legacy-transport-runtime"},
-    {"feature":"webhook","kind":"nested-transport"},
-    {"feature":"webhook","kind":"postgres-without-memory"},
-    {"feature":"webhook","kind":"unregistered-repositories"},
-    {"feature":"workflow","kind":"contract-service"},
-    {"feature":"workflow","kind":"installer-not-booted"},
-    {"feature":"workflow","kind":"legacy-transport-runtime"},
-    {"feature":"workflow","kind":"nested-transport"},
-    {"feature":"workflow","kind":"nested-web-entry"},
-    {"feature":"workflow","kind":"persistence-adapter"},
-    {"feature":"workflow","kind":"postgres-without-memory"},
-    {"feature":"workflow","kind":"refusing-composition"},
-    {"feature":"workflow","kind":"testing-entry"},
-    {"feature":"workflow","kind":"unregistered-repositories"}
+    {
+      "key": "agent|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "agent|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|fixtures-directory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "analytics|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "annotation|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "api-key|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "audit-log|memory-twin-untested",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "authz|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "authz|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "authz|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "authz|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "authz|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "auth|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|fixtures-directory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "automation|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|no-app",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "billing|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|fixtures-directory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "coding-agent|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluation|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "evaluator|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "experiment|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "gateway|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|fixtures-directory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "github|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "governance|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "hosted-mcp|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "hosted-mcp|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "hosted-mcp|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "identity|no-app",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "identity|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "identity|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "identity|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "identity|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "identity|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "langy|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|fixtures-directory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "licensing|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "log|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "managed-provider|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "managed-provider|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "managed-provider|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "metric|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "model-provider|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "monitor|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "navigation|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "onboarding|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "ops|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "organization|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "presence|memory-twin-untested",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "project|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "prompt|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "role|memory-twin-untested",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|memory-twin-untested",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scenario|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|no-installer",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "scim|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "stored-object|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "trace|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "user|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "webhook|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "webhook|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "webhook|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "webhook|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "webhook|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "webhook|unregistered-repositories",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|contract-service",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|installer-not-booted",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|legacy-transport-runtime",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|nested-transport",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|nested-web-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|persistence-adapter",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|postgres-without-memory",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|refusing-composition",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|testing-entry",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|unregistered-repositories",
+      "measured": "2026-09-08"
+    }
   ]
 }

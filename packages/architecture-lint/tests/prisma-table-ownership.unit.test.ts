@@ -33,7 +33,7 @@ model AuditLog {
   function repository(
     feature: string,
     expression: string,
-    options: { imports?: string; path?: string } = {},
+    options: { imports?: string; path?: string; declaration?: string } = {},
   ) {
     const featureRoot = `packages/features/${feature}`;
     if (!catalogue.some((entry) => entry.id === feature)) {
@@ -47,7 +47,7 @@ model AuditLog {
     write(
       `${featureRoot}/server/src/${options.path ?? `repositories/prisma/prisma.${feature}.repository.ts`}`,
       `${options.imports ?? 'import { prismaTables } from "@langwatch/prisma-client/ownership";'}
-export class Repository { static readonly tables = ${expression}; }`,
+${options.declaration ?? `export class Repository { static readonly tables = ${expression}; }`}`,
     );
   }
   return { repository, lint: () => lintPrismaTableOwnership(root, catalogue) };
@@ -77,6 +77,55 @@ describe("Prisma table ownership lint", () => {
       path: "repositories/prisma/prisma.profile.repository.ts",
     });
     expect(world.lint()).toEqual([]);
+  });
+
+  it("infers a native repository claim from its direct base declaration", () => {
+    const world = fixture();
+    world.repository("user", "unused", {
+      imports: 'import { PrismaRepository } from "@langwatch/prisma-client";',
+      declaration: 'export class Repository extends PrismaRepository.for("User") {}',
+    });
+
+    expect(world.lint()).toEqual([]);
+  });
+
+  it("infers a transactional native repository claim from its direct base declaration", () => {
+    const world = fixture();
+    world.repository("user", "unused", {
+      imports: 'import { PrismaRepository } from "@langwatch/prisma-client";',
+      declaration:
+        'export class Repository extends PrismaRepository.transactionalFor("Profile") {}',
+    });
+
+    expect(world.lint()).toEqual([]);
+  });
+
+  it("rejects a native repository claim outside the Prisma repository seam", () => {
+    const world = fixture();
+    world.repository("user", "unused", {
+      imports: 'import { PrismaRepository } from "@langwatch/prisma-client";',
+      path: "services/user.service.ts",
+      declaration: 'export class Repository extends PrismaRepository.for("User") {}',
+    });
+
+    expect(world.lint()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringContaining("directly extend") }),
+        expect.objectContaining({ message: expect.stringContaining("repository declaration") }),
+      ]),
+    );
+  });
+
+  it("rejects an unclaimed native repository base", () => {
+    const world = fixture();
+    world.repository("user", "unused", {
+      imports: 'import { PrismaRepository } from "@langwatch/prisma-client";',
+      declaration: "export class Repository extends PrismaRepository {}",
+    });
+
+    expect(world.lint()).toEqual([
+      expect.objectContaining({ message: expect.stringContaining("declare owned models") }),
+    ]);
   });
 
   it.each([

@@ -1,147 +1,83 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { z } from "zod";
-import type { ArchitectureViolation } from "./types.ts";
+import { resolve } from "node:path";
 import { type Instant, nowInstant } from "@langwatch/time";
+import {
+  type BaselineEntry,
+  type BaselinePolicy,
+  baselinePath,
+  expiredRows,
+  liveKeys,
+  readBaseline,
+  shrinkCheck,
+  staleRows,
+} from "./baseline.ts";
+import type { ArchitectureViolation } from "./types.ts";
 
 const FILE_NAME = "boundary-edge-baseline.json";
 const KINDS = ["cross-feature", "private-runtime-export"] as const;
 
 export type BoundaryEdgeKind = (typeof KINDS)[number];
 
-export type BoundaryEdgeEntry = {
-  kind: BoundaryEdgeKind;
-  from: string;
-  to: string;
-  expires: string;
-};
-
 export type BoundaryEdge = { kind: BoundaryEdgeKind; from: string; to: string };
 
 export type BoundaryEdgeBaselineCheck = {
   violations: ArchitectureViolation[];
-  entries: BoundaryEdgeEntry[];
+  entries: BaselineEntry[];
   bootstrapped: boolean;
 };
 
-const entrySchema = z
-  .object({
-    kind: z.enum(KINDS),
-    from: z.string().min(1),
-    to: z.string().min(1),
-    expires: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  })
-  .strict();
-const fileSchema = z.object({ version: z.literal(0), edges: z.array(entrySchema) }).strict();
+/** The key of a boundary-edge row: `<kind>|<from>|<to>`. */
+function key(edge: BoundaryEdge): string {
+  return `${edge.kind}|${edge.from}|${edge.to}`;
+}
+
+/** The edge a key names, for the copy that has to read it back out. */
+function edgeOf(entry: BaselineEntry): string {
+  const [kind, from, to] = entry.key.split("|");
+
+  return `${kind} ${from} -> ${to}`;
+}
+
+export const BOUNDARY_EDGE_BASELINE: BaselinePolicy = {
+  id: "boundary-edge",
+  file: FILE_NAME,
+  label: "Boundary edge baseline",
+  keyRule: "A key is `<kind>|<from>|<to>`, kind one of cross-feature, private-runtime-export.",
+  enforceExpiry: true,
+  // The `-stale` spelling predates the shared reader; normalising it changes
+  // nine finding lines, so it is named here rather than assumed.
+  staleAs: "boundary-edge-baseline-stale",
+  expiredAs: "boundary-edge-expired",
+  growthAs: "boundary-edge-baseline-growth",
+  expired: (entry) => ({
+    message: `Boundary edge baseline entry ${edgeOf(entry)} expired ${entry.expires}.`,
+    allowed:
+      "Close the edge behind a port and contract and delete the entry, or bring its own review forward with a new date.",
+  }),
+  stale: (entry) => ({
+    message: `Boundary edge baseline entry ${edgeOf(entry)} no longer exists.`,
+    allowed: "Delete the stale entry so the checked-in baseline only shrinks.",
+  }),
+  growth: {
+    added: (entry) => ({
+      message: `Boundary edge baseline cannot add ${edgeOf(entry)}.`,
+      allowed: "Close the edge behind a port and contract instead of adding it to the baseline.",
+    }),
+    postponed: (entry) => ({
+      message: `Boundary edge baseline cannot move ${edgeOf(entry)}'s expiry later.`,
+      allowed: "Keep the prior expiry, or bring it earlier.",
+    }),
+  },
+};
 
 export function boundaryEdgeBaselineFile(root: string): string {
-  return join(root, "packages/architecture-lint/src", FILE_NAME);
-}
-
-function key(entry: BoundaryEdge): string {
-  return `${entry.kind}\0${entry.from}\0${entry.to}`;
-}
-
-function readBoundaryEdgeBaselineFile(file: string): {
-  exists: boolean;
-  entries: BoundaryEdgeEntry[];
-  violations: ArchitectureViolation[];
-} {
-  if (!existsSync(file)) return { exists: false, entries: [], violations: [] };
-
-  let rawValue: unknown;
-  try {
-    rawValue = JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    return {
-      exists: true,
-      entries: [],
-      violations: [
-        {
-          policy: "boundary-edge-baseline",
-          file,
-          message: `Boundary edge baseline must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-    };
-  }
-
-  const result = fileSchema.safeParse(rawValue);
-  if (!result.success) {
-    return {
-      exists: true,
-      entries: [],
-      violations: [
-        {
-          policy: "boundary-edge-baseline",
-          file,
-          message:
-            "Boundary edge baseline must contain version 0 and an edges array of { kind, from, to, expires }.",
-        },
-      ],
-    };
-  }
-
-  const seen = new Set<string>();
-  const violations: ArchitectureViolation[] = [];
-  const entries: BoundaryEdgeEntry[] = [];
-  for (const entry of result.data.edges) {
-    const entryKey = key(entry);
-    if (seen.has(entryKey)) {
-      violations.push({
-        policy: "boundary-edge-baseline",
-        file,
-        message: `Boundary edge baseline lists ${entry.kind} ${entry.from} -> ${entry.to} more than once.`,
-      });
-      continue;
-    }
-
-    seen.add(entryKey);
-    entries.push(entry);
-  }
-
-  return { exists: true, entries, violations };
-}
-
-/** Growth check against a merge-base reference: an edge may only be removed, never added, and its expiry may only move earlier. */
-export function compareBoundaryEdgeBaseline(
-  reference: readonly BoundaryEdgeEntry[],
-  proposed: readonly BoundaryEdgeEntry[],
-  file: string,
-): ArchitectureViolation[] {
-  const referenceByKey = new Map(reference.map((entry) => [key(entry), entry]));
-  const violations: ArchitectureViolation[] = [];
-  for (const entry of proposed) {
-    const previous = referenceByKey.get(key(entry));
-    if (!previous) {
-      violations.push({
-        policy: "boundary-edge-baseline-growth",
-        file,
-        message: `Boundary edge baseline cannot add ${entry.kind} ${entry.from} -> ${entry.to}.`,
-        allowed: "Close the edge behind a port and contract instead of adding it to the baseline.",
-      });
-      continue;
-    }
-
-    if (entry.expires > previous.expires) {
-      violations.push({
-        policy: "boundary-edge-baseline-growth",
-        file,
-        message: `Boundary edge baseline cannot move ${entry.kind} ${entry.from} -> ${entry.to}'s expiry later.`,
-        allowed: "Keep the prior expiry, or bring it earlier.",
-      });
-    }
-  }
-
-  return violations;
+  return baselinePath({ root, policy: BOUNDARY_EDGE_BASELINE });
 }
 
 /**
  * Reads and validates `boundary-edge-baseline.json`. An expired entry fails
  * the run in its own right; an entry that no longer appears among
  * `currentEdges` is stale and must be deleted. With a `baselineReference`
- * (the merge-base copy), the file may only shrink, mirroring
- * `lintCommentBlockRoots`.
+ * (the merge-base copy), the file may only shrink.
  */
 export function lintBoundaryEdgeBaseline(
   root: string,
@@ -150,32 +86,21 @@ export function lintBoundaryEdgeBaseline(
   now: Instant = nowInstant(),
 ): BoundaryEdgeBaselineCheck {
   const file = boundaryEdgeBaselineFile(root);
-  const current = readBoundaryEdgeBaselineFile(file);
-  const violations = [...current.violations];
-  const today = now.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
-  const currentKeys = new Set(currentEdges.map(key));
+  const current = readBaseline({ policy: BOUNDARY_EDGE_BASELINE, file });
+  const found = new Set(currentEdges.map(key));
 
-  for (const entry of current.entries) {
-    if (entry.expires < today) {
-      violations.push({
-        policy: "boundary-edge-expired",
-        file,
-        message: `Boundary edge baseline entry ${entry.kind} ${entry.from} -> ${entry.to} expired ${entry.expires}.`,
-        allowed:
-          "Close the edge behind a port and contract and delete the entry, or bring its own review forward with a new date.",
-      });
-      continue;
-    }
-
-    if (!currentKeys.has(key(entry))) {
-      violations.push({
-        policy: "boundary-edge-baseline-stale",
-        file,
-        message: `Boundary edge baseline entry ${entry.kind} ${entry.from} -> ${entry.to} no longer exists.`,
-        allowed: "Delete the stale entry so the checked-in baseline only shrinks.",
-      });
-    }
-  }
+  const violations = [
+    ...current.violations,
+    ...expiredRows({ entries: current.entries, policy: BOUNDARY_EDGE_BASELINE, file, now }),
+    ...staleRows({
+      entries: current.entries,
+      found,
+      policy: BOUNDARY_EDGE_BASELINE,
+      file,
+      skipExpired: true,
+      now,
+    }),
+  ];
 
   if (baselineReference && !current.exists) {
     violations.push({
@@ -190,13 +115,24 @@ export function lintBoundaryEdgeBaseline(
     return { violations, entries: current.entries, bootstrapped: false };
   }
 
-  const reference = readBoundaryEdgeBaselineFile(resolve(root, baselineReference));
+  const reference = readBaseline({
+    policy: BOUNDARY_EDGE_BASELINE,
+    file: resolve(root, baselineReference),
+  });
   violations.push(...reference.violations);
+
   if (!reference.exists) {
     return { violations, entries: current.entries, bootstrapped: current.exists };
   }
 
-  violations.push(...compareBoundaryEdgeBaseline(reference.entries, current.entries, file));
+  violations.push(
+    ...shrinkCheck({
+      current: current.entries,
+      reference: reference.entries,
+      policy: BOUNDARY_EDGE_BASELINE,
+      file,
+    }),
+  );
 
   return { violations, entries: current.entries, bootstrapped: false };
 }
@@ -221,11 +157,10 @@ export function boundaryEdgesFromViolations(
 /** Drops a cross-feature/private-runtime-export violation whose edge is listed and not expired. Every other violation passes through untouched. */
 export function filterBaselinedBoundaryEdges(
   violations: readonly ArchitectureViolation[],
-  entries: readonly BoundaryEdgeEntry[],
+  entries: readonly BaselineEntry[],
   now: Instant = nowInstant(),
 ): ArchitectureViolation[] {
-  const today = now.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
-  const allowed = new Set(entries.filter((entry) => entry.expires >= today).map(key));
+  const allowed = liveKeys({ entries, now });
 
   return violations.filter((violation) => {
     if (violation.policy !== "cross-feature" && violation.policy !== "private-runtime-export") {

@@ -5,9 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   collectSourceFolderShapeBaseline,
   collectSourceFolderShapeFindings,
+  formatBaseline,
   FOLDER_BUDGET,
-  formatSourceFolderShapeBaseline,
   lintSourceFolderShape,
+  SOURCE_FOLDER_SHAPE_BASELINE,
 } from "../src/index.ts";
 
 let root = "";
@@ -33,6 +34,14 @@ function fill(directory: string, count: number): void {
 }
 
 const BASELINE = "packages/architecture-lint/src/source-folder-shape-baseline.json";
+
+/** Rows keyed `<kind>|<path>`, written the way the one writer writes them. */
+function baselineText(keys: readonly string[]): string {
+  return formatBaseline({
+    policy: SOURCE_FOLDER_SHAPE_BASELINE,
+    entries: keys.map((key) => ({ key, measured: "2026-09-08" })),
+  });
+}
 
 describe("source folder shape", () => {
   describe("given a folder that holds more source files than the budget", () => {
@@ -104,7 +113,10 @@ describe("source folder shape", () => {
   describe("given a small file the feature grammar requires", () => {
     /** @scenario A mount file the feature grammar requires is never a fragment */
     it("leaves an installer and a process mount alone however short they are", () => {
-      write("packages/features/widget/server/src/widget.server.ts", "export const widgetServer = 1;\n");
+      write(
+        "packages/features/widget/server/src/widget.server.ts",
+        "export const widgetServer = 1;\n",
+      );
       write(
         "packages/features/widget/server/src/index.ts",
         'export { widgetServer } from "./widget.server.ts";\n',
@@ -158,9 +170,9 @@ describe("source folder shape", () => {
       fill("packages/widget/src/rules", FOLDER_BUDGET + 1);
       write(
         BASELINE,
-        formatSourceFolderShapeBaseline([
-          { kind: "crowded-folder", path: "packages/widget/src/rules" },
-          { kind: "fragment-file", path: "packages/widget/src/gone.ts" },
+        baselineText([
+          "crowded-folder|packages/widget/src/rules",
+          "fragment-file|packages/widget/src/gone.ts",
         ]),
       );
 
@@ -176,7 +188,7 @@ describe("source folder shape", () => {
 
     it("reports an unlisted finding under the policy name", () => {
       fill("packages/widget/src/rules", FOLDER_BUDGET + 1);
-      write(BASELINE, formatSourceFolderShapeBaseline([]));
+      write(BASELINE, baselineText([]));
 
       const policies = lintSourceFolderShape(root).map((violation) => violation.policy);
 
@@ -184,7 +196,8 @@ describe("source folder shape", () => {
       expect(policies).toContain("source-folder-shape-baseline");
     });
 
-    it("collects the baseline as sorted kind and path pairs", () => {
+    /** @scenario "A collected baseline keeps the date an existing row carries" */
+    it("collects the baseline as rows sorted by key in code-unit order", () => {
       fill("packages/widget/src/rules", FOLDER_BUDGET + 1);
       write(
         "packages/widget/src/app/pricing.ts",
@@ -192,9 +205,14 @@ describe("source folder shape", () => {
       );
       write("packages/widget/src/app/rate.ts", "export const rate = 3;\n");
 
-      expect(collectSourceFolderShapeBaseline(root)).toEqual([
-        { kind: "fragment-file", path: "packages/widget/src/app/rate.ts" },
-        { kind: "crowded-folder", path: "packages/widget/src/rules" },
+      const entries = collectSourceFolderShapeBaseline({
+        root,
+        previous: [{ key: "crowded-folder|packages/widget/src/rules", measured: "2020-01-01" }],
+      });
+
+      expect(entries).toEqual([
+        { key: "crowded-folder|packages/widget/src/rules", measured: "2020-01-01" },
+        { key: "fragment-file|packages/widget/src/app/rate.ts", measured: expect.any(String) },
       ]);
     });
   });

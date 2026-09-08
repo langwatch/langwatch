@@ -1,7 +1,16 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { z } from "zod";
+import {
+  type BaselineEntry,
+  type BaselinePolicy,
+  baselinePath,
+  collectBaseline,
+  liveKeys,
+  readBaseline,
+  shrinkCheck,
+  staleRows,
+} from "./baseline.ts";
 import {
   createWorkspaceModuleResolver,
   walkValueImportGraph,
@@ -415,102 +424,39 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
   return subjects.filter((subject) => !composed.has(subject.name));
 }
 
-const baselineEntrySchema = z
-  .object({ key: z.string().regex(/^[^|]+\|[A-Za-z0-9_$]+$/), measured: z.string().min(1) })
-  .strict();
-
-const baselineSchema = z
-  .object({ version: z.literal(0), entries: z.array(baselineEntrySchema) })
-  .strict()
-  .superRefine((baseline, context) => {
-    const seen = new Set<string>();
-    for (const [index, entry] of baseline.entries.entries()) {
-      if (seen.has(entry.key)) {
-        context.addIssue({
-          code: "custom",
-          message: `duplicate baseline entry ${entry.key}`,
-          path: ["entries", index],
-        });
-      }
-
-      seen.add(entry.key);
-      const previous = baseline.entries[index - 1];
-      if (index > 0 && !(previous !== undefined && previous.key < entry.key)) {
-        context.addIssue({
-          code: "custom",
-          message: "composed-exports baseline must be sorted",
-          path: ["entries", index],
-        });
-      }
-    }
-  });
-
-export function readComposedExportsBaselineFile(file: string): {
-  exists: boolean;
-  keys: readonly string[];
-  violations: ArchitectureViolation[];
-} {
-  if (!existsSync(file)) {
-    return { exists: false, keys: [], violations: [] };
-  }
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    return {
-      exists: true,
-      keys: [],
-      violations: [
-        {
-          policy: "composed-exports-baseline",
-          file,
-          message: `Composed-exports baseline must be valid JSON: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        },
-      ],
-    };
-  }
-
-  const parsed = baselineSchema.safeParse(raw);
-  if (!parsed.success) {
-    const reason = parsed.error.issues.at(0)?.message ?? "invalid baseline";
-
-    return {
-      exists: true,
-      keys: [],
-      violations: [
-        {
-          policy: "composed-exports-baseline",
-          file,
-          message: `Composed-exports baseline is invalid: ${reason}`,
-        },
-      ],
-    };
-  }
-
-  return { exists: true, keys: parsed.data.entries.map((entry) => entry.key), violations: [] };
-}
-
-export function formatComposedExportsBaseline({
-  subjects,
-  measured,
-}: {
-  subjects: readonly ComposedExportSubject[];
-  measured: string;
-}): string {
-  // Code-point order, not locale order: the schema rejects anything the
-  // reader's own `<` comparison does not consider sorted.
-  const entries = [...subjects]
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
-    .map((subject) => ({ key: subject.key, measured }));
-
-  return `${JSON.stringify({ version: 0, entries }, null, 2)}\n`;
-}
+export const COMPOSED_EXPORTS_BASELINE: BaselinePolicy = {
+  id: "composed-exports",
+  file: BASELINE_FILE,
+  label: "Composed-exports baseline",
+  keyRule: "A key is `<package directory>|<exported name>`.",
+  enforceExpiry: false,
+  stale: (entry) => ({
+    message: `Composed-exports baseline entry ${entry.key} names an export no application leaves uncomposed.`,
+    allowed: "Delete the stale entry; the register only shrinks.",
+  }),
+  growth: {
+    added: (entry) => ({
+      message: `Baseline entry ${entry.key} is not in the merge base; the composed-exports baseline is shrink-only.`,
+      allowed:
+        "Compose the capability in the owning *.composition.ts, or delete it, and remove the entry; do not add new ones.",
+    }),
+  },
+};
 
 function baselineFile(root: string): string {
-  return join(root, "packages/architecture-lint/src", BASELINE_FILE);
+  return baselinePath({ root, policy: COMPOSED_EXPORTS_BASELINE });
+}
+
+export function collectComposedExportsBaseline({
+  root,
+  previous = [],
+}: {
+  root: string;
+  previous?: readonly BaselineEntry[];
+}): BaselineEntry[] {
+  const found = collectUncomposedExports({ root }).map((subject) => subject.key);
+
+  return collectBaseline({ policy: COMPOSED_EXPORTS_BASELINE, found, previous });
 }
 
 export function lintComposedExports(
@@ -518,10 +464,13 @@ export function lintComposedExports(
   options?: { baselineFile?: string },
 ): ArchitectureViolation[] {
   const file = options?.baselineFile ?? baselineFile(root);
-  const baseline = readComposedExportsBaselineFile(file);
-  const baselined = new Set(baseline.keys);
+  const baseline = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file });
+  const baselined = liveKeys({ entries: baseline.entries });
   const violations: ArchitectureViolation[] = [...baseline.violations];
+  const found = new Set<string>();
+
   for (const subject of collectUncomposedExports({ root })) {
+    found.add(subject.key);
     if (baselined.has(subject.key)) continue;
 
     violations.push({
@@ -532,6 +481,10 @@ export function lintComposedExports(
     });
   }
 
+  violations.push(
+    ...staleRows({ entries: baseline.entries, found, policy: COMPOSED_EXPORTS_BASELINE, file }),
+  );
+
   return violations;
 }
 
@@ -539,25 +492,30 @@ export function lintComposedExportsBaseline(
   root: string,
   baselineReference?: string,
 ): { violations: ArchitectureViolation[] } {
-  const current = readComposedExportsBaselineFile(baselineFile(root));
-  if (!baselineReference) {
-    return { violations: current.violations };
-  }
+  const file = baselineFile(root);
+  const current = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file });
 
-  const reference = readComposedExportsBaselineFile(resolve(root, baselineReference));
-  const referenceSet = new Set(reference.keys);
-  const violations: ArchitectureViolation[] = [...current.violations, ...reference.violations];
-  for (const key of current.keys) {
-    if (!referenceSet.has(key)) {
-      violations.push({
-        policy: "composed-exports-baseline",
-        file: baselineFile(root),
-        message: `Baseline entry ${key} is not in ${baselineReference}; the composed-exports baseline is shrink-only.`,
-        allowed:
-          "Compose the capability in the owning *.composition.ts, or delete it, and remove the entry; do not add new ones.",
-      });
-    }
-  }
+  if (!baselineReference) return { violations: current.violations };
 
-  return violations.length > 0 ? { violations } : { violations: [] };
+  const reference = readBaseline({
+    policy: COMPOSED_EXPORTS_BASELINE,
+    file: resolve(root, baselineReference),
+  });
+
+  // No merge-base copy is the one-time bootstrap the other ratchets already
+  // treat as such. Comparing against nothing would call every row an addition.
+  if (!reference.exists) return { violations: current.violations };
+
+  return {
+    violations: [
+      ...current.violations,
+      ...reference.violations,
+      ...shrinkCheck({
+        current: current.entries,
+        reference: reference.entries,
+        policy: COMPOSED_EXPORTS_BASELINE,
+        file,
+      }),
+    ],
+  };
 }

@@ -2,7 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { lintFrontendUiBoundaries } from "../src/index.ts";
+import {
+  declaredWebDependencyPairs,
+  lintFrontendUiBoundaries,
+  lintManifests,
+} from "../src/index.ts";
 import type { ClassifiedPackage } from "../src/index.ts";
 
 let root = "";
@@ -157,6 +161,103 @@ describe("frontend UI architecture boundaries", () => {
     );
 
     expect(lint([promptWeb])).toEqual([]);
+  });
+
+  it("accepts explicitly declared flat screen and surface exports", () => {
+    const promptWeb = webPackage("prompt", {
+      "./prompt-studio": "./src/prompt-studio.ts",
+      "./prompt-reference": "./src/prompt-reference.ts",
+    });
+    writeCatalogue([
+      {
+        id: "prompt-studio",
+        screens: ["@langwatch/prompt-web/prompt-studio"],
+      },
+      {
+        id: "trace-explorer",
+        surfaces: ["@langwatch/prompt-web/prompt-reference"],
+      },
+    ]);
+    write(
+      "apps/ui/src/features/prompt-studio/index.ts",
+      'import { PromptStudio } from "@langwatch/prompt-web/prompt-studio"; export { PromptStudio };',
+    );
+    write(
+      "apps/ui/src/features/trace-explorer/index.ts",
+      'import { PromptReference } from "@langwatch/prompt-web/prompt-reference"; export { PromptReference };',
+    );
+    write("packages/features/prompt/web/src/prompt-studio.ts", "export const PromptStudio = true;");
+    write(
+      "packages/features/prompt/web/src/prompt-reference.ts",
+      'export { PromptReference } from "./ui/elements/prompt-reference";',
+    );
+    write(
+      "packages/features/prompt/web/src/ui/elements/prompt-reference.ts",
+      "export const PromptReference = true;",
+    );
+
+    expect(lint([promptWeb])).toEqual([]);
+  });
+
+  it("keeps flat screens owner-only and rejects undeclared flat package exports", () => {
+    const promptWeb = webPackage("prompt", {
+      "./prompt-studio": "./src/prompt-studio.ts",
+      "./unlisted": "./src/unlisted.ts",
+    });
+    writeCatalogue([
+      {
+        id: "prompt-studio",
+        screens: ["@langwatch/prompt-web/prompt-studio"],
+      },
+      { id: "trace-explorer" },
+    ]);
+    write(
+      "apps/ui/src/features/trace-explorer/index.ts",
+      'import { PromptStudio } from "@langwatch/prompt-web/prompt-studio"; export { PromptStudio };',
+    );
+    write("packages/features/prompt/web/src/prompt-studio.ts", "export const PromptStudio = true;");
+    write("packages/features/prompt/web/src/unlisted.ts", "export const Unlisted = true;");
+
+    expect(policies([promptWeb])).toEqual(
+      expect.arrayContaining(["ui-screen-owner", "ui-web-public-entry"]),
+    );
+  });
+
+  it("permits only a declared exported web surface manifest dependency", () => {
+    const promptWeb = webPackage("prompt", {
+      "./prompt-reference": "./src/prompt-reference.ts",
+    });
+    const traceWeb = webPackage("trace", {
+      "./trace-card": "./src/trace-card.ts",
+    });
+    writeCatalogue(
+      [
+        {
+          id: "prompt-studio",
+          root: "prompt",
+          surfaces: ["@langwatch/trace-web/trace-card"],
+        },
+      ],
+      ["@langwatch/prompt-web", "@langwatch/trace-web"],
+    );
+    write(
+      "packages/features/prompt/web/src/prompt-reference.ts",
+      "export const PromptReference = true;",
+    );
+    write("packages/features/trace/web/src/trace-card.ts", "export const TraceCard = true;");
+    promptWeb.manifest.dependencies = { "@langwatch/trace-web": "workspace:*" };
+
+    const pairs = declaredWebDependencyPairs(root, [promptWeb, traceWeb]);
+    expect(pairs.has("@langwatch/prompt-web->@langwatch/trace-web")).toBe(true);
+    expect(lintManifests([promptWeb, traceWeb], pairs)).toEqual([]);
+
+    writeCatalogue([
+      { id: "prompt-studio", root: "prompt", screens: ["@langwatch/trace-web/trace-card"] },
+    ]);
+    expect(declaredWebDependencyPairs(root, [promptWeb, traceWeb])).toEqual(new Set());
+    expect(lintManifests([promptWeb, traceWeb])).toEqual(
+      expect.arrayContaining([expect.objectContaining({ policy: "cross-feature" })]),
+    );
   });
 
   /** @scenario "A web package can be governed before its screen migration completes" */
@@ -900,14 +1001,43 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(1);
   });
 
-  it("does not mistake a capability named inside a string literal for a comment", () => {
+  it("allows customer code examples that only name process.env in strings", () => {
     writeCatalogue([{ id: "prompt-studio" }]);
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
       'export const message = "read process.env on the server";\n',
     );
 
-    expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(1);
+    expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(0);
+  });
+
+  it.each([
+    "export const snippet = `const token = process.env.API_KEY;`;",
+    'export const snippet = `const token = process.env.API_KEY; ${"display only"}`;',
+    "export const snippet = <code>process.env.API_KEY</code>;",
+  ])("allows non-executable env examples in a public web closure: %s", (source) => {
+    const agentWeb = webPackage("agent", { "./surfaces/editor": "./src/surfaces/editor/index.ts" });
+    writeCatalogue([{ id: "agents", surfaces: ["@langwatch/agent-web/surfaces/editor"] }]);
+    write("packages/features/agent/web/src/surfaces/editor/index.ts", source);
+
+    expect(policies([agentWeb]).filter((policy) => policy === "ui-surface-closure")).toEqual([]);
+  });
+
+  it.each([
+    "export const snippet = `token: ${process.env.API_KEY}`;",
+    'export const snippet = `token: ${process["env"].API_KEY}`;',
+    "export const snippet = `token: ${process?.env?.API_KEY}`;",
+    "export const snippet = `example process.env ${(() => process.env.API_KEY)()}`;",
+  ])("rejects executable env reads inside a template interpolation: %s", (source) => {
+    const agentWeb = webPackage("agent", { "./surfaces/editor": "./src/surfaces/editor/index.ts" });
+    writeCatalogue([{ id: "agents", surfaces: ["@langwatch/agent-web/surfaces/editor"] }]);
+    write("packages/features/agent/web/src/surfaces/editor/index.ts", source);
+    write("apps/ui/src/features/agents/route.ts", source);
+
+    expect(policies([agentWeb]).filter((policy) => policy === "ui-surface-closure")).toHaveLength(
+      1,
+    );
+    expect(policies([agentWeb]).filter((policy) => policy === "ui-backend-access")).toHaveLength(1);
   });
 
   it("accepts the two-scope private web hierarchy and recursive browser-safe screen closure", () => {

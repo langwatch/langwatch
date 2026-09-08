@@ -7,9 +7,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  COMPOSED_EXPORTS_BASELINE,
   lintComposedExports,
   lintComposedExportsBaseline,
-  readComposedExportsBaselineFile,
+  readBaseline,
 } from "../src/index.ts";
 
 let root = "";
@@ -28,7 +29,8 @@ function baseline(keys: readonly string[], path = "packages/architecture-lint/sr
   write(
     `${path}/composed-exports-baseline.json`,
     JSON.stringify({
-      version: 0,
+      version: 1,
+      policy: "composed-exports",
       entries: keys.map((key) => ({ key, measured: "2026-09-07" })),
     }),
   );
@@ -292,13 +294,13 @@ describe("composed exports", () => {
       const file = join(root, "packages/architecture-lint/src/composed-exports-baseline.json");
       write(
         "packages/architecture-lint/src/composed-exports-baseline.json",
-        JSON.stringify({ version: 0, entries: [{ key: "a|B" }] }),
+        JSON.stringify({ version: 1, policy: "composed-exports", entries: [{ key: "a|B" }] }),
       );
 
-      const violations = readComposedExportsBaselineFile(file).violations;
+      const violations = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file }).violations;
 
       expect(violations).toHaveLength(1);
-      expect(violations[0]?.message).toContain("invalid");
+      expect(violations[0]?.message).toContain("must be version 1");
     });
   });
 });

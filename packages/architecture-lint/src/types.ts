@@ -58,6 +58,8 @@ export type ArchitectureViolation = {
   specifier?: string;
   message: string;
   allowed?: string;
+  /** A baseline row no live finding matches: an allowance that outlived what it allowed. */
+  stale?: true;
 };
 
 export type LintWorkspaceOptions = {

@@ -287,14 +287,25 @@ function dependencyViolations(
   pkg: ClassifiedPackage,
   dependency: string,
   byName: Map<string, ClassifiedPackage>,
+  allowedWebDependencies: ReadonlySet<string>,
 ): ArchitectureViolation[] {
   const runtimeViolation = enterpriseRuntimeViolation(pkg, dependency);
   const target = byName.get(dependency);
   if (!target) return runtimeViolation ? [runtimeViolation] : [];
 
-  const targetViolations = DEPENDENCY_TARGET_CHECKS.map((check) =>
-    check(pkg, target, dependency),
-  ).filter((violation) => violation !== undefined);
+  const targetViolations = DEPENDENCY_TARGET_CHECKS.flatMap((check) => {
+    if (
+      check === crossFeatureCheck &&
+      pkg.kind === "web" &&
+      target.kind === "web" &&
+      allowedWebDependencies.has(`${pkg.name}->${target.name}`)
+    ) {
+      return [];
+    }
+
+    const violation = check(pkg, target, dependency);
+    return violation ? [violation] : [];
+  });
 
   return runtimeViolation ? [runtimeViolation, ...targetViolations] : targetViolations;
 }
@@ -303,6 +314,7 @@ function dependencyViolations(
 function violationsForManifest(
   pkg: ClassifiedPackage,
   byName: Map<string, ClassifiedPackage>,
+  allowedWebDependencies: ReadonlySet<string>,
 ): ArchitectureViolation[] {
   const zodViolation = zodRuntimeViolation(pkg);
   const dependencies = Object.keys(manifestDependencies(pkg.manifest));
@@ -310,14 +322,19 @@ function violationsForManifest(
   return [
     ...exportViolations(pkg),
     ...(zodViolation ? [zodViolation] : []),
-    ...dependencies.flatMap((dependency) => dependencyViolations(pkg, dependency, byName)),
+    ...dependencies.flatMap((dependency) =>
+      dependencyViolations(pkg, dependency, byName, allowedWebDependencies),
+    ),
   ];
 }
 
-export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+export function lintManifests(
+  packages: ClassifiedPackage[],
+  allowedWebDependencies: ReadonlySet<string> = new Set(),
+): ArchitectureViolation[] {
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
 
-  return packages.flatMap((pkg) => violationsForManifest(pkg, byName));
+  return packages.flatMap((pkg) => violationsForManifest(pkg, byName, allowedWebDependencies));
 }
 
 export function exportedSubpaths(pkg: ClassifiedPackage): Set<string> {

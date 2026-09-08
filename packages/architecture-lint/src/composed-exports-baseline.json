@@ -1,5 +1,6 @@
 {
-  "version": 0,
+  "version": 1,
+  "policy": "composed-exports",
   "entries": [
     {
       "key": "packages/enterprise/features/billing/server|NullBillingOrganizationAdapter",
@@ -54,14 +55,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/enterprise/features/governance/server|PostgresSessionPolicyAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/enterprise/features/licensing/server|LicenseService",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/enterprise/features/licensing/server|PlanProviderService",
       "measured": "2026-09-07"
     },
@@ -74,19 +67,7 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/eventing|ReplayService",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/agent/server|PrismaAgentAdapter",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/features/analytics/server|LoggingAnalyticsTripwireService",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/analytics/server|LwqlKeyMapService",
       "measured": "2026-09-07"
     },
     {
@@ -98,14 +79,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/features/evaluation/server|EvaluationInputsOffloadService",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/evaluation/server|PrismaEvaluationCostRecorderAdapter",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/features/experiment/server|ExperimentRunStateStoreAdapter",
       "measured": "2026-09-07"
     },
@@ -114,15 +87,7 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/features/identity/server|IdentityBirthService",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/features/identity/server|IdentitySsoConnectionGrandfatherMigrationAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/identity/server|IdentityWriteGateService",
       "measured": "2026-09-07"
     },
     {
@@ -138,10 +103,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/features/identity/server|SsoConnectionBackofficeService",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/features/identity/server|SsoConnectionGrandfatherService",
       "measured": "2026-09-07"
     },
@@ -151,10 +112,6 @@
     },
     {
       "key": "packages/features/langy/server|NullLangyAnalyticsEventSinkAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/langy/server|OtelLangyBlockMetricsAdapter",
       "measured": "2026-09-07"
     },
     {
@@ -187,14 +144,6 @@
     },
     {
       "key": "packages/features/ops/server|NullReplayAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/ops/server|RedisSchedulerWakeAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/ops/server|ReplayService",
       "measured": "2026-09-07"
     },
     {
@@ -246,14 +195,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/features/stored-object/server|PostgresStoredObjectAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/stored-object/server|StoredObjectsPublicApi",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/features/topic/server|LangevalsStagedPayloadAdapter",
       "measured": "2026-09-07"
     },
@@ -275,18 +216,6 @@
     },
     {
       "key": "packages/features/webhook/server|PrismaWebhookRetentionRepository",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/webhook/server|WebhookHealthService",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/workflow/server|LambdaWebAdapterStreamService",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/workflow/server|NlpLambdaRuntimeService",
       "measured": "2026-09-07"
     }
   ]

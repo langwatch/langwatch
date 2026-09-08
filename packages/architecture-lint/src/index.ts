@@ -20,7 +20,6 @@ import { declaredWebDependencyPairs, lintFrontendUiBoundaries } from "./frontend
 import { lintGlobalAppAccess } from "./global-app-access.ts";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
 import { lintManifests } from "./manifests.ts";
-import { lintOverengineeringBaseline } from "./overengineering.ts";
 import { lintStrictPortModules } from "./port-modules.ts";
 import { lintServiceCeilings } from "./service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
@@ -41,27 +40,39 @@ export type {
 export { readFeatureCatalogue } from "./feature-catalogue.ts";
 export { lintFeatureConfiguration } from "./feature-configuration.ts";
 export {
+  BOUNDARY_EDGE_BASELINE,
+  boundaryEdgeBaselineFile,
   boundaryEdgesFromViolations,
-  compareBoundaryEdgeBaseline,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
 } from "./boundary-edge-baseline.ts";
 export type {
   BoundaryEdge,
   BoundaryEdgeBaselineCheck,
-  BoundaryEdgeEntry,
   BoundaryEdgeKind,
 } from "./boundary-edge-baseline.ts";
+export {
+  BASELINE_VERSION,
+  baselinePath,
+  collectBaseline,
+  emptyBaselineRows,
+  expiredRows,
+  formatBaseline,
+  liveKeys,
+  readBaseline,
+  shrinkCheck,
+  staleRows,
+} from "./baseline.ts";
+export type { Baseline, BaselineEntry, BaselinePolicy } from "./baseline.ts";
 export { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
 export {
   apiTransportFrameworkFindings,
   featureServerTransportFindings,
   lintApiTransportFramework,
-  readApiTransportFrameworkAllowlist,
 } from "./api-transport-framework.ts";
 export {
+  COMMENT_BLOCK_ROOTS_BASELINE,
   changedSourceFiles,
-  compareCommentBlockRoots,
   lintCommentBlocks,
   lintCommentBlockRoots,
 } from "./comment-blocks.ts";
@@ -69,7 +80,6 @@ export type {
   CommentBlockLintOptions,
   CommentBlockLintResult,
   CommentBlockReview,
-  CommentBlockRootEntry,
   CommentBlockRootsBaselineCheck,
 } from "./comment-blocks.ts";
 export type {
@@ -92,13 +102,7 @@ export { discoverClassifiedPackages } from "./workspace.ts";
 export { lintFeatureLayouts } from "./feature-layout.ts";
 export { lintFeatureSetupInfrastructure } from "./feature-setup-infrastructure.ts";
 export { lintManifests } from "./manifests.ts";
-export { formatServiceCeilingsBaseline } from "./service-ceilings.ts";
-export { collectServiceCeilings } from "./service-ceilings.ts";
-export { compareServiceCeilingsBaselines } from "./service-ceilings.ts";
-export { readServiceCeilingsBaselineFile } from "./service-ceilings.ts";
-export { lintServiceCeilingsBaseline } from "./service-ceilings.ts";
-export { lintServiceCeilings } from "./service-ceilings.ts";
-export { lintServiceCeilingsFile } from "./service-ceilings.ts";
+export { lintServiceCeilings, lintServiceCeilingsFile } from "./service-ceilings.ts";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
 export { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
 export { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
@@ -127,49 +131,41 @@ export {
   lintGlobalAppAccess,
 } from "./global-app-access.ts";
 export {
-  collectOverengineering,
-  formatOverengineeringBaseline,
-  lintOverengineeringBaseline,
-} from "./overengineering.ts";
-export {
   collectFeatureShapeBaseline,
   collectFeatureShapeFindings,
+  FEATURE_SHAPE_BASELINE,
   FEATURE_SHAPE_LEGACY_KINDS,
-  formatFeatureShapeBaseline,
   lintFeatureShape,
-  readFeatureShapeBaselineFile,
 } from "./feature-shape.ts";
 export type { FeatureShapeFinding, FeatureShapeLegacyKind } from "./feature-shape.ts";
 export {
   collectSourceFolderShapeBaseline,
   collectSourceFolderShapeFindings,
   FOLDER_BUDGET,
-  formatSourceFolderShapeBaseline,
   FRAGMENT_FLOOR,
   lintSourceFolderShape,
-  readSourceFolderShapeBaselineFile,
+  SOURCE_FOLDER_SHAPE_BASELINE,
   SOURCE_FOLDER_SHAPE_KINDS,
 } from "./source-folder-shape.ts";
 export type { SourceFolderShapeFinding, SourceFolderShapeKind } from "./source-folder-shape.ts";
 export { lintStrictPortModules } from "./port-modules.ts";
-export { lintStrictPortBaseline } from "./port-modules.ts";
-export { readStrictPortBaselineFile } from "./port-modules.ts";
-export { collectStrictPortBaseline } from "./port-modules.ts";
-export { formatStrictPortBaseline } from "./port-modules.ts";
 export {
+  COMPOSED_EXPORTS_BASELINE,
   collectComposedExportSubjects,
+  collectComposedExportsBaseline,
   collectUncomposedExports,
-  formatComposedExportsBaseline,
   lintComposedExports,
   lintComposedExportsBaseline,
   reachableFiles,
-  readComposedExportsBaselineFile,
   serverPackageIndexes,
 } from "./composed-exports.ts";
 export type { ComposedExportSubject } from "./composed-exports.ts";
-export { lintTypedPrismaSeamBaseline } from "./typed-prisma-seam.ts";
-export { readTypedPrismaSeamBaselineFile } from "./typed-prisma-seam.ts";
-export { lintOxlintBaseline, readOxlintBaselineFile } from "./oxlint-baseline-check.ts";
+export {
+  OXLINT_BASELINE,
+  lintOxlintBaseline,
+  oxlintBaselineFile,
+  readOxlintBaseline,
+} from "./oxlint-baseline-check.ts";
 export {
   applyFilenameMigration,
   collectFilenameMigrationMappings,
@@ -200,16 +196,15 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintArchitectureRecords(discovery.packages),
     ...lintStrictContractBuildConfigs(root, discovery.packages),
     ...lintDeclarationProjectReferences(root, discovery.packages),
-    ...lintStrictPortModules(root, discovery.packages),
+    ...lintStrictPortModules(discovery.packages),
     ...lintManifests(discovery.packages, declaredWebDependencyPairs(root, discovery.packages)),
-    ...lintOverengineeringBaseline(root, discovery.packages),
     ...lintApplicationBoundaries(root, discovery.packages, {
       legacyMigration: options.legacyApplicationMigration !== false,
     }),
-    ...lintApiTransportBoundaries(root, discovery.packages),
+    ...lintApiTransportBoundaries(discovery.packages),
     ...lintApiTransportFramework(root, discovery.packages),
     ...lintServiceProjectionBoundaries(discovery.packages),
-    ...lintServiceCeilings(root, discovery.packages),
+    ...lintServiceCeilings(discovery.packages),
     ...lintCycles(discovery.packages),
     ...lintTestQuality(root, { files: changedFiles }),
     ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),

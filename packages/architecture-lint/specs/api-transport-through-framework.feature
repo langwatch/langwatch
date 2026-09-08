@@ -33,8 +33,7 @@ Feature: API transport is defined through the framework
     Then both are reported, because access is declared in AuthZ terms through the chain
 
   @unit
-  Scenario: The allowlist of unconverted files only shrinks
-    Given a file that no longer defines its transport outside the framework is still on the allowlist
+  Scenario: The allowlist reached zero and the policy became a plain refusal
+    Given the allowlist of unconverted transport files reached zero and was deleted
     When the transport policy runs
-    Then the stale entry is itself reported
-    And converting a file is what removes its line
+    Then every offending file is refused outright, with no list left to excuse one

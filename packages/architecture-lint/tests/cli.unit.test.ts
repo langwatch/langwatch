@@ -30,17 +30,13 @@ function writeFixture(root: string, file: string, source: string): void {
 function writeSealedWorkspace(root: string): void {
   writeFixture(root, "src/base.ts", "export const base = 1;");
   writeFixture(root, "packages/features/catalogue.json", '{ "version": 0, "features": [] }');
-  writeFixture(
-    root,
-    "packages/architecture-lint/src/api-transport-framework-allowlist.json",
-    '{ "files": [] }',
-  );
 }
 
 /** A committed base plus uncommitted files, so `changedSourceFiles` sees them. */
 function gitFixture(name: string): string {
   const root = mkdtempSync(join(tmpdir(), `${name}-`));
-  const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
   git("init", "--quiet", "--initial-branch=main");
   git("config", "user.email", "test@example.com");
   git("config", "user.name", "Architecture Lint Test");
@@ -97,7 +93,10 @@ describe("given a report of findings from several policies", () => {
     it("counts a stale baseline row beside the findings and still fails", () => {
       const report = buildReport([
         finding("alpha", "a.ts", "Alpha refused."),
-        finding("beta-baseline-stale", "beta.json", "Baseline entry no longer exists."),
+        {
+          ...finding("beta-baseline", "beta.json", "Baseline entry no longer exists."),
+          stale: true,
+        },
       ]);
 
       expect(report.staleRowCount).toBe(1);

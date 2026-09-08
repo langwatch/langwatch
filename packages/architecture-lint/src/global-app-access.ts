@@ -61,7 +61,8 @@ function scriptKind(file: string): ts.ScriptKind {
 
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
 
-  if (file.endsWith(".mjs") || file.endsWith(".cjs")) return ts.ScriptKind.JS;
+  const isPlainJs = file.endsWith(".mjs") || file.endsWith(".cjs");
+  if (isPlainJs) return ts.ScriptKind.JS;
 
   return ts.ScriptKind.TS;
 }
@@ -109,31 +110,38 @@ function isBindingName(node: ts.Identifier): boolean {
   );
 }
 
-function unwrap(node: ts.Expression): ts.Expression {
-  if (
+type UnwrappableExpression =
+  | ts.ParenthesizedExpression
+  | ts.AsExpression
+  | ts.TypeAssertion
+  | ts.NonNullExpression
+  | ts.SatisfiesExpression
+  | ts.AwaitExpression;
+
+function isUnwrappable(node: ts.Expression): node is UnwrappableExpression {
+  return (
     ts.isParenthesizedExpression(node) ||
     ts.isAsExpression(node) ||
     ts.isTypeAssertionExpression(node) ||
     ts.isNonNullExpression(node) ||
     ts.isSatisfiesExpression(node) ||
     ts.isAwaitExpression(node)
-  )
-    return unwrap(node.expression);
+  );
+}
+
+function unwrap(node: ts.Expression): ts.Expression {
+  if (isUnwrappable(node)) return unwrap(node.expression);
 
   return node;
 }
 
 function moduleSpecifier(node: ts.Expression): string | undefined {
   const expression = unwrap(node);
-  const argument = ts.isCallExpression(expression) ? expression.arguments[0] : void 0;
-  if (
-    !expression ||
-    !ts.isCallExpression(expression) ||
-    expression.arguments.length !== 1 ||
-    !argument ||
-    !ts.isStringLiteral(argument)
-  )
-    return;
+  if (!ts.isCallExpression(expression)) return void 0;
+  if (expression.arguments.length !== 1) return void 0;
+
+  const argument = expression.arguments[0];
+  if (!argument || !ts.isStringLiteral(argument)) return void 0;
 
   if (expression.expression.kind === ts.SyntaxKind.ImportKeyword) return argument.text;
 
@@ -164,6 +172,10 @@ function propertySymbol(
     : void 0;
 }
 
+function isStatementLike(node: ts.Node): boolean {
+  return ts.isStatement(node) || ts.isImportDeclaration(node);
+}
+
 function accessFingerprint(
   source: ts.SourceFile,
   node: ts.Node,
@@ -171,15 +183,9 @@ function accessFingerprint(
   kind: AccessKind,
 ): string {
   let context = node;
-  while (
-    context.parent &&
-    !ts.isStatement(context.parent) &&
-    !ts.isImportDeclaration(context.parent)
-  )
-    context = context.parent;
+  while (context.parent && !isStatementLike(context.parent)) context = context.parent;
 
-  if (context.parent && (ts.isStatement(context.parent) || ts.isImportDeclaration(context.parent)))
-    context = context.parent;
+  if (context.parent && isStatementLike(context.parent)) context = context.parent;
 
   const normalized = context.getText(source).replace(/\s+/g, " ").trim();
   const prefix = source.text
@@ -201,19 +207,17 @@ function statementDeclares(node: ts.Node, name: string): boolean {
   const visit = (item: ts.Node): boolean => {
     if (item !== node && ts.isFunctionLike(item)) return false;
 
-    if (
+    const declaresLocalVariable =
       ts.isVariableDeclaration(item) &&
-      bindingNames(item.name).some((identifier) => identifier.text === name)
-    )
-      return true;
+      bindingNames(item.name).some((identifier) => identifier.text === name);
+    if (declaresLocalVariable) return true;
 
-    if (
+    const declaresLocalNamed =
       (ts.isFunctionDeclaration(item) ||
         ts.isClassDeclaration(item) ||
         ts.isEnumDeclaration(item)) &&
-      item.name?.text === name
-    )
-      return true;
+      item.name?.text === name;
+    if (declaresLocalNamed) return true;
 
     let found = false;
     ts.forEachChild(item, (child) => {
@@ -226,39 +230,57 @@ function statementDeclares(node: ts.Node, name: string): boolean {
   return visit(node);
 }
 
+function isShadowedByParameter(parent: ts.Node, name: string): boolean {
+  return (
+    ts.isFunctionLike(parent) &&
+    parent.parameters.some((parameter) =>
+      bindingNames(parameter.name).some((identifier) => identifier.text === name),
+    )
+  );
+}
+
+function isShadowedByCatchClause(parent: ts.Node, name: string): boolean {
+  return (
+    ts.isCatchClause(parent) &&
+    parent.variableDeclaration !== undefined &&
+    bindingNames(parent.variableDeclaration.name).some((identifier) => identifier.text === name)
+  );
+}
+
+function isBlockOrSourceFile(node: ts.Node): node is ts.Block | ts.SourceFile {
+  return ts.isBlock(node) || ts.isSourceFile(node);
+}
+
+/** Whether an enclosing block/source-file declares `node`'s name before it, outside `binding`. */
+function isShadowedByBlockDeclaration(
+  parent: ts.Node,
+  node: ts.Identifier,
+  binding: Binding,
+): boolean {
+  if (!isBlockOrSourceFile(parent)) return false;
+
+  for (const statement of parent.statements) {
+    const isAfterNode = statement.getStart() > node.getStart();
+    if (isAfterNode) continue;
+
+    const containsImportedBinding =
+      binding.declaration.getStart() >= statement.getStart() &&
+      binding.declaration.getEnd() <= statement.getEnd();
+    if (statementDeclares(statement, node.text) && !containsImportedBinding) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function isShadowed(node: ts.Identifier, binding: Binding): boolean {
   let child: ts.Node = node;
   while (child.parent) {
     const parent = child.parent;
-    if (
-      ts.isFunctionLike(parent) &&
-      parent.parameters.some((parameter) =>
-        bindingNames(parameter.name).some((identifier) => identifier.text === node.text),
-      )
-    )
-      return true;
-
-    if (
-      ts.isCatchClause(parent) &&
-      parent.variableDeclaration &&
-      bindingNames(parent.variableDeclaration.name).some(
-        (identifier) => identifier.text === node.text,
-      )
-    )
-      return true;
-
-    if (ts.isBlock(parent) || ts.isSourceFile(parent)) {
-      for (const statement of parent.statements) {
-        if (statement.getStart() > node.getStart()) continue;
-
-        const containsImportedBinding =
-          binding.declaration.getStart() >= statement.getStart() &&
-          binding.declaration.getEnd() <= statement.getEnd();
-        if (statementDeclares(statement, node.text) && !containsImportedBinding) {
-          return true;
-        }
-      }
-    }
+    if (isShadowedByParameter(parent, node.text)) return true;
+    if (isShadowedByCatchClause(parent, node.text)) return true;
+    if (isShadowedByBlockDeclaration(parent, node, binding)) return true;
 
     child = parent;
   }
@@ -296,6 +318,189 @@ function sourceFiles(root: string): string[] {
   }
 }
 
+type FileAccessContext = {
+  root: string;
+  file: string;
+  source: ts.SourceFile;
+  direct: Map<string, Binding>;
+  namespaces: Map<string, Binding>;
+  accesses: GlobalAppAccess[];
+  fingerprintOccurrences: Map<string, number>;
+};
+
+function recordAccess(
+  ctx: FileAccessContext,
+  node: ts.Node,
+  symbol: ForbiddenSymbol,
+  kind: AccessKind,
+  localName: string = symbol,
+): void {
+  const baseFingerprint = accessFingerprint(ctx.source, node, symbol, kind);
+  const ordinal = ctx.fingerprintOccurrences.get(baseFingerprint) ?? 0;
+  ctx.fingerprintOccurrences.set(baseFingerprint, ordinal + 1);
+  ctx.accesses.push({
+    file: workspacePath(ctx.root, ctx.file),
+    symbol,
+    kind,
+    localName,
+    line: ctx.source.getLineAndCharacterOfPosition(node.getStart(ctx.source)).line + 1,
+    fingerprint: occurrenceFingerprint(baseFingerprint, ordinal),
+  });
+}
+
+/** Whether `expression` refers to the accessor module directly, or through a tracked namespace. */
+function isAccessorReference(
+  ctx: FileAccessContext,
+  expression: ts.Expression,
+  specifier: string | undefined,
+): boolean {
+  if (specifier !== void 0 && isAccessorModule(ctx.root, ctx.file, specifier)) return true;
+  if (!ts.isIdentifier(expression)) return false;
+
+  const namespace = ctx.namespaces.get(expression.text);
+
+  return namespace !== void 0 && !isShadowed(expression, namespace);
+}
+
+function trackDestructuredBindingElement(ctx: FileAccessContext, element: ts.BindingElement): void {
+  if (element.dotDotDotToken || !ts.isIdentifier(element.name)) return;
+
+  const property = element.propertyName;
+  const isNamedProperty =
+    property !== undefined && (ts.isIdentifier(property) || ts.isStringLiteral(property));
+  const symbol = symbolNamed(isNamedProperty ? property.text : element.name.text);
+  if (!symbol) return;
+
+  ctx.direct.set(element.name.text, { symbol, declaration: element.name });
+  recordAccess(ctx, element.name, symbol, "import", element.name.text);
+}
+
+function trackDestructuredBindings(
+  ctx: FileAccessContext,
+  name: ts.BindingName,
+  initializer: ts.Expression,
+): void {
+  const specifier = moduleSpecifier(initializer);
+  const expression = unwrap(initializer);
+  const fromAccessor = isAccessorReference(ctx, expression, specifier);
+  if (!fromAccessor) return;
+
+  if (ts.isIdentifier(name)) {
+    ctx.namespaces.set(name.text, { symbol: "getApp", declaration: name });
+
+    return;
+  }
+
+  for (const element of name.elements) {
+    if (!ts.isBindingElement(element)) continue;
+
+    trackDestructuredBindingElement(ctx, element);
+  }
+}
+
+function trackImportStatement(ctx: FileAccessContext, statement: ts.ImportDeclaration): void {
+  const clause = statement.importClause;
+  if (!clause) return;
+  if (clause.isTypeOnly) return;
+  if (!ts.isStringLiteral(statement.moduleSpecifier)) return;
+  if (!isAccessorModule(ctx.root, ctx.file, statement.moduleSpecifier.text)) return;
+
+  const namedBindings = clause.namedBindings;
+  if (!namedBindings) return;
+
+  if (ts.isNamespaceImport(namedBindings)) {
+    ctx.namespaces.set(namedBindings.name.text, {
+      symbol: "getApp",
+      declaration: namedBindings.name,
+    });
+
+    return;
+  }
+
+  for (const element of namedBindings.elements) {
+    if (element.isTypeOnly) continue;
+
+    const symbol = symbolNamed(element.propertyName?.text ?? element.name.text);
+    if (!symbol) continue;
+
+    ctx.direct.set(element.name.text, { symbol, declaration: element.name });
+    recordAccess(ctx, element.name, symbol, "import", element.name.text);
+  }
+}
+
+function trackExportStatement(ctx: FileAccessContext, statement: ts.ExportDeclaration): void {
+  if (statement.isTypeOnly) return;
+
+  const module = statement.moduleSpecifier;
+  if (!module) return;
+  if (!ts.isStringLiteral(module)) return;
+
+  const clause = statement.exportClause;
+  if (!clause) return;
+  if (!ts.isNamedExports(clause)) return;
+  if (!isAccessorModule(ctx.root, ctx.file, module.text)) return;
+
+  for (const element of clause.elements) {
+    if (element.isTypeOnly) continue;
+
+    const symbol = symbolNamed(element.propertyName?.text ?? element.name.text);
+    if (symbol) recordAccess(ctx, element.name, symbol, "import", element.name.text);
+  }
+}
+
+function trackTopLevelStatement(ctx: FileAccessContext, statement: ts.Statement): void {
+  if (ts.isImportDeclaration(statement)) trackImportStatement(ctx, statement);
+
+  if (ts.isExportDeclaration(statement)) trackExportStatement(ctx, statement);
+}
+
+function trackPropertyOrElementAccess(
+  ctx: FileAccessContext,
+  node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+): void {
+  const symbol = propertySymbol(node);
+  if (!symbol) return;
+
+  const expression = unwrap(node.expression);
+  const specifier = moduleSpecifier(expression);
+  const isAccessor = isAccessorReference(ctx, expression, specifier);
+  if (isAccessor) recordAccess(ctx, node, symbol, "reference", node.getText(ctx.source));
+}
+
+function trackIdentifierReference(ctx: FileAccessContext, node: ts.Identifier): void {
+  const isDeclarationName = isPropertyName(node) || isBindingName(node);
+  if (isDeclarationName) return;
+
+  const binding = ctx.direct.get(node.text);
+  if (!binding) return;
+  if (isShadowed(node, binding)) return;
+
+  recordAccess(ctx, node, binding.symbol, "reference", node.text);
+}
+
+function isPropertyOrElementAccess(
+  node: ts.Node,
+): node is ts.PropertyAccessExpression | ts.ElementAccessExpression {
+  return ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node);
+}
+
+function visitFileAccessNode(ctx: FileAccessContext, node: ts.Node): void {
+  const isImportOrExport = ts.isImportDeclaration(node) || ts.isExportDeclaration(node);
+  if (isImportOrExport) return;
+
+  if (ts.isVariableDeclaration(node) && node.initializer) {
+    trackDestructuredBindings(ctx, node.name, node.initializer);
+  }
+
+  if (isPropertyOrElementAccess(node)) {
+    trackPropertyOrElementAccess(ctx, node);
+  }
+
+  if (ts.isIdentifier(node)) {
+    trackIdentifierReference(ctx, node);
+  }
+}
+
 function collectFileAccesses(root: string, file: string, sourceText: string): GlobalAppAccess[] {
   if (workspacePath(root, file) === ACCESSOR_FILE) return [];
 
@@ -306,144 +511,27 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
     true,
     scriptKind(file),
   );
-  const direct = new Map<string, Binding>();
-  const namespaces = new Map<string, Binding>();
-  const accesses: GlobalAppAccess[] = [];
-  const fingerprintOccurrences = new Map<string, number>();
-  const add = (
-    node: ts.Node,
-    symbol: ForbiddenSymbol,
-    kind: AccessKind,
-    localName: string = symbol,
-  ): void => {
-    const baseFingerprint = accessFingerprint(source, node, symbol, kind);
-    const ordinal = fingerprintOccurrences.get(baseFingerprint) ?? 0;
-    fingerprintOccurrences.set(baseFingerprint, ordinal + 1);
-    accesses.push({
-      file: workspacePath(root, file),
-      symbol,
-      kind,
-      localName,
-      line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
-      fingerprint: occurrenceFingerprint(baseFingerprint, ordinal),
-    });
-  };
-  const addDestructuredBindings = (name: ts.BindingName, initializer: ts.Expression): void => {
-    const specifier = moduleSpecifier(initializer);
-    const expression = unwrap(initializer);
-    const namespace = ts.isIdentifier(expression) ? namespaces.get(expression.text) : void 0;
-    const fromAccessor =
-      (specifier !== void 0 && isAccessorModule(root, file, specifier)) ||
-      (ts.isIdentifier(expression) && namespace !== void 0 && !isShadowed(expression, namespace));
-    if (!fromAccessor) return;
-
-    if (ts.isIdentifier(name)) {
-      namespaces.set(name.text, { symbol: "getApp", declaration: name });
-
-      return;
-    }
-
-    for (const element of name.elements) {
-      if (!ts.isBindingElement(element)) continue;
-
-      if (element.dotDotDotToken || !ts.isIdentifier(element.name)) continue;
-
-      const property = element.propertyName;
-      const symbol = symbolNamed(
-        property && (ts.isIdentifier(property) || ts.isStringLiteral(property))
-          ? property.text
-          : element.name.text,
-      );
-      if (!symbol) continue;
-
-      direct.set(element.name.text, { symbol, declaration: element.name });
-      add(element.name, symbol, "import", element.name.text);
-    }
+  const ctx: FileAccessContext = {
+    root,
+    file,
+    source,
+    direct: new Map(),
+    namespaces: new Map(),
+    accesses: [],
+    fingerprintOccurrences: new Map(),
   };
 
   for (const statement of source.statements) {
-    if (ts.isImportDeclaration(statement)) {
-      const clause = statement.importClause;
-      if (
-        !clause ||
-        clause.isTypeOnly ||
-        !ts.isStringLiteral(statement.moduleSpecifier) ||
-        !isAccessorModule(root, file, statement.moduleSpecifier.text) ||
-        !clause.namedBindings
-      )
-        continue;
-
-      if (ts.isNamespaceImport(clause.namedBindings)) {
-        namespaces.set(clause.namedBindings.name.text, {
-          symbol: "getApp",
-          declaration: clause.namedBindings.name,
-        });
-        continue;
-      }
-
-      for (const element of clause.namedBindings.elements) {
-        if (element.isTypeOnly) continue;
-
-        const symbol = symbolNamed(element.propertyName?.text ?? element.name.text);
-        if (!symbol) continue;
-
-        direct.set(element.name.text, { symbol, declaration: element.name });
-        add(element.name, symbol, "import", element.name.text);
-      }
-    }
-
-    if (ts.isExportDeclaration(statement) && !statement.isTypeOnly) {
-      const module = statement.moduleSpecifier;
-      const clause = statement.exportClause;
-      if (
-        !module ||
-        !ts.isStringLiteral(module) ||
-        !clause ||
-        !ts.isNamedExports(clause) ||
-        !isAccessorModule(root, file, module.text)
-      )
-        continue;
-
-      for (const element of clause.elements) {
-        if (element.isTypeOnly) continue;
-
-        const symbol = symbolNamed(element.propertyName?.text ?? element.name.text);
-        if (symbol) add(element.name, symbol, "import", element.name.text);
-      }
-    }
+    trackTopLevelStatement(ctx, statement);
   }
 
   const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
-
-    if (ts.isVariableDeclaration(node)) {
-      const initializer = node.initializer;
-      if (initializer) addDestructuredBindings(node.name, initializer);
-    }
-
-    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const symbol = propertySymbol(node);
-      const expression = unwrap(node.expression);
-      const specifier = moduleSpecifier(expression);
-      const namespace = ts.isIdentifier(expression) ? namespaces.get(expression.text) : void 0;
-      const isNamespaceAccess =
-        ts.isIdentifier(expression) && namespace !== void 0 && !isShadowed(expression, namespace);
-      if (symbol && ((specifier && isAccessorModule(root, file, specifier)) || isNamespaceAccess))
-        add(node, symbol, "reference", node.getText(source));
-    }
-
-    if (ts.isIdentifier(node) && !isPropertyName(node) && !isBindingName(node)) {
-      const binding = direct.get(node.text);
-      if (binding && !isShadowed(node, binding)) {
-        add(node, binding.symbol, "reference", node.text);
-      }
-    }
-
+    visitFileAccessNode(ctx, node);
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(source, visit);
 
-  return accesses.sort(
+  return ctx.accesses.sort(
     (left, right) =>
       left.line - right.line ||
       left.kind.localeCompare(right.kind) ||
@@ -522,7 +610,8 @@ function readBaseline(root: string): {
   }
 
   const sorted = [...entries].sort((left, right) => key(left).localeCompare(key(right)));
-  if (entries.some((item, index) => key(item) !== key(sorted[index]!)))
+  const isUnsorted = entries.some((item, index) => key(item) !== key(sorted[index]!));
+  if (isUnsorted)
     violations.push({
       policy: "global-app-access-baseline",
       file,
@@ -545,7 +634,8 @@ export function lintGlobalAppAccess(root: string): ArchitectureViolation[] {
   const baseline = new Set(entries.map(key));
   const currentKeys = new Set(current.map((access) => key(entry(access))));
   for (const access of current) {
-    if (baseline.has(key(entry(access)))) continue;
+    const isBaselined = baseline.has(key(entry(access)));
+    if (isBaselined) continue;
 
     violations.push({
       policy: "global-app-access",
@@ -559,7 +649,8 @@ export function lintGlobalAppAccess(root: string): ArchitectureViolation[] {
   }
 
   for (const item of entries) {
-    if (currentKeys.has(key(item))) continue;
+    const stillExists = currentKeys.has(key(item));
+    if (stillExists) continue;
 
     violations.push({
       policy: "global-app-access-baseline",

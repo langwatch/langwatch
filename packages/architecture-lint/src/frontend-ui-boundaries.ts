@@ -119,7 +119,6 @@ const BROWSER_CAPABILITY_IMPORTS: ReadonlyArray<readonly [RegExp, string]> = [
 
 const BROWSER_CAPABILITY_SOURCE: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bAppRouter\b/, "AppRouter"],
-  [/\bprocess\.env\b/, "process.env"],
   // Not `a.fetch(...)`: a tRPC utils client, a repository port and a queue
   // client all name a method `fetch`, and calling one is not reaching for the
   // browser global. The lookbehind is what tells the two apart.
@@ -269,12 +268,15 @@ function packageExports(pkg: WebPackage): Map<string, string> {
 }
 
 function isTestOnlyExportTarget(target: string): boolean {
-  return /(?:^|\/)(?:__tests__|__mocks__)(?:\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$/.test(target);
+  return /(?:^|\/)(?:__tests__|__mocks__)(?:\/|$)|(?:^|\/)testing\.[cm]?[jt]sx?$|\.(?:test|spec)\.[cm]?[jt]sx?$/.test(
+    target,
+  );
 }
 
 function capabilityForSpecifier(
   webPackages: readonly WebPackage[],
   specifier: string,
+  catalogue?: UiFeatureCatalogue,
 ): Capability | undefined {
   const pkg = webPackages
     .filter(
@@ -285,14 +287,45 @@ function capabilityForSpecifier(
 
   const exportPath = `./${specifier.slice(pkg.name.length + 1)}`;
   const match = exportPath.match(/^\.\/(screens|surfaces)\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/);
-  if (!match) return void 0;
+  if (match) {
+    return {
+      packageName: pkg.name,
+      exportPath,
+      kind: match[1] === "screens" ? "screen" : "surface",
+      id: match[2]!,
+    };
+  }
 
-  return {
-    packageName: pkg.name,
-    exportPath,
-    kind: match[1] === "screens" ? "screen" : "surface",
-    id: match[2]!,
-  };
+  if (!catalogue || !/^\.\/[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(exportPath)) {
+    return void 0;
+  }
+
+  const screenOwners = catalogue.features.filter((feature) =>
+    feature.uses.screens.includes(specifier),
+  );
+  const surfaceConsumers = catalogue.features.filter((feature) =>
+    feature.uses.surfaces.includes(specifier),
+  );
+
+  if (screenOwners.length === 1 && surfaceConsumers.length === 0) {
+    return {
+      packageName: pkg.name,
+      exportPath,
+      kind: "screen",
+      id: screenOwners[0]!.id,
+    };
+  }
+
+  if (screenOwners.length === 0 && surfaceConsumers.length > 0) {
+    return {
+      packageName: pkg.name,
+      exportPath,
+      kind: "surface",
+      id: exportPath.slice(2),
+    };
+  }
+
+  return void 0;
 }
 
 function webPackageForSpecifier(
@@ -452,9 +485,52 @@ function withoutComments(source: string): string {
 function browserCapabilitySourceViolations(source: string): string[] {
   const code = withoutComments(source);
 
-  return BROWSER_CAPABILITY_SOURCE.filter(([pattern]) => pattern.test(code)).map(
+  const capabilities = BROWSER_CAPABILITY_SOURCE.filter(([pattern]) => pattern.test(code)).map(
     ([, description]) => description,
   );
+
+  if (readsProcessEnvironment(source)) capabilities.push("process.env");
+
+  return capabilities;
+}
+
+function readsProcessEnvironment(source: string): boolean {
+  const sourceFile = ts.createSourceFile(
+    "source.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const owner = node.expression;
+      let key: string | undefined;
+
+      if (ts.isPropertyAccessExpression(node)) {
+        key = node.name.text;
+      } else if (ts.isStringLiteralLike(node.argumentExpression)) {
+        key = node.argumentExpression.text;
+      }
+
+      if (ts.isIdentifier(owner) && owner.text === "process" && key === "env") {
+        found = true;
+
+        return;
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+
+  return found;
 }
 
 /**
@@ -543,19 +619,32 @@ function collaboratingSurfaceImport({
   specifier,
   webPackages,
   ownPackageName,
+  catalogue,
 }: {
   specifier: string;
   webPackages: readonly WebPackage[];
   ownPackageName: string;
+  catalogue: UiFeatureCatalogue;
 }): boolean {
-  const door = specifier.match(
+  const nestedSurface = specifier.match(
     /^(@langwatch\/[a-z0-9-]+-web)\/surfaces\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/,
   );
-  if (!door || door[1] === ownPackageName) return false;
+  if (nestedSurface) {
+    if (nestedSurface[1] === ownPackageName) return false;
 
-  const target = webPackages.find((candidate) => candidate.name === door[1]);
+    const target = webPackages.find((candidate) => candidate.name === nestedSurface[1]);
 
-  return target === void 0 || packageExports(target).has(`./surfaces/${door[2]!}`);
+    return target === void 0 || packageExports(target).has(`./surfaces/${nestedSurface[2]!}`);
+  }
+
+  const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
+  if (!capability || capability.kind !== "surface" || capability.packageName === ownPackageName) {
+    return false;
+  }
+
+  const target = webPackageForSpecifier(webPackages, specifier);
+
+  return target !== void 0 && packageExports(target).has(capability.exportPath);
 }
 
 function forbiddenWebPresentationImport({
@@ -759,7 +848,7 @@ function lintDeclaredCapabilities(
       ["surface", feature.uses.surfaces],
     ] as const) {
       for (const specifier of specifiers) {
-        const capability = capabilityForSpecifier(webPackages, specifier);
+        const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
         const pkg = webPackageForSpecifier(webPackages, specifier);
         if (!capability || !pkg || !packageExports(pkg).has(capability.exportPath)) {
           violations.push({
@@ -827,22 +916,30 @@ function lintGovernedWebPackages(
   );
 }
 
-function lintWebPublicExports(webPackages: readonly WebPackage[]): ArchitectureViolation[] {
+function lintWebPublicExports(
+  webPackages: readonly WebPackage[],
+  catalogue: UiFeatureCatalogue,
+): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of webPackages) {
     const exports = packageExports(pkg);
     for (const [exportPath, target] of exports) {
       if (isTestOnlyExportTarget(target)) continue;
 
-      const capability = capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`);
+      const capability = capabilityForSpecifier(
+        webPackages,
+        `${pkg.name}/${exportPath.slice(2)}`,
+        catalogue,
+      );
       if (!capability) {
         violations.push({
           policy: "ui-web-public-entry",
           file: pkg.manifestPath,
           specifier: exportPath,
           message:
-            "Feature-web packages may expose only named screens/<owner> or surfaces/<id> entries during the UI feature pilot.",
-          allowed: "Keep implementation private and name each cross-feature capability explicitly.",
+            "Feature-web packages may expose only a catalogue-declared flat entry or named screens/<owner> or surfaces/<id> entry.",
+          allowed:
+            "Keep implementation private and declare each cross-feature capability explicitly.",
         });
       }
     }
@@ -927,7 +1024,7 @@ function lintUiSourceBoundaries(
       });
     }
 
-    if (/\bprocess\.env\b/.test(code)) {
+    if (readsProcessEnvironment(source)) {
       violations.push({
         policy: "ui-backend-access",
         file,
@@ -1068,14 +1165,14 @@ function lintUiSourceBoundaries(
         continue;
       }
 
-      const capability = capabilityForSpecifier(webPackages, sourceImport.specifier);
+      const capability = capabilityForSpecifier(webPackages, sourceImport.specifier, catalogue);
       if (!capability) {
         violations.push({
           policy: "ui-web-public-entry",
           file,
           line: sourceImport.line,
           specifier: sourceImport.specifier,
-          message: `Feature web package ${webPackage.name} may only be imported through an explicit screens/* or surfaces/* entry.`,
+          message: `Feature web package ${webPackage.name} may only be imported through a declared flat entry or explicit screens/* or surfaces/* entry.`,
         });
         continue;
       }
@@ -1193,12 +1290,18 @@ function screenClosureStep({
   current,
   exportPath,
   portable,
+  webPackages,
+  ownPackageName,
+  catalogue,
 }: {
   root: string;
   sourceRoot: string;
   current: string;
   exportPath: string;
   portable: PortableModuleOracle;
+  webPackages: readonly WebPackage[];
+  ownPackageName: string;
+  catalogue: UiFeatureCatalogue;
 }): { violations: ArchitectureViolation[]; next: string[] } {
   const violations: ArchitectureViolation[] = [];
   const next: string[] = [];
@@ -1227,7 +1330,12 @@ function screenClosureStep({
     }
 
     const forbiddenImport =
-      forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
+      forbiddenWebPresentationImport({
+        specifier: sourceImport.specifier,
+        portable,
+        collaboratingSurface: (specifier) =>
+          collaboratingSurfaceImport({ specifier, webPackages, ownPackageName, catalogue }),
+      }) ??
       (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
         ? "legacy platform/app implementation"
         : void 0);
@@ -1268,6 +1376,7 @@ function screenClosureStep({
 function lintWebScreenClosures(
   root: string,
   webPackages: readonly WebPackage[],
+  catalogue: UiFeatureCatalogue,
   portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
@@ -1276,7 +1385,11 @@ function lintWebScreenClosures(
     for (const [exportPath, target] of packageExports(pkg)) {
       if (isTestOnlyExportTarget(target)) continue;
 
-      const capability = capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`);
+      const capability = capabilityForSpecifier(
+        webPackages,
+        `${pkg.name}/${exportPath.slice(2)}`,
+        catalogue,
+      );
       if (!capability || capability.kind !== "screen") continue;
 
       const entry = resolve(pkg.root, target);
@@ -1297,7 +1410,16 @@ function lintWebScreenClosures(
         if (visited.has(current)) continue;
 
         visited.add(current);
-        const step = screenClosureStep({ root, sourceRoot, current, exportPath, portable });
+        const step = screenClosureStep({
+          root,
+          sourceRoot,
+          current,
+          exportPath,
+          portable,
+          webPackages,
+          ownPackageName: pkg.name,
+          catalogue,
+        });
         violations.push(...step.violations);
         pending.push(...step.next);
       }
@@ -1319,6 +1441,7 @@ function surfaceClosureStep({
   portable,
   webPackages,
   ownPackageName,
+  catalogue,
 }: {
   root: string;
   sourceRoot: string;
@@ -1330,6 +1453,7 @@ function surfaceClosureStep({
   portable: PortableModuleOracle;
   webPackages: readonly WebPackage[];
   ownPackageName: string;
+  catalogue: UiFeatureCatalogue;
 }): { violations: ArchitectureViolation[]; next: { file: string; chain: string[] }[] } {
   const violations: ArchitectureViolation[] = [];
   const next: { file: string; chain: string[] }[] = [];
@@ -1385,7 +1509,7 @@ function surfaceClosureStep({
         specifier: sourceImport.specifier,
         portable,
         collaboratingSurface: (edge) =>
-          collaboratingSurfaceImport({ specifier: edge, webPackages, ownPackageName }),
+          collaboratingSurfaceImport({ specifier: edge, webPackages, ownPackageName, catalogue }),
       }) ??
       (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
         ? "legacy platform/app implementation"
@@ -1427,6 +1551,7 @@ function surfaceClosureStep({
 function lintWebSurfaceClosures(
   root: string,
   webPackages: readonly WebPackage[],
+  catalogue: UiFeatureCatalogue,
   portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
@@ -1436,7 +1561,11 @@ function lintWebSurfaceClosures(
     for (const [exportPath, target] of exports) {
       if (isTestOnlyExportTarget(target)) continue;
 
-      const capability = capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`);
+      const capability = capabilityForSpecifier(
+        webPackages,
+        `${pkg.name}/${exportPath.slice(2)}`,
+        catalogue,
+      );
       if (!capability || capability.kind !== "surface") continue;
 
       const entry = resolve(pkg.root, target);
@@ -1456,7 +1585,7 @@ function lintWebSurfaceClosures(
       // and ui layers as well as its own directory; the forbidden directories, the
       // browser-capability ban and the one-surface rule still hold.
       const implementationRoots = [
-        surfaceRoot,
+        exportPath.startsWith("./surfaces/") ? surfaceRoot : entry,
         join(sourceRoot, "model"),
         join(sourceRoot, "behavior"),
         join(sourceRoot, "ui"),
@@ -1480,6 +1609,7 @@ function lintWebSurfaceClosures(
           portable,
           webPackages,
           ownPackageName: pkg.name,
+          catalogue,
         });
         violations.push(...step.violations);
         pending.push(...step.next);
@@ -1503,10 +1633,16 @@ type WebPrivateModule =
   | { kind: "screen" }
   | { kind: "surface" };
 
-function webPrivateModuleForFile(sourceRoot: string, file: string): WebPrivateModule | undefined {
+function webPrivateModuleForFile(
+  sourceRoot: string,
+  file: string,
+  flatPublicEntries: ReadonlySet<string> = new Set(),
+): WebPrivateModule | undefined {
   const segments = relative(sourceRoot, file).split(sep);
   const [first, second, third, fourth] = segments;
-  if (segments.length === 1 && isWebRootException(file)) return { kind: "package-entry" };
+  if (segments.length === 1 && (isWebRootException(file) || flatPublicEntries.has(file))) {
+    return { kind: "package-entry" };
+  }
 
   if (first === "screens") return { kind: "screen" };
 
@@ -1838,11 +1974,26 @@ function webPrivateImportViolations({
   return violations;
 }
 
-function lintWebPrivateStructure(webPackages: readonly WebPackage[]): ArchitectureViolation[] {
+function lintWebPrivateStructure(
+  webPackages: readonly WebPackage[],
+  catalogue: UiFeatureCatalogue,
+): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of webPackages) {
     const sourceRoot = join(pkg.root, "src");
     if (!existsSync(sourceRoot)) continue;
+
+    const flatPublicEntries = new Set(
+      [...packageExports(pkg)]
+        .filter(
+          ([exportPath]) =>
+            !exportPath.startsWith("./screens/") && !exportPath.startsWith("./surfaces/"),
+        )
+        .filter(([exportPath]) =>
+          capabilityForSpecifier(webPackages, `${pkg.name}/${exportPath.slice(2)}`, catalogue),
+        )
+        .map(([, target]) => resolve(pkg.root, target)),
+    );
 
     const { declarations, violations: declarationViolations } =
       readWebFeatureDeclarations(sourceRoot);
@@ -1857,8 +2008,8 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
 
     for (const file of sourceFiles(sourceRoot)) {
       const segments = relative(sourceRoot, file).split(sep);
-      const module = webPrivateModuleForFile(sourceRoot, file);
-      if (segments.length === 1 && !isWebRootException(file)) {
+      const module = webPrivateModuleForFile(sourceRoot, file, flatPublicEntries);
+      if (segments.length === 1 && !isWebRootException(file) && !flatPublicEntries.has(file)) {
         violations.push({
           policy: "ui-web-root-flat",
           file,
@@ -1895,7 +2046,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
         const targetFile = resolveUiSourceImport(sourceImport, sourceRoot);
         if (!targetFile || !isWithin(sourceRoot, targetFile)) continue;
 
-        const target = webPrivateModuleForFile(sourceRoot, targetFile);
+        const target = webPrivateModuleForFile(sourceRoot, targetFile, flatPublicEntries);
         if (!target) {
           violations.push({
             policy: "ui-web-private-layout",
@@ -1996,10 +2147,53 @@ export function lintFrontendUiBoundaries(
     ...lintUiFeatureStructure(root),
     ...lintGovernedWebPackages(root, catalogue, webPackages),
     ...lintDeclaredCapabilities(root, catalogue, webPackages),
-    ...lintWebPublicExports(selectedWebPackages),
-    ...lintWebPrivateStructure(selectedWebPackages),
+    ...lintWebPublicExports(selectedWebPackages, catalogue),
+    ...lintWebPrivateStructure(selectedWebPackages, catalogue),
     ...lintUiSourceBoundaries(root, catalogue, webPackages, portable),
-    ...lintWebScreenClosures(root, selectedWebPackages, portable),
-    ...lintWebSurfaceClosures(root, selectedWebPackages, portable),
+    ...lintWebScreenClosures(root, selectedWebPackages, catalogue, portable),
+    ...lintWebSurfaceClosures(root, selectedWebPackages, catalogue, portable),
   ];
+}
+
+/**
+ * Web package dependencies justified by an explicit, governed UI surface use.
+ * Manifest validation still rejects every other cross-feature package edge.
+ */
+export function declaredWebDependencyPairs(
+  root: string,
+  packages: ClassifiedPackage[],
+): ReadonlySet<string> {
+  const { catalogue } = readUiFeatureCatalogue(root);
+  if (!catalogue) return new Set();
+
+  const webPackages = packages.filter(
+    (pkg): pkg is WebPackage => pkg.kind === "web" && pkg.feature !== void 0,
+  );
+  const governed = new Set(catalogue.governedWebPackages);
+  const allowed = new Set<string>();
+
+  for (const feature of catalogue.features) {
+    const source = webPackages.find(
+      (pkg) => pkg.feature === feature.root && governed.has(pkg.name),
+    );
+    if (!source) continue;
+
+    for (const specifier of feature.uses.surfaces) {
+      const target = webPackageForSpecifier(webPackages, specifier);
+      const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
+      if (
+        !target ||
+        !governed.has(target.name) ||
+        !capability ||
+        capability.kind !== "surface" ||
+        !packageExports(target).has(capability.exportPath)
+      ) {
+        continue;
+      }
+
+      allowed.add(`${source.name}->${target.name}`);
+    }
+  }
+
+  return allowed;
 }

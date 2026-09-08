@@ -2,13 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  collectStrictPortBaseline,
-  formatStrictPortBaseline,
-  lintStrictPortBaseline,
-  lintStrictPortModules,
-  type ClassifiedPackage,
-} from "../src/index.ts";
+import { lintStrictPortModules, type ClassifiedPackage } from "../src/index.ts";
 
 let root = "";
 
@@ -38,17 +32,8 @@ function writePort(source: string): string {
   return file;
 }
 
-function writeBaseline(ports: string[]): void {
-  const directory = join(root, "packages/architecture-lint/src");
-  mkdirSync(directory, { recursive: true });
-  writeFileSync(
-    join(directory, "port-module-baseline.json"),
-    JSON.stringify({ version: 0, ports }),
-  );
-}
-
 function lint(): ReturnType<typeof lintStrictPortModules> {
-  return lintStrictPortModules(root, [packageForFixture()]);
+  return lintStrictPortModules([packageForFixture()]);
 }
 
 describe("strict feature ports", () => {
@@ -86,46 +71,14 @@ describe("strict feature ports", () => {
     expect(lint()).toMatchObject([{ policy: "strict-port-module" }]);
   });
 
-  it("collects and formats the exact legacy inventory reproducibly", () => {
-    root = mkdtempSync(join(tmpdir(), "strict-port-module-"));
-    writePort("export type ExamplePort = { load(): Promise<void>; };");
-    const ports = collectStrictPortBaseline(root, [packageForFixture()]);
-
-    expect(ports).toEqual(["packages/features/example/server/src/ports/example.port.ts"]);
-    expect(formatStrictPortBaseline(ports)).toBe(
-      `${JSON.stringify({ version: 0, ports }, null, 2)}\n`,
-    );
-  });
-
-  it("only permits listed legacy ports and makes the entry stale after conversion", () => {
+  /** @scenario "A ratchet whose inventory reached zero becomes a plain refusal" */
+  it("refuses a type-bag port with no inventory left to excuse it", () => {
     root = mkdtempSync(join(tmpdir(), "strict-port-module-"));
     const file = writePort("export type ExamplePort = { load(): Promise<void>; };");
-    const relativeFile = "packages/features/example/server/src/ports/example.port.ts";
-    writeBaseline([relativeFile]);
 
-    expect(lint()).toEqual([]);
+    expect(lint()).toMatchObject([{ policy: "strict-port-module" }]);
 
     writeFileSync(file, "export abstract class ExamplePort { abstract load(): Promise<void>; }");
-    expect(lint()).toMatchObject([{ policy: "strict-port-baseline" }]);
-  });
-
-  it("bootstraps once and then rejects a larger strict-port inventory", () => {
-    root = mkdtempSync(join(tmpdir(), "strict-port-module-"));
-    const legacyPort = "packages/features/example/server/src/ports/legacy.port.ts";
-    writeBaseline([legacyPort]);
-    const reference = join(root, "merge-base-port-module-baseline.json");
-
-    expect(lintStrictPortBaseline(root, reference)).toEqual({
-      violations: [],
-      bootstrapped: true,
-    });
-
-    writeFileSync(reference, JSON.stringify({ version: 0, ports: [legacyPort] }));
-    writeBaseline([legacyPort, "packages/features/example/server/src/ports/new.port.ts"]);
-
-    expect(lintStrictPortBaseline(root, reference)).toMatchObject({
-      bootstrapped: false,
-      violations: [{ policy: "strict-port-baseline-growth" }],
-    });
+    expect(lint()).toEqual([]);
   });
 });

@@ -15,8 +15,6 @@ import {
   lintManifests,
   lintOxlintBaseline,
   lintServiceCeilings,
-  lintServiceCeilingsBaseline,
-  lintStrictPortBaseline,
   lintStrictPortModules,
   lintTestQuality,
   lintWorkspace,
@@ -159,11 +157,7 @@ function reference(options: CliOptions, flag: string, file: string): string | un
 }
 
 function boundaryEdgeReference(options: CliOptions): string | undefined {
-  return reference(
-    options,
-    "--boundary-edge-baseline-reference",
-    "boundary-edge-baseline.json",
-  );
+  return reference(options, "--boundary-edge-baseline-reference", "boundary-edge-baseline.json");
 }
 
 function commentBlockRootsFindings(options: CliOptions): ArchitectureViolation[] {
@@ -193,8 +187,6 @@ function shrinkFindings(options: CliOptions): ShrinkResult {
     inventory.map((violation) => ({ ...violation, file: relative(root, violation.file) })),
   );
 
-  const serviceCeilings = lintServiceCeilingsBaseline(root);
-  const strictPorts = lintStrictPortBaseline(root);
   const boundaryEdges = lintBoundaryEdgeBaseline(root, edges, boundaryEdgeReference(options));
 
   const oxlint = lintOxlintBaseline(
@@ -207,21 +199,15 @@ function shrinkFindings(options: CliOptions): ShrinkResult {
     reference(options, "--composed-exports-baseline-reference", "composed-exports-baseline.json"),
   );
 
-  const bootstrapped = [
-    ...(serviceCeilings.bootstrapped ? ["service ceilings"] : []),
-    ...(strictPorts.bootstrapped ? ["strict port"] : []),
-    ...(boundaryEdges.bootstrapped ? ["boundary edge"] : []),
-  ];
+  const bootstrapped = boundaryEdges.bootstrapped ? ["boundary edge"] : [];
 
   const findings = [
-    ...serviceCeilings.violations,
-    ...strictPorts.violations,
     ...boundaryEdges.violations,
     ...oxlint.violations,
     ...composedExports.violations,
     ...commentBlockRootsFindings(options),
-    ...lintServiceCeilings(root, discovery.packages),
-    ...lintStrictPortModules(root, discovery.packages),
+    ...lintServiceCeilings(discovery.packages),
+    ...lintStrictPortModules(discovery.packages),
   ];
 
   return { findings, bootstrapped };

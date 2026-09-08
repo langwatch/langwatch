@@ -1,5 +1,6 @@
 {
-  "version": 0,
+  "version": 1,
+  "policy": "oxlint",
   "entries": [
     {
       "key": "cognitive-complexity|apps/api/src/api-rest.security.ts",

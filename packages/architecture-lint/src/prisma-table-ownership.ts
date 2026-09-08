@@ -3,11 +3,19 @@ import { join } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "./types.ts";
+import { lintPrismaMigrationAccess } from "./prisma-migration-access.ts";
 
 const OWNERSHIP_MODULE = "@langwatch/prisma-client/ownership";
+const REPOSITORY_MODULE = "@langwatch/prisma-client";
 const TEST_FILE = /(?:__tests__|__fixtures__|\/fixtures\/|\.(?:test|spec)\.)/;
 
-type Bindings = { named: Set<string>; namespaces: Set<string> };
+type Bindings = {
+  named: Set<string>;
+  namespaces: Set<string>;
+  repositoryBases: Set<string>;
+  repositoryNamespaces: Set<string>;
+};
+type ClaimCall = { call: ts.CallExpression; source: "tables" | "repository" };
 type Claim = { feature: string; file: string; model: string; line: number };
 
 function issue(file: string, message: string, line?: number): ArchitectureViolation {
@@ -17,7 +25,7 @@ function issue(file: string, message: string, line?: number): ArchitectureViolat
     line,
     message,
     allowed:
-      "Declare literal model names with static readonly tables = prismaTables(...) on the owning Prisma repository. Peers call the owner's FeatureApi. See ADR-134.",
+      "Declare literal model names with prismaTables(...) or PrismaRepository.for(...) on the owning Prisma repository. Peers call the owner's FeatureApi. See ADR-134.",
   };
 }
 
@@ -43,13 +51,28 @@ function isClaimProperty(call: ts.CallExpression, file: string): boolean {
 function importedBindings(source: ts.SourceFile): Bindings {
   const named = new Set<string>();
   const namespaces = new Set<string>();
+  const repositoryBases = new Set<string>();
+  const repositoryNamespaces = new Set<string>();
   for (const statement of source.statements.filter(ts.isImportDeclaration)) {
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
-    if (statement.moduleSpecifier.text !== OWNERSHIP_MODULE) continue;
-
+    const module = statement.moduleSpecifier.text;
     const imported = statement.importClause?.namedBindings;
     if (!imported) continue;
+
+    if (module === REPOSITORY_MODULE) {
+      if (ts.isNamespaceImport(imported)) {
+        repositoryNamespaces.add(imported.name.text);
+      } else {
+        for (const binding of imported.elements) {
+          if ((binding.propertyName ?? binding.name).text === "PrismaRepository") {
+            repositoryBases.add(binding.name.text);
+          }
+        }
+      }
+    }
+
+    if (module !== OWNERSHIP_MODULE) continue;
 
     if (ts.isNamespaceImport(imported)) {
       namespaces.add(imported.name.text);
@@ -63,7 +86,38 @@ function importedBindings(source: ts.SourceFile): Bindings {
     }
   }
 
-  return { named, namespaces };
+  return { named, namespaces, repositoryBases, repositoryNamespaces };
+}
+
+function isRepositoryBase(node: ts.Expression, bindings: Bindings): boolean {
+  if (ts.isIdentifier(node)) return bindings.repositoryBases.has(node.text);
+
+  return (
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    bindings.repositoryNamespaces.has(node.expression.text) &&
+    node.name.text === "PrismaRepository"
+  );
+}
+
+function nativeRepositoryCall(node: ts.Node, bindings: Bindings): ts.CallExpression | undefined {
+  if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return void 0;
+
+  const factory = node.expression;
+  const isNativeFactory = ["for", "transactionalFor"].includes(factory.name.text);
+  return isNativeFactory && isRepositoryBase(factory.expression, bindings) ? node : void 0;
+}
+
+function isNativeClaimHeritage(call: ts.CallExpression, file: string): boolean {
+  const heritage = call.parent;
+  return (
+    ts.isExpressionWithTypeArguments(heritage) &&
+    heritage.expression === call &&
+    ts.isHeritageClause(heritage.parent) &&
+    heritage.parent.token === ts.SyntaxKind.ExtendsKeyword &&
+    ts.isClassDeclaration(heritage.parent.parent) &&
+    /\/server\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file)
+  );
 }
 
 function isFactoryReference(node: ts.Node, bindings: Bindings): boolean {
@@ -107,11 +161,8 @@ function lintFactoryExports(source: ts.SourceFile): ArchitectureViolation[] {
   });
 }
 
-function claimCalls(
-  source: ts.SourceFile,
-  violations: ArchitectureViolation[],
-): ts.CallExpression[] {
-  const calls: ts.CallExpression[] = [];
+function claimCalls(source: ts.SourceFile, violations: ArchitectureViolation[]): ClaimCall[] {
+  const calls: ClaimCall[] = [];
   const bindings = importedBindings(source);
   violations.push(...lintFactoryExports(source));
   const visit = (node: ts.Node): void => {
@@ -128,7 +179,7 @@ function claimCalls(
       const parent = node.parent;
       const directCall = ts.isCallExpression(parent) && parent.expression === node;
       if (directCall) {
-        calls.push(parent);
+        calls.push({ call: parent, source: "tables" });
       } else {
         violations.push(
           issue(
@@ -146,15 +197,58 @@ function claimCalls(
   return calls;
 }
 
+function nativeRepositoryClaims(
+  source: ts.SourceFile,
+  violations: ArchitectureViolation[],
+): ClaimCall[] {
+  const calls: ClaimCall[] = [];
+  const bindings = importedBindings(source);
+  const visit = (node: ts.Node): void => {
+    const call = nativeRepositoryCall(node, bindings);
+    if (call) {
+      if (!isNativeClaimHeritage(call, source.fileName)) {
+        const line = source.getLineAndCharacterOfPosition(call.getStart(source)).line + 1;
+        violations.push(
+          issue(
+            source.fileName,
+            "PrismaRepository model declaration must directly extend an owning Prisma repository.",
+            line,
+          ),
+        );
+      }
+      calls.push({ call, source: "repository" });
+    }
+
+    if (ts.isExpressionWithTypeArguments(node) && isRepositoryBase(node.expression, bindings)) {
+      const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+      violations.push(
+        issue(
+          source.fileName,
+          "PrismaRepository must declare owned models through .for(...) or .transactionalFor(...).",
+          line,
+        ),
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+
+  return calls;
+}
+
 function readClaim(
-  call: ts.CallExpression,
+  claim: ClaimCall,
   source: ts.SourceFile,
   feature: string,
   violations: ArchitectureViolation[],
 ): Claim[] {
+  const { call } = claim;
   const file = source.fileName;
   const line = source.getLineAndCharacterOfPosition(call.getStart(source)).line + 1;
-  if (!isClaimProperty(call, file)) {
+  const validLocation =
+    claim.source === "tables" ? isClaimProperty(call, file) : isNativeClaimHeritage(call, file);
+  if (!validLocation) {
     violations.push(
       issue(file, "Prisma table claims belong to a static readonly repository declaration.", line),
     );
@@ -190,13 +284,14 @@ function featureClaims(
 
   return files.flatMap((file) => {
     const text = readFileSync(file, "utf8");
-    if (!text.includes(OWNERSHIP_MODULE)) return [];
+    if (!text.includes(OWNERSHIP_MODULE) && !text.includes(REPOSITORY_MODULE)) return [];
 
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
 
-    return claimCalls(source, violations).flatMap((call) =>
-      readClaim(call, source, feature.id, violations),
-    );
+    return [
+      ...claimCalls(source, violations),
+      ...nativeRepositoryClaims(source, violations),
+    ].flatMap((claim) => readClaim(claim, source, feature.id, violations));
   });
 }
 
@@ -248,5 +343,9 @@ export function lintPrismaTableOwnership(
   const violations: ArchitectureViolation[] = [];
   const claims = catalogue.flatMap((feature) => featureClaims(root, feature, violations));
 
-  return [...violations, ...checkOwners(claims, models)];
+  return [
+    ...violations,
+    ...checkOwners(claims, models),
+    ...lintPrismaMigrationAccess(root, catalogue, new Set(models.keys())),
+  ];
 }

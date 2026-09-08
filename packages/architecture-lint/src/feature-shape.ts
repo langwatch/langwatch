@@ -1,6 +1,15 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { z } from "zod";
+import {
+  type BaselineEntry,
+  type BaselinePolicy,
+  baselinePath,
+  collectBaseline,
+  emptyBaselineRows,
+  liveKeys,
+  readBaseline,
+  staleRows,
+} from "./baseline.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
 
 const BASELINE_FILE = "feature-shape-baseline.json";
@@ -88,14 +97,6 @@ const LEGACY_TRANSPORT_BUILDER =
 
 const PERSISTENCE_ADAPTER = /^(?:postgres|prisma)\.[a-z0-9-]+\.adapter\.ts$/;
 
-const entrySchema = z
-  .object({
-    feature: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    kind: z.enum(FEATURE_SHAPE_LEGACY_KINDS),
-  })
-  .strict();
-const baselineSchema = z.object({ version: z.literal(0), entries: z.array(z.unknown()) }).strict();
-
 function workspacePath(root: string, path: string): string {
   return relative(root, path).split(sep).join("/");
 }
@@ -169,10 +170,6 @@ function isBooted(feature: string, booted: ReadonlySet<string>): boolean {
 
 function compareEntries(left: FeatureShapeBaselineEntry, right: FeatureShapeBaselineEntry): number {
   return left.feature.localeCompare(right.feature) || left.kind.localeCompare(right.kind);
-}
-
-function entryKey(entry: FeatureShapeBaselineEntry): string {
-  return `${entry.feature}:${entry.kind}`;
 }
 
 function contractFindings(
@@ -305,112 +302,42 @@ export function collectFeatureShapeFindings(
     .sort((left, right) => compareEntries(left, right) || left.path.localeCompare(right.path));
 }
 
-export function collectFeatureShapeBaseline(
-  root: string,
-  catalogue: readonly FeatureCatalogueEntry[],
-  packages: readonly ClassifiedPackage[],
-): FeatureShapeBaselineEntry[] {
-  const entries = new Map<string, FeatureShapeBaselineEntry>();
-
-  for (const { feature, kind } of collectFeatureShapeFindings(root, catalogue, packages)) {
-    entries.set(entryKey({ feature, kind }), { feature, kind });
-  }
-
-  return [...entries.values()].sort(compareEntries);
+/** The key of a feature-shape row: `<feature>|<kind>`. */
+function entryKey(finding: { feature: string; kind: FeatureShapeLegacyKind }): string {
+  return `${finding.feature}|${finding.kind}`;
 }
 
-export function formatFeatureShapeBaseline(entries: readonly FeatureShapeBaselineEntry[]): string {
-  const sorted = [...entries].sort(compareEntries);
-  const lines = ["{", '  "version": 0,', '  "entries": ['];
+export const FEATURE_SHAPE_BASELINE: BaselinePolicy = {
+  id: "feature-shape",
+  file: BASELINE_FILE,
+  label: "Feature shape baseline",
+  keyRule: "A key is `<feature>|<kind>`.",
+  enforceExpiry: false,
+  refuseEmpty: true,
+  stale: (entry) => ({
+    message: `Feature shape baseline entry ${entry.key.split("|").join("/")} no longer matches anything and must be removed.`,
+    allowed: "Delete the stale entry so the checked-in inventory only shrinks.",
+  }),
+};
 
-  for (const [index, entry] of sorted.entries()) {
-    lines.push(`    ${JSON.stringify(entry)}${index + 1 === sorted.length ? "" : ","}`);
-  }
+export function collectFeatureShapeBaseline({
+  root,
+  catalogue,
+  packages,
+  previous = [],
+}: {
+  root: string;
+  catalogue: readonly FeatureCatalogueEntry[];
+  packages: readonly ClassifiedPackage[];
+  previous?: readonly BaselineEntry[];
+}): BaselineEntry[] {
+  const found = collectFeatureShapeFindings(root, catalogue, packages).map(entryKey);
 
-  lines.push("  ]", "}");
-
-  return `${lines.join("\n")}\n`;
+  return collectBaseline({ policy: FEATURE_SHAPE_BASELINE, found, previous });
 }
 
 function baselineFile(root: string): string {
-  return join(root, "packages/architecture-lint/src", BASELINE_FILE);
-}
-
-function baselineViolation(file: string, message: string, allowed?: string): ArchitectureViolation {
-  return { policy: "feature-shape-baseline", file, message, allowed };
-}
-
-export function readFeatureShapeBaselineFile(file: string): {
-  exists: boolean;
-  entries: FeatureShapeBaselineEntry[];
-  violations: ArchitectureViolation[];
-} {
-  if (!existsSync(file)) return { exists: false, entries: [], violations: [] };
-
-  let raw: unknown;
-
-  try {
-    raw = JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-
-    return {
-      exists: true,
-      entries: [],
-      violations: [baselineViolation(file, `Feature shape baseline must be valid JSON: ${reason}`)],
-    };
-  }
-
-  const parsed = baselineSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    return {
-      exists: true,
-      entries: [],
-      violations: [
-        baselineViolation(
-          file,
-          "Feature shape baseline must contain version 0 and an entries array.",
-        ),
-      ],
-    };
-  }
-
-  const violations: ArchitectureViolation[] = [];
-  const entries: FeatureShapeBaselineEntry[] = [];
-
-  for (const [index, entry] of parsed.data.entries.entries()) {
-    const result = entrySchema.safeParse(entry);
-
-    if (!result.success) {
-      violations.push(
-        baselineViolation(
-          file,
-          `Feature shape baseline entry ${index} is malformed.`,
-          `Use { feature, kind } with kind one of ${FEATURE_SHAPE_LEGACY_KINDS.join(", ")}.`,
-        ),
-      );
-
-      continue;
-    }
-
-    entries.push(result.data);
-  }
-
-  const unsorted = entries.some(
-    (entry, index) => index > 0 && compareEntries(entries[index - 1]!, entry) >= 0,
-  );
-
-  if (unsorted) {
-    violations.push(
-      baselineViolation(
-        file,
-        "Feature shape baseline entries must be unique and sorted by feature, then kind.",
-      ),
-    );
-  }
-
-  return { exists: true, entries, violations };
+  return baselinePath({ root, policy: FEATURE_SHAPE_BASELINE });
 }
 
 /**
@@ -423,28 +350,18 @@ export function lintFeatureShape(
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
   const file = baselineFile(root);
-  const baseline = readFeatureShapeBaselineFile(file);
-  const violations = [...baseline.violations];
-
-  const emptyBaseline =
-    baseline.exists && baseline.entries.length === 0 && baseline.violations.length === 0;
-
-  if (emptyBaseline) {
-    violations.push(
-      baselineViolation(
-        file,
-        "An empty feature shape baseline must be deleted rather than kept as an exception surface.",
-      ),
-    );
-  }
+  const baseline = readBaseline({ policy: FEATURE_SHAPE_BASELINE, file });
+  const violations = [
+    ...baseline.violations,
+    ...emptyBaselineRows({ read: baseline, policy: FEATURE_SHAPE_BASELINE, file }),
+  ];
 
   const findings = collectFeatureShapeFindings(root, catalogue, packages);
-  const baselined = new Set(baseline.entries.map(entryKey));
-  const seen = new Set(findings.map(entryKey));
+  const baselined = liveKeys({ entries: baseline.entries });
+  const found = new Set(findings.map(entryKey));
 
   for (const finding of findings) {
-    const listed = baselined.has(entryKey(finding));
-    if (listed) continue;
+    if (baselined.has(entryKey(finding))) continue;
 
     violations.push({
       policy: "feature-shape",
@@ -454,18 +371,9 @@ export function lintFeatureShape(
     });
   }
 
-  for (const entry of baseline.entries) {
-    const stillCarried = seen.has(entryKey(entry));
-    if (stillCarried) continue;
-
-    violations.push(
-      baselineViolation(
-        file,
-        `Feature shape baseline entry ${entry.feature}/${entry.kind} no longer matches anything and must be removed.`,
-        "Delete the stale entry so the checked-in inventory only shrinks.",
-      ),
-    );
-  }
+  violations.push(
+    ...staleRows({ entries: baseline.entries, found, policy: FEATURE_SHAPE_BASELINE, file }),
+  );
 
   return violations;
 }
