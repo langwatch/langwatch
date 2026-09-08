@@ -311,3 +311,38 @@ tables (tasks catalogue) and is not a user repository.
 - `specs/errors/handled-error-surfaces.feature:22,29,35,42` describe the deleted per-feature tRPC translation middleware;
   handled errors cross tRPC natively now. Rewrite or retire those four scenarios (spec owner).
 - Baseline rows removed by the root session: nine `dataset|*`.
+
+## evaluator (door landed; contract service and installer still open)
+
+- `apps/api/src/app/api-production.composition.ts`: drop `refusingEvaluatorFeature` from the import and the `EvaluatorApp`
+  import; `evaluatorApi: EvaluatorApp | undefined` → `EvaluatorApi | undefined` (contract). In `composeExecutionFeatures`,
+  where `this.evaluatorApi = EvaluatorApp.create({ evaluators, modelProviders })` stood, compose the feature there:
+  `this.composedEvaluator = infrastructure && modelProviders && this.composedAuthz?.app ? composeEvaluatorFeature({
+  infrastructure, peers: { evaluators, modelProviders, permissions: this.composedAuthz.app, workflows: () =>
+  this.composedWorkflow.app } }) : undefined; this.evaluatorApi = this.composedEvaluator?.app;` (the lazy `workflows`
+  accessor is what lets `composeWorkflowFeature` take this app as its peer a few lines later). Delete the later ternary that
+  built the feature with `app: this.evaluatorApi` or the refusing twin. Its two readers guard: `...(this.composedEvaluator ?
+  { evaluatorApp: this.composedEvaluator.app } : {})` and `...(this.composedEvaluator ? { evaluator: this.composedEvaluator }
+  : {})`.
+- `apps/api/src/app-trpc/app-trpc.context.ts`: `evaluatorApp: EvaluatorApp` → `EvaluatorApi`.
+- `apps/api/src/app-rest/app-rest.packaged-families.ts:40-41,133,423-435`: `createEvaluatorsRestApp` → `mountEvaluatorRest({
+  evaluators, credential: ports.handlerManagedCredential, platformUrl: ports.platformUrl, errors: ports.legacyErrors })`
+  from `apps/api/src/features/evaluator/evaluator-rest.mount.ts`; `EvaluatorApp` → `EvaluatorApi`.
+- `apps/api/src/index.ts:183-190`: drop `createEvaluatorsRestApp` and `EvaluatorAppVariables` from the re-export block.
+- `apps/api/src/features/monitor/monitor.composition.ts:13,129`: `EvaluatorReplicationApi` → `EvaluatorReplicationService`;
+  its `copyToProject` takes `evaluators: { findById: async (l) => (await this.evaluators.tryGetById(l)) ?? void 0, create }`.
+- `apps/worker/src/app/worker-evaluation-execution.composition.ts:64-69` and `worker-agent-apps.composition.ts:113-125`:
+  `PostgresEvaluatorAdapter.create({ database })` → `{ prisma }`. The second also builds `EvaluatorApp.create(...)` with no
+  `AuthzApi` and no graph: `WorkflowApp` names `evaluators: EvaluatorApi` but calls five operations (`getAll`,
+  `listByWorkflow`, `create`, `update`, `archive`); narrow that peer to a `WorkflowEvaluatorPort` in
+  `packages/features/workflow` and keep passing the service adapter (workflow lane).
+- Doubles: `api-trpc-record.test-doubles.ts:18,147,285`, `api-packaged-rest.usage-guard.integration.test.ts:13,63`,
+  `app-trpc/__tests__/support/app-trpc-features.ts:36,182`, `gateway.composition.integration.test.ts:39,216` drop the
+  refusing twin (omit the key). `role.composition.integration.test.ts:211` passes `workflows: () => workflowApp`,
+  `modelProviders`, `permissions`.
+- `apps/api/src/app/api-evaluator-execution.composition.ts:37`: `mappingStateSchema` now comes from `@langwatch/dataset-contract`
+  (the working copy already carries it; commit with the wave).
+- Blocked in the module: `contract-service` (about fifteen packages type against `EvaluatorService`), `no-installer` and the
+  three `feature-app-contract` findings that follow, `persistence-adapter` (the adapter is the process's build path while the
+  service survives). `WorkflowApi` needs a `getFields` carrying name and icon before the graph port can go.
+- Baseline rows removed by the root session: six `evaluator|*` and the `evaluator.api.ts` fragment row.

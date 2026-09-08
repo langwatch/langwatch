@@ -114,9 +114,9 @@ Where an ADR states one, the ADR is the authority and this list is the index.
 
 | Counter | Command | Value 2026-09-06 | Value 2026-09-08 23:30 | Target |
 | --- | --- | --- | --- | --- |
-| Feature-shape rows | `node -e` over `packages/architecture-lint/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **252 rows, 39 features, 28 on the legacy transport** (09-09 01:1x, after lint L2: evaluation, stored-object and monitor rows removed; agent's six and api-key's one read stale against uncommitted work that is not mine) | 0 |
+| Feature-shape rows | `node -e` over `packages/architecture-lint/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **246 rows, 39 features, 27 on the legacy transport** (09-09 01:4x, after lint L2: evaluation, stored-object and monitor rows removed; agent's six and api-key's one read stale against uncommitted work that is not mine) | 0 |
 | Fully converted features | rows = 0 | 1 (annotation) | **14**: annotation, api-key (Kimi), dashboard, data-privacy, data-retention, entitlement, feature-flag, notification, platform-health, secret, share, sso, suite, topic | every feature |
-| Source-folder-shape rows | same file family | 431 (09-08 17:50) | **357** | 0 |
+| Source-folder-shape rows | same file family | 431 (09-08 17:50) | **356** | 0 |
 | Unbound scenarios | `pnpm --filter @langwatch/architecture-lint check:feature-parity`, read `THIS RUN FAILS: N unbound` | 1 | **140** (rose with the restored legacy specs and the lanes' new scenarios; every converted feature's own specs are `✓ all bound`) | 0 |
 | `apps/api` typecheck | `tsc --noEmit -p apps/api/tsconfig.test.json`, colour stripped | not clean | **1,432 errors, red by design** until every family converts | prints nothing |
 | `apps/worker` typecheck | same for the worker | not clean | **742** | prints nothing |
@@ -186,7 +186,7 @@ when its row reads 0.
 | user | 3 of 8 | `1c795cfe76` | `contract-service`, `persistence-adapter`, `nested-transport`, `legacy-transport-runtime`, `refusing-composition` | tRPC runtime: anonymous procedure, session row id, caller address (runtime round three); Better Auth directory typed `UserService`: DECISION D-l |
 | dataset | DONE bar wiring | `bce3912c7e` | 0 | nine routes undeclared: multipart, session door, raw bytes, 201-or-200, streamed generator (round three A/B); `dataset-table` surface key + experiment imports in wave 4; `handled-error-surfaces.feature` has four dead scenarios |
 | evaluation | 4 of 7 | `ccf912e810` | `contract-service`, `nested-transport` (REST half), `legacy-transport-runtime` | legacy REST family needs the shared-prefix addressing mode (round three); `EvaluationService` typed in six packages outside the lane, incl. `tryGetRunByEvaluationId`/`tryGetInputs` callers in trace; `listCustomEvaluators` wants a `WorkflowApi` operation; process wiring in wave 4 |
-| evaluator | RUNNING | | 9 | |
+| evaluator | 6 of 9 | `80ac67f8a4` | `contract-service`, `no-installer`, `persistence-adapter` | ~15 packages type against `EvaluatorService`; `WorkflowApp` peer to narrow to five operations; process wiring in wave 4 |
 | monitor | DONE bar wiring | `b93fb67ed4` | 0 | process wiring in wave 4; tRPC AND-permission gap (round three C); evaluator peer once evaluator lands |
 | stored-object | 6 of 8 | `edee46b6e1` | `legacy-transport-runtime`, `nested-transport` | the `/api/files` byte family: raw responses, HEAD twin, in-handler owner resolution (round three A/B); `createUpload` needs a union output (A5); process wiring + tasks inventory port in wave 4 |
 | hosted-mcp | BLOCKED | | 3 | OPTIONS preflight, raw OAuth bodies |
@@ -296,7 +296,6 @@ guarding things outside the package, 29 failing, 17 policies untested).
 
 | Lane | Brief | Started |
 | --- | --- | --- |
-| evaluator conversion | feature-convert skill | 09-08 23:2x |
 | REST runtime round three B | `api-rest-runtime-gaps-3.md` | 09-09 01:3x |
 | lint L3 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 00:5x |
 | wave-4 process wiring | `wave4-process-wiring.md` (dashboard, platform-health, role, suite, authz, user, evaluation, stored-object, monitor) | 09-09 00:5x |
