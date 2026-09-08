@@ -6,13 +6,6 @@
 name: Scenario voice gateway cell
 
 on:
-  # TEMPORARY (#6180 proof run): GitHub only registers workflow_dispatch
-  # workflows once they exist on the default branch, so this push trigger is
-  # the only way to get a real run on the PR branch. It is removed before the
-  # PR leaves draft. Never widen it.
-  push:
-    branches:
-      - feat/6180-scenario-voice-gateway-cell
   workflow_dispatch:
     inputs:
       gateway_url:
