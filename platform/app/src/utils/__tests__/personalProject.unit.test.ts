@@ -14,11 +14,15 @@ import { findPersonalProject } from "../personalProject";
 
 const USER = "user-1";
 
-const orgWithPersonalProject = (
-  orgId: string,
-  project: { id: string; slug: string },
-  ownerUserId: string = USER,
-) => ({
+const orgWithPersonalProject = ({
+  orgId,
+  project,
+  ownerUserId = USER,
+}: {
+  orgId: string;
+  project: { id: string; slug: string };
+  ownerUserId?: string;
+}) => ({
   id: orgId,
   teams: [
     {
@@ -29,13 +33,13 @@ const orgWithPersonalProject = (
   ],
 });
 
-const FIRST_ORG = orgWithPersonalProject("org-first", {
-  id: "proj-first",
-  slug: "personal-first",
+const FIRST_ORG = orgWithPersonalProject({
+  orgId: "org-first",
+  project: { id: "proj-first", slug: "personal-first" },
 });
-const SECOND_ORG = orgWithPersonalProject("org-second", {
-  id: "proj-second",
-  slug: "personal-second",
+const SECOND_ORG = orgWithPersonalProject({
+  orgId: "org-second",
+  project: { id: "proj-second", slug: "personal-second" },
 });
 
 describe("findPersonalProject", () => {
@@ -98,39 +102,45 @@ describe("findPersonalProject", () => {
     });
   });
 
-  it("ignores a personal team owned by somebody else in the same organization", () => {
-    const someoneElses = orgWithPersonalProject(
-      "org-first",
-      { id: "proj-theirs", slug: "personal-theirs" },
-      "user-2",
-    );
+  describe("given the organization asked about holds somebody else's personal project", () => {
+    it("resolves nothing", () => {
+      const someoneElses = orgWithPersonalProject({
+        orgId: "org-first",
+        project: { id: "proj-theirs", slug: "personal-theirs" },
+        ownerUserId: "user-2",
+      });
 
-    expect(
-      findPersonalProject({
-        organizations: [someoneElses],
-        userId: USER,
-        organizationId: "org-first",
-      }),
-    ).toBeNull();
+      expect(
+        findPersonalProject({
+          organizations: [someoneElses],
+          userId: USER,
+          organizationId: "org-first",
+        }),
+      ).toBeNull();
+    });
   });
 
-  it("resolves nothing without a user", () => {
-    expect(
-      findPersonalProject({
-        organizations: [FIRST_ORG],
-        userId: null,
-        organizationId: "org-first",
-      }),
-    ).toBeNull();
+  describe("given no user has been resolved yet", () => {
+    it("resolves nothing", () => {
+      expect(
+        findPersonalProject({
+          organizations: [FIRST_ORG],
+          userId: null,
+          organizationId: "org-first",
+        }),
+      ).toBeNull();
+    });
   });
 
-  it("resolves nothing before the organizations have loaded", () => {
-    expect(
-      findPersonalProject({
-        organizations: undefined,
-        userId: USER,
-        organizationId: "org-first",
-      }),
-    ).toBeNull();
+  describe("given the organizations have not loaded yet", () => {
+    it("resolves nothing", () => {
+      expect(
+        findPersonalProject({
+          organizations: undefined,
+          userId: USER,
+          organizationId: "org-first",
+        }),
+      ).toBeNull();
+    });
   });
 });

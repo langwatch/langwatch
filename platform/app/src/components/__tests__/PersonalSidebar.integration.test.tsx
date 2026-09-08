@@ -70,7 +70,13 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const orgWithPersonalProject = (orgId: string, slug: string): Org => ({
+const orgWithPersonalProject = ({
+  orgId,
+  slug,
+}: {
+  orgId: string;
+  slug: string;
+}): Org => ({
   id: orgId,
   teams: [
     {
@@ -95,8 +101,8 @@ const tracesHref = () =>
 describe("PersonalSidebarLinks", () => {
   beforeEach(() => {
     state.organizations = [
-      orgWithPersonalProject("org-first", "personal-first"),
-      orgWithPersonalProject("org-second", "personal-second"),
+      orgWithPersonalProject({ orgId: "org-first", slug: "personal-first" }),
+      orgWithPersonalProject({ orgId: "org-second", slug: "personal-second" }),
     ];
     state.organization = { id: "org-second" };
   });
@@ -106,6 +112,7 @@ describe("PersonalSidebarLinks", () => {
   });
 
   describe("given the user owns a personal workspace in several organizations", () => {
+    /** @scenario "The Me sidebar's Traces entry stays inside the selected organization" */
     it("links Traces to the personal project of the selected organization", () => {
       renderLinks();
 
@@ -122,9 +129,10 @@ describe("PersonalSidebarLinks", () => {
   });
 
   describe("given the loaded organization holds no personal workspace", () => {
+    /** @scenario "The Me sidebar offers no Traces entry until it can see one here" */
     it("renders no Traces entry", () => {
       state.organizations = [
-        orgWithPersonalProject("org-first", "personal-first"),
+        orgWithPersonalProject({ orgId: "org-first", slug: "personal-first" }),
         { id: "org-shared", teams: [] },
       ];
       state.organization = { id: "org-shared" };
@@ -135,14 +143,16 @@ describe("PersonalSidebarLinks", () => {
     });
   });
 
-  it("always renders the organization-independent personal entries", () => {
-    renderLinks();
+  describe("given the personal entries that address no organization", () => {
+    it("renders them whichever organization is selected", () => {
+      renderLinks();
 
-    expect(
-      screen.getByRole("link", { name: "Sessions" }).getAttribute("href"),
-    ).toBe("/me/sessions");
-    expect(
-      screen.getByRole("link", { name: "Configure" }).getAttribute("href"),
-    ).toBe("/me/configure");
+      expect(
+        screen.getByRole("link", { name: "Sessions" }).getAttribute("href"),
+      ).toBe("/me/sessions");
+      expect(
+        screen.getByRole("link", { name: "Configure" }).getAttribute("href"),
+      ).toBe("/me/configure");
+    });
   });
 });
