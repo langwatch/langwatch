@@ -223,6 +223,36 @@ Feature: Test agent with one scripted run
       Given the HTTP agent editor drawer open for a new agent
       Then no "Test agent" panel is shown
 
+  Rule: A test turn overrides the code defaults with values typed for it
+
+    # A connected agent registers the defaults its code declares. The panel
+    # keeps them as the baseline and takes per-turn overrides on one line,
+    # the way the Run dialog does for a scenario. A name left out reads the
+    # code default; a name the agent does not declare, or a value outside
+    # its options, is refused by name before any instance is reached.
+
+    @integration
+    Scenario: The connected agent drawer test turn takes parameter overrides
+      Given an online connected agent that declares a parameter with a default
+      When the test panel is opened
+      Then a parameters field suggests the declared name and its default
+      And starting the test with "model=gpt-5" typed sends the turn with that value
+      And starting the test with the field empty sends the turn with no parameter, so the code default applies
+
+    @unit
+    Scenario: A test turn naming an undeclared parameter is refused
+      Given a connected agent that declares the parameter model
+      When a test turn is sent with a value for a parameter it does not declare
+      Then the turn is refused as scenario_parameter_unknown
+      And no instance is reached
+
+    @unit
+    Scenario: A test turn value outside the declared options is refused
+      Given a connected agent whose model parameter has options gpt-4 and gpt-5
+      When a test turn is sent with model=gpt-6
+      Then the turn is refused as scenario_parameter_option_invalid
+      And no instance is reached
+
   Rule: A turn answers inside the platform call deadline
 
     # Every kind of agent answers inside the same ceiling the connected path

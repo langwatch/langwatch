@@ -3,7 +3,9 @@
  *
  * The same panel sits at the bottom of the connected, HTTP and code agent
  * drawers. It sends one message on the path a simulation turn takes and
- * shows the answer, or the refusal in the words of the error registry.
+ * shows the answer, or the refusal in the words of the error registry. A
+ * connected agent that declares parameters takes per-turn overrides on one
+ * line, the way the Run dialog does.
  *
  * @see specs/agents/agent-test-run.feature
  */
@@ -11,9 +13,16 @@
 import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
+import { ParameterLineField } from "~/components/agent-testing/run/ParameterLineField";
+import { toLineRunParameters } from "~/components/agent-testing/run/parameter-line";
+import { parameterPlaceholder } from "~/components/agent-testing/run/parameter-suggestions";
+import { FieldLabel } from "~/components/agent-testing/shared/DialogFields";
 import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
+import type { DeclaredParameter } from "~/components/suites/useRunSuite";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Tooltip } from "~/components/ui/tooltip";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 
 /** The message the panel sends when nothing else is typed. */
@@ -24,15 +33,24 @@ export type AgentTestPanelProps = {
   projectId: string;
   /** When true, the turn cannot be sent and the panel says why. */
   offline?: boolean;
+  /**
+   * The parameters the agent declares, when it declares any. The panel then
+   * takes `name=value` pairs the turn overrides the code defaults with; a
+   * name left out reads the default the code declares.
+   */
+  parameters?: readonly ScenarioParameterDefinition[];
 };
 
 export function AgentTestPanel({
   agentId,
   projectId,
   offline = false,
+  parameters,
 }: AgentTestPanelProps) {
   const [message, setMessage] = useState(AGENT_TEST_DEFAULT_MESSAGE);
+  const [parameterLine, setParameterLine] = useState("");
   const test = api.agents.testTurn.useMutation();
+  const plainParameters = plainParametersOf(parameters);
 
   return (
     <VStack align="stretch" gap={2} data-testid="agent-test">
@@ -60,7 +78,15 @@ export function AgentTestPanel({
               loading={test.isPending}
               disabled={offline || message.trim().length === 0}
               onClick={() =>
-                test.mutate({ id: agentId, projectId, message: message.trim() })
+                test.mutate({
+                  id: agentId,
+                  projectId,
+                  message: message.trim(),
+                  ...turnParameters({
+                    line: parameterLine,
+                    definitions: plainParameters,
+                  }),
+                })
               }
               data-testid="agent-test-run"
             >
@@ -70,6 +96,11 @@ export function AgentTestPanel({
           </Box>
         </Tooltip>
       </HStack>
+      <ParameterLine
+        definitions={plainParameters}
+        value={parameterLine}
+        onChange={setParameterLine}
+      />
       <TestError error={test.error} />
       {test.data ? (
         <VStack
@@ -97,6 +128,82 @@ export function AgentTestPanel({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/** The declared parameters a line can carry: a secret never rides on one. */
+function plainParametersOf(
+  parameters: readonly ScenarioParameterDefinition[] | undefined,
+): ScenarioParameterDefinition[] {
+  return (parameters ?? []).filter((definition) => definition.secret !== true);
+}
+
+/**
+ * The overrides one turn carries, read off the line the way the Run dialog
+ * reads its own. Nothing typed, or no parameter declared, sends no `params`
+ * key at all, so the code defaults apply.
+ */
+function turnParameters({
+  line,
+  definitions,
+}: {
+  line: string;
+  definitions: readonly ScenarioParameterDefinition[];
+}): { params?: Record<string, string | number | boolean> } {
+  if (definitions.length === 0) return {};
+  const params = toLineRunParameters({
+    line,
+    secretValues: {},
+    definitions,
+  });
+  return params ? { params } : {};
+}
+
+/**
+ * One line of `name=value` pairs, shown only when the agent declares any. The
+ * field is the one the Run dialog and the case modal edit their parameters
+ * with, so it offers the same list and takes the same keys.
+ */
+
+/** The words the case modal shows for the same field. */
+const PARAMETERS_HELP =
+  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
+
+function ParameterLine({
+  definitions,
+  value,
+  onChange,
+}: {
+  definitions: readonly ScenarioParameterDefinition[];
+  value: string;
+  onChange: (line: string) => void;
+}) {
+  if (definitions.length === 0) return null;
+  const declared: DeclaredParameter[] = definitions.map((definition) => ({
+    ...definition,
+    source: "agent",
+  }));
+  return (
+    <Box data-testid="agent-test-parameters-block">
+      <FieldLabel>
+        Parameters
+        <FieldInfoTooltip
+          description={PARAMETERS_HELP}
+          docHref="/agent-testing/run-parameters"
+          docLabel="How to annotate an agent"
+          trigger="hover"
+          testId="agent-test-parameters-info"
+        />
+      </FieldLabel>
+      <ParameterLineField
+        ariaLabel="Parameters"
+        placeholder={parameterPlaceholder(declared)}
+        value={value}
+        onChange={onChange}
+        definitions={declared}
+        testId="agent-test-parameters"
+      />
+    </Box>
   );
 }
 
