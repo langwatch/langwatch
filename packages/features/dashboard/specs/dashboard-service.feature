@@ -37,3 +37,9 @@ Feature: Shared Dashboard service
     When tRPC, REST, or RPC handles a Dashboard operation
     Then it reads DashboardService from process application context
     And it does not construct Prisma or a repository per request
+
+  @unit
+  Scenario: The memory and Postgres dashboard repositories answer alike
+    Given the same dashboards, builder graphs, saved workbench charts and saved views written to each backend
+    When the same reads and writes run against every backend
+    Then each answers the same rows, refuses the same absences, and never a row belonging to another project

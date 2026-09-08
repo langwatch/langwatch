@@ -109,3 +109,9 @@ Feature: Data Retention service boundary
     When the Data Retention service triggers a retroactive update
     Then it routes the mutation through that project's ClickHouse tenant
     And it updates every table belonging to the requested category
+
+  @unit
+  Scenario: The memory and Postgres data retention repositories answer alike
+    Given the same retention policies and trace pins written to each backend
+    When the same reads and writes run against every backend
+    Then each answers the same rows, the same absences, and never a row belonging to another organization or project

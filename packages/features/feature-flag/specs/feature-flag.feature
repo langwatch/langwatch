@@ -354,3 +354,11 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       Given a signed-out browser
       When it attempts an enrolment or a policy write
       Then the request is refused
+
+  Rule: Every backend the feature stores flags in answers the same way
+
+    @unit
+    Scenario: The memory and Postgres feature flag repositories answer alike
+      Given the same operator rows and experiment settings written to each backend
+      When the same reads and writes run against every backend
+      Then each answers the same values, the same absences, and never a row belonging to another subject

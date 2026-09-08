@@ -25,3 +25,16 @@ Feature: Enterprise SSO package boundary
     Given SSO is licensed but the configured provider cannot be mounted
     When the SSO gate resolves the provider
     Then it returns email
+
+  @unit
+  Scenario: A refused command leaves no audit row
+    Given an operator commands the connection ledger and the ledger refuses the command
+    When the back office reports the refusal
+    Then no audit row is written for that command
+
+  @unit
+  Scenario: A command that succeeds is recorded once, after it ran
+    Given an operator commands the connection ledger
+    When the ledger completes the command
+    Then exactly one audit row is written
+    And it is written after the ledger answered

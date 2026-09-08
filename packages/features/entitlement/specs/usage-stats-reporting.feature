@@ -23,3 +23,9 @@ Feature: Usage statistics reporting
     When the approaching-limit warning is asked for
     Then a warning that went out is reported with the notification it was written down as
     And a reading that crossed no threshold is reported as nothing sent
+
+  @unit @entitlements
+  Scenario: The memory and Postgres entitlement repositories answer alike
+    Given the same membership counts and project spend written to each backend
+    When the same readings are taken against every backend
+    Then each answers the same counts and rollups, the same zeroes for an organization with no rows, and never another organization's spend

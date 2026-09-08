@@ -200,7 +200,7 @@ describe("the back-office single sign-on surface", () => {
       });
     });
 
-    it("records every attempt in the audit log before the command runs", async () => {
+    it("records the command in the audit log once the ledger has run it", async () => {
       const caller = context.callerFor({ id: STAFF_ID });
       await caller.attestDomain({ ...TARGET, domain: "acme.com" });
 

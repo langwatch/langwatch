@@ -70,3 +70,11 @@ Feature: Data Privacy service
       And the reader is told to set the rule on the organization, a team or a project instead
       And the reader is told to check their custom patterns and exceptions
       And no policy row is written
+
+  Rule: Every backend the feature stores rules in answers the same way
+
+    @unit
+    Scenario: The memory and Postgres privacy rule repositories answer alike
+      Given the same privacy rules written to each backend
+      When the same reads and writes run against every backend
+      Then each answers the same rules, the same absences, and never a rule another organization wrote

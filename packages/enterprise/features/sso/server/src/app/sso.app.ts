@@ -6,8 +6,8 @@
  * Every read and every command on the ledger is gated on the ADMIN_EMAILS
  * staff list — deliberately not `ops:*`, because who may attest a customer's
  * domain must not widen with a broader operator population — and recorded
- * BEFORE the command runs, so "why did this happen at 03:14" is answerable
- * from the attempts and not only the successes.
+ * AFTER the ledger answers, so the row says what happened rather than what was
+ * attempted: a refusal and a failure both leave no row behind.
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
@@ -118,79 +118,95 @@ export class SsoApp implements SsoApiContract {
     input: ListSsoConnectionsInput,
     by: SsoOperator,
   ): Promise<BackofficeSsoConnectionPage> {
-    await this.#audited(by, "getAll", {
-      page: input.page,
-      pageSize: input.pageSize,
-      hasSearch: Boolean(input.search),
-    });
-
-    return this.#connections.list(input);
+    return this.#audited(
+      by,
+      "getAll",
+      { page: input.page, pageSize: input.pageSize, hasSearch: Boolean(input.search) },
+      () => this.#connections.list(input),
+    );
   }
 
   async findConnection(
     input: SsoConnectionByIdInput,
     by: SsoOperator,
   ): Promise<BackofficeSsoConnection | undefined> {
-    await this.#audited(by, "getById", { connectionId: input.connectionId });
-
-    return (await this.#connections.findById(input)) ?? undefined;
+    return this.#audited(
+      by,
+      "getById",
+      { connectionId: input.connectionId },
+      async () => (await this.#connections.findById(input)) ?? undefined,
+    );
   }
 
   async registerConnection(input: RegisterSsoConnectionInput, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "register", { ...input });
-    await this.#connections.registerConnection({ ...input, operator });
+    await this.#audited(by, "register", { ...input }, (operator) =>
+      this.#connections.registerConnection({ ...input, operator }),
+    );
   }
 
   async claimDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "claimDomain", { ...input });
-    await this.#connections.claimDomain({ ...input, operator });
+    await this.#audited(by, "claimDomain", { ...input }, (operator) =>
+      this.#connections.claimDomain({ ...input, operator }),
+    );
   }
 
   async approveDomainClaim(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "approveDomainClaim", { ...input });
-    await this.#connections.approveDomainClaim({ ...input, operator });
+    await this.#audited(by, "approveDomainClaim", { ...input }, (operator) =>
+      this.#connections.approveDomainClaim({ ...input, operator }),
+    );
   }
 
   async rejectDomainClaim(input: RejectSsoDomainClaimInput, by: SsoOperator): Promise<void> {
     // The note is an operator's prose about a customer and audit rows outlive
     // the decision, so the command carries it and the audit row does not.
     const { note: _note, ...recorded } = input;
-    const operator = await this.#audited(by, "rejectDomainClaim", recorded);
-    await this.#connections.rejectDomainClaim({ ...input, operator });
+    await this.#audited(by, "rejectDomainClaim", recorded, (operator) =>
+      this.#connections.rejectDomainClaim({ ...input, operator }),
+    );
   }
 
   async attestDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "attestDomain", { ...input });
-    await this.#connections.attestDomain({ ...input, operator });
+    await this.#audited(by, "attestDomain", { ...input }, (operator) =>
+      this.#connections.attestDomain({ ...input, operator }),
+    );
   }
 
   async activateConnection(input: ActivateSsoConnectionInput, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "activate", { ...input });
-    await this.#connections.activateConnection({ ...input, operator });
+    await this.#audited(by, "activate", { ...input }, (operator) =>
+      this.#connections.activateConnection({ ...input, operator }),
+    );
   }
 
   async suspendConnection(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "suspend", { ...input });
-    await this.#connections.suspendConnection({ ...input, operator });
+    await this.#audited(by, "suspend", { ...input }, (operator) =>
+      this.#connections.suspendConnection({ ...input, operator }),
+    );
   }
 
   async resumeConnection(input: SsoConnectionTarget, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "resume", { ...input });
-    await this.#connections.resumeConnection({ ...input, operator });
+    await this.#audited(by, "resume", { ...input }, (operator) =>
+      this.#connections.resumeConnection({ ...input, operator }),
+    );
   }
 
   async requestTeardown(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void> {
-    const operator = await this.#audited(by, "requestTeardown", { ...input });
-    await this.#connections.requestTeardown({ ...input, operator, graceMs: TEARDOWN_GRACE_MS });
+    await this.#audited(by, "requestTeardown", { ...input }, (operator) =>
+      this.#connections.requestTeardown({ ...input, operator, graceMs: TEARDOWN_GRACE_MS }),
+    );
   }
 
-  /** Gate and record in one move; the row is written before the ledger is asked. */
-  async #audited(
+  /**
+   * Gate, run, then record. The row says the ledger answered, so a refusal at
+   * the gate and a command the ledger threw on both leave nothing behind.
+   */
+  async #audited<T>(
     by: SsoOperator,
     action: string,
     args: Record<string, unknown>,
-  ): Promise<SsoConnectionLedgerOperator> {
+    command: (operator: SsoConnectionLedgerOperator) => Promise<T>,
+  ): Promise<T> {
     const operator = await this.#requireOperator(by);
+    const answer = await command(operator);
     const connectionId = typeof args.connectionId === "string" ? args.connectionId : undefined;
     const organizationId =
       typeof args.organizationId === "string" ? args.organizationId : undefined;
@@ -206,7 +222,7 @@ export class SsoApp implements SsoApiContract {
       ...(organizationId === undefined ? {} : { organizationId }),
     });
 
-    return operator;
+    return answer;
   }
 
   /**

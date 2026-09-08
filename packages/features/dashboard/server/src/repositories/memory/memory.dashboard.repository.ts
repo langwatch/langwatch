@@ -18,13 +18,19 @@ import type {
   SavedWorkbenchChartRecord,
 } from "../dashboard.repository.ts";
 
+/**
+ * The one JSON column both chart kinds share: a builder graph payload, or a
+ * saved workbench chart's definition as the contract names it.
+ */
+type StoredChartPayload = Record<string, unknown> | SavedWorkbenchChartDefinition;
+
 /** One stored chart row, of either kind, as the shared table holds it. */
 type StoredChart = Pick<GraphRecord, "createdAt" | "updatedAt"> & {
   id: string;
   projectId: string;
   name: string;
   kind: DashboardGraphKind;
-  graph: Record<string, unknown>;
+  graph: StoredChartPayload;
   filters: Record<string, unknown> | null;
   dashboardId: string | null;
   gridColumn: number;
@@ -279,7 +285,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
       projectId: input.projectId,
       name: input.name,
       kind: "workbench_sql",
-      graph: input.definition as unknown as Record<string, unknown>,
+      graph: input.definition,
       filters: null,
       dashboardId: null,
       gridColumn: 0,
@@ -302,9 +308,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return savedChartOf(
       this.#replaceChart(this.#requireChart(input.projectId, input.chartId, "workbench_sql"), {
         ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.definition === undefined
-          ? {}
-          : { graph: input.definition as unknown as Record<string, unknown> }),
+        ...(input.definition === undefined ? {} : { graph: input.definition }),
       }),
     );
   }
