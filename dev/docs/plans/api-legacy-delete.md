@@ -3,6 +3,27 @@
 **Date:** 2026-09-08 · **Ruling:** Alex, "just delete legacy" and "how are there this many files in
 rest/trpc folders, it's unacceptable" · **Owner lane:** one Opus agent, reviewed by Fable
 
+## Landed
+
+`1dfbc5dcf1`: 73 source, 56 test and 2 type-test files deleted (28k lines out, 11k in); nine transport
+files, 8,502 lines. `./rest` lost 48 public names and `./trpc` 27; `MANAGEMENT_API_VERSION` survives in
+`rest/runtime.ts` until phase 3. Four behaviour specs the builder used to bind (`endpoint-capabilities`,
+`public-rest`, `sse-streaming`, `versioned-routing`) stay with every scenario `@unimplemented` and sit
+on `LEGACY_INERT`; `fluent-registration.feature` specified the deleted chain and went with it.
+
+Behaviours the new runtime still has to grow, and who waits on them:
+
+| Gap | Users outside `packages/api` |
+| --- | --- |
+| per-endpoint rate limit and response cache (`withRateLimit`, `withCache`) | 2 |
+| `publicEndpoint` (unauthenticated public routes) | 18 |
+| `registerJsonProtocol` | 1 |
+| declared REST middleware facts resolved at runtime | conversions that declared middleware |
+| `assertEveryRouteDeclared` is exported but nothing calls it | the process doors |
+
+`packages/api/README.md` still documents the deleted builders; rewrite it with the first wave of
+conversions, once the authoring story under `defineRestRouter` is settled by use.
+
 ## What is wrong
 
 `packages/api/src/rest` holds 52 source files and `trpc` 23, 16,019 lines together. Two transports
