@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
-import { CanonicalLogAdapter, LogService } from "@langwatch/log-server/testing";
 import type { LogTraceContribution } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
 import {
@@ -9,6 +8,7 @@ import {
   LogRequestCollectionService,
 } from "../log-request-collection.service.ts";
 import type { LogRedactionPort } from "../../ports/log-redaction.port.ts";
+import { createLogTestService } from "./log.fixture.ts";
 import { LogTraceIoPort, type LogTraceIo } from "../../ports/log-trace-io.port.ts";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 
@@ -69,10 +69,8 @@ function makeService(args?: { storageFails?: boolean; contributionFails?: boolea
     if (args?.contributionFails) throw new Error("trace unavailable");
     contributions.push(...batch);
   });
-  const logs = LogService.create({
-    preparation: CanonicalLogAdapter.create({
-      redaction: disabledRedaction,
-    }),
+  const logs = createLogTestService({
+    redaction: disabledRedaction,
     repository: unreadableLogRecords,
   });
   const service = LogRequestCollectionService.create({

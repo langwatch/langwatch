@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LogService } from "@langwatch/log-contract";
+import type { LogApi } from "@langwatch/log-contract";
 import { LogRecordStorageService } from "../trace-log-record-read.service.ts";
 import {
   LogRecordStorageRepository,
@@ -34,7 +34,7 @@ function makeService({ legacyRows = [row], canonicalRows = [] as StoredLogRecord
     getLogsByTraceId,
   } as unknown as LogRecordStorageRepository;
   const canonicalGetLogsByTraceId = vi.fn().mockResolvedValue(canonicalRows);
-  const canonical: LogService = {
+  const canonical: LogApi = {
     prepareCanonicalLogRecords: async () => ({
       accepted: [],
       rejectedLogRecords: 0,

@@ -1,3 +1,6 @@
+export { LogApp } from "./app/log.app.ts";
+export type { LogInfrastructure } from "./app/log.app.ts";
+export { logServer } from "./log.server.ts";
 export { CanonicalLogAdapter } from "./adapters/canonical-log.adapter.ts";
 export { ClickHouseLogProcessingAdapter } from "./adapters/clickhouse.log-processing.adapter.ts";
 export type { LogProcessingPipeline } from "./adapters/log-processing.adapter.ts";

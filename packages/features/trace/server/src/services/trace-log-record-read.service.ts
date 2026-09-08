@@ -1,4 +1,4 @@
-import type { LogService } from "@langwatch/log-contract";
+import type { LogApi } from "@langwatch/log-contract";
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
@@ -12,13 +12,13 @@ import {
 export class LogRecordStorageService {
   static create(options: {
     repository: LogRecordStorageRepository;
-    canonical: LogService;
+    canonical: LogApi;
   }): LogRecordStorageService {
     return new LogRecordStorageService(options);
   }
 
   readonly repository: LogRecordStorageRepository;
-  private readonly canonical: LogService;
+  private readonly canonical: LogApi;
 
   /**
    * `canonical` is required: canonical `log_records` is the only table still receiving writes, so
@@ -30,7 +30,7 @@ export class LogRecordStorageService {
     canonical,
   }: {
     repository: LogRecordStorageRepository;
-    canonical: LogService;
+    canonical: LogApi;
   }) {
     this.repository = repository;
     this.canonical = canonical;

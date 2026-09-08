@@ -1,5 +1,5 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
-import type { LogProcessingEvent, LogService as LogServiceContract } from "@langwatch/log-contract";
+import type { LogApi, LogProcessingEvent } from "@langwatch/log-contract";
 import type { LogRedactionPort } from "../ports/log-redaction.port.ts";
 import { CanonicalLogAdapter } from "./canonical-log.adapter.ts";
 import { LogProcessingAdapter, type LogProcessingPipeline } from "./log-processing.adapter.ts";
@@ -12,7 +12,7 @@ import { NullCanonicalLogRecordRepository } from "../repositories/null/null.cano
 /** Process composition for the log service and its durable processing pipeline. */
 export class LogRuntimeAdapter {
   private constructor(
-    private readonly service: LogServiceContract,
+    private readonly service: LogApi,
     private readonly repository: CanonicalLogRecordRepository,
     private readonly defaultRetentionDays: number,
     private readonly logCommandShardCount: number,
@@ -56,7 +56,7 @@ export class LogRuntimeAdapter {
     );
   }
 
-  getService(): LogServiceContract {
+  getService(): LogApi {
     return this.service;
   }
 

@@ -1,6 +1,6 @@
 import { featureApi } from "@langwatch/runtime-composition/contract";
 import type { CanonicalTraceLogRecord } from "./log-record.ts";
-import type { LogPiiRedactionLevel, LogPreparation } from "./log.service.ts";
+import type { LogPiiRedactionLevel, LogPreparation } from "./log-preparation.types.ts";
 
 /** The portable canonical log capability shared by process features. */
 export interface LogApi {

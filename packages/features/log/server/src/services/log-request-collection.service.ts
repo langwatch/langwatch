@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { CanonicalLogRecord, LogPreparation, LogService } from "@langwatch/log-contract";
+import type { CanonicalLogRecord, LogApi, LogPreparation } from "@langwatch/log-contract";
 import {
   NON_BILLABLE_ATTR,
   type LogTraceContribution,
@@ -21,7 +21,7 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 export interface LogRequestCollectionDeps {
   traceCanonicalisation: TraceCanonicalisationService;
   traceIo: LogTraceIoPort;
-  logs: LogService;
+  logs: LogApi;
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
   recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
 }
