@@ -26,6 +26,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DatasetRecordTrpcApi } from "../../transport/api-trpc/dataset-record.api.ts";
 import { DatasetApp } from "../dataset.app.ts";
+import { UnavailableDatasetAttachmentStore } from "../../adapters/unavailable-dataset-attachment-store.adapter.ts";
+import { DatasetAttachmentService } from "../../services/dataset-attachment.service.ts";
+import type { DatasetAttachmentStorePort } from "../../ports/dataset-attachment-store.port.ts";
+
+/** These surfaces upload nothing: the store refuses if an upload ever appears. */
+function noAttachments(): DatasetAttachmentService {
+  return DatasetAttachmentService.create({ store: UnavailableDatasetAttachmentStore.create() });
+}
 
 type TestContext = { app: { dataset: DatasetApp } };
 
@@ -41,7 +49,7 @@ const noExperiments = {
   },
 };
 
-function harness(dataset: Partial<DatasetService> = {}) {
+function harness(dataset: Partial<DatasetService> = {}, attachments?: DatasetAttachmentService) {
   const policyCalls: PolicyCall[] = [];
   const declaredPermissions: string[] = [];
 
@@ -76,6 +84,7 @@ function harness(dataset: Partial<DatasetService> = {}) {
         dataset: DatasetApp.create({
           dataset: dataset as DatasetService,
           experiments: noExperiments,
+          attachments: attachments ?? noAttachments(),
         }),
       },
     }),
@@ -97,9 +106,11 @@ describe("DatasetRecordTrpcApi", () => {
         "download",
         "getHead",
         "deleteMany",
+        "uploadAttachment",
       ]);
     });
 
+    /** @scenario "The upload is allowed to a person who may edit the dataset" */
     it("declares the same permission on each procedure as before the move", () => {
       const { router, declaredPermissions } = harness();
 
@@ -118,6 +129,7 @@ describe("DatasetRecordTrpcApi", () => {
         download: "datasets:view",
         getHead: "datasets:view",
         deleteMany: "datasets:delete",
+        uploadAttachment: "datasets:update",
       });
     });
   });
@@ -138,6 +150,34 @@ describe("DatasetRecordTrpcApi", () => {
           input: { ...lookup, page: 1, limit: 50 },
         },
       ]);
+    });
+  });
+
+  describe("when a person uploads a file into a cell", () => {
+    /** @scenario "An uploaded file is kept and the cell gets a reference to it" */
+    it("answers with the reference the cell writes", async () => {
+      const storeFromBytes = vi.fn(async () => ({
+        id: "so_1",
+        mediaType: "image/png",
+        isDuplicate: false,
+      }));
+      const { caller } = harness(
+        {},
+        DatasetAttachmentService.create({
+          store: { storeFromBytes } as unknown as DatasetAttachmentStorePort,
+        }),
+      );
+
+      const attachment = await caller.uploadAttachment({
+        projectId: "project-1",
+        fileName: "photo.png",
+        dataUrl: `data:image/png;base64,${Buffer.from("a tiny picture").toString("base64")}`,
+      });
+
+      expect(attachment.url).toBe("/api/files/project-1/so_1");
+      expect(storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({ purpose: "dataset_attachment" }),
+      );
     });
   });
 

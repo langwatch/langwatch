@@ -18,6 +18,13 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 
 import { BatchRecordTrpcApi } from "../../transport/api-trpc/batch-record.api.ts";
 import { DatasetApp } from "../dataset.app.ts";
+import { UnavailableDatasetAttachmentStore } from "../../adapters/unavailable-dataset-attachment-store.adapter.ts";
+import { DatasetAttachmentService } from "../../services/dataset-attachment.service.ts";
+
+/** These surfaces upload nothing: the store refuses if an upload ever appears. */
+function noAttachments(): DatasetAttachmentService {
+  return DatasetAttachmentService.create({ store: UnavailableDatasetAttachmentStore.create() });
+}
 
 type TestContext = { app: { dataset: DatasetApp } };
 
@@ -58,6 +65,7 @@ function harness({ experiment = { id: "experiment-1" } as { id: string } | null 
         dataset: DatasetApp.create({
           // This surface reads no dataset: the two record reads are host ports.
           dataset: {} as DatasetService,
+          attachments: noAttachments(),
           experiments: {
             tryGetBySlug,
             getById: async () => {

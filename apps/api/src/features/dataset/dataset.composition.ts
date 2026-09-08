@@ -6,12 +6,16 @@
 import type { DatasetService } from "@langwatch/dataset-contract";
 import {
   DatasetApp,
+  DatasetAttachmentService,
+  DatasetAttachmentStorePort,
   PostgresDatasetAdapter,
+  UnavailableDatasetAttachmentStore,
   type BatchRecordTrpcPorts,
   type DatasetExperimentLookup,
   type DatasetTrpcPorts,
 } from "@langwatch/dataset-server";
 import { HandledError } from "@langwatch/handled-error";
+import type { StoredObjectsService } from "@langwatch/stored-object-server";
 
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -34,7 +38,37 @@ export type DatasetPeers = Readonly<{
   datasets: DatasetService;
   /** The experiment lookup a dataset resolves a borrowed name through. */
   experimentLookup: DatasetExperimentLookup;
+  /**
+   * The content-addressed store a cell's uploaded file is kept in. Absent on a
+   * deployment that composed no object storage, where the upload procedure
+   * still mounts and refuses by name.
+   */
+  storedObjects?: StoredObjectsService;
 }>;
+
+/**
+ * The content-addressed store, in the shape the dataset cell upload takes.
+ */
+export class ApiDatasetAttachmentStore extends DatasetAttachmentStorePort {
+  static create(store: StoredObjectsService): ApiDatasetAttachmentStore {
+    return new ApiDatasetAttachmentStore(store);
+  }
+
+  private constructor(private readonly store: StoredObjectsService) {
+    super();
+  }
+
+  storeFromBytes(input: {
+    projectId: string;
+    purpose: string;
+    ownerKind: string;
+    ownerId: string;
+    mediaType: string;
+    bytes: Buffer;
+  }): Promise<{ id: string; mediaType: string; isDuplicate: boolean }> {
+    return this.store.storeFromBytes(input);
+  }
+}
 
 import type { ComposedDatasetFeature } from "./dataset.composition.types.ts";
 
@@ -48,6 +82,11 @@ export function composeDatasetFeature(options: {
   const app = DatasetApp.create({
     dataset: options.peers.datasets,
     experiments: options.peers.experimentLookup,
+    attachments: DatasetAttachmentService.create({
+      store: options.peers.storedObjects
+        ? ApiDatasetAttachmentStore.create(options.peers.storedObjects)
+        : UnavailableDatasetAttachmentStore.create(),
+    }),
   });
 
   const dataset: DatasetTrpcPorts = {

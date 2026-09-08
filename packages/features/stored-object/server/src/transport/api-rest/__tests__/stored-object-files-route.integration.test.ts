@@ -61,6 +61,20 @@ function traceContentRead(): StoredObjectFileRead {
   };
 }
 
+/** The same row as `availableRead`, carrying the purpose that maps to `datasets:view`. */
+function datasetAttachmentRead(): StoredObjectFileRead {
+  return {
+    row: {
+      id: OBJECT_ID,
+      purpose: "dataset_attachment",
+      owner_kind: "dataset_attachment",
+      media_type: "application/pdf",
+      size_bytes: BYTES.length,
+    },
+    stream: Readable.from([BYTES]),
+  };
+}
+
 function missingRead(): StoredObjectFileRead {
   return {
     row: {
@@ -174,11 +188,12 @@ describe("given the /api/files family", () => {
       expect(response.status).toBe(403);
       expect(read).not.toHaveBeenCalled();
       // The gate was applied to the project the ROW says owns the object, not
-      // to anything the caller supplied.
-      expect(permissionCheck.mock.calls.map(([args]) => args.projectId)).toEqual([
-        OWNER_PROJECT,
-        OWNER_PROJECT,
-      ]);
+      // to anything the caller supplied. It is asked once per file-view
+      // category, so the count follows that list rather than being pinned here.
+      expect(permissionCheck).toHaveBeenCalled();
+      expect(permissionCheck.mock.calls.every(([args]) => args.projectId === OWNER_PROJECT)).toBe(
+        true,
+      );
     });
   });
 
@@ -292,6 +307,55 @@ describe("given the /api/files family", () => {
 
       expect(response.status).toBe(200);
       await expect(response.text()).resolves.toBe(BYTES.toString("utf8"));
+    });
+  });
+
+  describe("when the key holds dataset access only and the object it names is a dataset attachment", () => {
+    /** @scenario "A reader who may see datasets reads the attachment" */
+    it("answers 200, because the purpose maps to the permission the key holds", async () => {
+      const api = mount({
+        read: async () => datasetAttachmentRead(),
+        caller: { apiKeyProjectId: OWNER_PROJECT },
+        apiKeyCeiling: async (permission) => {
+          if (permission !== "datasets:view") throw new ApiKeyPermissionDeniedTestError();
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(200);
+      await expect(response.text()).resolves.toBe(BYTES.toString("utf8"));
+    });
+  });
+
+  describe("when the key holds trace access only and the object it names is a dataset attachment", () => {
+    /** @scenario "A reader who may only see traces cannot read a dataset attachment" */
+    it("refuses on the purpose gate with the key's own code, and streams nothing", async () => {
+      const api = mount({
+        read: async () => datasetAttachmentRead(),
+        caller: { apiKeyProjectId: OWNER_PROJECT },
+        apiKeyCeiling: async (permission) => {
+          if (permission !== "traces:view") throw new ApiKeyPermissionDeniedTestError();
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ error: "api_key_permission_denied" });
+    });
+  });
+
+  describe("when the address names a project the caller is not authenticated for", () => {
+    /** @scenario "A read whose address names another project is refused" */
+    it("refuses on the membership gate before any row is read", async () => {
+      const read = vi.fn(async () => datasetAttachmentRead());
+      const api = mount({ read, caller: { apiKeyProjectId: OWNER_PROJECT } });
+
+      const response = await api.fetch(`/api/files/another-project/${OBJECT_ID}`);
+
+      expect(response.status).toBe(403);
+      expect(read).not.toHaveBeenCalled();
     });
   });
 

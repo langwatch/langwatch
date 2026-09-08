@@ -1116,6 +1116,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               // experiment's own row read.
               datasets: this.composedDatasets,
               experimentLookup: this.composedExperiment.experimentLookup,
+              // Where a file dropped into a cell is kept. Absent on a
+              // deployment with no object store, where the upload procedure
+              // still mounts and refuses by name.
+              ...(this.composedStoredObject.bytes
+                ? { storedObjects: this.composedStoredObject.bytes }
+                : {}),
             },
           })
         : refusingDatasetFeature();
@@ -4289,6 +4295,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // workbench cell saved on one replica has to reach the editor tab
       // subscribed on another, which a per-process emitter never does.
       broadcast: this.composedPresence.emitter,
+      // The SAME object store the dataset cell editor uploads into, resolved
+      // per read: the run inlines the very bytes the user attached.
+      storedObjects: () => this.composedStoredObject?.bytes,
       runReport: LoggedApiExperimentRunAbsence.create(createLogger(options.config.serviceName)),
     });
   }
