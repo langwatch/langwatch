@@ -148,7 +148,14 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     id: "sample-it-triage",
     name: "it-service-triage",
     environment: "production",
-    owner: null,
+    // Owned, and deliberately so. It leaves Copilot Studio as the one source
+    // with nothing unclaimed behind it, which is what makes the "no agent
+    // matches these filters" state reachable at all: every other source has an
+    // unclaimed agent, so before this the empty-filter branch could not be
+    // reached with sample data on, and neither a reviewer nor a test could
+    // ever see it. A bot built inside a service desk having an owner is also
+    // the likelier story.
+    owner: "IT Service Desk",
     models: ["gpt-5-mini"],
     source: "copilot_studio",
     costUsd30d: 214.6,

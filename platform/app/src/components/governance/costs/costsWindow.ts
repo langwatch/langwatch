@@ -280,3 +280,35 @@ export function aggregateSeatCounts(
   }
   return [...byBucket.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
+
+/**
+ * A lane's own series folded to the interval, with withheld days kept withheld.
+ *
+ * `aggregateLine` cannot be used here because it takes plain numbers, and this
+ * series carries nulls that mean something: ADR-128 §21 writes null on a day
+ * whose figure the read would not state, and summing that as zero would report
+ * money not spent where the truth is money not stated. A bucket holding
+ * nothing but withheld days stays withheld; one holding a single stated day
+ * totals that day and no more.
+ *
+ * The fold exists at all because the filter bar promises every chart on the
+ * screen is bucketed by the interval in view, and the lane sparklines are
+ * charts on the screen.
+ */
+export function aggregateLaneTrend(
+  points: Array<{ day: string; value: number | null }>,
+  interval: TimeInterval,
+): Array<{ day: string; value: number | null }> {
+  const totals = new Map<string, number | null>();
+  for (const point of points) {
+    const start = bucketStartOf(point.day, interval);
+    if (point.value === null) {
+      if (!totals.has(start)) totals.set(start, null);
+      continue;
+    }
+    totals.set(start, (totals.get(start) ?? 0) + point.value);
+  }
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, value]) => ({ day, value }));
+}

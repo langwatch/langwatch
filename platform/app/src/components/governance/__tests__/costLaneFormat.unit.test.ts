@@ -11,7 +11,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { azureBillingNoteSentence } from "../costLaneFormat";
+import {
+  azureBillingNoteSentence,
+  laneTrendBadge,
+  laneTrendPct,
+} from "../costLaneFormat";
 
 describe("azureBillingNoteSentence", () => {
   /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
@@ -49,5 +53,87 @@ describe("azureBillingNoteSentence", () => {
     ] as const) {
       expect(azureBillingNoteSentence(note)).not.toMatch(/\d/);
     }
+  });
+});
+
+/**
+ * The change figure beside a lane card's total.
+ *
+ * Halves rather than last-point-against-previous, and the reason is that the
+ * series arrives at whatever granularity the read answers in: days from a real
+ * summary, months from an invented one. A last-point comparison would mean a
+ * different thing on every screen it appeared on, while measuring mostly the
+ * noise of a single day.
+ */
+describe("laneTrendPct", () => {
+  /** @scenario "A lane card says which way its window is running" */
+  it("reports the later half as a percentage of the earlier half", () => {
+    const points = [
+      { value: 100 },
+      { value: 100 },
+      { value: 150 },
+      { value: 150 },
+    ];
+
+    expect(laneTrendPct(points)).toBe(50);
+    expect(laneTrendBadge(laneTrendPct(points))).toBe("+50%");
+  });
+
+  it("reports a fall as a negative, and a flat window as level", () => {
+    expect(
+      laneTrendPct([
+        { value: 200 },
+        { value: 200 },
+        { value: 100 },
+        { value: 100 },
+      ]),
+    ).toBe(-50);
+    expect(
+      laneTrendBadge(
+        laneTrendPct([
+          { value: 100 },
+          { value: 100 },
+          { value: 100 },
+          { value: 100 },
+        ]),
+      ),
+    ).toBe("level");
+  });
+
+  /** @scenario "A window too short to compare halves reports no change at all" */
+  it("answers nothing rather than a figure drawn from too little", () => {
+    expect(laneTrendPct([{ value: 100 }, { value: 400 }])).toBeNull();
+    expect(laneTrendBadge(null)).toBeNull();
+    // An earlier half of nothing has no percentage to report: every figure is
+    // an infinite rise on it, which is true and tells the reader nothing.
+    expect(
+      laneTrendPct([
+        { value: 0 },
+        { value: 0 },
+        { value: 900 },
+        { value: 900 },
+      ]),
+    ).toBeNull();
+  });
+
+  /** @scenario "A day whose figure is withheld is left out of the change, never counted as zero" */
+  it("skips a withheld day instead of counting it as nothing spent", () => {
+    const withheld = [
+      { value: 100 },
+      { value: null },
+      { value: 100 },
+      { value: 150 },
+      { value: 150 },
+    ];
+    const withoutIt = [
+      { value: 100 },
+      { value: 100 },
+      { value: 150 },
+      { value: 150 },
+    ];
+
+    // Counted as a zero, the withheld day would drag the earlier half down and
+    // report a rise that never happened.
+    expect(laneTrendPct(withheld)).toBe(laneTrendPct(withoutIt));
   });
 });

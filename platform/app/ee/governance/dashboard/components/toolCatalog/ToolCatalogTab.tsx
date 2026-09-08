@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Boxes } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { GovernanceEmptyState } from "~/components/governance/empty";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 
 import { ToolCatalogCards, type ToolCatalogLayout } from "./ToolCatalogCards";
@@ -51,6 +54,8 @@ export function ToolCatalogTab({
   health,
   sampleActive,
   layout,
+  canManage,
+  addToolAction,
 }: {
   /**
    * Whether the viewer may read the source list this pane is built from.
@@ -67,6 +72,21 @@ export function ToolCatalogTab({
   health: readonly ToolCardHealth[] | null | undefined;
   sampleActive: boolean;
   layout: ToolCatalogLayout;
+  /**
+   * Whether the reader may add a tool, which decides what the empty state SAYS.
+   * A reader without the grant is never told to press something that is not on
+   * their screen.
+   */
+  canManage: boolean;
+  /**
+   * The page header's own create control, rendered again inside the empty
+   * state. It is the SAME component the header renders, so it carries one
+   * label, one weight and one flow, which is what the create-on-top rule
+   * actually asks for. The rule forbids a second, differently-worded door —
+   * the outline "Add source" that used to sit in the sources table — not a
+   * second way to reach the same one.
+   */
+  addToolAction?: ReactNode;
 }) {
   if (!canRead) {
     return (
@@ -81,25 +101,20 @@ export function ToolCatalogTab({
 
   if (cards.length === 0) {
     return (
-      <Box
-        data-testid="tool-catalog-empty"
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={8}
-        textAlign="center"
-      >
-        <VStack gap={1}>
-          <Text fontSize="sm" fontWeight="medium">
-            No tools registered yet
-          </Text>
-          <Text fontSize="sm" color="fg.muted" maxWidth="440px">
-            A tool joins the catalog when you connect it as a source. Add one
-            with the button above, or turn on sample data to see what the
-            catalog holds once tools are reporting.
-          </Text>
-        </VStack>
-      </Box>
+      <GovernanceEmptyState
+        testId="tool-catalog-empty"
+        icon={Boxes}
+        headline="No tools registered yet"
+        // The state and its reason, not a fault. The sentence says what fills
+        // the catalog, because "no tools" alone reads as something broken on a
+        // page whose whole job is to say what the organization runs.
+        description={
+          canManage
+            ? "A tool joins the catalog when you connect it as a source, and appears here with its environment and what it has been spending."
+            : "A tool joins the catalog when someone connects it as a source. Once one is connected it appears here with its environment and what it has been spending."
+        }
+        action={addToolAction}
+      />
     );
   }
 

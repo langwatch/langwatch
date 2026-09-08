@@ -272,18 +272,29 @@ describe("the inventory tab shell", () => {
     });
   });
 
-  describe("when an admin addresses the Anomaly rules tab", () => {
-    /** @scenario "The Anomaly rules tab is addressable" */
-    it("selects Anomaly rules and mounts the rules editor under its own grants", () => {
+  describe("when an admin arrives on the retired anomaly-rules tab value", () => {
+    // The redirect at src/legacyRedirects.tsx pins tab=anomaly-rules onto the
+    // inventory address, and that pane is gone. This is therefore a live
+    // address, not a hypothetical one, and it has to land somewhere real.
+    /** @scenario "The retired anomaly-rules tab value lands on the catalog" */
+    it("lists no Anomaly rules tab and falls back to the catalog", () => {
       harness.permissions = [...CATALOG_ADMIN_PERMISSIONS, "anomalyRules:view"];
       renderInventoryAt(["/governance/inventory?tab=anomaly-rules"]);
 
-      expect(
-        screen.getByRole("tab", { name: "Anomaly rules" }),
-      ).toHaveAttribute("aria-selected", "true");
-      expect(harness.requested).toContain("anomalyRules.list");
-      // The editor's own write gate, unchanged from the standalone page.
-      expect(screen.getByText(/anomalyRules:manage/)).toBeVisible();
+      expect(screen.queryByRole("tab", { name: /anomaly/i })).toBeNull();
+      expect(screen.getByRole("tab", { name: "Catalog" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      // Not merely "a tab is selected": the pane behind it has to have
+      // rendered, or this passes on a selected tab over an empty body.
+      //
+      // Observed through the pane's own testid rather than through the tRPC
+      // call it was checked by before. That query is issued by
+      // useIngestionSourcesPage at page level, so it fires on whichever tab is
+      // selected — a control run with tab=sources records it while the catalog
+      // is not mounted at all. It proved the page loaded, never this pane.
+      expect(screen.getByTestId("tool-catalog-empty")).toBeInTheDocument();
     });
   });
 

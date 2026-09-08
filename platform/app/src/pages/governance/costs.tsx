@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type {
+  GovernanceCostDayDto,
   GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
   GovernanceCostUnpricedWindowDto,
@@ -25,6 +26,10 @@ import {
   CostLanePanel,
   SeatLanePanel,
 } from "~/components/governance/CostLanePanel";
+import {
+  CHART_SEAT_CONTRACT_FILL,
+  CHART_SEAT_FILL,
+} from "~/components/governance/chartTheme";
 import { azureBillingNoteSentence } from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
@@ -32,7 +37,7 @@ import {
   CostLine,
   CostRankList,
   CostStackedBars,
-  fmtCount,
+  fmtWhole,
 } from "~/components/governance/costs/CostCharts";
 import { CostFilterBar } from "~/components/governance/costs/CostFilterBar";
 import { CostPanel } from "~/components/governance/costs/CostPanel";
@@ -54,6 +59,7 @@ import {
 import {
   ALL_DEPARTMENTS,
   aggregateBuckets,
+  aggregateLaneTrend,
   aggregateLine,
   aggregateSeatCounts,
   bucketStartOf,
@@ -338,6 +344,7 @@ function CostsPage() {
   const departmentOptions = showSample
     ? SAMPLE_DEPARTMENTS.map((name) => ({ id: name, name }))
     : breakdowns.departments;
+  const holdsFigures = summaryHoldsFigures(summary.data, summary.isError);
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
@@ -382,6 +389,7 @@ function CostsPage() {
             periods={samplePeriods}
             showSample={showSample}
             spenders={spenders}
+            sourcesConnected={holdsFigures}
           />
         </SampleSaidOnce>
       </VStack>
@@ -478,21 +486,22 @@ function CostsBody({
   showSample: boolean;
   samplePeriods: string[];
 }) {
-  // "Holds figures", not merely "answered". A read that came back with every
-  // lane empty leaves the same blank screen a failed one does, and sample mode
-  // exists to fill a blank screen — the same test the panels below apply to
-  // themselves, asked once for all three lanes.
-  const holdsFigures =
-    data &&
-    !isError &&
-    data.unavailableReason === null &&
-    (summaryAsRead(data)?.length ?? 0) > 0;
+  // Sample mode exists to fill a blank screen — the same test the panels below
+  // apply to themselves, asked once for all three lanes. See
+  // `summaryHoldsFigures` for why the adoption card asks it too.
+  const holdsFigures = summaryHoldsFigures(data, isError);
   if (showSample && !holdsFigures) {
-    return <CostLanes data={sampleCostSummary(samplePeriods)} sample />;
+    return (
+      <CostLanes
+        data={sampleCostSummary(samplePeriods)}
+        interval={interval}
+        sample
+      />
+    );
   }
 
   if (holdsFigures) {
-    return <CostLanes data={data} sample={false} />;
+    return <CostLanes data={data} interval={interval} sample={false} />;
   }
 
   return (
@@ -599,11 +608,22 @@ function CostsWithoutFigures({
  */
 function CostLanes({
   data,
+  interval,
   sample,
 }: {
   data: GovernanceCostSummaryDto;
+  /** The bucket width in view, which the lane sparklines are folded to. */
+  interval: TimeInterval;
   sample: boolean;
 }) {
+  // Both lanes' shapes come off the one series the totals above them were
+  // summed from, so a card's sparkline and its figure cannot describe
+  // different money.
+  const trendOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
+    aggregateLaneTrend(
+      data.series.map((day) => ({ day: day.day, value: pick(day) })),
+      interval,
+    );
   return (
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
@@ -621,6 +641,8 @@ function CostLanes({
               ? azureBillingNoteSentence(data.azureBilling)
               : null
           }
+          trend={trendOf((day) => day.billedUsd)}
+          interval={interval}
           sample={sample}
         />
         <CostLanePanel
@@ -630,6 +652,8 @@ function CostLanes({
           amountUsd={data.gateway.amountUsd}
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
+          trend={trendOf((day) => day.gatewayUsd)}
+          interval={interval}
           sample={sample}
         />
         <SeatLanePanel
@@ -894,6 +918,27 @@ const SAMPLE_SERIES_DECAY_SUM = 1.94;
 /** Roughly what a twelve-month window holds, for the panels with no series. */
 const SAMPLE_WINDOW_TOTAL = SAMPLE_MONTHLY_TOP * SAMPLE_SERIES_DECAY_SUM * 12;
 
+/**
+ * How busy the invented organization's agents are, in conversations.
+ *
+ * DERIVED, NOT PICKED. The conversation count used to be a round number chosen
+ * on its own, which left it saying nothing about the same organization the
+ * adoption panel describes two rows above. It is now that panel's own
+ * headcount times a rate — a person who uses AI tools at work has about one
+ * conversation a week — so the two panels answer to each other and a reader
+ * who divides one by the other gets a number that means something.
+ *
+ * Six series decaying by half sum to about 1.97 times their leader, which is
+ * where the divisor comes from.
+ */
+const SAMPLE_CONVERSATIONS_PER_PERSON_MONTH = 4.5;
+const SAMPLE_SIX_SERIES_DECAY_SUM = 1.97;
+const SAMPLE_CONVERSATIONS_TOP = Math.round(
+  (sampleAdoption().peopleUsingAiTools *
+    SAMPLE_CONVERSATIONS_PER_PERSON_MONTH) /
+    SAMPLE_SIX_SERIES_DECAY_SUM,
+);
+
 /** The models and people the ranked sample panels name. */
 const SAMPLE_MODELS = [
   "gpt-5-mini",
@@ -926,6 +971,19 @@ interface SpenderReadState {
   retry: () => void;
 }
 
+/**
+ * The seat chart's two series, coloured apart.
+ *
+ * Both hues come from the shared chart theme rather than being picked here, so
+ * that these bars and the per-pool meter in the lane card cannot drift into two
+ * different colours for one subject — which is exactly what they had done, in
+ * two blues a reader could not tell apart. The reasoning is on the constants.
+ */
+const SEAT_SERIES_COLORS: Record<string, string> = {
+  bought: CHART_SEAT_CONTRACT_FILL,
+  assigned: CHART_SEAT_FILL,
+};
+
 /** Where a reader goes to make an empty panel stop being empty. */
 const ADD_A_SOURCE = {
   label: "Add a source",
@@ -937,18 +995,29 @@ const MANAGE_DEPARTMENTS = {
 } as const;
 
 /**
- * The billed-spend-by-person panel's slot in the grid.
+ * The billed-spend-by-key panel's slot in the grid.
  *
- * Different money from "Metered spend by person" on purpose: that panel is the cost
- * recorded on traces, this one is what the provider's BILL said each person
- * spent (the pulled lane). They disagree legitimately and are never
- * reconciled — each is labeled for its lane.
+ * BY KEY, NOT BY PERSON. A provider's invoice attributes spend to the
+ * credential that was presented, and nothing else — it has no idea who was
+ * holding it. Titling this by person promised an attribution the billing
+ * pipeline cannot make and quietly turned a key four engineers share into one
+ * person's spend. The read is unchanged; what changed is that the screen now
+ * claims exactly as much as the bill does.
  *
- * The panel used to disappear when the read answered with nothing or was
- * refused, which left a hole in the grid that said neither. It now states what
- * it holds and what fills it, and in sample mode it shows an invented list
- * rather than the read's failure.
+ * Different money from "Metered spend by person" on purpose: that panel is the
+ * cost recorded on traces as they were served, this one is what the provider's
+ * BILL charged. They disagree legitimately and are never reconciled — each is
+ * labeled for its lane.
+ *
+ * ONE PANEL, FOUR CONTENTS. This used to return a different `CostPanel` per
+ * state, sample included, which made the invented case a separate panel that
+ * happened to look like the real one. A panel is a real component whose data
+ * source is invented in sample mode, never a sample panel of its own: the
+ * shell, the title and the badge are decided once here, and only the rows
+ * below them differ.
  */
+const BILLED_BY_KEY = "Billed spend by API key";
+
 function SpenderPanelSlot({
   spenders,
   showSample,
@@ -956,41 +1025,40 @@ function SpenderPanelSlot({
   spenders: SpenderReadState;
   showSample: boolean;
 }) {
-  const hasRows = spenders.rows !== null && spenders.rows.length > 0;
+  const measured =
+    spenders.rows !== null && spenders.rows.length > 0 ? spenders.rows : null;
+  // Sample fills a panel holding nothing and never displaces measured rows —
+  // the same rule the breakdown grid applies to every panel in it.
+  const invented = measured === null && showSample;
+  const rows = measured ?? (invented ? sampleSpenderRows() : null);
 
-  if (showSample && !hasRows) {
-    return (
-      <CostPanel title="Billed spend by person" sample>
-        <CostSpenderList rows={sampleSpenderRows()} />
-      </CostPanel>
-    );
-  }
-  // Only a real failure gets the failure panel. A refusal falls through to the
+  return (
+    <CostPanel title={BILLED_BY_KEY} sample={invented}>
+      <SpenderPanelBody rows={rows} spenders={spenders} />
+    </CostPanel>
+  );
+}
+
+function SpenderPanelBody({
+  rows,
+  spenders,
+}: {
+  rows: SpenderRow[] | null;
+  spenders: SpenderReadState;
+}) {
+  if (rows) return <CostSpenderList rows={rows} />;
+  // Only a real failure gets the failure state. A refusal falls through to the
   // empty state below, which says what the panel holds and what would fill it —
   // true of a declined read, where "try again" is advice that cannot work.
-  if (spenders.isError && !spenders.refused) {
-    return (
-      <CostPanel title="Billed spend by person">
-        <CostSpenderError onRetry={spenders.retry} />
-      </CostPanel>
-    );
-  }
-  if (!hasRows) {
-    return (
-      <CostPanel title="Billed spend by person">
-        <CostPanelEmpty
-          unanswered={spenders.rows === null}
-          what="What the provider's own bill attributed to each person."
-          source="Fills once a billing source is pulling and its rows carry an actor."
-          action={ADD_A_SOURCE}
-        />
-      </CostPanel>
-    );
-  }
+  if (spenders.isError && !spenders.refused)
+    return <CostSpenderError onRetry={spenders.retry} />;
   return (
-    <CostPanel title="Billed spend by person">
-      <CostSpenderList rows={spenders.rows ?? []} />
-    </CostPanel>
+    <CostPanelEmpty
+      unanswered={spenders.rows === null}
+      what="What the provider's own bill charged against each API key."
+      source="Fills once a billing source is pulling and its rows name a key."
+      action={ADD_A_SOURCE}
+    />
   );
 }
 
@@ -1038,10 +1106,20 @@ function SampleHeadlinePanels({
         in §16 as wave 2.
       */}
       <CostPanel title="Seats · bought against assigned" sample>
+        {/* Whole numbers, like the conversations panel: a seat is a thing
+            somebody was given, and "1.2k seats" is not how a licence count is
+            ever discussed.
+
+            Explicit colours because the two series are the panel: bought and
+            assigned hashed to two blues that had to be told apart by reading
+            the legend, on the one chart whose whole content is the gap between
+            them. Bought is the outline of what is paid for and assigned is
+            what is used, so the used half carries the stronger colour. */}
         <CostStackedBars
           buckets={sample.seats}
-          format={fmtCount}
+          format={fmtWhole}
           interval={interval}
+          colorFor={(key) => SEAT_SERIES_COLORS[key]}
           grouped
         />
       </CostPanel>
@@ -1161,6 +1239,14 @@ function BreakdownGrid({
  * sources (docs/ai-governance/overview.mdx) and no metric in the ADR or the
  * product docs is named after it; a panel named for one provider reads as
  * empty to every customer using another.
+ *
+ * The two panels count different KINDS of thing and are formatted apart on
+ * purpose. Conversations are a tally — somebody could in principle count them,
+ * and a reader comparing quarters wants the figure, so the axis spells it out.
+ * Tokens are throughput nobody holds in their head, so that axis abbreviates.
+ * Both used the abbreviating formatter until the conversations axis read
+ * "4.6k" beside the token axis reading "3.4B", which made a few thousand
+ * support chats look like a unit of machine consumption.
  */
 function SampleTailPanels({
   sample,
@@ -1174,7 +1260,7 @@ function SampleTailPanels({
       <CostPanel title="Conversations over time" sample>
         <CostStackedBars
           buckets={sample.conversations}
-          format={fmtCount}
+          format={fmtWhole}
           interval={interval}
           showLegend={false}
         />
@@ -1201,6 +1287,7 @@ function CostBreakdowns({
   periods,
   showSample,
   spenders,
+  sourcesConnected: connected,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
@@ -1208,13 +1295,19 @@ function CostBreakdowns({
   periods: string[];
   showSample: boolean;
   spenders: SpenderReadState;
+  /** See `sourcesConnected`: the Adoption count cannot state its own absence. */
+  sourcesConnected: boolean;
 }) {
   const sample = useSampleSeries(periods, filters.interval, filters.department);
   const rows = measuredRows({ breakdowns, filters });
 
   return (
     <VStack align="stretch" gap={4}>
-      <AdoptionRow breakdowns={breakdowns} showSample={showSample} />
+      <AdoptionRow
+        breakdowns={breakdowns}
+        showSample={showSample}
+        sourcesConnected={connected}
+      />
       {showSample && (
         <SampleHeadlinePanels sample={sample} interval={filters.interval} />
       )}
@@ -1238,6 +1331,33 @@ interface MeasuredRows {
 }
 
 /**
+ * A bucket series holding no figures at all, as the empty list it is.
+ *
+ * THE OVER-TIME READ ANSWERS A ROW PER DAY WHETHER OR NOT ANYTHING WAS SPENT.
+ * A window with nothing in it therefore comes back as three hundred and
+ * sixty-five buckets of nothing, and every emptiness test on this page is a
+ * length check — so that read alone looked full while its neighbours looked
+ * empty. The consequence was visible: with sample mode on, every panel around
+ * "Cost over time · by team" filled with invented figures and that one panel
+ * sat there saying "Nothing in this window yet", because a list of 365 empty
+ * days is not an empty list.
+ *
+ * The ranked panels never had the bug — they total their series first, and a
+ * total of nothing is genuinely nothing. This puts the bucket series on the
+ * same footing rather than teaching every caller to ask a different question.
+ *
+ * Null in, null out: an unanswered read is not a measurement of an empty
+ * window, and that distinction is the one thing the empty states turn on.
+ */
+function withoutEmptyBuckets(
+  buckets: DailyBucket[] | null,
+): DailyBucket[] | null {
+  if (buckets === null) return null;
+  const holdsAFigure = buckets.some((bucket) => bucket.points.length > 0);
+  return holdsAFigure ? buckets : [];
+}
+
+/**
  * The wire rows, folded to the interval and narrowed by the department chip.
  *
  * Null carries all the way through: an unanswered read stays unanswered rather
@@ -1255,7 +1375,9 @@ function measuredRows({
     byTeam:
       breakdowns.overTime === null
         ? null
-        : aggregateBuckets(breakdowns.overTime, filters.interval),
+        : withoutEmptyBuckets(
+            aggregateBuckets(breakdowns.overTime, filters.interval),
+          ),
     byDepartment:
       breakdowns.departmentRows === null
         ? null
@@ -1297,60 +1419,136 @@ function measuredRows({
  * share wearing the name of an organization-wide total. It is gone rather than
  * quietly wrong.
  */
+/**
+ * Whether any source is reporting, which is what the lanes and the adoption
+ * count both need and neither should decide for itself.
+ *
+ * "Holds figures", not merely "answered". A read that came back with every
+ * lane empty leaves the same blank screen a failed one does, and an
+ * organization with a cost store configured but nothing flowing through it
+ * answers exactly that way: `unavailableReason` null, every lane empty. The
+ * structural reasons are the OTHER half — no governance project, no cost store
+ * — and `summaryAsRead` already folds both into one length.
+ *
+ * The adoption headcount needs this because it is the one number on this page
+ * that CANNOT state its own absence: the activity summary types
+ * `activeUsersThisWindow` as a plain number and zero-fills it when nothing is
+ * behind it, so "nobody used a tool" and "nothing is connected" arrive as the
+ * same 0. The tempting fix — treat every 0 as unmeasured — is wrong the other
+ * way: an organization with a source connected and a genuinely quiet quarter
+ * has a true zero, and that IS the finding. So the question asked is
+ * CONNECTEDNESS, never the count.
+ *
+ * One function rather than two because the lanes asked this first and the
+ * screen has to agree with itself. It was the second, weaker copy of this test
+ * — `unavailableReason` alone — that let the adoption card print "0" directly
+ * beneath the page's own banner saying nothing had been recorded.
+ */
+// A type predicate rather than a plain boolean: holding figures implies the
+// read answered, and the lane branch below draws from `data` on the strength of
+// exactly that. Written as `boolean` it compiled everywhere except there.
+function summaryHoldsFigures(
+  data: GovernanceCostSummaryDto | undefined,
+  isError: boolean,
+): data is GovernanceCostSummaryDto {
+  return (
+    !!data &&
+    !isError &&
+    data.unavailableReason === null &&
+    (summaryAsRead(data)?.length ?? 0) > 0
+  );
+}
+
 function AdoptionRow({
   breakdowns,
   showSample,
+  sourcesConnected: connected,
 }: {
   breakdowns: Breakdowns;
   showSample: boolean;
+  sourcesConnected: boolean;
 }) {
+  // Nobody is a measurement of nothing, the same way an empty list is. The
+  // check used to be `=== null`, so an activity read that answered with zero
+  // active users left this panel reading "0" in the middle of a screen full of
+  // invented figures — one card claiming to have measured an organization that
+  // the fifteen around it were busy inventing.
   const measured = breakdowns.activeUsers;
-
-  if (showSample && measured === null) {
-    const adoption = sampleAdoption();
-    return (
-      <CostPanel title="Adoption" sample>
-        <HStack gap={10} align="flex-end" flexWrap="wrap">
-          <Stat
-            label="People using AI tools"
-            value={numeral(adoption.peopleUsingAiTools).format("0,0")}
-          />
-          <Stat
-            label="Active seats"
-            value={numeral(adoption.activeSeats).format("0,0")}
-          />
-          <Stat
-            label="Tools adopted"
-            value={numeral(adoption.toolsAdopted).format("0,0")}
-          />
-          <Stat
-            label="Change against previous period"
-            value={`+${adoption.trendPct}%`}
-          />
-        </HStack>
-      </CostPanel>
-    );
-  }
+  const invented = showSample && !measured;
 
   return (
-    <CostPanel title="Adoption">
-      {measured === null ? (
-        <CostPanelEmpty
-          unanswered
-          height="72px"
-          what="How many people used an AI tool in this period."
-          source="Fills from the activity a connected source reports."
-          action={ADD_A_SOURCE}
-        />
-      ) : (
-        <HStack gap={10} align="flex-end">
-          <Stat
-            label="People using AI tools"
-            value={numeral(measured).format("0,0")}
-          />
-        </HStack>
-      )}
+    <CostPanel title="Adoption" sample={invented}>
+      <AdoptionFigures
+        invented={invented}
+        measured={measured}
+        sourcesConnected={connected}
+      />
     </CostPanel>
+  );
+}
+
+/**
+ * The adoption figures, invented or measured, in one shell.
+ *
+ * Sample mode chooses the DATA, never the panel: a sample-only panel that
+ * happened to look like the real one is two components to keep in step, and
+ * the day they drift the invented screen stops being a preview of anything.
+ */
+function AdoptionFigures({
+  invented,
+  measured,
+  sourcesConnected: connected,
+}: {
+  invented: boolean;
+  measured: number | null;
+  sourcesConnected: boolean;
+}) {
+  if (invented) {
+    const adoption = sampleAdoption();
+    return (
+      <HStack gap={10} align="flex-end" flexWrap="wrap">
+        <Stat
+          label="People using AI tools"
+          value={numeral(adoption.peopleUsingAiTools).format("0,0")}
+        />
+        <Stat
+          label="Active seats"
+          value={numeral(adoption.activeSeats).format("0,0")}
+        />
+        <Stat
+          label="Tools adopted"
+          value={numeral(adoption.toolsAdopted).format("0,0")}
+        />
+        <Stat
+          label="Change against previous period"
+          value={`+${adoption.trendPct}%`}
+        />
+      </HStack>
+    );
+  }
+  // Two ways to have no figure: the read never answered, or it answered with a
+  // zero that no connected source stands behind. Both are unanswered in the
+  // sense the panel cares about — nothing was measured — and both name the move
+  // that would fill the card. See `sourcesConnected` for why the count itself
+  // is never the test.
+  if (measured === null || !connected) {
+    return (
+      <CostPanelEmpty
+        unanswered
+        height="72px"
+        what="How many people used an AI tool in this period."
+        source="Fills from the activity a connected source reports."
+        action={ADD_A_SOURCE}
+      />
+    );
+  }
+  return (
+    <HStack gap={10} align="flex-end">
+      <Stat
+        label="People using AI tools"
+        value={numeral(measured).format("0,0")}
+      />
+    </HStack>
   );
 }
 
@@ -1369,6 +1567,27 @@ function useSamplePeriods(frame: TimeFrame): string[] {
     [frame],
   );
 }
+
+/**
+ * How far the forecast reaches, per interval in view.
+ *
+ * A quarter ahead is the claim the panel wants to make, and at Month and
+ * Quarter that is exactly what it makes. At YEAR it cannot: three projected
+ * months fold into the same year bucket as the nine measured months before
+ * them, and the bar that comes out holds spend and forecast added together
+ * with nothing able to say which part is which. So a screen set to Year
+ * reaches a year, where the projection gets a bucket of its own and the
+ * measured years stay measured.
+ *
+ * The alternative was to draw no projection at Year, which is honest and
+ * useless: the panel is named for a forecast and a reader who switched to
+ * Year would find it had quietly stopped making one.
+ */
+const PROJECTION_MONTHS: Record<TimeInterval, number> = {
+  month: 3,
+  quarter: 3,
+  year: 12,
+};
 
 /**
  * Every placeholder series the page needs, folded to the chosen interval and
@@ -1392,11 +1611,12 @@ function useSampleSeries(
     // The two series every ranked panel is derived from, so a reader who adds
     // up the department bars gets the same figure the chart above them draws.
     const byDepartment = sampleDaily(periods, departments, SAMPLE_MONTHLY_TOP);
-    const forecast = sampleForecast(
-      periods,
-      SAMPLE_AGENTS.slice(0, 5),
-      SAMPLE_MONTHLY_TOP,
-    );
+    const forecast = sampleForecast({
+      days: periods,
+      labels: SAMPLE_AGENTS.slice(0, 5),
+      monthlyTopValue: SAMPLE_MONTHLY_TOP,
+      monthsAhead: PROJECTION_MONTHS[interval],
+    });
 
     return {
       // Ranked FROM the series rather than beside it. Generating both
@@ -1405,14 +1625,24 @@ function useSampleSeries(
       // quarter, and a reader who noticed had learned only that the screen
       // does not add up.
       departments: totalPerSeries(byDepartment),
-      agents: totalPerSeries(forecast.buckets),
+      // MEASURED ONLY. The forecast now runs a quarter past the end of the
+      // window, and ranking agents by a total that included those months would
+      // put money nobody has spent into a panel titled "Cost by agent".
+      agents: totalPerSeries(forecast.measured),
       // These two have no series of their own on the page, so they are scaled
       // to the same window total by hand: a 0.42 decay sums to about 1.72x its
       // leader, which puts the leader near sixty per cent of the year.
       models: sampleRanked(SAMPLE_MODELS, SAMPLE_WINDOW_TOTAL * 0.58),
       users: sampleRanked(SAMPLE_PEOPLE, SAMPLE_WINDOW_TOTAL * 0.4),
       forecast: {
-        buckets: aggregateBuckets(forecast.buckets, interval),
+        // Measured months and projected months on one axis. The chart needs
+        // them together — a forecast is only legible against what it continues
+        // — and the fold is applied to the pair so a projected month cannot
+        // land in a bucket the measured months were not folded into.
+        buckets: aggregateBuckets(
+          [...forecast.measured, ...forecast.projected],
+          interval,
+        ),
         // The marker is folded by the same function that keys the buckets, so
         // it lands on a bucket the chart actually draws at every interval.
         //
@@ -1434,7 +1664,11 @@ function useSampleSeries(
       overTime: aggregateBuckets(byDepartment, interval),
       seats: aggregateSeatCounts(sampleSeats(periods), interval),
       conversations: aggregateBuckets(
-        sampleDaily(periods, SAMPLE_AGENTS.slice(0, 6), 780),
+        sampleDaily(
+          periods,
+          SAMPLE_AGENTS.slice(0, 6),
+          SAMPLE_CONVERSATIONS_TOP,
+        ),
         interval,
       ),
       tokens: aggregateLine(

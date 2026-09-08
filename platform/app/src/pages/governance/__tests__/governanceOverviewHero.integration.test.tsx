@@ -409,7 +409,17 @@ describe("governance overview", () => {
       const row = screen.getByRole("link", { name: /Engineering/ });
       expect(row).toHaveAttribute("href", "/governance/people");
       expect(row).toHaveTextContent("Engineering");
-      expect(row).toHaveTextContent("Directory");
+
+      // The kind is a chip rather than a second column of prose: its own
+      // element, stamped by the same house recipe the severities use. jsdom
+      // applies none of that recipe's CSS, so the class is all there is to read
+      // here. The scenario's other half — that the chip keeps its width while
+      // the name gives way — needs layout, which jsdom has none of. It is
+      // asserted in
+      // src/components/governance/home/__tests__/homeActivityChip.browser.test.tsx.
+      const kind = screen.getByText("Directory");
+      expect(row).toContainElement(kind);
+      expect(kind.className).toContain("badge");
       expect(
         screen.getByRole("link", { name: /Release notes bot/ }),
       ).toHaveAttribute("href", "/governance/agents");

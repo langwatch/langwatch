@@ -15,7 +15,8 @@ Feature: Governance home — route, nav promotion, persona detection
   governance addresses redirect too: `/governance/catalog*` and
   `/governance/ingestion-sources*` (both meant the sources surface),
   `/governance/tool-catalog` (now the Inventory catalog tab),
-  `/governance/anomaly-rules` (now the Inventory anomaly rules tab),
+  `/governance/anomaly-rules` (which pointed at an Inventory tab that has
+  since been removed, so it now degrades to the Catalog pane),
   `/governance/users` (now the People tab of the people page) and
   `/governance/departments` (renamed People).
 
@@ -69,7 +70,7 @@ Feature: Governance home — route, nav promotion, persona detection
   @bdd @ui @governance-home @route @sub-routes @integration @unimplemented
   Scenario: Admin-authoring sub-routes live under /governance
     Then "/governance/inventory" is the tabbed inventory surface
-      (Catalog + Sources + Anomaly Rules)
+      (Catalog + Environments + Sources)
     And "/governance/inventory/<id>" is the per-source
       detail page
     And "/governance/agents" is the tabbed agents surface
@@ -78,12 +79,17 @@ Feature: Governance home — route, nav promotion, persona detection
     # routing-policy surface the gateway owns at /gateway/routing-policies.
 
   @bdd @ui @governance-home @route @alias @integration
-  Scenario: The retired anomaly rules address lands on the inventory Anomaly Rules tab
+  Scenario: The retired anomaly rules address still resolves
     When the admin cold-loads "/governance/anomaly-rules"
     Then they land on "/governance/inventory?tab=anomaly-rules"
     And the old address is not kept in the browser history
-    # Pinned, since the inventory default tab is Catalog and the retired
-    # address always meant the rules.
+    # The redirect still pins the tab it was written for, and that tab is now
+    # gone: anomaly rules left the inventory, because a rule is a standing
+    # instruction about what to watch for rather than a thing the organization
+    # runs. The pinned value therefore degrades to the Catalog pane — see
+    # "The retired anomaly-rules tab value lands on the catalog" below, which
+    # is what stops it landing on nothing. Repointing this redirect at the
+    # rules' eventual home is a routing change and is NOT done here.
 
   @bdd @ui @governance-home @route @alias @integration
   Scenario: The retired users listing address lands on the People tab
@@ -214,12 +220,22 @@ Feature: Governance home — route, nav promotion, persona detection
     # Never a blank pane: a stale or mistyped tab value degrades to the
     # default instead of selecting nothing.
 
+  # Anomaly rules left the inventory: a rule is a standing instruction about
+  # what to watch for, not a thing the organization runs, so it belongs with
+  # alerts and signals. The retired /governance/anomaly-rules address still
+  # redirects here with tab=anomaly-rules pinned, so that value has to degrade
+  # to a real pane rather than select nothing.
   @bdd @ui @governance-home @inventory-tabs @integration
-  Scenario: The Anomaly rules tab is addressable
+  Scenario: The retired anomaly-rules tab value lands on the catalog
+    Given an admin holding ingestionSources:view
     When the admin opens "/governance/inventory?tab=anomaly-rules"
-    Then the Anomaly rules tab is selected and the rules editor renders
-      inside it, under the same anomalyRules grants and Enterprise gate
-      the retired standalone page applied
+    Then no Anomaly rules tab is listed
+    And the Catalog tab is selected and the registered-tools catalog renders
+    # The grant is named because the second Then is an EXISTENCE claim about
+    # the catalog. A reader without ingestionSources:view also lands on
+    # Catalog, correctly, and reads a grant notice there instead — so without
+    # the Given this scenario is false for that reader rather than silent about
+    # them. Their landing has its own scenario above.
 
   # ---------------------------------------------------------------------------
   # `?add=<sourceType>` — the deep link the overview and the docs hand out.
@@ -284,6 +300,13 @@ Feature: Governance home — route, nav promotion, persona detection
   # the reader has turned sample data off. The other three do not depend on
   # it: no query is issued either way, the Applications pane has no sample
   # cards to show, and the guard refuses before any of it renders.
+  #
+  # These scenarios no longer quote the panes' sentences. They used to, and it
+  # made a routing feature break every time the copy changed — twice now. What
+  # a pane SAYS belongs to the page's own feature file; what routing owns is
+  # that the right pane arrives and is not blank. The exact words, and the
+  # rule that every empty state carries an action, live in
+  # specs/ai-governance/dashboard/agents-page.feature.
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @agents-tabs @integration
@@ -291,8 +314,8 @@ Feature: Governance home — route, nav promotion, persona detection
     Given the reader has turned sample data off
     When a governance viewer opens "/governance/agents"
     Then the heading "Agents" renders and the Agents tab is selected
-    And the pane reads "Agents appear here as they are detected across
-      the organization's connected sources."
+    And the Agents pane renders its own empty state, offering a way to
+      register an agent
     And the address carries no "tab" parameter
 
   @bdd @ui @governance-home @agents-tabs @integration
@@ -307,8 +330,8 @@ Feature: Governance home — route, nav promotion, persona detection
   Scenario: The Applications tab is addressable
     When a governance viewer opens "/governance/agents?tab=applications"
     Then the Applications tab is selected
-    And the pane reads "Applications appear here as they are detected
-      across the organization's connected sources."
+    And the Applications pane renders its own empty state, offering a way to
+      register an agent
     And selecting Applications from the Agents tab writes "?tab=applications"
       to the address, replacing the history entry
 

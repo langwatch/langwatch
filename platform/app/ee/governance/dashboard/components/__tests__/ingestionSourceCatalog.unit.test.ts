@@ -28,13 +28,12 @@ describe("given the ingestion-source catalog", () => {
       expect(options.length).toBe(offerable.length);
     });
 
-    /**
+    /*
      * "Every option" means every option still on offer. A retired type is
      * dropped rather than locked: locked is a sales message about what
      * Enterprise unlocks, and a retired source is not something to sell.
-     *
-     * @scenario "The composer and the menu share one plan gate"
      */
+    /** @scenario "The composer and the menu share one plan gate" */
     it("keeps every offerable option visible so the locked ones can say why", () => {
       const options = gatedSourceTypeOptions({ isEnterprise: false });
       expect(options.map((o) => o.value)).toEqual(
