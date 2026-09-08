@@ -32717,25 +32717,25 @@ The `CI` half of each expression keeps the default the SDK applies on its own. W
 ---
 title: Evaluators
 sidebarTitle: Evaluators
-keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, tool call, contexts, golden answer, sql
-description: An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required pass or fail evaluator fails the scenario when it fails, and a score-only evaluator never gates.
+keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, faithfulness, rag, answer clarity, pii, golden answer, tool call, contexts
+description: An evaluator attached to a test suite runs after every scenario run and reports beside the judge's verdict, such as a faithfulness check on a RAG agent, an answer clarity score, a PII scan, or a comparison against a golden answer the scenario carries. A required evaluator fails the run when it fails.
 ---
 
 ## When to attach an evaluator
 
-The judge grades behavior from the criteria. An evaluator compares against a known answer or runs a check an existing evaluator already does well: a SQL query against the golden one, a reply against a reference answer, a transcript through a PII scanner, retrieved contexts through a faithfulness check. Any evaluator of the project's [library](/evaluations/evaluators/overview) can be attached, LLM judges included.
+The judge grades behavior from the criteria. An evaluator adds a check the [evaluator library](/evaluations/evaluators/overview) already does well: whether the answer of a RAG agent is faithful to the contexts it retrieved, a score for the clarity of the answer, a PII scan of the transcript, or a comparison against a golden answer the scenario carries. Any evaluator of the project can be attached, LLM judges included.
 
-A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against. A scenario may carry a value for each field; a blank value skips the evaluators that read it.
+For a golden answer, the test suite declares [fields](/agent-testing/test-suites#fields), for example `reference_answer`, and each scenario carries its value. A blank value skips the evaluators that read it.
 
 ## Attach an evaluator
 
-**Edit suite** on a test suite opens the suite editor. Under **Customize test suite**, **Add evaluators** shows the attached evaluators as chips and **Add evaluator** opens the evaluator list of the project. Picking one attaches it with its mappings inferred; when a required input is still unmapped, or when the evaluator reads an expected value, the evaluator drawer opens on the attachment so you confirm where each input reads from.
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add evaluator** lists the evaluators of the project, and picking one attaches it with its mappings inferred. When a required input is still unmapped, or the evaluator reads an expected value, the drawer opens on the attachment so you confirm each mapping.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, and two evaluator chips, SQL Query Equivalence marked as required and a score judge" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
 </Frame>
 
-A chip with an amber alert has a required input with no mapping. Press it to open the drawer. **Run suite** does not start while an attachment is in that state: it opens the drawer on the offending evaluator instead.
+A chip with an amber alert has a required input with no mapping. **Run suite** does not start in that state: it opens the drawer on that evaluator instead.
 
 ## Mappings
 
@@ -32748,34 +32748,96 @@ Every evaluator input reads from one source:
 | **Trace** | `contexts`, `spans`, `tool_calls.<tool>.input`, `tool_calls.<tool>.output` | The retrieved contexts of the run's traces, every span of those traces as JSON in start order, or the input or output of the last call of a tool. Needs [linked traces](/agent-testing/linking-your-traces). |
 | A value | | A literal, the same for every scenario. |
 
-Mappings are inferred when an evaluator is attached. An input named `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts.
+Mappings are inferred from the input names: `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts. So a faithfulness evaluator on a RAG agent needs no mapping at all once its traces are linked.
 
-An input named `expected_output`, `expected_contexts` or another `expected_*` reads a suite field. A field identifier equal to the input name wins. Otherwise the words of the identifier decide: `expected_output` takes a field carrying `golden`, `answer`, `sql`, `query`, `label` or `target`, which is how it takes `golden_sql`; `expected_contexts` takes one carrying `schema`, `context` or `table`, which is how it takes `table_schema`.
+An `expected_*` input reads a suite field: the field with the same name, otherwise the one field whose name shares a word with the input. `expected_output` also takes `golden`, `answer`, `sql`, `query`, `label` or `target`, and `expected_contexts` takes `schema`, `context` or `table`. A suite with a single field maps it regardless, and two matches leave the input for you to pick in the drawer. A tool call or the spans are never inferred: set them by hand.
 
-Two fields matching leaves the input unmapped, so you pick one in the drawer. With no match at all, a suite with a single field maps the input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
+<Frame>
+<img className="block" src="/images/agent-testing/evaluator-drawer-mappings-required.png" alt="The SQL Query Equivalence drawer with output mapped to tool_calls.run_sql.input, expected_output to Scenario.fields.golden_sql, expected_contexts to Scenario.fields.table_schema, and Required to pass switched on" />
+</Frame>
 
-The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
+For example, the drawer above reads `output` from the `run_sql` tool call and the two expected inputs from the `golden_sql` and `table_schema` fields, one mapping per input under **Variables**. `spans` hands an evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
 
 ## Required evaluators and scores
 
-**Required to pass** on the attachment makes a failing result fail the scenario. It is on by default for an evaluator that produces a pass or fail verdict. A score-only evaluator reports its score beside the verdict and never gates, whatever the switch says.
+**Required to pass** makes a failing result fail the scenario. It is on by default for an evaluator with a pass or fail verdict. A score-only evaluator, such as an answer clarity score, reports beside the verdict and never gates.
 
 ## What each run reports
 
-After the conversation and the judge, the platform runs every attached evaluator and stores one result per evaluator on the run:
+After the judge, every attached evaluator runs and the run keeps one result per evaluator:
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. |
+| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. A required input the trace never delivered, no such tool call, no retrieved contexts or no spans, is recorded as `failed` with the reason naming it. |
 | `scored` | A score, for an evaluator with no pass or fail verdict. |
 | `skipped` | A field the mapping reads is blank on this scenario. The reason names the field. |
-| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+| `error` | The evaluator itself failed to run. The reason says why. |
 
-The run drawer lists the evaluators under the criteria, and the run header shows a pill per evaluator with its pass rate or its mean score. See [Results](/agent-testing/results#evaluator-results).
+Between the judge's verdict and the evaluator results the run reads `Evaluating`, and `langwatch test-suite run --wait` treats it as still going. A required evaluator that never ran fails the run instead of leaving it pending. The run header shows one pill per evaluator with its pass rate or its mean score, and the run drawer lists the rows under the criteria. See [Results](/agent-testing/results#evaluator-results).
 
 ## Evaluators on a run plan
 
-The [run dialog](/agent-testing/run-plans#the-run-dialog) shows the evaluators inherited from the test suites in scope, and **Add evaluator** adds one to the plan itself. A plan evaluator reads the conversation and the trace only, because a plan may cover scenarios from suites with different fields. Use it for a check that applies to every scenario, such as a PII scanner.
+The [run dialog](/agent-testing/run-plans#the-run-dialog) lists the evaluators inherited from the test suites in scope, and **Add evaluator** under **On this run** adds one to the plan itself. A plan evaluator reads the conversation and the trace only, because a plan may cover suites with different fields. Use it for a check that applies to every scenario, such as a PII scanner.
+
+## Step by step: a golden answer on every scenario
+
+The screenshots follow a text-to-SQL suite, where the golden answer is a query and the evaluator is **SQL Query Equivalence**. The steps are the same for any evaluator that compares against a field, such as a reference answer on a RAG agent.
+
+<Steps>
+  <Step title="Declare the fields on the suite">
+    On the **Scenarios** tab, press **Edit suite** and, under **Customize test suite**, **Add fields**. Add one field per value the evaluator compares against, here `golden_sql` and `table_schema` of type **Text**, then **Save**. The editor of every scenario in the suite now asks for them.
+  </Step>
+  <Step title="Give each scenario its values">
+    Open a scenario with **Edit** in its row menu. After the criteria, the editor shows one box per field. Fill them and **Save**. A blank value is allowed: the evaluators that read it are skipped for that scenario.
+
+    <Frame>
+    <img className="block" src="/images/agent-testing/scenario-editor-field-values.png" alt="The scenario editor with the golden_sql and table_schema boxes filled in under the criteria" />
+    </Frame>
+  </Step>
+  <Step title="Attach the evaluator and confirm its mappings">
+    Back in the suite editor, press **Add evaluator** and pick the evaluator. The drawer opens with the expected inputs inferred from the fields. Here `output` has to read the query the agent ran rather than its reply, so change it to the **Trace** source, tool call `run_sql`, `input`. Leave **Required to pass** on and press **Save Changes**, then **Save** on the suite.
+
+    A score-only evaluator, such as an answer clarity judge, is attached the same way. Its switch is disabled with `Scores report, they do not gate.`
+  </Step>
+  <Step title="Run the suite">
+    Press **Run suite**, pick the agent and press **Run N scenarios**. The dialog lists the inherited evaluators, and **Add evaluator** under **On this run** adds a check for this run only. While the evaluators run, a row reads `Evaluating` in the **Result** column and `Grading` in the **Evaluators** column.
+
+    <Frame>
+    <img className="block" src="/images/agent-testing/run-dialog-inherited-and-extra.png" alt="The run dialog with the evaluators inherited from the Case lookups suite and a PII Leak Scanner added on this run" />
+    </Frame>
+  </Step>
+  <Step title="Read the results">
+    The run header shows one pill per evaluator, and every row shows one pill per evaluator with its verdict, its score or `Skipped`. Press a row: the drawer lists the evaluators under **EVALUATORS**, below the criteria, with the `REQUIRED` mark, the explanation and the **Inputs** it compared. A run the required evaluator failed reads `Verdict: FAILED · SQL Query Equivalence`, with the judge's criteria kept.
+
+    <Frame>
+    <img className="block" src="/images/agent-testing/results-run-evaluator-pills.png" alt="The results page of a run: the header pills SQL Query Equivalence 67%, Answer clarity score 9.25 and PII Leak Scanner 100%, and one pill per evaluator on each row, one of them Skipped and one Fail" />
+    </Frame>
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### The evaluator was skipped
+
+The scenario has no value for the field the mapping reads. The reason names it, for example `no golden_sql on this scenario`, and the run keeps the judge's verdict. Fill the field, then **Rerun this scenario** from the row menu.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-drawer-evaluator-rows-skipped.png" alt="The run drawer of a passed run, with SQL Query Equivalence skipped and the reason no golden_sql on this scenario, while the other two evaluators report" />
+</Frame>
+
+### Run suite opens the evaluator drawer instead of running
+
+A required input has no mapping. The chip shows an amber alert, and **Run** opens the drawer on that evaluator with `Please map all required fields: expected_output`. Map the input, press **Save Changes** and run again. The API refuses the same run with `suite_evaluator_mappings_missing`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-gate-opens-editor-at-offender.png" alt="The run dialog behind the SQL Query Equivalence drawer, open on the unmapped expected_output input with the message Please map all required fields" />
+</Frame>
+
+### The evaluator failed with a reason about the trace
+
+`no run_sql call in the trace`, `no retrieved contexts in the trace` or `no spans in the trace` means the run's traces did not hold what the mapping reads. The platform waits for the traces and retries, and on the last attempt records the evaluator as `failed`, so a required one fails the run.
+
+Check that the traces reach the project and join the run, see [Linking your traces](/agent-testing/linking-your-traces), and that the tool name in the mapping is the span name the agent reports.
 
 ## From the CLI and the API
 
@@ -32784,6 +32846,13 @@ langwatch test-suite create "Case lookups" \
   --field golden_sql:text --field table_schema:text \
   --evaluator sql-query-equivalence --required
 
+langwatch scenario create "Open cases count" \
+  --situation "The user is a support lead who wants to know how many support cases are open." \
+  --criteria "Gives a number of open cases" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT COUNT(*) FROM cases WHERE status = 'open'" \
+  --field table_schema="CREATE TABLE cases (id INT, status TEXT, created_at TIMESTAMP)"
+
 langwatch test-suite update "Case lookups" --evaluators-json evaluators.json
 
 langwatch run-plan run --test-suite "Case lookups" --target http:agent_abc123 --evaluator pii-leak-scanner
@@ -32791,7 +32860,7 @@ langwatch run-plan run --test-suite "Case lookups" --target http:agent_abc123 --
 langwatch simulation-run get <scenarioRunId> --format json   # results.evaluations
 ```
 
-`--evaluator` infers the mappings the way the suite editor does. `--evaluators-json` takes the full attachment list, for a tool call mapping:
+`--evaluator` infers the mappings the way the suite editor does. `--evaluators-json` takes the full attachment list, which is how a tool call mapping is set:
 
 ```json
 [{
@@ -32806,11 +32875,11 @@ langwatch simulation-run get <scenarioRunId> --format json   # results.evaluatio
 }]
 ```
 
-The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`. `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python and TypeScript SDKs take `fields` and `evaluators` on `test_suites.create` / `testSuites.create`, `test_suites.update` / `testSuites.update` and on `run_plans.run` / `runPlans.run`; the MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
+The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`, and `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python SDK takes `fields` and `evaluators` on `test_suites.create`, `test_suites.update` and `run_plans.run`; the TypeScript SDK takes them on `testSuites.create`, `testSuites.update` and, under `config`, on `runPlans.run`. The MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
 
 ## From code
 
-A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict like a platform-run scenario's. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
+A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
 
 Also check: [Test suites](/agent-testing/test-suites), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces).
 
@@ -33372,6 +33441,9 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
   <Card title="Test suites" icon="folder" href="/agent-testing/test-suites">
     Group scenarios, run a group, and where scenarios written in code appear.
   </Card>
+  <Card title="Evaluators" icon="clipboard-check" href="/agent-testing/evaluators">
+    Grade every run with a faithfulness check, a score or a golden answer, and fail the scenario when a required check fails.
+  </Card>
   <Card title="Run plans" icon="play" href="/agent-testing/run-plans">
     What happens when you press Run, and how runs join one history.
   </Card>
@@ -33597,7 +33669,9 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** cell shows one pill per evaluator that ran, with its verdict or its score. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** column appears only on a run that has evaluators, and its cell shows one pill per attached evaluator, with its verdict, its score or its status when it was skipped or hit an error; a row whose evaluators are still running reads `Grading`.
+
+The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`, or in `Evaluating` while the evaluators of the run are still reporting.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -33619,16 +33693,28 @@ Under the transcript: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASO
 
 An [evaluator](/agent-testing/evaluators) attached to the test suite or to the run plan runs after the judge, and the run keeps one result per evaluator. The drawer lists them under the criteria, one row each: the status, the name, a mark when it is required, the verdict or the score, and the reason under it.
 
+<Frame>
+<img className="block" src="/images/agent-testing/results-run-evaluator-pills.png" alt="The results page of a run: the header pills SQL Query Equivalence 67%, Answer clarity score 9.25 and PII Leak Scanner 100%, and one pill per evaluator on each row, one of them Skipped and one Fail" />
+</Frame>
+
+The header shows one pill per evaluator, and the **Evaluators** column shows one pill per evaluator on every row. A skipped evaluator keeps its pill, in grey.
+
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, or no retrieved contexts. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
+| `passed`, `failed` | The evaluator's verdict. When the trace never delivered a required input, the result is `failed` with the reason `no <tool> call in the trace`, `no retrieved contexts in the trace` or `no spans in the trace`. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
 | `error` | The evaluator itself failed to run. The reason says why. |
 
+<Frame>
+<img className="block" src="/images/agent-testing/run-drawer-evaluator-rows-failed.png" alt="The run drawer of a failed run: the verdict line reads FAILED · SQL Query Equivalence, the passed criterion, and the evaluator rows with the failed required SQL Query Equivalence and its explanation, a 7.00 clarity score and a passed PII Leak Scanner" />
+</Frame>
+
+A run the required **SQL Query Equivalence** failed: the verdict line names it, its row shows the explanation and the **Inputs**, and the criterion the judge passed is kept above.
+
 The run header shows a pill per evaluator: the pass rate for one with a verdict, the mean for one with a score. The verdict of a run is settled when the evaluators are in. A run whose evaluators all pass, or that has none, keeps the judge's verdict.
 
-Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so a batch is not reported as green while a required evaluator can still fail one of its runs.
+Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface: the **Result** column shows `Evaluating` with a spinner and the **Evaluators** column shows `Grading`. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so a batch is not reported as green while a required evaluator can still fail one of its runs.
 
 The run stays pending until its evaluators are recorded. A grading job that is lost is recorded as errored evaluators once its deadline passes, so a required evaluator that never ran fails the run instead of leaving it pending.
 
@@ -33640,13 +33726,13 @@ While the run is going, the drawer shows `The conversation is running…` and th
 
 ## What a status means
 
-The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
+The **Result** column of the table shows `Passed`, `Failed`, `Running` or `Evaluating`. The **Status** chip of the drawer is more precise:
 
 | Status | Meaning | What to do |
 |---|---|---|
 | `completed` | The judge delivered a verdict and every evaluator is in. The verdict itself is `PASSED` or `FAILED`, and a failed required evaluator is what makes it `FAILED` even when the judge passed the run. | On a fail, read the reasoning in the **RESULTS** block and the evaluator rows, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
-| `evaluating` | The conversation is over and the judge has decided, but the evaluators the suite and the plan attach have not been recorded yet. A required one can still fail the run. | Wait. The API and the CLI report this run as `PENDING_EVALUATION` and do not count it as finished. |
+| `evaluating` | The conversation is over and the judge has decided, but the evaluators the suite and the plan attach have not been recorded yet. A required one can still fail the run. The table shows `Evaluating` in the **Result** column and `Grading` in the **Evaluators** column. | Wait. The API and the CLI report this run as `PENDING_EVALUATION` and do not count it as finished. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
 | `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |
 | `stalled` | The run stopped reporting before a verdict. | **Rerun this scenario**. A stalled run counts as not passed. |
@@ -34349,6 +34435,13 @@ The chips, in the order the dialog shows them:
 | **Run against a prompt** | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets). |
 | **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
 | **Run multiple times** | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
+| **Add evaluators** | Opens **Evaluators**: the evaluators inherited from the test suites in scope, each under `Inherited from <suite> · edit in the suite`, and **Add evaluator** under **On this run** for one on the plan itself. A plan evaluator reads the conversation and the trace only, since a plan has no scenario field to map to. The block is already open when a test suite in scope attaches any. See [Evaluators](/agent-testing/evaluators#evaluators-on-a-run-plan). |
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-dialog-inherited-and-extra.png" alt="The run dialog with the evaluators inherited from the Case lookups suite and a PII Leak Scanner added on this run" />
+</Frame>
+
+The **Evaluators** block: two chips inherited from the `Case lookups` suite, and a PII Leak Scanner added under **On this run**.
 
 <Note>
 The dialog shows **No model provider is set up** when the project has no model provider for the simulator and the judge. Add one under the project settings before the first run.
@@ -34372,7 +34465,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. A row with evaluators shows `Evaluating` between the two, until every evaluator has reported. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with rows still running and the Stop all button" />
@@ -34679,6 +34772,8 @@ When your adapter calls an agent that runs as a separate service, the judge cann
 
 Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-testing/linking-your-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
 
+Also check: [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation, for an evaluator declared in the test itself that grades every run against a golden answer, with the same mappings and the same gate as one attached on the platform.
+
 ---
 
 # FILE: ./agent-testing/scenarios.mdx
@@ -34730,6 +34825,12 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 ## Field values
 
 When the test suite declares [fields](/agent-testing/test-suites#fields), the editor shows one control per field after the criteria, and the value is stored on the scenario. An [evaluator](/agent-testing/evaluators) attached to the suite reads the value through its mapping, for example `expected_output` from `golden_sql`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/scenario-editor-field-values.png" alt="The scenario editor with the golden_sql and table_schema boxes filled in under the criteria" />
+</Frame>
+
+The `golden_sql` and `table_schema` boxes under the criteria are the fields the `Case lookups` suite declares. A text box grows with its text.
 
 A blank value is no value: the evaluators that read the field are skipped for this scenario, with the reason `no golden_sql on this scenario`. A scenario moved to another suite keeps the values it holds; the editor lists the ones the new suite does not declare under **Not in this suite**, each with a remove action.
 
@@ -34964,7 +35065,7 @@ The **Results** tab lists every run plan of the project. A run plan is the histo
 - After every incident or complaint, add a scenario for it.
 - Keep scenarios short: one situation, a few criteria.
 
-Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results).
+Also check: [Evaluators](/agent-testing/evaluators) to grade every run with a faithfulness check, a score or a golden answer, [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results).
 
 ---
 
@@ -35003,7 +35104,13 @@ Under the suite name, the header shows a chip per field and a chip per evaluator
 
 A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and a scenario in it may carry a value for each. A blank value skips the evaluators that read it. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
 
-**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one. Drag a row by the handle on its left to reorder the fields. The handle appears once the suite declares more than one field, and it takes the arrow keys when it has focus.
+
+<Frame>
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
+</Frame>
+
+The field rows of the `Case lookups` suite, with the drag handle on the left of each.
 
 | Setting | Rule |
 |---|---|
