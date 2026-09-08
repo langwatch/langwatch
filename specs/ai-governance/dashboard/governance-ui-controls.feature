@@ -53,10 +53,24 @@ Feature: The controls every AI Governance page renders the same way
   # to the test that covers it. Every scenario title here is a single line for
   # exactly that reason.
   #
-  # The one-line form is load-bearing, not a style preference: the parity
-  # checker rejects an `@scenario` written inside a multi-line JSDoc block, so
-  # that form binds NOTHING while looking like a binding. Two tests were
-  # already found green and unbound this way.
+  # CORRECTION, and the earlier text here caused real damage before it was
+  # caught. This paragraph used to say the parity checker rejects an
+  # `@scenario` written inside a multi-line JSDoc block, and that two tests
+  # had been found green and unbound that way. BOTH CLAIMS WERE FALSE. The
+  # checker's ANNOTATION_RE (platform/app/scripts/check-feature-parity.ts:1003)
+  # begins `^[ \t]*(?:(?:\/\/|\/\*|\*|#)[ \t]*)*@scenario`, and that `\*` in
+  # the alternation is exactly the continuation marker a multi-line block
+  # uses. A multi-line JSDoc binds perfectly well; around twenty governance
+  # annotations are written that way today. An agent read the old paragraph,
+  # believed it, and rewrote a working binding to escape a rule that does not
+  # exist. A spec that states a falsehood as settled fact is worse than one
+  # that says nothing, because it is followed.
+  #
+  # What DOES break, silently, is a scenario TITLE that wraps across a
+  # newline. The quoted group cannot cross one, so the bare-title branch
+  # captures the first line including its opening quote and binds a phantom
+  # that matches no scenario. Every scenario title in this file is therefore
+  # kept on one line, and that is the real reason — not the comment style.
   #
   # And the checker matches on the comment alone. It never reads what a test
   # asserts, and it accepts any number of tests claiming one scenario without
@@ -106,7 +120,7 @@ Feature: The controls every AI Governance page renders the same way
     When the page renders with data and again with none
     Then the page contains no native select element
 
-  @integration @unimplemented
+  @integration
   Scenario: A choice too long for a pill uses the app's own select
     Given a choice with more options than a menu pill can hold comfortably
     When the page renders it
@@ -238,12 +252,32 @@ Feature: The controls every AI Governance page renders the same way
     Then the toggle is among the actions at the top right of the page header
     And the banner, when sample mode is on, is directly under the header and above the filter row
 
+  # The rule this protects is "an invented figure is never unmarked", and the
+  # first draft mistook the mark for the badge. On Costs, where every panel is
+  # invented whenever sample mode is on, the page-wide banner already said so
+  # and sixteen badges repeated it — so the badge carried no information there
+  # and the page now stands them down. That is the rule being honoured, not
+  # broken, which the wording below now says.
+  #
+  # The exemption is deliberately narrow: only a banner covering the WHOLE
+  # screen earns it. A page showing measured and invented panels side by side
+  # has no such banner, and there the badge is the only thing telling the two
+  # apart, so it stays mandatory.
+  #
+  # Bound on Inventory, which is the one page that renders both kinds at once
+  # and can therefore prove the second clause. Costs never could: a panel is
+  # invented there only while sample mode is on, and sample mode is what
+  # raises the banner, so measured and invented have never coexisted on that
+  # screen for a single render. It was the only binder of a rule it could
+  # half-prove at best.
+
   @integration
-  Scenario: Every invented panel carries the sample badge
+  Scenario: Every invented panel is marked, by a badge or by a banner above it
     Given sample mode is on
     When the page renders its panels
     Then each panel whose figures are invented carries the sample badge
     And no measured panel carries it
+    And a panel may drop its badge only while a banner speaks for the whole screen
 
   @integration
   Scenario: A panel with nothing in it shows sample data instead of Not available

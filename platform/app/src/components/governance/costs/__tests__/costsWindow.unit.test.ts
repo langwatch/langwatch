@@ -17,6 +17,7 @@ import {
   READ_WINDOW_DAY_CEILING,
   windowDaysForFrame,
 } from "../costsWindow";
+import { recentMonths, sampleForecast } from "../sampleSeries";
 
 /** A lane day with every honesty field at its quiet default. */
 const laneDay = (
@@ -218,5 +219,40 @@ describe("aggregateLaneSeries", () => {
       expect(folded[0]?.billedRevisedAt).toBe(1_000);
       expect(folded[0]?.billedPreviousUsd).toBeNull();
     });
+  });
+});
+
+/**
+ * The forecast panel's projection marker.
+ *
+ * The marker is a day. The buckets under it are folded to the interval in
+ * view. Unless the marker is folded by the same rule, it names an x value the
+ * chart has no bucket for, and recharts draws nothing at all — silently, since
+ * a reference line with no match is not an error.
+ */
+describe("given a forecast whose window is part served and part projected", () => {
+  const forecast = sampleForecast(recentMonths(12), ["checkout-agent"], 400);
+
+  /** @scenario "The projection marker survives the fold to any interval" */
+  it.each([
+    "month",
+    "quarter",
+    "year",
+  ] as const)("names a bucket the chart draws, folded to %s", (interval) => {
+    const drawn = aggregateBuckets(forecast.buckets, interval);
+    const marker = bucketStartOf(forecast.projectedFromDay ?? "", interval);
+
+    expect(drawn.map((bucket) => bucket.day)).toContain(marker);
+  });
+
+  it("puts the bucket holding the split on the projected side, not the served one", () => {
+    const split = forecast.projectedFromDay ?? "";
+    const marker = bucketStartOf(split, "quarter");
+
+    // Rounding down is what does this: the marker opens no later than the
+    // split, so every projected day sits at or after it. The reverse would
+    // leave part of the run-rate drawn as spend, which is the one error
+    // worth engineering against.
+    expect(marker <= split).toBe(true);
   });
 });

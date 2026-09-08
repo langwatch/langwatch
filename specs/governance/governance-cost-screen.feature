@@ -82,6 +82,28 @@ Feature: One cost screen, three honest lanes
     And the time axis reads the same way on every chart that has one
     And the screen says once, in words, which bucket the charts are drawn in
 
+  # =========================================================================
+  # A panel named "forecast" has to draw one. The marker that separates
+  # served spend from the run-rate carried forward is placed on a day, and
+  # the buckets under it are folded to whatever interval is in view, so the
+  # two are only comparable once the marker is folded the same way. It was
+  # not: it was dropped at anything wider than a month, which is every view
+  # but one and NOT the default. The panel drew an unbroken area and the
+  # projected tail read as money already spent.
+  #
+  # Rounding down is deliberate. The bucket holding the split is part
+  # served and part projected, and it goes on the projected side, so the
+  # screen understates what it knows rather than overstating what was
+  # spent. Only one of those two errors invents money.
+  # =========================================================================
+
+  @unit
+  Scenario: The projection marker survives the fold to any interval
+    Given a sample forecast split partway through its window
+    When its buckets are folded to the interval in view
+    Then the marker names a bucket the chart draws
+    And the bucket holding the split counts as projected, not as served
+
   @integration
   Scenario: A frame longer than the reads answer says how far the figures reach
     Given the reader picks a Time Frame of two years
@@ -142,15 +164,38 @@ Feature: One cost screen, three honest lanes
     Given the cost read failed
     When sample mode is on
     Then no error alert is on the screen
-    And the lanes show invented figures under the sample badge
+    And the lanes show invented figures under the sample banner
+
+  # The rule below used to read "each invented panel carries the badge", full
+  # stop, and on a screen where every panel is invented that meant the amber
+  # banner said nothing here is real and then sixteen grey badges said it again.
+  # Sixteen repetitions do not make a point sixteen times; they turn the mark
+  # into furniture, and furniture is what a reader stops seeing.
+  #
+  # So the mark is now suppressed by the banner and by nothing else. What must
+  # never happen is an invented figure with nothing at all saying so, and the
+  # scenario below is written to fail if the suppression ever widens past the
+  # one case where something louder is already speaking for the whole screen.
 
   @integration
-  Scenario: Every invented figure on the screen carries the sample badge
+  Scenario: The screen says figures are invented once, not once per panel
     Given sample mode is on with nothing measured
     When the screen renders
-    Then each lane whose figure is invented carries the sample badge
-    And each invented panel carries it too
-    And no panel holding measured figures carries it
+    Then the banner says nothing on the screen is real
+    And no panel repeats it with a badge
+
+  # On this screen a panel is only ever invented while sample mode is on, so
+  # the banner is up wherever a badge would have been and the suppression above
+  # accounts for every one of them. The guarantee is asserted on the mark itself
+  # rather than through the page, because the page cannot currently reach the
+  # state that would prove it — and a scenario driven through a state the screen
+  # cannot produce is not evidence of anything.
+
+  @unit
+  Scenario: The sample mark returns wherever no banner speaks for it
+    Given an invented panel with no sample banner above it
+    When the mark renders
+    Then it shows, because nothing else on the screen says the figures are invented
 
   @integration
   Scenario: An empty panel says what it holds and what would fill it
@@ -164,7 +209,7 @@ Feature: One cost screen, three honest lanes
   Scenario: The adoption panel shows sample figures rather than nothing
     Given no adoption has been measured
     When sample mode is on
-    Then the adoption panel shows invented adoption figures under the sample badge
+    Then the adoption panel shows invented adoption figures under the sample banner
 
   @integration
   Scenario: The department chip offers sample departments while sample mode is on

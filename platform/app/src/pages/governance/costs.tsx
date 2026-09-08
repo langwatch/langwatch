@@ -56,6 +56,7 @@ import {
   aggregateBuckets,
   aggregateLine,
   aggregateSeatCounts,
+  bucketStartOf,
   frameExceedsReadCeiling,
   windowDaysForFrame,
 } from "~/components/governance/costs/costsWindow";
@@ -63,6 +64,7 @@ import {
   sampleCostSummary,
   sampleSpenderRows,
 } from "~/components/governance/costs/sampleLanes";
+import { SampleSaidOnce } from "~/components/governance/costs/sampleMark";
 import {
   type DailyBucket,
   type RankRow,
@@ -345,36 +347,43 @@ function CostsPage() {
           <SampleDataToggle active={showSample} onToggle={toggleSample} />
         </HStack>
         {showSample && <SampleDataBanner />}
-        <CostFilterBar
-          departmentName={filters.departmentName}
-          departments={departmentOptions}
-          onDepartmentChange={(department, departmentName) =>
-            patch({ department, departmentName })
-          }
-          frame={filters.frame}
-          onFrameChange={chooseFrame}
-          interval={filters.interval}
-          onIntervalChange={(interval) => patch({ interval })}
-        />
-        <ReadCeilingNotice frame={filters.frame} showSample={showSample} />
+        {/* Everything under the banner inherits what the banner said. While it
+            is up, the per-panel marks stand down rather than restating it
+            sixteen times; the moment it comes down they are the only thing
+            telling an invented panel from a measured one, and they return.
+            `sampleMark.tsx` carries the reasoning. */}
+        <SampleSaidOnce said={showSample}>
+          <CostFilterBar
+            departmentName={filters.departmentName}
+            departments={departmentOptions}
+            onDepartmentChange={(department, departmentName) =>
+              patch({ department, departmentName })
+            }
+            frame={filters.frame}
+            onFrameChange={chooseFrame}
+            interval={filters.interval}
+            onIntervalChange={(interval) => patch({ interval })}
+          />
+          <ReadCeilingNotice frame={filters.frame} showSample={showSample} />
 
-        <CostsBody
-          isLoading={summary.isLoading && !!organizationId}
-          isError={summary.isError}
-          refused={isRefusedRead(summary.error)}
-          data={summary.data}
-          interval={filters.interval}
-          showSample={showSample}
-          samplePeriods={samplePeriods}
-        />
+          <CostsBody
+            isLoading={summary.isLoading && !!organizationId}
+            isError={summary.isError}
+            refused={isRefusedRead(summary.error)}
+            data={summary.data}
+            interval={filters.interval}
+            showSample={showSample}
+            samplePeriods={samplePeriods}
+          />
 
-        <CostBreakdowns
-          filters={filters}
-          breakdowns={breakdowns}
-          periods={samplePeriods}
-          showSample={showSample}
-          spenders={spenders}
-        />
+          <CostBreakdowns
+            filters={filters}
+            breakdowns={breakdowns}
+            periods={samplePeriods}
+            showSample={showSample}
+            spenders={spenders}
+          />
+        </SampleSaidOnce>
       </VStack>
     </GovernanceLayout>
   );
@@ -570,11 +579,23 @@ function CostsWithoutFigures({
 /**
  * The three lanes, in the same panel shell as everything below them.
  *
- * `alignItems="start"` rather than a stretched row: the seats lane lists a
- * line per licence pool and the money lanes hold one figure each, so stretching
- * them to a common height left the two money lanes mostly empty box. A card
- * that ends where its content ends reads as deliberate; one padded out to match
- * its tallest neighbour reads as missing something.
+ * One height for all three, which is a row of cards and not three cards that
+ * happen to be adjacent. The seats lane lists a line per licence pool and the
+ * money lanes hold one figure each, so the heights differ by a lot and the
+ * ragged bottom edge was the first thing the eye landed on.
+ *
+ * Letting each card end at its own content was the earlier answer here, and it
+ * traded one problem for another: the ragged edge went away and the two money
+ * cards became visibly stubby beside the seats card. The height was never the
+ * real complaint. Empty box below a figure was, and a shorter card has exactly
+ * as much of it — the emptiness just moves outside the border where it reads as
+ * a layout that gave up rather than a card with room.
+ *
+ * So: stretch, and the cards earn the height. Each lane pins its explanation to
+ * its own bottom edge (`marginTop="auto"` in CostLanePanel), which puts the
+ * slack between the figure and its footing and closes all three lanes on one
+ * line. Two aligned edges, top and bottom, and the difference in content sits
+ * where a reader reads it as spacing.
  */
 function CostLanes({
   data,
@@ -587,7 +608,7 @@ function CostLanes({
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
       <UnpricedWindowNotice unpricedWindow={data.unpricedWindow} />
-      <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} alignItems="start">
+      <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
         <CostLanePanel
           testId="cost-lane-billed"
           label="Billed by provider"
@@ -1392,12 +1413,23 @@ function useSampleSeries(
       users: sampleRanked(SAMPLE_PEOPLE, SAMPLE_WINDOW_TOTAL * 0.4),
       forecast: {
         buckets: aggregateBuckets(forecast.buckets, interval),
-        // The projection marker sits on one bucket start, so it only lines up
-        // with the axis while the axis is drawn on those starts. A fold to a
-        // wider interval drops it rather than pointing it at a boundary it
-        // does not fall on.
-        projectedFromDay:
-          interval === "month" ? forecast.projectedFromDay : null,
+        // The marker is folded by the same function that keys the buckets, so
+        // it lands on a bucket the chart actually draws at every interval.
+        //
+        // It used to be dropped instead at anything wider than a month, on the
+        // grounds that a day marker cannot point at a quarter boundary it does
+        // not fall on. True, and the wrong remedy: quarter is the default, so
+        // the panel called "forecast" drew no forecast on the view almost
+        // everyone sees, and the run-rate tail read as money already spent.
+        //
+        // Folding rounds DOWN, which puts the whole bucket holding the split
+        // on the projected side. That bucket is part measured, so this
+        // understates what is known — and never the reverse. Showing a
+        // projection as spend is the lie worth engineering against; calling a
+        // few measured days projected only costs the reader some certainty.
+        projectedFromDay: forecast.projectedFromDay
+          ? bucketStartOf(forecast.projectedFromDay, interval)
+          : null,
       },
       overTime: aggregateBuckets(byDepartment, interval),
       seats: aggregateSeatCounts(sampleSeats(periods), interval),

@@ -1,4 +1,4 @@
-import { Badge, Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type {
   GovernanceSeatLaneDto,
@@ -10,6 +10,7 @@ import {
   laneWithheldTotalNote,
   seatPoolName,
 } from "./costLaneFormat";
+import { SampleMark } from "./costs/sampleMark";
 
 /**
  * One cost lane, labeled for what it measures.
@@ -25,21 +26,6 @@ import {
  * whether a total is offered is the read side's decision, made once, in
  * `governanceCost.service.ts`.
  */
-/**
- * The `sample` mark, in the same grey the panels below the lanes use.
- *
- * One component so a lane can never carry a different badge from a panel: the
- * reader learns the mark once, on whichever surface they look at first.
- */
-function SampleBadge({ shown }: { shown?: boolean }) {
-  if (!shown) return null;
-  return (
-    <Badge size="xs" variant="subtle" colorPalette="gray">
-      sample
-    </Badge>
-  );
-}
-
 export function CostLanePanel({
   label,
   description,
@@ -81,10 +67,10 @@ export function CostLanePanel({
       backgroundColor="bg.panel"
       padding={4}
     >
-      <VStack align="start" gap={1}>
+      <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
           <Heading size="sm">{label}</Heading>
-          <SampleBadge shown={sample} />
+          <SampleMark shown={sample} />
         </HStack>
         <Text
           fontSize="2xl"
@@ -93,7 +79,13 @@ export function CostLanePanel({
         >
           {formatLaneUsd(amountUsd)}
         </Text>
-        <Text fontSize="sm" color="fg.muted">
+        {/* The claim sits at the top of the card and what it means sits at the
+            bottom, so three cards of different content still agree on two
+            lines. `marginTop="auto"` takes the slack in the middle: a card
+            with room to spare shows it between the figure and its footing,
+            where it reads as spacing, rather than trailing off the end, where
+            it reads as something that failed to load. */}
+        <Text fontSize="sm" color="fg.muted" marginTop="auto">
           {description}
         </Text>
         {cellsWithoutAmount > 0 ? (
@@ -154,10 +146,10 @@ export function SeatLanePanel({
       borderStyle={reported ? "solid" : "dashed"}
       padding={4}
     >
-      <VStack align="start" gap={1}>
+      <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
           <Heading size="sm">Seats</Heading>
-          <SampleBadge shown={sample} />
+          <SampleMark shown={sample} />
         </HStack>
         {seats.status === "reported" ? (
           <SeatPools pools={seats.pools} />
@@ -219,7 +211,7 @@ function SeatLaneWithoutCounts({
  */
 function SeatPools({ pools }: { pools: GovernanceSeatPoolDto[] }) {
   return (
-    <VStack align="start" gap={2} width="full">
+    <VStack align="start" gap={2} width="full" flex="1">
       {pools.map((pool) => (
         <VStack key={pool.skuPartNumber} align="start" gap={0} width="full">
           {/* The raw SKU stays reachable on hover: it is what a reader matches
@@ -236,7 +228,9 @@ function SeatPools({ pools }: { pools: GovernanceSeatPoolDto[] }) {
           </Text>
         </VStack>
       ))}
-      <Text fontSize="xs" color="fg.subtle">
+      {/* Same footing as the money lanes: the explanation goes to the bottom
+          of the card, so all three lanes close on the same line. */}
+      <Text fontSize="xs" color="fg.subtle" marginTop="auto">
         Seats your provider reports as bought, and how many are assigned to
         someone.
       </Text>

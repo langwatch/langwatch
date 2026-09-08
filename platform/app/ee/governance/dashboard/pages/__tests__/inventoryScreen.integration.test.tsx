@@ -326,6 +326,23 @@ describe("given an admin on the Inventory page", () => {
   describe("when the page renders with tools connected", () => {
     beforeEach(connectTools);
 
+    // The rulebook's badge scenario has two clauses and the second is the one
+    // that protects the reader: a badge on every card, sample or not, would be
+    // decoration rather than a warning. The sample half is asserted in the
+    // sample-mode block below; this is the measured half, and the pair of them
+    // is what the scenario actually claims.
+    /** @scenario "Every invented panel is marked, by a badge or by a banner above it" */
+    it("leaves the badge off cards built from real connected tools", () => {
+      renderScreen();
+      const cards = screen
+        .getByTestId("tool-catalog-cards")
+        .querySelectorAll("[data-testid^='tool-card-']");
+      expect(cards.length).toBeGreaterThan(0);
+      for (const card of cards) {
+        expect(card.textContent).not.toMatch(/sample/i);
+      }
+    });
+
     /** @scenario "A registered tool is a card carrying its name and its vendor" */
     it("shows a card per connected tool with its name and vendor", () => {
       renderScreen();
@@ -452,6 +469,7 @@ describe("given an admin on the Inventory page", () => {
 
   describe("when sample mode is on because nothing is connected", () => {
     /** @scenario "Every sample card says it is a sample" */
+    /** @scenario "Every invented panel is marked, by a badge or by a banner above it" */
     it("badges every card as a sample", () => {
       renderScreen();
       const cards = screen
