@@ -2426,6 +2426,18 @@ const presentations = {
     title: "That column's type can't be changed",
     describe: () => "Add a new column with the type you need, then move the values across.",
   },
+  dataset_attachment_storage_unavailable: {
+    title: "File uploads are not available",
+    describe: () => "This deployment has no file storage set up. Enter a URL instead.",
+  },
+  dataset_attachment_too_large: {
+    title: "This file is too large",
+    describe: () => "Files up to 20 MB can be uploaded into a cell. Use a smaller file or enter a URL.",
+  },
+  dataset_attachment_unreadable: {
+    title: "This file could not be read",
+    describe: () => "Pick the file again. If it still fails, try a different file.",
+  },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
     // a real action, so this is not the "we've been notified" shape.

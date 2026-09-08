@@ -1,6 +1,7 @@
 export * from "./dataset.ts";
 export * from "./dataset.responses.ts";
 export * from "./dataset-file.ts";
+export * from "./dataset-attachment.ts";
 export * from "./dataset-record-count.ts";
 export * from "./dataset-chunks.ts";
 export * from "./dataset-normalization.ts";

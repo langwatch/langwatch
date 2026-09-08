@@ -337,3 +337,42 @@ export class DatasetRecordNotFoundError extends Error {
     this.name = "DatasetRecordNotFoundError";
   }
 }
+
+/** The uploaded attachment decodes to more bytes than a cell may hold. */
+export class DatasetAttachmentTooLargeError extends HandledError {
+  declare readonly code: "dataset_attachment_too_large";
+
+  constructor() {
+    super("dataset_attachment_too_large", "The file is larger than the attachment limit", {
+      httpStatus: 413,
+      fault: "customer",
+    });
+    this.name = "DatasetAttachmentTooLargeError";
+  }
+}
+
+/** The upload body is not a base64 data URL we can decode. */
+export class DatasetAttachmentUnreadableError extends HandledError {
+  declare readonly code: "dataset_attachment_unreadable";
+
+  constructor() {
+    super("dataset_attachment_unreadable", "The file could not be read", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "DatasetAttachmentUnreadableError";
+  }
+}
+
+/** This deployment composed no object storage, so cell uploads cannot be kept. */
+export class DatasetAttachmentStorageUnavailableError extends HandledError {
+  declare readonly code: "dataset_attachment_storage_unavailable";
+
+  constructor() {
+    super("dataset_attachment_storage_unavailable", "File uploads are not available", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "DatasetAttachmentStorageUnavailableError";
+  }
+}
