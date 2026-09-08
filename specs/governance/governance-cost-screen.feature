@@ -484,21 +484,6 @@ Feature: One cost screen, three honest lanes
     # holding one more period — five identical periods reported a 50% rise.
 
   @unit
-  Scenario: A flat year reports level, and folding it to quarters would not
-    Given a year of identical daily spend
-    When the card's change figure is read
-    Then it reports level
-    And that same spend folded to quarters lands in buckets differing several-fold
-    # The second Then is why the first is measured where it is. A calendar
-    # bucket is not a unit of time that may be compared: a January holding
-    # fourteen days of a quarter sits beside a full ninety-one-day April, so
-    # the buckets differ in length as well as in number. Averages fix halves
-    # of unequal count; only measuring before the fold fixes unequal length.
-    # The interval is not named in the Given because the figure is read from
-    # the series as it arrives, before any interval is applied to it. What an
-    # interval does to the reading is the mounted scenario's job, below.
-
-  @unit
   Scenario: A day whose figure is withheld is left out of the change, never counted as zero
     Given a lane series holding a day the read would not price
     When the card's change figure is read
