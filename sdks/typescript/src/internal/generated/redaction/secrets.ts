@@ -30,7 +30,7 @@
  * `sessionReport.ts`) so issue reports are scrubbed with the exact same rules
  * before leaving the user's machine.
  */
-import { SECRET_MARKER } from "./markers.js";
+import { SECRET_MARKER } from "./markers.ts";
 
 /** The placeholder a redacted secret is replaced with. */
 export const SECRETS_REDACTION_MARKER = SECRET_MARKER;

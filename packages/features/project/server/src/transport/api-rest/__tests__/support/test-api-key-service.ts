@@ -29,6 +29,7 @@ export class TestApiKeyService extends ApiKeyService {
   revokeCliLoginKeyForLogout = unsupported<ApiKeyService["revokeCliLoginKeyForLogout"]>();
   revokeCliLoginKeysForDevice = unsupported<ApiKeyService["revokeCliLoginKeysForDevice"]>();
   tryGetById = unsupported<ApiKeyService["tryGetById"]>();
+  tryGetByLookupId = unsupported<ApiKeyService["tryGetByLookupId"]>();
   tryGetIngestionKey = unsupported<ApiKeyService["tryGetIngestionKey"]>();
   tryGetNameByIdInOrg = unsupported<ApiKeyService["tryGetNameByIdInOrg"]>();
   tryResolveDefaultCliSelection = unsupported<ApiKeyService["tryResolveDefaultCliSelection"]>();

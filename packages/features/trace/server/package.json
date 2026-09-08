@@ -28,6 +28,14 @@
     "./composition/trace-processing-producer": {
       "types": "./src/adapters/trace-processing-producer.adapter.ts",
       "default": "./src/adapters/trace-processing-producer.adapter.ts"
+    },
+    "./api-rest/collector": {
+      "types": "./src/transport/api-rest/collector.api.ts",
+      "default": "./src/transport/api-rest/collector.api.ts"
+    },
+    "./api-rest/tracked-event": {
+      "types": "./src/transport/api-rest/tracked-event.api.ts",
+      "default": "./src/transport/api-rest/tracked-event.api.ts"
     }
   },
   "scripts": {

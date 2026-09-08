@@ -128,7 +128,7 @@ setup-hooks:
 # the default port, and wrong everywhere else with no error anywhere: the
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
-DEV_ENV_FILE ?= .env
+DEV_ENV_FILE ?= ./.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
