@@ -27,7 +27,10 @@
  * noise a single LLM turn carries.
  *
  * On a timeout the in-flight turn is left alone: the worker finishes or fails
- * it on its own schedule and the fold records whichever it was.
+ * it on its own schedule and the fold records whichever it was. Because that
+ * turn outlives the answer, the caller's single-flight slot is held for one
+ * further budget rather than released with the response, so a monitor that
+ * retries faster than the documented interval cannot stack turns on top of it.
  *
  * @see specs/langy/langy-health-canary.feature
  */
@@ -202,6 +205,17 @@ export async function runLangyCanary(
  * Keyed per caller (project + user), never global: two monitors on two
  * projects must not block each other. In-process only, which is enough for a
  * probe polled every few minutes.
+ *
+ * A `timeout` keeps the caller's slot for one further budget after the answer
+ * has gone out. The probe abandons the WAIT at the budget, but the turn it
+ * started is left alone to finish or fail on its own schedule, so releasing
+ * the slot the moment the response is written lets a monitor that retries
+ * faster than it should stack fresh billable turns on top of the ones still
+ * running. Holding it bounds that to one turn per two budgets per caller.
+ * At the documented poll interval the reservation has always lapsed, so a
+ * correctly configured monitor never meets it, and a `429` fails its check
+ * either way. Every other outcome releases at once — the turn is over, so
+ * there is nothing left to protect.
  */
 export function createSingleFlightLangyCanary(
   run: (deps: LangyCanaryDeps) => Promise<LangyCanaryOutcome>,
@@ -210,13 +224,30 @@ export function createSingleFlightLangyCanary(
   deps: LangyCanaryDeps;
 }) => Promise<LangyCanaryResult> {
   const inFlight = new Map<string, Promise<LangyCanaryOutcome>>();
+  const reservedUntil = new Map<string, number>();
 
   return ({ key, deps }) => {
-    const existing = inFlight.get(key);
-    if (existing) return Promise.resolve({ busy: true });
-    const attempt = run(deps).finally(() => {
-      inFlight.delete(key);
-    });
+    if (inFlight.has(key)) return Promise.resolve({ busy: true });
+
+    const reserved = reservedUntil.get(key);
+    if (reserved !== undefined) {
+      if (deps.now() < reserved) return Promise.resolve({ busy: true });
+      reservedUntil.delete(key);
+    }
+
+    const attempt = run(deps)
+      .then((outcome) => {
+        if (!outcome.healthy && outcome.reason === "timeout") {
+          reservedUntil.set(
+            key,
+            deps.now() + (deps.budgetMs ?? LANGY_CANARY_BUDGET_MS),
+          );
+        }
+        return outcome;
+      })
+      .finally(() => {
+        inFlight.delete(key);
+      });
     inFlight.set(key, attempt);
     return attempt;
   };

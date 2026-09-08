@@ -378,6 +378,105 @@ describe("createSingleFlightLangyCanary", () => {
       });
     });
   });
+
+  /**
+   * A movable clock, because the reservation a timeout takes is measured on
+   * the injected `now` rather than a real timer.
+   */
+  function depsAtClock(clock: { value: number }): LangyCanaryDeps {
+    return {
+      startTurn: vi.fn(async () => STARTED),
+      awaitSettlement: vi.fn(async () => completed("Hi")),
+      now: () => clock.value,
+    };
+  }
+
+  function runAnswering(outcome: LangyCanaryOutcome) {
+    return vi.fn(async (): Promise<LangyCanaryOutcome> => outcome);
+  }
+
+  const TIMED_OUT: LangyCanaryOutcome = {
+    healthy: false,
+    reason: "timeout",
+    durationMs: LANGY_CANARY_BUDGET_MS,
+  };
+
+  describe("given a canary run for one caller that answered timeout", () => {
+    describe("when the same caller checks again inside one budget", () => {
+      /** @scenario "A check arriving straight after a timeout is busy" */
+      it("tells the caller it is busy and starts no second turn", async () => {
+        const clock = { value: 0 };
+        const timedOutDeps = depsAtClock(clock);
+        const run = runAnswering(TIMED_OUT);
+        const guarded = createSingleFlightLangyCanary(run);
+
+        await guarded({ key: "proj/user", deps: timedOutDeps });
+        clock.value = LANGY_CANARY_BUDGET_MS - 1;
+        const again = await guarded({ key: "proj/user", deps: timedOutDeps });
+
+        expect(again).toEqual({ busy: true });
+        expect(run).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe("when the same caller checks again after one budget", () => {
+      /** @scenario "The reservation a timeout takes lapses after one budget" */
+      it("runs the new check", async () => {
+        const clock = { value: 0 };
+        const timedOutDeps = depsAtClock(clock);
+        const run = runAnswering(TIMED_OUT);
+        const guarded = createSingleFlightLangyCanary(run);
+
+        await guarded({ key: "proj/user", deps: timedOutDeps });
+        clock.value = LANGY_CANARY_BUDGET_MS;
+        const again = await guarded({ key: "proj/user", deps: timedOutDeps });
+
+        expect(again).toEqual(TIMED_OUT);
+        expect(run).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when a different caller checks inside one budget", () => {
+      /** @scenario "A timeout for one caller does not reserve another caller" */
+      it("runs the other caller check", async () => {
+        const clock = { value: 0 };
+        const timedOutDeps = depsAtClock(clock);
+        const run = runAnswering(TIMED_OUT);
+        const guarded = createSingleFlightLangyCanary(run);
+
+        await guarded({ key: "proj/user-a", deps: timedOutDeps });
+        clock.value = 1;
+        const other = await guarded({ key: "proj/user-b", deps: timedOutDeps });
+
+        expect(other).toEqual(TIMED_OUT);
+        expect(run).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("given a canary run for one caller that answered turn_failed", () => {
+    describe("when the same caller checks again inside one budget", () => {
+      /** @scenario "A settled unhealthy run that is not a timeout reserves nothing" */
+      it("runs the new check", async () => {
+        const clock = { value: 0 };
+        const failedDeps = depsAtClock(clock);
+        const outcome: LangyCanaryOutcome = {
+          healthy: false,
+          reason: "turn_failed",
+          durationMs: 1,
+        };
+        const run = runAnswering(outcome);
+        const guarded = createSingleFlightLangyCanary(run);
+
+        await guarded({ key: "proj/user", deps: failedDeps });
+        clock.value = 1;
+        const again = await guarded({ key: "proj/user", deps: failedDeps });
+
+        expect(again).toEqual(outcome);
+        expect(run).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
 });
 
 describe("buildProductionLangyCanaryDeps", () => {

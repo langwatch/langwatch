@@ -32,7 +32,7 @@ The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be o
 | --- | --- | --- |
 | `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
 | `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
-| `429` | `{ "status": "busy" }` | A check for the same key is still running. Poll less often. |
+| `429` | `{ "status": "busy" }` | A check for the same key is still running, or its last one timed out less than 55 seconds ago. Poll less often. |
 | `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
 
 Every response the probe answers itself carries `Cache-Control: no-store`. The one exception is the `404` while the surface flag is off, which is byte-identical to an unmounted path, headers included, so the response does not disclose whether the flag is on. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
@@ -42,5 +42,7 @@ The 55-second budget starts once the key is authenticated, so a slow database ad
 ## What each check costs
 
 Each poll is one real Langy turn: one worker boot and one model call, attributed to the monitor's user in the monitor's project. A 3-minute interval is 480 turns a day.
+
+A check that times out gives up waiting, but the turn it started keeps running until the worker finishes or fails it. So a check that arrives within 55 seconds of a timed-out one is answered `429` rather than starting a second turn, which caps what a monitor polling faster than the interval above can spend. At a 3-minute interval that never applies.
 
 Langy's first turn on a cold worker is the slowest part of the path, so a `timeout` under load or right after a deploy is worth a second look before it is treated as an outage. Most monitors confirm a failure from a second location before alerting, which covers that.

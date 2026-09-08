@@ -156,6 +156,31 @@ Feature: A Langy health check that sends a real greeting and says what broke
     When a new check arrives for the same caller
     Then that check runs
 
+  @unit
+  Scenario: A check arriving straight after a timeout is busy
+    Given a canary run for one caller that answered "timeout"
+    When a new check arrives for the same caller inside one budget
+    Then that check is told the probe is busy
+    And no second turn is started
+
+  @unit
+  Scenario: The reservation a timeout takes lapses after one budget
+    Given a canary run for one caller that answered "timeout"
+    When a new check arrives for the same caller after one budget
+    Then that check runs
+
+  @unit
+  Scenario: A timeout for one caller does not reserve another caller
+    Given a canary run for one caller that answered "timeout"
+    When a check arrives for a different caller inside one budget
+    Then that check runs
+
+  @unit
+  Scenario: A settled unhealthy run that is not a timeout reserves nothing
+    Given a canary run for one caller that answered "turn_failed"
+    When a new check arrives for the same caller inside one budget
+    Then that check runs
+
   # ---------------------------------------------------------------------------
   # Route — GET /api/health/langy
   # ---------------------------------------------------------------------------
