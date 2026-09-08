@@ -88,7 +88,10 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
    A `select` object is a module const. This is the only file that names Prisma.
 3. `repositories/memory/memory.<x>.repository.ts`: the same observable behaviour over
    arrays or a `Map`; the same errors thrown for the same absences. Several twins that
-   share rows share a `memory.<f>.database.ts`.
+   share rows share a `memory.<f>.database.ts`. A twin is only proven by a contract test
+   (`repositories/__tests__/<x>.repository.contract.test.ts`) that runs the same cases
+   against the memory and the Prisma backends; the installation test booting over the
+   twin proves nothing about the twin. Five features landed without one on 2026-09-08.
 4. `repositories/<f>.repositories.ts` (the bundle interface),
    `repositories/prisma/prisma.<f>.repositories.ts` (`prismaRepositories({...})`),
    `repositories/memory/memory.<f>.repositories.ts` (`static readonly requires = [] as const`,
@@ -228,6 +231,17 @@ layers under `model/`, `behavior/`, `ui/` do not move.
   it used to be (`LegacyApiKeyGrantService` is a smell to resolve, not to carry).
 - A gap you cannot close in this change (a peer feature with no `*Api` token yet, a job
   the worker registry freezes) is named in the report with the file that blocks it.
+- The spec wins. If the converted code answers differently from a bound scenario or a doc
+  comment (a refusal that now succeeds, a status that changed), the code is wrong: fix the
+  code, never the assertion. A lane once rewrote a test so a key bound to nobody could
+  write a secret; the spec said otherwise.
+- Read before you delete. `git diff` and read every file in a directory before `rm`; a
+  lane deleted `adapters/` unread and lost another lane's uncommitted edits to two tests.
+  Edit/Write for every change, no scripted rewrites (`sed`, heredocs) over files you have
+  not read; a moved file goes with `mv`, not `git mv` (lanes never touch the index).
+- A memory twin, a Prisma repository and a service are three files, not one 500-line
+  class: an app past ~30 public operations is several features wearing one door; say so
+  in the report rather than folding a fifth namespace in.
 
 ## Report
 
