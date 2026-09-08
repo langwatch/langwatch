@@ -22,6 +22,15 @@ Feature: One cost screen, three honest lanes
     Given an organization with billed and gateway cost available
 
   @integration
+  Scenario: The department filter explains that it changes only the department chart
+    Given cost activity in two departments
+    And the viewer holds both governanceCost:view and activityMonitor:view
+    When a permitted viewer selects one department on the cost screen
+    Then the filter says it applies only to the Cost by department chart
+    And that chart shows only the selected department
+    And the billed total, gateway total and cost-by-user panel stay unchanged
+
+  @integration
   Scenario: Each lane renders its own labeled total
     Given billed and gateway totals that differ from each other
     When a permitted viewer opens the cost screen
