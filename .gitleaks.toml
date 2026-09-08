@@ -317,22 +317,36 @@ description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway
 targetRules = ["curl-auth-header"]
 regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
 
-# `conversations30Days`, one entry in the governance tool card's row list
-# (`TOOL_CARD_ROWS`). The list names the rows a card prints — seats, licence per
-# month, tokens over thirty days, and so on — and every entry is a plain string
-# identifier the UI keys its labels off.
+# `TOOL_CARD_ROWS` in the governance tool card names the rows a card prints —
+# seats, licence per month, tokens over thirty days, and so on. Every entry is a
+# plain string identifier the UI keys its labels off. Nobody issued any of them,
+# they authenticate against nothing, and there is nothing to revoke.
 #
-# gitleaks reads the pair as `tokens30Days": "conversations30Days"`: the
-# `generic-api-key` rule fires on a `...token...": "<high-entropy value>"`
-# shape, and two adjacent camel-case identifiers in a string array are exactly
-# that shape. Reordering the list to separate them would silence this by
-# accident and re-break the moment anyone sorted it.
+# gitleaks reads consecutive array entries as a key/value pair: the finding is
+# reported on the `"tokens30Days",` line and names the NEXT entry as the secret,
+# because `generic-api-key` fires on a `...token...": "<high-entropy value>"`
+# shape and two adjacent camel-case identifiers are exactly that shape.
 #
-# Nobody issued this value, it authenticates against nothing, and there is
-# nothing to revoke. Scoped by VALUE and ANCHORED, for the reason given above
-# the block before it: a substring allowlist would also permit a real token
-# that merely starts with it.
+# So the trigger is POSITION, not the value — whichever row happens to follow
+# `tokens30Days` is the one accused. It is also entropy-dependent, which makes
+# it worse rather than better: of seven plausible row names tested in that slot,
+# `completions30Days` and `conversationsPerSeat30Days` trip the rule while
+# `escalations30Days`, `promptsLast7Days`, `integrationsLast30Days`,
+# `deflectionRateLast30Days` and `averageHandleTime30Days` do not. A value-scoped
+# allowlist therefore fixes exactly one arrangement of this list and breaks the
+# build again, unpredictably, the next time someone adds or reorders a row.
+#
+# Scoped by path rather than by value for the same reason the Stripe catalog
+# block above is: a new row must not need a config change to be added.
+#
+# `targetRules` holds this to `generic-api-key` alone, so every other rule still
+# applies to this file by construction. Checked rather than assumed: a synthetic
+# GitHub PAT, Stripe live key and Slack bot token appended to this file are each
+# still reported, identically to the same string in a file this block does not
+# cover.
 [[allowlists]]
-description = "Governance tool-card row identifier `conversations30Days`, not a credential"
+description = "Governance tool-card row identifiers are UI keys, not credentials"
 targetRules = ["generic-api-key"]
-regexes = ['''^conversations30Days$''']
+paths = [
+  '''platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts''',
+]
