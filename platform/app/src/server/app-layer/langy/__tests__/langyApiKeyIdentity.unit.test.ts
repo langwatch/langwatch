@@ -11,11 +11,14 @@ import { resolveLangyKeyIdentity } from "../langyApiKeyIdentity";
  */
 function apiKeyToken({
   userId,
+  apiKeyId = "key-1",
 }: {
   userId: string | null;
+  apiKeyId?: string;
 }): LangyIdentityToken {
   return {
     type: "apiKey",
+    apiKeyId,
     userId,
     project: {
       id: "project-1",
@@ -23,6 +26,11 @@ function apiKeyToken({
     },
   };
 }
+
+const LEGACY_PROJECT_KEY: LangyIdentityToken = {
+  type: "legacyProjectKey",
+  project: { id: "project-1", team: { organizationId: "org-1" } },
+};
 
 describe("resolveLangyKeyIdentity", () => {
   /** @scenario A key owned by a user with Langy access resolves to that user */
@@ -34,7 +42,10 @@ describe("resolveLangyKeyIdentity", () => {
       flags: { isEnabled },
     });
 
-    expect(result).toEqual({ ok: true, userId: "customer-1" });
+    expect(result).toEqual({
+      ok: true,
+      actor: { type: "user", id: "customer-1" },
+    });
     // The gate is asked about the key's OWNER, not the key or the project.
     expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
       distinctId: "customer-1",
@@ -75,24 +86,65 @@ describe("resolveLangyKeyIdentity", () => {
       flags: { isEnabled },
     });
 
-    expect(before).toEqual({ ok: true, userId: "customer-3" });
+    expect(before).toEqual({
+      ok: true,
+      actor: { type: "user", id: "customer-3" },
+    });
     expect(after.ok).toBe(false);
     expect(after).toMatchObject({ reason: "no-access" });
   });
 
-  /** @scenario A key owned by no user is refused rather than evaluated on project alone */
-  it("refuses an ownerless key without consulting the gate", async () => {
+  /**
+   * @scenario A service key acts as itself when its project is in the cohort
+   * @scenario A service key with no owning user is admitted and the turn runs as the key
+   */
+  it("resolves a service key to the key itself, judged by its project and organization", async () => {
     const isEnabled = vi.fn().mockResolvedValue(true);
 
     const result = await resolveLangyKeyIdentity({
-      resolved: apiKeyToken({ userId: null }),
+      resolved: apiKeyToken({ userId: null, apiKeyId: "service-key-1" }),
+      flags: { isEnabled },
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      actor: { type: "apiKey", id: "service-key-1" },
+    });
+    // The gate is asked with the KEY as the distinct id and the key's real
+    // project and organization, so only a rule naming one of those admits it.
+    expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+      distinctId: "service-key-1",
+      projectId: "project-1",
+      organizationId: "org-1",
+    });
+  });
+
+  /** @scenario A service key whose project is outside the cohort is refused */
+  it("refuses a service key when neither its project nor its organization is opted in", async () => {
+    const isEnabled = vi.fn().mockResolvedValue(false);
+
+    const result = await resolveLangyKeyIdentity({
+      resolved: apiKeyToken({ userId: null, apiKeyId: "service-key-2" }),
+      flags: { isEnabled },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ reason: "no-access" });
+  });
+
+  /** @scenario The project's own key is refused because it has no identity to act as */
+  it("refuses the legacy project key without consulting the gate", async () => {
+    const isEnabled = vi.fn().mockResolvedValue(true);
+
+    const result = await resolveLangyKeyIdentity({
+      resolved: LEGACY_PROJECT_KEY,
       flags: { isEnabled },
     });
 
     expect(result.ok).toBe(false);
     expect(result).toMatchObject({ reason: "unowned" });
-    // Fail closed: an ownerless key must not inherit access from a project
-    // whose flag happens to be on.
+    // Fail closed: the project key has no bindings and no id of its own, so
+    // there is no principal for the gate to judge.
     expect(isEnabled).not.toHaveBeenCalled();
   });
 
@@ -110,7 +162,10 @@ describe("resolveLangyKeyIdentity", () => {
       flags: { isEnabled },
     });
 
-    expect(result).toEqual({ ok: true, userId: "owner-1" });
+    expect(result).toEqual({
+      ok: true,
+      actor: { type: "user", id: "owner-1" },
+    });
     expect(isEnabled).toHaveBeenCalledWith(
       "release_langy_enabled",
       expect.objectContaining({ distinctId: "owner-1" }),

@@ -734,18 +734,18 @@ const registry = {
   },
   langy_api_key_unowned: {
     tips: [
-      "This key has no owning user, so there is no one for the turn to act as; mint a personal API key and use that instead",
+      "The project's own key has no identity to act as; use an API key from the organization's API keys page, either a personal key or a service key, with Langy access in this project",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   langy_api_key_no_langy_access: {
     tips: [
-      "The user who owns this key cannot use Langy in this project; ask a workspace admin to grant Langy access, then retry",
+      "The user who owns this key, or the project for a service key, cannot use Langy here; ask a workspace admin to grant Langy access, then retry",
     ],
   },
   langy_api_actor_missing: {
     tips: [
-      "The user who owns this key no longer exists; mint a new key under a current user",
+      "The user or service key behind this request no longer exists; mint a new key and retry",
     ],
   },
   langy_api_request_invalid: {

@@ -34,8 +34,9 @@ Feature: A Langy health check that sends a real greeting and says what broke
   routes' own, in the same order, as POST /api/langy/conversations: a project
   API key resolves (else 401), the surface flag is open (else the same 404 an
   unmounted path gives), the key clears the `langy:create` ceiling (else 403),
-  and the key's owner is in the Langy cohort (else 403). The turn runs as that
-  owner. No new env var and no new credential class is involved.
+  and the key's principal is in the Langy cohort (else 403): the owner for a
+  personal key, the key itself for a service key. The turn runs as that
+  principal. No new env var and no new credential class is involved.
 
   # Bindings:
   #   platform/app/src/server/health-probes/langy-canary.service.ts
@@ -124,7 +125,7 @@ Feature: A Langy health check that sends a real greeting and says what broke
     Then the run is unhealthy with reason "timeout"
 
   @unit
-  Scenario: The production turn is the greeting, sent as the key's owner
+  Scenario: The production turn is the greeting, sent as the key's principal
     Given the project and session the auth chain resolved
     When the production deps start the turn
     Then the turn service receives one user message "Hi Langy."
@@ -212,6 +213,13 @@ Feature: A Langy health check that sends a real greeting and says what broke
     When GET /api/health/langy is called
     Then the response is 403 with the denial's message, in the shape the sibling probes use
     And no turn is started
+
+  @unit
+  Scenario: A service key with no owning user is admitted and the turn runs as the key
+    Given a service key, an API key issued to no user, with langy:create in a project in the Langy cohort
+    When the auth chain resolves the identity behind the key
+    Then the resolved actor is the key itself
+    And the turn is attributed to the key, not to any person
 
   @unit
   Scenario: A healthy run answers 200 with the turn's ids

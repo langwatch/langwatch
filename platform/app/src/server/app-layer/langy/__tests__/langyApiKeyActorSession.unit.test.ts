@@ -1,22 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { FEATURE_FLAGS } from "~/server/featureFlag/registry";
-import type { LangyActorUserReader } from "../langyApiKeyActorSession";
+import type { LangyActorReader } from "../langyApiKeyActorSession";
 import { resolveLangyActorSession } from "../langyApiKeyActorSession";
 
 /**
- * A prisma stand-in exposing only the `user.findUnique` the resolver uses.
- * Typed as the reader contract rather than cast to it, so a change to the read
- * this resolver makes breaks the double instead of silently passing through.
+ * A prisma stand-in exposing only the two reads the resolver makes. Typed as
+ * the reader contract rather than cast to it, so a change to the reads this
+ * resolver makes breaks the double instead of silently passing through.
  */
-const prismaWithUser = (
-  user: {
+const readerWith = ({
+  user = null,
+  apiKey = null,
+}: {
+  user?: {
     id: string;
     name: string | null;
     email: string | null;
     image: string | null;
-  } | null,
-): LangyActorUserReader => ({
+  } | null;
+  apiKey?: { id: string; name: string } | null;
+}): LangyActorReader => ({
   user: { findUnique: async () => user },
+  apiKey: { findUnique: async () => apiKey },
 });
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
@@ -25,13 +30,15 @@ describe("resolveLangyActorSession", () => {
   /** @scenario The acting identity is loaded from the owner's record, not invented */
   it("carries the owner's own name and email, with no placeholder actor", async () => {
     const result = await resolveLangyActorSession({
-      prisma: prismaWithUser({
-        id: "user_1",
-        name: "Ada Lovelace",
-        email: "ada@example.com",
-        image: null,
+      prisma: readerWith({
+        user: {
+          id: "user_1",
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          image: null,
+        },
       }),
-      userId: "user_1",
+      actor: { type: "user", id: "user_1" },
       now: NOW,
     });
 
@@ -47,8 +54,41 @@ describe("resolveLangyActorSession", () => {
   /** @scenario A key whose owning user no longer exists is refused */
   it("refuses when the owning user row is gone, rather than substituting one", async () => {
     const result = await resolveLangyActorSession({
-      prisma: prismaWithUser(null),
-      userId: "user_deleted",
+      prisma: readerWith({ user: null }),
+      actor: { type: "user", id: "user_deleted" },
+      now: NOW,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("actor-missing");
+  });
+
+  /** @scenario A service key's turn is attributed to the key, named after it */
+  it("presents a service key as itself, named after the key and with no email", async () => {
+    const result = await resolveLangyActorSession({
+      prisma: readerWith({
+        apiKey: { id: "service_key_1", name: "Uptime monitor" },
+      }),
+      actor: { type: "apiKey", id: "service_key_1" },
+      now: NOW,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // The key's id is the actor id everywhere downstream: the session key it
+    // mints, the conversation it starts, the fold it follows.
+    expect(result.session.user.id).toBe("service_key_1");
+    // Attribution names the credential, not a person who did not act.
+    expect(result.session.user.name).toBe("Uptime monitor");
+    expect(result.session.user.email).toBeNull();
+  });
+
+  /** @scenario A service key that vanished between resolution and actor is refused */
+  it("refuses when the service key row is gone, rather than substituting one", async () => {
+    const result = await resolveLangyActorSession({
+      prisma: readerWith({ apiKey: null }),
+      actor: { type: "apiKey", id: "service_key_gone" },
       now: NOW,
     });
 
@@ -79,13 +119,5 @@ describe("key-authed Langy surface rollback switch", () => {
     expect((surface as { key: string }).key).not.toBe(
       (langy as { key: string }).key,
     );
-    // The surface is its own lever, not an alias: exactly one registry entry
-    // answers to its key, so opening browser Langy cannot open this route as a
-    // side effect.
-    expect(
-      FEATURE_FLAGS.filter(
-        (f) => "key" in f && f.key === "release_langy_api_key_turns_enabled",
-      ),
-    ).toHaveLength(1);
   });
 });

@@ -105,8 +105,18 @@ async function authorize(c: Context) {
       identity.message,
     );
   }
+  // The local surface stores the actor as a user id and later rebuilds the
+  // acting session from the User table, so a service key has no row to act
+  // from there. Refuse it here, at the door, with the reason spelled out,
+  // rather than admitting it and dropping every folder turn as actor-missing.
+  if (identity.actor.type !== "user") {
+    throw new LangyApiIdentityDeniedError(
+      "langy_api_key_unowned",
+      "The local Langy surface runs as a person. Use a personal API key here; service keys are accepted by the conversation and health endpoints only.",
+    );
+  }
   return {
-    userId: identity.userId,
+    userId: identity.actor.id,
     projectId: resolved.project.id,
     projectName: resolved.project.name,
     projectSlug: resolved.project.slug,

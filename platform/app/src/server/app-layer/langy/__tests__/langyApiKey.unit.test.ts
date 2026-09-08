@@ -41,6 +41,14 @@ vi.mock("~/server/api-key/api-key.service", () => ({
   },
 }));
 
+// A service key's ceiling is its own bindings, answered by the permissions
+// service's batched api-key cut (the same decision `enforceApiKeyCeiling`
+// asks per permission).
+const apiKeyProjectCuts = vi.fn();
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ permissions: { apiKeyProjectCuts } }),
+}));
+
 import { hasPermissionWithHierarchy } from "~/server/api/rbac";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
@@ -54,8 +62,10 @@ import { LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langyPermissionPolicy";
 const SESSION = { user: { id: "user-1" }, expires: "1" } as any;
 // The mint resolves the project's team once (a TEAM binding inherits to its
 // projects) and hands it to the batched resolution.
+const apiKeyFindUnique = vi.fn();
 const prisma = {
   project: { findUnique: vi.fn().mockResolvedValue({ teamId: "team-1" }) },
+  apiKey: { findUnique: apiKeyFindUnique },
 } as any;
 
 // The full candidate surface, in declaration order — used to assert the "all
@@ -70,6 +80,9 @@ const ALL_CANDIDATES = [...LANGY_CANDIDATE_PERMISSIONS];
 
 beforeEach(() => {
   batchProjectPermissions.mockReset();
+  apiKeyProjectCuts.mockReset();
+  apiKeyFindUnique.mockReset();
+  apiKeyFindUnique.mockResolvedValue(null);
   apiKeyCreate.mockReset();
   apiKeyCreate.mockResolvedValue({
     token: "sk-lw-minted",
@@ -394,6 +407,122 @@ describe("mintLangySessionApiKey", () => {
           mintLangySessionApiKey({
             prisma,
             session: SESSION,
+            projectId: "proj-1",
+            organizationId: "org-1",
+          }),
+        ).rejects.toBeInstanceOf(LangySessionKeyScopeError);
+
+        expect(apiKeyCreate).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // A service key (an API key issued to no user, the credential an uptime
+  // monitor holds) acts as itself: the actor id names the key row, and the
+  // session key is clamped to the KEY's own bindings rather than a person's.
+  describe("given a service key acting as itself", () => {
+    const SERVICE_KEY_SESSION = {
+      user: { id: "service-key-1", name: "Uptime monitor" },
+      expires: "1",
+    } as any;
+
+    beforeEach(() => {
+      // No user row holds anything under that id...
+      batchProjectPermissions.mockResolvedValue([]);
+      // ...but a live service key of this organization does.
+      apiKeyFindUnique.mockResolvedValue({
+        id: "service-key-1",
+        userId: null,
+        organizationId: "org-1",
+        revokedAt: null,
+        expiresAt: null,
+      });
+      const held = new Set(["langy:create", "prompts:view", "datasets:view"]);
+      apiKeyProjectCuts.mockImplementation(
+        ({ permissions }: { permissions: readonly string[] }) =>
+          Promise.resolve(
+            new Map(
+              permissions.map((p) => [p, new Map([["proj-1", held.has(p)]])]),
+            ),
+          ),
+      );
+    });
+
+    describe("when a session key is minted", () => {
+      /** @scenario A service key mints a session key clamped to its own bindings */
+      it("requests an unowned, restricted, project-scoped key carrying exactly what the service key holds", async () => {
+        await mintLangySessionApiKey({
+          prisma,
+          session: SERVICE_KEY_SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        // The ceiling was asked about the KEY, with no owner to intersect.
+        expect(apiKeyProjectCuts).toHaveBeenCalledWith(
+          expect.objectContaining({
+            apiKeyId: "service-key-1",
+            userId: null,
+            organizationId: "org-1",
+            projects: [{ projectId: "proj-1", teamId: "team-1" }],
+          }),
+        );
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        // Unowned like its parent: a service key's own bindings are its
+        // ceiling, and the child's restricted grant list is that ceiling cut
+        // to what Langy may hold.
+        expect(arg.userId).toBeNull();
+        expect(arg.createdByUserId).toBeNull();
+        expect(arg.permissionMode).toBe("restricted");
+        expect(arg.bindings).toEqual([
+          { role: "CUSTOM", scopeType: "PROJECT", scopeId: "proj-1" },
+        ]);
+        expect(arg.permissions).toEqual(
+          ALL_CANDIDATES.filter((p) =>
+            ["prompts:view", "datasets:view"].includes(p),
+          ),
+        );
+        expect(arg.permissions).not.toContain("langy:create");
+      });
+
+      /** @scenario A service key from another organization cannot mint here */
+      it("refuses when the id names a key of a different organization", async () => {
+        apiKeyFindUnique.mockResolvedValue({
+          id: "service-key-1",
+          userId: null,
+          organizationId: "org-other",
+          revokedAt: null,
+          expiresAt: null,
+        });
+
+        await expect(
+          mintLangySessionApiKey({
+            prisma,
+            session: SERVICE_KEY_SESSION,
+            projectId: "proj-1",
+            organizationId: "org-1",
+          }),
+        ).rejects.toBeInstanceOf(LangySessionKeyScopeError);
+
+        expect(apiKeyProjectCuts).not.toHaveBeenCalled();
+        expect(apiKeyCreate).not.toHaveBeenCalled();
+      });
+
+      it("refuses a service key that holds none of Langy's permissions in the project", async () => {
+        apiKeyProjectCuts.mockImplementation(
+          ({ permissions }: { permissions: readonly string[] }) =>
+            Promise.resolve(
+              new Map(
+                permissions.map((p) => [p, new Map([["proj-1", false]])]),
+              ),
+            ),
+        );
+
+        await expect(
+          mintLangySessionApiKey({
+            prisma,
+            session: SERVICE_KEY_SESSION,
             projectId: "proj-1",
             organizationId: "org-1",
           }),

@@ -901,7 +901,7 @@ function defaultTurnStarter(prisma: PrismaClient): ControlTurnStarter {
     async start({ projectId, conversationId, userId, text, idempotencyKey }) {
       const actor = await resolveLangyActorSession({
         prisma,
-        userId,
+        actor: { type: "user", id: userId },
         now: new Date(),
       });
       if (!actor.ok) {

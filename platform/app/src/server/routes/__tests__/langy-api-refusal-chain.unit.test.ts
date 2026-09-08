@@ -161,7 +161,7 @@ describe("/api/langy refusal chain", () => {
     mockEnforceApiKeyCeiling.mockResolvedValue(undefined);
     mockResolveLangyKeyIdentity.mockResolvedValue({
       ok: true,
-      userId: "user-1",
+      actor: { type: "user", id: "user-1" },
     });
     mockResolveLangyActorSession.mockResolvedValue({
       ok: true,
@@ -255,8 +255,8 @@ describe("/api/langy refusal chain", () => {
       expect(mockEnforceApiKeyCeiling).toHaveBeenCalled();
     });
 
-    /** @scenario "A key owned by no user is refused rather than evaluated on project alone" */
-    it("refuses a key with no owning user as 403", async () => {
+    /** @scenario "The project's own key is refused because it has no identity to act as" */
+    it("refuses the project's own key as 403", async () => {
       mockResolveLangyKeyIdentity.mockResolvedValue({
         ok: false,
         reason: "unowned" satisfies LangyIdentityDenialReason,

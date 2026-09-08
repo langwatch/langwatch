@@ -2712,19 +2712,19 @@ const presentations = {
       "The token did not resolve to a project. Check it was copied whole and has not been revoked.",
   },
   langy_api_key_unowned: {
-    title: "Key has no owner",
+    title: "Key has no identity to act as",
     describe: () =>
-      "A Langy turn acts as a user, and this key has no owning user to act as. Use a personal API key instead.",
+      "The project's own API key cannot start a Langy turn. Use an API key from the organization's API keys page, a personal key or a service key, with Langy access in this project.",
   },
   langy_api_key_no_langy_access: {
     title: "No Langy access",
     describe: () =>
-      "The user who owns this key cannot use Langy in this project. A workspace admin can grant that access.",
+      "The user who owns this key, or the project for a service key, cannot use Langy here. A workspace admin can grant that access.",
   },
   langy_api_actor_missing: {
-    title: "Key owner is gone",
+    title: "Actor is gone",
     describe: () =>
-      "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+      "The user or service key behind this request no longer exists, so the turn has nothing to act as. Mint a new key and retry.",
   },
   langy_api_request_invalid: {
     title: "Invalid request body",

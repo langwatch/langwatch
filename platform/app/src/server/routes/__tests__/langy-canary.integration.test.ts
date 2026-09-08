@@ -133,7 +133,7 @@ describe("GET /api/health/langy", () => {
     mockEnforceApiKeyCeiling.mockResolvedValue(undefined);
     mockResolveLangyKeyIdentity.mockResolvedValue({
       ok: true,
-      userId: "user-1",
+      actor: { type: "user", id: "user-1" },
     });
     mockResolveLangyActorSession.mockResolvedValue({
       ok: true,

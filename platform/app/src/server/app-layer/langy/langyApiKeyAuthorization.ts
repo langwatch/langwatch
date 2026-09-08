@@ -32,7 +32,7 @@ const tokenResolver = TokenResolver.create(prisma);
  * with the key before any handler code runs.
  */
 export const LANGY_API_KEY_AUTH_REASON =
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
+  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an actor (the owning user, or the key itself for a service key) by resolveLangyKeyIdentity";
 
 /**
  * Authenticate, open the flag, enforce the ceiling, and bridge to an actor.
@@ -95,7 +95,7 @@ export async function authorizeLangyApiKey(c: {
 
   const actor = await resolveLangyActorSession({
     prisma,
-    userId: identity.userId,
+    actor: identity.actor,
     now: new Date(),
   });
   if (!actor.ok) {

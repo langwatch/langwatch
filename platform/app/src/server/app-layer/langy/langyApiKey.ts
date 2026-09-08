@@ -4,6 +4,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
+import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
 import { langyCandidatePermissions } from "./langyPermissionPolicy";
@@ -255,18 +256,22 @@ export class LangySessionKeyScopeError extends Error {
  *     so the blast radius is small in both breadth (the user's own access) and
  *     time.
  *
- * Identity source: this keys off the CALLER'S user identity, not a browser
- * session per se — it only reads `session.user.id` (to own the key) and passes
- * the session to `probeProjectPermission` (to intersect the caller's own
- * permissions). Langy chat is session-gated today, so `session` always comes
- * from a logged-in user. If/when Langy is exposed to programmatic (API-key)
- * callers, the route resolves the API key to its owning user and passes THAT
- * identity here unchanged — the own-the-user + intersect-permissions logic is
- * identical regardless of how the caller authenticated. Nothing here assumes a
- * browser session beyond the user id.
+ * Identity source: this keys off the CALLER'S identity, not a browser session
+ * per se — it only reads `session.user.id` (to own the key) and passes the
+ * session to the batched permission resolution (to intersect the caller's own
+ * permissions). A browser session and a personal API key both resolve to a
+ * user and take that path unchanged. A service key (an API key issued to no
+ * user, the credential an uptime monitor holds) acts as itself: the key-authed
+ * routes hand its id in as `session.user.id`, and when no user holds anything
+ * under that id the mint asks whether a live service key of this organization
+ * does. That key's own role bindings are then the ceiling — the same ceiling
+ * `resolveApiKeyPermission` already applies to an ownerless key — and the
+ * child is minted unowned like its parent. Asking the user path first keeps
+ * the human turn at its four queries; the service branch costs one more read
+ * and only ever runs when the user path came back empty.
  *
- * Throws `LangySessionKeyScopeError` when the held subset is empty — a user with
- * zero Langy-relevant permissions must not receive a key at all.
+ * Throws `LangySessionKeyScopeError` when the held subset is empty — an actor
+ * with zero Langy-relevant permissions must not receive a key at all.
  */
 export async function mintLangySessionApiKey({
   prisma,
@@ -342,12 +347,29 @@ export async function mintLangySessionApiKey({
     },
   );
 
+  // Nothing held as a user: a service key acting as itself, clamped to its
+  // own bindings, or nobody at all.
+  const serviceKey =
+    heldPermissions.length === 0
+      ? await resolveServiceKeyCut({
+          prisma,
+          session,
+          projectId,
+          organizationId,
+        })
+      : null;
+  if (serviceKey) heldPermissions.push(...serviceKey.held);
+
   if (heldPermissions.length === 0) {
     throw new LangySessionKeyScopeError(
       "You do not hold any of the permissions Langy needs in this project, " +
         "so no Langy session key could be created for you.",
     );
   }
+
+  // Owned by whoever is acting: the user, or nobody for a service key, whose
+  // own bindings were the ceiling above.
+  const ownerUserId = serviceKey ? null : session.user.id;
 
   const service = ApiKeyService.create(prisma);
   // Its own span: this is the INSERT (plus the ceiling check). Separating it from
@@ -374,9 +396,8 @@ export async function mintLangySessionApiKey({
           "Ephemeral per-session key for the Langy assistant. Mirrors your own " +
           "permissions in this project and auto-expires — revoked automatically " +
           "when it lapses.",
-        // OWNED by the requesting user → their permissions are the ceiling.
-        userId: session.user.id,
-        createdByUserId: session.user.id,
+        userId: ownerUserId,
+        createdByUserId: ownerUserId,
         organizationId,
         permissionMode: "restricted",
         permissions: heldPermissions,
@@ -389,4 +410,74 @@ export async function mintLangySessionApiKey({
 
   getLangySessionKeysCounter("minted").inc();
   return { token, apiKeyId: apiKey.id };
+}
+
+/**
+ * The service key `session.user.id` names, and the Langy candidates its own
+ * bindings grant in `projectId`; null when the id is not a service key here.
+ *
+ * Only a live, ownerless key of this organization counts: a personal key's
+ * id is never an actor (its owner is), and a key of another organization is
+ * refused as not-found so an id cannot mint across tenants. The token
+ * resolver already refused a revoked or expired key at the door; checking
+ * again here is what keeps this honest when the session reached the mint by
+ * a longer path (the pipeline's spawn, the local-control turn) some minutes
+ * after resolution.
+ *
+ * The cut is one batched call through the permissions service, the same
+ * decision `enforceApiKeyCeiling` asks per permission, with no owning user
+ * to intersect. Order follows the candidate list, like the user path.
+ */
+async function resolveServiceKeyCut({
+  prisma,
+  session,
+  projectId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  session: Session;
+  projectId: string;
+  organizationId: string;
+}): Promise<{ id: string; held: Permission[] } | null> {
+  const key = await prisma.apiKey.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      userId: true,
+      organizationId: true,
+      revokedAt: true,
+      expiresAt: true,
+    },
+  });
+  if (!key || key.userId !== null || key.organizationId !== organizationId) {
+    return null;
+  }
+  if (key.revokedAt || (key.expiresAt && key.expiresAt <= new Date())) {
+    return null;
+  }
+
+  const held = await tracer.withActiveSpan(
+    "langy.mint.service_key_cut",
+    { attributes: { "tenant.id": projectId } },
+    async (span) => {
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { teamId: true },
+      });
+      if (!project) return [];
+      const cuts = await getApp().permissions.apiKeyProjectCuts({
+        apiKeyId: key.id,
+        userId: null,
+        organizationId,
+        projects: [{ projectId, teamId: project.teamId }],
+        permissions: [...LANGY_CANDIDATE_PERMISSIONS],
+      });
+      const held = LANGY_CANDIDATE_PERMISSIONS.filter(
+        (permission) => cuts.get(permission)?.get(projectId) === true,
+      );
+      span.setAttribute("langy.permission.held", held.length);
+      return held;
+    },
+  );
+  return { id: key.id, held };
 }

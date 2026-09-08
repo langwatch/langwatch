@@ -122,7 +122,7 @@ async function authorizeUiRequest(c: Context) {
   return {
     dark: false as const,
     resolved,
-    userId: identity.userId,
+    userId: identity.actor.id,
     projectId: resolved.project.id,
   };
 }

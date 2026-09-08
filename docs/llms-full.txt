@@ -60860,7 +60860,7 @@ keywords:
 | Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
 | Check interval | 3 minutes or longer |
 
-The API key must be one issued to a user (Settings → API keys), that user must have Langy access, and the key must carry the `langy:create` permission. The turn runs as that user, so create a dedicated user and key for the monitor rather than reusing a person's. The project's own key from the project settings page has no owning user and is refused with `403`.
+The API key must come from the organization's API keys page (Settings → API keys) and carry the `langy:create` permission on the project. A service key, one issued to no user, is the right credential for a monitor: the turn runs as the key itself, named after it, and the project must have Langy access. A personal key also works, with the turn running as its owner, who must have Langy access. The project's own key from the project settings page has no identity to act as and is refused with `403`.
 
 `X-Project-Id` names the project the turn runs in. A key scoped to exactly one project may omit it; any other key without it is refused with `401`.
 
@@ -60873,7 +60873,7 @@ The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be o
 | `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
 | `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
 | `429` | `{ "status": "busy" }` | A check for the same key is still running, or its last one timed out less than 55 seconds ago. Poll less often. |
-| `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
+| `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, is the project's own key, or its principal has no Langy access. |
 
 Every response the probe answers itself carries `Cache-Control: no-store`. The one exception is the `404` while the surface flag is off, which is byte-identical to an unmounted path, headers included, so the response does not disclose whether the flag is on. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
 

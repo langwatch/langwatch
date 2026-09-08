@@ -4,9 +4,10 @@ Feature: Starting Langy conversations with a project API key
   So that scripts and CI can use the assistant without a browser session
   or a human's password
 
-  # The access decision stays per user (ADR-033): the key names its owner, and
-  # that owner is judged by the same gate the browser surface uses. The key
-  # authenticates the caller; it never names the actor.
+  # The access decision stays per principal (ADR-033): a personal key names its
+  # owner, a service key (issued to no user) names itself, and that principal
+  # is judged by the same gate the browser surface uses. The key authenticates
+  # the caller; a request never names the actor.
 
   # ---------------------------------------------------------------------------
   # Identity bridge — key owner resolved through the Langy access gate
@@ -33,11 +34,38 @@ Feature: Starting Langy conversations with a project API key
     Then resolving the identity behind the same unedited key is refused
 
   @unit
-  Scenario: A key owned by no user is refused rather than evaluated on project alone
-    Given a project API key that is not owned by any individual user
+  Scenario: A service key acts as itself when its project is in the cohort
+    Given a service key, an API key issued to no user, for a project in the Langy cohort
+    When the Langy surface resolves the identity behind the key
+    Then the resolved actor is the key itself
+    And the Langy access gate judged the key by its project and organization
+
+  @unit
+  Scenario: A service key whose project is outside the cohort is refused
+    Given a service key for a project that is not in the Langy cohort
+    When the Langy surface resolves the identity behind the key
+    Then the resolution is refused for lack of Langy access
+
+  @unit
+  Scenario: The project's own key is refused because it has no identity to act as
+    Given the project's own API key from the project settings page
     When the Langy surface resolves the identity behind the key
     Then the resolution is refused as unowned
     And the Langy access gate is not consulted
+
+  @unit
+  Scenario: A service key's turn is attributed to the key, named after it
+    Given a service key with a name on file
+    When the surface builds the acting identity for a turn
+    Then the identity carries the key's id and the key's name
+    And no email and no person is attributed
+
+  @unit
+  Scenario: A service key that vanished between resolution and actor is refused
+    Given a service key whose row has been deleted
+    When the surface builds the acting identity for a turn
+    Then the turn is refused
+    And no stand-in actor is used in the key's place
 
   @unit
   Scenario: The actor is never taken from the request payload
