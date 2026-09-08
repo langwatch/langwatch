@@ -423,7 +423,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/workspace.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/workspace/snapshot.ts",
       "measured": "2026-09-07"
     },
     {
@@ -3807,7 +3807,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/architecture-lint/src/workspace.ts",
+      "key": "complexity|packages/architecture-lint/src/workspace/snapshot.ts",
       "measured": "2026-09-07"
     },
     {
@@ -4823,10 +4823,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/files.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/architecture-lint/src/frontend-ui-boundaries.ts",
       "measured": "2026-09-06"
     },
@@ -4851,7 +4847,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/workspace.ts",
+      "key": "condition-shape|packages/architecture-lint/src/workspace/snapshot.ts",
       "measured": "2026-09-07"
     },
     {

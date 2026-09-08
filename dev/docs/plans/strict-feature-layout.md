@@ -285,9 +285,9 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | fixes | `memory-twin-untested` kind; `*.server.ts` and `*.mount.ts` exempt from the fragment rule; type-only imports no longer make a reader; `.d.ts` package exports are not runtime entrypoints | DONE `a3a8f40a92`, `c1363cbb99`, `f6ea1c26f1` |
 | L1 report and CLI | summary first, 25 per policy, `--all`, `--review-comment-blocks`, exit 0/1/2 pinned, lint queue removed | DONE `111eb16bf2` |
 | L2 one baseline shape | `{ version: 1, policy, entries[{ key, measured, expires?, count? }] }`, `readBaseline`/`formatBaseline`/`shrinkCheck` in `baseline.ts`, stale rows from one code path, six empty baselines and 277 lines of their plumbing deleted, 18 stale composed-exports rows removed; D2 kept per policy behind `enforceExpiry`; `README.md` lists the files | DONE `6a643f6527` |
-| L3 workspace snapshot | one tree walk, module graph through the TS AST, under 10 s | RUNNING |
+| L3 workspace snapshot | `workspace/{layout,module-graph,snapshot}.ts`, one walk, one parse cache, 25 policies take the snapshot, `source-folder-shape` reads value imports from the graph | DONE `58d0a759b9`; 22.6 s → 12.4 s queue-free, the 10 s bar waits on L5 (one AST pass per file) and one changed-files computation |
 | L4 frontend grammar | governed = discovered, flat entries the only spelling, `frontend-ui-boundaries.ts` split four ways | QUEUED (D7) |
-| L5 registry and folders | `policies/index.ts` with `definePolicy`, package passes its own folder rule | QUEUED |
+| L5 registry and folders | `policies/index.ts` with `definePolicy`, package passes its own folder rule | RUNNING (Sonnet) |
 | L6 parity out | own tool; `@inert` tag replaces `LEGACY_INERT` | QUEUED (D1) |
 | L7 repo guards home | 37 tests to the code they guard, 29 failing fixed or deleted | QUEUED (D5) |
 | L8 messages | 289 sites against the contract, `allowed` on every finding | QUEUED |
@@ -297,7 +297,7 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | Lane | Brief | Started |
 | --- | --- | --- |
 | REST runtime round three B | `api-rest-runtime-gaps-3.md` | 09-09 01:3x |
-| lint L3 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 00:5x |
+| lint L5 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 02:0x |
 | wave-4 process wiring | `wave4-process-wiring.md` (dashboard, platform-health, role, suite, authz, user, evaluation, stored-object, monitor) | 09-09 00:5x |
 
 Live briefs kept as work orders: `wave4-process-wiring.md` (RUNNING),

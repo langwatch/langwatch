@@ -39,7 +39,7 @@ Machinery that hardcodes the layout:
   `packages/enterprise/plan-gate`, `packages/enterprise/features/*/*`.
 - root `package.json` scripts `test`, `lint:oxlint`, `lint:fix`, `start:prepare:files` (the evaluator
   generated-file copy path).
-- `packages/architecture-lint/src/workspace.ts` lines ~194–195 (`discoverFeatures`), ~271–436
+- `packages/architecture-lint/src/workspace/snapshot.ts` lines ~194–195 (`discoverFeatures`), ~271–436
   (enterprise root checks, the "aggregate outside packages/enterprise" rule, fixed roots).
 - `packages/architecture-lint/src/comment-block-roots.json`, `feature-shape-baseline.json`,
   `boundary-edge-baseline.json`, `composed-exports-baseline.json`, `oxlint-baseline.json` (keys carry
