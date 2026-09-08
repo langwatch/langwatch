@@ -7,7 +7,7 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";
 import { useState } from "react";
-import { SuiteArchiveDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
+import { SuiteArchiveDialog } from "@langwatch/suite-web/run-dialogs";
 import { Menu } from "@langwatch/design-system/menu";
 import { useNow } from "../../../../behavior/use-now.ts";
 import type { ResultGroup } from "@langwatch/scenario-contract";

@@ -20,7 +20,7 @@ import {
   SuiteContextMenu,
   SuiteRunConfirmationDialog,
   NowProvider,
-} from "@langwatch/suite-web/surfaces/run-dialogs";
+} from "@langwatch/suite-web/run-dialogs";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
 import { SuiteSidebar } from "./suite-sidebar.tsx";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite.ts";

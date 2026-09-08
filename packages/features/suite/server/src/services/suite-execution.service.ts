@@ -7,7 +7,7 @@ import {
   type RunActor,
   type RunSecretCiphertext,
   type ScenarioRunConfig,
-  type ScenarioService,
+  type ScenarioApi,
   withActor,
   withNote,
   withResolvedModels,
@@ -59,7 +59,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
   static create(input: {
     commands: SuiteRunCommandsPort;
     ids: SuiteRunIdPort;
-    scenarios: ScenarioService;
+    scenarios: ScenarioApi;
     /**
      * Reads, once per batch, the models each queued run really runs on. Absent in a context
      * with no model-default resolution behind it; the runs then record no resolved model, the
@@ -78,7 +78,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
   private constructor(
     private readonly commands: SuiteRunCommandsPort,
     private readonly ids: SuiteRunIdPort,
-    private readonly scenarios: ScenarioService,
+    private readonly scenarios: ScenarioApi,
     private readonly resolveRunModels?: SuiteRunModelsResolver,
   ) {
     super();

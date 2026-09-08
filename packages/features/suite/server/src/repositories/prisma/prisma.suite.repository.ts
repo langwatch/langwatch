@@ -268,7 +268,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
     }
   }
 
-  async tryFindById(input: SuiteIdInput): Promise<Suite | null> {
+  async findById(input: SuiteIdInput): Promise<Suite | null> {
     const row = await this.database.simulationSuite.findFirst({
       where: {
         id: input.id,
@@ -280,7 +280,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
     return row ? mapSuite(row) : null;
   }
 
-  async tryFindBySlug(input: { projectId: string; slug: string }): Promise<Suite | null> {
+  async findBySlug(input: { projectId: string; slug: string }): Promise<Suite | null> {
     const row = await this.database.simulationSuite.findFirst({
       where: {
         projectId: input.projectId,

@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
+import type { RunGroupSummary } from "@langwatch/suite-web/run-formatters";
 import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing.ts";
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
 import type {

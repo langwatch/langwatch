@@ -11,7 +11,7 @@ import {
   computeBatchRunSummary,
   computeIterationMap,
   groupRunsByBatchId,
-} from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
 import { useRunHistoryPagination } from "../../suites/use-run-history-pagination.ts";
 import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
 import { api } from "../../scenario-api.ts";

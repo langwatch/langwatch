@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "../scenario-api.ts";
-import { getAdaptivePollingInterval } from "@langwatch/suite-web/surfaces/run-formatters";
+import { getAdaptivePollingInterval } from "@langwatch/suite-web/run-formatters";
 
 interface UseSuiteRunFreshnessOptions {
   /** When provided, scopes the probe to a single scenario set. */

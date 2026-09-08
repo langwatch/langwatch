@@ -2,8 +2,6 @@
  * Scenario Mappings Section
  */
 
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
-
 import { Box, Link, Separator, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
@@ -16,7 +14,7 @@ import {
   fromOutputFieldState,
   resolveOutputField,
   toOutputFieldState,
-} from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
@@ -100,27 +98,7 @@ function buildAgentOutputSource(outputs: Variable[]): AvailableSource {
   };
 }
 
-/**
- * Checks whether at least one source mapping wires to a required scenario input field
- * (`input` or `messages`).
- */
-export function hasScenarioInputMapping(mappings: Record<string, FieldMapping>): boolean {
-  const mappedPaths = Object.values(mappings)
-    .filter((m) => m.type === "source")
-    .map((m) => m.path[0]);
-  return mappedPaths.includes("input") || mappedPaths.includes("messages");
-}
-
-/**
- * Whether the scenario mappings are sufficient to save and run an agent.
- */
-export function isScenarioMappingValid({
-  mappings,
-}: {
-  mappings: Record<string, FieldMapping>;
-}): boolean {
-  return hasScenarioInputMapping(mappings);
-}
+export { hasScenarioInputMapping, isScenarioMappingValid } from "@langwatch/scenario-contract";
 
 export function ScenarioInputMappingSection({
   inputs,

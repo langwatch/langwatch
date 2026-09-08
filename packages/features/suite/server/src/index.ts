@@ -1,7 +1,3 @@
-export {
-  PostgresSuiteAdapter,
-  type PostgresSuiteAdapterOptions,
-} from "./adapters/postgres.suite.adapter.ts";
 export { SuiteRuntimePort, type SuiteEventingCapabilities } from "./ports/suite-runtime.port.ts";
 export {
   ClickHouseSuiteEventingAdapter,
@@ -48,8 +44,8 @@ export {
   type RecordSuiteRunItemStartedCommandData,
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
-export { SuiteTrpcApi } from "./transport/api-trpc/suite.api.ts";
-export type { SuiteTrpcContext, SuiteTrpcProcedures } from "./rules/suite-trpc-context.rules.ts";
+export { suiteTrpcTransport } from "./transport/suite.trpc.ts";
+export { testSuiteTrpcTransport } from "./transport/test-suite.trpc.ts";
 
 /**
  * The feature's application: the one object both of its doors call, and the
@@ -60,8 +56,18 @@ export {
   OrganizationNotFoundForProjectError,
   SuiteApp,
   type SuiteAppDependencies,
+  type SuiteAppInfrastructure,
   type SuiteOrTestSuite,
 } from "./app/suite.app.ts";
+export { suiteServer } from "./suite.server.ts";
+
+/**
+ * The Postgres backend of the tables this feature owns. The process installs it
+ * through the feature's own registry; a test that composes {@link SuiteApp}
+ * against a real database names it directly.
+ */
+export { PostgresSuiteRepositories } from "./repositories/prisma/prisma.suite.repositories.ts";
+export type { SuiteRepositories } from "./repositories/suite.repositories.ts";
 
 /**
  * The app-process REST family this feature owns. The process supplies the bound REST

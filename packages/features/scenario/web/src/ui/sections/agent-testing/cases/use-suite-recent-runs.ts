@@ -9,7 +9,7 @@ import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import {
   computeBatchRunSummary,
   groupRunsByBatchId,
-} from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { type PlanIdentity, planOfSet } from "./plan-of-set.ts";

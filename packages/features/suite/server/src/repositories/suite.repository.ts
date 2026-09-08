@@ -19,8 +19,8 @@ export abstract class SuiteRepository {
     projectId: string;
     scope: SuiteScope;
   }): Promise<string[]>;
-  abstract tryFindById(input: SuiteIdInput): Promise<Suite | null>;
-  abstract tryFindBySlug(input: { projectId: string; slug: string }): Promise<Suite | null>;
+  abstract findById(input: SuiteIdInput): Promise<Suite | null>;
+  abstract findBySlug(input: { projectId: string; slug: string }): Promise<Suite | null>;
   abstract saveManagedRunAll(input: {
     id: string;
     projectId: string;

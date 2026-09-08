@@ -24,7 +24,7 @@ import {
   RunRow,
   type ScenarioRunContextRenderer,
   ScenarioTabConnectedBadge,
-} from "@langwatch/suite-web/surfaces/run-cards";
+} from "@langwatch/suite-web/run-cards";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -33,12 +33,12 @@ import {
   computeGroupSummary,
   groupRunsByBatchId,
   groupRunsByScenarioId,
-} from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
 import {
   useAutoExpansion,
   useRunHistoryStore,
   useScrollToBatch,
-} from "@langwatch/suite-web/surfaces/run-history-store";
+} from "@langwatch/suite-web/run-history-store";
 import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness.ts";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state.ts";
 

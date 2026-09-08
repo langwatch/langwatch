@@ -8,7 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { RunRow, ScenarioTargetRow } from "@langwatch/suite-web/surfaces/run-cards";
+import { RunRow, ScenarioTargetRow } from "@langwatch/suite-web/run-cards";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-web/testing";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({

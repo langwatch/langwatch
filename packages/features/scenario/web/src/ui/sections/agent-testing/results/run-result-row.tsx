@@ -6,7 +6,7 @@
 
 import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
 import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
-import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
+import { buildDisplayTitle } from "@langwatch/suite-web/run-formatters";
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { Menu } from "@langwatch/design-system/menu";
 import { isTerminalStatus } from "@langwatch/scenario-contract";

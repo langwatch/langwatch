@@ -19,10 +19,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -32,6 +28,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -50,6 +48,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "hono": "^4.12.27",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"

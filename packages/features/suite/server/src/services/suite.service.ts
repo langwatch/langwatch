@@ -8,7 +8,6 @@ import {
   SuiteNameTakenError,
   SuiteNotFoundError,
   SuiteScopeNotAllowedError,
-  SuiteService as SuiteServiceContract,
   updateSuiteCommandSchema,
   type CreateSuiteCommand,
   type Suite,
@@ -25,15 +24,16 @@ import {
   type SuiteRunStateInput,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   jsonValueSchema,
   ScenarioTestSuiteNotFoundError,
   type ScenarioTestSuite,
-  type ScenarioService,
+  type ScenarioApi,
 } from "@langwatch/scenario-contract";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port.ts";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
 import { SuiteRunService } from "./suite-run.service.ts";
@@ -43,9 +43,9 @@ const archivedSlugSuffix = "--archived";
 
 export type SuiteServiceOptions = {
   repository: SuiteRepository;
-  scenarios: ScenarioService;
-  agents: AgentService;
-  prompts: PromptService;
+  scenarios: ScenarioApi;
+  agents: AgentApi;
+  prompts: PromptApi;
   execution: SuiteExecutionPort;
   runRepository: SuiteRunReadRepository;
   /**
@@ -56,10 +56,10 @@ export type SuiteServiceOptions = {
    */
   connectedPresence?: ConnectedPresenceReader;
   generateId?: () => string;
-  now?: () => Date;
+  now?: () => Instant;
 };
 
-export class SuiteService extends SuiteServiceContract {
+export class SuiteService {
   static create(options: SuiteServiceOptions): SuiteService {
     return new SuiteService(options);
   }
@@ -69,7 +69,6 @@ export class SuiteService extends SuiteServiceContract {
   private readonly runs: SuiteRunService;
 
   private constructor(private readonly options: SuiteServiceOptions) {
-    super();
     this.runRepository = options.runRepository;
     this.runs = SuiteRunService.create({
       options,
@@ -84,7 +83,7 @@ export class SuiteService extends SuiteServiceContract {
 
   async get(input: SuiteIdInput): Promise<Suite> {
     const parsed = suiteIdInputSchema.parse(input);
-    const suite = await this.tryGet(parsed);
+    const suite = await this.findById(parsed);
     if (!suite) {
       throw new SuiteNotFoundError(parsed.id);
     }
@@ -92,9 +91,9 @@ export class SuiteService extends SuiteServiceContract {
     return suite;
   }
 
-  async tryGet(input: SuiteIdInput): Promise<Suite | null> {
+  async findById(input: SuiteIdInput): Promise<Suite | null> {
     const parsed = suiteIdInputSchema.parse(input);
-    const suite = await this.options.repository.tryFindById(parsed);
+    const suite = await this.options.repository.findById(parsed);
     if (suite) {
       return suite;
     }
@@ -183,7 +182,7 @@ export class SuiteService extends SuiteServiceContract {
 
     return this.options.repository.archive({
       ...suiteIdInputSchema.parse(input),
-      archivedAt: (this.options.now ?? (() => new Date()))(),
+      archivedAt: toDate((this.options.now ?? nowInstant)()),
       archivedSlug,
     });
   }
@@ -292,7 +291,7 @@ export class SuiteService extends SuiteServiceContract {
     slug: string;
     excludeId?: string;
   }): Promise<void> {
-    const existing = await this.options.repository.tryFindBySlug(input);
+    const existing = await this.options.repository.findBySlug(input);
     if (existing && existing.id !== input.excludeId) {
       throw new SuiteNameTakenError(existing.name);
     }

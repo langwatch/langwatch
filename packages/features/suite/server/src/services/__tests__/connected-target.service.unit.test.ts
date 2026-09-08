@@ -4,7 +4,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { connectedAgentSelectability } from "@langwatch/agent-contract";
-import type { Agent, AgentReferenceState, AgentService } from "@langwatch/agent-contract";
+import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 import {
@@ -52,10 +53,10 @@ function baseSuite(overrides: Partial<Suite> = {}): Suite {
   };
 }
 
-/** A fake `AgentService` backed by a small in-memory registry of connected agents. */
-function connectedAgentService(agents: ConnectedAgentFixture[]): AgentService {
+/** An AgentApi fixture backed by a small registry of connected agents. */
+function connectedAgentApi(agents: ConnectedAgentFixture[]): AgentApi {
   const byId = new Map(agents.map((agent) => [agent.id, agent]));
-  return {
+  return createApiFixture<AgentApi>({
     getReferenceStates: vi.fn(async (input: { ids: string[] }): Promise<AgentReferenceState[]> =>
       input.ids
         .map((id) => byId.get(id))
@@ -108,10 +109,10 @@ function connectedAgentService(agents: ConnectedAgentFixture[]): AgentService {
       }
       return owners;
     }),
-  } as unknown as AgentService;
+  });
 }
 
-function buildService(agents: AgentService) {
+function buildService(agents: AgentApi) {
   const execute = vi.fn(async (input: Parameters<SuiteExecutionPort["execute"]>[0]) => ({
     batchRunId: "batch_1",
     setId: `suiteset_${input.suiteId}`,
@@ -199,7 +200,7 @@ describe("running against a personal development agent", () => {
   describe("when a teammate starts the run", () => {
     /** @scenario "A teammate cannot target another person's personal agent" */
     it("refuses the run with agent_owner_only, naming the owner, and schedules nothing", async () => {
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         {
           id: "agent_support",
           name: "support-agent",
@@ -231,7 +232,7 @@ describe("running against a personal development agent", () => {
   describe("when the owner starts the run", () => {
     /** @scenario "The owner can target their own personal agent" */
     it("schedules the run", async () => {
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         {
           id: "agent_support",
           name: "support-agent",
@@ -251,7 +252,7 @@ describe("running against a personal development agent", () => {
   describe("when no person is behind the run", () => {
     /** @scenario "A legacy project key can never target a personal agent" */
     it("refuses the run with agent_owner_only", async () => {
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         {
           id: "agent_support",
           name: "support-agent",
@@ -273,7 +274,7 @@ describe("running against a personal development agent", () => {
   describe("when the agent is scoped to a host instead of a person", () => {
     /** @scenario "A host-scoped development agent is runnable by the team" */
     it("schedules a teammate's run", async () => {
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         {
           id: "agent_support",
           name: "support-agent",
@@ -295,7 +296,7 @@ describe("addressing a connected agent by name and environment", () => {
   describe("when a shared agent of that name exists in that environment", () => {
     /** @scenario "A run can address a connected agent by name and environment" */
     it("resolves the target to the agent's id", async () => {
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         { id: "agent_prod", name: "support-agent", environment: "production", ownerUserId: null },
       ]);
       const { service, execute } = buildService(agents);
@@ -313,7 +314,7 @@ describe("addressing a connected agent by name and environment", () => {
   describe("when no agent of that name exists in that environment", () => {
     /** @scenario "A name and environment that match no agent are refused" */
     it("refuses the run as an invalid target reference", async () => {
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         { id: "agent_prod", name: "support-agent", environment: "production", ownerUserId: null },
       ]);
       const { service, execute } = buildService(agents);
@@ -335,7 +336,7 @@ describe("given a connected target unseen for thirty one days", () => {
     /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
     it("skips it the way it skips an archived target", async () => {
       const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
-      const agents = connectedAgentService([
+      const agents = connectedAgentApi([
         {
           id: "agent_1",
           name: "agent_1",

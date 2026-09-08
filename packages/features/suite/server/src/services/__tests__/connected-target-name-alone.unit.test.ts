@@ -1,25 +1,19 @@
-/**
- * A connected target that names an agent without an environment.
- *
- * The name alone means the agent in development, where the person improving it
- * runs it. When no process is connected there but one other environment has
- * one, that environment is the one; anything else is refused rather than
- * guessed at.
- *
- * @see specs/agents/connected-agents.feature
- */
-import type { Agent, AgentService } from "@langwatch/agent-contract";
+import type { Agent, AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { AgentEnvironmentUnresolvedError } from "@langwatch/agent-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
-import { ConnectedTargetService, type ConnectedPresenceReader } from "../connected-target.service.ts";
+import {
+  ConnectedTargetService,
+  type ConnectedPresenceReader,
+} from "../connected-target.service.ts";
 
 const PROJECT_ID = "project_1";
 
 type Row = { id: string; environment: string; online: boolean };
 
-function agentsOver(rows: readonly Row[]): AgentService {
+function agentsOver(rows: readonly Row[]): AgentApi {
   const asAgent = (row: Row): Agent =>
     ({
       id: row.id,
@@ -29,11 +23,11 @@ function agentsOver(rows: readonly Row[]): AgentService {
       environment: row.environment,
       ownerUserId: null,
     }) as unknown as Agent;
-  return {
+  return createApiFixture<AgentApi>({
     getConnectedByName: async ({ name }: { name: string }) =>
       name === "support-agent" ? rows.map(asAgent) : [],
     getConnectedByNameAndEnvironment: async () => [],
-  } as unknown as AgentService;
+  });
 }
 
 function presenceOver(rows: readonly Row[]): ConnectedPresenceReader {
@@ -79,7 +73,9 @@ describe("given a name registered in development and in production", () => {
   });
 
   describe("when a process is connected in production only", () => {
-    /** @scenario "A name with no environment falls back to the one other environment with a process connected" */
+    /** @scenario
+     * "A name with no environment falls back to the one other environment with a process connected"
+     */
     it("resolves to the production agent", async () => {
       const rows: Row[] = [
         { id: "agent_dev", environment: "development", online: false },
@@ -91,7 +87,9 @@ describe("given a name registered in development and in production", () => {
   });
 
   describe("when no process is connected anywhere", () => {
-    /** @scenario "A name with no environment is refused when no process is connected anywhere" */
+    /** @scenario
+     * "A name with no environment is refused when no process is connected anywhere"
+     */
     it("refuses with agent_environment_unresolved, naming the environments it is registered in", async () => {
       const rows: Row[] = [
         { id: "agent_dev", environment: "development", online: false },
@@ -111,7 +109,10 @@ describe("given a name registered in development and in production", () => {
 
 describe("given a name registered in staging and in production", () => {
   describe("when a process is connected in both", () => {
-    /** @scenario "A name with no environment is refused when several other environments have a process connected" */
+    /** @scenario
+     * "A name with no environment is refused when several other environments have a process
+     * connected"
+     */
     it("refuses with agent_environment_unresolved, naming the environments that are online", async () => {
       const rows: Row[] = [
         { id: "agent_staging", environment: "staging", online: true },

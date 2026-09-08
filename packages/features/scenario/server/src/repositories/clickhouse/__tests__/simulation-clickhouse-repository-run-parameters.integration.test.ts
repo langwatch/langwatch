@@ -12,7 +12,7 @@ import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
 import {
   SuiteExecutionService,
   type QueueSimulationRunCommandData,
-} from "@langwatch/suite-server/testing";
+} from "@langwatch/suite-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

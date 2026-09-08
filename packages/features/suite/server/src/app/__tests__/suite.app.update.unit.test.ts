@@ -1,12 +1,16 @@
 /**
  * @vitest-environment node
  */
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
-import type { ScenarioService, ScenarioTestSuite } from "@langwatch/scenario-contract";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { SimulationService } from "@langwatch/scenario-contract";
-import { SuiteScopeNotAllowedError, type SuiteService } from "@langwatch/suite-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
+import { SuiteScopeNotAllowedError } from "@langwatch/suite-contract";
+import { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
 import { SuiteApp } from "../suite.app.ts";
+import { createSuiteTestRepositories } from "./suite.fixture.ts";
 
 function testSuite(overrides: Partial<ScenarioTestSuite> = {}): ScenarioTestSuite {
   return {
@@ -30,19 +34,124 @@ function testSuite(overrides: Partial<ScenarioTestSuite> = {}): ScenarioTestSuit
   };
 }
 
-function buildApp(overrides: { scenarios?: Partial<ScenarioService> } = {}) {
-  const updateTestSuite = vi.fn().mockResolvedValue(testSuite());
-  const scenarios = {
-    tryGetTestSuite: vi.fn().mockResolvedValue(testSuite()),
+function mockMethod<T extends (...args: never[]) => unknown>(): T {
+  return vi.fn<T>();
+}
+
+const agentApi: AgentApi = {
+  getAll: mockMethod(),
+  getById: mockMethod(),
+  list: mockMethod(),
+  create: mockMethod(),
+  update: mockMethod(),
+  archive: mockMethod(),
+  relatedEntities: mockMethod(),
+  cascadeArchive: mockMethod(),
+  getCopies: mockMethod(),
+  getSourceOfCopy: mockMethod(),
+  copy: mockMethod(),
+  pushToCopies: mockMethod(),
+  syncFromSource: mockMethod(),
+  getHistory: mockMethod(),
+  ownersOf: mockMethod(),
+  getNamesByIds: mockMethod(),
+  getReferenceStates: mockMethod(),
+  getConnectedByNameAndEnvironment: mockMethod(),
+  getConnectedByName: mockMethod(),
+  testTurn: mockMethod(),
+  testRun: mockMethod(),
+};
+
+const promptApi: PromptApi = {
+  getAllPrompts: mockMethod(),
+  tryGetPromptByIdOrHandle: mockMethod(),
+  getAllVersions: mockMethod(),
+  createPrompt: mockMethod(),
+  updatePrompt: mockMethod(),
+  deletePrompt: mockMethod(),
+  syncPrompt: mockMethod(),
+  assignTag: mockMethod(),
+  listTags: mockMethod(),
+  createTag: mockMethod(),
+  renameTag: mockMethod(),
+  tryDeleteTagByName: mockMethod(),
+  listForProject: mockMethod(),
+  tryGetByIdOrHandle: mockMethod(),
+  getByIdOrHandle: mockMethod(),
+  listVersions: mockMethod(),
+  create: mockMethod(),
+  update: mockMethod(),
+  updateHandle: mockMethod(),
+  restoreVersion: mockMethod(),
+  delete: mockMethod(),
+  copyToProject: mockMethod(),
+  duplicate: mockMethod(),
+  applySourceToCopy: mockMethod(),
+  checkHandleUniqueness: mockMethod(),
+  checkModifyPermission: mockMethod(),
+  getTagsForConfig: mockMethod(),
+  listTagsForProject: mockMethod(),
+  getNamesByIds: mockMethod(),
+  getExistingIds: mockMethod(),
+  listCopies: mockMethod(),
+  getCopySource: mockMethod(),
+  createTagForProject: mockMethod(),
+  projectsSharingTagCatalog: mockMethod(),
+  assertMayManageTagCatalog: mockMethod(),
+  renameTagForProject: mockMethod(),
+  deleteTagForProject: mockMethod(),
+};
+
+const projectApi: ProjectApi = {
+  tryGetById: mockMethod(),
+  getOrganizationId: mockMethod(),
+  getWithTeam: mockMethod(),
+  tryGetWithTeam: mockMethod(),
+  listByOrganization: mockMethod(),
+  listByTeam: mockMethod(),
+  create: mockMethod(),
+  updateSettings: mockMethod(),
+  archive: mockMethod(),
+  regenerateLegacyProjectKey: mockMethod(),
+  requestTopicClustering: mockMethod(),
+  touchCodingAgentPullRequestSeen: mockMethod(),
+};
+
+function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
+  const updateTestSuite = vi.fn<ScenarioApi["updateTestSuite"]>().mockResolvedValue(testSuite());
+  const scenarios: ScenarioApi = {
+    list: mockMethod(),
+    listTestSuites: mockMethod(),
+    getReferenceStates: mockMethod(),
+    getRunConfigs: mockMethod(),
+    getModelChoices: mockMethod(),
+    resolveRunParameters: mockMethod(),
+    resolveRunParametersForScenarios: mockMethod(),
+    getNamesByIds: mockMethod(),
+    tryGetTestSuite: vi.fn<ScenarioApi["tryGetTestSuite"]>().mockResolvedValue(testSuite()),
+    createTestSuite: mockMethod(),
     updateTestSuite,
+    getTestSuiteRunDefinition: mockMethod(),
+    archiveTestSuite: mockMethod(),
+    renameTestSuite: mockMethod(),
+    getInternalSuiteSummaries: mockMethod(),
     ...overrides.scenarios,
-  } as unknown as ScenarioService;
+  };
+
+  const execution = new (class extends SuiteExecutionPort {
+    execute = vi.fn<SuiteExecutionPort["execute"]>();
+  })();
 
   const app = SuiteApp.create({
-    suites: {} as SuiteService,
-    scenarios,
-    projects: {} as ProjectService,
-    simulations: {} as SimulationService,
+    repositories: createSuiteTestRepositories(),
+    dependencies: { scenarios, agents: agentApi, prompts: promptApi, projects: projectApi },
+    infrastructure: {
+      execution,
+      resolveClickHouseClient: null,
+      defaultRetentionDays: 30,
+    },
+    config: void 0,
+    resources: new ResourceScope(),
   });
   return { app, updateTestSuite };
 }
@@ -102,7 +211,8 @@ describe("SuiteApp.update", () => {
       expect(updateTestSuite).not.toHaveBeenCalled();
     });
 
-    /** @scenario "Updating a test suite with execution settings is refused with validation_error" */
+    /** @scenario "Updating a test suite with execution settings is refused with validation_error"
+     */
     it("names only the execution field the request carried, leaving the row unchanged", async () => {
       const { app, updateTestSuite } = buildApp();
 
@@ -141,5 +251,26 @@ describe("SuiteApp.update", () => {
         expect.objectContaining({ name: "Refunds v2", labels: ["billing"] }),
       );
     });
+  });
+});
+
+describe("SuiteApp.listByIds", () => {
+  it("keeps matching test suites, omits missing associations and looks up duplicate IDs once", async () => {
+    const lookup = vi.fn<ScenarioApi["tryGetTestSuite"]>(async ({ testSuiteId, projectId }) =>
+      testSuiteId === "test_suite_1" && projectId === "project_1" ? testSuite() : null,
+    );
+    const { app } = buildApp({ scenarios: { tryGetTestSuite: lookup } });
+
+    const suites = await app.listByIds({
+      projectId: "project_1",
+      ids: ["test_suite_1", "missing", "test_suite_1"],
+    });
+
+    expect(suites).toEqual([
+      expect.objectContaining({ id: "test_suite_1", projectId: "project_1" }),
+    ]);
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup).toHaveBeenCalledWith({ testSuiteId: "missing", projectId: "project_1" });
+    expect(await app.listByIds({ projectId: "project_other", ids: ["test_suite_1"] })).toEqual([]);
   });
 });

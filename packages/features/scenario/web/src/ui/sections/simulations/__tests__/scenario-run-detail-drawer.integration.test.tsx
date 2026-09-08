@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
-import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web/surfaces/run-formatters";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web/run-formatters";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing-run-drawer.tsx";
 

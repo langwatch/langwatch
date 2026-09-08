@@ -2,7 +2,8 @@
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
@@ -44,7 +45,7 @@ function baseSuite(overrides: Partial<Suite> = {}): Suite {
 function buildService(overrides: {
   repository?: Partial<SuiteRepository>;
   scenarios?: Partial<ScenarioService>;
-  agents?: Partial<AgentService>;
+  agents?: Partial<AgentApi>;
   execution?: SuiteExecutionPort;
 }) {
   // Spied so a refusal test can assert the plan row was never touched: a
@@ -91,12 +92,12 @@ function buildService(overrides: {
       }),
     } as SuiteExecutionPort);
 
-  const agents: AgentService = {
+  const agents = createApiFixture<AgentApi>({
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({ id, archivedAt: null })),
     getNamesByIds: async ({ ids }: { ids: string[] }) => ids.map((id) => ({ id, name: id })),
     ...overrides.agents,
-  } as unknown as AgentService;
+  });
 
   const service = SuiteService.create({
     repository,

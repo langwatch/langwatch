@@ -7,7 +7,7 @@
 import {
   type BatchRun,
   computeBatchRunSummary,
-} from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
 import { useNow } from "../../../../behavior/use-now.ts";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {

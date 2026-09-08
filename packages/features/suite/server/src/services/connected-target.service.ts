@@ -12,7 +12,7 @@ import {
   isConnectedAgentStale,
   parseConnectedReference,
 } from "@langwatch/agent-contract";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 import {
   parseScenarioParameterDefinitions,
@@ -37,7 +37,7 @@ type ConnectedAgentRow = {
 
 /** The read `resolveConnectedReferences` needs, and nothing more. */
 export type ConnectedTargetReferenceReader = Pick<
-  AgentService,
+  AgentApi,
   "getConnectedByNameAndEnvironment" | "getConnectedByName"
 >;
 
@@ -114,9 +114,9 @@ export class ConnectedTargetService {
   /**
    * Bridges `AgentService.ownersOf` (agent-server's own read of the owner
    * names) to the `AgentOwnerNameReader` port above, so a caller that already
-   * holds an `AgentService` need not read a user store itself.
+   * holds an `AgentApi` need not read a user store itself.
    */
-  static agentOwnerNameReader(agents: Pick<AgentService, "ownersOf">): AgentOwnerNameReader {
+  static agentOwnerNameReader(agents: Pick<AgentApi, "ownersOf">): AgentOwnerNameReader {
     return {
       async findNamesByIds(ids) {
         const owners = await agents.ownersOf(ids.map((ownerUserId) => ({ ownerUserId })));

@@ -6,8 +6,8 @@
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-react";
-import { RunMetricsSummary } from "@langwatch/suite-web/surfaces/run-cards";
-import { type RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
+import { RunMetricsSummary } from "@langwatch/suite-web/run-cards";
+import { type RunGroupSummary } from "@langwatch/suite-web/run-formatters";
 import { Menu } from "@langwatch/design-system/menu";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";

@@ -8,13 +8,13 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { GroupRow } from "@langwatch/suite-web/surfaces/run-cards";
+import { GroupRow } from "@langwatch/suite-web/run-cards";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
   computeGroupSummary,
-} from "@langwatch/suite-web/surfaces/run-formatters";
-import type { RunGroup } from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
+import type { RunGroup } from "@langwatch/suite-web/run-formatters";
 import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({

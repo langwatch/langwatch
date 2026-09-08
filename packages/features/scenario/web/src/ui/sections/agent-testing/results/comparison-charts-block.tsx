@@ -5,8 +5,8 @@
  */
 
 import { Grid } from "@chakra-ui/react";
-import { formatCost, formatLatency } from "@langwatch/suite-web/surfaces/run-formatters";
-import type { BatchRun, RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
+import { formatCost, formatLatency } from "@langwatch/suite-web/run-formatters";
+import type { BatchRun, RunGroupSummary } from "@langwatch/suite-web/run-formatters";
 import {
   MiniBarCard,
   type MiniBarGroup,

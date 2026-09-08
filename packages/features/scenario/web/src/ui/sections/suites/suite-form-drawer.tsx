@@ -14,7 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { applyHandledErrorToForm, describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { FormServerError } from "../../../behavior/errors.tsx";
@@ -23,14 +23,13 @@ import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-draw
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { api } from "../../../behavior/scenario-api.ts";
-import { AgentHttpEditorDrawer } from "../agents/agent-http-editor-drawer.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
 import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section.tsx";
-import { type SuiteFormData, useSuiteForm } from "@langwatch/suite-web/surfaces/suite-form";
-import { ScenarioPicker, TargetPicker } from "@langwatch/suite-web/surfaces/suite-pickers";
+import { type SuiteFormData, useSuiteForm } from "@langwatch/suite-web/suite-form";
+import { ScenarioPicker, TargetPicker } from "@langwatch/suite-web/suite-pickers";
 import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
 
@@ -38,6 +37,7 @@ import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-muta
 export type SuiteFormDrawerProps = {
   onSaved?: (suite: SimulationSuite) => void;
   onRunRequested?: (suite: SimulationSuite) => void;
+  renderHttpEditor(props: { open: boolean; onClose(): void }): ReactNode;
 };
 
 /** Build the mutation payload from validated form data. */
@@ -58,7 +58,7 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
   };
 }
 
-export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
+export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
@@ -503,11 +503,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       {/* Child drawer: Scenario Editor -- managed via local state */}
       <ScenarioFormDrawer open={scenarioEditorOpen} onClose={() => setScenarioEditorOpen(false)} />
 
-      {/* Child drawer: Agent HTTP Editor -- managed via local state */}
-      <AgentHttpEditorDrawer
-        open={agentHttpEditorOpen}
-        onClose={() => setAgentHttpEditorOpen(false)}
-      />
+      {props.renderHttpEditor({
+        open: agentHttpEditorOpen,
+        onClose: () => setAgentHttpEditorOpen(false),
+      })}
     </>
   );
 }

@@ -30,8 +30,8 @@ import {
   RunRow,
   RunSummaryCounts,
   type ScenarioRunContextRenderer,
-} from "@langwatch/suite-web/surfaces/run-cards";
-import { ScenarioRunExportDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
+} from "@langwatch/suite-web/run-cards";
+import { ScenarioRunExportDialog } from "@langwatch/suite-web/run-dialogs";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -42,12 +42,12 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
   resolveOriginLabel,
-} from "@langwatch/suite-web/surfaces/run-formatters";
+} from "@langwatch/suite-web/run-formatters";
 import {
   useAutoExpansion,
   useRunHistoryStore,
   useScrollToBatch,
-} from "@langwatch/suite-web/surfaces/run-history-store";
+} from "@langwatch/suite-web/run-history-store";
 import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs.ts";
 import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination.ts";

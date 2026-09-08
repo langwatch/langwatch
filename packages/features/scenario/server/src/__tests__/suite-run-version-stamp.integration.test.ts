@@ -4,7 +4,7 @@
  * A queued run records the version read at queue time; a later edit never moves it.
  */
 import { randomUUID } from "node:crypto";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -13,22 +13,25 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   SimulationService,
   type Scenario,
+  type ScenarioApi,
   type ScenarioService,
 } from "@langwatch/scenario-contract";
-import type { SuiteService } from "@langwatch/suite-contract";
+import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
 import {
-  PostgresSuiteAdapter,
+  PostgresSuiteRepositories,
+  SuiteApp,
   SuiteExecutionService,
   SuiteRunCommandsPort,
   SuiteRunIdPort,
   type QueueSimulationRunCommandData,
-} from "@langwatch/suite-server/testing";
-import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
+} from "@langwatch/suite-server";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaScenarioAdapter } from "../index.ts";
@@ -90,8 +93,8 @@ class CapturingCommands extends SuiteRunCommandsPort {
 /** Targets are opaque JSON on the suite row, so nothing here needs a real FK. */
 type FakeAgent = { id: string; name: string; type: "http" };
 
-function fakeAgentService(agents: Map<string, FakeAgent>): AgentService {
-  return {
+function fakeAgentApi(agents: Map<string, FakeAgent>): AgentApi {
+  return createApiFixture<AgentApi>({
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
       ids.flatMap((id) => {
         const agent = agents.get(id);
@@ -104,14 +107,37 @@ function fakeAgentService(agents: Map<string, FakeAgent>): AgentService {
       }),
     getConnectedByNameAndEnvironment: async () => [],
     ownersOf: async () => new Map(),
-  } as unknown as AgentService;
+  });
 }
 
-function fakePromptService(): PromptService {
-  return {
+function fakePromptApi(): PromptApi {
+  return createApiFixture<PromptApi>({
     getExistingIds: async () => [],
     getNamesByIds: async () => [],
-  } as unknown as PromptService;
+  });
+}
+
+/**
+ * The scenario capability the suite application reads through, served by this
+ * test's own Prisma-backed scenario service so the versions are the stored ones.
+ */
+function scenarioApiOver(service: ScenarioService): ScenarioApi {
+  return createApiFixture<ScenarioApi>({
+    list: (input) => service.list(input),
+    listTestSuites: (input) => service.listTestSuites(input),
+    tryGetTestSuite: (input) => service.tryGetTestSuite(input),
+    createTestSuite: (input) => service.createTestSuite(input),
+    updateTestSuite: (input) => service.updateTestSuite(input),
+    renameTestSuite: (input) => service.renameTestSuite(input),
+    archiveTestSuite: (input) => service.archiveTestSuite(input),
+    getTestSuiteRunDefinition: (input) => service.getTestSuiteRunDefinition(input),
+    getReferenceStates: (input) => service.getReferenceStates(input),
+    getRunConfigs: (input) => service.getRunConfigs(input),
+    getModelChoices: (input) => service.getModelChoices(input),
+    getNamesByIds: (input) => service.getNamesByIds(input),
+    resolveRunParameters: (input) => service.resolveRunParameters(input),
+    resolveRunParametersForScenarios: (input) => service.resolveRunParametersForScenarios(input),
+  });
 }
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -132,8 +158,9 @@ const namespace = `suite-version-stamp-${randomUUID()}`;
 let organizationId = "";
 let teamId = "";
 let projectId = "";
+let project: ProjectWithTeam | null = null;
 let scenarios: ScenarioService;
-let suites: SuiteService;
+let suites: SuiteApi;
 let commands: CapturingCommands;
 let agents: Map<string, FakeAgent>;
 
@@ -181,7 +208,7 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       data: { name: namespace, slug: namespace, organizationId },
     });
     teamId = team.id;
-    const project = await db.project.create({
+    const created = await db.project.create({
       data: {
         name: namespace,
         slug: namespace,
@@ -190,8 +217,10 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
         language: "typescript",
         framework: "other",
       },
+      include: { team: true },
     });
-    projectId = project.id;
+    projectId = created.id;
+    project = created;
   });
 
   beforeEach(async () => {
@@ -212,19 +241,29 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       clock: new TestClock(),
       secretCipher: new TestSecretCipher(),
     });
-    suites = PostgresSuiteAdapter.create({
-      database: db,
-      scenarios,
-      agents: fakeAgentService(agents),
-      prompts: fakePromptService(),
-      execution: SuiteExecutionService.create({
-        commands,
-        ids: new RunIds(),
-        scenarios,
-      }),
-      resolveClickHouseClient: null,
-      defaultRetentionDays: 30,
-    }).build();
+    const scenarioApi = scenarioApiOver(scenarios);
+    suites = SuiteApp.create({
+      config: undefined,
+      resources: { own: () => undefined, ownService: () => undefined },
+      dependencies: {
+        scenarios: scenarioApi,
+        agents: fakeAgentApi(agents),
+        prompts: fakePromptApi(),
+        projects: createApiFixture<ProjectApi>({
+          tryGetWithTeam: async (id: string) => (id === projectId ? project : null),
+        }),
+      },
+      infrastructure: {
+        execution: SuiteExecutionService.create({
+          commands,
+          ids: new RunIds(),
+          scenarios: scenarioApi,
+        }),
+        resolveClickHouseClient: null,
+        defaultRetentionDays: 30,
+      },
+      repositories: PostgresSuiteRepositories.create({ prisma: db }),
+    });
   });
 
   afterAll(async () => {
@@ -261,7 +300,6 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
     await suites.run({
       id: suite.id,
       projectId,
-      organizationId,
       idempotencyKey: `run-${randomUUID().slice(0, 8)}`,
     });
 
@@ -296,7 +334,6 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
     await suites.run({
       id: suite.id,
       projectId,
-      organizationId,
       idempotencyKey: `run-${randomUUID().slice(0, 8)}`,
     });
 

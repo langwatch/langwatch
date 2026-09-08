@@ -12,12 +12,10 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
-import type { ScenarioService } from "@langwatch/scenario-contract";
-import {
-  ScenarioTestSuiteNotFoundError,
-} from "@langwatch/scenario-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { ScenarioTestSuiteNotFoundError } from "@langwatch/scenario-contract";
 import { SuiteNotFoundError } from "@langwatch/suite-contract";
 import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service.ts";
 import { isAgentTarget } from "../rules/suite-target.rules.ts";
@@ -222,7 +220,7 @@ export class SuiteRunScopeService {
   async resolveScenarioReferences(input: {
     scenarioIds: string[];
     projectId: string;
-    scenarios: ScenarioService;
+    scenarios: ScenarioApi;
   }): Promise<{ active: string[]; archived: string[]; missing: string[] }> {
     const rows = await input.scenarios.getReferenceStates({
       ids: input.scenarioIds,
@@ -250,8 +248,8 @@ export class SuiteRunScopeService {
     targets: SuiteTarget[];
     projectId: string;
     organizationId: string;
-    agents: AgentService;
-    prompts: PromptService;
+    agents: AgentApi;
+    prompts: PromptApi;
   }): Promise<{
     active: SuiteTarget[];
     archived: SuiteTarget[];

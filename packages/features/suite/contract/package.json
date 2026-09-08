@@ -22,7 +22,10 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "zod": "^4.4.3"
   },

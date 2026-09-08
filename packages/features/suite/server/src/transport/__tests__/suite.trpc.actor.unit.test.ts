@@ -2,12 +2,14 @@
  * @vitest-environment node
  * @see specs/scenarios/run-actor-on-runs.feature
  */
-import type { SuiteApp } from "#app/suite.app";
-import type { SuiteRunResult } from "@langwatch/suite-contract";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { SuiteApi, SuiteRunResult } from "@langwatch/suite-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { SuiteTrpcApi } from "../suite.api.ts";
-import type { SuiteTrpcContext } from "../../../rules/suite-trpc-context.rules.ts";
+
+import { suiteTrpcTransport } from "../suite.trpc.ts";
+import { suiteTrpcTestPorts, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
 
 const runResult: SuiteRunResult = {
   batchRunId: "batch_1",
@@ -18,20 +20,16 @@ const runResult: SuiteRunResult = {
 };
 
 function harness(run = vi.fn().mockResolvedValue(runResult)) {
-  const trpc = initTRPC.context<SuiteTrpcContext>().create();
-  const router = SuiteTrpcApi.create(trpc, {
-    protected: trpc.procedure,
-    policy: () => (procedure) => procedure,
-    validateOutput: true,
-  });
+  const trpc = initTRPC.context<SuiteTrpcTestContext>().create();
+  const app = createApiFixture<SuiteApi>({ run });
 
-  const suites = { run } as unknown as SuiteApp;
-  const caller = router.createCaller({
-    app: { suites },
-    actor: () => ({ id: "user_lena" }),
-  });
+  const router = createTrpcRuntime<SuiteTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    ports: suiteTrpcTestPorts(),
+  }).mount(suiteTrpcTransport, () => app);
 
-  return { caller, run };
+  return { caller: router.createCaller({ actor: { id: "user_lena" } }), run };
 }
 
 describe("the actor of a run started from the app", () => {

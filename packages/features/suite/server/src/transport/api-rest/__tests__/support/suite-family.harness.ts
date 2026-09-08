@@ -1,7 +1,9 @@
+import { ResourceScope } from "@langwatch/runtime-composition";
 /**
  * The three suite REST families over the REAL suite application.
  */
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
@@ -482,26 +484,21 @@ function memoryScenarioService(world: SuiteWorld): ScenarioService {
   return namedAbsences(implemented, "scenario");
 }
 
-function memoryAgentService(world: SuiteWorld): AgentService {
-  return namedAbsences(
-    {
-      getReferenceStates: async (input: { ids: string[] }) =>
-        input.ids.flatMap((id) => {
-          const row = world.agents.get(id);
-          return row
-            ? [{ id: row.id, name: row.name, type: row.type, archivedAt: row.archivedAt }]
-            : [];
-        }),
-      getNamesByIds: async (input: { ids: string[] }) =>
-        input.ids.flatMap((id) => {
-          const row = world.agents.get(id);
-          return row ? [{ id: row.id, name: row.name }] : [];
-        }),
-      tryGetByReference: async () => null,
-      findNamesByIds: async () => [],
-    },
-    "agent",
-  );
+function memoryAgentApi(world: SuiteWorld): AgentApi {
+  return createApiFixture<AgentApi>({
+    getReferenceStates: async (input: { ids: string[] }) =>
+      input.ids.flatMap((id) => {
+        const row = world.agents.get(id);
+        return row
+          ? [{ id: row.id, name: row.name, type: row.type, archivedAt: row.archivedAt }]
+          : [];
+      }),
+    getNamesByIds: async (input: { ids: string[] }) =>
+      input.ids.flatMap((id) => {
+        const row = world.agents.get(id);
+        return row ? [{ id: row.id, name: row.name }] : [];
+      }),
+  });
 }
 
 function memoryPromptService(): PromptService {
@@ -597,7 +594,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   const suites = SuiteService.create({
     repository: new MemorySuiteRepository(world),
     scenarios,
-    agents: memoryAgentService(world),
+    agents: memoryAgentApi(world),
     prompts: memoryPromptService(),
     execution: SuiteExecutionService.create({
       commands,
@@ -610,21 +607,26 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   });
 
   const app = SuiteApp.create({
-    suites,
-    scenarios,
-    projects: namedAbsences(
-      {
-        tryGetWithTeam: async () => ({
-          id: TEST_PROJECT.id,
-          team: { organizationId: TEST_PROJECT.organizationId },
-        }),
-      },
-      "project",
-    ) as ProjectService,
-    simulations: namedAbsences(
-      { getInternalSuiteSummaries: async () => [] },
-      "simulation",
-    ) as SimulationService,
+    dependencies: {},
+    infrastructure: {
+      suites,
+      scenarios,
+      projects: namedAbsences(
+        {
+          tryGetWithTeam: async () => ({
+            id: TEST_PROJECT.id,
+            team: { organizationId: TEST_PROJECT.organizationId },
+          }),
+        },
+        "project",
+      ) as ProjectService,
+      simulations: namedAbsences(
+        { getInternalSuiteSummaries: async () => [] },
+        "simulation",
+      ) as SimulationService,
+    },
+    config: void 0,
+    resources: new ResourceScope(),
   });
 
   const security = suiteTestSecurity(options.caller ?? {});

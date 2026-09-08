@@ -17,7 +17,7 @@ export type SuiteClickHouseClient = {
      * Eventing ClickHouse client a background worker composes from — satisfy
      * this port without copying every insert.
      */
-    values: readonly unknown[];
+    values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
     /**
      * The settings map as a driver takes it, rather than the two keys this
@@ -26,7 +26,7 @@ export type SuiteClickHouseClient = {
      * `wait_for_async_insert` here refused the Eventing substrate's own client
      * for describing the same knobs more generally.
      */
-    clickhouse_settings?: Record<string, number>;
+    clickhouse_settings: Record<string, number>;
   }): Promise<unknown>;
 };
 
@@ -39,8 +39,8 @@ export abstract class SuiteClickHousePort {
   }): Promise<SuiteClickHouseQueryResult>;
   abstract insert(input: {
     table: string;
-    values: readonly unknown[];
+    values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
-    clickhouse_settings?: Record<string, number>;
+    clickhouse_settings: Record<string, number>;
   }): Promise<unknown>;
 }

@@ -12,7 +12,7 @@ import type {
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
 import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
-import { SuiteArchiveDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
+import { SuiteArchiveDialog } from "@langwatch/suite-web/run-dialogs";
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailSections } from "./suite-rail-sections.tsx";

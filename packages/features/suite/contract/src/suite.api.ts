@@ -3,6 +3,8 @@ import type {
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
+  SimulationExternalSetSummary,
+  SimulationProjectDateRangeInput,
 } from "@langwatch/scenario-contract";
 import type {
   CreateSuiteCommand,
@@ -35,10 +37,13 @@ export interface SuiteApi {
   ): Promise<
     Readonly<{ kind: "suite"; suite: Suite } | { kind: "test_suite"; testSuite: ScenarioTestSuite }>
   >;
+  /** The organization is the application's to resolve, so no caller states it. */
   resolveArchivedNames(
-    input: SuiteArchivedNamesInput,
+    input: Omit<SuiteArchivedNamesInput, "organizationId">,
   ): Promise<{ scenarios: Record<string, string>; targets: Record<string, string> }>;
-  getInternalSuiteSummaries(input: { projectId: string }): Promise<unknown>;
+  getInternalSuiteSummaries(
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationExternalSetSummary[]>;
   create(input: CreateSuiteCommand): Promise<Suite>;
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
   update(

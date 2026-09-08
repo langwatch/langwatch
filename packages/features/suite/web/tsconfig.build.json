@@ -14,12 +14,12 @@
   "files": [
     "./src/index.ts",
     "./src/__tests__/test-helpers.ts",
-    "./src/surfaces/run-cards.ts",
-    "./src/surfaces/run-dialogs.ts",
-    "./src/surfaces/run-formatters.ts",
-    "./src/surfaces/suite-pickers.ts",
-    "./src/surfaces/run-history-store.ts",
-    "./src/surfaces/suite-form.ts"
+    "./src/run-cards.ts",
+    "./src/run-dialogs.ts",
+    "./src/run-formatters.ts",
+    "./src/run-history-store.ts",
+    "./src/suite-form.ts",
+    "./src/suite-pickers.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioGridCard } from "@langwatch/suite-web/surfaces/run-cards";
+import { ScenarioGridCard } from "@langwatch/suite-web/run-cards";
 import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 const prefetchMock = vi.hoisted(() => vi.fn());

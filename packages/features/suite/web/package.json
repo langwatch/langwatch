@@ -18,29 +18,35 @@
       "types": "./dist/__tests__/test-helpers.d.ts",
       "default": "./src/__tests__/test-helpers.ts"
     },
-    "./surfaces/run-cards": {
-      "types": "./dist/surfaces/run-cards.d.ts",
-      "default": "./src/surfaces/run-cards.ts"
+    "./run-cards": {
+      "langwatch-declaration-source": "./src/run-cards.ts",
+      "types": "./dist/run-cards.d.ts",
+      "default": "./src/run-cards.ts"
     },
-    "./surfaces/run-dialogs": {
-      "types": "./dist/surfaces/run-dialogs.d.ts",
-      "default": "./src/surfaces/run-dialogs.ts"
+    "./run-dialogs": {
+      "langwatch-declaration-source": "./src/run-dialogs.ts",
+      "types": "./dist/run-dialogs.d.ts",
+      "default": "./src/run-dialogs.ts"
     },
-    "./surfaces/run-formatters": {
-      "types": "./dist/surfaces/run-formatters.d.ts",
-      "default": "./src/surfaces/run-formatters.ts"
+    "./run-formatters": {
+      "langwatch-declaration-source": "./src/run-formatters.ts",
+      "types": "./dist/run-formatters.d.ts",
+      "default": "./src/run-formatters.ts"
     },
-    "./surfaces/suite-pickers": {
-      "types": "./dist/surfaces/suite-pickers.d.ts",
-      "default": "./src/surfaces/suite-pickers.ts"
+    "./run-history-store": {
+      "langwatch-declaration-source": "./src/run-history-store.ts",
+      "types": "./dist/run-history-store.d.ts",
+      "default": "./src/run-history-store.ts"
     },
-    "./surfaces/run-history-store": {
-      "types": "./dist/surfaces/run-history-store.d.ts",
-      "default": "./src/surfaces/run-history-store.ts"
+    "./suite-form": {
+      "langwatch-declaration-source": "./src/suite-form.ts",
+      "types": "./dist/suite-form.d.ts",
+      "default": "./src/suite-form.ts"
     },
-    "./surfaces/suite-form": {
-      "types": "./dist/surfaces/suite-form.d.ts",
-      "default": "./src/surfaces/suite-form.ts"
+    "./suite-pickers": {
+      "langwatch-declaration-source": "./src/suite-pickers.ts",
+      "types": "./dist/suite-pickers.d.ts",
+      "default": "./src/suite-pickers.ts"
     }
   },
   "scripts": {

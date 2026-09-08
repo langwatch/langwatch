@@ -11,7 +11,8 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import {
   resolveRunParameters,
@@ -64,8 +65,8 @@ let projectId = "";
  * stored as opaque JSON on the suite row, so nothing here needs a real FK. */
 type FakeAgent = { id: string; name: string; type: "http" };
 
-function fakeAgentService(agents: Map<string, FakeAgent>): AgentService {
-  return {
+function fakeAgentApi(agents: Map<string, FakeAgent>): AgentApi {
+  return createApiFixture<AgentApi>({
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
       ids.flatMap((id) => {
         const agent = agents.get(id);
@@ -78,7 +79,7 @@ function fakeAgentService(agents: Map<string, FakeAgent>): AgentService {
       }),
     getConnectedByNameAndEnvironment: async () => [],
     ownersOf: async () => new Map(),
-  } as unknown as AgentService;
+  });
 }
 
 function fakePromptService(): PromptService {
@@ -192,7 +193,7 @@ function buildService() {
   suiteService = SuiteService.create({
     repository: PrismaSuiteRepository.create(database()),
     scenarios: fakeScenarioService(),
-    agents: fakeAgentService(agents),
+    agents: fakeAgentApi(agents),
     prompts: fakePromptService(),
     execution: capturingExecution(startedRuns),
     runRepository: MemorySuiteRunRepository.create(),
@@ -647,7 +648,9 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
     });
 
     describe("when the scope names every suite of the project", () => {
-      /** @scenario "Naming every suite of the project resolves to the same plan as running everything" */
+      /** @scenario
+       * "Naming every suite of the project resolves to the same plan as running everything"
+       */
       it("stores the scope as all, so it lands where Run all lands", async () => {
         const agent = createHttpAgent();
         const refunds = await createTestSuite("Refunds");
