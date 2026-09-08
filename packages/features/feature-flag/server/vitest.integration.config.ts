@@ -2,11 +2,10 @@ import { defineConfig } from "vitest/config";
 
 /**
  * Integration lane: `*.integration.test.ts` and the repository contract suites
- * under `src/`. Needs Postgres — the persistence suites assert against real
- * rows at `DATABASE_URL`, and the contract suites run their cases against the
- * Prisma repositories at `LANGWATCH_TEST_DATABASE_URL` rather than the memory
- * twins alone. The memory cases run here too, which is what makes the two
- * answers comparable in one report.
+ * under `src/`. Needs Postgres, at `LANGWATCH_TEST_DATABASE_URL` — this is the
+ * lane where the contract suites run their cases against the Prisma
+ * repositories rather than the memory twins alone. The memory cases run here
+ * too, which is what makes the two answers comparable in one report.
  */
 export default defineConfig({
   test: {

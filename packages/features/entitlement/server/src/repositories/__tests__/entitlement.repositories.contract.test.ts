@@ -1,9 +1,17 @@
 /**
  * @vitest-environment node
- * The two entitlement readers' contract, stated once and run against every
- * backend the package can reach. The memory twins run always; a Postgres
- * backend joins the table when this package declares a datastore in its vitest
- * config. Both interfaces are small, so one file holds both.
+ * The two entitlement readers' contract. Both interfaces are small, so one
+ * file holds both.
+ *
+ * The memory twin is the only backend registered here, and deliberately so.
+ * Neither Prisma repository owns a row: `PrismaUsageMembershipRepository`
+ * counts memberships, invites, custom roles and role bindings, and aggregates
+ * costs; `PrismaOrganizationSpendRepository` groups those same cost rows over
+ * projects. Seeding them would mean this suite writing the identity, role and
+ * billing features' tables to assert on a reading it only takes — a fixture
+ * that goes stale the moment any of those three change shape. Those readings
+ * belong to a suite that owns the rows. Everything the entitlement feature
+ * itself decides on top of them is covered by the service and app tests.
  * @see specs/usage-stats-reporting.feature
  */
 import type { ProjectSpendRollup } from "@langwatch/entitlement-contract";
@@ -30,20 +38,20 @@ type Backend = Readonly<{
   create: (seeds: readonly UsageSeed[]) => EntitlementRepositories;
 }>;
 
-const backends: readonly Backend[] = [
-  {
-    name: "memory",
-    create: (seeds) => {
-      const database = MemoryEntitlementDatabase.create();
-      for (const seed of seeds) database.put(seed);
+const memoryBackend: Backend = {
+  name: "memory",
+  create: (seeds) => {
+    const database = MemoryEntitlementDatabase.create();
+    for (const seed of seeds) database.put(seed);
 
-      return {
-        membership: MemoryUsageMembershipRepository.create({ memory: database }),
-        spend: MemoryOrganizationSpendRepository.create({ memory: database }),
-      };
-    },
+    return {
+      membership: MemoryUsageMembershipRepository.create({ memory: database }),
+      spend: MemoryOrganizationSpendRepository.create({ memory: database }),
+    };
   },
-];
+};
+
+const backends: readonly Backend[] = [memoryBackend];
 
 function rollup(projectId: string, amount: number): ProjectSpendRollup {
   return {
