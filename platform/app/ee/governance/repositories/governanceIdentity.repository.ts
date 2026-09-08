@@ -15,8 +15,6 @@
  */
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
-import { isUniqueViolation } from "../services/logic/postgresConstraintErrors";
-
 type Client = Prisma.TransactionClient | PrismaClient;
 
 /** Every `TenantId` an organization has ever written governance rows under. */
@@ -220,23 +218,24 @@ export class DiscoveredPersonRepository {
       provider: params.provider,
       rawActorId: params.rawActorId,
     };
-    try {
-      await client.discoveredPerson.create({
-        data: {
+    // `skipDuplicates` rather than a caught P2002: on every run after the
+    // first, every actor already has a row, so the duplicate is the common
+    // case — and Prisma logs a caught unique violation as `prisma:error`
+    // before the catch ever sees it, one stack trace per known person per
+    // pull. The widen below is a no-op WHERE when nothing moved.
+    const created = await client.discoveredPerson.createMany({
+      data: [
+        {
           ...key,
           displayText: params.displayText,
           kind: params.kind,
           firstSeenAt: params.earliestAt,
           lastSeenAt: params.latestAt,
         },
-      });
-      return;
-    } catch (error) {
-      // The row already exists — from an earlier run, or from a concurrent
-      // source racing this one to the same actor. Both fall through to the
-      // widen below.
-      if (!isUniqueViolation(error)) throw error;
-    }
+      ],
+      skipDuplicates: true,
+    });
+    if (created.count > 0) return;
     await client.discoveredPerson.updateMany({
       where: { ...key, lastSeenAt: { lt: params.latestAt } },
       data: { lastSeenAt: params.latestAt },
@@ -293,9 +292,11 @@ export class DiscoveredPersonRepository {
       provider: params.provider,
       rawActorId: params.rawActorId,
     };
-    try {
-      await client.discoveredPerson.create({
-        data: {
+    // Same shape as the activity sighting, for the same reason: a daily
+    // directory read finds every row already there.
+    const created = await client.discoveredPerson.createMany({
+      data: [
+        {
           ...key,
           displayText: params.displayText,
           // Null rather than "": a person the directory filed under nothing has
@@ -306,11 +307,10 @@ export class DiscoveredPersonRepository {
           firstSeenAt: params.seenAt,
           lastSeenAt: params.seenAt,
         },
-      });
-      return;
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
+      ],
+      skipDuplicates: true,
+    });
+    if (created.count > 0) return;
 
     // Only the fields this sighting actually named, and only when the stored
     // row disagrees with them. The directory read is daily over the whole
