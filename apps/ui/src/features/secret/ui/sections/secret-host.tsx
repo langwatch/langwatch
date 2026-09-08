@@ -8,7 +8,7 @@ import {
   SecretHostProvider,
   secretApi,
   type SecretHostPort,
-} from "@langwatch/secret-web/screens/secret";
+} from "@langwatch/secret-web/secrets";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { UiProjectSwitcher } from "../../../../ui/blocks/ui-project-switcher";

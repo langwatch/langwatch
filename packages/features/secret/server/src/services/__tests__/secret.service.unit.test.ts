@@ -6,9 +6,15 @@ import {
   SecretReservedNameError,
 } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { SecretEncryptionPort } from "../secret.port.ts";
-import { SecretRepository } from "../../repositories/secret.repository.ts";
-import { SecretService } from "../../services/secret.service.ts";
+import { ReversibleTestSecretEncryption } from "../../app/__tests__/secret.fixture.ts";
+import type {
+  CreateStoredSecretInput,
+  SecretIdentity,
+  SecretRepository,
+  StoredSecretValue,
+  UpdateStoredSecretInput,
+} from "../../repositories/secret.repository.ts";
+import { SecretService } from "../secret.service.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -25,69 +31,51 @@ function row(input: Partial<Secret> = {}): Secret {
   };
 }
 
-class StubSecretRepository extends SecretRepository {
+/** Records what the service asked persistence for, and answers from arrays. */
+class RecordingSecretRepository implements SecretRepository {
   readonly rows: Secret[] = [];
-  readonly encryptedValues: Array<{ name: string; encryptedValue: string }> = [];
+  readonly values: StoredSecretValue[] = [];
   readonly createCall = vi.fn();
   readonly updateCall = vi.fn();
   readonly deleteCall = vi.fn();
   countValue = 0;
 
-  list(): Promise<Secret[]> {
+  findAll(): Promise<Secret[]> {
     return Promise.resolve(this.rows);
   }
 
-  listEncryptedValues(): Promise<Array<{ name: string; encryptedValue: string }>> {
-    return Promise.resolve(this.encryptedValues);
+  findAllValues(): Promise<StoredSecretValue[]> {
+    return Promise.resolve(this.values);
   }
 
-  async get({ projectId, id }: { projectId: string; id: string }): Promise<Secret> {
-    // Scoped like the real repository: a secret is addressed by project AND
-    // id, so a lookup from the wrong project finds nothing.
-    const secret = this.rows.find(
-      (candidate) => candidate.id === id && candidate.projectId === projectId,
+  // Scoped like the real repository: a secret is addressed by project AND id,
+  // so a lookup from the wrong project finds nothing.
+  findById({ projectId, id }: SecretIdentity): Promise<Secret | undefined> {
+    return Promise.resolve(
+      this.rows.find((candidate) => candidate.id === id && candidate.projectId === projectId),
     );
-    if (!secret) throw new SecretNotFoundError();
-    return secret;
   }
 
   count(): Promise<number> {
     return Promise.resolve(this.countValue);
   }
 
-  create(input: {
-    projectId: string;
-    name: string;
-    encryptedValue: string;
-    actorId: string;
-  }): Promise<Secret> {
+  create(input: CreateStoredSecretInput): Promise<Secret> {
     this.createCall(input);
+
     return Promise.resolve(row({ projectId: input.projectId, name: input.name }));
   }
 
-  update(input: {
-    projectId: string;
-    id: string;
-    encryptedValue: string;
-    actorId: string;
-  }): Promise<Secret> {
+  update(input: UpdateStoredSecretInput): Promise<Secret> {
     this.updateCall(input);
+
     return Promise.resolve(row({ id: input.id, projectId: input.projectId }));
   }
 
-  delete({ projectId, id }: { projectId: string; id: string }): Promise<void> {
+  delete({ projectId, id }: SecretIdentity): Promise<void> {
     this.deleteCall(projectId, id);
+
     return Promise.resolve();
-  }
-}
-
-class StubSecretEncryption extends SecretEncryptionPort {
-  encrypt(value: string): string {
-    return `encrypted(${value})`;
-  }
-
-  decrypt(value: string): string {
-    return value.replace(/^encrypted\((.*)\)$/, "$1");
   }
 }
 
@@ -95,13 +83,14 @@ function createService(options?: {
   reservedNames?: readonly string[];
   maximumPerProject?: number;
 }) {
-  const repository = new StubSecretRepository();
+  const repository = new RecordingSecretRepository();
   const service = SecretService.create({
     repository,
-    encryption: new StubSecretEncryption(),
+    encryption: new ReversibleTestSecretEncryption(),
     reservedNames: options?.reservedNames ?? ["LANGY_KEY"],
     maximumPerProject: options?.maximumPerProject,
   });
+
   return { repository, service };
 }
 
@@ -117,7 +106,7 @@ describe("SecretService", () => {
 
   it("decrypts every project secret for trusted server execution", async () => {
     const { repository, service } = createService();
-    repository.encryptedValues.push(
+    repository.values.push(
       { name: "OPENAI_API_KEY", encryptedValue: "encrypted(openai)" },
       { name: "LANGY_KEY", encryptedValue: "encrypted(internal)" },
     );
@@ -142,9 +131,7 @@ describe("SecretService", () => {
   });
 
   it("refuses a creatable reserved name before persistence", async () => {
-    const { repository, service } = createService({
-      reservedNames: ["PRODUCT_KEY"],
-    });
+    const { repository, service } = createService({ reservedNames: ["PRODUCT_KEY"] });
 
     await expect(
       service.create({

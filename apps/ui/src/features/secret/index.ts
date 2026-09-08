@@ -1,6 +1,6 @@
 /** Project Secrets settings: single screen in `@langwatch/secret-web`. */
 
-import { secretApi } from "@langwatch/secret-web/screens/secret";
+import { secretApi } from "@langwatch/secret-web/secrets";
 import { uiFeature } from "../../behavior/ui-feature";
 import { secretPageLoaders } from "./ui/sections/secret-routes";
 

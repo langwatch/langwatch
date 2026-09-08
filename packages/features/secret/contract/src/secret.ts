@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const SECRET_FEATURE_ID = "secret" as const;
+export const SECRET_KSUID_RESOURCE = "secret";
 export const MAX_SECRETS_PER_PROJECT = 50;
 export const MAX_SECRET_VALUE_LENGTH = 10_000;
 export const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;

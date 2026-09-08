@@ -3,7 +3,7 @@
  * `secrets:manage` is read inside the page, so a `secrets:view`-only reader sees the names with no way to change them.
  */
 
-import { secretScreens } from "@langwatch/secret-web/screens/secret";
+import { secretScreens } from "@langwatch/secret-web/secrets";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

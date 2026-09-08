@@ -2622,7 +2622,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/secret/web/src/screens/secret/secrets.screen.tsx",
+      "key": "cognitive-complexity|packages/features/secret/web/src/ui/sections/secrets-screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9014,7 +9014,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/secret/web/src/screens/secret/secrets.screen.tsx",
+      "key": "nested-ternary|packages/features/secret/web/src/ui/sections/secrets-screen.tsx",
       "measured": "2026-09-06"
     },
     {

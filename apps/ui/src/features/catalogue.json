@@ -340,7 +340,7 @@
       "id": "secret",
       "root": "secret",
       "uses": {
-        "screens": ["@langwatch/secret-web/screens/secret"],
+        "screens": ["@langwatch/secret-web/secrets"],
         "surfaces": []
       }
     },

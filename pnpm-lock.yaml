@@ -4975,6 +4975,9 @@ importers:
 
   packages/features/data-retention/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -5006,6 +5009,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -5021,6 +5027,12 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -5028,6 +5040,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -6080,6 +6095,9 @@ importers:
 
   packages/features/feature-flag/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -6102,6 +6120,9 @@ importers:
 
   packages/features/feature-flag/server:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -6114,6 +6135,15 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../redis-client
@@ -6123,16 +6153,13 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
-      '@trpc/server':
-        specifier: ^11.18.0
-        version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@langwatch/api':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../api
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -9226,9 +9253,9 @@ importers:
 
   packages/features/secret/contract:
     dependencies:
-      '@langwatch/authz-contract':
+      '@langwatch/api':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -9251,12 +9278,15 @@ importers:
 
   packages/features/secret/server:
     dependencies:
+      '@langwatch/actor':
+        specifier: workspace:*
+        version: link:../../../actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
@@ -9266,6 +9296,9 @@ importers:
       '@langwatch/secret-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       '@trpc/server':
         specifier: 11.18.0
         version: 11.18.0(typescript@7.0.2)

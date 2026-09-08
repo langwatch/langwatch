@@ -1,77 +1,84 @@
-/**
- * The secret feature's application: what both of its doors call.
- *
- * It holds every service and port the feature needs, and it is the one typed
- * thing a transport is given. Before it, each door declared its own
- * `Readonly<{ secrets: SecretService }>` — two descriptions of the same bag,
- * agreeing by attention rather than by construction, and neither reachable
- * from the other.
- *
- * Most operations are the service's own, reached through {@link secrets}. What
- * lives here as a method is what a door would otherwise have to know: today
- * that is attributing a write to its caller, which both doors did for
- * themselves, twice each.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
- */
-import type {
-  CreateSecretInput,
-  DeleteSecretInput,
-  GetSecretInput,
-  ListSecretsInput,
-  Secret,
-  SecretService,
-  UpdateSecretInput,
+/** The secret feature application shared by all transports. */
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import {
+  RESERVED_PROJECT_SECRET_NAMES,
+  SecretApi,
+  type CreateSecretInput,
+  type DeleteSecretInput,
+  type GetSecretInput,
+  type ListSecretsInput,
+  type Secret,
+  type SecretApi as SecretApiContract,
+  type SecretCaller,
+  type UpdateSecretInput,
 } from "@langwatch/secret-contract";
+import type { SecretEncryptionPort } from "../ports/secret.port.ts";
+import type { SecretRepositories } from "../repositories/secret.repositories.ts";
+import { SecretService } from "../services/secret.service.ts";
 
-/** Who a write is attributed to. */
-export interface SecretCaller {
-  readonly id: string;
+/** The cipher the composing process owns; the key never reaches this package. */
+export interface SecretInfrastructure {
+  readonly encryption: SecretEncryptionPort;
 }
 
-/** What the process composes this feature's application from. */
-export interface SecretAppDependencies {
-  secrets: SecretService;
-}
+type SecretSetup = FeatureSetup<
+  typeof SecretApp.dependencies,
+  SecretInfrastructure,
+  undefined,
+  SecretRepositories
+>;
 
-export class SecretApp {
-  static create(dependencies: SecretAppDependencies): SecretApp {
-    return new SecretApp(dependencies);
+export class SecretApp implements SecretApiContract {
+  static readonly contract = SecretApi;
+  static readonly dependencies = {};
+
+  #secrets: SecretService;
+
+  private constructor(secrets: SecretService) {
+    this.#secrets = secrets;
   }
 
-  private constructor(private readonly dependencies: SecretAppDependencies) {}
+  static create(setup: SecretSetup): SecretApp {
+    return new SecretApp(
+      SecretService.create({
+        repository: setup.repositories.secrets,
+        encryption: setup.infrastructure.encryption,
+        reservedNames: RESERVED_PROJECT_SECRET_NAMES,
+      }),
+    );
+  }
 
   /** The project's secrets, metadata only. */
   list(input: ListSecretsInput): Promise<Secret[]> {
-    return this.dependencies.secrets.list(input);
+    return this.#secrets.list(input);
   }
 
   /** One secret's metadata. */
   get(input: GetSecretInput): Promise<Secret> {
-    return this.dependencies.secrets.get(input);
+    return this.#secrets.get(input);
+  }
+
+  /** Every stored value, decrypted, for a process that runs on them. */
+  getValues(input: ListSecretsInput): Promise<Record<string, string>> {
+    return this.#secrets.getValues(input);
   }
 
   /** Removes one secret from the project. */
   delete(input: DeleteSecretInput): Promise<void> {
-    return this.dependencies.secrets.delete(input);
+    return this.#secrets.delete(input);
   }
 
   /**
-   * Stores a new secret, attributed to the caller who asked for it.
-   *
-   * The attribution is here rather than in each door because a secret is a
-   * live credential: "who added this" is a property of the act, not of the
-   * transport it arrived over, and two doors stamping it separately is two
-   * chances to stamp it differently or not at all.
+   * Stores a new secret, attributed to the caller who asked for it. The
+   * attribution is here rather than in each door: "who added this" is a
+   * property of the act, not of the transport it arrived over.
    */
   create(input: Omit<CreateSecretInput, "actorId">, by: SecretCaller): Promise<Secret> {
-    return this.dependencies.secrets.create({ ...input, actorId: by.id });
+    return this.#secrets.create({ ...input, actorId: by.id });
   }
 
   /** Replaces a secret's value, attributed to the caller who asked for it. */
   update(input: Omit<UpdateSecretInput, "actorId">, by: SecretCaller): Promise<Secret> {
-    return this.dependencies.secrets.update({ ...input, actorId: by.id });
+    return this.#secrets.update({ ...input, actorId: by.id });
   }
 }

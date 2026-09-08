@@ -1271,10 +1271,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/secret/contract/src/secret.service.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/secret/server/src/secret.server.ts"
     },
     {

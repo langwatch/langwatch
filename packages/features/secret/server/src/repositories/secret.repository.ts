@@ -1,23 +1,43 @@
 import type { Secret } from "@langwatch/secret-contract";
 
-export abstract class SecretRepository {
-  abstract list(projectId: string): Promise<Secret[]>;
-  abstract listEncryptedValues(
-    projectId: string,
-  ): Promise<Array<{ name: string; encryptedValue: string }>>;
-  abstract get(input: { projectId: string; id: string }): Promise<Secret>;
-  abstract count(projectId: string): Promise<number>;
-  abstract create(input: {
-    projectId: string;
-    name: string;
-    encryptedValue: string;
-    actorId: string;
-  }): Promise<Secret>;
-  abstract update(input: {
-    projectId: string;
-    id: string;
-    encryptedValue: string;
-    actorId: string;
-  }): Promise<Secret>;
-  abstract delete(input: { projectId: string; id: string }): Promise<void>;
+/**
+ * One stored row's name and ciphertext. The only shape in this feature that
+ * carries an encrypted value, and it never leaves the service that decrypts it.
+ */
+export interface StoredSecretValue {
+  readonly name: string;
+  readonly encryptedValue: string;
+}
+
+export interface SecretProjectScope {
+  readonly projectId: string;
+}
+
+export interface SecretIdentity {
+  readonly projectId: string;
+  readonly id: string;
+}
+
+export interface CreateStoredSecretInput {
+  readonly projectId: string;
+  readonly name: string;
+  readonly encryptedValue: string;
+  readonly actorId: string;
+}
+
+export interface UpdateStoredSecretInput {
+  readonly projectId: string;
+  readonly id: string;
+  readonly encryptedValue: string;
+  readonly actorId: string;
+}
+
+export interface SecretRepository {
+  findAll(input: SecretProjectScope): Promise<Secret[]>;
+  findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]>;
+  findById(input: SecretIdentity): Promise<Secret | undefined>;
+  count(input: SecretProjectScope): Promise<number>;
+  create(input: CreateStoredSecretInput): Promise<Secret>;
+  update(input: UpdateStoredSecretInput): Promise<Secret>;
+  delete(input: SecretIdentity): Promise<void>;
 }

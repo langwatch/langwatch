@@ -1,13 +1,22 @@
+import { PrismaRepository } from "@langwatch/prisma-client";
+import { isRecordNotFoundError, isUniqueConstraintError } from "@langwatch/prisma-client/errors";
 import {
   SecretDuplicateError,
   SecretNotFoundError,
   secretSchema,
   type Secret,
 } from "@langwatch/secret-contract";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { SecretRepository } from "../secret.repository.ts";
+import type {
+  CreateStoredSecretInput,
+  SecretIdentity,
+  SecretProjectScope,
+  SecretRepository,
+  StoredSecretValue,
+  UpdateStoredSecretInput,
+} from "../secret.repository.ts";
 
-const safeSecretSelection = {
+/** Metadata only: the encrypted column is absent from every read but one. */
+const safeSecretSelect = {
   id: true,
   projectId: true,
   name: true,
@@ -17,103 +26,87 @@ const safeSecretSelection = {
   updatedBy: { select: { name: true } },
 } as const;
 
-export class PrismaSecretRepository extends SecretRepository {
-  private constructor(private readonly database: PrismaClient) {
-    super();
-  }
+export class PrismaSecretRepository
+  extends PrismaRepository.for("ProjectSecret")
+  implements SecretRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaSecretRepository(prisma));
 
-  static create(database: PrismaClient): PrismaSecretRepository {
-    return new PrismaSecretRepository(database);
-  }
-
-  async list(projectId: string): Promise<Secret[]> {
-    const rows = await this.database.projectSecret.findMany({
-      where: { projectId },
-      select: safeSecretSelection,
+  async findAll(input: SecretProjectScope): Promise<Secret[]> {
+    const rows = await this.prisma.projectSecret.findMany({
+      where: { projectId: input.projectId },
+      select: safeSecretSelect,
       orderBy: { name: "asc" },
     });
+
     return rows.map((row) => secretSchema.parse(row));
   }
 
-  listEncryptedValues(projectId: string): Promise<Array<{ name: string; encryptedValue: string }>> {
-    return this.database.projectSecret.findMany({
-      where: { projectId },
+  findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]> {
+    return this.prisma.projectSecret.findMany({
+      where: { projectId: input.projectId },
       select: { name: true, encryptedValue: true },
     });
   }
 
-  async get({ projectId, id }: { projectId: string; id: string }): Promise<Secret> {
-    const row = await this.database.projectSecret.findFirst({
-      where: { id, projectId },
-      select: safeSecretSelection,
+  async findById(input: SecretIdentity): Promise<Secret | undefined> {
+    const row = await this.prisma.projectSecret.findFirst({
+      where: { id: input.id, projectId: input.projectId },
+      select: safeSecretSelect,
     });
-    if (!row) throw new SecretNotFoundError();
-    return secretSchema.parse(row);
+
+    return row ? secretSchema.parse(row) : undefined;
   }
 
-  count(projectId: string): Promise<number> {
-    return this.database.projectSecret.count({ where: { projectId } });
+  count(input: SecretProjectScope): Promise<number> {
+    return this.prisma.projectSecret.count({ where: { projectId: input.projectId } });
   }
 
-  async create(input: {
-    projectId: string;
-    name: string;
-    encryptedValue: string;
-    actorId: string;
-  }): Promise<Secret> {
+  async create(input: CreateStoredSecretInput): Promise<Secret> {
     try {
-      return secretSchema.parse(
-        await this.database.projectSecret.create({
-          data: {
-            projectId: input.projectId,
-            name: input.name,
-            encryptedValue: input.encryptedValue,
-            createdById: input.actorId,
-            updatedById: input.actorId,
-          },
-          select: safeSecretSelection,
-        }),
-      );
+      const row = await this.prisma.projectSecret.create({
+        data: {
+          projectId: input.projectId,
+          name: input.name,
+          encryptedValue: input.encryptedValue,
+          createdById: input.actorId,
+          updatedById: input.actorId,
+        },
+        select: safeSecretSelect,
+      });
+
+      return secretSchema.parse(row);
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw new SecretDuplicateError(input.name);
-      }
+      if (isUniqueConstraintError(error)) throw new SecretDuplicateError(input.name);
+
       throw error;
     }
   }
 
-  async update(input: {
-    projectId: string;
-    id: string;
-    encryptedValue: string;
-    actorId: string;
-  }): Promise<Secret> {
+  async update(input: UpdateStoredSecretInput): Promise<Secret> {
     try {
-      return secretSchema.parse(
-        await this.database.projectSecret.update({
-          where: { id: input.id, projectId: input.projectId },
-          data: {
-            encryptedValue: input.encryptedValue,
-            updatedById: input.actorId,
-          },
-          select: safeSecretSelection,
-        }),
-      );
+      const row = await this.prisma.projectSecret.update({
+        where: { id: input.id, projectId: input.projectId },
+        data: { encryptedValue: input.encryptedValue, updatedById: input.actorId },
+        select: safeSecretSelect,
+      });
+
+      return secretSchema.parse(row);
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-        throw new SecretNotFoundError();
-      }
+      if (isRecordNotFoundError(error)) throw new SecretNotFoundError();
+
       throw error;
     }
   }
 
-  async delete({ projectId, id }: { projectId: string; id: string }): Promise<void> {
+  async delete(input: SecretIdentity): Promise<void> {
     try {
-      await this.database.projectSecret.delete({ where: { id, projectId } });
+      await this.prisma.projectSecret.delete({
+        where: { id: input.id, projectId: input.projectId },
+      });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-        throw new SecretNotFoundError();
-      }
+      if (isRecordNotFoundError(error)) throw new SecretNotFoundError();
+
       throw error;
     }
   }

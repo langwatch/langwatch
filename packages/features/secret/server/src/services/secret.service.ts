@@ -7,7 +7,6 @@ import {
   SecretLimitReachedError,
   SecretNotFoundError,
   SecretReservedNameError,
-  SecretService as SecretServiceContract,
   updateSecretInputSchema,
   type CreateSecretInput,
   type DeleteSecretInput,
@@ -26,12 +25,11 @@ export interface SecretServiceOptions {
   maximumPerProject?: number;
 }
 
-export class SecretService extends SecretServiceContract {
+export class SecretService {
   private readonly reservedNames: ReadonlySet<string>;
   private readonly maximumPerProject: number;
 
   private constructor(private readonly options: SecretServiceOptions) {
-    super();
     this.reservedNames = new Set(options.reservedNames);
     this.maximumPerProject = options.maximumPerProject ?? MAX_SECRETS_PER_PROJECT;
   }
@@ -42,14 +40,14 @@ export class SecretService extends SecretServiceContract {
 
   async list(input: ListSecretsInput): Promise<Secret[]> {
     const parsed = listSecretsInputSchema.parse(input);
-    const rows = await this.options.repository.list(parsed.projectId);
+    const rows = await this.options.repository.findAll({ projectId: parsed.projectId });
 
     return rows.filter((secret) => !this.reservedNames.has(secret.name));
   }
 
   async getValues(input: ListSecretsInput): Promise<Record<string, string>> {
     const parsed = listSecretsInputSchema.parse(input);
-    const rows = await this.options.repository.listEncryptedValues(parsed.projectId);
+    const rows = await this.options.repository.findAllValues({ projectId: parsed.projectId });
     const values: Record<string, string> = {};
 
     for (const row of rows) {
@@ -77,7 +75,8 @@ export class SecretService extends SecretServiceContract {
       throw new SecretReservedNameError(parsed.name);
     }
 
-    if ((await this.options.repository.count(parsed.projectId)) >= this.maximumPerProject) {
+    const stored = await this.options.repository.count({ projectId: parsed.projectId });
+    if (stored >= this.maximumPerProject) {
       throw new SecretLimitReachedError(this.maximumPerProject);
     }
 
@@ -107,12 +106,16 @@ export class SecretService extends SecretServiceContract {
     await this.options.repository.delete({ projectId: parsed.projectId, id: parsed.id });
   }
 
+  /**
+   * A reserved row answers exactly as an absent one: a caller must not be able
+   * to tell that a product-owned credential is there.
+   */
   private async getMutableSecret(input: { projectId: string; id: string }): Promise<Secret> {
-    const secret = await this.options.repository.get({
+    const secret = await this.options.repository.findById({
       projectId: input.projectId,
       id: input.id,
     });
-    if (this.reservedNames.has(secret.name)) {
+    if (!secret || this.reservedNames.has(secret.name)) {
       throw new SecretNotFoundError();
     }
 
