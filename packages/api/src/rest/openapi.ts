@@ -61,6 +61,8 @@ export function restRouteDocumentation({
 
   if (route.docs?.summary !== undefined) options.summary = route.docs.summary;
 
+  if (route.docs?.tags !== undefined) options.tags = [...route.docs.tags];
+
   return options;
 }
 

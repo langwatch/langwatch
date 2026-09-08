@@ -42,13 +42,12 @@ describe("the secret REST family", () => {
       const app = mount();
       await create(app, { projectId: PROJECT, name: "OPENAI_API_KEY", value: "sk-live" });
 
-      // The dated and `latest` addresses of a COLLECTION route carry a trailing
-      // slash: the runtime builds them as `/<version>` + the route path, and a
-      // collection's path is already "/".
+      // A collection's path is the family root, so it contributes nothing to
+      // the dated and `latest` addresses: they end at the version segment.
       const paths = [
         `/api/secret?projectId=${PROJECT}`,
-        `/api/secret/latest/?projectId=${PROJECT}`,
-        `/api/secret/${SECRET_REST_VERSION}/?projectId=${PROJECT}`,
+        `/api/secret/latest?projectId=${PROJECT}`,
+        `/api/secret/${SECRET_REST_VERSION}?projectId=${PROJECT}`,
         `/api/v1/secret?projectId=${PROJECT}`,
       ];
       const answers = await Promise.all(

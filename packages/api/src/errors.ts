@@ -102,6 +102,20 @@ export class EndpointWithdrawnError extends HandledError {
   }
 }
 
+/**
+ * The body passed the cap the route declared. The caller can act on it — send
+ * less — and the cap itself is documented on the operation, so nothing about
+ * the limit belongs on the wire.
+ */
+export class PayloadTooLargeError extends HandledError {
+  constructor() {
+    super("payload_too_large", "The request body is larger than this endpoint accepts", {
+      httpStatus: 413,
+    });
+    this.name = "PayloadTooLargeError";
+  }
+}
+
 export class RateLimitedError extends HandledError {
   constructor() {
     super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });

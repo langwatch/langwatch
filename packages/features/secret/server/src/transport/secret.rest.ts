@@ -9,6 +9,7 @@
 // runtime's scope check compares it against the project the credential
 // resolved. Every handler reads the CREDENTIAL's project, never the claim.
 
+import { PayloadTooLargeError } from "@langwatch/api";
 import { defineRestRouter, UnauthorizedError } from "@langwatch/api/rest";
 import type { Actor } from "@langwatch/actor";
 import {
@@ -25,6 +26,14 @@ import {
 } from "@langwatch/secret-contract";
 
 export const SECRET_REST_VERSION = "2026-08-24";
+
+/** A secret is a name and a value; nothing legitimate arrives near this. */
+const SECRET_MAX_INPUT_BYTES = 16 * 1024;
+
+const secretBodyLimit = {
+  maxBytes: SECRET_MAX_INPUT_BYTES,
+  onExceeded: () => new PayloadTooLargeError(),
+} as const;
 
 /** Who a write is attributed to. A credential bound to nobody cannot write. */
 function callerOf(actor: Actor | null): SecretCaller {
@@ -45,7 +54,7 @@ function defineSecretRest(namespace: string, operationSuffix: string) {
     .withDocs({
       summary: "List project secrets",
       description:
-        "Lists metadata only. Secret values are never returned. The service enforces the 50-secret cap. Responses are not cached.",
+        "Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service enforces the 50-secret cap. Responses are not cached.",
     })
     .handle(async ({ app, scope }) => {
       const secrets = await app.list({ projectId: scope.id });
@@ -70,8 +79,9 @@ function defineSecretRest(namespace: string, operationSuffix: string) {
     .withStatus(201)
     .withDocs({
       summary: "Create a project secret",
-      description: "Encrypts the value at rest and never returns it.",
+      description: "Encrypts the value at rest and never returns it. Requests have 16 KiB inputs.",
     })
+    .withBodyLimit(secretBodyLimit)
     .handle(async ({ app, input, scope, actor }) =>
       toSecretPublic(
         await app.create(
@@ -86,7 +96,11 @@ function defineSecretRest(namespace: string, operationSuffix: string) {
     .withInput(secretPublicUpdateInputSchema)
     .withPermission("secrets:manage")
     .withOutput(secretPublicSchema)
-    .withDocs({ summary: "Replace a project secret value" })
+    .withDocs({
+      summary: "Replace a project secret value",
+      description: "Requests have 16 KiB inputs.",
+    })
+    .withBodyLimit(secretBodyLimit)
     .handle(async ({ app, input, scope, actor }) =>
       toSecretPublic(
         await app.update(
@@ -102,6 +116,7 @@ function defineSecretRest(namespace: string, operationSuffix: string) {
     .withPermission("secrets:manage")
     .withOutput(secretPublicDeleteOutputSchema)
     .withDocs({ summary: "Delete a project secret" })
+    .withBodyLimit(secretBodyLimit)
     .handle(async ({ app, input, scope }) => {
       await app.delete({ projectId: scope.id, id: input.id });
 

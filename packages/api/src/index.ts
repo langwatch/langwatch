@@ -11,6 +11,8 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
+  PayloadTooLargeError,
+  ScopeInputMismatchError,
 } from "./errors.ts";
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";

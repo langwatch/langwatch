@@ -362,6 +362,8 @@ type OutputSchema = z.ZodObject | z.ZodArray | z.ZodVoid | z.ZodUndefined;
 export type RestTransportDocs = Readonly<{
   readonly summary?: string;
   readonly description?: string;
+  /** The groups the operation is filed under in the published reference. */
+  readonly tags?: readonly string[];
 }>;
 
 type ProjectScope = Extract<AuthzDeclaredScopeId, { tier: "project" }>;
@@ -917,15 +919,18 @@ function addressesOf({
   path: string;
   context: { version: string; status: VersionStatus; suffix?: string };
 }[] {
-  const path = route.path || "/";
+  // A collection route's path is the family root, so it contributes nothing to
+  // an address: concatenating it would date the namespace as `/<version>/`,
+  // which no caller sends and a sibling `/:id` answers instead.
+  const suffix = route.path === "/" ? "" : route.path;
 
   return [
-    { path: `/${version}${path}`, context: { version, status: "stable", suffix: dated(version) } },
+    { path: `/${version}${suffix}`, context: { version, status: "stable", suffix: dated(version) } },
     {
-      path: `/${VERSION_LATEST}${path}`,
+      path: `/${VERSION_LATEST}${suffix}`,
       context: { version: VERSION_LATEST, status: "latest", suffix: VERSION_LATEST },
     },
-    { path, context: { version: VERSION_LATEST, status: "latest" } },
+    { path: suffix || "/", context: { version: VERSION_LATEST, status: "latest" } },
   ];
 }
 
@@ -958,29 +963,27 @@ function routeStack<Api>({
   paramSource?: "route" | "context";
   documented?: boolean;
 }): MiddlewareHandler[] {
-  const stack: MiddlewareHandler[] = [
+  const limit = route.bodyLimit;
+
+  return [
     versionContext({ route, family, version, status }),
     ...(documented ? [documentRoute({ route, suffix })] : []),
+    // Ahead of the validators: they read the body to parse it, and a stream
+    // read once cannot be drained again to measure it.
+    ...(limit
+      ? [
+          bodyLimit({
+            maxSize: limit.maxBytes,
+            onError: () => {
+              throw limit.onExceeded();
+            },
+          }),
+        ]
+      : []),
     ...validators({ route, documented, paramSource }),
     inputMiddleware({ route, paramSource }),
+    handlerMiddleware({ route, ports, options }),
   ];
-
-  if (route.bodyLimit) {
-    const limit = route.bodyLimit;
-
-    stack.push(
-      bodyLimit({
-        maxSize: limit.maxBytes,
-        onError: () => {
-          throw limit.onExceeded();
-        },
-      }),
-    );
-  }
-
-  stack.push(handlerMiddleware({ route, ports, options }));
-
-  return stack;
 }
 
 /**

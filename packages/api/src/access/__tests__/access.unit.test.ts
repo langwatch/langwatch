@@ -7,6 +7,7 @@
 import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
+import { ScopeInputMismatchError } from "../../errors.ts";
 import {
   AccessWiringError,
   AuthenticationRequiredError,
@@ -152,14 +153,39 @@ describe("deciding access for one call", () => {
   });
 
   describe("given the credential resolved a project of its own", () => {
-    it("refuses an input project id that disagrees with it", async () => {
-      await expect(
-        decide({
+    /** The refusal itself, so its wire form can be read rather than matched. */
+    async function refuseMismatch(): Promise<ScopeInputMismatchError> {
+      try {
+        await decide({
           declaration: { kind: "service-authorized", reason: "the door", permissions: [] },
           caller: { actor: null, scope: { tier: "project", id: "project-1" } },
           input: { projectId: "project-2" },
-        }),
-      ).rejects.toThrow(/does not match the authorized project scope/);
+        });
+      } catch (error) {
+        if (error instanceof ScopeInputMismatchError) return error;
+
+        throw error;
+      }
+
+      throw new Error("the input project id was accepted");
+    }
+
+    /** @scenario "A project id the credential did not resolve is a handled refusal" */
+    it("refuses an input project id that disagrees with it, as a forbidden the caller can act on", async () => {
+      const refused = await refuseMismatch();
+
+      expect(refused.code).toBe("scope_input_mismatch");
+      expect(refused.httpStatus).toBe(403);
+    });
+
+    /** @scenario "A project id the credential did not resolve is a handled refusal" */
+    it("names the offending field and neither project", async () => {
+      const refused = await refuseMismatch();
+      const wire = JSON.stringify(refused.serialize());
+
+      expect(refused.meta).toEqual({ field: "projectId" });
+      expect(wire).not.toContain("project-1");
+      expect(wire).not.toContain("project-2");
     });
   });
 

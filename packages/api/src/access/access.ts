@@ -25,6 +25,8 @@ import {
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 
+import { ScopeInputMismatchError } from "../errors.ts";
+
 const logger = createLogger("langwatch:authz");
 
 /**
@@ -273,7 +275,9 @@ function assertInputScope({
   const named = (input as Record<string, unknown>).projectId;
 
   if (typeof named === "string" && named !== scope.id) {
-    throw new Error("input projectId does not match the authorized project scope");
+    // Names the field and nothing else: which project the credential DOES
+    // cover is the question this refusal exists to withhold.
+    throw new ScopeInputMismatchError("projectId");
   }
 }
 

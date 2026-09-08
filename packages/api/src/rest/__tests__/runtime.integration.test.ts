@@ -12,10 +12,12 @@ import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
 import { createRestRuntime, defineRestRouter } from "../runtime.ts";
 
 const SPEC_OPTIONS = { excludeStaticFile: false } as const;
 const VERSION = "2026-09-08";
+const BODY_CAP_BYTES = 1024;
 
 interface AnnotationApi {
   getById(input: { id: string }): Promise<{ id: string }>;
@@ -65,6 +67,68 @@ function runtimeApp(app: () => AnnotationApi = () => application): Hono {
 
 function addresses(app: Hono): string[] {
   return [...new Set(app.routes.map((route) => `${route.method} ${route.path}`))].sort();
+}
+
+// A family shaped like the secret one: a collection at the family root, a
+// sibling by-id route, and a write carrying a declared cap and a tag.
+interface SecretApi {
+  list(input: { projectId: string }): Promise<{ id: string }[]>;
+  getById(input: { id: string }): Promise<{ id: string }>;
+  create(input: { name: string }): Promise<{ id: string }>;
+}
+
+const SecretApi = featureApi<SecretApi>("secret");
+
+const secrets = defineRestRouter(SecretApi)
+  .withNamespace("secrets")
+  .withVersion(VERSION)
+  .get("/", "listSecrets")
+  .withPermission("secrets:view")
+  .withOutput(z.object({ id: z.string() }).array())
+  .withDocs({ summary: "List project secrets", tags: ["Secrets"] })
+  .handle(async ({ app, scope }) => app.list({ projectId: scope.id }))
+
+  .get("/:id", "getSecret")
+  .withParams(z.object({ id: z.string() }))
+  .withPermission("secrets:view")
+  .withOutput(z.object({ id: z.string() }))
+  .handle(async ({ app, input }) => app.getById({ id: input.id }))
+
+  .post("/", "createSecret")
+  .withInput(z.object({ name: z.string() }))
+  .withPermission("secrets:manage")
+  .withOutput(z.object({ id: z.string() }))
+  .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .handle(async ({ app, input }) => app.create({ name: input.name }))
+  .build();
+
+const secretApplication: SecretApi = {
+  list: async () => [{ id: "the-collection" }],
+  getById: async ({ id }) => ({ id }),
+  create: async ({ name }) => ({ id: name.slice(0, 4) }),
+};
+
+/** The same mount, with the boundary that serialises a handled refusal. */
+function secretsApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    },
+  });
+
+  return runtime.mount(secrets.router(), {
+    app: () => secretApplication,
+    credential: "projectKey",
+    onError: createErrorHandler(),
+  });
+}
+
+async function post(app: Hono, path: string, name: string): Promise<Response> {
+  return app.request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
 }
 
 describe("a declared REST router mounted through the runtime", () => {
@@ -165,5 +229,67 @@ describe("a declared REST router mounted through the runtime", () => {
 
       expect(response.status).toBe(404);
     });
+  });
+});
+
+describe("a declared route that caps the body it accepts", () => {
+  describe("given the route also declares a body schema", () => {
+    /** @scenario "A declared body cap is measured before the body is parsed" */
+    it("serves a body under the cap", async () => {
+      const response = await post(secretsApp(), `/api/secrets/${VERSION}`, "n".repeat(512));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ id: "nnnn" });
+    });
+
+    /** @scenario "A declared body cap is measured before the body is parsed" */
+    it("refuses a body over the cap as the declared refusal, never as a server fault", async () => {
+      const response = await post(secretsApp(), `/api/secrets/${VERSION}`, "n".repeat(2048));
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toMatchObject({ code: "payload_too_large" });
+    });
+  });
+});
+
+describe("a declared collection route", () => {
+  /** @scenario "A collection route is addressed at the family root, with no trailing slash" */
+  it("answers at its dated, latest and bare addresses, none of them trailing a slash", () => {
+    const registered = addresses(secretsApp());
+
+    expect(registered).toContain(`GET /api/secrets/${VERSION}`);
+    expect(registered).toContain("GET /api/secrets/latest");
+    expect(registered).toContain("GET /api/secrets");
+    expect(registered).toContain(`GET /api/v1/secrets/${VERSION}`);
+    expect(registered.filter((address) => address.endsWith("/"))).toEqual([]);
+  });
+
+  /** @scenario "A collection route is addressed at the family root, with no trailing slash" */
+  it("reaches the collection handler, not the by-id one, at every address", async () => {
+    for (const path of [
+      `/api/secrets/${VERSION}`,
+      "/api/secrets/latest",
+      "/api/secrets",
+      `/api/v1/secrets/${VERSION}`,
+      "/api/v1/secrets/latest",
+      "/api/v1/secrets",
+    ]) {
+      const response = await secretsApp().request(path);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual([{ id: "the-collection" }]);
+    }
+  });
+});
+
+describe("the document a declared route publishes", () => {
+  /** @scenario "A route's declared tags reach the published document" */
+  it("files the operation under the tags the declaration named", async () => {
+    const published = await generateSpecs(secretsApp(), SPEC_OPTIONS);
+    const dated = published.paths?.[`/api/secrets/${VERSION}`] as
+      | { get?: { tags?: string[] } }
+      | undefined;
+
+    expect(dated?.get?.tags).toEqual(["Secrets"]);
   });
 });

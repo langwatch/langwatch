@@ -113,6 +113,34 @@ Feature: Transport declaration split
     And a version segment that names no servable version is refused
 
   @integration
+  Scenario: A collection route is addressed at the family root, with no trailing slash
+    Given a REST declaration carrying a collection route and a by-id route beside it
+    When a caller addresses the collection by its dated path, by latest, by the bare path or by the /api/v1 twin
+    Then no address the family registers ends in a slash
+    And each one reaches the collection handler rather than the by-id handler
+
+  @integration
+  Scenario: A declared body cap is measured before the body is parsed
+    Given a route declaring both a body cap and a body schema
+    When a caller sends a body under the cap
+    Then the route is served
+    And a body over the cap is refused as the declared refusal, with the status that refusal carries
+    And neither answer is a server fault
+
+  @integration
+  Scenario: A route's declared tags reach the published document
+    Given a route whose docs name the groups it belongs to
+    When the process publishes the OpenAPI document
+    Then the operation is filed under exactly those tags
+
+  @unit
+  Scenario: A project id the credential did not resolve is a handled refusal
+    Given a credential that resolved one project
+    When the request body names a different project
+    Then the caller is refused as forbidden, with a stable code a client renders copy from
+    And the refusal names the offending field and neither project
+
+  @integration
   Scenario: The declarations publish the OpenAPI document
     Given a REST router declared with docs on every route
     And its application provider refuses resolution before the process boots
