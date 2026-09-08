@@ -667,6 +667,10 @@ const LEGACY_INERT: string[] = [
  */
 const LEGACY_PARTIAL: string[] = [
   "sdks/typescript/specs/cli/daemon.feature",
+  // Reason: arrived from main already partially tagged (#7778 self-mapped
+  // Azure deployments on the dispatch path). Its six untagged scenarios
+  // describe gateway endpoint derivation, which this branch does not own.
+  "specs/ai-gateway/azure-endpoint-from-api-base.feature",
   "specs/ai-gateway/budgets.feature",
   "specs/ai-gateway/cli-token-revoke-on-deactivation.feature",
   "specs/ai-gateway/custom-provider-base-url.feature",
@@ -722,8 +726,14 @@ const LEGACY_PARTIAL: string[] = [
   "specs/features/scenario-cli.feature",
   "specs/features/simulation-runs-cli.feature",
   "specs/langevals-staging/staged-payload.feature",
+  // Reason: arrived from main already partially tagged (#7879). Its seven
+  // untagged scenarios describe langy card taxonomy, not owned here.
+  "specs/langy/langy-card-taxonomy.feature",
   "specs/langy/langy-choice-questions.feature",
   "specs/langy/langy-composer-feedback-and-cards.feature",
+  // Reason: arrived from main already partially tagged (#7879). Its ten
+  // untagged scenarios describe langy conversation titling, not owned here.
+  "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-deploy-hardening.feature",
   "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-dogfood-scenarios.feature",
@@ -748,6 +758,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/prompts/locked-input-variable.feature",
   "specs/queue-pausing/queue-pausing.feature",
   "specs/rbac/scoped-role-bindings.feature",
+  // Reason: arrived from main already partially tagged (#3698 structured
+  // error surfacing for the serialized code-agent adapter). Its one
+  // untagged scenario belongs to the scenarios tree, not owned here.
+  "specs/scenarios/scenario-infra-error-surfacing.feature",
   // Reason: same as specs/ci/pr-token-usage.feature — arrived from main
   // already partially tagged. Its two untagged scenarios describe the skill
   // testing harness, which this branch does not own.
