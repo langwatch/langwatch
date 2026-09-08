@@ -29,6 +29,14 @@ func (a *seedRecordingAgent) Post(_ context.Context, _ string, turn app.Turn) er
 func (a *seedRecordingAgent) Stream(context.Context, string, app.ChatSink) error {
 	return nil
 }
+
+// AbortTurn and TurnEnded became part of app.CodingAgent in ADR-131 (they were
+// optional capabilities only because the removed harness implemented neither),
+// so every fake agent carries them. The no-ops are the honest default: a fake
+// that does not model aborting should not pretend to abort.
+func (a *seedRecordingAgent) AbortTurn(context.Context, string, string) error { return nil }
+func (a *seedRecordingAgent) TurnEnded()                                      {}
+
 func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, string, time.Time) error {
 	return nil
 }

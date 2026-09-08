@@ -89,11 +89,28 @@ dev's Personal Workspace at https://<your-host>/me .
         -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
     Everything else in the install keeps running either way.
 {{- else }}
+{{- if eq ((index .Values "langyagent").workerIsolation | default "per-uid") "none" }}
+    Isolation: per-worker identity is OFF (workerIsolation: none), so every
+    conversation's worker shares the manager identity. Workers can read sibling
+    credentials and files, reopen control pipes through /proc/<pid>/fd, and read
+    manager secrets through /proc/<pid>/environ, including LANGY_INTERNAL_SECRET
+    and any mirror key. The internal secret authenticates manager RPCs and
+    internal turn-result callbacks. Every conversation must be trusted with
+    that authority.
+{{- else }}
     Isolation: each conversation's worker runs under its own UID with its own
-    credentials, workers cannot read each other's, and the NetworkPolicy denies
-    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}. The pod runs on the node's
-    normal runtime, so a worker that escapes its container faces the node
-    kernel. Hardening that last step is a sandboxed RuntimeClass:
+    credentials; workers cannot read each other's credentials.
+{{- end }}
+{{- if not (index .Values "langyagent").networkPolicy.enabled }}
+    The agent NetworkPolicy is disabled; this chart does not restrict its egress.
+{{- else if (index .Values "langyagent").networkPolicy.allowExternalHttps }}
+    The agent NetworkPolicy permits configured external HTTPS egress.
+{{- else }}
+    The agent NetworkPolicy denies egress to the internet.
+{{- end }}
+    The pod runs on the node's normal runtime, so a worker that escapes its
+    container faces the node kernel. Hardening that last step is a sandboxed
+    RuntimeClass:
       https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
 {{- /* Deliberately NO `lookup` here, and do not reintroduce one. Naming the
        cluster's own sandboxed classes would take a cluster-scoped list of

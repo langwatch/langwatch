@@ -11,10 +11,12 @@
 #   - DNS (kube-system:53).
 #   - Control plane (langwatch-app) — the per-session MCP server calls the
 #     LangWatch API at LANGWATCH_ENDPOINT.
-#   - AI gateway (langwatch-gateway) — a worker's LLM traffic goes out via
+#   - AI gateway (langwatch-gateway) — worker LLM traffic goes out via
 #     OPENAI_BASE_URL pointed at the gateway, not direct to providers.
 #   - 443 to anywhere (optional, default OFF) — the tools a worker shells out
-#     to (git, gh, npm) need it.
+#     to (git, gh, npm) need it. Nothing else does: the worker binary ships in
+#     the image and phones home to nobody, so this rule exists ONLY for those
+#     tools and can be tightened to their hosts.
 #     Turn it on with networkPolicy.allowExternalHttps=true; private ranges and
 #     the cloud metadata service stay carved out either way.
 apiVersion: networking.k8s.io/v1

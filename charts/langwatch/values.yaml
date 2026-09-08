@@ -2266,15 +2266,32 @@ gateway:
 ## provider for the project as you would for any other LangWatch feature.
 ##
 ## ISOLATION. The agent runs shell written by a language model, and the workers
-## hold the requesting user's credentials, so the controls that bound that are
-## on by DEFAULT and cost nothing: each conversation's worker runs under its own
-## UID with its own credentials, workers cannot read each other's, a worker
-## binds no listener a sibling could dial, and the NetworkPolicy denies egress
-## to the internet unless you turn it on.
+## hold the requesting user's credentials. Workers use stdio pipes instead of
+## a control listener, and config files contain variable names rather than
+## secrets. Unix identity protects access to live credentials and control
+## descriptors; the NetworkPolicy restricts network access.
 ##
-## Those are the controls that stop the attack that actually happens: a worker
-## reached by prompt injection through ingested data, using its own legitimate
-## access to exfiltrate. They work identically on every cluster.
+## Per-worker Unix identity is on by DEFAULT, and it is the protection that
+## does NOT work identically on every cluster — the claim this block used to
+## make. Giving each worker its own uid needs root plus five capabilities, and a
+## cluster enforcing Pod Security Admission "restricted" admits no such pod at
+## all. There the choice is between sibling identity and having an assistant:
+##
+##   langyagent:
+##     workerIsolation: none              # per-uid (default) | none
+##     acceptWorkerIsolationDisabled: true
+##
+## renders the pod non-root with no capabilities, which "restricted" admits. It
+## removes isolation between workers and the manager. Workers can read sibling
+## credentials and files, reopen control pipes via /proc/<pid>/fd, and read
+## manager secrets via /proc/<pid>/environ. LANGY_INTERNAL_SECRET authenticates
+## manager RPCs and internal turn-result callbacks; any mirror key is exposed
+## too. Only select this posture when every conversation is trusted with that
+## authority. See ADR-130 and the self-hosting Langy setup guide.
+##
+## Together these bound the attack that actually happens: a worker reached by
+## prompt injection through ingested data, using its own legitimate access to
+## exfiltrate.
 ##
 ## A sandboxed RuntimeClass (gvisor, Kata) is the rung ABOVE that: it protects
 ## the node kernel from a worker that escapes its container, which needs a kernel
@@ -2305,6 +2322,10 @@ langyagent:
 
   ## @param langyagent.acceptUnsandboxedRuntime [default: true] Accept running the agent without a pod-to-host sandbox. Default true so the chart installs and works on any cluster. Setting it false without also setting runtimeClassName is refused at render time, so a cluster that has hardened cannot silently lose its sandbox.
   acceptUnsandboxedRuntime: true
+  ## @param langyagent.workerIsolation [string, default: per-uid] Per-worker identity posture (ADR-130). "per-uid" gives each conversation's worker its own uid, which costs the pod root plus five capabilities. "none" runs every worker as the pod's own user, which is what makes the pod admissible under Pod Security Admission "restricted" — at the cost of access to sibling credentials, files and control descriptors, and manager secrets including LANGY_INTERNAL_SECRET. Any other value is refused at render time. Forcing the default posture non-root instead is refused too, because it renders a pod that is admitted and then fails every worker spawn.
+  workerIsolation: per-uid
+  ## @param langyagent.acceptWorkerIsolationDisabled [default: false] Accept running every worker under one shared identity. Required for workerIsolation "none"; the render fails without it, so the weaker posture is never reached by leaving a field blank or by an override that replaced more than it named.
+  acceptWorkerIsolationDisabled: false
 
   ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
   enableForAllUsers: true

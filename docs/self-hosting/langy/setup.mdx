@@ -32,20 +32,30 @@ asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 ## How Langy is isolated
 
 Langy's workers run shell written by a language model, and each one holds the
-credentials of the person who asked. Two controls bound that, both on by
-default on every cluster:
+credentials of the person who asked. Workers use stdio pipes instead of an HTTP
+control listener, and their config files contain environment variable names
+rather than secret values. Access to live credentials and control descriptors
+still depends on Unix identity.
 
-- **Per-worker identity.** Each conversation's worker runs under its own UID
-  with its own credentials and no listener a sibling could dial. Workers cannot read
-  each other's keys or reach each other's control ports.
+Per-worker identity is on by default and is the protection a hardened cluster
+may force you to give up:
+
+- **Per-worker identity.** Each conversation's worker runs under its own UID,
+  with a `0700` home, so a sibling cannot read its process environment or its
+  session files. Holding this costs the pod root plus five capabilities: see
+  [Clusters that refuse root](#hardening-clusters-that-refuse-root) if yours
+  will not admit that.
+
+Network restrictions are also on by default:
+
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and no other destination. Egress to the internet is off until you turn it
+  the gateway, with other destinations blocked by default. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
-Those are the controls that bound the realistic attack: a worker reached by
-prompt injection through data it was asked to look at, using its own legitimate
-access to exfiltrate. They need no configuration and behave the same everywhere.
+Together these bound the realistic attack: a worker reached by prompt injection
+through data it was asked to look at, using its own legitimate access to
+exfiltrate.
 
 The rung above them is a **sandboxed runtime**, which protects the node's kernel
 from a worker that escapes its container. That needs a kernel exploit on top of
@@ -69,7 +79,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
+app.kubernetes.io/name=langyagent` lists no pods, and the reason sits on the
 Deployment.
 
 ```bash
@@ -239,6 +249,67 @@ kubectl -n langwatch exec deploy/langwatch-langyagent -- cat /proc/version
 # Linux version 4.19.0-gvisor ...
 ```
 
+## Hardening: clusters that refuse root
+
+Pod Security Admission `restricted`, and the common Gatekeeper or Kyverno
+policies, require `runAsNonRoot: true` and `capabilities.drop: [ALL]`. The
+chart supports `per-uid` with a manager running as UID 0 and five capabilities:
+`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That configuration
+provisions worker files with `chown` and applies each worker identity with
+`setuid`/`setgid`, so it does not satisfy those admission policies.
+
+Forcing `runAsNonRoot` or a nonzero `runAsUser` while retaining `per-uid`
+is rejected during Helm rendering. Dropping required capabilities does not
+select shared identity: it makes worker provisioning fail. Helm also merges
+capability maps, so adding `drop: ["ALL"]` alone does not remove the chart's
+`add` list.
+
+The supported way is to say what you are giving up:
+
+```yaml
+langyagent:
+  workerIsolation: none
+  acceptWorkerIsolationDisabled: true
+```
+
+With no identity override, the pod defaults to UID 1000 with `runAsNonRoot: true`,
+`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
+This satisfies PSA `restricted` without requiring an exemption, a RuntimeClass or a
+separate namespace. Any configured `runtimeClassName` is retained.
+
+For clusters requiring a different UID, set
+`langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID. The
+container inherits that UID unless `langyagent.containerSecurityContext.runAsUser`
+sets a nonzero override. Omitting the acknowledgement fails the render with a message
+naming the trade, so nobody reaches this posture by leaving a field blank.
+
+<Warning>
+**What `workerIsolation: none` costs.** Shared identity removes isolation
+between workers and the manager. A worker can read sibling credentials and
+conversation files, reopen control pipes through `/proc/<pid>/fd`, and read
+manager secrets through `/proc/<pid>/environ`. This includes
+`LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can
+authenticate manager RPCs and internal turn-result callbacks. Treat every
+conversation as trusted with that authority.
+
+Take it for a single-tenant install whose users are all colleagues in one
+organization: the case this setting exists for, where the alternative is no
+assistant at all. Do not take it if you serve mutually untrusted users from one
+install.
+
+It also forecloses one future upgrade: the per-worker network namespace that
+would make egress enforcement mandatory rather than cooperative needs
+`CAP_SYS_ADMIN`, which this pod can never hold. If you expect to need
+bypass-proof egress, stay on `per-uid` and seek a policy exemption instead.
+</Warning>
+
+The pod logs a warning at boot identifying the shared-identity posture, so the posture is
+visible in your logs rather than only in a values file:
+
+```bash
+kubectl -n langwatch logs deploy/langwatch-langyagent | grep worker_isolation
+```
+
 ## Letting Langy reach the internet
 
 Langy's tools shell out to `git`, `gh`, and package managers. Egress to the
@@ -318,5 +389,5 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Every
-other part of your install is left as it was.
+The agent pod and every reference to it are removed on the next upgrade. Other
+components retain their configuration.

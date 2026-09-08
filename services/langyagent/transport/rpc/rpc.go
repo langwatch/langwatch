@@ -94,8 +94,8 @@ func (rpc *RPC) HandleProbe(ctx context.Context, req *probeRequest) (*probeRespo
 // in-flight turn, the token-burn half of the user's Stop (ADR-078). The stop
 // is already truthful before this arrives (the durable stopped terminal is
 // recorded, the stream ended), so the cancel is fire-and-forget: any miss
-// (no worker, the turn already finished, an agent without abort support) is
-// a 204 that halted nothing, and only the wasted tokens are the cost.
+// (no worker, or the turn already finished) is a 204 that halted nothing, and
+// only the wasted tokens are the cost.
 func (rpc *RPC) HandleCancel(ctx context.Context, req *cancelRequest) error {
 	if !domain.IsValidConversationID(req.ConversationID) {
 		return herr.New(ctx, domain.ErrInvalidConversationID, herr.M{"message": "invalid conversationId"})

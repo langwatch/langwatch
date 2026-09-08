@@ -2,22 +2,30 @@ import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { SupportedPlatform } from "../shared/platform.ts";
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // The Go AI Gateway monobinary is built per-platform in CI and uploaded to a
 // GitHub release named v$VERSION. The npm package version is in lockstep with
 // the langwatch release tag — see .github/workflows/npx-server-publish.yml.
-function downloadUrl(version: string, platform: string): string {
-  const map: Record<string, string> = {
+export function aigatewayAssetName(platform: SupportedPlatform): string {
+  const map: Record<SupportedPlatform, string> = {
     "darwin-arm64": "darwin-arm64",
     "darwin-x64": "darwin-amd64",
     "linux-arm64": "linux-arm64",
     "linux-x64": "linux-amd64",
+    // The gateway is built with CGO_ENABLED=0, so the same static Linux
+    // binary runs on glibc and musl hosts.
+    "linux-arm64-musl": "linux-arm64",
+    "linux-x64-musl": "linux-amd64",
   };
   const slug = map[platform];
-  if (!slug) throw new Error(`No aigateway build for ${platform}`);
-  return `https://github.com/langwatch/langwatch/releases/download/v${version}/aigateway-${slug}`;
+  return `aigateway-${slug}`;
+}
+
+function downloadUrl(version: string, platform: SupportedPlatform): string {
+  return `https://github.com/langwatch/langwatch/releases/download/v${version}/${aigatewayAssetName(platform)}`;
 }
 
 async function resolveVersion(bin: string): Promise<string | null> {

@@ -21,7 +21,7 @@ helm install langwatch ./langwatch \
   --wait --timeout 10m
 ```
 
-That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets, so you have no secret to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets without manual preparation. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
 
 Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
 
@@ -56,7 +56,7 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
+Running [Langy](/langy/overview), the automated AI engineer? It ships as a separate agent pod in the same umbrella chart, deployed by default and removable with one value. See [Self-hosting Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models

@@ -19,9 +19,9 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
-// progressInterval is the heartbeat cadence:
-// comfortably below the control plane's HEARTBEAT_GRACE (30s) so a live but
-// quiet turn is never mistaken for a dead one.
+// progressInterval is the heartbeat cadence: comfortably below the control
+// plane's HEARTBEAT_GRACE (30s) so a live but quiet turn is never mistaken for
+// a dead one.
 const progressInterval = 5 * time.Second
 
 // maxStartedInputs caps the recorded tool-start inputs one turn keeps for the
@@ -76,13 +76,10 @@ type postedTurn struct {
 	mb     *mailbox
 }
 
-// Compile-time proof Agent satisfies the app ports, including the optional
-// abort capability the worker type-asserts at cancel time.
-var (
-	_ app.CodingAgent  = (*Agent)(nil)
-	_ app.TurnAborter  = (*Agent)(nil)
-	_ app.TurnBoundary = (*Agent)(nil)
-)
+// Compile-time proof Agent satisfies the driven port. Abort and the turn
+// boundary are part of CodingAgent since ADR-131 — they were optional
+// capabilities only because the other harness implemented neither.
+var _ app.CodingAgent = (*Agent)(nil)
 
 // NewAgent returns a pi CodingAgent. readinessTimeout bounds WaitReady.
 func NewAgent(readinessTimeout time.Duration) *Agent {
@@ -150,7 +147,7 @@ func (a *Agent) OpenSession(_ context.Context) (string, bool, error) {
 func (a *Agent) Post(ctx context.Context, _ string, turn app.Turn) error {
 	r := a.currentReader()
 	if r == nil {
-		return errors.New("pi agent: Post before Spawn")
+		return errWorkerGone(ctx, "Post before Spawn")
 	}
 	turnID := turn.TurnID
 	if turnID == "" {
@@ -181,7 +178,7 @@ func (a *Agent) Post(ctx context.Context, _ string, turn app.Turn) error {
 	return nil
 }
 
-// TurnEnded is the app.TurnBoundary capability. The worker calls it from
+// TurnEnded implements app.CodingAgent. The worker calls it from
 // Release, once Post and Stream have both returned, so it is the one moment
 // where a handle still sitting in the channel is provably unclaimed: its turn
 // is over and no Stream is waiting for it. Dropping it here is what keeps the
@@ -508,7 +505,7 @@ func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ string, deadline t
 	return a.writeCommand(ctx, command{Type: "shutdown_imminent", DeadlineMs: deadline.UnixMilli()})
 }
 
-// AbortTurn is the optional app.TurnAborter capability: it writes abort for
+// AbortTurn implements app.CodingAgent: it writes abort for
 // exactly the named turn. The wrapper double-checks the id against its running
 // turn, so a stale cancel can never halt the wrong generation. The aborted
 // turn still terminates with turn_done aborted, which Stream settles clean.
@@ -555,10 +552,10 @@ func (a *Agent) writeCommand(ctx context.Context, cmd command) error {
 	a.pipesMu.Lock()
 	defer a.pipesMu.Unlock()
 	if a.stdin == nil {
-		return errors.New("pi agent: worker stdin not open")
+		return errWorkerGone(ctx, "worker stdin not open")
 	}
 	if a.stdinBroken {
-		return errors.New("pi agent: worker stdin is broken, an earlier command did not write whole")
+		return errWorkerGone(ctx, "worker stdin is broken, an earlier command did not write whole")
 	}
 	if pipe, ok := any(a.stdin).(deadlineWriter); ok {
 		if err := pipe.SetWriteDeadline(deadline); err == nil {
@@ -567,9 +564,32 @@ func (a *Agent) writeCommand(ctx context.Context, cmd command) error {
 	}
 	if _, err := a.stdin.Write(append(body, '\n')); err != nil {
 		a.stdinBroken = true
-		return fmt.Errorf("pi agent: write %s command: %w", cmd.Type, err)
+		return errWorkerGone(ctx, fmt.Sprintf("write %s command: %v", cmd.Type, err))
 	}
 	return nil
+}
+
+// errWorkerGone reports that this worker can never serve another turn, in the
+// one shape the app recycles on.
+//
+// The pipe IS the session here: pi has no remote session to look up, so the
+// wrapper being unreachable is the whole of "the session vanished". Every
+// caller of this reaches it only after the worker is structurally unusable —
+// stdin never opened, or poisoned by a partial write that no later command can
+// be appended to safely.
+//
+// Returning domain.ErrSessionNotFound is what makes the comment on
+// writeCommand true. app.go recycles the conversation's worker on exactly this
+// code and falls through to a generic post failure on anything else, and a
+// generic failure leaves the dead worker in the pool for the next turn to find.
+// Under the opencode harness this code was raised by an HTTP 404 on a vanished
+// session; ADR-131 removed that harness, and without this the recovery path
+// would have had no producer left.
+func errWorkerGone(ctx context.Context, detail string) error {
+	return herr.New(ctx, domain.ErrSessionNotFound, herr.M{
+		"message": "the assistant session ended, please try again",
+		"detail":  "pi agent: " + detail,
+	})
 }
 
 // randomID returns a short random hex handle (session ids, private turn ids).

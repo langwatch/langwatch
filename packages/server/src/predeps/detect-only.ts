@@ -11,8 +11,14 @@ export type DoctorRow = {
   reason?: string;
 };
 
-export async function inspectPredeps({ version }: { version: string }): Promise<DoctorRow[]> {
-  const predeps = predepRegistry({ version });
+export async function inspectPredeps({
+  version,
+  isLangyEnabled,
+}: {
+  version: string;
+  isLangyEnabled: boolean;
+}): Promise<DoctorRow[]> {
+  const predeps = predepRegistry({ version, isLangyEnabled });
   const rows: DoctorRow[] = [];
   for (const p of predeps) {
     const det = await p.detect(paths);

@@ -193,9 +193,17 @@ func (w *Worker) Release() {
 	w.mu.Unlock()
 
 	// Outside w.mu: the agent takes its own locks, and the turn is already
-	// recorded as finished above. See app.TurnBoundary for what this clears.
-	if boundary, ok := w.agent.(app.TurnBoundary); ok {
-		boundary.TurnEnded()
+	// recorded as finished above. See app.CodingAgent.TurnEnded for what this
+	// clears.
+	//
+	// Nil-guarded because a Worker can exist without an agent: the registry
+	// holds bookkeeping-only entries (a worker being replaced, a test fixture
+	// asserting reuse), and this used to be a type assertion on an optional
+	// capability, which no-opped on a nil interface for free. Folding the
+	// capability into the port turned that into a panic on the turn-completion
+	// path.
+	if w.agent != nil {
+		w.agent.TurnEnded()
 	}
 }
 
@@ -295,10 +303,11 @@ func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time)
 // stopped a turn that already finished, and a new one started) can never halt
 // the wrong generation. An empty turnID is a no-op: a cancel needs a name.
 //
-// The abort is an OPTIONAL agent capability (app.TurnAborter): an agent that
-// does not implement it is a silent no-op, fail-open, so
-// the stop stays truthful on the durable record and only the token burn
-// continues. Best-effort by design: a failed abort is logged, never surfaced.
+// Abort is part of app.CodingAgent since ADR-131. It was an optional capability
+// the worker type-asserted for, because the removed harness could not abort and
+// had to degrade to a silent no-op. Best-effort by design either way: a failed
+// abort is logged, never surfaced, so the stop stays truthful on the durable
+// record and only the token burn continues.
 func (w *Worker) AbortTurn(ctx context.Context, turnID string) {
 	if turnID == "" {
 		return
@@ -309,11 +318,7 @@ func (w *Worker) AbortTurn(ctx context.Context, turnID string) {
 	if !claimed {
 		return
 	}
-	aborter, ok := w.agent.(app.TurnAborter)
-	if !ok {
-		return
-	}
-	if err := aborter.AbortTurn(ctx, w.sessionID, turnID); err != nil {
+	if err := w.agent.AbortTurn(ctx, w.sessionID, turnID); err != nil {
 		clog.Get(ctx).Warn("abort turn failed, the generation runs to completion on its own",
 			zap.String("conversation", w.conversationID),
 			zap.String("turn_id", turnID),

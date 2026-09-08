@@ -14,6 +14,7 @@ import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
 import { captureUserEnv } from "./shared/env.ts";
+import { resolveEffectiveFeatures } from "./shared/features.ts";
 import { paths } from "./shared/paths.ts";
 import { detectPlatform } from "./shared/platform.ts";
 import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
@@ -137,7 +138,12 @@ program
 			console.log("");
 		}
 
-		const predeps = await runPredeps({ yes: opts.yes, version: VERSION });
+		const installFeatures = resolveEffectiveFeatures(paths.envFile);
+		const predeps = await runPredeps({
+			yes: opts.yes,
+			version: VERSION,
+			isLangyEnabled: installFeatures.isLangyEnabled,
+		});
 
 		const runtime = await loadRuntime();
 		const ctx: RuntimeContext = {
@@ -238,7 +244,11 @@ program
 	.action(async (opts) => {
 		detectPlatform();
 		printBanner(VERSION);
-		const rows = await inspectPredeps({ version: VERSION });
+		const features = resolveEffectiveFeatures(paths.envFile);
+		const rows = await inspectPredeps({
+			version: VERSION,
+			isLangyEnabled: features.isLangyEnabled,
+		});
 		printDoctorTable(rows);
 		const base = Number.parseInt(opts.portBase, 10);
 		const ports = allocatePorts(base);
@@ -269,7 +279,12 @@ program
 	.action(async (opts) => {
 		detectPlatform();
 		printBanner(VERSION);
-		await runPredeps({ yes: opts.yes, version: VERSION });
+		const features = resolveEffectiveFeatures(paths.envFile);
+		await runPredeps({
+			yes: opts.yes,
+			version: VERSION,
+			isLangyEnabled: features.isLangyEnabled,
+		});
 		const runtime = await loadRuntime();
 		const base = PORT_BASE_DEFAULT;
 		const ports = allocatePorts(base);

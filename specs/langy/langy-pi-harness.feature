@@ -9,6 +9,16 @@ Feature: Langy runs a conversation on the pi worker
   #     tool surface look like)
   #   - specs/langy/langy-stop-and-resume.feature  (the user-facing stop this
   #     feature's cancel path completes)
+  #   - specs/langy/langy-opencode-harness-removal.feature  (ADR-131; what
+  #     happens to a turn that still names the harness that was removed)
+  #
+  # Four scenarios here described SELECTING between two harnesses: a turn
+  # naming none, a turn flipping to pi, an unrecognized value, and a probe that
+  # compared harnesses. ADR-131 removed the second harness, so all four
+  # described a choice that no longer exists. What survived of them — that a
+  # turn naming no harness runs, and that a turn naming the removed one is
+  # served rather than refused — moved to the removal spec, where it is about
+  # tolerating an old envelope rather than about picking a worker.
 
   # The wrapper generates pi's model registry from the manager's config. That
   # entry must not LOSE what pi's own catalog knows about the model: Claude 5
@@ -132,6 +142,12 @@ Feature: Langy runs a conversation on the pi worker
     Then the shared stash directory lets a worker pass through it
     And the stash stays unlistable, so sibling conversation ids stay hidden
     And a stash created earlier with a stricter mode is repaired on provision
+    # The unlistable property is a consequence of the worker being someone
+    # OTHER than the stash's owner. Under the shared-identity posture (ADR-130)
+    # the worker runs as the manager, so it holds the owner bits and the stash
+    # is listable to it: sibling conversation ids stop being hidden. That is
+    # part of what an operator trades there, and it is why this scenario names
+    # per-conversation identities in its Given rather than assuming them.
 
   # Conversation content must not sit on the manager's disk indefinitely
   # after the user moved on; a day covers every cache tier the store serves.

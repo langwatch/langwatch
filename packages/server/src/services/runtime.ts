@@ -111,14 +111,19 @@ const runtimeImpl: RuntimeApi = {
 		let langyHandle: SupervisedHandle | null = null;
 		if (isLangyRunnable) {
 			const binary = ctx.predeps.aigateway?.resolvedPath;
+			const workerBinary = ctx.predeps["langy-worker"]?.resolvedPath;
 			isLangyRunnable =
-				!!binary && (await monobinarySupportsLangyagent(binary));
+				!!binary &&
+				!!workerBinary &&
+				(await monobinarySupportsLangyagent(binary));
 			if (!isLangyRunnable) {
 				bus.emit({
 					type: "log",
 					service: "langyagent",
 					stream: "stderr",
-					line: "langy assistant disabled: the installed ai-gateway binary predates it. The next release's binary includes it and will be picked up automatically.",
+					line: workerBinary
+						? "langy assistant disabled: the installed ai-gateway binary predates it. The next release's binary includes it and will be picked up automatically."
+						: "langy assistant disabled: the langy-worker binary is not installed. Run `npx @langwatch/server install` and retry.",
 				});
 			}
 		}

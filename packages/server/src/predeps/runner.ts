@@ -13,9 +13,15 @@ export type PredepOptions = {
   yes?: boolean;
   skipConfirm?: boolean;
   version: string;
+  isLangyEnabled: boolean;
 };
 
-export async function runPredeps({ yes = false, skipConfirm = false, version }: PredepOptions): Promise<PredepResult> {
+export async function runPredeps({
+  yes = false,
+  skipConfirm = false,
+  version,
+  isLangyEnabled,
+}: PredepOptions): Promise<PredepResult> {
   const platform = detectPlatform();
   mkdirSync(paths.bin, { recursive: true });
   mkdirSync(paths.data, { recursive: true });
@@ -24,7 +30,7 @@ export async function runPredeps({ yes = false, skipConfirm = false, version }: 
   mkdirSync(paths.postgresData, { recursive: true });
   mkdirSync(paths.clickhouseData, { recursive: true });
 
-  const predeps = predepRegistry({ version });
+  const predeps = predepRegistry({ version, isLangyEnabled });
   const detection = await detectAll(predeps);
   const missing = predeps.filter((p) => !detection[p.id]?.installed);
 

@@ -2,6 +2,14 @@
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "langyagent.workerIsolation" -}}
+{{- if hasKey .Values "workerIsolation" -}}
+{{- .Values.workerIsolation -}}
+{{- else -}}
+per-uid
+{{- end -}}
+{{- end }}
+
 {{- define "langyagent.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}

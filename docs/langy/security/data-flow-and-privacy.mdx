@@ -19,7 +19,7 @@ A Langy conversation sends data to at most three destinations. Two of them are y
 flowchart TD
     U[You, in the LangWatch UI] --> CP[LangWatch control plane]
     CP -->|LANGY_INTERNAL_SECRET bearer, ClusterIP| AG[Langy agent pod]
-    AG --> W[One gVisor-sandboxed worker per conversation]
+    AG --> W[One isolated worker per conversation]
 
     W -->|langwatch CLI, per-session caller-scoped key| API[LangWatch API]
     W -->|LLM traffic via per-project virtual key| GW[LangWatch AI Gateway]
@@ -88,7 +88,7 @@ The lane is allow-list based (never a denylist), with three tiers set per organi
 |---|---|
 | `content` | Adds an explicit content allow-list: `gen_ai.input.messages`, `gen_ai.output.messages`, and named tool-payload keys. |
 | `structural` | Timings, tokens, status, and enums only. No prompts, completions, or tool output. |
-| `skip` | Nothing. |
+| `skip` | No trace data is mirrored. |
 
 <Note>
 On a self-hosted install the mirror lane is **off** unless `langyagent.mirror.existingSecretName` names a Secret with the mirror project's API key, and you choose the tier. On LangWatch SaaS the default is the `content` tier, with specific organizations restricted. If you are self-hosting and do not want any operator copy of Langy's traces, leave the mirror Secret unset.

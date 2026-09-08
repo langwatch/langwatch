@@ -473,7 +473,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
-  "specs/langy/langy-worker-isolation.feature",
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-activation-ui.feature",
@@ -560,7 +559,10 @@ const LEGACY_INERT: string[] = [
   // are bindable: annotate the suite's test functions with `# @scenario` and
   // drop the file from this list. Until someone does, the scenarios are all
   // @e2e @unimplemented and the file yields nothing to enforce.
-  "specs/security/helm-strict-admission.feature",
+  //
+  // helm-strict-admission.feature has left this list: its non-root posture
+  // scenario is bound to test_langy_isolation_postures. Its remaining
+  // scenarios stay @unimplemented and are bindable the same way.
   "specs/security/ingress-internal-path-block.feature",
   "specs/security/org-level-tenancy-enforcement.feature",
   "specs/security/tenant-aware-egress-isolation.feature",

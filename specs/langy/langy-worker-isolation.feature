@@ -1,91 +1,125 @@
-@unimplemented
-Feature: Langy worker network isolation under a sandboxed runtime
+Feature: Langy worker isolation
   As the operator of the langy-agent backend
-  I want each conversation worker isolated on the network from its siblings
-  So that a prompt-injected worker cannot reach another worker's opencode port
-     and exfiltrate that worker's live API key / GitHub token
+  I want each conversation's worker isolated from its siblings
+  So that a prompt-injected worker cannot read another conversation's live
+     credentials or the content of someone else's conversation
 
-  # ---------------------------------------------------------------------------
-  # Background: the threat this feature closes
+  # Cross-references:
+  #   ADR-033 — the original per-worker isolation model, written for the
+  #             opencode harness and its unauthenticated control port.
+  #   ADR-130 — per-worker identity isolation is the operator's choice; the
+  #             shared-identity posture and what it does and does not trade.
+  #   specs/langy/langy-deploy-hardening.feature — the chart-side guards.
+  #   specs/langy/langy-pi-harness.feature — the harness this now describes.
   #
-  # The manager runs many opencode workers inside ONE pod. Each worker holds a
-  # different user's live credentials in its environment. Workers execute
-  # LLM-generated shell, so worker A can be induced to attack worker B.
-  #
-  # Today, sibling isolation on the NETWORK is enforced by an iptables OUTPUT
-  # OWNER-match DROP rule on the shared pod loopback (services/langy-agent/
-  # iptables.go, from PR #4913). That rule requires the kernel netfilter
-  # subsystem, which is unavailable under gVisor (runtimeClassName: gvisor —
-  # the required posture for this workload per langwatch-saas#620): gVisor's
-  # Sentry does not implement iptables / nftables in ANY backend or network
-  # mode. The rule cannot be installed, and the manager aborts startup.
-  # Verified on dev EKS (ARM64) 2026-07-02; see langwatch-saas#620 for the
-  # full capability matrix.
-  #
-  # Root cause (established 2026-07-07): the iptables rule was treating a
-  # symptom. Opencode's HTTP control server has no authentication by default,
-  # so any sibling that can reach a worker's loopback port can drive that
-  # worker's opencode to run shell as it and exfiltrate its live credentials.
-  # The port being reachable was never the vulnerability — the port being
-  # unauthenticated was.
-  #
-  # This feature closes the hole by giving every worker's opencode a distinct,
-  # random OPENCODE_SERVER_PASSWORD (HTTP Basic auth). The manager's
-  # authenticated proxy knows the password and can reach the worker; a sibling
-  # that never learns the password gets 401. Isolation becomes a property of
-  # authentication rather than network topology, so it no longer depends on
-  # netfilter and works unchanged under gVisor.
-  # ---------------------------------------------------------------------------
+  # On the @unimplemented tags. They mean "not bound to a test yet", and that is
+  # true of every scenario here. The product implements the isolated and
+  # shared-identity postures, including the startup warning for shared identity.
+  # These requirements remain unbound until tests bind them. As tests land, the
+  # @unimplemented tag comes off scenario by scenario; the level tag stays.
 
   # ===========================================================================
-  # Sibling isolation (the core security property — must hold under gVisor)
+  # One conversation cannot control another
   # ===========================================================================
 
-  Scenario: A worker cannot authenticate to a sibling worker's opencode port
-    Given two workers A and B are running for different conversations
-    And each worker's opencode is secured by its own random password
-    When worker A attempts to connect to worker B's opencode port without B's password
-    Then the request is rejected with 401 Unauthorized
-    And worker A cannot read worker B's session or credentials
+  @unit @unimplemented
+  Scenario: A worker cannot observe or control another conversation
+    Given two workers are running for different conversations
+    When one tries to observe or send commands to the other conversation
+    Then it cannot observe or send those commands
+    And the other conversation is unaffected
 
-  Scenario: A worker can still reach its own opencode port
-    Given a worker is running for a conversation
-    When the manager's authenticated proxy forwards a request to that worker
-    Then the request reaches the worker's opencode
-    And the response is returned to the caller
+  # ===========================================================================
+  # The isolation posture governs credentials and conversation content
+  # ===========================================================================
+
+  @unit
+  Scenario: A worker receives live credentials without persisting them
+    Given a worker is provisioned with credentials for its conversation
+    When the worker receives those credentials for its conversation
+    Then no resolved credential value is present in its provisioned files
+
+  @unit
+  Scenario: Provisioned files do not expose live credentials
+    Given a worker is provisioned for a conversation
+    When its provisioned files are inspected
+    Then they identify the credentials the worker needs without containing their values
+
+  @unit @unimplemented
+  Scenario: Under per-worker identity, a worker cannot obtain a sibling's credentials
+    Given per-worker identity isolation is in effect
+    And two workers are running for different conversations
+    When one attempts to obtain the other's live credentials
+    Then access is refused
+
+  @unit @unimplemented
+  Scenario: Under per-worker identity, a worker cannot read a sibling's conversation
+    Given per-worker identity isolation is in effect
+    And two workers are running for different conversations
+    When one attempts to obtain the other's conversation content
+    Then access is refused
+
+  # Stated as a scenario rather than left implicit, because an operator who
+  # selects this posture is entitled to a precise account of it, and because a
+  # reader who finds only the two scenarios above would reasonably conclude the
+  # product always refuses. See ADR-130 for the trade and the acknowledgement
+  # the chart requires before it can be selected.
+  @unit @unimplemented
+  Scenario: Under shared identity, those two refusals do not hold
+    Given the operator has turned per-worker identity isolation off
+    And two workers are running for different conversations
+    When one tries to obtain the other's live credentials or conversation content
+    Then it succeeds
+    And it can control the other conversation
+    And the configured pod sandbox and egress restrictions still apply
 
   # ===========================================================================
   # Required connectivity is preserved
   #
-  # Securing the worker's opencode port must NOT cut off the connectivity it
-  # legitimately needs. These scenarios are the acceptance bar regardless of
-  # mechanism — under the current password-based design the network topology
-  # never changes, so they hold by construction.
+  # Isolating a worker must not cut off what it legitimately needs. These are
+  # the acceptance bar under either posture.
   # ===========================================================================
 
-  Scenario: An isolated worker can still reach the control plane and gateway
-    Given a worker is running under network isolation
+  @unit @unimplemented
+  Scenario Outline: A worker can still reach the control plane and gateway under either posture
+    Given a worker is running under the <posture> posture
     When the worker calls the LangWatch API or the AI gateway
     Then the call succeeds
 
-  Scenario: An isolated worker can still perform its GitHub / package work
-    Given a worker is running under network isolation
+    Examples:
+      | posture |
+      | per-worker identity |
+      | shared identity     |
+
+  @unit @unimplemented
+  Scenario Outline: A worker can still perform its GitHub and package work under either posture
+    Given a worker is running under the <posture> posture
     And external egress is permitted for that worker
     When the worker runs git, gh, or a package install against an allowed host
     Then the operation succeeds
 
+    Examples:
+      | posture |
+      | per-worker identity |
+      | shared identity     |
+
   # ===========================================================================
-  # Runtime posture
+  # Posture is chosen, never drifted into
   # ===========================================================================
 
-  Scenario: The manager starts successfully under the sandboxed runtime
-    Given the pod runs under the sandboxed runtime with per-worker isolation enabled
-    When the manager starts
-    Then it does not depend on kernel netfilter being available
-    And it begins accepting traffic only after worker isolation is in effect
-
-  Scenario: Sibling isolation is never silently disabled in production
-    Given the production configuration
-    When worker network isolation cannot be established for a new worker
+  @unit @unimplemented
+  Scenario: Isolation is never silently downgraded at runtime
+    Given per-worker identity isolation is in effect
+    When isolation cannot be established for a new worker
     Then that worker is not started
     And the failure is surfaced rather than downgraded to a warning
+    # The operator may choose the weaker posture deliberately, and the chart
+    # makes them write that choice down. What must never happen is arriving
+    # there because something failed and the manager carried on regardless.
+
+  @unit @unimplemented
+  Scenario: The manager announces which posture it started in
+    Given the manager is starting
+    When it resolves its isolation posture
+    Then it records which one is in effect
+    And a posture without per-worker identity is recorded as a warning

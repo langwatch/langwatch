@@ -56128,15 +56128,15 @@ keywords:
 
 ---
 title: How Langy works
-description: "Each Langy conversation is one agent worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
+description: "Each Langy conversation has one worker process, isolated by Unix identity by default: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
 sidebarTitle: How Langy works
 keywords:
   - how langy works
   - ai agent architecture
-  - langy agent worker
+  - langy worker
 ---
 
-Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one agent worker process per conversation and reaps it when the conversation goes idle.
+Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one worker process per conversation and reaps it when the conversation goes idle. The manager drives each worker over stdio pipes established when the worker starts, so a worker has no network control listener. Access to its control descriptors depends on the [worker isolation posture](/langy/security/sandbox#the-worker-to-worker-boundary).
 
 The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
@@ -56151,7 +56151,7 @@ graph LR
   browser["Browser<br/>(event-sourced chat UI)"]
   control["LangWatch control plane<br/>(turn processor, event log)"]
   manager["langyagent pod<br/>(Go manager)"]
-  worker["Agent worker<br/>(one per conversation, gVisor-sandboxed)"]
+  worker["Langy worker<br/>(one per conversation, isolated)"]
   cli["langwatch CLI<br/>&rarr; LangWatch API"]
   gateway["LangWatch AI Gateway<br/>(model calls)"]
   github["GitHub App<br/>(bot-authored PRs)"]
@@ -56169,8 +56169,8 @@ graph LR
 |---|---|
 | Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
 | Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
-| `langyagent` | The agent service. Spawns one worker per conversation. Single replica; scale vertically. |
-| Agent worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
+| `langyagent` | The agent service. Spawns one worker per conversation and drives it over stdio. Single replica; scale vertically. |
+| Langy worker | The coding agent itself, holding that conversation's credentials, repo clone, and skills. A distinct Unix identity separates it from siblings by default; `workerIsolation: none` disables that protection. Reaped after ~10 minutes idle, home wiped. |
 
 The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
 
@@ -56470,7 +56470,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
     Enable Langy, pick a model or sign in with Codex, and review the first pull request.
   </Card>
   <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
-    The mechanism: a gVisor-sandboxed agent worker whose only interface to LangWatch is the `langwatch` CLI.
+    The mechanism: one isolated worker per conversation, whose only interface to LangWatch is the `langwatch` CLI.
   </Card>
   <Card title="Ask Langy" icon="comments" href="/langy/chat">
     The chat panel and the kinds of questions Langy answers, from regressions to cost spikes.
@@ -56485,7 +56485,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
     What the sandbox can and cannot reach, and where the boundaries sit.
   </Card>
   <Card title="Self-hosting Langy" icon="server" href="/self-hosting/langy/overview">
-    Ships enabled in the Helm chart, sandboxed with gVisor by default.
+    Ships enabled in the Helm chart; pin a sandboxed runtime to harden the pod-to-host boundary.
   </Card>
 </CardGroup>
 
@@ -56949,7 +56949,7 @@ A Langy conversation sends data to at most three destinations. Two of them are y
 flowchart TD
     U[You, in the LangWatch UI] --> CP[LangWatch control plane]
     CP -->|LANGY_INTERNAL_SECRET bearer, ClusterIP| AG[Langy agent pod]
-    AG --> W[One gVisor-sandboxed worker per conversation]
+    AG --> W[One isolated worker per conversation]
 
     W -->|langwatch CLI, per-session caller-scoped key| API[LangWatch API]
     W -->|LLM traffic via per-project virtual key| GW[LangWatch AI Gateway]
@@ -57018,7 +57018,7 @@ The lane is allow-list based (never a denylist), with three tiers set per organi
 |---|---|
 | `content` | Adds an explicit content allow-list: `gen_ai.input.messages`, `gen_ai.output.messages`, and named tool-payload keys. |
 | `structural` | Timings, tokens, status, and enums only. No prompts, completions, or tool output. |
-| `skip` | Nothing. |
+| `skip` | No trace data is mirrored. |
 
 <Note>
 On a self-hosted install the mirror lane is **off** unless `langyagent.mirror.existingSecretName` names a Secret with the mirror project's API key, and you choose the tier. On LangWatch SaaS the default is the `content` tier, with specific organizations restricted. If you are self-hosting and do not want any operator copy of Langy's traces, leave the mirror Secret unset.
@@ -57124,7 +57124,7 @@ Install and disconnect actions are recorded in the audit log as `langy.github.in
 
 ---
 title: How Langy is Isolated
-description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
+description: Langy uses a separate Unix identity per worker by default. Shared identity is an explicit opt-out, and a sandboxed container runtime is optional. This page describes those boundaries and cooperative L7 egress controls.
 sidebarTitle: Sandbox and isolation
 keywords:
   - ai agent sandbox
@@ -57133,44 +57133,87 @@ keywords:
   - ai agent security
 ---
 
-Each conversation runs as a separate worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
+Each conversation runs as a separate worker process inside a single agent pod. The worker runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`), so there are two boundaries that matter: the one between a worker and the host, and the one between a worker and the conversation next to it. They are set independently, and on a self-hosted install you choose both.
 
-On LangWatch Cloud the pod always runs under gVisor. Self-hosted, the chart pins the pod to a `gvisor` RuntimeClass by default; on a cluster without one the pod waits rather than silently dropping to the node's runtime. Any sandboxed RuntimeClass works (a Kata class on AKS, for example).
+## The pod-to-host boundary
 
-Running unsandboxed takes an explicit pair, `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`; the chart's render-time `fail` guard refuses the first value alone. You then lose the pod-to-host boundary and keep only the in-pod walls below.
+gVisor is a user-space kernel that sits between the worker and the host kernel, giving a container that runs arbitrary shell a much smaller escape surface than a normal one. Any sandboxed RuntimeClass does the same job: a Kata class on AKS, GKE Sandbox on GKE.
+
+On LangWatch Cloud the pod always runs under gVisor.
+
+**Self-hosted, it is off by default.** The chart ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, so the agent installs and runs on any cluster and hardening is a deliberate later step. Most self-managed clusters cannot offer a sandboxed runtime, and refusing them outright made the assistant hosted-only in practice.
+
+To pin one:
+
+```yaml
+langyagent:
+  runtimeClassName: "gvisor"
+  acceptUnsandboxedRuntime: false
+```
+
+Blanking the class afterward while `acceptUnsandboxedRuntime` stays `false` is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox. Pinning a class the cluster does not define creates no pod at all: Kubernetes refuses it at admission, and the reason lands on the Deployment rather than on a pod you can see.
+
+## The worker-to-worker boundary
+
+Two conversations in one pod belong to two different people, and a prompt-injected worker's most valuable neighbour is the worker beside it. Their isolation depends on Unix identity, including access to the control pipes.
+
+**The control channel uses anonymous stdio pipes.** There is no worker HTTP listener. With distinct UIDs, Linux permissions prevent siblings from reopening those pipes; under shared identity, `/proc/<pid>/fd` can expose them. Anonymous pipes alone are not an isolation boundary.
+
+**No credential is written to disk.** A worker's config file carries environment variable *names*, never values. Every live credential reaches the worker through its process environment, so there is no credential file for a sibling to read.
+
+**Unix identity is the configurable one.** By default each conversation's worker gets a distinct UID; its home, tmp dir and session store are `chown`ed to that UID and `chmod`ed `0700`/`0600`, and the process is `setuid`ed into that UID before `exec`. That is what stops a sibling reading another worker's process environment through `/proc/<pid>/environ` or its conversation content out of the session directory.
+
+The chart supports `per-uid` with a manager running as UID 0 and five capabilities (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`). This is the supported configuration for provisioning worker files with `chown` and handing each worker its identity with `setuid`/`setgid`.
+
+To keep the blast radius small the container drops all capabilities and adds back exactly those five, sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`, omits `fsGroup` (sharing it would reopen the boundary it exists to hold), and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+
+### On a cluster that refuses root
+
+Pod Security Admission `restricted`, and the common Gatekeeper / Kyverno rules, require `runAsNonRoot: true`. Such a cluster admits no pod that can do the above at all, so the choice there is between per-worker identity and having an assistant:
+
+```yaml
+langyagent:
+  workerIsolation: none
+  acceptWorkerIsolationDisabled: true
+```
+
+The pod then defaults to UID 1000 with `capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`: a spec that satisfies PSA `restricted` without requiring an exemption, a RuntimeClass or a separate namespace. Any configured `runtimeClassName` is retained.
+
+Set `langyagent.podSecurityContext.runAsUser` to select another nonzero UID; the container inherits it unless `langyagent.containerSecurityContext.runAsUser` supplies a nonzero override. For details, see [the Helm settings](/self-hosting/langy/setup#hardening-clusters-that-refuse-root). The render fails without the acknowledgement, so nobody arrives at the weaker posture by leaving a field blank.
+
+Shared identity removes isolation between workers and the manager. A worker can read sibling credentials and conversation files, reopen control pipes through `/proc/<pid>/fd`, and read manager secrets through `/proc/<pid>/environ`. This includes `LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can authenticate manager RPCs and internal turn-result callbacks. Treat every conversation as trusted with that authority.
+
+Take it for a single-tenant install whose users are all colleagues in one organization. Do not take it if you serve mutually untrusted users from one install. One further consequence is easy to miss: a pod that cannot hold capabilities can never run the per-worker network namespace described under "hard egress" below, so this setting also forecloses that upgrade path for as long as it is selected.
+
+The pod logs a warning at boot identifying the shared-identity posture, so the posture shows up in the first support bundle rather than being reconstructed from a values file after an incident.
 
 ## Isolation layers
 
-Langy is isolated at several layers, from the pod boundary down to the walls between two conversations sharing one pod. Weakest to strongest:
-
 | Boundary | Mechanism | Enforced by |
 |---|---|---|
-| Pod to host | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard | Kubernetes + chart |
-| Worker to worker (files) | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES` | Linux file permissions (DAC) |
-| Worker to worker (control port) | A worker binds no listener at all. The manager drives it over a private stdio pipe pair, so there is no port for a sibling worker to reach | Go manager |
+| Pod to host | A sandboxed RuntimeClass such as gVisor (`runsc`). Off by default self-hosted; opt in with `runtimeClassName` and a render-time guard against losing it | Kubernetes + chart |
+| Worker to worker (control channel) | Anonymous stdio pipes protected by distinct Unix identities; shared identity permits reopening descriptors through `/proc` | Linux permissions; disabled by `workerIsolation: none` |
+| Worker to worker (credentials at rest) | None are written. The worker config holds variable names; values live only in the process environment | Process construction (not configurable) |
+| Worker to worker (process env and session files) | A distinct Unix UID per conversation, `0700` home, `/proc/<pid>/environ` readable only by the owning UID. Traded away by `workerIsolation: none` | Linux file permissions (DAC) |
 | Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
 | Worker to external (L3/L4) | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked | Container network interface (CNI) |
-| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
+| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace | Cilium / netns (planned, see below) |
 | Control plane to agent | `LANGY_INTERNAL_SECRET` bearer token, constant-time compared; the agent Service is ClusterIP only and never exposed outside the cluster | Go |
-
-The manager process runs as root in the container, because assigning a distinct UID per worker needs `CAP_SETUID`, `CAP_SETGID`, and `CAP_CHOWN`.
-
-To keep the blast radius small, the container drops all capabilities and adds back only five: `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, and `SETGID`. It also sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`.
-
-It omits `fsGroup`, since sharing it would reopen the cross-worker file boundary, and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
 
 ## Why egress is enforced at L7, not with iptables
 
 gVisor's kernel implements **no netfilter**. `iptables` and `nftables` fail in every mode under gVisor, so the usual way to control a container's outbound traffic (an `iptables` OWNER-match DROP or a REDIRECT to a local proxy) is not available here.
 
-That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-076) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
+That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
 
 The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed because they are dead under gVisor.
 
 <Warning>
 **Isolation limits (state these to a regulated buyer).**
 
-Today the per-worker Unix accounts are a **sibling-process boundary, not a full per-tenant boundary**. Multiple workers still share one gVisor sandbox and one network namespace (ADR-053, Proposed). The file and control-port walls above stop one worker from reading another worker's secrets or driving another worker's control server, but they do not give each conversation its own kernel or its own network stack.
+Per-worker Unix accounts are a **sibling-process boundary, not a full per-tenant boundary**. Multiple workers share one sandbox and one network namespace. The identity wall stops one worker reading another's process environment or session files; it does not give each conversation its own kernel or its own network stack.
+
+With `workerIsolation: none` that wall is **gone entirely**, including protection of control descriptors and manager secrets. The worker config still contains variable names rather than secret values; that does not protect live credentials from a process running under the same identity.
 
 The stock L7 egress adapter is **cooperative**, not mandatory. It enforces the allow-list only for traffic that goes through the proxy. A prompt-injected worker that ignores `HTTPS_PROXY` and dials an external IP directly on `:443` is **monitored, not blocked**, in the stock pod.
 
@@ -57192,7 +57235,7 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
 - **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint. These are blocked at L3/L4 to prevent SSRF and IMDS credential theft, so the block holds regardless of what the worker attempts.
 - **Reaches only through the adapter, by cooperation:** any other external host goes through the L7 egress adapter, which enforces the project allow-list and the operator floor. In the stock pod that path is cooperative, not mandatory: a worker that ignores `HTTPS_PROXY` and dials a public address on `:443` directly is monitored rather than blocked, per the limits above.
-- **Does not keep at rest:** the worker writes only to disposable storage. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
+- **Does not keep at rest:** worker storage is ephemeral. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
 **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
@@ -57962,7 +58005,9 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 </Note>
 
 <Warning>
-`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely: the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart.
+
+Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely: the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
 </Warning>
 
 ## Object Storage (Azure Blob)
@@ -57973,7 +58018,7 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
+| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` alone does not configure a destination. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
 | `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | - |
 | `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required only by `AZURE_BLOB_AUTH_MODE=sharedKey` | - |
 | `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
@@ -57983,7 +58028,9 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below). An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent (see below). An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem.
+
+Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
 </Warning>
 
 ### Migrating an existing installation
@@ -58004,7 +58051,9 @@ OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
 pnpm run task migrateObjectStorage verify
 ```
 
-`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object.
+
+`finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
 
 After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
 
@@ -58056,7 +58105,7 @@ Three rules before you configure it:
 - **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
 - **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
 
-In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, because the federated identity requires a ServiceAccount binding. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
 
 On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
 
@@ -58155,7 +58204,7 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 ## Langy (optional)
 
-Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
+Langy, the automated AI engineer, runs as a separate agent pod, deployed by default and removable with `langyagent.chartManaged: false`. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
 
 <Note>
 See [Langy environment variables](/self-hosting/langy/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
@@ -60547,7 +60596,7 @@ keywords:
   - langy_internal_secret
 ---
 
-The agent-side variables (`LANGY_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
+The agent-side variables (`LANGY_*` apart from the app URL below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
@@ -60563,7 +60612,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 |---|---|---|---|
 | `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
 | `LANGY_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
-| `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like. | No | `production` |
+| `ENVIRONMENT` | Deployment environment. Read for telemetry and log labeling only; it holds no security boundary. | No | `production` |
 
 <Warning>
 `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a secrets manager and never commit it or log it.
@@ -60575,8 +60624,9 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 |---|---|---|---|
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
-| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
+| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker's ready handshake. The Go default is 15000; the chart raises it to 60000 for sandboxed-runtime cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | Yes | `/workspace` |
+| `LANGY_WORKER_ISOLATION` | Per-worker identity posture: `per-uid` (each worker gets its own uid) or `none` (all workers share the pod's user). Set through `langyagent.workerIsolation`, which also requires `acceptWorkerIsolationDisabled` for `none`. Any other value refuses to boot. See [the sandbox page](/langy/security/sandbox). | No | `per-uid` |
 
 ## Egress
 
@@ -60614,7 +60664,7 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
 | `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
 | `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
-| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub uses the existing secret. | Yes (prod) | none |
 
 <Warning>
 `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
@@ -60834,7 +60884,7 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table.
+On a pod pinned to gVisor (an optional hardening setting), the default Netstack mode does not expose the host kernel's netfilter, so egress controls based on `iptables` or `nftables` features such as REDIRECT, OWNER-match DROP, and NAT are unavailable inside the sandbox. gVisor's host-networking mode uses the host network stack and its firewall rules, but gives up part of Netstack's isolation. The L7 adapter avoids Netstack's firewall limitations and works consistently whichever runtime the pod uses.
 
 That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
 
@@ -60928,7 +60978,7 @@ If your threat model requires that a compromised worker cannot reach an arbitrar
 
 ---
 title: Self-Hosting Langy
-description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the two isolation postures you choose between.
 sidebarTitle: Overview
 keywords:
   - self-host langy
@@ -60939,18 +60989,18 @@ keywords:
 
 Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, only the agent pod waits (Pending) while the rest of the install runs; provide a sandboxed runtime or accept running without one. See [Setup](/self-hosting/langy/setup).
+Two isolation postures ship as defaults you can change: the pod runs **without** a sandboxed RuntimeClass, because most self-managed clusters cannot offer one, and **with** per-worker Unix identity, which costs the pod root. Pin a RuntimeClass to harden the first; if your cluster refuses root, trade away the second. Both are covered in [Setup](/self-hosting/langy/setup) and stated in full on [the sandbox page](/langy/security/sandbox).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [agent worker](/langy/how-langy-works) per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one [worker](/langy/how-langy-works) per conversation and drives it over stdio pipes. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
 </Info>
 
 <Note>
-**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and every other part of the install is left as it was. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, while other components retain their configuration. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
 </Note>
 
 ## At a glance
@@ -60962,7 +61012,8 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 | Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
 | Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
 | Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true` |
+| Sandbox | No RuntimeClass by default (`runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`); pin one to harden |
+| Worker isolation | Each worker gets its own uid by default, which costs the pod root; `workerIsolation: none` trades it for a pod a restricted cluster admits |
 | Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
 | Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
 | GitHub App | Optional, for bot-authored pull requests |
@@ -60970,10 +61021,11 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
-  - GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly).
-  - On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works.
-  - EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`.
+- **A sandboxed runtime: recommended, not required, and not the default.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so a pod-to-host sandbox is worth having. The chart nonetheless ships `runtimeClassName: ""` with `acceptUnsandboxedRuntime: true`, because most self-managed clusters cannot offer one and refusing them made the assistant hosted-only in practice: **a default install runs on the node's own runtime, with no sandbox.**
+
+  To harden, pin a class and set `acceptUnsandboxedRuntime: false`: GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly), on AKS point `runtimeClassName` at your Kata VM isolation class, and on EKS install gVisor on the node group.
+
+  Once pinned, blanking it again is refused at render time, so a cluster that has hardened cannot quietly lose its sandbox; and pinning a class the cluster does not define creates no pod at all. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -60989,7 +61041,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>agent worker"]
+    Agent -->|"one per conversation<br/>(stdio pipes)"| Worker["Langy worker<br/>(own Unix identity)"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
@@ -61017,7 +61069,7 @@ Each worker's only path to LangWatch data is the `langwatch` CLI, and its only p
     The NetworkPolicy, the FQDN floor, and the cooperative-vs-mandatory egress limit.
   </Card>
   <Card title="The sandbox" icon="shield-halved" href="/langy/security/sandbox">
-    What the gVisor sandbox can and cannot reach, and where the boundaries sit.
+    What a worker can and cannot reach, which walls are configurable, and where the boundaries sit.
   </Card>
   <Card title="Platform self-hosting" icon="server" href="/self-hosting/overview">
     Deploy the rest of the LangWatch stack that Langy runs alongside.
@@ -61062,20 +61114,30 @@ asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 ## How Langy is isolated
 
 Langy's workers run shell written by a language model, and each one holds the
-credentials of the person who asked. Two controls bound that, both on by
-default on every cluster:
+credentials of the person who asked. Workers use stdio pipes instead of an HTTP
+control listener, and their config files contain environment variable names
+rather than secret values. Access to live credentials and control descriptors
+still depends on Unix identity.
 
-- **Per-worker identity.** Each conversation's worker runs under its own UID
-  with its own credentials and no listener a sibling could dial. Workers cannot read
-  each other's keys or reach each other's control ports.
+Per-worker identity is on by default and is the protection a hardened cluster
+may force you to give up:
+
+- **Per-worker identity.** Each conversation's worker runs under its own UID,
+  with a `0700` home, so a sibling cannot read its process environment or its
+  session files. Holding this costs the pod root plus five capabilities: see
+  [Clusters that refuse root](#hardening-clusters-that-refuse-root) if yours
+  will not admit that.
+
+Network restrictions are also on by default:
+
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and no other destination. Egress to the internet is off until you turn it
+  the gateway, with other destinations blocked by default. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
-Those are the controls that bound the realistic attack: a worker reached by
-prompt injection through data it was asked to look at, using its own legitimate
-access to exfiltrate. They need no configuration and behave the same everywhere.
+Together these bound the realistic attack: a worker reached by prompt injection
+through data it was asked to look at, using its own legitimate access to
+exfiltrate.
 
 The rung above them is a **sandboxed runtime**, which protects the node's kernel
 from a worker that escapes its container. That needs a kernel exploit on top of
@@ -61099,7 +61161,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
+app.kubernetes.io/name=langyagent` lists no pods, and the reason sits on the
 Deployment.
 
 ```bash
@@ -61269,6 +61331,67 @@ kubectl -n langwatch exec deploy/langwatch-langyagent -- cat /proc/version
 # Linux version 4.19.0-gvisor ...
 ```
 
+## Hardening: clusters that refuse root
+
+Pod Security Admission `restricted`, and the common Gatekeeper or Kyverno
+policies, require `runAsNonRoot: true` and `capabilities.drop: [ALL]`. The
+chart supports `per-uid` with a manager running as UID 0 and five capabilities:
+`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That configuration
+provisions worker files with `chown` and applies each worker identity with
+`setuid`/`setgid`, so it does not satisfy those admission policies.
+
+Forcing `runAsNonRoot` or a nonzero `runAsUser` while retaining `per-uid`
+is rejected during Helm rendering. Dropping required capabilities does not
+select shared identity: it makes worker provisioning fail. Helm also merges
+capability maps, so adding `drop: ["ALL"]` alone does not remove the chart's
+`add` list.
+
+The supported way is to say what you are giving up:
+
+```yaml
+langyagent:
+  workerIsolation: none
+  acceptWorkerIsolationDisabled: true
+```
+
+With no identity override, the pod defaults to UID 1000 with `runAsNonRoot: true`,
+`capabilities.drop: ["ALL"]`, no `add`, and `seccompProfile: RuntimeDefault`.
+This satisfies PSA `restricted` without requiring an exemption, a RuntimeClass or a
+separate namespace. Any configured `runtimeClassName` is retained.
+
+For clusters requiring a different UID, set
+`langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID. The
+container inherits that UID unless `langyagent.containerSecurityContext.runAsUser`
+sets a nonzero override. Omitting the acknowledgement fails the render with a message
+naming the trade, so nobody reaches this posture by leaving a field blank.
+
+<Warning>
+**What `workerIsolation: none` costs.** Shared identity removes isolation
+between workers and the manager. A worker can read sibling credentials and
+conversation files, reopen control pipes through `/proc/<pid>/fd`, and read
+manager secrets through `/proc/<pid>/environ`. This includes
+`LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can
+authenticate manager RPCs and internal turn-result callbacks. Treat every
+conversation as trusted with that authority.
+
+Take it for a single-tenant install whose users are all colleagues in one
+organization: the case this setting exists for, where the alternative is no
+assistant at all. Do not take it if you serve mutually untrusted users from one
+install.
+
+It also forecloses one future upgrade: the per-worker network namespace that
+would make egress enforcement mandatory rather than cooperative needs
+`CAP_SYS_ADMIN`, which this pod can never hold. If you expect to need
+bypass-proof egress, stay on `per-uid` and seek a policy exemption instead.
+</Warning>
+
+The pod logs a warning at boot identifying the shared-identity posture, so the posture is
+visible in your logs rather than only in a values file:
+
+```bash
+kubectl -n langwatch logs deploy/langwatch-langyagent | grep worker_isolation
+```
+
 ## Letting Langy reach the internet
 
 Langy's tools shell out to `git`, `gh`, and package managers. Egress to the
@@ -61348,8 +61471,8 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Every
-other part of your install is left as it was.
+The agent pod and every reference to it are removed on the next upgrade. Other
+components retain their configuration.
 
 ---
 
@@ -62150,7 +62273,7 @@ helm install langwatch ./langwatch \
   --wait --timeout 10m
 ```
 
-That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets, so you have no secret to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets without manual preparation. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
 
 Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
 
@@ -62185,7 +62308,7 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
+Running [Langy](/langy/overview), the automated AI engineer? It ships as a separate agent pod in the same umbrella chart, deployed by default and removable with one value. See [Self-hosting Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models
@@ -62520,14 +62643,17 @@ helm install lw . \
 A **default** install does not pass on its own. Everything LangWatch authors already complies (read-only root, non-root at both levels, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, CPU + memory requests and limits), but three bundled components cannot, and the overlay turns all three off:
 
 - **Prometheus** (`prometheus.chartManaged`) is an upstream subchart LangWatch doesn't control. Its pods carry no `readOnlyRootFilesystem`, no seccomp profile, and no resource limits on the config-reload sidecar. Bring your own, or disable metrics.
-- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That is by design: the manager gives every assistant worker a distinct UID, and without those capabilities sibling workers share a UID and can read each other's credentials. Don't force it non-root. Deploy it on a cluster that allows it, or run without the assistant.
-- **The ClickHouse preflight Job** (`clickhouse.preflight.enabled`) shells out to `kubectl` to check your Secret's keys, so it needs both an automounted token and a writable root for kubectl's discovery cache. It only renders when you supply the ClickHouse Secret yourself rather than using autogen, which is the production path, so the overlay pins it off.
+- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` by default. The manager needs those capabilities to provision and launch each worker under a distinct UID. Removing them makes provisioning fail; it does not select shared identity. The overlay disables the assistant.
+
+  To run it non-root, explicitly set `langyagent.workerIsolation: none` with `langyagent.acceptWorkerIsolationDisabled: true`. That defaults to UID 1000 with `drop: [ALL]` and `RuntimeDefault` seccomp. Set `langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID when required by cluster policy; a nonzero `langyagent.containerSecurityContext.runAsUser` overrides the pod UID.
+
+  Read [the accepted exposure](/self-hosting/langy/setup#hardening-clusters-that-refuse-root): workers share credentials, files and control-descriptor access, and can read manager secrets. Forcing `runAsNonRoot` or a nonzero UID while retaining `per-uid` is rejected during Helm rendering.
 
 One more toggle in the overlay isn't an admission failure but an unmet dependency:
 
 - **Gateway HPA** (`gateway.autoscaling.enabled`) scales on a custom metric via `prometheus-adapter`. Set it to `false` if you don't run one; the overlay pins `gateway.replicaCount: 2` instead.
 
-With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so nothing exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
+With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so the app does not expose a `/metrics` endpoint and Prometheus does not scrape it; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
 
 In-cluster datastores satisfy read-only-root policies, but managed databases (the `postgres-external`, `redis-external`, and `clickhouse-external` overlays) are still the better production choice: you get backups, HA, and patching, and there are no datastore pods to admit.
 
@@ -62593,7 +62719,7 @@ The `langwatch` npm package is published with [npm provenance attestations](http
 - [ ] Monitoring and alerting configured
 - [ ] Secret rotation procedure documented
 - [ ] Pod security contexts verified (non-root, read-only filesystem, `RuntimeDefault` seccomp, no automounted token)
-- [ ] On strict admission clusters: apply `examples/overlays/strict-admission.yaml` (`prometheus.chartManaged: false`, `langyagent.chartManaged: false`, and, without a custom metrics API, `gateway.autoscaling.enabled: false`)
+- [ ] On strict admission clusters: apply `examples/overlays/strict-admission.yaml` (`prometheus.chartManaged: false`, `langyagent.chartManaged: false`, and, without a custom metrics API, `gateway.autoscaling.enabled: false`). To keep the assistant, swap the Langy line for `workerIsolation: none` + `acceptWorkerIsolationDisabled: true` and record the trade
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
 - [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)

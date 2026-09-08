@@ -1,9 +1,11 @@
 # langwatch-langyagent helm chart
 
-Deploys the **Langy agent pod** — the worker manager (Go, `services/langyagent/`) that
-backs the in-product Langy assistant. The manager spawns one isolated
-worker subprocess per conversation and injects that request's credentials
-into the subprocess env at spawn time, so sessions never share credentials.
+Deploys the **Langy agent pod** — the "manager" (Go, `services/langyagent/`) that
+backs the in-product Langy assistant. The manager spawns one isolated worker
+subprocess per conversation and injects that request's credentials into the
+subprocess env at spawn time. Workers use anonymous stdio pipes instead of a
+control listener. Distinct Unix identities protect credentials and pipes by
+default; the shared-identity option removes that protection.
 
 This is an **internal-only** service: it has no Ingress and a default-deny
 NetworkPolicy that admits only the LangWatch control-plane pods. The control
@@ -47,7 +49,7 @@ langyagent:
   acceptUnsandboxedRuntime: false
 ```
 
-Blanking the class afterwards while `acceptUnsandboxedRuntime` stays false is
+Blanking the class afterward while `acceptUnsandboxedRuntime` stays false is
 refused at render time, so a cluster that has hardened cannot quietly lose its
 sandbox.
 
@@ -63,11 +65,34 @@ kubectl -n <namespace> get deploy <release>-langyagent \
 
 Everything else in the install keeps running either way.
 
-Unsandboxed, you keep per-worker UID isolation, workers that bind no
-listener, and the NetworkPolicy; you give up the pod-to-host sandbox. A
-single-tenant install whose users are colleagues carries a much smaller
-worker-versus-worker risk than a multi-tenant one; read the trade that way,
-not as a formality.
+Unsandboxed, you keep per-worker UID isolation and the NetworkPolicy; you give
+up the pod-to-host sandbox. A single-tenant install whose users are colleagues
+carries a much smaller worker-versus-worker risk than a multi-tenant one; read
+the trade that way, not as a formality.
+
+### Clusters that refuse root
+
+`runtimeClassName` governs the pod-to-node boundary. A separate, lower rung
+governs the worker-to-worker one, and a cluster running Pod Security Admission
+`restricted` — or a Gatekeeper / Kyverno rule requiring `runAsNonRoot: true` —
+forces a choice about it, because per-worker UID isolation needs root plus five
+capabilities and such a cluster admits no pod that holds them.
+
+```yaml
+workerIsolation: none
+acceptWorkerIsolationDisabled: true
+```
+
+The render fails without the acknowledgement. Shared identity removes isolation
+between workers and the manager. A worker can read sibling credentials and
+conversation files, reopen control pipes through `/proc/<pid>/fd`, and read
+manager secrets through `/proc/<pid>/environ`. This includes
+`LANGY_INTERNAL_SECRET` and any configured mirror key; the internal secret can
+authenticate manager RPCs and internal turn-result callbacks. Treat every
+conversation as trusted with that authority.
+
+Use it only when all conversations and their tool inputs are trusted with this
+authority. See ADR-130.
 
 ### Standalone
 
@@ -91,9 +116,11 @@ Override the Secret/key names via `secrets.existingSecretName` and
 |-------------------------------|-------------------------------------------------------------------------|
 | `chartManaged`                | Master on/off switch for the agent (umbrella: `langyagent.chartManaged`) |
 | `enableForAllUsers`           | Umbrella-only. Opens Langy to everyone in the install as soon as the agent is deployed. `false` keeps the rollout flag authoritative so you open it per project/org from `/ops/feature-flags` |
-| `runtimeClassName`            | Sandboxed runtime for the pod (default `gvisor`). Blank it only together with `acceptUnsandboxedRuntime` |
+| `runtimeClassName`            | Sandboxed runtime for the pod. Ships blank with `acceptUnsandboxedRuntime` true, so the agent installs anywhere; pin a class and set the acknowledgement false to harden |
 | `acceptUnsandboxedRuntime`    | Accept running with no pod-to-host sandbox, on clusters that cannot offer one. Required for a blank `runtimeClassName`, so an unsandboxed deploy is always deliberate |
-| `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Security-load-bearing: prod pods must report a production environment so the manager refuses `LANGY_UNSAFE_DEV_DISABLE_ISOLATION` |
+| `workerIsolation`             | Per-worker identity posture: `per-uid` (default, each worker gets its own uid; needs root + five capabilities) or `none` (shared identity; the pod needs neither root nor any capability, so it passes PSA `restricted`). See ADR-130 |
+| `acceptWorkerIsolationDisabled` | Accept running workers under one shared identity. Required for `workerIsolation: none`, so the weaker posture is always deliberate |
+| `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Read for telemetry and log labeling only — it gated the isolation bypass until ADR-130 and holds no boundary now |
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                     |
 | `replicaCount`                | **Keep at 1** — see Scaling below                                       |
 | `manager.maxWorkers`          | Max concurrent worker subprocesses before the pod returns 503           |
@@ -101,7 +128,7 @@ Override the Secret/key names via `secrets.existingSecretName` and
 | `secrets.existingSecretName`  | Name of the Secret created above                                        |
 | `resources`                   | Pod CPU/memory requests + limits                                        |
 | `networkPolicy.ingressFrom`   | Which pods may call the agent (default: `app.kubernetes.io/name: langwatch`) |
-| `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (git/gh/npm); tighten once pinned |
+| `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (worker tool traffic); tighten once pinned |
 | `networkPolicy.privateExcept` / `privateExceptV6` | Private/link-local/CGNAT CIDRs carved out of the `:443`-to-anywhere rule so a worker cannot pivot to internal services. Includes `100.64.0.0/10` (EKS CGNAT). Append your cluster's CIDR if it lives outside RFC1918 |
 | `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `egress.cilium.enabled` | ADR-076 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only for destination decisions; `egress.cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
 | `nodeSelector` / `affinity` / `tolerations` | Node placement. Opt-in **public-subnet** pinning is a defence-in-depth wall (a node with no route to private RDS/ElastiCache). Needs a Terraform-side node group; see Network policy below |

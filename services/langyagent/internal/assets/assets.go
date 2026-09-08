@@ -1,5 +1,5 @@
 // Package assets embeds the manager's static worker templates — the AGENTS.md
-// system prompt and the skills/ tree the worker discovers — INTO the binary, so a
+// system prompt and the skills/ tree a worker discovers — INTO the binary, so a
 // worker spawn depends on nothing outside the process. This replaces the old
 // entrypoint.sh dance that seeded /opt/langy-templates into the /workspace
 // emptyDir at pod startup (a runtime dependency that failed silently when the

@@ -10,9 +10,10 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/app"
 )
 
-// abortRecordingAgent is a seedRecordingAgent that ALSO implements the optional
-// app.TurnAborter capability, recording every abort so tests can prove which
-// turn (if any) was told to die.
+// abortRecordingAgent is a seedRecordingAgent that records every abort, so
+// tests can prove which turn (if any) was told to die. Abort was an optional
+// capability the worker type-asserted for until ADR-131; it is now part of
+// app.CodingAgent, so the base fake carries a no-op and this one overrides it.
 type abortRecordingAgent struct {
 	seedRecordingAgent
 	aborts   []string // turnIDs, in order
@@ -25,9 +26,6 @@ func (a *abortRecordingAgent) AbortTurn(_ context.Context, sessionID, turnID str
 	a.sessions = append(a.sessions, sessionID)
 	return a.abortErr
 }
-
-// compile-time proof the fake exercises the real capability interface.
-var _ app.TurnAborter = (*abortRecordingAgent)(nil)
 
 // claimedWorker registers a worker for conversationID whose agent is `agent`,
 // with turnID claimed in flight, and returns it.
@@ -100,20 +98,6 @@ func TestPoolCancelTurn_IdleWorkerIsANoOp(t *testing.T) {
 
 	if len(agent.aborts) != 0 {
 		t.Fatalf("aborts = %v, want none — the turn already finished", agent.aborts)
-	}
-}
-
-// An agent WITHOUT the abort capability is fail-open: the
-// cancel is a silent no-op and nothing about the running turn changes.
-func TestWorkerAbortTurn_NonAbortingAgentIsANoOp(t *testing.T) {
-	p := newTestPool(4)
-	agent := &seedRecordingAgent{} // no AbortTurn method
-	w := claimedWorker(t, p, "conv-1", "turn-1", agent)
-
-	p.CancelTurn("conv-1", "turn-1")
-
-	if !w.isInFlight() {
-		t.Fatal("a no-op cancel must leave the claimed turn in flight")
 	}
 }
 

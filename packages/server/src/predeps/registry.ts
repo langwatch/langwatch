@@ -1,27 +1,27 @@
 import { makeAigatewayPredep } from "./aigateway.ts";
-import { makeOpencodePredep } from "./opencode.ts";
 import { clickhousePredep } from "./clickhouse.ts";
 import { goosePredep } from "./goose.ts";
+import { makeLangyWorkerPredep } from "./langy-worker.ts";
 import { pnpmPredep } from "./pnpm.ts";
 import { postgresPredep } from "./postgres.ts";
 import { redisPredep } from "./redis.ts";
 import { uvPredep } from "./uv.ts";
-import { resolveEffectiveFeatures } from "../shared/features.ts";
-import { paths } from "../shared/paths.ts";
 import type { Predep } from "./types.ts";
 
-export function predepRegistry({ version }: { version: string }): Predep[] {
+export function predepRegistry({
+  version,
+  isLangyEnabled,
+}: {
+  version: string;
+  isLangyEnabled: boolean;
+}): Predep[] {
   // pnpm comes FIRST so the bundled binary is in place before
   // ensureLangwatchDeps + runMigrations call resolvePnpm(paths). uv is
   // fast/cached so its position is mostly irrelevant; everything else
   // doesn't depend on pnpm.
-  // The assistant's runtime is last: it is the only optional one, and the
-  // only one whose failure leaves a working install behind.
-  // Resolved the same way the runtime resolves them (persisted .env first,
-  // shell on top): a LANGWATCH_ENABLE_LANGY=false line in ~/.langwatch/.env
-  // must stop the assistant runtime from being downloaded, not only from
-  // being started.
-  const features = resolveEffectiveFeatures(paths.envFile);
+  //
+  // The worker is last and feature-gated: an install that disables Langy must
+  // not download a per-conversation runtime it will never execute.
   return [
     pnpmPredep,
     uvPredep,
@@ -30,6 +30,6 @@ export function predepRegistry({ version }: { version: string }): Predep[] {
     clickhousePredep,
     goosePredep,
     makeAigatewayPredep(version),
-    makeOpencodePredep({ isEnabled: features.isLangyEnabled }),
+    makeLangyWorkerPredep({ isEnabled: isLangyEnabled, serverVersion: version }),
   ];
 }

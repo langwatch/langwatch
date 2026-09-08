@@ -234,14 +234,17 @@ helm install lw . \
 A **default** install does not pass on its own. Everything LangWatch authors already complies (read-only root, non-root at both levels, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, CPU + memory requests and limits), but three bundled components cannot, and the overlay turns all three off:
 
 - **Prometheus** (`prometheus.chartManaged`) is an upstream subchart LangWatch doesn't control. Its pods carry no `readOnlyRootFilesystem`, no seccomp profile, and no resource limits on the config-reload sidecar. Bring your own, or disable metrics.
-- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID`. That is by design: the manager gives every assistant worker a distinct UID, and without those capabilities sibling workers share a UID and can read each other's credentials. Don't force it non-root. Deploy it on a cluster that allows it, or run without the assistant.
-- **The ClickHouse preflight Job** (`clickhouse.preflight.enabled`) shells out to `kubectl` to check your Secret's keys, so it needs both an automounted token and a writable root for kubectl's discovery cache. It only renders when you supply the ClickHouse Secret yourself rather than using autogen, which is the production path, so the overlay pins it off.
+- **The Langy assistant** (`langyagent.chartManaged`) runs its manager as root with `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` by default. The manager needs those capabilities to provision and launch each worker under a distinct UID. Removing them makes provisioning fail; it does not select shared identity. The overlay disables the assistant.
+
+  To run it non-root, explicitly set `langyagent.workerIsolation: none` with `langyagent.acceptWorkerIsolationDisabled: true`. That defaults to UID 1000 with `drop: [ALL]` and `RuntimeDefault` seccomp. Set `langyagent.podSecurityContext.runAsUser` to an allowed nonzero UID when required by cluster policy; a nonzero `langyagent.containerSecurityContext.runAsUser` overrides the pod UID.
+
+  Read [the accepted exposure](/self-hosting/langy/setup#hardening-clusters-that-refuse-root): workers share credentials, files and control-descriptor access, and can read manager secrets. Forcing `runAsNonRoot` or a nonzero UID while retaining `per-uid` is rejected during Helm rendering.
 
 One more toggle in the overlay isn't an admission failure but an unmet dependency:
 
 - **Gateway HPA** (`gateway.autoscaling.enabled`) scales on a custom metric via `prometheus-adapter`. Set it to `false` if you don't run one; the overlay pins `gateway.replicaCount: 2` instead.
 
-With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so nothing exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
+With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so the app does not expose a `/metrics` endpoint and Prometheus does not scrape it; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
 
 In-cluster datastores satisfy read-only-root policies, but managed databases (the `postgres-external`, `redis-external`, and `clickhouse-external` overlays) are still the better production choice: you get backups, HA, and patching, and there are no datastore pods to admit.
 
@@ -307,7 +310,7 @@ The `langwatch` npm package is published with [npm provenance attestations](http
 - [ ] Monitoring and alerting configured
 - [ ] Secret rotation procedure documented
 - [ ] Pod security contexts verified (non-root, read-only filesystem, `RuntimeDefault` seccomp, no automounted token)
-- [ ] On strict admission clusters: apply `examples/overlays/strict-admission.yaml` (`prometheus.chartManaged: false`, `langyagent.chartManaged: false`, and, without a custom metrics API, `gateway.autoscaling.enabled: false`)
+- [ ] On strict admission clusters: apply `examples/overlays/strict-admission.yaml` (`prometheus.chartManaged: false`, `langyagent.chartManaged: false`, and, without a custom metrics API, `gateway.autoscaling.enabled: false`). To keep the assistant, swap the Langy line for `workerIsolation: none` + `acceptWorkerIsolationDisabled: true` and record the trade
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
 - [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)

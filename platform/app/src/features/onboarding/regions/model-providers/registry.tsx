@@ -106,7 +106,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       AZURE_OPENAI_API_VERSION: {
         label: "API Version",
         description:
-          "Optional: used when calling your Azure OpenAI resource directly. It is ignored when your traffic routes through the LangWatch AI Gateway, which sets its own version.",
+          "Optional: used when calling your Azure OpenAI resource directly. The LangWatch AI Gateway also uses this value for chat (except Claude), embeddings, speech, and transcription. It is ignored for Responses and other endpoint types. Passthrough requests use it where the Azure endpoint supports api-version.",
       },
       AZURE_API_GATEWAY_BASE_URL: {
         label: "Base URL",
@@ -116,7 +116,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       AZURE_API_GATEWAY_VERSION: {
         label: "Version",
         description:
-          "Optional: used when calling through your Azure API Management gateway. It is ignored when your traffic routes through the LangWatch AI Gateway, which sets its own version.",
+          "Optional: used when calling through your Azure API Management gateway. The LangWatch AI Gateway also uses this value for chat (except Claude), embeddings, speech, and transcription. It is ignored for Responses and other endpoint types. Passthrough requests use it where the Azure endpoint supports api-version.",
       },
     },
   },

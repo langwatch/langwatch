@@ -82,6 +82,35 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 }
 
+// The probe folded a harness into the signature it compares until ADR-131, so
+// that a flip was a MISS. With one harness there is nothing to compare, and
+// what has to hold instead is tolerance: a control plane mid-rollout still
+// sends `harness`, and the probe is the FIRST call of every turn — refusing it
+// would fail the turn before a worker was even looked for.
+//
+// @scenario "A turn that names the removed harness still runs"
+func TestProbe_AnswersAnEnvelopeThatStillNamesAHarness(t *testing.T) {
+	pool := &stubPool{liveWorker: true}
+	router := newTestRouter(pool)
+
+	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","harness":"opencode"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("a probe naming the removed harness must be answered, status = %d", rec.Code)
+	}
+
+	// And it must ask the SAME question as one that names none — otherwise the
+	// two would disagree about whether the live worker matches, and a turn would
+	// respawn a worker that was already serving it.
+	withHarness := pool.lastSig
+	rec = post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if pool.lastSig != withHarness {
+		t.Fatalf("naming a harness must not change the signature (with=%+v without=%+v)", withHarness, pool.lastSig)
+	}
+}
+
 // A cancel is the token-burn half of the user's Stop (ADR-078): fire-and-forget,
 // 204 with no body, handed straight to the pool for the named conversation+turn.
 //

@@ -11,6 +11,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/assets"
 	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
 
@@ -30,29 +31,8 @@ const (
 // the forward, regardless of the value sent.
 const mediatedLLMPlaceholderKey = "langy-mediated"
 
-// defaultModel is what a turn that names no model runs on.
+// defaultModel is the model for a turn naming none.
 const defaultModel = "openai/gpt-5-mini"
-
-// langyAgentPrompt is the agent's own system prompt, the whole persona slot.
-// The operating contract stays in AGENTS.md, which the wrapper appends as an
-// instructions file regardless of this prompt: keep the two non-overlapping,
-// persona here, rules there.
-const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
-	"LangWatch project from inside the product. You work by running the `langwatch` " +
-	"CLI in your shell and reading its JSON output. The AGENTS.md instructions " +
-	"document is your operating contract and applies to every reply. When a request " +
-	"maps to a real action, you act first and answer from the result. " +
-	// Without this the stock coding-agent persona leaks back in through the
-	// model's priors: asked to refactor a file, Langy answers "I can't find
-	// src/agent.py in this workspace, paste the contents and I'll fix it" -
-	// claiming to have searched a checkout it never had. Working on the user's
-	// source IS the job when they ask for it; the GitHub skill clones the
-	// repository first (see AGENTS.md). What is wrong is narrating a workspace
-	// that was never obtained, so this fixes the premise, not the capability.
-	"Your shell does not start with a copy of the user's code in it. When their " +
-	"source is the ask, the repository is cloned first and the work happens there, " +
-	"so never report a file as missing, never describe reading or editing one you " +
-	"have not obtained, and never ask the user to paste their code."
 
 // ProvisionInput is everything Provision needs to lay down a worker's home.
 // Runner selects the isolation substrate.
@@ -222,8 +202,8 @@ func provisionSessionDir(in ProvisionInput) error {
 }
 
 // Provision creates a per-worker home with the wrapper's config file, the
-// substituted AGENTS.md, and the pi session dir. Isolation ordering: every
-// directory is chown'd (via the runner) to the
+// substituted AGENTS.md, and the pi session dir. The isolation ordering is
+// load-bearing: every directory is chown'd (via the runner) to the
 // per-conversation UID and chmod'd 0700/0600 BEFORE per-worker material lands,
 // so a sibling worker (a different UID) can never open(2) this worker's files.
 // The config file itself carries no secret (env var NAMES only) but is owned
@@ -279,7 +259,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// Responses lane and Anthropic thinking maps through the gateway at
 		// this level; trivial prompts legitimately produce no summary.
 		ThinkingLevel:  "medium",
-		PersonaPrompt:  langyAgentPrompt,
+		PersonaPrompt:  assets.LangyAgentPrompt,
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,

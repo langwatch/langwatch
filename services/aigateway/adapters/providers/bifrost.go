@@ -266,6 +266,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	provider := r.mapProviderForDispatch(cred)
 
+	if provider == bfschemas.Azure && azureLegacyOperation(req.Type) != "" && !bfschemas.IsAnthropicModel(cred.DeploymentMap[model]) {
+		return r.dispatchAzureCompatibility(ctx, req, azureCompatibilityTarget{model: model, credential: cred})
+	}
+
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
 	}
@@ -649,6 +653,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	provider := r.mapProviderForDispatch(cred)
 
+	if provider == bfschemas.Azure && req.Type == domain.RequestTypeChat && !bfschemas.IsAnthropicModel(cred.DeploymentMap[model]) {
+		return r.dispatchAzureCompatibilityStream(ctx, req, azureCompatibilityTarget{model: model, credential: cred})
+	}
+
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
 	}
@@ -840,6 +848,9 @@ func (r *BifrostRouter) dispatchPassthrough(
 	cred domain.Credential,
 ) (*domain.Response, error) {
 	bfReq := passthroughRequest(req, model)
+	if provider == bfschemas.Azure && applyAzurePassthroughVersion(bfReq, cred) {
+		ctx = context.WithValue(ctx, azureAPIVersionAppliedKey{}, true)
+	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
 	resp, berr := r.bf.Passthrough(bfCtx, provider, bfReq)
@@ -884,6 +895,9 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 	cred domain.Credential,
 ) (domain.StreamIterator, error) {
 	bfReq := passthroughRequest(req, model)
+	if provider == bfschemas.Azure && applyAzurePassthroughVersion(bfReq, cred) {
+		ctx = context.WithValue(ctx, azureAPIVersionAppliedKey{}, true)
+	}
 	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
 
 	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
@@ -931,12 +945,13 @@ func passthroughResponseHeaders(in map[string]string) map[string]string {
 	return out
 }
 
-// rawForwardCtx enriches a context with both Bifrost flags the
+// rawForwardCtx enables per-request raw overrides and the flags the
 // raw-forward code path needs: UseRawRequestBody sends the inbound
 // bytes unchanged to the provider adapter; SendBackRawResponse attaches
 // the provider's native response bytes to ExtraFields.RawResponse so
 // the gateway can emit them verbatim downstream.
 func rawForwardCtx(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeyAllowPerRequestRawOverride, true)
 	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeyUseRawRequestBody, true)
 	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeySendBackRawResponse, true)
 	return ctx
@@ -1229,8 +1244,16 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
 	}
-	key := credentialToBifrostKey(cred, provider, a.azureAPIVersionWarnLogger(cred))
+	logger := a.azureAPIVersionLogger(ctx, cred)
+	key := credentialToBifrostKey(cred, provider, logger)
 	return []bfschemas.Key{key}, nil
+}
+
+func (a *account) azureAPIVersionLogger(ctx context.Context, cred domain.Credential) *zap.Logger {
+	if applied, _ := ctx.Value(azureAPIVersionAppliedKey{}).(bool); applied {
+		return nil
+	}
+	return a.azureAPIVersionWarnLogger(cred)
 }
 
 // azureAPIVersionWarnLogger returns the account's logger only on the first

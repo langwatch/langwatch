@@ -3,7 +3,7 @@
 # turn needs, with the exact fix printed for whatever is missing.
 #
 # Langy locally = the app (pnpm dev), the AI gateway (auto-started by pnpm
-# dev), and the langyagent Go service running the no-sandbox dev runner
+# dev), and the langyagent Go service running with shared worker identity
 # (gVisor does not exist on macOS), plus a handful of env entries in
 # platform/app/.env and the release flag force-enabled. Each missing piece fails
 # a turn with a different distant symptom, this script fails them all HERE,
@@ -50,12 +50,12 @@ missing_env=()
 for key in LANGY_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
   if [[ -n "$(env_value "$key")" ]]; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
 done
-# The isolation flag must literally be true: set-but-false still spawns the
-# gVisor runner, which cannot exist on a dev laptop.
-case "$(env_value LANGY_UNSAFE_DEV_DISABLE_ISOLATION)" in
-  true|1) ok "LANGY_UNSAFE_DEV_DISABLE_ISOLATION" ;;
-  "") bad "LANGY_UNSAFE_DEV_DISABLE_ISOLATION missing"; missing_env+=(LANGY_UNSAFE_DEV_DISABLE_ISOLATION) ;;
-  *) bad "LANGY_UNSAFE_DEV_DISABLE_ISOLATION must be true for a local (no gVisor) agent" ;;
+# Local workers share the manager identity; per-uid isolation needs privileges
+# unavailable to an ordinary dev process.
+case "$(env_value LANGY_WORKER_ISOLATION)" in
+  none) ok "LANGY_WORKER_ISOLATION" ;;
+  "") bad "LANGY_WORKER_ISOLATION missing"; missing_env+=(LANGY_WORKER_ISOLATION) ;;
+  *) bad "LANGY_WORKER_ISOLATION must be none for a local agent" ;;
 esac
 # The roots must be writable directories or the worker provision fails at
 # spawn with a distant chown/mkdir error.
@@ -74,10 +74,10 @@ if [[ ${#missing_env[@]} -gt 0 ]]; then
   else
     BLOCK=$(cat <<BLOCK
 
-# Langy local dev (agent runs without gVisor via the unsafe-dev runner)
+# Langy local dev (agent runs with shared worker identity)
 LANGY_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="${SECRET}"
-LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
+LANGY_WORKER_ISOLATION=none
 SESSIONS_ROOT="\$HOME/.langwatch-langy/sessions"
 LANGY_WORKSPACE_ROOT="\$HOME/.langwatch-langy/workspace"
 BLOCK
@@ -108,6 +108,12 @@ fi
 
 # --- binaries --------------------------------------------------------------
 echo "binaries:"
+if command -v langy-worker >/dev/null 2>&1; then
+  ok "langy-worker ($(command -v langy-worker))"
+else
+  bad "langy-worker not on PATH (the langyagent spawns it per conversation)"
+  hint "cd services/langyworker && bun run scripts/build-binary.ts, then put out/langy-worker on PATH"
+fi
 if command -v go >/dev/null 2>&1; then
   ok "go toolchain"
 else

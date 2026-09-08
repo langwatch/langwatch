@@ -366,7 +366,7 @@ func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 		return "The credentials configured for this model provider were not accepted, so the request never reached the provider and will fail the same way on every retry. Check the provider's credentials in your model provider settings."
 	case domain.ErrProviderConfigInvalid:
 		if model := berr.ExtraFields.OriginalModelRequested; model != "" {
-			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
+			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", bfClampMetaValue(model))
 		}
 		return "This model provider is not configured to serve the requested model. Check the models and deployments configured for it in your model provider settings."
 	case domain.ErrInternal:
@@ -448,7 +448,7 @@ func bfDescribeUnquotableCause(category string, cause error) (string, bool) {
 }
 
 // bfMaxMetaValue bounds the customer-supplied strings copied into meta.
-// ModelRequested is whatever the caller put in the request body, and meta is
+// OriginalModelRequested is whatever the caller put in the request body, and meta is
 // rendered into a sentence in the browser and written to a log line; neither
 // has a length of its own to fall back on.
 const bfMaxMetaValue = 120
