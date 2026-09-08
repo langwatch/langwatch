@@ -1,0 +1,43 @@
+# Dispatch-only: this cell drives real TTS + STT through the deployed LangWatch
+# AI Gateway and so spends real provider money on every run. It must never fire
+# on push or PR. The per-push sdk-python-ci job skips this test automatically
+# because SCENARIO_VOICE_GATEWAY_VK is absent in that job's environment; here we
+# provision it from a secret so the cell actually runs. Tracked in issue #6180.
+name: Scenario voice gateway cell
+
+on:
+  workflow_dispatch:
+    inputs:
+      gateway_url:
+        description: Gateway base URL the audio calls route through
+        required: false
+        default: https://gateway.langwatch.ai/v1
+
+permissions:
+  contents: read
+
+jobs:
+  voice-cell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "sdks/python/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: sdks/python
+        run: uv sync --all-groups --all-extras
+
+      - name: Run the Scenario voice gateway cell
+        working-directory: sdks/python
+        env:
+          LANGWATCH_DEBUG: "true"
+          SCENARIO_VOICE_GATEWAY_VK: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url }}
+        run: uv run pytest -s -vv -m e2e tests/e2e/test_scenario_voice_gateway_e2e.py
