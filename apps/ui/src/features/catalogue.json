@@ -142,7 +142,7 @@
       "id": "data-privacy",
       "root": "data-privacy",
       "uses": {
-        "screens": ["@langwatch/data-privacy-web/screens/data-privacy"],
+        "screens": ["@langwatch/data-privacy-web/data-privacy"],
         "surfaces": []
       }
     },
@@ -352,6 +352,12 @@
         "surfaces": [
           "@langwatch/scenario-web/drawers",
           "@langwatch/scenario-web/scenario-mappings",
+          "@langwatch/suite-web/run-cards",
+          "@langwatch/suite-web/run-dialogs",
+          "@langwatch/suite-web/run-formatters",
+          "@langwatch/suite-web/run-history-store",
+          "@langwatch/suite-web/suite-form",
+          "@langwatch/suite-web/suite-pickers",
           "@langwatch/agent-web/agent-editors",
           "@langwatch/agent-web/agent-client",
           "@langwatch/agent-web/agent-http-editor",
@@ -375,7 +381,7 @@
       "id": "topic-clustering",
       "root": "topic",
       "uses": {
-        "screens": ["@langwatch/topic-web/screens/topic-clustering"],
+        "screens": ["@langwatch/topic-web/topic-clustering"],
         "surfaces": []
       }
     },
