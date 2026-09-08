@@ -67,7 +67,8 @@ import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import path from "path";
-import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { PUBLIC_KEY } from "../ee/licensing/constants";
+import { resolveSeedLicense } from "../scripts/localDevLicense";
 import {
   PrismaClient,
   RoleBindingScopeType,
@@ -148,15 +149,27 @@ async function main() {
     ? firstMessageOverride === "1" || firstMessageOverride === "true"
     : process.env.HAVEN_SEED_PRESET === "demo";
 
+  // The license must verify against the key this app boots with, otherwise
+  // every settings page reports it as invalid. `resolveSeedLicense` keeps a
+  // license that already verifies (someone activated a real one) and only
+  // replaces what does not.
+  const existingOrganization = await prisma.organization.findUnique({
+    where: { id: ORG_ID },
+    select: { license: true },
+  });
+  const license = resolveSeedLicense({
+    stored: existingOrganization?.license ?? null,
+    publicKey: PUBLIC_KEY,
+  });
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
       id: ORG_ID,
       name: ORG_NAME,
       slug: ORG_SLUG,
-      license: ENTERPRISE_LICENSE_KEY,
+      license,
     },
-    update: { license: ENTERPRISE_LICENSE_KEY },
+    update: { license },
   });
 
   // Prompt tags are org-defined, and `production` is the one
