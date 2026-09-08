@@ -160,6 +160,7 @@ export function useAgentFilters(): {
     key: K,
     value: AgentFilters[K],
   ) => void;
+  clearFilters: () => void;
 } {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters: AgentFilters = {
@@ -183,5 +184,24 @@ export function useAgentFilters(): {
     [setSearchParams],
   );
 
-  return { filters, setFilter };
+  /**
+   * The way back from having filtered everything out of view.
+   *
+   * Source and ownership only. Sort is not a filter — it hides nothing — so
+   * resetting it here would reorder the cards as a side effect of a button
+   * that promised to bring them back.
+   */
+  const clearFilters = useCallback(() => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("source");
+        next.delete("ownership");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+
+  return { filters, setFilter, clearFilters };
 }

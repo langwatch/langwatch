@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateBuckets,
   aggregateLaneSeries,
+  aggregateLaneTrend,
   aggregateSeatCounts,
   bucketStartOf,
   formatBucketTick,
@@ -230,8 +231,51 @@ describe("aggregateLaneSeries", () => {
  * chart has no bucket for, and recharts draws nothing at all — silently, since
  * a reference line with no match is not an error.
  */
+describe("given a lane series read per day and a quarter in view", () => {
+  /** @scenario "A lane sparkline is bucketed by the interval in view like every other chart" */
+  it("folds the sparkline to one point per quarter, withheld quarters included", () => {
+    const folded = aggregateLaneTrend(
+      [
+        { day: "2026-01-05", value: 10 },
+        { day: "2026-02-11", value: 20 },
+        { day: "2026-03-30", value: 30 },
+        // A whole quarter the read would not price. It stays on the chart as a
+        // gap rather than a floor — a zero here claims nothing was spent.
+        { day: "2026-04-02", value: null },
+        { day: "2026-05-09", value: null },
+        { day: "2026-07-01", value: 7 },
+      ],
+      "quarter",
+    );
+
+    expect(folded).toEqual([
+      { day: "2026-01-01", value: 60 },
+      { day: "2026-04-01", value: null },
+      { day: "2026-07-01", value: 7 },
+    ]);
+  });
+
+  it("totals the days it does have when only some of a quarter is withheld", () => {
+    const folded = aggregateLaneTrend(
+      [
+        { day: "2026-01-05", value: null },
+        { day: "2026-02-11", value: 20 },
+      ],
+      "quarter",
+    );
+
+    expect(folded).toEqual([{ day: "2026-01-01", value: 20 }]);
+  });
+});
+
 describe("given a forecast whose window is part served and part projected", () => {
-  const forecast = sampleForecast(recentMonths(12), ["checkout-agent"], 400);
+  const measuredMonths = recentMonths(12);
+  const forecast = sampleForecast({
+    days: measuredMonths,
+    labels: ["checkout-agent"],
+    monthlyTopValue: 400,
+  });
+  const drawnBuckets = [...forecast.measured, ...forecast.projected];
 
   /** @scenario "The projection marker survives the fold to any interval" */
   it.each([
@@ -239,10 +283,45 @@ describe("given a forecast whose window is part served and part projected", () =
     "quarter",
     "year",
   ] as const)("names a bucket the chart draws, folded to %s", (interval) => {
-    const drawn = aggregateBuckets(forecast.buckets, interval);
+    const drawn = aggregateBuckets(drawnBuckets, interval);
     const marker = bucketStartOf(forecast.projectedFromDay ?? "", interval);
 
     expect(drawn.map((bucket) => bucket.day)).toContain(marker);
+  });
+
+  /** @scenario "The forecast projects months the window does not contain" */
+  it("projects past the end of the measured window", () => {
+    const lastMeasured = measuredMonths[measuredMonths.length - 1] ?? "";
+
+    // The whole complaint this replaced: shading the tail of the window and
+    // calling it a projection meant every month drawn had already happened.
+    expect(forecast.projected.length).toBeGreaterThan(0);
+    for (const bucket of forecast.projected) {
+      expect(bucket.day > lastMeasured).toBe(true);
+    }
+    expect(forecast.projectedFromDay).toBe(forecast.projected[0]?.day);
+  });
+
+  /** @scenario "A projected month is a run rate, not another roll of the dice" */
+  it("carries a steady run rate forward rather than re-rolling the noise", () => {
+    const values = forecast.projected.map(
+      (bucket) => bucket.points[0]?.value ?? 0,
+    );
+    const measuredValues = forecast.measured.map(
+      (bucket) => bucket.points[0]?.value ?? 0,
+    );
+
+    // Projected months drift by a fixed rate, so successive months never move
+    // by more than the drift. Measured months are noisy on purpose, so the
+    // same test applied to them would fail — which is what makes this one
+    // evidence of anything.
+    const spread = (series: number[]) =>
+      series
+        .slice(1)
+        .map((value, index) => Math.abs(value - (series[index] ?? 0)))
+        .reduce((largest, step) => Math.max(largest, step), 0);
+
+    expect(spread(values)).toBeLessThan(spread(measuredValues));
   });
 
   it("puts the bucket holding the split on the projected side, not the served one", () => {

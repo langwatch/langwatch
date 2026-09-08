@@ -65,6 +65,46 @@ export function formatLaneUsd(amountUsd: number | null): string {
   return amountUsd < 0 ? `-${digits}` : digits;
 }
 
+/**
+ * Which way a lane's window is running, as a percentage.
+ *
+ * The later half of the window against the earlier half, not the last point
+ * against the one before it. The lane series arrives at whatever granularity
+ * the read answers in — days from a real summary, months from an invented one
+ * — and a last-point comparison would therefore mean something different on
+ * every screen it appeared on, while measuring mostly the noise of a single
+ * day. Halves say the same thing at any granularity: is this window ending
+ * heavier than it started.
+ *
+ * Null when the comparison cannot be made honestly: fewer than four periods to
+ * split, or an earlier half that holds nothing to divide by. Withheld days
+ * (§21) are skipped rather than counted as zero, since a zero would report
+ * money not spent when the truth is money not stated.
+ */
+export function laneTrendPct(
+  points: readonly { value: number | null }[],
+): number | null {
+  const stated = points.filter(
+    (point): point is { value: number } => point.value !== null,
+  );
+  if (stated.length < 4) return null;
+  const middle = Math.floor(stated.length / 2);
+  const sum = (from: number, to: number) =>
+    stated.slice(from, to).reduce((total, point) => total + point.value, 0);
+  const earlier = sum(0, middle);
+  const later = sum(middle, stated.length);
+  if (earlier <= 0) return null;
+  return ((later - earlier) / earlier) * 100;
+}
+
+/** That percentage as a signed badge, or null when there is nothing to say. */
+export function laneTrendBadge(changePct: number | null): string | null {
+  if (changePct === null) return null;
+  const rounded = Math.round(changePct);
+  if (rounded === 0) return "level";
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
+}
+
 function laneDigits(magnitude: number): string {
   if (magnitude >= CENTS_STOP_MATTERING_AT)
     return GROUPED_USD_WHOLE.format(magnitude);

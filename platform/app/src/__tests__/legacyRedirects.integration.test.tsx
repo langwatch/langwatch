@@ -304,8 +304,13 @@ describe("legacy governance redirects", () => {
   });
 
   describe("when the retired anomaly rules address is cold-loaded", () => {
-    /** @scenario "The retired anomaly rules address lands on the inventory Anomaly Rules tab" */
-    it("lands on the inventory Anomaly Rules tab and replaces the history entry", async () => {
+    // The redirect is unchanged and still pins the tab it was written for.
+    // That tab has since been removed from the inventory, so the pinned value
+    // now degrades to the Catalog pane rather than selecting nothing; the tab
+    // shell's own test covers where it lands. Repointing this redirect at the
+    // rules' eventual home is a routing change and is not made here.
+    /** @scenario "The retired anomaly rules address still resolves" */
+    it("lands on the inventory and replaces the history entry", async () => {
       const router = renderRouterAt(["/start", "/governance/anomaly-rules"]);
 
       await waitFor(() => {

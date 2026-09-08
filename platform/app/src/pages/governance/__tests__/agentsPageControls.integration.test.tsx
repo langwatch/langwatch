@@ -27,6 +27,11 @@ import type React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  AGENTS_EMPTY_COPY,
+  APPLICATIONS_EMPTY_COPY,
+  NO_MATCHING_AGENTS_COPY,
+} from "~/components/governance/agents";
 import { findNativeSelects } from "~/components/governance/filters";
 import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
 
@@ -114,6 +119,9 @@ function ButtonReferences() {
       <Button size="sm" variant="solid" colorPalette="orange">
         reference solid small
       </Button>
+      <Button size="sm" variant="outline">
+        reference outline small
+      </Button>
     </>
   );
 }
@@ -200,8 +208,12 @@ describe("the agents page sample cards", () => {
      * the real button, because `colorPalette` is part of the class Chakra
      * generates and a reference without it would never match.
      *
-     * @scenario "Primary page actions sit top-right in the page header"
+     * The annotation below is on its own single line on purpose: the parity
+     * checker only accepts `@scenario` when the annotation line also closes
+     * the comment, so the same tag written as the last line of this block
+     * binds nothing and reports nothing.
      */
+    /** @scenario "Primary page actions sit top-right in the page header" */
     it("renders Register agent solid small and the sample toggle ghost small", () => {
       // Sample off, so the toggle is in its resting state.
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
@@ -232,9 +244,8 @@ describe("the agents page sample cards", () => {
      * treatment once samples are showing, so a reader can see at a glance
      * that they are looking at invented data, and it is still never solid.
      * The test above covers the rest half; neither covers both.
-     *
-     * @scenario "Primary page actions sit top-right in the page header"
      */
+    /** @scenario "Primary page actions sit top-right in the page header" */
     it("keeps the pressed sample toggle subtle and never solid", () => {
       renderAgentsWithReferences();
 
@@ -255,9 +266,40 @@ describe("the agents page sample cards", () => {
     });
   });
 
+  describe("when the filter row is placed", () => {
+    /**
+     * The chips narrow the cards, so they sit above the cards rather than
+     * among them. `role="tabpanel"` is the content region itself, which makes
+     * "outside the content" something the DOM can answer rather than
+     * something a screenshot has to be trusted for.
+     */
+    /** @scenario "The filter row sits outside the content it narrows" */
+    it("keeps every chip out of the tab panel and off the Applications tab", async () => {
+      const user = userEvent.setup();
+      renderAgentsAt();
+
+      const chips = await screen.findAllByRole("button", {
+        expanded: false,
+        name: /Source|Ownership|Sort/,
+      });
+      expect(chips).toHaveLength(3);
+      for (const chip of chips) {
+        expect(chip.closest('[role="tabpanel"]')).toBeNull();
+      }
+
+      await user.click(screen.getByRole("tab", { name: "Applications" }));
+
+      await waitFor(() =>
+        expect(
+          document.body.querySelectorAll('[aria-haspopup="menu"]'),
+        ).toHaveLength(0),
+      );
+    });
+  });
+
   describe("when the reader turns sample data off", () => {
     /** @scenario "Turning sample data off leaves the honest empty pane" */
-    it("removes every card and leaves the pane's own sentence", async () => {
+    it("removes every card and leaves the page's own empty state", async () => {
       const user = userEvent.setup();
       renderAgentsAt();
 
@@ -270,8 +312,14 @@ describe("the agents page sample cards", () => {
           0,
         ),
       );
+      const empty = screen.getByTestId("agents-empty");
+      expect(empty).toBeVisible();
+      expect(within(empty).getByText(AGENTS_EMPTY_COPY.headline)).toBeVisible();
+      // The way out, which is the whole reason this replaced a dashed box.
       expect(
-        screen.getByText(/Agents appear here as they are detected/),
+        within(empty).getByRole("button", {
+          name: AGENTS_EMPTY_COPY.actionLabel,
+        }),
       ).toBeVisible();
       expect(screen.queryByRole("status")).toBeNull();
     });
@@ -332,9 +380,8 @@ describe("the whole agents page", () => {
      * dialog and every chip menu portal out of the container, and those are
      * exactly the places a native select would hide. Each pass opens one of
      * them and asserts while it is on screen.
-     *
-     * @scenario "No governance page renders a native select"
      */
+    /** @scenario "No governance page renders a native select" */
     it("contains no native select element, sample or empty", async () => {
       const user = userEvent.setup();
 
@@ -359,12 +406,10 @@ describe("the whole agents page", () => {
       cleanup();
 
       // And with none: sample off, nothing connected, so the pane is down to
-      // its own sentence and the chips are gone with the cards.
+      // its empty state and the chips are gone with the cards.
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       renderAgentsAt();
-      expect(
-        screen.getByText(/Agents appear here as they are detected/),
-      ).toBeVisible();
+      expect(screen.getByTestId("agents-empty")).toBeVisible();
       expect(findNativeSelects(document.body)).toHaveLength(0);
     });
   });
@@ -382,14 +427,41 @@ describe("the agents filter chips", () => {
       expect(findNativeSelects(container)).toHaveLength(0);
     });
 
-    /** @scenario "Every filter and sort control sits in one row under the page header" */
-    it("keeps every chip in one row and renders no filter anywhere else", () => {
+    /**
+     * The old wording of this scenario said the row sits DIRECTLY under the
+     * page header, and this test never checked what preceded the row, so the
+     * clause was asserted by the spec and verified by nothing. It also stopped
+     * being true here: the tab list intervenes, deliberately, because a filter
+     * that narrows one pane belongs below the control that chooses the pane.
+     *
+     * The clause now says the row sits above the content it narrows and that
+     * nothing between it and the header is filtered by it, and this test
+     * checks the position rather than only the grouping.
+     */
+    /** @scenario "Every filter and sort control sits in one row above the content it narrows" */
+    it("keeps every chip in one row above the pane, with only the tab list between", () => {
       const { container } = renderAgentsAt();
 
       const chips = [...container.querySelectorAll('[aria-haspopup="menu"]')];
       expect(chips).toHaveLength(3);
       const rows = new Set(chips.map((chip) => chip.parentElement));
       expect(rows.size).toBe(1);
+
+      // Above the content, never inside it.
+      const panel = container.querySelector('[role="tabpanel"]') as HTMLElement;
+      const row = chips[0]?.parentElement as HTMLElement;
+      expect(panel.contains(row)).toBe(false);
+      expect(
+        row.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      // And what does intervene is the tab list, which the chips do not filter.
+      const tabs = screen.getByRole("tablist");
+      expect(
+        tabs.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(tabs.contains(row)).toBe(false);
+      expect(row.querySelectorAll('[role="tab"]')).toHaveLength(0);
     });
 
     /** @scenario "The sample toggle sits top-right and the banner directly under the header" */
@@ -478,11 +550,201 @@ describe("the agents filter chips", () => {
         expect(cardNames()).toEqual([
           "genie-revenue-analyst",
           "churn-predictor",
-          "it-service-triage",
           "contract-review",
         ]),
       );
-      expect(screen.getAllByText("Unclaimed")).toHaveLength(4);
+      expect(screen.getAllByText("Unclaimed")).toHaveLength(3);
+    });
+  });
+
+  describe("when the reader filters every card out of view", () => {
+    /**
+     * The state a shared empty-state component cannot get right on its own,
+     * because it cannot see WHY the list is empty. Copilot Studio is the one
+     * source with nothing unclaimed behind it, which is what makes this pair
+     * reachable at all.
+     */
+    /** @scenario "Filtering everything out offers the filters back, not a registration" */
+    it("offers the filters back rather than telling the reader to register one", async () => {
+      const user = userEvent.setup();
+      renderAgentsAt();
+
+      await pickFilter("Source", "Copilot Studio");
+      await pickFilter("Ownership", "Unclaimed only");
+
+      const empty = await screen.findByTestId("agents-no-match");
+      expect(
+        within(empty).getByText(NO_MATCHING_AGENTS_COPY.headline),
+      ).toBeVisible();
+      // The wrong way out, and the whole point of branching on the reason:
+      // this reader has ten agents, not none.
+      expect(
+        within(empty).queryByRole("button", { name: "Register agent" }),
+      ).toBeNull();
+
+      await user.click(
+        within(empty).getByRole("button", {
+          name: NO_MATCHING_AGENTS_COPY.actionLabel,
+        }),
+      );
+
+      await waitFor(() =>
+        expect(screen.getAllByTestId("governance-agent-card")).toHaveLength(10),
+      );
+    });
+
+    /**
+     * The regression this catches is silent to every other assertion in this
+     * file: the button is present, correctly labelled and does the right
+     * thing, and is simply drawn wrong.
+     *
+     * Pinned to reference buttons of known variant rather than merely asserted
+     * to differ from the create action. "Different from primary" is not the
+     * rule and does not enforce it: the shared component briefly mapped
+     * secondary to a solid RED, which is louder than the orange primary and
+     * reads as destructive, and a not-equal assertion passes happily through
+     * that. Quieter is a specific treatment, so it is compared against one.
+     */
+    /** @scenario "An empty pane's action is weighted by what it does" */
+    it("draws Clear filters outline and the create actions solid", async () => {
+      renderAgentsWithReferences(
+        "/governance/agents?source=copilot_studio&ownership=unclaimed",
+      );
+
+      const outlineSmall = screen.getByText(
+        "reference outline small",
+      ).className;
+      const solidSmall = screen.getByText("reference solid small").className;
+
+      const empty = await screen.findByTestId("agents-no-match");
+      expect(
+        within(empty).getByRole("button", {
+          name: NO_MATCHING_AGENTS_COPY.actionLabel,
+        }).className,
+      ).toBe(outlineSmall);
+
+      // And the create-flow states go the other way, so this is a distinction
+      // rather than a blanket demotion of everything in an empty pane.
+      cleanup();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderAgentsWithReferences();
+
+      expect(
+        within(screen.getByTestId("agents-empty")).getByRole("button", {
+          name: AGENTS_EMPTY_COPY.actionLabel,
+        }).className,
+      ).toBe(solidSmall);
+    });
+  });
+
+  describe("when a pane has nothing to show", () => {
+    /** @scenario "Every empty state on the page carries a way out" */
+    it("gives each pane a glyph, a headline, a sentence and a button", async () => {
+      const user = userEvent.setup();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderAgentsAt();
+
+      const agentsEmpty = screen.getByTestId("agents-empty");
+      expect(
+        within(agentsEmpty).getByText(AGENTS_EMPTY_COPY.headline),
+      ).toBeVisible();
+      expect(
+        within(agentsEmpty).getByText(AGENTS_EMPTY_COPY.description),
+      ).toBeVisible();
+      expect(within(agentsEmpty).getByRole("button")).toBeVisible();
+      // A hairline card, never the dashed box this replaced.
+      expect(agentsEmpty).not.toHaveStyle({ borderStyle: "dashed" });
+
+      await user.click(screen.getByRole("tab", { name: "Applications" }));
+
+      const applicationsEmpty = await screen.findByTestId("applications-empty");
+      expect(
+        within(applicationsEmpty).getByText(APPLICATIONS_EMPTY_COPY.headline),
+      ).toBeVisible();
+      expect(
+        within(applicationsEmpty).getByText(
+          APPLICATIONS_EMPTY_COPY.description,
+        ),
+      ).toBeVisible();
+      expect(within(applicationsEmpty).getByRole("button")).toBeVisible();
+    });
+
+    /**
+     * The section rule, asserted on this page rather than taken on trust from
+     * the page that wrote it. The empty pane may repeat the header's create
+     * action — that was settled after this page contradicted the first draft
+     * of the rule — but it may not invent a second name for it.
+     */
+    /** @scenario "An empty pane explains itself rather than sitting blank" */
+    it("offers the header's own create action rather than a new one", async () => {
+      const user = userEvent.setup();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderAgentsAt();
+
+      const headerRow = screen.getByRole("heading", { name: "Agents" })
+        .parentElement as HTMLElement;
+      const headerLabel = within(headerRow)
+        .getByRole("button", { name: /Register agent/ })
+        .textContent?.trim();
+
+      for (const testId of ["agents-empty", "applications-empty"]) {
+        if (testId === "applications-empty") {
+          await user.click(screen.getByRole("tab", { name: "Applications" }));
+          await screen.findByTestId(testId);
+        }
+        const pane = screen.getByTestId(testId);
+        expect(within(pane).getByRole("button").textContent?.trim()).toBe(
+          headerLabel,
+        );
+      }
+
+      // Its own words, not the other pane's: a shared empty state that also
+      // shared its sentences is the failure this rule names.
+      expect(APPLICATIONS_EMPTY_COPY.description).not.toBe(
+        AGENTS_EMPTY_COPY.description,
+      );
+    });
+  });
+
+  describe("when a reader looks for the way to register something", () => {
+    /**
+     * One flow, one label, one weight. Label and weight together, because the
+     * defect behind this rule was both at once: a solid control up top and an
+     * outline one below, worded differently, so a reader had to work out which
+     * was real. Same shape as the assertion Inventory makes on Add tool.
+     */
+    /** @scenario "A page offers one create flow, under one label, from its header" */
+    it("opens it under one label at one weight, from the header", async () => {
+      const user = userEvent.setup();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderAgentsAt();
+
+      const buttons = () => screen.getAllByRole("button");
+      const named = (label: RegExp) =>
+        buttons().filter((b) => label.test(b.textContent ?? ""));
+
+      // No second name for the same room.
+      expect(
+        named(/\b(add|new|create|connect)\b[^]*agent/i).map(
+          (b) => b.textContent,
+        ),
+      ).toEqual([]);
+
+      const doors = named(/Register agent/);
+      expect(doors.length).toBeGreaterThan(1);
+      expect(new Set(doors.map((b) => b.className)).size).toBe(1);
+
+      const headerRow = screen.getByRole("heading", { name: "Agents" })
+        .parentElement as HTMLElement;
+      expect(doors.some((b) => headerRow.contains(b))).toBe(true);
+
+      // And it is one FLOW, not merely one label: the pane's copy opens the
+      // same dialog the header does.
+      const inPane = doors.find((b) => !headerRow.contains(b));
+      await user.click(inPane as HTMLButtonElement);
+      expect(
+        await screen.findByRole("dialog", { name: /Register an agent/ }),
+      ).toBeVisible();
     });
   });
 

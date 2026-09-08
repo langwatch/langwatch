@@ -220,13 +220,12 @@ describe("given a source that pulls conversations", () => {
       ).toBeNull();
     });
 
-    /**
-     * @scenario "An archived destination is named as archived, not as absent"
-     *
+    /*
      * Telling an admin routing has stopped and giving them no control to
      * restart it strands them: the drawer would refuse every save, because
      * the archived id fails the write-time guard on the way back out.
      */
+    /** @scenario "An archived destination is named as archived, not as absent" */
     it("still offers the picker, so there is a way to repoint it", () => {
       renderField({
         sourceType: "databricks_genie",

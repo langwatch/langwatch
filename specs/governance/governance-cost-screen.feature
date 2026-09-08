@@ -104,6 +104,45 @@ Feature: One cost screen, three honest lanes
     Then the marker names a bucket the chart draws
     And the bucket holding the split counts as projected, not as served
 
+  # =========================================================================
+  # And then a second thing was wrong with the same panel, which the marker
+  # fix made visible rather than caused: the projection pointed BACKWARDS.
+  # The generator shaded the last quarter of the window itself, so every
+  # month the panel called projected had already happened. A forecast that
+  # forecasts nothing is worse than no forecast, because the reader plans
+  # against it.
+  #
+  # The projected months now come after the window's last day, and they are
+  # a run rate carried forward rather than another roll of the generator.
+  # Measured spend is noisy because serving traffic is noisy; a projection is
+  # an average with an assumption on it, and drawing the tail with the same
+  # jitter would claim we can predict next month's wobble.
+  #
+  # Money nobody has spent is not spend: the ranked panels total the measured
+  # months alone, or "Cost by agent" would rank agents partly on a forecast.
+  # =========================================================================
+
+  @unit
+  Scenario: The forecast projects months the window does not contain
+    Given a sample forecast over a window of measured months
+    When the projected months are read
+    Then every one of them falls after the window's last month
+    And the marker names the first of them
+
+  @unit
+  Scenario: A projected month is a run rate, not another roll of the dice
+    Given a sample forecast whose measured months vary as real traffic does
+    When the projected months are read
+    Then they move less from month to month than the measured ones do
+
+  # How the two regions are TOLD APART is deliberately not a scenario here.
+  # Recharts draws nothing under jsdom — no SVG, no defs, no axis — so a test
+  # claiming to check that the projected span is filled differently would
+  # assert on markup that never exists, and pass forever whatever the chart
+  # did. The drawing is checked by looking at it. What is pinned above is the
+  # part a test can actually see: which months are projected, and that they
+  # behave like a projection.
+
   @integration
   Scenario: A frame longer than the reads answer says how far the figures reach
     Given the reader picks a Time Frame of two years
@@ -120,6 +159,43 @@ Feature: One cost screen, three honest lanes
     # A seat count is a level, not a flow. Three months at 420 seats is a
     # quarter holding 420, never 1,260 — the fold that is right for money
     # is wrong for a count, so seats get their own.
+
+  # =========================================================================
+  # SAMPLE DATA THAT MODELS THE REAL SHAPE, which is the only reason to have
+  # sample data at all. Seats were generated as a near-constant fraction of
+  # one another — bought and assigned rising together, quarter after quarter
+  # — and that is not how anybody buys licences. A contract is signed once,
+  # the seats are paid for before a single person has been given one, and
+  # assignment catches up over the following quarters.
+  #
+  # The gap between the two lines is the idle spend this lane exists to show.
+  # Drawn as a constant ratio it reads as a fixed overhead nobody can do
+  # anything about. Drawn truthfully it reads as a spike at renewal that the
+  # organization works off, which is a thing an admin can act on and the
+  # reason they opened the panel.
+  # =========================================================================
+
+  @unit
+  Scenario: Seats bought step up at renewal and hold flat until the next one
+    Given invented seat counts across a window spanning a renewal
+    When the bought counts are read month by month
+    Then they change only at the renewal month
+    And they never fall
+
+  @unit
+  Scenario: Seats assigned climb from the floor after a renewal
+    Given invented seat counts for the months following a renewal
+    When the assigned counts are read month by month
+    Then they start well below the seats bought and rise toward them
+    And no month assigns more seats than were bought
+
+  @unit
+  Scenario: The seat lane and the seat chart report the same month alike
+    Given the invented seat lane and the invented seat chart
+    When both are asked for the last month in the window
+    Then they report the same counts
+    # Two invented figures for one thing, side by side and disagreeing, is
+    # the incoherence the rest of the sample data was fixed for.
 
   @unit
   Scenario: A period containing a day with no figure holds no figure either
@@ -219,6 +295,75 @@ Feature: One cost screen, three honest lanes
     And picking one narrows the invented department breakdown to it
 
   # =========================================================================
+  # EMPTY IS A COUNT OF FIGURES, NOT A COUNT OF DAYS. The over-time read
+  # answers a row per day whether or not anything was spent, so a window with
+  # nothing in it comes back as three hundred and sixty-five buckets of
+  # nothing. Every emptiness test on this screen is a length check, and that
+  # read alone therefore looked full while its neighbours looked empty: with
+  # sample mode on, one panel sat saying "Nothing in this window yet" in the
+  # middle of a screen of invented figures, because a list of 365 empty days
+  # is not an empty list.
+  #
+  # The ranked panels never had it — they total their series first, and a
+  # total of nothing is genuinely nothing.
+  # =========================================================================
+
+  @integration
+  Scenario: A window of empty days fills with sample figures like every panel beside it
+    Given the over-time read answers a row per day with nothing spent on any of them
+    When sample mode is on
+    Then the cost-over-time panel holds invented figures
+    And no panel on the screen reports the window as measured and empty
+
+  # =========================================================================
+  # A COUNT THAT CANNOT STATE ITS OWN ABSENCE. Every other figure on this
+  # screen is nullable, so "we did not measure this" and "we measured nothing"
+  # arrive as different values. The adoption headcount is not: the activity
+  # summary types it as a plain number and answers a zero-filled record when
+  # there is no governance project and when there is no cost store, so an
+  # organization with nothing connected gets the same 0 as an organization
+  # whose people simply did not use a tool.
+  #
+  # Read literally that 0 was printed, and the screen said "People using AI
+  # tools / 0" directly beneath its own banner saying no cost had been
+  # recorded — the page contradicting itself in two adjacent lines, and
+  # claiming a measurement of an organization it had just said it could not
+  # see.
+  #
+  # THE BLUNT FIX IS WRONG IN THE OTHER DIRECTION. Treating every 0 as
+  # unmeasured would hide a true zero: an organization with a source connected
+  # and a genuinely quiet quarter measured nothing, and that IS the finding an
+  # admin came to read. Suppressing it denies a measurement we actually took,
+  # which is the same lie pointing the other way.
+  #
+  # So the test is CONNECTEDNESS, never the count. Nothing connected means
+  # nothing was measured, whatever number arrived. Something connected means
+  # the number is a reading, including when the reading is zero.
+  #
+  # And connectedness is a question this screen had already answered: the lanes
+  # ask whether the summary HOLDS FIGURES before deciding whether the screen is
+  # blank. The adoption card asks the same question, through the same function,
+  # rather than a second one of its own — an organization can have a cost store
+  # and a governance project with nothing flowing through them, so a card that
+  # asked only whether the summary was structurally available would call that
+  # organization connected and print its zero.
+  # =========================================================================
+
+  @integration
+  Scenario: An adoption count of zero from a connected source is shown as the measurement it is
+    Given a source is connected and the activity read answers zero active people
+    When sample mode is off
+    Then the adoption panel shows a headcount of zero
+    And it does not ask the reader to add a source they already have
+
+  @integration
+  Scenario: An adoption count of zero with nothing connected is not reported as a measurement
+    Given no source is connected and the activity read answers zero active people
+    When sample mode is off
+    Then the adoption panel does not print a headcount
+    And it names what would fill it instead
+
+  # =========================================================================
   # What the invented charts are allowed to claim.
   #
   # A sample chart teaches a reader the shape of a screen they have not
@@ -259,6 +404,22 @@ Feature: One cost screen, three honest lanes
     Then no panel title names one provider's product
     And the forecast is named for metered spend, the words the lane above it uses
 
+  # A count of things and a measure of throughput are formatted apart. Both
+  # axes used the abbreviating formatter, which put "4.6k" on the
+  # conversations panel directly beside "3.4B" on the tokens one and made a
+  # few thousand support chats look like a unit of machine consumption.
+  # Conversations and seats are tallies — somebody could in principle count
+  # them, and a reader comparing quarters wants the figure — so they are
+  # spelled out. Tokens are throughput nobody holds in their head, where the
+  # magnitude is the only part that matters.
+
+  @unit
+  Scenario: A count a person could tally is spelled out, never abbreviated
+    Given a count of conversations and a count of tokens
+    When each is formatted for its own axis
+    Then the conversation count is written in full with its thousands separated
+    And the token count is abbreviated
+
   @integration
   Scenario: Each lane renders its own labeled total
     Given billed and gateway totals that differ from each other
@@ -272,6 +433,65 @@ Feature: One cost screen, three honest lanes
     # prove; ADR-128 assigns it to the code-review gate in wave 1.
     # "Matches its own source" end to end is a datastore-lane concern
     # covered by the rollup spec, not this component test.
+
+  # =========================================================================
+  # A LANE CARD ANSWERS ONE QUESTION AND RAISES ANOTHER. The money cards
+  # showed a figure at the top, a sentence at the bottom, and a hand's width
+  # of nothing between them, which a reader is owed an answer about. A total
+  # on its own cannot say whether it is the end of a climb, a spike already
+  # over, or a flat quarter — and that is the next thing anybody asks.
+  #
+  # So the space holds the lane's own window, drawn from the same series the
+  # total above it was summed from. Never a second read: two figures for one
+  # lane that could disagree is worse than a blank card.
+  #
+  # The change figure compares the LATER HALF of the window to the earlier
+  # half, not the last period to the one before it. The series arrives per
+  # day from a real read and per month from an invented one, so a last-point
+  # comparison would mean a different thing on every screen it appeared on,
+  # while measuring mostly the noise of a single day.
+  #
+  # It carries no colour. Spend rising is a fact about a window, not a fault,
+  # and a red arrow would have this card judging an organization's AI
+  # programme by whether it grew.
+  # =========================================================================
+
+  @unit
+  Scenario: A lane card says which way its window is running
+    Given a lane series whose later half spends more than its earlier half
+    When the card's change figure is read
+    Then it reports the rise as a percentage of the earlier half
+
+  @unit
+  Scenario: A window too short to compare halves reports no change at all
+    Given a lane series of fewer periods than the comparison needs
+    When the card's change figure is read
+    Then there is none, rather than a figure drawn from too little
+
+  @unit
+  Scenario: A day whose figure is withheld is left out of the change, never counted as zero
+    Given a lane series holding a day the read would not price
+    When the card's change figure is read
+    Then that day counts toward neither half
+    # Same rule as everywhere else on this screen (ADR-128 §21): a withheld
+    # amount is money not stated, and zero is money not spent.
+
+  @unit
+  Scenario: A lane sparkline is bucketed by the interval in view like every other chart
+    Given a lane series read per day and an interval of Quarter
+    When the sparkline's points are folded
+    Then there is one point per quarter
+    And a quarter holding only withheld days holds no point
+
+  # Which COLOUR a mark on this screen is drawn in is not ruled here. It is a
+  # section-wide rule, not a cost-screen one, and it lives in the UI rulebook
+  # at specs/ai-governance/dashboard/governance-ui-controls.feature — see "A
+  # single-series mark on a governance card is drawn from the chart palette"
+  # and "A data mark does not borrow the brand accent reserved for controls".
+  # This note exists because the rule was briefly written twice, once here and
+  # once there, by two authors fixing the same black sparkline at the same
+  # time. A style rule stated in two places is a style rule that will
+  # eventually be stated two different ways.
 
   @integration
   Scenario: The seat lane is an honest hole until a licence list is read
@@ -720,6 +940,30 @@ Feature: One cost screen, three honest lanes
       # when the breakdown holds no rows. A failed read is the exception:
       # that is an outage, not an empty account, so the panel says it
       # failed instead of vanishing as if nobody spent anything.
+
+    # =======================================================================
+    # A BILL KNOWS A CREDENTIAL, NOT A PERSON. This panel was titled by
+    # person, which promised an attribution the billing pipeline cannot make:
+    # a provider's invoice records which key was presented, so a key four
+    # engineers share billed as one person's spend and the screen said so
+    # without hedging.
+    #
+    # The read is unchanged. A key discovery has matched still resolves to
+    # the identity screen's display text, so a row may well carry somebody's
+    # name — as the holder of that key, which is a smaller and truer claim
+    # than that the money is theirs. What changed is that the panel now
+    # claims exactly as much as the invoice does.
+    # =======================================================================
+
+    @integration
+    Scenario: The billed breakdown names the key the provider charged, not a person
+      Given pulled cost recorded against several API keys
+      When a permitted viewer opens the cost screen
+      Then the panel is titled for the API key it charges against
+      And the row for spend the provider named no key for says so in those words
+      # The empty and declined states carry the same framing — see the
+      # scenarios under the declined-read rule below, whose copy names a key
+      # rather than an actor.
 
     @integration
     Scenario: The spender breakdown stays behind the identity screen's permission

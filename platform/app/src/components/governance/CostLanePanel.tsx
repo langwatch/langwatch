@@ -5,11 +5,18 @@ import type {
   GovernanceSeatPoolDto,
 } from "@ee/governance/services/governanceCost.service";
 
+import type { TimeInterval } from "~/components/governance/filters";
+import { MeterBar } from "~/components/ui/MeterBar";
+
+import { CHART_SEAT_FILL } from "./chartTheme";
 import {
   formatLaneUsd,
+  laneTrendBadge,
+  laneTrendPct,
   laneWithheldTotalNote,
   seatPoolName,
 } from "./costLaneFormat";
+import { LaneSparkline } from "./costs/CostCharts";
 import { SampleMark } from "./costs/sampleMark";
 
 /**
@@ -33,6 +40,8 @@ export function CostLanePanel({
   cellsWithoutAmount,
   currenciesWithoutUsdAmount,
   laneNote,
+  trend,
+  interval,
   sample = false,
   testId,
 }: {
@@ -51,6 +60,15 @@ export function CostLanePanel({
    */
   laneNote?: string | null;
   /**
+   * This lane's own series across the window, for the card's sparkline. The
+   * same read the figure above it was totalled from, so the shape and the
+   * total can never describe different money. Omitted when the read holds no
+   * series, in which case the card simply has no sparkline.
+   */
+  trend?: Array<{ day: string; value: number | null }>;
+  /** The bucket width in view, for the sparkline's tooltip heading. */
+  interval?: TimeInterval;
+  /**
    * Whether this lane's figure is invented. Never optional in practice on a
    * sample lane: an unbadged figure in the house typeface reads as measured
    * whether or not it was, and this one is the largest number on the screen.
@@ -58,6 +76,8 @@ export function CostLanePanel({
   sample?: boolean;
   testId: string;
 }) {
+  const changePct = trend ? laneTrendPct(trend) : null;
+  const badge = laneTrendBadge(changePct);
   return (
     <Box
       data-testid={testId}
@@ -72,13 +92,37 @@ export function CostLanePanel({
           <Heading size="sm">{label}</Heading>
           <SampleMark shown={sample} />
         </HStack>
-        <Text
-          fontSize="2xl"
-          fontWeight="semibold"
-          fontVariantNumeric="tabular-nums"
-        >
-          {formatLaneUsd(amountUsd)}
-        </Text>
+        <HStack gap={2} alignItems="baseline">
+          <Text
+            fontSize="2xl"
+            fontWeight="semibold"
+            fontVariantNumeric="tabular-nums"
+          >
+            {formatLaneUsd(amountUsd)}
+          </Text>
+          {/* Deliberately uncoloured. Spend rising is a fact about a window,
+              not a fault, and a red arrow on it would have this card judging
+              an organization's AI programme by whether it grew. The sentence
+              behind the badge says what it was measured against, because a
+              bare percentage on a card invites the reader to supply their own
+              comparison and they will pick the wrong one. */}
+          {badge && (
+            <Text
+              fontSize="xs"
+              color="fg.muted"
+              fontVariantNumeric="tabular-nums"
+              data-testid={`${testId}-trend`}
+              title="The later half of this window against the earlier half."
+            >
+              {badge}
+            </Text>
+          )}
+        </HStack>
+        {/* The middle of the card used to be blank, and a reader looking at it
+            was owed an answer about what it was for. A lane states one figure,
+            and the question a single figure always raises is which way it has
+            been moving — so the space holds the window's own shape. */}
+        {trend && <LaneSparkline points={trend} interval={interval} />}
         {/* The claim sits at the top of the card and what it means sits at the
             bottom, so three cards of different content still agree on two
             lines. `marginTop="auto"` takes the slack in the middle: a card
@@ -201,32 +245,28 @@ function SeatLaneWithoutCounts({
 }
 
 /**
- * The licence pools, one line each.
+ * The licence pools, one row each.
  *
- * Both numbers on the same line and in the same sentence, because the reader's
- * question is the difference between them. A pool's counts are shown as its
- * provider reports them — nothing is summed across pools, since a Copilot seat
- * and a Power Platform seat are not interchangeable and a total would suggest
- * they are.
+ * ONE ROW, NOT TWO. Each pool used to take a name line and a sentence under
+ * it, which made this card half again as tall as the two money lanes beside it
+ * and pulled the whole row out of shape. The name and the counts now share a
+ * line, and the fill bar beneath carries the comparison the sentence was
+ * spelling out: the bar is how much of the pool is sat in, so three pools read
+ * as three bars at a glance and the exact figures are there for the reader who
+ * wants them.
+ *
+ * `96 / 140` rather than "96 of 140 seats assigned", with the word moved to
+ * the footing that already explains the card. Repeating "seats assigned" on
+ * every row spent a line each time to say what the card's title says once.
+ *
+ * Nothing is summed across pools: a Copilot seat and a Power Platform seat are
+ * not interchangeable, and a total would suggest they are.
  */
 function SeatPools({ pools }: { pools: GovernanceSeatPoolDto[] }) {
   return (
-    <VStack align="start" gap={2} width="full" flex="1">
+    <VStack align="start" gap={2} width="full" flex="1" marginTop={1}>
       {pools.map((pool) => (
-        <VStack key={pool.skuPartNumber} align="start" gap={0} width="full">
-          {/* The raw SKU stays reachable on hover: it is what a reader matches
-              against the provider's invoice when the two disagree. */}
-          <Text fontSize="sm" fontWeight="medium" title={pool.skuPartNumber}>
-            {seatPoolName(pool.skuPartNumber)}
-          </Text>
-          <Text
-            fontSize="sm"
-            color="fg.muted"
-            fontVariantNumeric="tabular-nums"
-          >
-            {pool.seatsAssigned} of {pool.seatsBought} seats assigned
-          </Text>
-        </VStack>
+        <SeatPoolRow key={pool.skuPartNumber} pool={pool} />
       ))}
       {/* Same footing as the money lanes: the explanation goes to the bottom
           of the card, so all three lanes close on the same line. */}
@@ -234,6 +274,67 @@ function SeatPools({ pools }: { pools: GovernanceSeatPoolDto[] }) {
         Seats your provider reports as bought, and how many are assigned to
         someone.
       </Text>
+    </VStack>
+  );
+}
+
+function SeatPoolRow({ pool }: { pool: GovernanceSeatPoolDto }) {
+  // A ratio, not a percentage, because that is what the meter takes — and the
+  // clamp that used to live here went with it, since the meter clamps. A pool
+  // with no seats bought has no fraction to state, which is a different thing
+  // from a fraction of zero, so it hands over null and gets the bare track.
+  const filled =
+    pool.seatsBought > 0 ? pool.seatsAssigned / pool.seatsBought : null;
+  return (
+    <VStack align="stretch" gap={1} width="full">
+      <HStack gap={2} width="full">
+        {/* The raw SKU stays reachable on hover: it is what a reader matches
+            against the provider's invoice when the two disagree. */}
+        <Text
+          fontSize="sm"
+          fontWeight="medium"
+          truncate
+          minWidth={0}
+          flex="1"
+          title={pool.skuPartNumber}
+        >
+          {seatPoolName(pool.skuPartNumber)}
+        </Text>
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          fontVariantNumeric="tabular-nums"
+          flexShrink={0}
+        >
+          {pool.seatsAssigned} / {pool.seatsBought}
+        </Text>
+      </HStack>
+      {/* The unfilled remainder is the idle seats — the thing this lane is on
+          the screen for — so the track is drawn, not just the fill.
+
+          This is the shared meter primitive rather than a track Box wrapping a
+          fill Box, which is what it was. Hand-rolling it had already produced
+          three names for one idea (`data-fill-pct` here, `data-fill-ratio` in
+          the primitive, `data-width-pct` in the charts next door) and a track
+          on `bg.muted` where every other meter in the product uses
+          `border.subtle`.
+
+          The fill does not change colour with the reading, which is where this
+          meter parts company with the primitive's other three consumers. They
+          measure against a limit somebody typed, so their colour states a
+          verdict its reader configured; seats bought is a contract with no
+          threshold on it, and grading a pool red for being idle would invent a
+          judgement nobody set. The level is carried in the LENGTH, which is how
+          a meter carries a level. Rules and the boundary in
+          specs/ai-governance/dashboard/governance-ui-controls.feature,
+          "A meter is not a trend mark". */}
+      <MeterBar
+        fillRatio={filled}
+        width="full"
+        height="4px"
+        fillColor={CHART_SEAT_FILL}
+        data-testid="seat-pool-meter"
+      />
     </VStack>
   );
 }

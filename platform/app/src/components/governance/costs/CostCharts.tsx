@@ -23,6 +23,7 @@ import { getHexColorForString } from "~/utils/rotatingColors";
 import {
   CHART_AXIS_TICK,
   CHART_GRID_STROKE,
+  CHART_SPARK_STROKE,
   CHART_TOOLTIP_CONTENT,
   CHART_TOOLTIP_CURSOR,
   CHART_TOOLTIP_LABEL,
@@ -54,6 +55,20 @@ export function fmtMoney(value: number): string {
 
 export function fmtCount(value: number): string {
   return numeral(value).format("0.[0]a");
+}
+
+/**
+ * A count spelled out in full, thousands separated.
+ *
+ * For the things a reader could in principle count: conversations, seats,
+ * people. Tokens get `fmtCount` and its `k`/`M` suffixes because nobody holds
+ * a token count in their head and the magnitude is the only part that matters.
+ * Using the abbreviating formatter for both put "4.6k" on the conversations
+ * axis directly beside "3.4B" on the tokens one, which made a few thousand
+ * support chats look like a unit of machine throughput.
+ */
+export function fmtWhole(value: number): string {
+  return numeral(value).format("0,0");
 }
 
 /**
@@ -386,6 +401,7 @@ export function CostStackedBars({
   showLegend = true,
   interval,
   grouped = false,
+  colorFor,
   empty,
 }: {
   buckets: DailyBucket[] | null;
@@ -396,6 +412,17 @@ export function CostStackedBars({
   interval?: TimeInterval;
   /** Draw the series side by side rather than summed into one bar. */
   grouped?: boolean;
+  /**
+   * A colour for a series, overriding the label's hash.
+   *
+   * The hash is right for panels whose series are open-ended — teams, models,
+   * agents — because it gives the same name the same hue on every screen. It
+   * is wrong for a chart of exactly two series that exist to be compared:
+   * "Seats bought" and "Seats assigned" hashed to two blues a reader had to
+   * consult the legend to separate, on the one chart whose entire content is
+   * the gap between them.
+   */
+  colorFor?: (key: string) => string | undefined;
   /** This panel's own empty state. See `costPanelEmpty`. */
   empty?: (unanswered: boolean) => ReactNode;
 }) {
@@ -448,7 +475,7 @@ export function CostStackedBars({
               // as "these add up", which is exactly the claim the seat chart
               // must not make.
               stackId={grouped ? undefined : "cost"}
-              fill={getHexColorForString(k.label)}
+              fill={colorFor?.(k.key) ?? getHexColorForString(k.label)}
               isAnimationActive={false}
             />
           ))}
@@ -458,11 +485,161 @@ export function CostStackedBars({
   );
 }
 
+/** Opacity of a series over the months that were actually measured. */
+const MEASURED_FILL = 0.42;
+/** Opacity of the same series over the months still to come. */
+const PROJECTED_FILL = 0.07;
+/** The projected span's own wash, over the top of the faded series. */
+const PROJECTION_INK = "#94a3b8";
+
 /**
- * Stacked area with the tail of the window shaded as a projection. The
- * projected span is drawn from the same series — it is a run-rate carried
- * forward, not a separate measurement — and marked so it cannot be read as
- * something already spent.
+ * Where the projection begins: the LAST MEASURED bucket, and its position as a
+ * fraction of the plot's width.
+ *
+ * ANCHORING ON THE MEASURED SIDE is what makes the region visible at all. A
+ * category axis puts each bucket at a point, so a projection of one bucket —
+ * which is what a quarter ahead folds to on a screen set to Quarter — has no
+ * width: shading from the first projected bucket to the last ran from the last
+ * point to the last point and drew nothing at all, which is the complaint this
+ * rework began with.
+ *
+ * The segment between two points belongs to neither of its ends alone, so one
+ * of them has to claim it. The measured side claims it, which draws a little of
+ * what is known as though it were forecast. That is the direction the marker's
+ * own fold already rounds, and for the same reason: showing a projection as
+ * spend is the error worth engineering against, and calling a few measured days
+ * projected only costs the reader some certainty.
+ *
+ * Null when nothing is projected, when the boundary names no bucket the chart
+ * draws, or when there is no measured bucket to leave from. The chart then says
+ * nothing about a projection rather than shading a span it cannot justify.
+ */
+function projectionSpan(
+  rows: Array<Record<string, number | string>>,
+  projectedFromDay: string | null,
+): { from: string; at: number } | null {
+  if (!projectedFromDay || rows.length < 2) return null;
+  const first = rows.findIndex((row) => row.day === projectedFromDay);
+  if (first <= 0) return null;
+  const from = rows[first - 1]?.day;
+  if (from === undefined) return null;
+  return { from: String(from), at: (first - 1) / (rows.length - 1) };
+}
+
+/**
+ * An id safe to hang a `<defs>` entry on. Series keys are agent names and
+ * model names, which are free to carry characters a URL reference is not.
+ */
+function defsId(prefix: string, key: string): string {
+  return `${prefix}-${key.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+/**
+ * The paints the forecast chart draws with: one fill gradient and one stroke
+ * gradient per series, plus the hatch laid over the projected span.
+ *
+ * Called as a plain function, not rendered as `<ForecastDefs />`, for the same
+ * reason `ChartLegend` is — recharts inspects the type of each direct child to
+ * decide what it is, and a wrapper component is not a `defs` as far as that
+ * inspection goes.
+ *
+ * `splitAt` is where the projection begins as a fraction of the plot's width.
+ * TWO STOPS AT THAT ONE OFFSET is what makes it a hard edge rather than a
+ * fade: the reader should see where measurement stopped, not a slow dissolve
+ * that leaves the boundary a matter of opinion. With nothing projected the
+ * split sits at 1 and every series is solid all the way across.
+ */
+function ForecastDefs({
+  keys,
+  splitAt,
+}: {
+  keys: Array<{ key: string; label: string }>;
+  splitAt: number | null;
+}) {
+  const edge = splitAt ?? 1;
+  return (
+    <defs>
+      {keys.map((k) => {
+        const color = getHexColorForString(k.label);
+        return (
+          <linearGradient
+            key={k.key}
+            id={defsId("cost-forecast-fill", k.key)}
+            x1="0"
+            y1="0"
+            x2="1"
+            y2="0"
+          >
+            <stop offset={0} stopColor={color} stopOpacity={MEASURED_FILL} />
+            <stop offset={edge} stopColor={color} stopOpacity={MEASURED_FILL} />
+            <stop
+              offset={edge}
+              stopColor={color}
+              stopOpacity={PROJECTED_FILL}
+            />
+            <stop offset={1} stopColor={color} stopOpacity={PROJECTED_FILL} />
+          </linearGradient>
+        );
+      })}
+      {keys.map((k) => {
+        const color = getHexColorForString(k.label);
+        return (
+          <linearGradient
+            key={k.key}
+            id={defsId("cost-forecast-line", k.key)}
+            x1="0"
+            y1="0"
+            x2="1"
+            y2="0"
+          >
+            <stop offset={0} stopColor={color} stopOpacity={1} />
+            <stop offset={edge} stopColor={color} stopOpacity={1} />
+            <stop offset={edge} stopColor={color} stopOpacity={0.4} />
+            <stop offset={1} stopColor={color} stopOpacity={0.4} />
+          </linearGradient>
+        );
+      })}
+      <pattern
+        id="cost-forecast-hatch"
+        width={6}
+        height={6}
+        patternTransform="rotate(45)"
+        patternUnits="userSpaceOnUse"
+      >
+        <line
+          x1={0}
+          y1={0}
+          x2={0}
+          y2={6}
+          stroke={PROJECTION_INK}
+          strokeWidth={1}
+          strokeOpacity={0.35}
+        />
+      </pattern>
+    </defs>
+  );
+}
+
+/**
+ * Stacked area over the measured months and the months still to come.
+ *
+ * TELLING THE TWO APART IS THE WHOLE JOB. The panel used to draw both halves
+ * in one flat fill and rely on a dashed line and the word "projected" to say
+ * which was which — a caption doing work the drawing should do, and a reader
+ * skimming the row saw one continuous block of spend running past today. The
+ * two regions are now different objects to the eye before any label is read:
+ * each series is filled through a gradient that drops hard at the boundary,
+ * so the projected months are ghosted against solid measured ones, and the
+ * projected span carries a diagonal hatch over the top of it.
+ *
+ * The hatch is the older convention and the one that survives a screenshot at
+ * any size: fills flatten when an image is scaled down, and a texture does
+ * not. Both signals rather than either, because this chart says money will be
+ * spent that has not been, and that claim should be hard to miss.
+ *
+ * The gradient offsets are computed from the boundary's INDEX, not its date:
+ * a category axis spaces its points evenly, so the split sits at a known
+ * fraction of the plot's width whatever the interval folds the months into.
  */
 export function CostForecastArea({
   buckets,
@@ -480,6 +657,12 @@ export function CostForecastArea({
   const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
   const lastDay = rows[rows.length - 1]?.day;
 
+  const projection = useMemo(
+    () => projectionSpan(rows, projectedFromDay),
+    [projectedFromDay, rows],
+  );
+  const splitAt = projection?.at ?? null;
+
   if (rows.length === 0 || keys.length === 0)
     return <EmptyPanel height={height} unanswered={false} />;
 
@@ -487,6 +670,7 @@ export function CostForecastArea({
     <Box height={height}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={rows} margin={CHART_MARGIN}>
+          {ForecastDefs({ keys, splitAt })}
           <CartesianGrid
             strokeDasharray="3 3"
             stroke={GRID_STROKE}
@@ -509,24 +693,24 @@ export function CostForecastArea({
             labelStyle={CHART_TOOLTIP_LABEL}
           />
           {ChartLegend({ keys })}
-          {projectedFromDay && lastDay && (
+          {projection && lastDay && (
             <ReferenceArea
-              x1={projectedFromDay}
+              x1={projection.from}
               x2={String(lastDay)}
-              fill="#94a3b8"
-              fillOpacity={0.12}
+              fill="url(#cost-forecast-hatch)"
+              fillOpacity={1}
             />
           )}
-          {projectedFromDay && (
+          {projection && (
             <ReferenceLine
-              x={projectedFromDay}
-              stroke="#94a3b8"
+              x={projection.from}
+              stroke={PROJECTION_INK}
               strokeDasharray="4 4"
               label={{
                 value: "projected",
                 position: "insideTopRight",
                 fontSize: 10,
-                fill: "#94a3b8",
+                fill: PROJECTION_INK,
               }}
             />
           )}
@@ -536,13 +720,85 @@ export function CostForecastArea({
               type="monotone"
               dataKey={k.key}
               stackId="cost"
-              stroke={getHexColorForString(k.label)}
+              stroke={`url(#${defsId("cost-forecast-line", k.key)})`}
               strokeWidth={1.5}
-              fill={getHexColorForString(k.label)}
-              fillOpacity={0.35}
+              fill={`url(#${defsId("cost-forecast-fill", k.key)})`}
+              fillOpacity={1}
               isAnimationActive={false}
             />
           ))}
+        </AreaChart>
+      </ResponsiveContainer>
+    </Box>
+  );
+}
+
+/**
+ * The shape of a lane's window, at card size.
+ *
+ * A lane card states one figure, and one figure cannot say whether it is the
+ * end of a climb, a spike already over, or a flat month. The cards used to
+ * carry that question in a blank middle; this answers it in the same space.
+ *
+ * No axes, no grid, no legend — a sparkline that carried them would be a
+ * chart, and the card already has a chart's worth of explanation underneath
+ * it. The tooltip stays, because the one thing a reader wants from a shape
+ * they have spotted is which period it was.
+ *
+ * Days with no figure are gaps rather than zeroes (ADR-128 §21): a withheld
+ * amount drawn on the floor is a claim that nothing was spent that day.
+ */
+export function LaneSparkline({
+  points,
+  interval,
+  height = "40px",
+}: {
+  points: Array<{ day: string; value: number | null }>;
+  /** The bucket width in view, which the tooltip's heading is read in. */
+  interval?: TimeInterval;
+  height?: string;
+}) {
+  if (points.length < 2) return null;
+  return (
+    <Box height={height} width="full" marginTop={1}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={points}
+          margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
+        >
+          <defs>
+            <linearGradient id="cost-lane-spark" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                stopColor={CHART_SPARK_STROKE}
+                stopOpacity={0.32}
+              />
+              <stop
+                offset="100%"
+                stopColor={CHART_SPARK_STROKE}
+                stopOpacity={0.02}
+              />
+            </linearGradient>
+          </defs>
+          <YAxis hide domain={["dataMin", "dataMax"]} />
+          <Tooltip
+            formatter={(value) => [fmtMoney(Number(value)), "Spend"]}
+            labelFormatter={(label) => formatDayTick(label as string, interval)}
+            contentStyle={CHART_TOOLTIP_CONTENT}
+            labelStyle={CHART_TOOLTIP_LABEL}
+            cursor={CHART_TOOLTIP_CURSOR}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={CHART_SPARK_STROKE}
+            strokeWidth={1.5}
+            fill="url(#cost-lane-spark)"
+            fillOpacity={1}
+            connectNulls={false}
+            isAnimationActive={false}
+            dot={false}
+          />
         </AreaChart>
       </ResponsiveContainer>
     </Box>
@@ -574,8 +830,16 @@ export function CostLine({
         <AreaChart data={points} margin={CHART_MARGIN}>
           <defs>
             <linearGradient id="cost-line-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3182ce" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#3182ce" stopOpacity={0.03} />
+              <stop
+                offset="0%"
+                stopColor={CHART_SPARK_STROKE}
+                stopOpacity={0.35}
+              />
+              <stop
+                offset="100%"
+                stopColor={CHART_SPARK_STROKE}
+                stopOpacity={0.03}
+              />
             </linearGradient>
           </defs>
           <CartesianGrid
@@ -599,7 +863,7 @@ export function CostLine({
           <Area
             type="monotone"
             dataKey="value"
-            stroke="#3182ce"
+            stroke={CHART_SPARK_STROKE}
             strokeWidth={1.5}
             fill="url(#cost-line-fill)"
             isAnimationActive={false}

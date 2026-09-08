@@ -29,6 +29,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -155,9 +156,10 @@ describe("the agents page tab shell", () => {
         "aria-selected",
         "true",
       );
-      expect(
-        screen.getByText(/Agents appear here as they are detected/),
-      ).toBeVisible();
+      // The empty state by its handle, not by its sentence. Routing owns that
+      // the right pane arrived and is not blank; the words belong to
+      // agents-page.feature, and pinning them here broke this file twice.
+      expect(screen.getByTestId("agents-empty")).toBeVisible();
       expect(router.state.location.search).not.toContain("tab");
     });
 
@@ -178,8 +180,10 @@ describe("the agents page tab shell", () => {
         "aria-selected",
         "true",
       );
+      const empty = screen.getByTestId("applications-empty");
+      expect(empty).toBeVisible();
       expect(
-        screen.getByText(/Applications appear here as they are detected/),
+        within(empty).getByRole("button", { name: "Register agent" }),
       ).toBeVisible();
     });
   });
@@ -207,9 +211,7 @@ describe("the agents page tab shell", () => {
         "aria-selected",
         "true",
       );
-      expect(
-        screen.getByText(/Agents appear here as they are detected/),
-      ).toBeVisible();
+      expect(screen.getByTestId("agents-empty")).toBeVisible();
     });
   });
 

@@ -36,6 +36,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const harness = vi.hoisted(() => ({
   summaryFails: false,
   spendersFail: false,
+  /**
+   * The over-time read answering a row per day with nothing spent on any of
+   * them, which is what an empty window actually looks like on the wire —
+   * days are the read's own axis and it emits them whether or not anything
+   * landed on one.
+   */
+  overTimeAnswersEmptyDays: false,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -108,7 +115,23 @@ vi.mock("~/utils/api", () => {
         summary: unanswered(),
         spendByDepartment: unanswered(),
         spendByUser: unanswered(),
-        spendOverTime: unanswered(),
+        spendOverTime: {
+          useQuery: () =>
+            harness.overTimeAnswersEmptyDays
+              ? {
+                  data: {
+                    buckets: Array.from({ length: 90 }, (_, index) => ({
+                      bucketIso: `2026-0${1 + Math.floor(index / 31)}-${String(
+                        (index % 31) + 1,
+                      ).padStart(2, "0")}`,
+                      points: [],
+                    })),
+                  },
+                  isLoading: false,
+                  isError: false,
+                }
+              : { data: undefined, isLoading: false, isError: false },
+        },
       },
     },
   };
@@ -139,6 +162,7 @@ const renderInSampleMode = async () => {
 beforeEach(() => {
   harness.summaryFails = false;
   harness.spendersFail = false;
+  harness.overTimeAnswersEmptyDays = false;
   // The section keeps ONE sample choice for the whole sitting, in session
   // storage, so the first test to press the toggle would otherwise hand its
   // answer to every test after it and they would open with samples already on.
@@ -187,14 +211,13 @@ describe("the cost screen in sample mode", () => {
     it("shows an invented spender list rather than the failure", async () => {
       await renderInSampleMode();
 
-      const panel = panelFor("Billed spend by person");
+      const panel = panelFor("Billed spend by API key");
 
-      // Invented spenders in the panel, not a badge on it: the reserved `.test`
-      // domain is what makes them recognisably not anybody's, and it is in the
-      // rows themselves rather than in a mark that can be suppressed.
-      expect(within(panel).getAllByText(/@acme\.test/).length).toBeGreaterThan(
-        0,
-      );
+      // Invented keys in the panel, not a badge on it. The masked tail is what
+      // makes a row recognisable as a credential rather than a person, and it
+      // is in the rows themselves rather than in a mark that can be
+      // suppressed.
+      expect(within(panel).getAllByText(/· sk-/).length).toBeGreaterThan(0);
       expect(
         screen.queryByText(/could not be loaded/i),
       ).not.toBeInTheDocument();
@@ -307,6 +330,40 @@ describe("the cost screen in sample mode", () => {
       const panel = panelFor("Cost by department");
       expect(panel.textContent).toContain("Engineering");
       expect(panel.textContent).not.toContain("Marketing");
+    });
+  });
+
+  /**
+   * The one read that answers in days rather than in figures.
+   *
+   * `spendOverTime` emits a bucket per day across the window whether or not
+   * anything was spent, so an empty window arrives as hundreds of buckets of
+   * nothing. Every emptiness test on the page is a length check, so this read
+   * alone looked answered-and-full while its neighbours looked empty — and
+   * "Cost over time · by team" sat saying it had nothing in the middle of a
+   * screen of invented figures.
+   */
+  describe("given the over-time read answered days but no figures", () => {
+    beforeEach(() => {
+      harness.overTimeAnswersEmptyDays = true;
+    });
+
+    /** @scenario "A window of empty days fills with sample figures like every panel beside it" */
+    it("fills the over-time panel like every panel beside it", async () => {
+      await renderInSampleMode();
+
+      // The empty state, not the chart: recharts draws nothing under jsdom, so
+      // the assertion that can be made honestly is that the panel is NOT
+      // reporting the window as measured and empty.
+      const panel = panelFor("Cost over time · by team");
+      expect(
+        within(panel).queryByTestId("cost-panel-empty"),
+      ).not.toBeInTheDocument();
+
+      // And no other panel is either. A screen where one card says "nothing
+      // here" among fifteen full ones is the defect, so the absence is
+      // asserted across the whole screen rather than only where it was seen.
+      expect(screen.queryAllByTestId("cost-panel-empty")).toHaveLength(0);
     });
   });
 

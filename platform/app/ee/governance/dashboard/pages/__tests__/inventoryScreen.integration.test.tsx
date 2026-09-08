@@ -33,6 +33,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { findNativeSelects } from "~/components/governance/filters";
+import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
 import {
   getOrganizationRolePermissions,
   hasPermissionWithHierarchy,
@@ -110,7 +111,6 @@ vi.mock("~/utils/api", () => {
     api: {
       useUtils: () => ({
         ingestionSources: { list: { invalidate: vi.fn() } },
-        anomalyRules: { list: { invalidate: vi.fn() } },
       }),
       ingestionSources: {
         list: { useQuery: () => harness.sources },
@@ -125,17 +125,6 @@ vi.mock("~/utils/api", () => {
       },
       activityMonitor: {
         ingestionSourcesHealth: { useQuery: () => harness.health },
-      },
-      // The Anomaly rules pane. It is mounted here only so the native-select
-      // sweep can reach its rule composer, so an empty rule list is enough:
-      // the composer's pickers do not depend on there being any rules.
-      anomalyRules: {
-        list: {
-          useQuery: () => ({ data: [], isLoading: false, error: null }),
-        },
-        create: mutation(),
-        update: mutation(),
-        archive: mutation(),
       },
     },
   };
@@ -294,6 +283,19 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/**
+ * An organization with no tools AND the samples turned off.
+ *
+ * Both halves are needed to see a real empty pane: with nothing connected the
+ * page offers sample data by itself, so an empty source list alone renders
+ * eight invented cards rather than the empty state. This is the reader who
+ * pressed "Hide sample data" and is looking at their actual, empty catalog.
+ */
+function emptyWithSamplesOff() {
+  harness.sources = { data: [], isLoading: false, error: null };
+  window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+}
+
 /** The screen with two tools connected, so sample mode stays off by itself. */
 function connectTools() {
   harness.sources = { data: CONNECTED_SOURCES, isLoading: false, error: null };
@@ -303,16 +305,20 @@ function connectTools() {
 describe("given an admin on the Inventory page", () => {
   describe("when the tab strip renders", () => {
     /** @scenario "The Environments tab sits between Catalog and Sources" */
-    it("reads Catalog, Environments, Sources and Anomaly rules, with no Approvals", () => {
+    it("reads Catalog, Environments and Sources, with no Approvals or Anomaly rules", () => {
       renderScreen();
       const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
       expect(tabs.map((label) => label?.replace(/\d+$/, "").trim())).toEqual([
         "Catalog",
         "Environments",
         "Sources",
-        "Anomaly rules",
       ]);
       expect(screen.queryByRole("tab", { name: /approvals/i })).toBeNull();
+      // A rule is a standing instruction about what to watch for, not a thing
+      // the organization runs, so it is not part of an inventory. Asserted by
+      // absence rather than left to the list above, because a tab appended
+      // after Sources would otherwise only fail the equality on its way past.
+      expect(screen.queryByRole("tab", { name: /anomaly/i })).toBeNull();
     });
 
     /** @scenario "The tab says how many tools are in the catalog" */
@@ -611,13 +617,12 @@ describe("given an admin on the Inventory page", () => {
   });
 
   describe("when the section's shared UI rules are checked", () => {
-    /**
-     * @scenario "Primary page actions sit top-right in the page header"
-     *
+    /*
      * Position is asserted structurally rather than by pixel: the actions are
      * the last child of the header row, which is what puts them at its right
      * end under `justify="space-between"`, and jsdom lays nothing out.
      */
+    /** @scenario "Primary page actions sit top-right in the page header" */
     it("puts the page actions at the right of the header, small, one solid", async () => {
       connectTools();
       renderScreenWithReferences();
@@ -680,9 +685,132 @@ describe("given an admin on the Inventory page", () => {
       expect(ghostSmall).not.toBe(subtleSmall);
     });
 
-    /**
-     * @scenario "No governance page renders a native select"
-     *
+    // Swept across the WHOLE screen, not inside the header. Sweeping only the
+    // header is what would have missed the defect this rule was written for:
+    // the second control was down in the sources table's own header, and every
+    // assertion scoped to the page header agreed the page was fine.
+    //
+    // Label AND weight, because the defect was both. A solid "Add tool" up top
+    // beside an outline "Add source" below gave one flow two names and two
+    // weights. Asserting only the count would forbid an empty state from
+    // repeating the header's own action, which the shared empty state is built
+    // to allow and which Agents does.
+    /** @scenario "A page offers one create flow, under one label, from its header" */
+    it("gives the create flow one label and one weight on each pane, from the header", async () => {
+      connectTools();
+      renderScreen();
+
+      const createControls = () =>
+        screen.queryAllByRole("button", { name: /Add (tool|source)/ });
+      const heading = screen.getByRole("heading", { name: "Inventory" });
+      const headerRow = heading.closest("div")?.parentElement;
+
+      const assertOneDoor = (expectedLabel: string) => {
+        const controls = createControls();
+        expect(controls.length).toBeGreaterThan(0);
+        for (const control of controls) {
+          expect(control).toHaveTextContent(expectedLabel);
+        }
+        // One weight: every control opening this flow renders identically.
+        const weights = new Set(controls.map((c) => c.className));
+        expect(weights.size).toBe(1);
+        // And the flow is reachable from the header, not only from the content.
+        expect(controls.some((c) => headerRow?.contains(c))).toBe(true);
+      };
+
+      assertOneDoor("Add tool");
+
+      await openTab(/Sources/);
+
+      // The sources table used to add its own, differently-worded control, so
+      // this is the pane the rule exists for.
+      assertOneDoor("Add source");
+    });
+
+    // The catalog with nothing in it, and the samples turned off, which is the
+    // only combination that shows a reader their own empty catalog.
+    /** @scenario "An empty pane explains itself rather than sitting blank" */
+    it("draws the shared empty state on an empty catalog, glyph, headline and sentence", async () => {
+      emptyWithSamplesOff();
+      renderScreen();
+
+      const empty = screen.getByTestId("tool-catalog-empty");
+      expect(
+        within(empty).getByText("No tools registered yet"),
+      ).toBeInTheDocument();
+      // The sentence says what fills the catalog. Asserted because a headline
+      // alone is the old grey-box empty state wearing a bigger font.
+      expect(within(empty).getByText(/joins the catalog/)).toBeInTheDocument();
+      // The glyph. The scenario names it, and a shared empty state that
+      // silently dropped it would still pass on headline and sentence alone.
+      expect(empty.querySelector("svg")).not.toBeNull();
+      // Never the dashed box this replaced. Dashes read as a drop target or a
+      // component that failed to arrive, which is what the owner reported.
+      expect(empty).not.toHaveStyle({ borderStyle: "dashed" });
+      // The empty state offers the way out, and offers it under the HEADER'S
+      // label rather than a new one. The sentence used to name the button in
+      // prose instead ("with Add tool, above"), which pointed at a control by
+      // a name nothing checked: rename the header and the sentence lies, and
+      // no rule about controls can catch a stale sentence.
+      const inside = within(empty).getByRole("button", { name: /Add tool/ });
+      const header = screen
+        .getByRole("heading", { name: "Inventory" })
+        .closest("div")?.parentElement;
+      const inHeader = within(header as HTMLElement).getByRole("button", {
+        name: /Add tool/,
+      });
+      expect(inside).not.toBe(inHeader);
+      // Same label and same weight.
+      expect(inside.className).toBe(inHeader.className);
+      // And same FLOW, which label and weight alone do not prove: two
+      // identically-drawn buttons can still lead to different places, and that
+      // would be the original defect wearing a matching coat. Followed all the
+      // way to the composer, because both controls own a menu and asserting
+      // only that a menu opened would accept two menus onto two flows.
+      //
+      // Scoped to the menu that this press opened, not to the screen: both
+      // triggers mount their own menu content, so a page-level query for a
+      // menu item finds two and cannot say which trigger opened one. The
+      // trigger reporting itself expanded is what ties the open menu to it.
+      await userEvent.click(inside);
+      expect(inside).toHaveAttribute("aria-expanded", "true");
+      expect(inHeader).toHaveAttribute("aria-expanded", "false");
+      const menus = await screen.findAllByRole("menu");
+      const open = menus.filter((m) => m.dataset.state === "open");
+      expect(open).toHaveLength(1);
+      await userEvent.click(
+        within(open[0] as HTMLElement).getByRole("menuitem", {
+          name: /Anthropic Admin API/,
+        }),
+      );
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    });
+
+    // A reader who cannot create must not be told to press a button that is
+    // not on their screen. The sentence changes with the grant, which is the
+    // only part of the empty state that may.
+    /** @scenario "An empty pane explains itself rather than sitting blank" */
+    it("does not point a read-only viewer at a create control they cannot see", () => {
+      harness.permissions = [
+        "organization:view",
+        "governance:view",
+        "ingestionSources:view",
+      ];
+      emptyWithSamplesOff();
+      renderScreen();
+
+      const empty = screen.getByTestId("tool-catalog-empty");
+      expect(
+        within(empty).getByText(/someone connects it/),
+      ).toBeInTheDocument();
+      // Neither the sentence nor the action offers a create. The empty state
+      // drops its action with the grant, so a viewer gets an explanation and
+      // no button, rather than a button that would fail on press.
+      expect(within(empty).queryByRole("button")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Add tool/ })).toBeNull();
+    });
+
+    /*
      * Every pane, and both drawers that carry choice controls.
      *
      * The narrow version of this test opened one drawer on one source type and
@@ -692,15 +820,15 @@ describe("given an admin on the Inventory page", () => {
      * underneath a passing assertion. So this walks every tab and opens the
      * drawer on a PULL-BASED type, which is the only way the cadence field
      * renders.
+     *
+     * The composer's own four selects left this page with the Anomaly rules
+     * tab. They are still swept, in the component test beside the tab itself:
+     * ee/governance/dashboard/components/__tests__/anomalyRulesComposer.integration.test.tsx.
      */
+    /** @scenario "No governance page renders a native select" */
     it("renders no native select on any tab, empty or full", async () => {
       const { unmount } = renderScreen();
-      for (const tab of [
-        /Environments/,
-        /Sources/,
-        /Anomaly rules/,
-        /Catalog/,
-      ]) {
+      for (const tab of [/Environments/, /Sources/, /Catalog/]) {
         await openTab(tab);
         expect(findNativeSelects(document.body)).toHaveLength(0);
       }
@@ -708,19 +836,18 @@ describe("given an admin on the Inventory page", () => {
 
       connectTools();
       renderScreen();
-      for (const tab of [/Environments/, /Sources/, /Anomaly rules/]) {
+      for (const tab of [/Environments/, /Sources/]) {
         await openTab(tab);
         expect(findNativeSelects(document.body)).toHaveLength(0);
       }
     });
 
-    /**
-     * @scenario "No governance page renders a native select"
-     *
+    /*
      * `anthropic_admin` is chosen deliberately: it has a pull adapter, so the
      * cadence field mounts. A push-only type skips it and the assertion goes
      * quiet again.
      */
+    /** @scenario "No governance page renders a native select" */
     it("renders no native select in the source drawer, cadence field and all", async () => {
       connectTools();
       renderScreen();
@@ -738,32 +865,6 @@ describe("given an admin on the Inventory page", () => {
       expect(
         screen.getByRole("combobox", { name: "Frequency" }),
       ).toBeInTheDocument();
-      expect(findNativeSelects(document.body)).toHaveLength(0);
-    });
-
-    /**
-     * @scenario "No governance page renders a native select"
-     *
-     * The anomaly-rule composer held four of the five, including the scope
-     * picker that only appears once the scope stops being the organization.
-     */
-    it("renders no native select in the anomaly rule composer", async () => {
-      connectTools();
-      renderScreen();
-      await openTab(/Anomaly rules/);
-      const newRule = (
-        await screen.findAllByRole("button", { name: /New rule/ })
-      )[0];
-      if (!newRule) throw new Error("the composer has no New rule control");
-      await userEvent.click(newRule);
-      await screen.findByRole("dialog");
-      expect(findNativeSelects(document.body)).toHaveLength(0);
-
-      // Scope drives a second picker into view; it is native-free too.
-      await userEvent.click(screen.getByRole("combobox", { name: "Scope" }));
-      await userEvent.click(
-        await screen.findByRole("option", { name: /source type/i }),
-      );
       expect(findNativeSelects(document.body)).toHaveLength(0);
     });
   });
