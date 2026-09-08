@@ -141,6 +141,16 @@ export function FloatingCellEditor({
       return;
     }
 
+    // The measurement is only meaningful once the intended offsets are on the
+    // element. Reading it while the style is still empty measures the editor
+    // in the flow of its portal container, and correcting from that pushes it
+    // off the viewport for good.
+    const appliedLeft = style.left;
+    const appliedTop = style.top;
+    if (typeof appliedLeft !== "number" || typeof appliedTop !== "number") {
+      return;
+    }
+
     const rect = editor.getBoundingClientRect();
     const horizontalMiss = rect.left - intended.left;
     const verticalMiss = rect.top - intended.top;
@@ -153,8 +163,8 @@ export function FloatingCellEditor({
     offsetCorrectedRef.current = true;
     setStyle((previous) => ({
       ...previous,
-      left: (typeof previous.left === "number" ? previous.left : 0) - horizontalMiss,
-      top: (typeof previous.top === "number" ? previous.top : 0) - verticalMiss,
+      left: appliedLeft - horizontalMiss,
+      top: appliedTop - verticalMiss,
     }));
   }, [isEditing, style]);
 
