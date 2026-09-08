@@ -1,11 +1,10 @@
-import fs from "fs";
-import path from "path";
 import { describe, expect, it } from "vitest";
-import { ENTERPRISE_LICENSE_KEY as EE_TEST_FIXTURE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
+import { TEST_PUBLIC_KEY } from "../../ee/licensing/__tests__/fixtures/testKeys";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
 // The key the app boots with when LANGWATCH_LICENSE_PUBLIC_KEY is unset,
 // which is what `haven up` runs. The vitest setup swaps `PUBLIC_KEY` for the
 // test-suite key, so that export would test the wrong deployment.
-import { PLACEHOLDER_PUBLIC_KEY as PUBLIC_KEY } from "../../ee/licensing/constants";
+import { PLACEHOLDER_PUBLIC_KEY as DEFAULT_PUBLIC_KEY } from "../../ee/licensing/constants";
 import {
   parseLicenseKey,
   verifySignature,
@@ -15,30 +14,44 @@ import {
   resolveSeedLicense,
 } from "../localDevLicense";
 
-function isSignedByLangWatch(licenseKey: string): boolean {
+function isSignedFor(licenseKey: string, publicKey: string): boolean {
   const parsed = parseLicenseKey(licenseKey);
-  return parsed !== null && verifySignature(parsed, PUBLIC_KEY);
+  return parsed !== null && verifySignature(parsed, publicKey);
 }
 
-describe("localDevLicense", () => {
-  describe("given the verification key the app boots with", () => {
-    it("verifies the local-dev enterprise license", () => {
-      expect(isSignedByLangWatch(LOCAL_DEV_ENTERPRISE_LICENSE_KEY)).toBe(true);
+const SEED_CANDIDATES = [
+  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+  TEST_SUITE_LICENSE_KEY,
+] as const;
+
+describe("LOCAL_DEV_ENTERPRISE_LICENSE_KEY", () => {
+  describe("when verified with the key the app boots with by default", () => {
+    it("verifies", () => {
+      expect(
+        isSignedFor(LOCAL_DEV_ENTERPRISE_LICENSE_KEY, DEFAULT_PUBLIC_KEY),
+      ).toBe(true);
     });
 
-    // Documents why the seed must never write the ee test fixture: it is
-    // signed with the test-suite private key, so the running app reports it
-    // as an invalid license on every settings page.
+    // Documents why the seed used to show an invalid license: the ee fixture
+    // is signed with the test-suite private key, not the default one.
     it("rejects the ee test fixture license", () => {
-      expect(isSignedByLangWatch(EE_TEST_FIXTURE_LICENSE_KEY)).toBe(false);
+      expect(isSignedFor(TEST_SUITE_LICENSE_KEY, DEFAULT_PUBLIC_KEY)).toBe(
+        false,
+      );
     });
   });
+});
 
-  describe("resolveSeedLicense", () => {
+describe("resolveSeedLicense", () => {
+  describe("given the app boots with the default key", () => {
     describe("when the organization has no license yet", () => {
       it("returns the local-dev enterprise license", () => {
         expect(
-          resolveSeedLicense({ stored: null, publicKey: PUBLIC_KEY }),
+          resolveSeedLicense({
+            stored: null,
+            publicKey: DEFAULT_PUBLIC_KEY,
+            candidates: SEED_CANDIDATES,
+          }),
         ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
       });
     });
@@ -48,7 +61,8 @@ describe("localDevLicense", () => {
         expect(
           resolveSeedLicense({
             stored: "not-a-license",
-            publicKey: PUBLIC_KEY,
+            publicKey: DEFAULT_PUBLIC_KEY,
+            candidates: SEED_CANDIDATES,
           }),
         ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
       });
@@ -56,8 +70,9 @@ describe("localDevLicense", () => {
       it("replaces a fixture left behind by an older seed", () => {
         expect(
           resolveSeedLicense({
-            stored: EE_TEST_FIXTURE_LICENSE_KEY,
-            publicKey: PUBLIC_KEY,
+            stored: TEST_SUITE_LICENSE_KEY,
+            publicKey: DEFAULT_PUBLIC_KEY,
+            candidates: SEED_CANDIDATES,
           }),
         ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
       });
@@ -67,19 +82,42 @@ describe("localDevLicense", () => {
       it("keeps it, so a re-seed never clobbers a license someone activated", () => {
         const activated = LOCAL_DEV_ENTERPRISE_LICENSE_KEY;
         expect(
-          resolveSeedLicense({ stored: activated, publicKey: PUBLIC_KEY }),
+          resolveSeedLicense({
+            stored: activated,
+            publicKey: DEFAULT_PUBLIC_KEY,
+            candidates: SEED_CANDIDATES,
+          }),
         ).toBe(activated);
       });
     });
   });
 
-  describe("prisma/seed.ts", () => {
-    it("does not source its license from the ee test fixtures", () => {
-      const source = fs.readFileSync(
-        path.resolve(__dirname, "../../prisma/seed.ts"),
-        "utf8",
-      );
-      expect(source).not.toMatch(/ee\/licensing\/__tests__/);
+  describe("given the app boots with the test-suite key, as CI seeds do", () => {
+    describe("when the organization has no license yet", () => {
+      it("returns the ee test fixture, the candidate that verifies there", () => {
+        expect(
+          resolveSeedLicense({
+            stored: null,
+            publicKey: TEST_PUBLIC_KEY,
+            candidates: SEED_CANDIDATES,
+          }),
+        ).toBe(TEST_SUITE_LICENSE_KEY);
+      });
+    });
+  });
+
+  describe("given no candidate verifies against the boot key", () => {
+    describe("when the organization has no license yet", () => {
+      it("falls back to the first candidate so the org still has a readable license", () => {
+        expect(
+          resolveSeedLicense({
+            stored: null,
+            publicKey:
+              "-----BEGIN PUBLIC KEY-----\nnot-a-key\n-----END PUBLIC KEY-----",
+            candidates: SEED_CANDIDATES,
+          }),
+        ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
+      });
     });
   });
 });

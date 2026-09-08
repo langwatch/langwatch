@@ -4,8 +4,9 @@ import { parseLicenseKey, verifySignature } from "../ee/licensing/validation";
 /**
  * Local-dev enterprise license key for seed/dev-tooling scripts.
  *
- * This is a self-signed, pre-generated ENTERPRISE license used only to
- * bootstrap a fresh local install with enterprise features unlocked,
+ * This is a pre-generated ENTERPRISE license signed for the public key the
+ * app boots with by default, used only to bootstrap a fresh local install
+ * with enterprise features unlocked,
  * including webhookEndpointsEnabled (regenerated when the flag landed). It is
  * intentionally NOT sourced from the ee test fixtures — test fixtures are not
  * a runtime dependency surface, and rotating them must not break local seeding.
@@ -18,23 +19,31 @@ export const LOCAL_DEV_ENTERPRISE_LICENSE_KEY =
  *
  * The seed runs on every `haven up` as an idempotent upsert, so it must never
  * clobber a license somebody activated by hand: a stored license that verifies
- * against the key the app boots with stays. Anything else (no license, an
- * unreadable value, or the ee test fixture an older seed wrote, which is signed
- * with the test-suite key and reports as invalid in the running app) is
- * replaced with the local-dev key.
+ * against the key the app boots with stays. Otherwise the first candidate that
+ * verifies against that key wins, so the seed writes the local-dev key under
+ * the default key and the ee fixture under the test-suite key (CI seeds with
+ * `LANGWATCH_LICENSE_PUBLIC_KEY` set to it). If nothing verifies, the first
+ * candidate is written so the org still has a readable license.
  */
 export function resolveSeedLicense({
   stored,
   publicKey,
+  candidates = [LOCAL_DEV_ENTERPRISE_LICENSE_KEY],
 }: {
   stored: string | null;
   publicKey: string;
+  candidates?: readonly [string, ...string[]];
 }): string {
-  if (stored) {
-    const parsed = parseLicenseKey(stored);
-    if (parsed && verifySignature(parsed, publicKey)) {
-      return stored;
-    }
+  if (stored && isSignedFor(stored, publicKey)) {
+    return stored;
   }
-  return LOCAL_DEV_ENTERPRISE_LICENSE_KEY;
+  return (
+    candidates.find((candidate) => isSignedFor(candidate, publicKey)) ??
+    candidates[0]
+  );
+}
+
+function isSignedFor(licenseKey: string, publicKey: string): boolean {
+  const parsed = parseLicenseKey(licenseKey);
+  return parsed !== null && verifySignature(parsed, publicKey);
 }
