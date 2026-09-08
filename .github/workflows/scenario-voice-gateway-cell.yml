@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       gateway_url:
-        description: Gateway base URL the audio calls route through
+        description: Gateway base URL the audio calls route through. Must be an https URL whose host is gateway.langwatch.ai or ends with .langwatch.ai; anything else fails the run before a request is made.
         required: false
         default: https://gateway.langwatch.ai/v1
 
@@ -39,6 +39,62 @@ jobs:
       - name: Setup Python UV
         working-directory: sdks/python
         run: uv sync --all-groups --all-extras
+
+      - name: Refuse a gateway URL outside langwatch.ai
+        # The virtual key rides in the Authorization header of every request,
+        # so an arbitrary gateway_url would hand the secret to whoever runs
+        # that host. Only LangWatch-controlled https origins are accepted.
+        env:
+          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url }}
+        run: |
+          url="$SCENARIO_VOICE_GATEWAY_URL"
+
+          # Check if URL is empty
+          if [ -z "$url" ]; then
+            echo "::error::gateway_url is empty"
+            exit 1
+          fi
+
+          # Check if URL starts with https://
+          case "$url" in
+            https://*)
+              ;;
+            *)
+              echo "::error::gateway_url '$url' must use https://"
+              exit 1
+              ;;
+          esac
+
+          # Extract host from URL: remove https:// prefix, then remove everything from first / or : onward
+          host="${url#https://}"        # remove https:// prefix
+          host="${host%%/*}"             # remove everything from first /
+          host="${host%%:*}"             # remove everything from first : (port)
+
+          # Check if host is empty
+          if [ -z "$host" ]; then
+            echo "::error::gateway_url '$url' has an empty host"
+            exit 1
+          fi
+
+          # Check for @ in host (userinfo trick like https://gateway.langwatch.ai@evil.com)
+          case "$host" in
+            *@*)
+              echo "::error::gateway_url '$url' contains @ in the host part, which could be used to redirect to another host"
+              exit 1
+              ;;
+          esac
+
+          # Check if host matches the allowlist
+          # Only gateway.langwatch.ai or subdomains under langwatch.ai are permitted
+          case "$host" in
+            gateway.langwatch.ai|*.langwatch.ai)
+              # Valid hostname - this is a LangWatch-controlled origin
+              ;;
+            *)
+              echo "::error::gateway_url '$url' is not an https origin under langwatch.ai; refusing to send the virtual key there"
+              exit 1
+              ;;
+          esac
 
       # The test file skips when SCENARIO_VOICE_GATEWAY_VK is absent so the
       # per-push lane stays free, but this dedicated cell must never go green by

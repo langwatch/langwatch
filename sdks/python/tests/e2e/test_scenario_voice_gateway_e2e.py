@@ -12,9 +12,10 @@ output of the real TTS audio, produced by the STT model.
 
 Required environment:
     SCENARIO_VOICE_GATEWAY_VK   (required) a LangWatch virtual key. When absent
-                                the test skips — it runs only from the
-                                scenario-voice-gateway-cell workflow, which
-                                spends real provider money on a provisioned key.
+                                the module skips at collection time — it runs
+                                only from the scenario-voice-gateway-cell
+                                workflow, which spends real provider money on a
+                                provisioned key.
     SCENARIO_VOICE_GATEWAY_URL  (optional) gateway base URL; defaults to
                                 https://gateway.langwatch.ai/v1
 
@@ -37,6 +38,18 @@ from urllib.parse import urlsplit
 
 import httpx
 import pytest
+
+# Skip at import time, not inside the test: the SDK unit job collects this
+# tree with `-m "not e2e"`, and a module-level `import scenario` would still
+# run during that collection (it drags in joblib and numpy). Without the key
+# nothing below is needed, so the module never imports scenario at all.
+SKIP_REASON = (
+    "SCENARIO_VOICE_GATEWAY_VK not set; the Scenario voice gateway cell "
+    "runs only from the scenario-voice-gateway-cell workflow "
+    "(workflow_dispatch) with a provisioned LangWatch virtual key"
+)
+if not os.environ.get("SCENARIO_VOICE_GATEWAY_VK"):
+    pytest.skip(SKIP_REASON, allow_module_level=True)
 
 import scenario
 from scenario.types import ScenarioResult
@@ -265,12 +278,6 @@ async def test_scenario_voice_runs_through_the_gateway(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     virtual_key = os.environ.get("SCENARIO_VOICE_GATEWAY_VK")
-    if not virtual_key:
-        pytest.skip(
-            "SCENARIO_VOICE_GATEWAY_VK not set; the Scenario voice gateway cell "
-            "runs only from the scenario-voice-gateway-cell workflow "
-            "(workflow_dispatch) with a provisioned LangWatch virtual key"
-        )
 
     base_url = os.environ.get("SCENARIO_VOICE_GATEWAY_URL", DEFAULT_GATEWAY_URL)
     gateway_host = urlsplit(base_url).hostname or ""
@@ -340,8 +347,8 @@ async def test_scenario_voice_runs_through_the_gateway(
         statuses = [r.status or r.error for r in recorded]
         first_bad = next((r for r in recorded if r.status != 200), None)
         last = recorded[-1]
-        ok = last.status == 200 and any(r.status == 200 for r in recorded)
-        assert ok, (
+        is_route_successful = last.status == 200 and any(r.status == 200 for r in recorded)
+        assert is_route_successful, (
             f"POST {last.path} returned {statuses} from {gateway_host} "
             f"(expected 200) first error body: "
             f"{first_bad.body if first_bad is not None else None!r}"
