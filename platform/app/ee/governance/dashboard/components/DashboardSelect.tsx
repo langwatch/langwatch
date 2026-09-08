@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createListCollection, Select } from "@chakra-ui/react";
+import { createListCollection } from "@chakra-ui/react";
 import { useMemo } from "react";
+import { Select } from "~/components/ui/select";
 
 /**
  * The one choice control the governance dashboard renders.
@@ -17,6 +18,20 @@ import { useMemo } from "react";
  * the anomaly-rule composer, and the pull-cadence field. A rule with three
  * implementations is a rule that will be broken a fourth way, so there is now
  * one control and one place to fix.
+ *
+ * Built on `~/components/ui/select`, NOT on Chakra's `Select` directly, and the
+ * difference is not cosmetic. Chakra's `Select.Content` is a bare div: the
+ * floating-ui styles that anchor the list to its trigger ride on
+ * `Select.Positioner`, which Chakra makes you render yourself (see
+ * @zag-js/select's `getPositionerProps`, which carries `popperStyles.floating`,
+ * against `getContentProps`, which carries none). A `Content` with no
+ * `Positioner` is therefore not a dropdown at all — it lays out in normal flow
+ * and shoves the form apart as it opens. The wrapper supplies the positioner, a
+ * portal, and a z-index override for the case where Zag's layer ordering puts a
+ * select behind a dialog, which is every call site here. It also renders Ark's
+ * `HiddenSelect`, so browser autofill and a plain form submit keep working —
+ * that hidden element is the one native select the rulebook exempts, because it
+ * carries both aria-hidden and tabindex="-1".
  *
  * The trigger takes an explicit `ariaLabel` rather than relying on a nearby
  * heading: the labels beside these fields are `Text`, not bound `<label>`
