@@ -2,10 +2,12 @@ import {
   Badge,
   Box,
   Button,
+  Collapsible,
   Heading,
   HStack,
   Input,
   Spinner,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -14,10 +16,18 @@ import {
   departmentLabelFor,
   groupObservedDepartments,
 } from "@ee/governance/services/logic/observedDepartments";
-import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  ExternalLink,
+  MoreVertical,
+  Pencil,
+} from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PeopleSpendPanel } from "~/components/governance/PeopleTable";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
 import { Link } from "~/components/ui/link";
@@ -27,6 +37,7 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSpendSortParam } from "~/hooks/useSpendSortParam";
 import { api, type RouterOutputs } from "~/utils/api";
 
 type Department = RouterOutputs["departments"]["list"][number];
@@ -34,15 +45,131 @@ type DiscoveredPerson = RouterOutputs["governancePeople"]["list"][number];
 type MatchSuggestion = RouterOutputs["governancePeople"]["suggestions"][number];
 
 /**
- * The People page (nee Departments — the page identity renamed, the
- * department entity did not). Departments are read with `governance:view`
- * and written with `governance:manage`. The page opens on the read grant,
- * and the create box plus the per-row actions appear only for a viewer
- * who holds the write one.
+ * The People page: who used AI through a connected source, ranked by spend,
+ * and the departments that spend rolls up to. Two tabs, one address each
+ * (`?tab=people` is the default and stays out of the address).
  *
+ * The page opens on `governance:view`. The People tab reads spend with
+ * `activityMonitor:view` and says so when the viewer lacks it. Departments
+ * are read with `governance:view` and written with `governance:manage`:
+ * the create control and the per-row actions appear only for a viewer who
+ * holds the write grant.
+ *
+ * Spec: specs/ai-governance/dashboard/people-tabs.feature
  * Spec: specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
+const PEOPLE_TABS = ["people", "departments"] as const;
+type PeopleTab = (typeof PEOPLE_TABS)[number];
+const DEFAULT_TAB: PeopleTab = "people";
+
+const isPeopleTab = (value: string | null): value is PeopleTab =>
+  PEOPLE_TABS.some((tab) => tab === value);
+
+/**
+ * A selected non-default tab is part of the address; the default stays out
+ * of it, and an unknown value degrades to the default instead of a blank
+ * pane. Every other parameter (the sort, say) is preserved.
+ */
+function usePeopleTab() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("tab");
+  const tab: PeopleTab = isPeopleTab(requested) ? requested : DEFAULT_TAB;
+  const selectTab = (next: string) =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === DEFAULT_TAB) params.delete("tab");
+        else params.set("tab", next);
+        return params;
+      },
+      { replace: true },
+    );
+  return { tab, selectTab };
+}
+
 function PeoplePage() {
+  const { tab, selectTab } = usePeopleTab();
+
+  return (
+    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
+      <VStack align="stretch" gap={4} width="full" maxW="container.xl">
+        <Heading size="md">People</Heading>
+
+        <Tabs.Root
+          value={tab}
+          onValueChange={({ value }) => selectTab(value)}
+          variant="line"
+          lazyMount
+        >
+          <Tabs.List>
+            <Tabs.Trigger
+              value="people"
+              color="fg.muted"
+              _selected={{ color: "fg", fontWeight: "semibold" }}
+            >
+              People
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="departments"
+              color="fg.muted"
+              _selected={{ color: "fg", fontWeight: "semibold" }}
+            >
+              Departments
+            </Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="people" paddingTop={4}>
+            <PeopleTabPane />
+          </Tabs.Content>
+          <Tabs.Content value="departments" paddingTop={4}>
+            <DepartmentsTabPane />
+          </Tabs.Content>
+        </Tabs.Root>
+      </VStack>
+    </GovernanceLayout>
+  );
+}
+
+/*
+ * People tab
+ */
+
+function PeopleTabPane() {
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
+  const canReadSources = hasAnyPermission("ingestionSources:view");
+  const canManage = hasAnyPermission("governance:manage");
+  const { sortBy, setSortBy } = useSpendSortParam();
+
+  if (!canReadActivity) {
+    return (
+      <PermissionRequiredNotice
+        permission="activityMonitor:view"
+        detail="Spend and activity per person stay hidden until then."
+      />
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={6} width="full">
+      <PeopleSpendPanel
+        orgId={orgId}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        canReadSources={canReadSources}
+      />
+      <DiscoveredPeoplePanel orgId={orgId} canManage={canManage} />
+    </VStack>
+  );
+}
+
+/*
+ * Departments tab
+ */
+
+function DepartmentsTabPane() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -60,40 +187,50 @@ function PeoplePage() {
   };
 
   const departments = listQuery.data ?? [];
-  const hasDepartments = departments.length > 0;
+
+  // The departments the providers' directories name live beside the list an
+  // administrator creates: the first is where the names come from, the
+  // second is what spend rolls up by.
+  const peopleQuery = api.governancePeople.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
 
   return (
-    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <Heading size="md">People</Heading>
-
-        <HandledErrorAlert
-          error={listQuery.error}
-          fallbackTitle="Couldn't load departments"
-        />
-
-        <DiscoveredPeoplePanel orgId={orgId} canManage={canManage} />
-
-        {canManage && <CreateDepartmentBox orgId={orgId} onCreated={refresh} />}
-
-        <DepartmentList
-          orgId={orgId}
-          departments={departments}
-          isLoading={listQuery.isLoading}
-          onChanged={refresh}
-          canManage={canManage}
-        />
-
-        {!canManage && (
-          <PermissionRequiredNotice
-            permission="governance:manage"
-            detail="You can read the department list. Creating, renaming, archiving, and assigning need this grant."
-          />
+    <VStack align="stretch" gap={4} width="full">
+      <HStack justifyContent="space-between" flexWrap="wrap" gap={2}>
+        <Text fontSize="sm" color="fg.muted">
+          Spend rolls up by department, including personal AI use.
+        </Text>
+        {canManage && (
+          <CreateDepartmentControl orgId={orgId} onCreated={refresh} />
         )}
+      </HStack>
 
-        {hasDepartments && <AssignmentGuide />}
-      </VStack>
-    </GovernanceLayout>
+      <HandledErrorAlert
+        error={listQuery.error}
+        fallbackTitle="Couldn't load departments"
+      />
+
+      <ObservedDepartmentsPanel people={peopleQuery.data ?? []} />
+
+      <DepartmentList
+        orgId={orgId}
+        departments={departments}
+        isLoading={listQuery.isLoading}
+        onChanged={refresh}
+        canManage={canManage}
+      />
+
+      {!canManage && (
+        <PermissionRequiredNotice
+          permission="governance:manage"
+          detail="You can read the department list. Creating, renaming, archiving, and assigning need this grant."
+        />
+      )}
+
+      <AssignmentGuide />
+    </VStack>
   );
 }
 
@@ -258,8 +395,6 @@ function DiscoveredPeoplePanel({
         )}
       </VStack>
 
-      <ObservedDepartmentsPanel people={people} />
-
       {suggestions.length > 0 && (
         <SuggestionsPanel
           orgId={orgId}
@@ -359,7 +494,7 @@ function ObservedDepartmentsPanel({ people }: { people: DiscoveredPerson[] }) {
         </Text>
         <Text fontSize="xs" color="fg.subtle" marginTop={1}>
           What the connected directories call these people. Create the ones you
-          want to attribute spend by below — spend rolls up by your own
+          want to attribute spend by above — spend rolls up by your own
           departments, not by these.
         </Text>
       </Box>
@@ -525,7 +660,7 @@ function SuggestionsPanel({
 }
 
 /** Mounted only for a viewer holding `governance:manage`. */
-function CreateDepartmentBox({
+function CreateDepartmentControl({
   orgId,
   onCreated,
 }: {
@@ -549,87 +684,85 @@ function CreateDepartmentBox({
   };
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
-      <Text fontWeight="semibold" fontSize="sm" marginBottom={2}>
-        Create a department
-      </Text>
-      <HStack>
-        <Input
-          size="sm"
-          maxW="sm"
-          placeholder="e.g. Engineering, Marketing"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-        />
-        <Button
-          size="sm"
-          colorPalette="orange"
-          loading={createMutation.isPending}
-          disabled={!newName.trim()}
-          onClick={submit}
-        >
-          Create
-        </Button>
-      </HStack>
-    </Box>
+    <HStack>
+      <Input
+        size="sm"
+        width="16rem"
+        aria-label="Create a department"
+        placeholder="New department name"
+        value={newName}
+        onChange={(e) => setNewName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+      />
+      <Button
+        size="sm"
+        colorPalette="orange"
+        loading={createMutation.isPending}
+        disabled={!newName.trim()}
+        onClick={submit}
+      >
+        Create
+      </Button>
+    </HStack>
   );
 }
 
+/**
+ * Where a department gets assigned, collapsed by default: the list is the
+ * point of the tab, and the guide is for the first time someone wonders why
+ * a row says Unassigned.
+ */
 function AssignmentGuide() {
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflow="hidden"
-    >
+    <Collapsible.Root>
       <Box
-        paddingY={2}
-        paddingX={3}
-        borderBottomWidth="1px"
+        borderWidth="1px"
         borderColor="border.muted"
-        backgroundColor="bg.subtle"
+        borderRadius="md"
+        overflow="hidden"
       >
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          Assigning departments
-        </Text>
-        <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          Assign people and teams to a department where you already manage them.
-          Spend rolls up by department, including personal AI use.
-        </Text>
+        <Collapsible.Trigger asChild>
+          <HStack
+            as="button"
+            width="full"
+            justifyContent="space-between"
+            paddingY={2}
+            paddingX={3}
+            backgroundColor="bg.subtle"
+            cursor="pointer"
+            _hover={{ backgroundColor: "bg.muted" }}
+          >
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              How departments are assigned
+            </Text>
+            <Box color="fg.muted" display="flex">
+              <ChevronDown size={16} aria-hidden="true" />
+            </Box>
+          </HStack>
+        </Collapsible.Trigger>
+        <Collapsible.Content>
+          <VStack align="stretch" gap={0}>
+            <AssignmentLink
+              href="/settings/members"
+              title="People"
+              description="A person's spend, including personal AI use, rolls up to their department. Assign each member from the members page."
+            />
+            <AssignmentLink
+              href="/settings/teams"
+              title="Teams"
+              description="A team department is the default its members and projects inherit when they have none of their own. Assign each team from the teams page."
+            />
+            <AssignmentLink
+              href="/settings/teams"
+              title="Projects"
+              description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's department. Assign each project from the teams page, next to its team."
+            />
+          </VStack>
+        </Collapsible.Content>
       </Box>
-      <AssignmentLink
-        href="/settings/members"
-        title="People"
-        description="A person's spend, including personal AI use, rolls up to their department. Assign each member from the members page."
-      />
-      <AssignmentLink
-        href="/settings/teams"
-        title="Teams"
-        description="A team department is the default its members and projects inherit when they have none of their own. Assign each team from the teams page."
-      />
-      <AssignmentLink
-        href="/settings/teams"
-        title="Projects"
-        description="A project is where an autonomous agent runs. Agent spend with no human principal rolls up to the project's department. Assign each project from the teams page, next to its team."
-      />
-    </VStack>
+    </Collapsible.Root>
   );
 }
 
@@ -647,7 +780,7 @@ function AssignmentLink({
       <HStack
         paddingY={3}
         paddingX={3}
-        borderBottomWidth="1px"
+        borderTopWidth="1px"
         borderColor="border.muted"
         justifyContent="space-between"
         color="fg.muted"
@@ -706,7 +839,7 @@ function DepartmentList({
         borderRadius="md"
         overflow="hidden"
       >
-        <Box
+        <HStack
           paddingY={2}
           paddingX={3}
           borderBottomWidth="1px"
@@ -717,23 +850,35 @@ function DepartmentList({
           color="fg.muted"
           textTransform="uppercase"
           letterSpacing="wider"
+          justifyContent="space-between"
         >
-          Departments
-        </Box>
+          <Text>Departments</Text>
+          {!isLoading && (
+            <Text
+              fontWeight="normal"
+              textTransform="none"
+              letterSpacing="normal"
+            >
+              {departments.length}
+            </Text>
+          )}
+        </HStack>
         {isLoading ? (
           <Box padding={4}>
             <Spinner />
           </Box>
         ) : departments.length === 0 ? (
           <Box padding={4} color="fg.muted" fontSize="sm">
-            No departments yet. Create one above to start attributing spend.
+            {canManage
+              ? "No departments yet. Create one to start attributing spend."
+              : "No departments yet."}
           </Box>
         ) : (
           departments.map((dept) => (
             <DepartmentRow
               key={dept.id}
               department={dept}
-              onEdit={() => setEditing(dept)}
+              onRename={() => setEditing(dept)}
               onArchive={() => setArchiving(dept)}
               canManage={canManage}
             />
@@ -774,12 +919,12 @@ function DepartmentList({
 
 function DepartmentRow({
   department,
-  onEdit,
+  onRename,
   onArchive,
   canManage,
 }: {
   department: Department;
-  onEdit: () => void;
+  onRename: () => void;
   onArchive: () => void;
   canManage: boolean;
 }) {
@@ -796,15 +941,19 @@ function DepartmentRow({
       {canManage && (
         <Menu.Root>
           <Menu.Trigger asChild>
-            <Button variant="ghost" size="xs" aria-label="Actions">
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Actions for ${department.name}`}
+            >
               <MoreVertical size={14} />
             </Button>
           </Menu.Trigger>
           <Menu.Content>
-            <Menu.Item value="edit" onClick={onEdit}>
-              <Pencil size={14} /> Edit
+            <Menu.Item value="rename" onClick={onRename}>
+              <Pencil size={14} /> Rename
             </Menu.Item>
-            <Menu.Item value="archive" onClick={onArchive}>
+            <Menu.Item value="archive" color="red.500" onClick={onArchive}>
               <Archive size={14} /> Archive
             </Menu.Item>
           </Menu.Content>

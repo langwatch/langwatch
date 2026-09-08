@@ -362,13 +362,16 @@ describe("the product sidebar", () => {
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
       expect(screen.getByText("Inventory")).toBeInTheDocument();
-      expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
+      expect(screen.getByText("Agents")).toBeInTheDocument();
       expect(screen.getByText("People")).toBeInTheDocument();
-      // Enabling Costs must not expose the unfinished Billed destination.
+      // The flag mock reports every flag enabled, so Costs is visible here;
+      // enabling it must not expose the unfinished Billed destination.
       expect(screen.getByText("Costs")).toBeInTheDocument();
       expect(screen.queryByText("Billed")).not.toBeInTheDocument();
-      // Tool Tiles folded into Inventory's Catalog tab.
+      // Tool Tiles folded into Inventory's Catalog tab, Anomaly Rules into
+      // its own Inventory tab.
       expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
+      expect(screen.queryByText("Anomaly Rules")).not.toBeInTheDocument();
     });
 
     /** @scenario "The Platform group lists its three entries under one label" */

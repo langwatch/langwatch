@@ -19,10 +19,32 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
 
   Scenario: Admin lands on the IngestionSources index
     When the admin navigates to "/governance/inventory?tab=sources"
-    Then a list shows every configured source with: name, source type,
-      last event timestamp, status
+    Then one table shows every configured source with: name, source type,
+      protocol, delivery, status, last event timestamp
     And each row links to a per-source detail page with health metrics
-    And the page has an "Add source" button surfacing all supported types
+    And the "Connectors" header above the table has an "Add source"
+      button surfacing all supported types
+
+  @integration
+  Scenario: The sources table shows delivery as a column
+    Given a real-time source "Workato prod", a real-time source "Agents
+      OpenTelemetry" and a scheduled source "Anthropic spend" polling hourly
+    When the admin opens the Sources tab
+    Then the sources sit in one table, the real-time ones first and each
+      group by name: "Agents OpenTelemetry", "Workato prod", "Anthropic spend"
+    And each row's Delivery cell reads "Real-time" or "Scheduled" in place
+      of the two group sections the page used to draw
+    And a scheduled source's Protocol cell reads its cadence in a few words,
+      "Hourly", under the protocol chip
+    And the header reads the real counts: "3 sources · 1 active"
+
+  @integration
+  Scenario: Row actions live in the overflow menu
+    Given a real-time source and a scheduled source
+    When the admin opens a real-time source's row actions
+    Then the menu offers Edit, Rotate secret and Archive
+    And a scheduled source's menu offers Edit and Archive, no secret to rotate
+    And a viewer without ingestionSources:manage sees no row actions at all
 
   @integration
   Scenario: Add source menu lists every type by vendor, grouped in plain language
