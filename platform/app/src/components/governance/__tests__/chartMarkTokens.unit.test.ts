@@ -90,9 +90,14 @@ const DIRECTION =
 
 /**
  * Axis ticks ARE text — they are labels on a chart, not marks on it — so the
- * ink rule does not apply to them. Named as a declaration rather than matched
- * by proximity: a mark inside a component belongs to that component, even when
- * a tick constant happens to sit a few lines above it.
+ * ink rule does not apply to them.
+ *
+ * These are CONSTANT names, and the only thing that reads them is
+ * `isTickConstant`. A second reading of this set against the site's FILE name
+ * used to sit in the ink filter, where it could never match anything: a file is
+ * not named `CHART_AXIS_TICK`. Instrumenting it across the real tree put the
+ * number at zero sites excluded, so it was removed rather than left to suggest
+ * a file-level exemption that never existed.
  */
 const TEXT_ROLE_EXCEPTIONS = new Set(["CHART_AXIS_TICK"]);
 
@@ -309,7 +314,6 @@ describe("governance chart marks", () => {
             (site) =>
               site.kind === "literal" &&
               INK.test(site.value) &&
-              !TEXT_ROLE_EXCEPTIONS.has(site.fileName.split("/").pop() ?? "") &&
               !isTickConstant(site),
           )
           .map(
