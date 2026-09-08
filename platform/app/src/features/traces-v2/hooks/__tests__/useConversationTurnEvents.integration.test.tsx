@@ -151,7 +151,7 @@ describe("useConversationTurnEvents", () => {
     it("keeps reporting none until its own answer arrives", () => {
       resolveWith({
         data: { "old-turn": rollup("vote", 2) },
-        extra: { isPreviousData: true },
+        extra: { isPlaceholderData: true },
       });
 
       const { result } = renderHook(() =>

@@ -3,8 +3,9 @@
  * passthrough to the repository, virtual-key display-name resolution, the
  * ClickHouse-disabled degrade, and RBAC denial.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";
@@ -14,20 +15,26 @@ const PROJECT_ID = "project_1";
 const seenPermissions: string[] = [];
 const denied = new Set<string>();
 
+// A denied query flows through auditLogTRPCErrors, whose real implementation
+// writes prisma.auditLog — no database in a unit test, and its crash would
+// replace the denial this file asserts on.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission:
-      (permission: string) =>
-      async ({ ctx, next }: any) => {
+    resolveProjectPermission: vi.fn(
+      async (_ctx: unknown, _projectId: string, permission: string) => {
         seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw Object.assign(new Error("denied"), { code: "UNAUTHORIZED" });
-        }
-        ctx.permissionChecked = true;
-        return next();
+        return {
+          permitted: !denied.has(permission),
+          organizationRole: "MEMBER",
+        };
       },
+    ),
   };
 });
 
@@ -42,11 +49,19 @@ const spendEventsRepository = vi.hoisted(() => ({
     | { readSpendEventsPage: typeof readSpendEventsPage }
     | undefined,
 }));
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    gateway: { spendEvents: spendEventsRepository.current },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: appPermissionsService(),
+      gateway: { spendEvents: spendEventsRepository.current },
+    }),
+  };
+});
 
 const SPEND_ROW: SpendEventRow = {
   tenantId: PROJECT_ID,
@@ -182,7 +197,9 @@ describe("gatewaySpendEventsRouter", () => {
   it("denies without the gateway usage view scope", async () => {
     denied.add("gatewayUsage:view");
     const caller = buildCaller();
-    await expect(caller.list(BASE_INPUT)).rejects.toThrow("denied");
+    await expect(caller.list(BASE_INPUT)).rejects.toThrow(
+      "You do not have permission",
+    );
     expect(readSpendEventsPage).not.toHaveBeenCalled();
   });
 });

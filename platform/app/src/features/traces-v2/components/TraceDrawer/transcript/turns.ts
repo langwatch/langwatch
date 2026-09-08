@@ -20,16 +20,25 @@ export function groupMessagesIntoTurns(
 ): ConversationTurn[] {
   const turns: ConversationTurn[] = [];
 
-  // Fold a user-role message into the preceding assistant turn whenever
-  // the message carries no actual user prose. That covers:
+  // Fold a user-role message into the preceding assistant turn when every
+  // block it carries is an assistant operation. That covers:
   //   - the standard Anthropic tool_result echo pattern (every block is
   //     a tool_result);
   //   - mislabeled traces where tool_use / thinking blocks ended up under
   //     role=user — semantically they're always assistant operations.
-  // A "user" message with at least one text block is treated as a real
-  // user beat regardless of any other blocks alongside it.
+  //
+  // The test asks what the blocks ARE rather than what they are missing.
+  // "No text block" also describes a person sending a picture, a recording or
+  // a document with no caption, which is the opposite of an echo: it is the
+  // user speaking, and folding it relabelled them as the assistant.
   const isAssistantOperationEcho = (blocks: ContentBlock[]) =>
-    blocks.length > 0 && !blocks.some((b) => b.kind === "text");
+    blocks.length > 0 &&
+    blocks.every(
+      (b) =>
+        b.kind === "tool_result" ||
+        b.kind === "tool_use" ||
+        b.kind === "thinking",
+    );
 
   const appendToAssistant = (msg: ChatMessage, blocks: ContentBlock[]) => {
     // If the message has reasoning_content (OpenAI) or thinking (top-level)

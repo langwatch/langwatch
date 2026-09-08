@@ -12,7 +12,7 @@ sidebarTitle: Generic OTel
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-governance/ingestion-sources/claude-cowork)).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
@@ -94,7 +94,7 @@ langwatch ingest tail <sourceId> --follow
 langwatch ingest health <sourceId>
 ```
 
-The web equivalent is `/settings/governance/ingestion-sources/<sourceId>`, same data, same poll cadence semantics.
+The web equivalent is `/governance/ingestion-sources/<sourceId>`, same data, same poll cadence semantics.
 
 A successful smoke test produces output like:
 

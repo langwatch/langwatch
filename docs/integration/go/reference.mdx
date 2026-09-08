@@ -6,7 +6,7 @@ icon: terminal
 keywords: go, golang, sdk, api, reference, documentation, langwatch, opentelemetry, tracer, span, data capture, instrumentation
 ---
 
-This reference provides detailed documentation for all public APIs in the LangWatch Go SDK and its associated instrumentation packages.
+The LangWatch Go SDK and its instrumentation packages expose the public APIs below.
 
 The SDK is made of three kinds of module:
 
@@ -276,7 +276,7 @@ Helpers: `TextMessage`, `MultiContentMessage` (build `ChatMessage` values); `Tex
 Handy when instrumenting manually. These map directly to OpenTelemetry GenAI semantic conventions.
 
 <ParamField path="SetRequestModel(model string) / SetResponseModel(model string)" type="function">
-  Sets `gen_ai.request.model` (the model you requested) and `gen_ai.response.model` (the model that actually answered).
+  Sets `gen_ai.request.model` (the model you requested) and `gen_ai.response.model` (the model that actually answered). Providers answer with the dated build they served, so the response model is normally a longer identifier than the one you requested. Setting both is what lets you see, later, which build produced a given output.
 
   **Example:**
   ```go

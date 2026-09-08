@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UserService } from "../user.service";
 
-// Mock the redis connection so the revoke helper used by deactivate()
-// doesn't try to talk to a real Redis from a unit test.
-vi.mock("~/server/redis", () => ({ connection: undefined }));
+// An App carrying no Redis, so the revoke helper deactivate() calls takes its
+// Postgres-only path instead of talking to a real Redis from a unit test.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ redis: null }),
+  tryGetApp: () => ({ redis: null }),
+}));
 
 function createMockPrisma() {
   return {

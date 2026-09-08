@@ -48,6 +48,9 @@ func New(environment string) (Runner, error) {
 // Name identifies the runner in logs and telemetry.
 func (Runner) Name() string { return "local-unsafe" }
 
+// CommandContext runs the worker with NO isolation wrapper, which is safe only
+// because New refuses this runner outside local development: on a shared
+// machine the worker would execute agent-driven commands against the host.
 func (Runner) CommandContext(ctx context.Context, binary string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, binary, args...)
 }
@@ -59,7 +62,7 @@ func (Runner) Chown(path string, uid uint32) error { return nil }
 // Lchown is a no-op, for the same reason as Chown.
 func (Runner) Lchown(path string, uid uint32) error { return nil }
 
-// SysProcAttr sets ONLY Setpgid: opencode runs as the manager's own user (no
+// SysProcAttr sets ONLY Setpgid: the worker runs as the manager's own user (no
 // setuid Credential — a non-root manager cannot setuid), still in its own process
 // group so the manager can group-kill it and its shelled children on shutdown.
 func (Runner) SysProcAttr(uid uint32) *syscall.SysProcAttr {

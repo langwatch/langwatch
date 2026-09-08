@@ -89,6 +89,7 @@ export async function ensureAzuriteContainer({
   container: string;
 }): Promise<void> {
   const driver = new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: azurite.accountName,
     accountKey: azurite.accountKey,
     endpointBaseUrl: azurite.endpointBaseUrl,

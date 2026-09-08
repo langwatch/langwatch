@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
-import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "~/generated/prisma/client";
 
 vi.mock("~/utils/encryption", () => ({
   encrypt: vi.fn((value: string) => `enc:${value}`),
@@ -371,7 +371,7 @@ describe("LangyCredentialService", () => {
   });
 
   // Server-side allowlist read used by /langy/chat to reject tampered
-  // `modelOverride` values before they reach the OpenCode pod. The picker
+  // `modelOverride` values before they reach the langyagent pod. The picker
   // UI also narrows by this list — the server check is defense in depth.
   // The query happens at the DB layer (organizationId + purpose +
   // project-scope are all in the Prisma WHERE), so the tests assert both:

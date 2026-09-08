@@ -24,17 +24,28 @@ Instead of manually reading docs and writing boilerplate code, just ask your AI 
 <Step title="Get your API key">
 Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
 
-See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for step-by-step instructions.
+See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-step instructions.
 </Step>
 
 <Step title="Configure your MCP">
 
 <Tabs>
+<Tab title="Claude Desktop">
+1. Go to **Settings → Connectors**
+2. Click **Add custom connector**
+3. Enter the server URL: `https://app.langwatch.ai/sse`
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+
+The same steps work in Claude Cowork and in Claude chat on the web.
+
+*Requires a paid Claude plan.*
+</Tab>
+
 <Tab title="Claude Code">
 Run this command to add the MCP server:
 
 ```bash
-claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
 ```
 
 Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
@@ -46,7 +57,7 @@ Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add 
 See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
 
 <Info>
-This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe — the package name is followed by a whitespace terminator.
+This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
 </Info>
 </Tab>
 
@@ -79,24 +90,15 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 *Requires a Plus or Team plan.*
 </Tab>
 
-<Tab title="Claude Chat">
-1. Go to **Settings → Connectors**
-2. Click **Add custom connector**
-3. Enter the server URL: `https://app.langwatch.ai/mcp`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
-
-*Requires a Pro or Max plan.*
-</Tab>
-
 <Tab title="BoltAI, Other MCP Clients">
 For any MCP client that supports remote servers with OAuth:
 
 1. Add a new remote MCP server
-2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
+2. Enter the endpoint URL: `https://app.langwatch.ai/sse`
 3. Select **OAuth (browser)** authentication
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
-The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
+The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
 </Tab>
 
 <Tab title="Other">
@@ -129,13 +131,13 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
+- **Remote (HTTP/SSE)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports.
 
 ## Usage Examples
 
 ### Write Agent Tests with Scenario
 
-Simply ask your AI assistant to write scenario tests for your agents:
+Ask your AI assistant to write scenario tests for your agents:
 
 <CodeGroup>
 ```plaintext Basic
@@ -205,7 +207,7 @@ The LangWatch MCP automatically handles fetching the right documentation, unders
 
 ### Instrument Your Code with LangWatch
 
-Simply ask your AI assistant to add LangWatch tracking to your existing code:
+Ask your AI assistant to add LangWatch tracking to your existing code:
 
 <CodeGroup>
 ```plaintext Basic
@@ -238,7 +240,7 @@ client = OpenAI()
 
 def chat(message: str):
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-5-mini",
         messages=[{"role": "user", "content": message}]
     )
     return response.choices[0].message.content
@@ -260,7 +262,7 @@ def chat(message: str):
     )
 
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-5-mini",
         messages=[{"role": "user", "content": message}]
     )
     return response.choices[0].message.content
@@ -342,7 +344,7 @@ The AI assistant will guide you through creating, versioning, and using prompts 
 
 ## Advanced: Self-Building AI Agents
 
-The LangWatch MCP is so powerful that it can help AI agents automatically instrument themselves while being built. This enables self-improving AI systems that can track and debug their own behavior.
+An AI agent can use the LangWatch MCP to instrument itself while it is being built, which lets it track and debug its own behavior.
 
 <Frame>
 <iframe
@@ -381,10 +383,32 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List all prompts in the project |
-| `get_prompt` | Get a prompt with messages, model config, and version history |
-| `create_prompt` | Create a new prompt with messages and model configuration |
-| `update_prompt` | Update a prompt or create a new version |
+| `platform_list_prompts` | List all prompts in the project |
+| `platform_get_prompt` | Get a prompt with messages, model config, and version history |
+| `platform_create_prompt` | Create a new prompt with messages and model configuration |
+| `platform_update_prompt` | Update a prompt or create a new version |
+
+### Evaluations (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_evaluators` | List the saved evaluators in the project |
+| `platform_get_evaluator` | Get a saved evaluator with its type, settings and input mappings |
+| `platform_create_evaluator` | Create a saved evaluator |
+| `platform_update_evaluator` | Update a saved evaluator's settings or mappings |
+| `platform_delete_evaluator` | Delete a saved evaluator |
+| `platform_list_monitors` | List the online evaluations |
+| `platform_get_monitor` | Get an online evaluation with its evaluator, preconditions and sampling |
+| `platform_create_monitor` | Create an online evaluation |
+| `platform_update_monitor` | Update, enable or disable an online evaluation |
+| `platform_delete_monitor` | Delete an online evaluation |
+| `platform_experiment_list` | List the experiments in the project |
+| `platform_run_experiment` | Start an experiment run |
+| `platform_experiment_status` | Get the progress of a run |
+| `platform_experiment_list_runs` | List the runs of an experiment |
+| `platform_experiment_results` | Get the per-row results of a run |
+
+Dataset tools are listed on the [datasets page](/datasets/programmatic-access#mcp-tools-ai-coding-agents). Annotation tools are `platform_list_annotations`, `platform_get_annotation`, `platform_create_annotation` and `platform_delete_annotation`.
 
 ### Organization Management (requires org-level API key)
 
@@ -446,11 +470,11 @@ Query analytics timeseries from LangWatch. Metrics use `"category.name"` format 
 - `filters` (optional): Filters to apply
 - `timeZone` (optional): Timezone. Default: UTC
 
-#### `list_prompts`
+#### `platform_list_prompts`
 
 List all prompts configured in the LangWatch project. No parameters required.
 
-#### `get_prompt`
+#### `platform_get_prompt`
 
 Get a specific prompt by ID or handle, including messages, model config, and version history.
 
@@ -458,19 +482,19 @@ Get a specific prompt by ID or handle, including messages, model config, and ver
 - `idOrHandle` (required): Prompt ID or handle
 - `version` (optional): Specific version number (default: latest)
 
-#### `create_prompt`
+#### `platform_create_prompt`
 
 Create a new prompt in the LangWatch project.
 
 **Parameters:**
 - `name` (required): Prompt name
 - `messages` (required): Array of `{role, content}` messages
-- `model` (required): Model name (e.g., `"gpt-4o"`, `"claude-sonnet-4-5-20250929"`)
+- `model` (required): Model name (e.g., `"gpt-5-mini"`, `"claude-sonnet-4-5-20250929"`)
 - `modelProvider` (required): Provider name (e.g., `"openai"`, `"anthropic"`)
 - `handle` (optional): URL-friendly handle
 - `description` (optional): Prompt description
 
-#### `update_prompt`
+#### `platform_update_prompt`
 
 Update an existing prompt or create a new version.
 

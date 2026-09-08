@@ -2,7 +2,9 @@ package controlplane
 
 import (
 	"encoding/json"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -362,5 +364,163 @@ func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
 			},
 		})
 		assert.Empty(t, cred.Extra["project_id"])
+	})
+}
+
+// The older side of a half-done deploy still sends "on" and "timeout_ms".
+// Neither was ever read, so ignoring them has to be a decode-time non-event:
+// the key keeps the attempt budget its operator configured, and the request is
+// served. Refusing the payload instead would take traffic down for the window
+// where the two sides disagree.
+//
+// @scenario "A key keeps serving while a deploy is half done"
+func TestConfigWire_RetiredFallbackKeysStillDecode(t *testing.T) {
+	payload := []byte(`{
+		"routing_mode": "fallback_all",
+		"fallback": {
+			"on": ["5xx", "timeout", "rate_limit_exceeded"],
+			"chain": ["pc_openai", "pc_anthropic"],
+			"timeout_ms": 30000,
+			"max_attempts": 3
+		}
+	}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 3, cfg.Fallback.MaxAttempts)
+	assert.Equal(t, []string{"pc_openai", "pc_anthropic"}, wire.Fallback.Chain)
+}
+
+// A control plane that has already dropped the keys is the other direction of
+// the same deploy, and must decode identically.
+func TestConfigWire_FallbackWithoutRetiredKeysDecodes(t *testing.T) {
+	payload := []byte(`{"routing_mode":"fallback_all","fallback":{"chain":["pc_openai"],"max_attempts":2}}`)
+
+	var wire configWire
+	require.NoError(t, json.Unmarshal(payload, &wire))
+
+	cfg := wire.toDomain()
+	assert.Equal(t, 2, cfg.Fallback.MaxAttempts)
+}
+
+// The key's own expiration date on the config wire. Three answers have to stay
+// apart, because two of them look the same to a decoder that only reads a
+// zero value: a key that never expires, and a control plane older than the field
+// that said nothing. Collapsing them lifts the expiry cap off a key whose own
+// token says it expires.
+//
+// Spec: specs/ai-gateway/auth-cache.feature, Rule "A changed expiration date
+// reaches the gateway on the config channel".
+//
+// @scenario "the config wire tells a null date apart from a missing one"
+func TestConfigWire_KeyExpiry(t *testing.T) {
+	decode := func(t *testing.T, payload string) *configWire {
+		t.Helper()
+		var wire configWire
+		require.NoError(t, json.Unmarshal([]byte(payload), &wire))
+		return &wire
+	}
+
+	t.Run("a unix timestamp is the date the key stops", func(t *testing.T) {
+		at, known, err := decode(t, `{"expires_at":1734568790}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.True(t, known)
+		assert.True(t, at.Equal(time.Unix(1734568790, 0)), "got %s", at)
+	})
+
+	t.Run("an explicit null is a key that never expires", func(t *testing.T) {
+		at, known, err := decode(t, `{"expires_at":null}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.True(t, known, "the control plane answered about expiry; the answer is that there is none")
+		assert.True(t, at.IsZero(), "no date, which is what the zero value means downstream")
+	})
+
+	t.Run("a missing field says nothing about expiry", func(t *testing.T) {
+		at, known, err := decode(t, `{"models_allowed":["gpt-5-mini"]}`).keyExpiry()
+
+		require.NoError(t, err)
+		assert.False(t, known, "the caller has to keep the date it already holds")
+		assert.True(t, at.IsZero())
+	})
+
+	t.Run("a field that is neither is a malformed response", func(t *testing.T) {
+		_, _, err := decode(t, `{"expires_at":"2026-09-01T00:00:00Z"}`).keyExpiry()
+
+		require.Error(t, err, "a date the gateway cannot read must fail the fetch, not move the key's end date")
+	})
+}
+
+// The control-plane half of the same contract. A rename or a unit change here
+// reads as "an older control plane" on the gateway side, which is tolerated by
+// design and therefore silent: the cap would quietly stop following a changed
+// date. Pin both the field and its unit.
+func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
+	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+
+	// Whitespace-tolerant: a formatter may break the expression across lines
+	// without breaking the contract it expresses.
+	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
+		t.Error("config.materialiser.ts no longer emits expires_at from the key's own date")
+	}
+	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
+		t.Error("config.materialiser.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+	}
+}
+
+// The bundle's budget validity horizon: the earliest instant one of its
+// enforceable budgets leaves the period its spend figure was read in. The
+// auth cache re-reads rather than revalidates past it, because the config
+// version token does not move when a period ends.
+//
+// Spec: specs/ai-gateway/auth-cache.feature
+//
+//	(@unit — "A budget period that ends invalidates the spend the gateway
+//	 is holding").
+/** @scenario "a bundle knows when its spend figures stop describing the current period" */
+func TestConfigWire_BudgetsValidUntil(t *testing.T) {
+	day := int64(1788739200)  // the earlier boundary
+	week := int64(1789171200) // the later one
+
+	t.Run("takes the earliest boundary any enforceable budget is heading for", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_week", Window: "week", LimitMicroUSD: 50_000_000, ResetsAt: week},
+			{ID: "b_day", Window: "day", LimitMicroUSD: 5_000_000, ResetsAt: day},
+		}}
+		assert.Equal(t, time.Unix(day, 0), w.toDomain().Budget.ValidUntil,
+			"the first period to end is the first that can leave a spend figure describing a period that is over")
+	})
+
+	t.Run("ignores a budget with no limit", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_week", Window: "week", LimitMicroUSD: 50_000_000, ResetsAt: week},
+			{ID: "b_unset", Window: "day", LimitMicroUSD: 0, ResetsAt: day},
+		}}
+		assert.Equal(t, time.Unix(week, 0), w.toDomain().Budget.ValidUntil,
+			"a budget that can never block must not shorten the config's life")
+	})
+
+	t.Run("ignores a boundary the control plane did not send", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_week", Window: "week", LimitMicroUSD: 50_000_000, ResetsAt: week},
+			{ID: "b_total", Window: "total", LimitMicroUSD: 5_000_000, ResetsAt: 0},
+		}}
+		assert.Equal(t, time.Unix(week, 0), w.toDomain().Budget.ValidUntil,
+			"an absent boundary is no answer, not a period that ended in 1970")
+	})
+
+	t.Run("is zero when nothing carries a boundary", func(t *testing.T) {
+		w := configWire{Budgets: []budgetWire{
+			{ID: "b_total", Window: "total", LimitMicroUSD: 5_000_000, ResetsAt: 0},
+		}}
+		assert.True(t, w.toDomain().Budget.ValidUntil.IsZero(),
+			"with nothing to expire, the ordinary staleness clock is the only schedule")
+	})
+
+	t.Run("is zero when the key has no budgets at all", func(t *testing.T) {
+		assert.True(t, (&configWire{}).toDomain().Budget.ValidUntil.IsZero())
 	})
 }

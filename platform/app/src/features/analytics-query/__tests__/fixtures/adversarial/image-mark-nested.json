@@ -1,0 +1,24 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"vconcat": [
+		{
+			"layer": [
+				{
+					"mark": {
+						"type": "image",
+						"width": 10
+					},
+					"encoding": {
+						"x": {
+							"field": "model",
+							"type": "nominal"
+						}
+					}
+				}
+			]
+		}
+	]
+}

@@ -10,6 +10,9 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { resolveLatestAlias } from "~/server/modelProviders/latestAliases";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   type AgentFetcher,
@@ -20,18 +23,22 @@ import {
   type ProjectSecretsFetcher,
   type PromptFetcher,
   prefetchScenarioData,
+  type SandboxKeyMinter,
   type ScenarioFetcher,
   type SuiteConfigFetcher,
+  type TraceWaitBudgetResolver,
   type WorkflowVersionFetcher,
 } from "../data-prefetcher";
 import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
 
-// Mock only env.mjs since it's a module-level import
+// Mock only env.mjs since it's a module-level import. CREDENTIALS_SECRET is a
+// 32-byte hex key so the real encrypt/decrypt pair runs for secret parameters.
 vi.mock("~/env.mjs", () => ({
   env: {
     LANGWATCH_NLP_SERVICE: "http://langwatch_nlp:5561",
     LANGWATCH_ENDPOINT: "http://app:5560",
     // BASE_HOST no longer needed — telemetry endpoint comes from LANGWATCH_ENDPOINT
+    CREDENTIALS_SECRET: "11".repeat(32),
   },
 }));
 
@@ -53,6 +60,7 @@ describe("prefetchScenarioData", () => {
 
   const defaultProject = {
     apiKey: "test-api-key",
+    team: { organizationId: "organization_1" },
   };
 
   const defaultModelParams: LiteLLMParams = {
@@ -92,12 +100,20 @@ describe("prefetchScenarioData", () => {
       findUnique: vi.fn().mockResolvedValue(defaultProject),
     };
 
+    const sandboxKeyMinter: SandboxKeyMinter = {
+      mint: vi.fn().mockResolvedValue("sk-lw-run-scoped"),
+    };
+
     const modelParamsProvider: ModelParamsProvider = {
       prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
     };
 
     const projectSecretsFetcher: ProjectSecretsFetcher = {
       getSecrets: vi.fn().mockResolvedValue({}),
+    };
+
+    const traceWaitBudgetResolver: TraceWaitBudgetResolver = {
+      resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(30_000),
     };
 
     const modelResolver = {
@@ -132,9 +148,84 @@ describe("prefetchScenarioData", () => {
       modelParamsProvider,
       modelResolver,
       projectSecretsFetcher,
+      traceWaitBudgetResolver,
+      sandboxKeyMinter,
       ...overrides,
     };
   }
+
+  describe("child environment readiness", () => {
+    const promptTarget: TargetConfig = {
+      type: "prompt",
+      referenceId: "prompt_123",
+    };
+
+    describe("when the scenario and project resolve", () => {
+      it("announces the labels and api key the child environment needs", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi
+              .fn()
+              .mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+          },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+          onChildEnvReady,
+        });
+
+        expect(onChildEnvReady).toHaveBeenCalledTimes(1);
+        expect(onChildEnvReady).toHaveBeenCalledWith(
+          expect.objectContaining({
+            labels: ["smoke"],
+            telemetry: expect.objectContaining({ apiKey: "test-api-key" }),
+          }),
+        );
+      });
+    });
+
+    describe("when the run is already doomed", () => {
+      // No child may be started for a run that is about to fail, so the
+      // signal has to stay silent rather than fire optimistically.
+      it("stays silent when the scenario does not exist", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: { getById: vi.fn().mockResolvedValue(null) },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+          onChildEnvReady,
+        });
+
+        expect(onChildEnvReady).not.toHaveBeenCalled();
+      });
+
+      it("stays silent when the project has no api key", async () => {
+        const deps = createMockDeps({
+          projectFetcher: {
+            findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
+          },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+          onChildEnvReady,
+        });
+
+        expect(onChildEnvReady).not.toHaveBeenCalled();
+      });
+    });
+  });
 
   describe("model selection", () => {
     describe("given a prompt with a specific model configured", () => {
@@ -165,7 +256,7 @@ describe("prefetchScenarioData", () => {
             referenceId: "prompt_123",
           };
 
-          await prefetchScenarioData(defaultContext, target, deps);
+          await prefetchScenarioData({ context: defaultContext, target, deps });
 
           expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
             "proj_123",
@@ -181,14 +272,14 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          await prefetchScenarioData(
-            defaultContext,
-            {
+          await prefetchScenarioData({
+            context: defaultContext,
+            target: {
               type: "prompt",
               referenceId: "prompt_123",
             },
             deps,
-          );
+          });
 
           expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -230,7 +321,7 @@ describe("prefetchScenarioData", () => {
             referenceId: "prompt_123",
           };
 
-          await prefetchScenarioData(defaultContext, target, deps);
+          await prefetchScenarioData({ context: defaultContext, target, deps });
 
           expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -261,11 +352,11 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          await prefetchScenarioData(
-            defaultContext,
-            { type: "prompt", referenceId: "prompt_123" },
+          await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
             deps,
-          );
+          });
 
           const agentUnderTestCalls = (
             deps.modelResolver.resolve as ReturnType<typeof vi.fn>
@@ -285,11 +376,11 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            { type: "prompt", referenceId: "prompt_123" },
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
@@ -388,7 +479,7 @@ describe("prefetchScenarioData", () => {
         it("never calls the agent-under-test resolver", async () => {
           const deps = depsFor();
 
-          await prefetchScenarioData(defaultContext, target, deps);
+          await prefetchScenarioData({ context: defaultContext, target, deps });
 
           expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -404,11 +495,11 @@ describe("prefetchScenarioData", () => {
         it("prepares model params exactly twice — simulator and judge only", async () => {
           const deps = depsFor();
 
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(2);
@@ -466,11 +557,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
             "scenarios.user_simulator",
@@ -509,11 +600,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -544,11 +635,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -578,11 +669,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -595,6 +686,130 @@ describe("prefetchScenarioData", () => {
             );
           }
         });
+      });
+    });
+
+    describe("given a model override that is a latest alias", () => {
+      // The alias is stored verbatim, so the prefetcher is the boundary
+      // that must expand it before litellm params are prepared: providers
+      // do not understand "latest" as a model id. The expected concrete
+      // model comes from the same registry resolution the picker shows.
+      const concreteFor = (alias: string) => {
+        const concrete = resolveLatestAlias(alias);
+        if (concrete === null || concrete === alias) {
+          throw new Error(`"${alias}" does not resolve to a concrete model`);
+        }
+        return concrete;
+      };
+
+      /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
+      it("expands a scenario simulator alias before preparing params", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: "openai/latest",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.simulatorModelParams?.model).toBe(
+            concreteFor("openai/latest"),
+          );
+        }
+      });
+
+      /** @scenario "A latest alias on the scenario judge model expands to a concrete model at run time" */
+      it("expands a scenario judge alias before preparing params", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: null,
+              judgeModel: "anthropic/latest-mini",
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.judgeModelParams?.model).toBe(
+            concreteFor("anthropic/latest-mini"),
+          );
+        }
+      });
+
+      /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
+      it("expands a run plan simulator alias before preparing params", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: "openai/latest-mini",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.simulatorModelParams?.model).toBe(
+            concreteFor("openai/latest-mini"),
+          );
+        }
+      });
+
+      /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
+      it("expands a run plan judge alias before preparing params", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: null,
+              judgeModel: "gemini/latest",
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.judgeModelParams?.model).toBe(
+            concreteFor("gemini/latest"),
+          );
+        }
       });
     });
 
@@ -613,11 +828,11 @@ describe("prefetchScenarioData", () => {
             modelParamsProvider: echoingProvider(),
           });
 
-          const result = await prefetchScenarioData(
-            defaultContext,
-            httpTarget,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: httpTarget,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -647,11 +862,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -674,11 +889,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -701,11 +916,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -728,15 +943,44 @@ describe("prefetchScenarioData", () => {
             type: "http",
             referenceId: "agent_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
             expect(result.error).toBe("HTTP agent agent_123 not found");
+          }
+        });
+      });
+    });
+
+    describe("given the connected agent does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("names the missing target as a connected agent", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = {
+            type: "connected",
+            referenceId: "agent_connected",
+          };
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target,
+            deps,
+          });
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toBe(
+              "Connected agent agent_connected not found",
+            );
           }
         });
       });
@@ -755,17 +999,139 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
             expect(result.error).toContain("Code agent");
             expect(result.error).toContain("not found");
           }
+        });
+      });
+    });
+
+    describe("given a code target", () => {
+      const codeAgent = {
+        id: "agent_code",
+        type: "code" as const,
+        name: "Test Code Agent",
+        projectId: "proj_123",
+        config: {
+          parameters: [
+            {
+              identifier: "code",
+              type: "code",
+              value: "def execute(input):\n    return input",
+            },
+          ],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+        workflowId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        archivedAt: null,
+      };
+      const codeTarget: TargetConfig = {
+        type: "code",
+        referenceId: "agent_code",
+      };
+
+      describe("when the platform mints a key for the run", () => {
+        it("carries it on the adapter data", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(deps.sandboxKeyMinter.mint).toHaveBeenCalledWith({
+            projectId: defaultContext.projectId,
+            organizationId: "organization_1",
+          });
+          expect(result.data.adapterData).toMatchObject({
+            type: "code",
+            sandboxApiKey: "sk-lw-run-scoped",
+          });
+        });
+      });
+
+      describe("when the platform cannot mint a key", () => {
+        it("still prepares the run, with no credential on it", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+            sandboxKeyMinter: { mint: vi.fn().mockResolvedValue(undefined) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.data.adapterData).toMatchObject({ type: "code" });
+          expect(
+            (result.data.adapterData as { sandboxApiKey?: string })
+              .sandboxApiKey,
+          ).toBeUndefined();
+        });
+      });
+
+      describe("when the agent config sets its own code timeout", () => {
+        it("carries it on the adapter data as timeoutMs", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue({
+                ...codeAgent,
+                config: { ...codeAgent.config, timeoutMs: 5000 },
+              }),
+            },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(result.data.adapterData).toMatchObject({
+            type: "code",
+            timeoutMs: 5000,
+          });
+        });
+      });
+
+      describe("when the agent config sets no code timeout", () => {
+        it("leaves timeoutMs off the adapter data", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
+          });
+
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: codeTarget,
+            deps,
+          });
+
+          expect(result.success).toBe(true);
+          if (!result.success) return;
+          expect(
+            (result.data.adapterData as { timeoutMs?: number }).timeoutMs,
+          ).toBeUndefined();
         });
       });
     });
@@ -799,11 +1165,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -842,11 +1208,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(false);
           if (!result.success) {
@@ -855,6 +1221,71 @@ describe("prefetchScenarioData", () => {
             );
             expect(result.reason).toBe("provider_not_enabled");
           }
+        });
+      });
+    });
+
+    describe("given model resolution throws", () => {
+      const promptWithoutAModel = {
+        id: "prompt_123",
+        prompt: "You are helpful",
+        messages: [],
+      };
+
+      const depsWhoseResolverThrows = (error: unknown) =>
+        createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi
+              .fn()
+              .mockResolvedValue(promptWithoutAModel),
+          },
+          modelResolver: {
+            resolve: vi.fn().mockRejectedValue(error),
+          },
+        });
+
+      describe("when the error is one LangWatch wrote for the customer", () => {
+        /** @scenario "Technical detail stops at the trace id" */
+        it("keeps its message, and names the reason", async () => {
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
+            deps: depsWhoseResolverThrows(
+              new ModelNotConfiguredError(
+                "scenarios.agent_under_test",
+                "DEFAULT",
+                "Agent under test",
+                "project_123",
+              ),
+            ),
+          });
+
+          expect(result.success).toBe(false);
+          if (result.success) return;
+          expect(result.reason).toBe("model_not_configured");
+          expect(result.error).not.toBe(
+            "The models this run needs could not be resolved",
+          );
+        });
+      });
+
+      describe("when the error is an internal one", () => {
+        /** @scenario "Technical detail stops at the trace id" */
+        it("never puts its message in the reason the customer reads", async () => {
+          const result = await prefetchScenarioData({
+            context: defaultContext,
+            target: { type: "prompt", referenceId: "prompt_123" },
+            deps: depsWhoseResolverThrows(
+              new Error("connect ECONNREFUSED 10.0.0.4:5432"),
+            ),
+          });
+
+          expect(result.success).toBe(false);
+          if (result.success) return;
+          expect(result.error).toBe(
+            "The models this run needs could not be resolved",
+          );
+          expect(result.reason).toBeUndefined();
         });
       });
     });
@@ -896,11 +1327,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -941,11 +1372,11 @@ describe("prefetchScenarioData", () => {
             type: "code",
             referenceId: "agent_456",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith(
             "proj_123",
@@ -993,11 +1424,11 @@ describe("prefetchScenarioData", () => {
             type: "prompt",
             referenceId: "prompt_123",
           };
-          const result = await prefetchScenarioData(
-            defaultContext,
+          const result = await prefetchScenarioData({
+            context: defaultContext,
             target,
             deps,
-          );
+          });
 
           expect(result.success).toBe(true);
           if (result.success) {
@@ -1097,11 +1528,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (result.success) {
@@ -1141,11 +1572,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1170,11 +1601,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1275,11 +1706,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
@@ -1361,11 +1792,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(false);
         if (!result.success) {
@@ -1443,11 +1874,11 @@ describe("prefetchScenarioData", () => {
           modelParamsProvider: { prepare: modelAwarePrepare },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(modelAwarePrepare).toHaveBeenCalledWith(
           defaultContext.projectId,
@@ -1519,11 +1950,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         // Two distinct models → prepare called exactly twice (once for LLM provider model params)
         // Note: prefetchScenarioData also calls prepare for the scenario-level model params
@@ -1597,7 +2028,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        await prefetchScenarioData(defaultContext, workflowTarget, deps);
+        await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
+          deps,
+        });
 
         // Both nodes share "openai/gpt-4o-mini" → prepare called exactly once for that model
         const workflowModelCalls = prepareFn.mock.calls
@@ -1654,11 +2089,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         // prepare must be called with DEFAULT_MODEL for the workflow node
         const workflowModelCall = prepareFn.mock.calls.find(
@@ -1733,11 +2168,11 @@ describe("prefetchScenarioData", () => {
           },
         });
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
@@ -1806,11 +2241,11 @@ describe("prefetchScenarioData", () => {
       ])("does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param", async (specVersion) => {
         const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         expect(
@@ -1823,11 +2258,11 @@ describe("prefetchScenarioData", () => {
       it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
         const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
 
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: workflowTarget,
           deps,
-        );
+        });
 
         expect(result.success).toBe(true);
         expect(
@@ -1835,6 +2270,388 @@ describe("prefetchScenarioData", () => {
             (call) => (call[1] as string) === DEFAULT_MODEL,
           ),
         ).toBe(true);
+      });
+    });
+  });
+
+  describe("given a run that resolved parameter values", () => {
+    const promptTarget: TargetConfig = {
+      type: "prompt",
+      referenceId: "prompt_123",
+    };
+
+    function depsForScenario(scenario: Record<string, unknown>) {
+      return createMockDeps({
+        scenarioFetcher: { getById: vi.fn().mockResolvedValue(scenario) },
+        promptFetcher: {
+          getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+            id: "prompt_123",
+            prompt: "You are helpful",
+            messages: [],
+            model: "openai/gpt-4",
+          }),
+        },
+      });
+    }
+
+    describe("given a scenario whose text reads a parameter", () => {
+      const parameterisedScenario = {
+        ...defaultScenario,
+        situation: "A {{ params.account_tier }} customer asks for a refund",
+        criteria: ["Offers the {{ params.account_tier }} refund window"],
+        parameters: [
+          { name: "account_tier", defaultValue: "gold" },
+          { name: "region", defaultValue: "eu-central" },
+        ],
+      };
+
+      /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
+      it("hands on a situation and criteria already rendered against the run's values", async () => {
+        const deps = depsForScenario(parameterisedScenario);
+
+        const result = await prefetchScenarioData({
+          context: {
+            ...defaultContext,
+            parameters: { account_tier: "platinum" },
+          },
+          target: promptTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.situation).toBe(
+          "A platinum customer asks for a refund",
+        );
+        expect(result.data.scenario.criteria).toEqual([
+          "Offers the platinum refund window",
+        ]);
+      });
+
+      /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
+      it("carries the resolved values on the job", async () => {
+        const deps = depsForScenario(parameterisedScenario);
+
+        const result = await prefetchScenarioData({
+          context: {
+            ...defaultContext,
+            parameters: { account_tier: "platinum" },
+          },
+          target: promptTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.parameters).toEqual({
+          account_tier: "platinum",
+          region: "eu-central",
+        });
+      });
+
+      it("falls back to the declared defaults when the job carries no values", async () => {
+        const deps = depsForScenario(parameterisedScenario);
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.parameters).toEqual({
+          account_tier: "gold",
+          region: "eu-central",
+        });
+        expect(result.data.scenario.situation).toBe(
+          "A gold customer asks for a refund",
+        );
+      });
+    });
+
+    describe("given a scenario that declares none", () => {
+      /** @scenario "A scenario without parameters renders byte-identical to its stored text" */
+      it("hands its text on byte-identical", async () => {
+        const situation = "The customer writes {{ and {% in their message";
+        const deps = depsForScenario({
+          ...defaultScenario,
+          situation,
+          criteria: ["Repeats {% verbatim"],
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.scenario.situation).toBe(situation);
+        expect(result.data.scenario.criteria).toEqual(["Repeats {% verbatim"]);
+        expect(result.data.parameters).toEqual({});
+      });
+    });
+
+    describe("given the scenario changed under a queued run", () => {
+      it("fails loudly rather than running against an unrendered reference", async () => {
+        const deps = depsForScenario({
+          ...defaultScenario,
+          situation: "A {{ params.account_tier }} customer asks for a refund",
+          parameters: [{ name: "account_tier" }],
+        });
+
+        await expect(
+          prefetchScenarioData({
+            context: defaultContext,
+            target: promptTarget,
+            deps,
+          }),
+        ).rejects.toThrow(/could not be rendered/);
+      });
+    });
+  });
+
+  describe("given an http target and a project holding secrets", () => {
+    /** @scenario "The http prefetch loads project secrets for the run" */
+    it("loads the project's secrets so the target can reference them", async () => {
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue({
+            id: "agent_http",
+            type: "http",
+            config: { url: "https://api.test/chat", method: "POST" },
+          }),
+        },
+        projectSecretsFetcher: {
+          getSecrets: vi.fn().mockResolvedValue({ AGENT_TOKEN: "tok-123" }),
+        },
+      });
+
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        type: "http",
+        secrets: { AGENT_TOKEN: "tok-123" },
+      });
+    });
+  });
+
+  describe("given a run carrying secret parameter values", () => {
+    const httpDepsWithProjectSecrets = (secrets: Record<string, string>) =>
+      createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue({
+            id: "agent_http",
+            type: "http",
+            config: { url: "https://api.test/chat", method: "POST" },
+          }),
+        },
+        projectSecretsFetcher: {
+          getSecrets: vi.fn().mockResolvedValue(secrets),
+        },
+      });
+
+    /** @scenario "A secret value reaches targets through the secrets namespace" */
+    it("delivers the run's secrets alongside the project's", async () => {
+      const deps = httpDepsWithProjectSecrets({ PROJECT_TOKEN: "project-1" });
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          secretParameters: encryptRunSecretValues({
+            api_token: "tok-live-1",
+          }),
+        },
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        secrets: { PROJECT_TOKEN: "project-1", api_token: "tok-live-1" },
+      });
+    });
+
+    /** @scenario "A run value overrides a project secret with the same name for that run" */
+    it("lets the run's value win over the project's for that name", async () => {
+      const deps = httpDepsWithProjectSecrets({ API_TOKEN: "project-value" });
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          secretParameters: encryptRunSecretValues({
+            API_TOKEN: "run-value",
+          }),
+        },
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        secrets: { API_TOKEN: "run-value" },
+      });
+    });
+
+    it("fails the run when the values can no longer be decrypted", async () => {
+      const deps = httpDepsWithProjectSecrets({});
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          secretParameters: { api_token: "not-a-ciphertext" },
+        },
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toContain("api_token");
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the secret out of the values the child reads as params", async () => {
+      const deps = createMockDeps({
+        scenarioFetcher: {
+          getById: vi.fn().mockResolvedValue({
+            ...defaultScenario,
+            parameters: [
+              { name: "api_token", secret: true },
+              { name: "region", defaultValue: "eu-central" },
+            ],
+          }),
+        },
+        promptFetcher: {
+          getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+            id: "prompt_123",
+            prompt: "You are helpful",
+            messages: [],
+            model: "openai/gpt-4",
+          }),
+        },
+      });
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          // A build that queued the run before the split could still put the
+          // value here, so the prefetch drops it rather than trusting it.
+          parameters: { api_token: "tok-live-1" },
+          secretParameters: encryptRunSecretValues({
+            api_token: "tok-live-1",
+          }),
+        },
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.parameters).toEqual({ region: "eu-central" });
+    });
+  });
+
+  describe("when the prefetcher sizes the trace wait budget", () => {
+    const httpDeps = (budgetMs: number) =>
+      createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue({
+            id: "agent_http",
+            type: "http",
+            config: { url: "https://api.test/chat", method: "POST" },
+          }),
+        },
+        traceWaitBudgetResolver: {
+          resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(budgetMs),
+        },
+      });
+
+    describe("given an http target", () => {
+      /** @scenario "The prefetcher computes the wait budget only for http targets" */
+      it("puts the project's resolved budget on the job data", async () => {
+        const deps = httpDeps(45_000);
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: { type: "http", referenceId: "agent_http" },
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.traceWaitTimeoutMs).toBe(45_000);
+        expect(
+          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
+        ).toHaveBeenCalledWith({ projectId: "proj_123" });
+      });
+    });
+
+    describe("given a prompt target", () => {
+      it("computes no budget and carries none on the job data", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+              id: "prompt_123",
+              prompt: "You are helpful",
+              messages: [],
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: { type: "prompt", referenceId: "prompt_123" },
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+        expect(
+          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given a code target", () => {
+      it("computes no budget", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue({
+              id: "agent_code",
+              type: "code",
+              config: {
+                parameters: [
+                  { identifier: "code", type: "code", value: "def f(): pass" },
+                ],
+              },
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: { type: "code", referenceId: "agent_code" },
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+        expect(
+          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
+        ).not.toHaveBeenCalled();
       });
     });
   });

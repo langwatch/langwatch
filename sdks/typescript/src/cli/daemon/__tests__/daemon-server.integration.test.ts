@@ -491,34 +491,62 @@ describe("daemon over a unix socket", () => {
 
     describe("when several commands are dispatched at once", () => {
       it("serves them concurrently, each with its own output and exit code", async () => {
+        // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE. The five commands
+        // are held at a rendezvous, so a daemon serving one at a time never
+        // gets past the first: it waits on four peers that cannot arrive until
+        // it returns.
+        //
+        // Concurrency is the whole point of the daemon, since an agent fanning
+        // out must not be slower than five cold processes running in parallel,
+        // and a rendezvous is what tests that property directly. No command
+        // emits its output or its exit code until all five are inside the
+        // daemon at the same moment, so being served concurrently is what lets
+        // this test finish at all. Nothing is measured against the clock, so
+        // machine load cannot decide the outcome.
+        const fanOut = [1, 2, 3, 4, 5];
+        let releaseAll: (() => void) | undefined;
+        const allArrived = new Promise<void>((resolve) => {
+          releaseAll = resolve;
+        });
+        let arrived = 0;
+
         await startDaemon({
-          executor: scriptedExecutor((args) => ({
-            stdout: `out:${args[1]}\n`,
-            exitCode: Number(args[1]),
-            delayMs: 20,
-          })),
+          executor: (request): CommandExecution => {
+            const n = Number(request.args[1]);
+            let cancelled = false;
+            let settle: ((code: number) => void) | undefined;
+            const completed = new Promise<number>((resolve) => {
+              settle = resolve;
+            });
+
+            if (++arrived === fanOut.length) releaseAll?.();
+            void allArrived.then(() => {
+              if (cancelled) return;
+              request.sink("stdout", Buffer.from(`out:${n}\n`));
+              settle?.(n);
+            });
+
+            return {
+              completed,
+              // Whatever is still waiting at the barrier has to settle its
+              // caller when the daemon gives up on it, teardown included.
+              cancel: (code) => {
+                cancelled = true;
+                settle?.(code);
+              },
+            };
+          },
         });
 
-        const started = Date.now();
-        const results = await Promise.all([
-          exec(["cmd", "1"]),
-          exec(["cmd", "2"]),
-          exec(["cmd", "3"]),
-          exec(["cmd", "4"]),
-          exec(["cmd", "5"]),
-        ]);
-        const elapsed = Date.now() - started;
+        const results = await Promise.all(
+          fanOut.map((n) => exec(["cmd", String(n)])),
+        );
 
         results.forEach((result, index) => {
           const n = index + 1;
           expect(result.outcome).toEqual({ served: true, exitCode: n });
           expect(result.stdout).toBe(`out:${n}\n`);
         });
-
-        // Serialised, five 20ms commands would take >=100ms. Concurrency is the
-        // whole point: an agent fanning out must not be slower than five cold
-        // processes running in parallel.
-        expect(elapsed).toBeLessThan(100);
       });
     });
 
@@ -920,6 +948,87 @@ describe("daemon over a unix socket", () => {
 
         vi.restoreAllMocks();
         await new Promise<void>((resolve) => squatter.close(() => resolve()));
+      });
+    });
+  });
+
+  /**
+   * The shape from a customer report: one `ui call` printed the runtime's
+   * crash banner, and the very next identical invocation printed NOTHING and
+   * was killed by the agent harness at 30 seconds. The daemon had accepted the
+   * exec and then wedged, output is held back until the command finishes, and
+   * the daemon's own per-request timeout is ten minutes, so the client waited
+   * with zero bytes written until something outside killed it.
+   */
+  describe("given a daemon that accepts a command and then stops answering", () => {
+    /** A daemon that takes the exec, writes nothing, and never finishes. */
+    const wedgedExecutor = (): CommandExecution => ({
+      completed: new Promise<number>(() => undefined),
+      cancel: () => undefined,
+    });
+
+    describe("when the client's request deadline elapses", () => {
+      /** @scenario "The daemon accepts a command and then stops answering" */
+      it("stops waiting and says what happened", async () => {
+        await startDaemon({ executor: wedgedExecutor });
+
+        const started = Date.now();
+        const { outcome, stdout, stderr } = await exec(
+          ["ui", "call", "workbench.setEvaluatorMapping"],
+          { requestTimeoutMs: 120 },
+        );
+
+        expect(outcome).toMatchObject({ served: true, exitCode: 124 });
+        expect(Date.now() - started).toBeLessThan(5_000);
+        // Nothing partial is printed as though it were the command's answer.
+        expect(stdout).toBe("");
+        expect(stderr).toContain("did not answer");
+        expect(stderr).toContain("LANGWATCH_NO_DAEMON=1");
+      });
+
+      /** @scenario "A wedged daemon is not left for the next command" */
+      it("asks that daemon to stop so the next command does not wedge too", async () => {
+        await startDaemon({ executor: wedgedExecutor });
+
+        const { outcome } = await exec(["ui", "call", "workbench.run"], {
+          requestTimeoutMs: 120,
+        });
+
+        // dispatch.ts turns this into a requestStop before the process leaves,
+        // and it never re-runs the command: the deadline already spent the
+        // caller's budget.
+        expect(outcome).toMatchObject({ served: true, evict: true });
+      });
+    });
+  });
+
+  describe("given a daemon streaming a command's output as it arrives", () => {
+    describe("when the request deadline would have elapsed", () => {
+      /** @scenario "A command still streaming output is left to finish" */
+      it("leaves the command to finish rather than cutting the stream in half", async () => {
+        await startDaemon({
+          executor: (request): CommandExecution => {
+            request.sink("stdout", Buffer.from("first page\n"));
+            return {
+              completed: new Promise<number>((resolve) => {
+                setTimeout(() => {
+                  request.sink("stdout", Buffer.from("last page\n"));
+                  resolve(0);
+                }, 260);
+              }),
+              cancel: () => undefined,
+            };
+          },
+        });
+
+        const { outcome, stdout } = await exec(["trace", "export"], {
+          // Commit on the first byte, as a real large-output command does.
+          maxBufferBytes: 1,
+          requestTimeoutMs: 120,
+        });
+
+        expect(outcome).toEqual({ served: true, exitCode: 0 });
+        expect(stdout).toBe("first page\nlast page\n");
       });
     });
   });

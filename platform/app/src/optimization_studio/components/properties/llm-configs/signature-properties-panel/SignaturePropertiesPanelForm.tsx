@@ -41,7 +41,7 @@ export function SignaturePropertiesPanelForm({
 }: {
   node: Node<LlmPromptConfigComponent>;
 }) {
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const configId = node.data.configId;
   const setNode = useSmartSetNode();

@@ -60,6 +60,11 @@ export const TIME_PARTITIONED_TABLES = {
   experiment_runs: ["StartedAt"],
   experiment_run_items: ["OccurredAt"],
   simulation_runs: ["StartedAt"],
+  simulation_run_metrics: ["OccurredAt"],
+  // The rollup prunes on its plain `PartitionMonth` anchor, not `OccurredAt`:
+  // that column is an AggregateFunction state there and cannot be a partition
+  // expression.
+  simulation_run_metrics_rollup: ["PartitionMonth"],
   suite_runs: ["StartedAt"],
   dspy_steps: ["CreatedAt"],
 

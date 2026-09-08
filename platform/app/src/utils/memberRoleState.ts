@@ -4,7 +4,7 @@ import {
   type Team,
   type TeamUser,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import {
   MISSING_CUSTOM_ROLE_VALUE,
   teamRolesOptions,

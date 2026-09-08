@@ -16,6 +16,7 @@
  * The "outage" half matters just as much: masking a dropped connection as a 403
  * would tell the caller they lack access to a file they own.
  */
+import { PermissionDeniedError } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -38,6 +39,20 @@ describe("isPermissionDenial", () => {
       expect(isPermissionDenial(new LiteMemberRestrictedError("traces"))).toBe(
         true,
       );
+    });
+
+    // The ADR-092 engine denies with its own code. A route migrated to
+    // `authz.authorize()` must still answer 403 rather than 500.
+    it("recognises the unified engine's denial", () => {
+      expect(
+        isPermissionDenial(
+          new PermissionDeniedError({
+            permission: "traces:view",
+            scope: { type: "project", id: "proj-1" },
+            denialReason: "no-binding",
+          }),
+        ),
+      ).toBe(true);
     });
 
     /**

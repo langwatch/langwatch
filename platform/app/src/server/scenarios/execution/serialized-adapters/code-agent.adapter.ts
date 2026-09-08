@@ -9,33 +9,91 @@
  * as an execute_flow event.
  */
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
+import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
-import { resolveFieldMappings } from "../resolve-field-mappings";
+import {
+  createNlpFetchDispatcher,
+  type FetchInitWithDispatcher,
+  NLP_FETCH_HEADROOM_MS,
+  resolveFloorFetchTimeoutMs,
+  resolveMaxFetchTimeoutMs,
+} from "../../../nlpgo/timeouts";
+import type { RunParameterValues } from "../../parameters";
+import { resolveFieldMappings, sourceFieldOf } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
-
-/** Timeout for NLP service requests (2 minutes) */
-const NLP_FETCH_TIMEOUT_MS = 120_000;
-
-/** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
-type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
+import type { NlpEngineResult } from "./format-execution-error";
+import {
+  formatEngineError,
+  formatFetchError,
+  formatHttpError,
+  formatMalformedBodyError,
+  scrubKnownSecrets,
+} from "./format-execution-error";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /**
- * Adapter-level error that always carries a structured `kind` so the parent
- * span/trace can distinguish a timeout from a network failure or a non-2xx
- * response from the NLP service. See lw#3438.
+ * Categories for adapter failures, surfaced as the `error.kind` span attribute.
+ *
+ * `execution` is a run the NLP engine accepted and then finalized as failed —
+ * it arrives as a 200, so it is not an `http` failure. `parse` is a 2xx whose
+ * body is not the JSON the engine promises, and `output` is a run that
+ * succeeded without producing the field the agent declared. Keeping these
+ * distinct is the point: an operator filtering `error.kind=http` must not be
+ * handed a 200.
+ */
+type AdapterErrorKind =
+  | "timeout"
+  | "fetch"
+  | "http"
+  | "execution"
+  | "parse"
+  | "output";
+
+/** Whether a rejection is the AbortController firing, in either runtime shape. */
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" ||
+      (error as Error & { code?: unknown }).code === "ABORT_ERR")
+  );
+}
+
+/**
+ * Failure surfaced by the adapter to the scenario runner.
+ *
+ * Carries two orthogonal classifications so both observability and customer
+ * debugging are served from a single thrown error:
+ * - `kind` (lw#3438): coarse failure category mirrored onto the parent span's
+ *   `error.kind` attribute so a timeout is greppable from a network failure or
+ *   a non-2xx response without reading the message string.
+ * - `source` (lw#3439): whether the failure came from the user's Python code
+ *   vs the NLP service/network, used to render the user-friendly message while
+ *   `rawDetail` keeps the original NLP payload for deep debugging. Derived
+ *   from the Go engine's own error contract — see `format-execution-error.ts`.
  */
 export class SerializedCodeAgentAdapterError extends Error {
   readonly kind: AdapterErrorKind;
+  readonly source: "user_code" | "nlp_service" | "network" | "timeout";
+  readonly endpoint: string;
   readonly httpStatus?: number;
+  readonly rawDetail?: string;
 
   constructor(
     message: string,
-    options: { kind: AdapterErrorKind; httpStatus?: number; cause?: unknown },
+    options: {
+      kind: AdapterErrorKind;
+      source: SerializedCodeAgentAdapterError["source"];
+      endpoint: string;
+      httpStatus?: number;
+      rawDetail?: string;
+      cause?: unknown;
+    },
   ) {
     super(
       message,
@@ -43,7 +101,10 @@ export class SerializedCodeAgentAdapterError extends Error {
     );
     this.name = "SerializedCodeAgentAdapterError";
     this.kind = options.kind;
+    this.source = options.source;
+    this.endpoint = options.endpoint;
     this.httpStatus = options.httpStatus;
+    this.rawDetail = options.rawDetail;
   }
 }
 
@@ -53,35 +114,114 @@ const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
  * Serialized code agent adapter that uses pre-fetched configuration.
  * Sends code execution requests to the NLP service. No database access required.
  */
-export class SerializedCodeAgentAdapter extends AgentAdapter {
+export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private static readonly ENTRY_NODE_ID = "entry";
   private static readonly CODE_NODE_ID = "code_agent";
   private static readonly END_NODE_ID = "end";
 
-  constructor(
-    private readonly config: CodeAgentData,
-    private readonly nlpServiceUrl: string,
-    /**
-     * The LangWatch platform API key (project.apiKey), sent as
-     * workflow.api_key on the synthesized entry->code->end workflow. nlpgo
-     * forwards it verbatim as the X-Auth-Token header on its callbacks into
-     * the platform (agentblock/workflow_runner.go, evaluatorblock/executor.go,
-     * engine.go) — never an LLM provider credential, so it must not be
-     * sourced from litellm params (issue #6634).
-     */
-    private readonly projectApiKey: string,
-  ) {
+  private readonly config: CodeAgentData;
+  private readonly nlpServiceUrl: string;
+  /**
+   * The LangWatch platform API key (project.apiKey), sent as workflow.api_key
+   * on the synthesized entry->code->end workflow. nlpgo forwards it verbatim
+   * as the X-Auth-Token header on its callbacks into the platform
+   * (agentblock/workflow_runner.go, evaluatorblock/executor.go, engine.go),
+   * never an LLM provider credential, so it must not be sourced from litellm
+   * params (issue #6634).
+   */
+  private readonly projectApiKey: string;
+  /**
+   * The run's resolved parameter values, carried on the DSL as
+   * `workflow.params` beside `workflow.secrets`. The engine exposes them to
+   * the Python under test as `params.NAME`, keeping their native types: a
+   * boolean stays a boolean, a number stays a number.
+   */
+  private readonly parameters: RunParameterValues;
+
+  constructor({
+    config,
+    nlpServiceUrl,
+    projectApiKey,
+    parameters,
+  }: {
+    config: CodeAgentData;
+    nlpServiceUrl: string;
+    projectApiKey: string;
+    parameters?: RunParameterValues;
+  }) {
     super();
+    this.config = config;
+    this.nlpServiceUrl = nlpServiceUrl;
+    this.projectApiKey = projectApiKey;
+    this.parameters = parameters ?? {};
     this.name = "SerializedCodeAgentAdapter";
+  }
+
+  /**
+   * Every secret this adapter puts on the wire, so no failure path can render
+   * one back to the customer. See `scrubKnownSecrets`.
+   */
+  private get knownSecrets(): string[] {
+    return [this.projectApiKey, ...Object.values(this.config.secrets ?? {})];
+  }
+
+  /**
+   * Scrub a failure on its way out of the adapter.
+   *
+   * Applied at the single exit point rather than at each of the six throw
+   * sites, so a future seventh cannot forget it.
+   */
+  private scrubFailure(
+    error: SerializedCodeAgentAdapterError,
+  ): SerializedCodeAgentAdapterError {
+    const secrets = this.knownSecrets;
+    const message = scrubKnownSecrets(error.message, secrets);
+    const rawDetail =
+      error.rawDetail === undefined
+        ? undefined
+        : scrubKnownSecrets(error.rawDetail, secrets);
+    if (message === error.message && rawDetail === error.rawDetail) {
+      return error;
+    }
+    return new SerializedCodeAgentAdapterError(message, {
+      kind: error.kind,
+      source: error.source,
+      endpoint: error.endpoint,
+      httpStatus: error.httpStatus,
+      rawDetail,
+      cause: error.cause,
+    });
   }
 
   async call(input: AgentInput): Promise<string> {
     const inputRecord = this.resolveInputValues(input);
-    const workflow = this.buildWorkflow(inputRecord);
-    const result = await this.executeOnNlpService(workflow, inputRecord);
-    return result;
+    const workflow = this.buildWorkflow(inputRecord, this.turnParameters());
+    const { output, session } = await this.executeOnNlpService(
+      workflow,
+      inputRecord,
+    );
+    this.storeSession({ threadId: input.threadId, session });
+    return output;
+  }
+
+  /**
+   * The `params` namespace for one turn: the run's resolved values plus this
+   * turn's trace context, so the code under test can forward
+   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
+   * per call, because every turn opens its own trace. `trace_id` and
+   * `traceparent` are reserved names: they win over a run parameter with the
+   * same name.
+   */
+  private turnParameters(): RunParameterValues {
+    const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
+    const traceparent = headers.traceparent;
+    return {
+      ...this.parameters,
+      ...(traceId !== undefined && { trace_id: traceId }),
+      ...(traceparent !== undefined && { traceparent }),
+    };
   }
 
   /**
@@ -90,7 +230,10 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * The /studio/execute_sync endpoint returns result.get("end"), so we need
    * an end node to capture the code node's outputs.
    */
-  private buildWorkflow(resolvedValues: Record<string, string>) {
+  private buildWorkflow(
+    resolvedValues: Record<string, unknown>,
+    params: RunParameterValues,
+  ) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
       SerializedCodeAgentAdapter;
 
@@ -124,6 +267,14 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       version: "1.0",
       template_adapter: "default" as const,
       secrets: this.config.secrets,
+      params,
+      // The run's own credential, when the platform minted one. The engine
+      // injects it into the sandbox next to its LangWatch endpoint, so the
+      // code under test reaches the project's agent cache with no wiring of
+      // its own. An absent field injects nothing.
+      ...(this.config.sandboxApiKey
+        ? { sandbox_api_key: this.config.sandboxApiKey }
+        : {}),
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),
@@ -156,7 +307,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
 
   /** Build the entry node that provides input fields to the workflow. */
   private buildEntryNode(
-    inputs: { identifier: string; type: string; value: string }[],
+    inputs: { identifier: string; type: string; value: unknown }[],
   ) {
     return {
       id: SerializedCodeAgentAdapter.ENTRY_NODE_ID,
@@ -181,11 +332,22 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     };
   }
 
-  /** Build the code node that executes the agent's Python code. */
+  /**
+   * Build the code node that executes the agent's Python code.
+   *
+   * A configured `timeoutMs` travels as the node's `timeout_ms` parameter —
+   * the identifier and units the engine reads (`nodeTimeout` in
+   * services/nlpgo/app/engine/engine.go). It is a request for a SHORTER
+   * budget only: the code executor clamps it to the operator's ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset — see
+   * `services/nlpgo/config.go`), so a larger value buys the agent nothing. Omitted when unset, which leaves the engine
+   * on that operator default.
+   */
   private buildCodeNode(
-    inputs: { identifier: string; type: string; value: string }[],
+    inputs: { identifier: string; type: string; value: unknown }[],
     outputs: { identifier: string; type: string }[],
   ) {
+    const { timeoutMs } = this.config;
     return {
       id: SerializedCodeAgentAdapter.CODE_NODE_ID,
       type: "code",
@@ -200,10 +362,55 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             type: "code",
             value: this.config.code,
           },
+          ...(timeoutMs === undefined
+            ? []
+            : [
+                {
+                  identifier: "timeout_ms",
+                  type: "int",
+                  value: timeoutMs,
+                },
+              ]),
         ],
         cls: "Code",
       },
     };
+  }
+
+  /**
+   * How long to wait on the NLP service for one turn.
+   *
+   * Always at least {@link resolveFloorFetchTimeoutMs}'s result — the engine's
+   * own code-block ceiling plus headroom — and above the agent's own code
+   * budget when that budget is longer, so the engine gets to enforce (and
+   * report) the timeout rather than the request being aborted from here —
+   * bounded by {@link resolveMaxFetchTimeoutMs}, this platform's operator-
+   * configurable maximum for one turn.
+   *
+   * An over-large `timeoutMs` is clamped rather than rejected. The schemas
+   * that carry it (`CodeAgentDataSchema`, `RawCodeAgentConfigSchema`) stay
+   * `.positive()` with no `.max()` on purpose: they mirror what is already
+   * stored on the agent, and the engine's contract for the same number is
+   * "clamp to the operator's ceiling", not "fail the call". Adding a `.max()`
+   * would make a stored value that the engine handles fine fail the whole
+   * scenario run at prefetch time instead — and there is no constant to put in
+   * a `.max()` any more, since the ceiling is now read from the environment.
+   *
+   * The ceiling bounds the deadline whether or not the agent named a budget:
+   * an operator who sets it below the floor has asked for a shorter socket
+   * hold than the engine's own ceiling, and gets it.
+   */
+  private fetchTimeoutMs(): number {
+    const { timeoutMs } = this.config;
+    const floorTimeoutMs = resolveFloorFetchTimeoutMs();
+    const maxTimeoutMs = resolveMaxFetchTimeoutMs();
+    if (timeoutMs === undefined) {
+      return Math.min(maxTimeoutMs, floorTimeoutMs);
+    }
+    return Math.min(
+      maxTimeoutMs,
+      Math.max(floorTimeoutMs, timeoutMs + NLP_FETCH_HEADROOM_MS),
+    );
   }
 
   /** Build the end node that captures code node outputs for the response. */
@@ -232,12 +439,24 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * failures always leave a footprint in the trace (lw#3438). The span's
    * `setStatus(ERROR)` + `recordException` are handled by `withActiveSpan`,
    * and we annotate `error.kind` + `http.status_code` so the failure mode
-   * is greppable without reading the message string.
+   * is greppable without reading the message string. The thrown error also
+   * carries a `source` + `rawDetail` so worker logs can render a
+   * user-friendly message while the original NLP payload stays available
+   * for deep debugging (lw#3439).
+   *
+   * Three distinct failure shapes are surfaced, because the engine reports
+   * a failed *run* differently from a rejected *request*:
+   * - a 200 whose `status` is `"error"` — the run was accepted and a node
+   *   failed. For this adapter's one-code-node workflow that is the user's
+   *   Python. Ignoring it is what made a failed run resolve to an empty
+   *   agent reply;
+   * - a non-2xx carrying the herr envelope — the request itself was rejected;
+   * - fetch/abort — the service was never reached, or never answered.
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
-    inputRecord: Record<string, string>,
-  ): Promise<string> {
+    inputRecord: Record<string, unknown>,
+  ): Promise<{ output: string; session: unknown }> {
     const event = {
       type: "execute_flow" as const,
       payload: {
@@ -250,7 +469,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       },
     };
 
-    const url = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const endpoint = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const fetchTimeoutMs = this.fetchTimeoutMs();
 
     return tracer.withActiveSpan(
       "SerializedCodeAgentAdapter.execute_nlp_request",
@@ -258,82 +478,233 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         kind: SpanKind.CLIENT,
         attributes: {
           "scenario.agent.id": this.config.agentId,
-          "http.url": url,
+          "http.url": endpoint,
           "http.method": "POST",
-          "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
+          "nlp.timeout_ms": fetchTimeoutMs,
         },
       },
       async (span) => {
         const controller = new AbortController();
         let timedOut = false;
+        // Latched once the full response body is read — see the disarm below.
+        let responseComplete = false;
         const timeout = setTimeout(() => {
           timedOut = true;
           controller.abort();
-        }, NLP_FETCH_TIMEOUT_MS);
+        }, fetchTimeoutMs);
 
         try {
-          let response: Response;
+          let response: UndiciResponse;
           try {
-            response = await fetch(url, {
+            const fetchInit: FetchInitWithDispatcher = {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
               signal: controller.signal,
-            });
+              dispatcher: createNlpFetchDispatcher({
+                timeoutMs: fetchTimeoutMs,
+              }),
+            };
+            // undici's own fetch, not the global one: Node's global fetch is
+            // bound to the undici bundled with Node, which rejects a
+            // dispatcher built by this package with "invalid onRequestStart
+            // method" (see mailer/providers/resend.ts for the same fix).
+            response = await undiciFetch(endpoint, fetchInit);
           } catch (fetchError) {
-            if (timedOut) {
-              span.setAttribute(
-                "error.kind",
-                "timeout" satisfies AdapterErrorKind,
-              );
-              throw new SerializedCodeAgentAdapterError(
-                `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
-                { kind: "timeout", cause: fetchError },
-              );
-            }
+            // An abort is classified once, by the outer handler, so a timeout
+            // fired mid-body-read lands in the same place as one fired
+            // mid-connect.
+            if (timedOut || isAbortError(fetchError)) throw fetchError;
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
-            const cause =
-              fetchError instanceof Error && "cause" in fetchError
-                ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
-                : "";
             throw new SerializedCodeAgentAdapterError(
-              `Code execution failed: fetch to ${url} failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
-              { kind: "fetch", cause: fetchError },
+              formatFetchError({ cause: fetchError }),
+              { kind: "fetch", source: "network", endpoint, cause: fetchError },
             );
           }
 
           span.setAttribute("http.status_code", response.status);
 
+          // Read the body exactly once, as text. `response.json()` consumes
+          // the stream, so a json()-then-text() fallback can never recover a
+          // non-JSON payload — it rejects with "Body is unusable" and the
+          // customer is shown an empty body (review lw#3439).
+          const rawBody = await response.text();
+          // The response is complete. Disarm now, so a timer that fires from
+          // here on cannot relabel an unrelated downstream failure (a missing
+          // output field, say) as "the NLP service did not respond" — it
+          // demonstrably did (review lw#3439).
+          clearTimeout(timeout);
+          responseComplete = true;
+
           if (!response.ok) {
-            let errorMessage = "";
-            try {
-              const errorBody = (await response.json()) as { detail?: string };
-              errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
-            } catch {
-              errorMessage = await response.text().catch(() => "");
-            }
+            // Classification is single-sourced inside formatHttpError: the
+            // returned `source` is derived from the same predicate that chose
+            // the message wording, so they can never drift (lw#3439).
+            const { message, source, rawDetail } = formatHttpError({
+              status: response.status,
+              rawBody,
+            });
             span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
-            throw new SerializedCodeAgentAdapterError(
-              `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
-              { kind: "http", httpStatus: response.status },
-            );
+            throw new SerializedCodeAgentAdapterError(message, {
+              kind: "http",
+              source,
+              endpoint,
+              httpStatus: response.status,
+              rawDetail,
+            });
           }
 
-          const result = (await response.json()) as {
-            trace_id: string;
-            status: string;
-            result: Record<string, unknown> | null;
-          };
-          span.setAttribute("nlp.status", result.status);
+          const result = this.parseExecutionResult({
+            rawBody,
+            status: response.status,
+            endpoint,
+            span,
+          });
+
+          span.setAttribute("nlp.status", result.status ?? "unknown");
           if (result.trace_id) {
             span.setAttribute("nlp.trace_id", result.trace_id);
           }
-          return this.extractOutput(result.result);
+
+          // A failed run comes back 200 with `status: "error"` and no
+          // `result` — for this adapter's single-code-node workflow that is
+          // the user's Python blowing up. Without this branch the run
+          // silently resolves to an empty agent reply (lw#3439).
+          if (result.status === "error") {
+            const { message, source, rawDetail } = formatEngineError({
+              engineError: result.error,
+            });
+            span.setAttribute(
+              "error.kind",
+              "execution" satisfies AdapterErrorKind,
+            );
+            throw new SerializedCodeAgentAdapterError(message, {
+              kind: "execution",
+              source,
+              endpoint,
+              httpStatus: response.status,
+              rawDetail,
+            });
+          }
+
+          // The engine reports each node's own outputs beside the flattened
+          // end-node `result`; `extractSession` reads the code node's held
+          // `session` from there. `NlpEngineResult` does not model `nodes`
+          // (it is not part of the error contract), so it is read off a local
+          // widening rather than the typed field.
+          const session = this.extractSession(
+            (
+              result as NlpEngineResult & {
+                nodes?: Record<
+                  string,
+                  { outputs?: Record<string, unknown> | null } | null
+                >;
+              }
+            ).nodes,
+          );
+
+          try {
+            return {
+              output: this.extractOutput(result.result ?? null),
+              session,
+            };
+          } catch (outputError) {
+            // A declared output the agent never returned is the customer's
+            // config, and it must leave the same span footprint and structured
+            // fields as every other failure — otherwise it is the untraced
+            // failure lw#3438 exists to eliminate.
+            span.setAttribute(
+              "error.kind",
+              "output" satisfies AdapterErrorKind,
+            );
+            throw new SerializedCodeAgentAdapterError(
+              outputError instanceof Error
+                ? outputError.message
+                : String(outputError),
+              {
+                kind: "output",
+                source: "user_code",
+                endpoint,
+                httpStatus: response.status,
+                cause: outputError,
+              },
+            );
+          }
+        } catch (error) {
+          if (error instanceof SerializedCodeAgentAdapterError) {
+            throw this.scrubFailure(error);
+          }
+          // The abort timer stays armed once headers arrive, so it can fire
+          // while the body is still streaming. That rejection surfaces here,
+          // outside the fetch try — classify it as the timeout it is rather
+          // than letting a bare "The operation was aborted." escape unwrapped
+          // (review lw#3439).
+          //
+          // `responseComplete` covers the narrow race where the timer fired
+          // DURING the body read but the body arrived anyway: the latch is
+          // then true over a response that demonstrably completed, and a
+          // later failure must not be relabelled a timeout. It is
+          // defence-in-depth — today every post-body failure is already
+          // wrapped as a SerializedCodeAgentAdapterError and returns above —
+          // and it is what keeps that true if a future path throws raw.
+          if (!responseComplete && (timedOut || isAbortError(error))) {
+            span.setAttribute(
+              "error.kind",
+              "timeout" satisfies AdapterErrorKind,
+            );
+            throw this.scrubFailure(
+              new SerializedCodeAgentAdapterError(
+                formatFetchError({
+                  cause: error,
+                  timedOutAfterMs: fetchTimeoutMs,
+                }),
+                { kind: "timeout", source: "timeout", endpoint, cause: error },
+              ),
+            );
+          }
+          throw error;
         } finally {
           clearTimeout(timeout);
         }
       },
     );
+  }
+
+  /**
+   * Parse a 2xx body into the engine's WorkflowResult.
+   *
+   * A 200 that is not JSON means something is answering on the NLP service's
+   * behalf (a proxy, a captive portal). Surfacing that as a structured infra
+   * failure keeps a raw `SyntaxError` from escaping the adapter unwrapped.
+   */
+  private parseExecutionResult({
+    rawBody,
+    status,
+    endpoint,
+    span,
+  }: {
+    rawBody: string;
+    status: number;
+    endpoint: string;
+    span: { setAttribute: (key: string, value: string | number) => void };
+  }): NlpEngineResult {
+    try {
+      return JSON.parse(rawBody) as NlpEngineResult;
+    } catch (parseError) {
+      const { message, source, rawDetail } = formatMalformedBodyError({
+        status,
+        rawBody,
+      });
+      span.setAttribute("error.kind", "parse" satisfies AdapterErrorKind);
+      throw new SerializedCodeAgentAdapterError(message, {
+        kind: "parse",
+        source,
+        endpoint,
+        httpStatus: status,
+        rawDetail,
+        cause: parseError,
+      });
+    }
   }
 
   /**
@@ -344,26 +715,19 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    *   Orphan mappings (for inputs that don't exist on the agent) are ignored.
    * Without scenarioMappings: first input gets the last user message, rest get "".
    */
-  private resolveInputValues(agentInput: AgentInput): Record<string, string> {
+  private resolveInputValues(agentInput: AgentInput): Record<string, unknown> {
     const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    if (
-      this.config.scenarioMappings &&
-      Object.keys(this.config.scenarioMappings).length > 0
-    ) {
-      const resolved = resolveFieldMappings({
-        fieldMappings: this.config.scenarioMappings,
+    const mappings = this.config.scenarioMappings;
+    if (mappings && Object.keys(mappings).length > 0) {
+      return this.resolveMappedInputValues({
+        declaredInputs,
+        mappings,
         agentInput,
       });
-      // Only include values for inputs that exist on the agent
-      const record: Record<string, string> = {};
-      for (const inp of declaredInputs) {
-        record[inp.identifier] = resolved[inp.identifier] ?? "";
-      }
-      return record;
     }
 
     // Legacy behavior: first input = last user message, rest = ""
@@ -420,6 +784,58 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
 
     // Last resort: stringify the whole result
     return this.stringify(result);
+  }
+
+  /**
+   * One value per declared input, from its mapping. Orphan mappings, for
+   * inputs the agent does not declare, are ignored.
+   *
+   * An input mapped to the scenario session receives the JSON value the code
+   * returned, not text: the engine passes a non-string entry input through
+   * untouched, so the code reads back exactly what it returned, and None on
+   * the first turn of a thread.
+   */
+  private resolveMappedInputValues({
+    declaredInputs,
+    mappings,
+    agentInput,
+  }: {
+    declaredInputs: { identifier: string; type: string }[];
+    mappings: NonNullable<CodeAgentData["scenarioMappings"]>;
+    agentInput: AgentInput;
+  }): Record<string, unknown> {
+    const session = this.sessionOf(agentInput.threadId);
+    const resolved = resolveFieldMappings({
+      fieldMappings: mappings,
+      agentInput,
+      session,
+    });
+    const record: Record<string, unknown> = {};
+    for (const inp of declaredInputs) {
+      const mapping = mappings[inp.identifier];
+      const isSession =
+        mapping !== undefined && sourceFieldOf(mapping) === "session";
+      record[inp.identifier] = isSession
+        ? (session ?? null)
+        : (resolved[inp.identifier] ?? "");
+    }
+    return record;
+  }
+
+  /**
+   * The `session` the code returned beside its outputs, read from the code
+   * node's own state rather than the end node: the runner keeps every key the
+   * code returns, declared or not, so the session needs no declared output
+   * and no edge, and a code that returns none leaves the held value as it is.
+   */
+  private extractSession(
+    nodes:
+      | Record<string, { outputs?: Record<string, unknown> | null } | null>
+      | undefined,
+  ): unknown {
+    const outputs = nodes?.[SerializedCodeAgentAdapter.CODE_NODE_ID]?.outputs;
+    if (!outputs || typeof outputs !== "object") return undefined;
+    return "session" in outputs ? outputs.session : undefined;
   }
 
   private stringify(value: unknown): string {

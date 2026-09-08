@@ -60,7 +60,7 @@ function writeRollout(threadId: string, traceId: string, reply: string): void {
 function enableCapture(endpoint: string): void {
 	writeCodexOtelBlock(
 		{
-			endpoint: `${endpoint}/v1/traces`,
+			baseEndpoint: endpoint,
 			ingestionToken: "sk-lw-test-key",
 			environment: "test",
 		},

@@ -13,6 +13,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/pkg/profiling"
 )
 
 // configureNLPGoOTel installs nlpgo's OTel provider in multi-tenant
@@ -80,6 +81,10 @@ type Deps struct {
 	NodeID string
 	OTel   *otelsetup.Provider
 	Health *health.Registry
+	// Profiler is the continuous CPU/heap profiler. Its zero value is a
+	// no-op, so an unconfigured deployment carries an inert struct rather
+	// than a nil check at every use.
+	Profiler profiling.Profiler
 }
 
 // NewDeps wires every adapter from the validated Config.
@@ -102,14 +107,20 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		ctx = clog.Set(ctx, logger)
 	}
 
-	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)
+	svcInfo := contexts.MustGetServiceInfo(ctx)
+	probes := health.New(svcInfo.Environment)
 	probes.MarkStarted()
 
+	// Started after the collector-teed logger exists, so the one line saying
+	// profiling is on lands wherever the rest of this service's logs do.
+	profiler := profiling.StartFromEnv(svcInfo.Service, svcInfo.Environment, logger)
+
 	return ctx, &Deps{
-		Logger: logger,
-		NodeID: nodeID,
-		OTel:   otelProvider,
-		Health: probes,
+		Logger:   logger,
+		NodeID:   nodeID,
+		OTel:     otelProvider,
+		Health:   probes,
+		Profiler: profiler,
 	}, nil
 }
 

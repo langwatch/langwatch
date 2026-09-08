@@ -13,3 +13,17 @@ import { env } from "~/env.mjs";
 export function buildInviteAcceptUrl(inviteCode: string): string {
   return `${env.BASE_HOST}/invite/accept?inviteCode=${encodeURIComponent(inviteCode)}`;
 }
+
+/**
+ * Where an admin goes to act on invitations. The "somebody is waiting" mail
+ * carries this rather than a link that sends anything: resending is an
+ * authenticated click on the members table, and mail is not a place to put
+ * a second way to mint a live invite code.
+ *
+ * The page reads its organization from the signed-in session, so there is no
+ * organization in the URL — an admin of two organizations lands in whichever
+ * one they are currently in, and the mail names the organization in words.
+ */
+export function buildMembersSettingsUrl(): string {
+  return `${env.BASE_HOST}/settings/members`;
+}

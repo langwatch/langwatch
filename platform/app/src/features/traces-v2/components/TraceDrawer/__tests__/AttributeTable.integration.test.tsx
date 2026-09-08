@@ -3,7 +3,9 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
@@ -43,6 +45,24 @@ describe("AttributeTable", () => {
         expect(
           getByRole("button", { name: /pin gen_ai\.operation\.name/i }),
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a span's attributes in the drawer", () => {
+    describe("when the user opens the attributes format selector", () => {
+      /** @scenario "The span attributes table uses the same format selector" */
+      it("offers flat and JSON through the shared format selector", async () => {
+        const user = userEvent.setup();
+        const { getByRole, findAllByRole } = renderTable();
+
+        const trigger = getByRole("button", { name: "Attributes view format" });
+        expect(trigger).toHaveTextContent("Flat");
+
+        await user.click(trigger);
+        expect(
+          (await findAllByRole("menuitem")).map((i) => i.textContent),
+        ).toEqual(["Flat", "JSON"]);
       });
     });
   });

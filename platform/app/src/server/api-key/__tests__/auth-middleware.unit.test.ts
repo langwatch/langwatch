@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 // alive after tests complete (causes shard 2 to hang until runner cancels it).
 // Established pattern: see better-auth/__tests__/fallbackName.test.ts.
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 import { collectAuthDiagnostics, extractCredentials } from "../auth-middleware";
 

@@ -297,7 +297,7 @@ class TestPromptTagsE2E:
         assert fetched.handle == handle
         assert fetched.version_id == created.version_id
 
-    def test_create_list_delete_tag_round_trip(self):
+    def test_create_list_delete_tag_round_trip(self, tag_factory):
         """
         GIVEN a unique tag name
         WHEN I create the tag, list tags, delete it, then list again
@@ -305,25 +305,23 @@ class TestPromptTagsE2E:
         """
         tag_name = f"e2e-tag-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.tags.create(tag_name)
+        created = tag_factory(tag_name)
 
-        try:
-            assert created["name"] == tag_name
+        assert created["name"] == tag_name
 
-            tags = langwatch.prompts.tags.list()
-            tag_names = [t["name"] for t in tags]
-            assert tag_name in tag_names
-        finally:
-            try:
-                langwatch.prompts.tags.delete(tag_name)
-            except Exception as e:
-                logger.warning("Failed to delete tag %s: %s", tag_name, e)
+        tags = langwatch.prompts.tags.list()
+        tag_names = [t["name"] for t in tags]
+        assert tag_name in tag_names
+
+        # Deleting is the behaviour under test, so it stays in the body. The
+        # factory's teardown then meets a 404 and treats it as already clean.
+        langwatch.prompts.tags.delete(tag_name)
 
         tags_after = langwatch.prompts.tags.list()
         tag_names_after = [t["name"] for t in tags_after]
         assert tag_name not in tag_names_after
 
-    def test_rename_tag_round_trip(self):
+    def test_rename_tag_round_trip(self, tag_factory):
         """
         GIVEN a tag named A
         WHEN I rename it to B
@@ -332,20 +330,18 @@ class TestPromptTagsE2E:
         tag_a = f"e2e-tag-a-{uuid4().hex[:8]}"
         tag_b = f"e2e-tag-b-{uuid4().hex[:8]}"
 
-        langwatch.prompts.tags.create(tag_a)
+        tag_factory(tag_a)
 
-        try:
-            langwatch.prompts.tags.rename(tag_a, new_name=tag_b)
+        langwatch.prompts.tags.rename(tag_a, new_name=tag_b)
+        # The rename is what leaked here: the org now holds a tag nothing
+        # created, so nothing was tracking it. Register the new name before
+        # asserting, so a failure below still tears the tag down.
+        tag_factory.track(tag_b)
 
-            tags = langwatch.prompts.tags.list()
-            tag_names = [t["name"] for t in tags]
-            assert tag_b in tag_names
-            assert tag_a not in tag_names
-        finally:
-            try:
-                langwatch.prompts.tags.delete(tag_b)
-            except Exception as e:
-                logger.warning("Failed to delete tag %s: %s", tag_b, e)
+        tags = langwatch.prompts.tags.list()
+        tag_names = [t["name"] for t in tags]
+        assert tag_b in tag_names
+        assert tag_a not in tag_names
 
     def test_delete_tag_cascades_to_assignments(self, prompt_factory, tag_factory):
         """

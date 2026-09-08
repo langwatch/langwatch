@@ -1,6 +1,6 @@
 import { createListCollection } from "@chakra-ui/react";
-import { AlertType } from "@prisma/client";
 import { Select } from "~/components/ui/select";
+import { AlertType } from "~/generated/prisma/client";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";

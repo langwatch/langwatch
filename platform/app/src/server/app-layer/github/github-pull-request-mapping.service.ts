@@ -14,7 +14,7 @@
  * left alone for fifteen minutes; a branch nobody has asked about in a week
  * stops being swept at all.
  *
- * It never throws at its callers. The reactor that drives it runs on the fold's
+ * It never throws at its callers. The subscriber that drives it runs on the fold's
  * queue, and a rethrow there would turn one rate-limited read into a retry
  * storm against the same rate limit.
  *
@@ -24,17 +24,24 @@ import { createLogger } from "@langwatch/observability";
 import type { GithubInstallationsService } from "./github-installations.service";
 import {
   type GithubAppTokenService,
+  type GithubPullRequestSummary,
   GithubRateLimitedError,
 } from "./githubAppToken";
+import {
+  getGithubHost,
+  isMappableGithubHost,
+  normalizeGithubHost,
+} from "./githubHost";
+import {
+  type GithubPullRequestEvent,
+  LINKING_PULL_REQUEST_ACTIONS,
+} from "./githubPullRequestEvent";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
 } from "./repositories/github-pull-requests.repository";
 
 const logger = createLogger("langwatch:github:pull-request-mapping");
-
-/** The only host this maps. An unset host is the default one. */
-export const GITHUB_HOST = "github.com";
 
 /** How long a branch that resolved to a pull request is trusted. */
 const FRESH_MAPPING_MS = 15 * 60 * 1000;
@@ -58,9 +65,16 @@ const REQUEST_TOUCH_MS = 60 * 60 * 1000;
 
 /**
  * The backoff a branch with no pull request walks, indexed by how many empty
- * answers it has given. The last entry is the cap: a branch that has been empty
- * four times is a branch whose work never became a pull request, and asking
- * daily is generous.
+ * answers it has given. The last entry is the cap for a branch nothing has
+ * anything more to say about.
+ *
+ * A branch someone is actually working on does not reach that cap. Two things
+ * keep it off: a pull request being opened arrives as a `pull_request` webhook
+ * and is linked on the spot rather than waited for, and a session folding on
+ * the branch brings its next question back to the first rung. Both matter,
+ * because the ladder on its own is climbing fastest exactly when the pull
+ * request is about to appear: branches are cut first, worked for hours, and
+ * turned into a pull request last.
  */
 const EMPTY_BACKOFF_MS = [
   15 * 60 * 1000,
@@ -68,6 +82,17 @@ const EMPTY_BACKOFF_MS = [
   4 * 60 * 60 * 1000,
   24 * 60 * 60 * 1000,
 ] as const;
+
+/**
+ * The longest a branch with fresh session activity waits before being asked
+ * again: the first rung, whatever the branch had climbed to.
+ *
+ * A ceiling rather than a reset to zero, deliberately. However many agent
+ * worktrees fold on one branch in a minute, the branch is still not asked about
+ * again until this much time has passed, so bringing the question forward
+ * cannot turn into a call per fold.
+ */
+const ACTIVE_BRANCH_MAX_BACKOFF_MS = EMPTY_BACKOFF_MS[0];
 
 /** How far back the post-connect backfill looks for branches to map. */
 export const BACKFILL_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -105,9 +130,36 @@ export interface GithubPullRequestMappingServiceDeps {
   /** The organization's project ids, for the post-connect backfill. */
   findProjectIds(organizationId: string): Promise<string[]>;
   sessions: CodingAgentSessionBranchLookup;
+  /**
+   * Records on a project that one of its sessions' branches turned out to have
+   * a pull request, which is what puts the Pull requests destination in that
+   * project's sidebar. Only the demand path can call it, because it is the only
+   * one that names a project: a branch belongs to an organization, and the
+   * organization's other paths (the webhook, the sweep) have no project to
+   * attribute the answer to. Absent where nothing records it.
+   *
+   * See specs/coding-agent/project-menu-links.feature.
+   */
+  touchCodingAgentPullRequestSeen?: (params: {
+    projectId: string;
+    at: Date;
+  }) => Promise<void>;
   /** Injectable clock so the backoff can be tested without waiting it out. */
   now?: () => number;
 }
+
+/**
+ * Why a branch is being mapped.
+ *
+ * `demand` means someone asked: a session folded on the branch, or an operator
+ * connected GitHub and the backfill is catching up. `sweep` means the periodic
+ * recheck picked the branch off its own due list.
+ *
+ * The distinction decides one column. `lastRequestedAt` records demand, and the
+ * sweep selects branches by it, so a sweep that wrote it would keep renewing
+ * the very signal it reads and no branch would ever leave the sweep.
+ */
+export type BranchMappingOrigin = "demand" | "sweep";
 
 /** A repository and branch, already resolved to an organization. */
 export interface BranchMappingTarget {
@@ -116,6 +168,17 @@ export interface BranchMappingTarget {
   repositoryOwner: string;
   repositoryName: string;
   headBranch: string;
+  origin: BranchMappingOrigin;
+  /**
+   * The project whose folded session asked for this mapping, when one did.
+   *
+   * Carried only so a found pull request can be recorded against that project.
+   * Linkage itself is organization-scoped and reads none of it, and the paths
+   * with no project behind them (the webhook, the sweep) leave it unset, which
+   * is what keeps those paths from attributing an answer to a project that did
+   * not ask for it.
+   */
+  originProjectId?: string;
 }
 
 /** The same, addressed by the project a session was folded under. */
@@ -125,26 +188,6 @@ export interface BranchMappingRequest {
   repositoryOwner: string;
   repositoryName: string;
   headBranch: string;
-}
-
-/**
- * An unset host means github.com; anything else is a host we do not map.
- *
- * Case-folded, because a session records whatever casing its git remote
- * carries and a host is case insensitive. A literal comparison here refuses
- * `GitHub.com` outright, so that session is never mapped at all, and every
- * reader downstream folds its host and then looks for a mapping row nothing
- * ever wrote.
- */
-export function isMappableHost(repositoryHost: string): boolean {
-  const host = repositoryHost.toLowerCase();
-  return host === "" || host === GITHUB_HOST;
-}
-
-/** The host to store: the default, spelled out and folded, so rows compare. */
-export function normalizeHost(repositoryHost: string): string {
-  const host = repositoryHost.toLowerCase();
-  return host === "" ? GITHUB_HOST : host;
 }
 
 /**
@@ -183,18 +226,117 @@ export class GithubPullRequestMappingService {
    * mapping can fix.
    */
   async requestBranchMapping(request: BranchMappingRequest): Promise<void> {
-    if (!isMappableHost(request.repositoryHost)) return;
+    if (!isMappableGithubHost(request.repositoryHost)) return;
     const organizationId = await this.deps.resolveOrganizationId(
       request.tenantId,
     );
     if (!organizationId) return;
-    await this.mapBranch({
+    const target: BranchMappingTarget = {
       organizationId,
       repositoryHost: request.repositoryHost,
       repositoryOwner: request.repositoryOwner,
       repositoryName: request.repositoryName,
       headBranch: request.headBranch,
+      origin: "demand",
+      originProjectId: request.tenantId,
+    };
+    // This entry point, and only this one, means a session just folded on the
+    // branch. The sweep and the backfill call `mapBranch` directly and carry no
+    // such evidence.
+    await this.bringRecheckForward(target);
+    await this.mapBranch(target);
+  }
+
+  /**
+   * Cancel however far a branch had climbed the backoff, because a session just
+   * ran on it.
+   *
+   * The branch's own empty answers are what put it there, on the reading that a
+   * branch which has answered empty enough times never will have a pull
+   * request. A session folding on that branch is the plainest evidence against
+   * it. Bounded by {@link ACTIVE_BRANCH_MAX_BACKOFF_MS} rather than cleared, so
+   * the branch rejoins the sweep at the first rung instead of being asked about
+   * on every fold, and the attempt count goes back to zero so a later empty
+   * answer starts the ladder again rather than resuming near its cap.
+   *
+   * A no-op for a branch already due sooner, for one that has already mapped
+   * (its `recheckAfter` is null), and for one with no bookkeeping row at all,
+   * which `mapBranch` is about to create.
+   */
+  private async bringRecheckForward(
+    target: BranchMappingTarget,
+  ): Promise<void> {
+    const scope = branchScopeFor(target);
+    if (!scope) return;
+    await this.deps.repository.bringBranchRecheckForward({
+      ...scope,
+      dueAt: new Date(nowMs(this.deps) + ACTIVE_BRANCH_MAX_BACKOFF_MS),
     });
+  }
+
+  /**
+   * Link a branch from a `pull_request` webhook delivery: the event-driven half
+   * of linkage, and the one that makes it feel immediate.
+   *
+   * Nothing here calls GitHub. The delivery already carries the pull request in
+   * the same shape the REST listing returns, so it goes through the same
+   * normalisation and the same write as a listing's answer, and the write
+   * clears the branch's negative cache exactly as a found pull request does.
+   *
+   * Three things it deliberately does NOT check:
+   *
+   *   - the lookup claim, which exists to stop concurrent callers making the
+   *     same GitHub call. There is no call to serialise here, and both writes
+   *     are upserts on the same unique keys, so a redelivered event lands on
+   *     the same row with the same values.
+   *   - whether the installation is suspended. GitHub does not deliver for a
+   *     suspended installation, so the delivery is itself fresher evidence than
+   *     a local flag that a missed `suspend`/`unsuspend` pair may have stranded.
+   *   - whether the connection covers the repository. GitHub only delivers for
+   *     repositories the installation is actually on, which is a better answer
+   *     than the cached repository selection this instance holds.
+   *
+   * Tenancy comes from the installation row and nothing in the payload: an
+   * installation id maps to exactly one organization, bound at `/setup` behind
+   * the cross-tenant takeover guard. An installation this instance has no row
+   * for is dropped, because there is no organization to attribute it to.
+   *
+   * Returns whether the event was applied, which is what the route logs.
+   */
+  async applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean> {
+    if (!LINKING_PULL_REQUEST_ACTIONS.has(event.action)) return false;
+
+    const installation = await this.deps.installations.getByInstallationId(
+      event.installationId,
+    );
+    if (!installation) {
+      logger.info(
+        { installationId: event.installationId, action: event.action },
+        "pull request event for an installation with no local record",
+      );
+      return false;
+    }
+
+    const scope = branchScopeFor({
+      organizationId: installation.organizationId,
+      // The App is registered on one GitHub, so a delivery can only ever be
+      // about that one.
+      repositoryHost: getGithubHost(),
+      repositoryOwner: event.repositoryOwner,
+      repositoryName: event.repositoryName,
+      headBranch: event.headBranch,
+    });
+    if (!scope) return false;
+
+    await this.recordAnswer({
+      scope,
+      pullRequests: [event.pullRequest],
+      isExhaustive: false,
+      // A delivery says a person just acted on the branch, which is demand by
+      // the same reading a fold is.
+      origin: "demand",
+    });
+    return true;
   }
 
   /**
@@ -202,20 +344,8 @@ export class GithubPullRequestMappingService {
    * directly, having read the organization off the bookkeeping row.
    */
   async mapBranch(target: BranchMappingTarget): Promise<void> {
-    if (!isMappableHost(target.repositoryHost)) return;
-    const scope = {
-      organizationId: target.organizationId,
-      repositoryHost: normalizeHost(target.repositoryHost),
-      repositoryFullName: `${target.repositoryOwner}/${target.repositoryName}`,
-      headBranch: target.headBranch,
-    };
-    if (
-      !scope.headBranch ||
-      !target.repositoryOwner ||
-      !target.repositoryName
-    ) {
-      return;
-    }
+    const scope = branchScopeFor(target);
+    if (!scope) return;
 
     const covering =
       await this.deps.installations.resolveInstallationForRepository({
@@ -229,7 +359,7 @@ export class GithubPullRequestMappingService {
     // immediately.
     if (!covering) return;
 
-    if (!(await this.claimLookup(scope))) return;
+    if (!(await this.claimLookup({ scope, origin: target.origin }))) return;
 
     try {
       const pullRequests = await this.deps.appTokens.listPullRequestsForHead({
@@ -239,9 +369,15 @@ export class GithubPullRequestMappingService {
         repo: target.repositoryName,
         branch: scope.headBranch,
       });
-      await this.recordAnswer({ scope, pullRequests });
+      await this.recordAnswer({
+        scope,
+        pullRequests,
+        isExhaustive: true,
+        origin: target.origin,
+        originProjectId: target.originProjectId,
+      });
     } catch (error) {
-      await this.recordFailure({ scope, error });
+      await this.recordFailure({ scope, error, origin: target.origin });
     }
   }
 
@@ -269,7 +405,12 @@ export class GithubPullRequestMappingService {
         fromMs,
         toMs,
       });
-      this.collectBranchTargets({ organizationId, sessions, targets });
+      this.collectBranchTargets({
+        organizationId,
+        projectId,
+        sessions,
+        targets,
+      });
     }
 
     await this.mapAllWithConcurrency([...targets.values()]);
@@ -312,16 +453,22 @@ export class GithubPullRequestMappingService {
    */
   private collectBranchTargets({
     organizationId,
+    projectId,
     sessions,
     targets,
   }: {
     organizationId: string;
+    projectId: string;
     sessions: BackfillSessionRow[];
     targets: Map<string, BranchMappingTarget>;
   }): void {
     for (const session of sessions) {
       if (targets.size >= BACKFILL_BRANCH_CAP) break;
-      const target = this.targetFromSession({ organizationId, session });
+      const target = this.targetFromSession({
+        organizationId,
+        projectId,
+        session,
+      });
       if (!target) continue;
       const key = [
         target.repositoryHost,
@@ -335,12 +482,14 @@ export class GithubPullRequestMappingService {
 
   private targetFromSession({
     organizationId,
+    projectId,
     session,
   }: {
     organizationId: string;
+    projectId: string;
     session: BackfillSessionRow;
   }): BranchMappingTarget | null {
-    if (!isMappableHost(session.repositoryHost)) return null;
+    if (!isMappableGithubHost(session.repositoryHost)) return null;
     if (
       !session.repositoryOwner ||
       !session.repositoryName ||
@@ -350,10 +499,20 @@ export class GithubPullRequestMappingService {
     }
     return {
       organizationId,
-      repositoryHost: normalizeHost(session.repositoryHost),
+      repositoryHost: normalizeGithubHost(session.repositoryHost),
       repositoryOwner: session.repositoryOwner,
       repositoryName: session.repositoryName,
       headBranch: session.gitBranch,
+      // An operator connecting GitHub is asking for these branches, as plainly
+      // as a fold does.
+      origin: "demand",
+      // The backfill reads one project's sessions at a time, so it knows which
+      // project ran this branch and a found pull request is recorded against
+      // it. Without this the Pull requests destination stays hidden until the
+      // next live fold, which is exactly the moment the connection is supposed
+      // to pay off. Two projects on one branch dedupe to the first that
+      // claimed it, which attributes better than attributing to none.
+      originProjectId: projectId,
     };
   }
 
@@ -384,16 +543,28 @@ export class GithubPullRequestMappingService {
    * other, both read "nothing stored yet", and both call GitHub. Whichever
    * caller loses the claim still keeps the branch inside the sweep's activity
    * window, throttled — that touch is the whole reason a skip writes at all.
+   *
+   * Both writes carry the origin, so only a caller acting on demand records
+   * demand. A sweep that lost the claim writes nothing: it had no demand to
+   * record, and the caller holding the claim records its own.
    */
-  private async claimLookup(scope: BranchScope): Promise<boolean> {
+  private async claimLookup({
+    scope,
+    origin,
+  }: {
+    scope: BranchScope;
+    origin: BranchMappingOrigin;
+  }): Promise<boolean> {
     const now = nowMs(this.deps);
     const claimed = await this.deps.repository.claimBranchLookup({
       ...scope,
       now: new Date(now),
       freshMappingMs: FRESH_MAPPING_MS,
       leaseMs: LOOKUP_CLAIM_LEASE_MS,
+      shouldRecordDemand: origin === "demand",
     });
     if (claimed) return true;
+    if (origin !== "demand") return false;
 
     await this.deps.repository.touchBranchCheckRequestedAt({
       ...scope,
@@ -403,15 +574,30 @@ export class GithubPullRequestMappingService {
     return false;
   }
 
-  /** Store what GitHub answered, and set the next question's due date. */
+  /**
+   * Store what GitHub said, and set the next question's due date. Shared by
+   * both halves of linkage: a listing's answer, and a webhook's announcement.
+   */
   private async recordAnswer({
     scope,
     pullRequests,
+    isExhaustive,
+    origin,
+    originProjectId,
   }: {
     scope: BranchScope;
-    pullRequests: Awaited<
-      ReturnType<GithubAppTokenService["listPullRequestsForHead"]>
-    >;
+    pullRequests: readonly GithubPullRequestSummary[];
+    /**
+     * Whether `pullRequests` is everything the branch has. A listing answers
+     * for the whole branch, so its count replaces the stored one; a webhook
+     * describes a single pull request, so it may only raise that count. Lower
+     * it and a branch known to host two pull requests reads as hosting one,
+     * which is the number the freshness guard on the lookup claim reads.
+     */
+    isExhaustive: boolean;
+    origin: BranchMappingOrigin;
+    /** Set only when a project's own session asked; see BranchMappingTarget. */
+    originProjectId?: string;
   }): Promise<void> {
     const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
@@ -419,6 +605,10 @@ export class GithubPullRequestMappingService {
         pullRequests: pullRequests.map((pull) =>
           toUpsertInput({ scope, pull }),
         ),
+      });
+      await this.recordProjectPullRequestActivity({
+        projectId: originProjectId,
+        at: now,
       });
     }
 
@@ -428,7 +618,9 @@ export class GithubPullRequestMappingService {
     await this.deps.repository.upsertBranchCheck({
       ...scope,
       lastCheckedAt: now,
-      prCount: pullRequests.length,
+      prCount: isExhaustive
+        ? pullRequests.length
+        : Math.max(existing?.prCount ?? 0, pullRequests.length),
       // A pull request clears the negative cache outright: the branch has an
       // answer, and a stale notFoundAt would keep the sweep asking about it
       // forever.
@@ -437,8 +629,35 @@ export class GithubPullRequestMappingService {
         ? null
         : new Date(now.getTime() + backoffMsFor(attempts)),
       attempts,
-      lastRequestedAt: now,
+      lastRequestedAt: origin === "demand" ? now : null,
     });
+  }
+
+  /**
+   * Record on the asking project that its work has pull requests, so the
+   * project's sidebar can offer the Pull requests destination.
+   *
+   * A no-op with no project to attribute the answer to, and with nothing wired
+   * to record it. Failures are logged and swallowed: linkage is already stored
+   * and correct, and losing a menu link until the branch's next answer is not
+   * worth failing the mapping over.
+   */
+  private async recordProjectPullRequestActivity({
+    projectId,
+    at,
+  }: {
+    projectId: string | undefined;
+    at: Date;
+  }): Promise<void> {
+    if (!projectId) return;
+    try {
+      await this.deps.touchCodingAgentPullRequestSeen?.({ projectId, at });
+    } catch (error) {
+      logger.warn(
+        { error, projectId },
+        "recording the project's pull-request activity failed, non-fatal",
+      );
+    }
   }
 
   /**
@@ -455,9 +674,11 @@ export class GithubPullRequestMappingService {
   private async recordFailure({
     scope,
     error,
+    origin,
   }: {
     scope: BranchScope;
     error: unknown;
+    origin: BranchMappingOrigin;
   }): Promise<void> {
     if (!(error instanceof GithubRateLimitedError)) {
       logger.warn({ error, ...scope }, "branch pull-request mapping failed");
@@ -473,7 +694,7 @@ export class GithubPullRequestMappingService {
       notFoundAt: existing?.notFoundAt ?? null,
       recheckAfter: new Date(now.getTime() + backoffMsFor(attempts)),
       attempts,
-      lastRequestedAt: now,
+      lastRequestedAt: origin === "demand" ? now : null,
     });
   }
 }
@@ -486,14 +707,32 @@ interface BranchScope {
   headBranch: string;
 }
 
+/**
+ * The bookkeeping key for a target, or null when it names no branch this
+ * connection can answer for. Every write in this service goes through it, so
+ * the host fold and the owner/name/branch completeness check happen once.
+ */
+function branchScopeFor(
+  target: Omit<BranchMappingTarget, "origin">,
+): BranchScope | null {
+  if (!isMappableGithubHost(target.repositoryHost)) return null;
+  if (!target.headBranch || !target.repositoryOwner || !target.repositoryName) {
+    return null;
+  }
+  return {
+    organizationId: target.organizationId,
+    repositoryHost: normalizeGithubHost(target.repositoryHost),
+    repositoryFullName: `${target.repositoryOwner}/${target.repositoryName}`,
+    headBranch: target.headBranch,
+  };
+}
+
 function toUpsertInput({
   scope,
   pull,
 }: {
   scope: BranchScope;
-  pull: Awaited<
-    ReturnType<GithubAppTokenService["listPullRequestsForHead"]>
-  >[number];
+  pull: GithubPullRequestSummary;
 }): UpsertGithubPullRequestInput {
   return {
     organizationId: scope.organizationId,
@@ -509,5 +748,9 @@ function toUpsertInput({
     prCreatedAt: new Date(pull.createdAt),
     prClosedAt: pull.closedAt ? new Date(pull.closedAt) : null,
     prMergedAt: pull.mergedAt ? new Date(pull.mergedAt) : null,
+    // The ordering key the store writes behind. Both a webhook and a listing
+    // can arrive after a newer snapshot was already stored, and this is what
+    // stops either from rolling the row back.
+    prUpdatedAt: new Date(pull.updatedAt),
   };
 }

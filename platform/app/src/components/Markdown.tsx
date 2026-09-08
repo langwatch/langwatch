@@ -125,7 +125,7 @@ function textOf(node: ReactNode): string {
 
 /**
  * A same-app destination we can hand to the SPA router — an absolute path like
- * `/my-project/messages/abc123`. Protocol-relative (`//host`) and absolute
+ * `/my-project/traces/abc123`. Protocol-relative (`//host`) and absolute
  * (`https://…`) URLs are external and must get a real navigation, so a trace
  * link inside the app stays SPA while a GitHub PR link opens for real.
  */

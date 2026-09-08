@@ -6,6 +6,7 @@ import {
   ValidationError,
 } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { customAlphabet } from "nanoid";
 /**
  * IngestionTemplateService — owns the catalog read + admin-authoring
  * surface for the personal-project trace-ingest flow.
@@ -19,8 +20,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *       specs/ai-governance/admin-ottl-authoring.feature
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { customAlphabet } from "nanoid";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
 import {

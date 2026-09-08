@@ -7,12 +7,15 @@
  * mapping cannot see that: it only runs when a session is folded, and by then
  * the branch may never be touched again. This pass is what closes that gap. It
  * picks up the branches that mapped to nothing, whose backoff has elapsed, and
- * that a reader still cares about, and asks GitHub once more.
+ * that a session has run on recently, and asks GitHub once more.
  *
- * "Still cares about" is the load-bearing cut. Without it the sweep would grow
- * without bound, asking GitHub daily about every branch any session ever ran on
- * since the connection was made. The same horizon bounds the retention prune,
- * so a branch that falls out of the sweep also stops costing storage.
+ * That last cut is what bounds the sweep. Without it, every branch any session
+ * ever ran on since the connection was made is asked about daily, for good. The
+ * cut works only because the sweep does not write the column it selects on: a
+ * pass runs with `origin: "sweep"`, which leaves `lastRequestedAt` alone, so a
+ * branch with no new folds ages out of the sweep on its own. The same horizon
+ * bounds the retention prune, so a branch that falls out of the sweep also
+ * stops costing a bookkeeping row. Its pull requests are kept.
  *
  * SCHEDULING LIVES ELSEWHERE. This module owns one pass and nothing else; the
  * `githubBranchRecheck` process manager (pipelines/github-maintenance) owns
@@ -24,10 +27,10 @@ import type { GithubPullRequestMappingService } from "./github-pull-request-mapp
 import type { GithubPullRequestsRepository } from "./repositories/github-pull-requests.repository";
 
 /**
- * How long since a reader last asked before a branch drops out of the sweep,
- * and past which its bookkeeping and its pull requests are pruned. A week is
- * generous for a branch someone is still working on and short enough that an
- * abandoned one stops costing GitHub calls and rows.
+ * How long since a session last folded on a branch before it drops out of the
+ * sweep, and past which its bookkeeping is pruned. A week is generous for a
+ * branch someone is still working on and short enough that an abandoned one
+ * stops costing GitHub calls and rows.
  */
 export const RECHECK_ACTIVE_WITHIN_MS = 7 * 24 * 60 * 60 * 1000;
 /** Branches per pass. Each one is a GitHub call, so the pass stays small. */
@@ -65,6 +68,9 @@ export async function runBranchRecheckPass({
       repositoryOwner: owner,
       repositoryName: name,
       headBranch: row.headBranch,
+      // The sweep asks on its own account, so the answer must not refresh the
+      // demand the sweep selected this branch by.
+      origin: "sweep",
     });
   }
 
@@ -72,15 +78,14 @@ export async function runBranchRecheckPass({
 }
 
 /**
- * One retention pass: drop the bookkeeping past the activity horizon, and the
- * pull requests it was the only reason to keep.
+ * One retention pass: drop the branch bookkeeping past the activity horizon.
+ * The pull requests it found stay.
  */
 export async function runBranchRetentionPrune({
   repository,
   now = () => Date.now(),
 }: Pick<GithubBranchRecheckDeps, "repository" | "now">): Promise<{
   branchChecks: number;
-  pullRequests: number;
 }> {
   return await repository.deleteStaleBefore({
     before: new Date(now() - RECHECK_ACTIVE_WITHIN_MS),

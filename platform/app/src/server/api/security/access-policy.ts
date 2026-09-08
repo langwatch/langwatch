@@ -1,4 +1,4 @@
-import type { Permission } from "~/server/api/rbac";
+import type { AuthzPermission } from "@langwatch/authz";
 
 /**
  * The access decision for a single HTTP route. Every route mounted through the
@@ -31,11 +31,11 @@ import type { Permission } from "~/server/api/rbac";
  *                        cron, gateway-internal, webhooks). Reason mandatory.
  */
 export type AccessPolicy =
-  | { readonly kind: "permission"; readonly permission: Permission }
-  | { readonly kind: "apiKeyPermission"; readonly permission: Permission }
+  | { readonly kind: "permission"; readonly permission: AuthzPermission }
+  | { readonly kind: "apiKeyPermission"; readonly permission: AuthzPermission }
   | {
       readonly kind: "projectPermission";
-      readonly permission: Permission;
+      readonly permission: AuthzPermission;
       /** Route param naming the project. Defaults to `id`. */
       readonly param: string;
     }
@@ -50,7 +50,7 @@ export type AccessPolicy =
        * gates on something that is not an RBAC permission. Mandatory — see
        * `handlerManagedAuth` for why the optional version was a defect.
        */
-      readonly permissions: readonly Permission[];
+      readonly permissions: readonly AuthzPermission[];
       /**
        * What kind of credential reaches this route:
        *
@@ -175,7 +175,9 @@ function handlerManagedCredentialClass({
  * resolves it against the caller's role bindings (project scope) or org role
  * bindings (org scope), exactly like the tRPC `checkProjectPermission` path.
  */
-export function requires(permission: Permission): AccessPolicy {
+export function requires<P extends AuthzPermission>(
+  permission: P,
+): { readonly kind: "permission"; readonly permission: P } {
   return { kind: "permission", permission };
 }
 
@@ -187,7 +189,9 @@ export function requires(permission: Permission): AccessPolicy {
  * equivalent of `requires(...)`, kept distinct so the registry records that
  * the gate is the API-key ceiling rather than a strict role check.
  */
-export function apiKeyPermission(permission: Permission): AccessPolicy {
+export function apiKeyPermission<P extends AuthzPermission>(
+  permission: P,
+): { readonly kind: "apiKeyPermission"; readonly permission: P } {
   return { kind: "apiKeyPermission", permission };
 }
 
@@ -197,10 +201,14 @@ export function apiKeyPermission(permission: Permission): AccessPolicy {
  * resolve at organization scope there, so a single org-wide grant would reach
  * every project in the org.
  */
-export function requiresOnProject(
-  permission: Permission,
+export function requiresOnProject<P extends AuthzPermission>(
+  permission: P,
   options: { param?: string } = {},
-): AccessPolicy {
+): {
+  readonly kind: "projectPermission";
+  readonly permission: P;
+  readonly param: string;
+} {
   return {
     kind: "projectPermission",
     permission,
@@ -213,7 +221,7 @@ export function requiresOnProject(
  * is checked. Reserve for routes whose handler performs no privileged action
  * beyond what authentication already proves (e.g. "whoami").
  */
-export function anyAuthenticated(): AccessPolicy {
+export function anyAuthenticated(): { readonly kind: "anyAuthenticated" } {
   return { kind: "anyAuthenticated" };
 }
 
@@ -222,7 +230,10 @@ export function anyAuthenticated(): AccessPolicy {
  * it is the reviewable justification that this route is safe to expose without
  * credentials.
  */
-export function publicEndpoint(reason: string): AccessPolicy {
+export function publicEndpoint(reason: string): {
+  readonly kind: "public";
+  readonly reason: string;
+} {
   assertReason(reason, "publicEndpoint");
   return { kind: "public", reason };
 }
@@ -231,7 +242,10 @@ export function publicEndpoint(reason: string): AccessPolicy {
  * Service-to-service route authenticated by a shared secret or signature, not
  * an RBAC credential. `reason` is mandatory.
  */
-export function internalSecret(reason: string): AccessPolicy {
+export function internalSecret(reason: string): {
+  readonly kind: "internal";
+  readonly reason: string;
+} {
   assertReason(reason, "internalSecret");
   return { kind: "internal", reason };
 }
@@ -265,8 +279,8 @@ export function handlerManagedAuth({
    * was an absence, and absence is what let `POST /api/experiments/:slug/run`
    * sit on a grain no least-privilege key could hold.
    */
-  permissions: readonly Permission[];
-}): AccessPolicy {
+  permissions: readonly AuthzPermission[];
+}): Extract<AccessPolicy, { kind: "handlerManaged" }> {
   assertReason(reason, "handlerManagedAuth");
   return { kind: "handlerManaged", reason, permissions, credential };
 }
@@ -291,7 +305,9 @@ export function isApiKeyReachable(policy: AccessPolicy): boolean {
  * should ask "what does this route actually demand?", so a new policy kind
  * cannot quietly drop out of the answer.
  */
-export function policyPermissions(policy: AccessPolicy): readonly Permission[] {
+export function policyPermissions(
+  policy: AccessPolicy,
+): readonly AuthzPermission[] {
   switch (policy.kind) {
     case "permission":
     case "apiKeyPermission":

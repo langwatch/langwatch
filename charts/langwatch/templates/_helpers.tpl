@@ -242,7 +242,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not (has .Values.app.dataplane.provider (list "awsS3" "azureBlob")) }}
     {{- $errors = append $errors (printf "app.dataplane.provider is %q — must be one of awsS3, azureBlob" .Values.app.dataplane.provider) }}
   {{- end }}
+  {{/* Each legacy read flag belongs to exactly one migration direction. Set
+       alongside the provider it "migrates away from", it is a no-op the
+       operator almost certainly did not intend — reject rather than ignore. */}}
+  {{- if and (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
+    {{- $errors = append $errors "app.dataplane.legacyAzureRead is set but azureBlob is already the active provider — the flag is for keeping Azure reads alive AFTER moving writes to S3 (provider awsS3). Remove it." }}
+  {{- end }}
+  {{- if and (eq .Values.app.dataplane.provider "awsS3") .Values.app.dataplane.legacyS3ReadBucket }}
+    {{- $errors = append $errors "app.dataplane.legacyS3ReadBucket is set but awsS3 is already the active provider — the flag is for keeping S3 reads alive AFTER moving writes to Azure (provider azureBlob). Remove it." }}
+  {{- end }}
   {{- if eq .Values.app.dataplane.provider "awsS3" }}
+    {{- if empty .Values.app.dataplane.bucket }}
+      {{- $errors = append $errors "app.dataplane.provider is awsS3 but app.dataplane.bucket is empty — S3_BUCKET_NAME would render blank and every write would fall back to local storage" }}
+    {{- end }}
     {{- if .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.key }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.endpoint.secretKeyRef.name is set but key is empty" }}
@@ -266,21 +278,89 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
-  {{- else if eq .Values.app.dataplane.provider "azureBlob" }}
+  {{- end }}
+
+  {{/* Azure settings are validated whenever they are EMITTED — when azureBlob
+       is the active provider OR when legacyAzureRead keeps them alive across an
+       Azure->S3 migration. That is deliberately the same condition the env
+       emission uses, because validating only the active-provider case let a
+       migration install render green with authMode=workloadIdentity and no
+       ServiceAccount: the pod then never received an injected token and every
+       read of a historical azure-blob:// object failed at runtime instead of at
+       deploy time. Validate exactly what you emit. */}}
+  {{- if or (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
+    {{- $azureWhy := ternary "app.dataplane.provider is azureBlob" "app.dataplane.legacyAzureRead is true" (eq .Values.app.dataplane.provider "azureBlob") }}
     {{- if .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.key }}
         {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountName.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- else if empty .Values.app.dataplane.providers.azureBlob.accountName.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountName is not configured" }}
+      {{- $errors = append $errors (printf "%s but providers.azureBlob.accountName is not configured" $azureWhy) }}
     {{- end }}
 
-    {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
-      {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+    {{- $azureAuthMode := .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" }}
+    {{- if not (has $azureAuthMode (list "sharedKey" "workloadIdentity" "managedIdentity" "azureCli")) }}
+      {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q — must be one of sharedKey, workloadIdentity, managedIdentity, azureCli" $azureAuthMode) }}
+    {{- end }}
+    {{/* The account key is required by, and only by, sharedKey auth. Under an
+         identity mode it must be absent — a key that would be silently ignored
+         is worse than no key, because the operator believes it is in use. */}}
+    {{- if eq $azureAuthMode "sharedKey" }}
+      {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+        {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
+          {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+        {{- end }}
+      {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
+        {{- $errors = append $errors (printf "%s with authMode sharedKey but providers.azureBlob.accountKey is not configured" $azureWhy) }}
       {{- end }}
-    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountKey is not configured" }}
+    {{- else }}
+      {{- if or .Values.app.dataplane.providers.azureBlob.accountKey.value .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+        {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q but providers.azureBlob.accountKey is also configured — remove the key, it would be ignored" $azureAuthMode) }}
+      {{- end }}
+      {{/* The app refuses a non-public endpoint in a token mode without a
+           matching identity authority (it would otherwise ask the
+           public-cloud issuer for a sovereign token). Mirror that here so a
+           sovereign install fails at deploy time rather than on the first
+           write, when the chart would otherwise have rendered green. */}}
+      {{- $azureEndpoint := .Values.app.dataplane.providers.azureBlob.endpoint.value }}
+      {{- $azureEndpointFromSecret := .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
+      {{- $hasAuthority := or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
+      {{/* Hostnames are case-insensitive (the runtime check lowercases
+           before comparing), so classify on the lowered value or a valid
+           public endpoint written in uppercase gets rejected as sovereign. */}}
+      {{- if and $azureEndpoint (not (contains ".blob.core.windows.net" (lower $azureEndpoint))) }}
+        {{- if not $hasAuthority }}
+          {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.endpoint is %q, which is not the Azure public cloud — a token-based authMode also requires providers.azureBlob.authorityHost so tokens are requested from the matching identity authority" $azureEndpoint) }}
+        {{- end }}
+      {{/* A secret-backed endpoint is checked as if it were sovereign. Helm
+           cannot read the Secret, so the hostname is unknowable at render
+           time and assuming "public cloud" is the one guess that fails
+           silently — the deploy succeeds and the first storage call is
+           refused. An install that IS on the public cloud does not need to
+           set endpoint at all (it defaults), so requiring an authority
+           alongside a secret-backed endpoint costs a correct configuration
+           nothing and catches the sovereign one. */}}
+      {{- else if and $azureEndpointFromSecret (not $hasAuthority) }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.endpoint is supplied through a Secret, so the chart cannot tell whether it is the Azure public cloud — a token-based authMode therefore also requires providers.azureBlob.authorityHost. Set it to the identity authority matching that endpoint, or drop the endpoint override if this install is on the public cloud" }}
+      {{- end }}
+      {{- if eq $azureAuthMode "workloadIdentity" }}
+        {{- if not (include "langwatch.serviceAccountName" .) }}
+          {{- $errors = append $errors "azureBlob authMode workloadIdentity requires global.serviceAccount (create=true or name) so the Entra identity has a ServiceAccount to bind to" }}
+        {{/* A ServiceAccount without the client-id annotation fails the same
+             way as a pod without the webhook label, one layer down: the chart
+             renders, the pods come up healthy, and the webhook has no identity
+             to bind them to, so the first Blob operation fails claiming the
+             cluster is misconfigured. Only enforceable when WE create the
+             account — an account the operator names lives outside this chart
+             and its annotations are not ours to read, so that path is a
+             documented prerequisite instead. */}}
+        {{- else if ((.Values.global).serviceAccount).create }}
+          {{- $saAnnotations := ((.Values.global).serviceAccount).annotations | default dict }}
+          {{- if not (index $saAnnotations "azure.workload.identity/client-id") }}
+            {{- $errors = append $errors "azureBlob authMode workloadIdentity with global.serviceAccount.create=true also requires the annotation azure.workload.identity/client-id on global.serviceAccount.annotations — without it the admission webhook has no identity to bind the pods to and every storage operation fails at runtime" }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
     {{- end }}
 
     {{- if .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.name }}
@@ -288,7 +368,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.azureBlob.container.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- else if empty .Values.app.dataplane.providers.azureBlob.container.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.container is not configured" }}
+      {{- $errors = append $errors (printf "%s but providers.azureBlob.container is not configured" $azureWhy) }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -382,13 +462,151 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        so the default-named case requires the chart-managed url-secret to
        still render. */}}
   {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
-  {{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+  {{- $chDefaultName := include "langwatch.clickhouse.serviceName" . }}
   {{- if and (not .Values.autogen.enabled) (eq $chSecretName $chDefaultName) }}
     {{- $errors = append $errors (printf "clickhouse.chartManaged=true with autogen.enabled=false requires clickhouse.auth.existingSecret to be set to an operator-owned Secret name different from the default %q. The deployment composes CLICKHOUSE_URL at runtime from the password key when a custom name is used; with the default name the deployment expects the chart-rendered url key, which is gated off when autogen.enabled=false. Either set autogen.enabled=true OR override clickhouse.auth.existingSecret." $chDefaultName) }}
   {{- end }}
   {{- if or $chValues.cold.enabled $chValues.backup.enabled }}
     {{- if empty $chValues.objectStorage.bucket }}
       {{- $errors = append $errors "clickhouse.objectStorage.bucket is required when cold.enabled or backup.enabled" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* LangWatchQL PostgreSQL bridge (lwql_postgres named collection), chart-managed
+     ClickHouse only — for external ClickHouse the app self-provisions the bridge
+     from DATABASE_URL and none of this applies.
+
+     The subchart derives the bridge host from the release name via the PARENT
+     chart's own values.yaml default (a tpl string), which is only a real
+     address when this chart also manages PostgreSQL. So:
+
+       - EXTERNAL PostgreSQL, host left at its default-derived value cancelled to
+         "" (every external-PostgreSQL example/profile does this): the bridge is
+         deliberately disabled, not a mistake — no shipped LangWatchQL view reads
+         through it yet (langwatch-saas#7387), so the render proceeds with the
+         bridge omitted entirely (no CLICKHOUSE_LWQL_PG_HOST rendered). Surfaced
+         loudly via NOTES.txt and the langwatch.io/lwql-postgres-bridge annotation
+         on the app Deployment (langwatch.lwql.postgresBridgeDisabled) rather than
+         failing silently or failing the render.
+
+       - EXTERNAL PostgreSQL, host empty but .database/.user/.passwordSecretKey
+         were changed from their defaults: that is a PARTIAL configuration, not a
+         deliberate disable — refuse the render, since it looks like an operator
+         started configuring an external bridge and forgot the host.
+
+       - EXTERNAL PostgreSQL, EXPLICIT (non-empty) host set: the operator wants
+         the bridge live against their own PostgreSQL, so the render REQUIRES
+         clickhouse.lwqlAccessModel.existingSecret carrying BOTH keys —
+         lwql_pg_password (the lwql_ro reader password) AND lwql_password (the
+         langwatch_lwql ClickHouse identity password); existingSecret redirects
+         both the subchart's mount and this chart's lwqlSecretName, so it backs
+         both credentials. See the guard below for the full reasoning and the
+         optional:true silent-omission trap it exists to catch.
+
+       - CHART-MANAGED PostgreSQL: the bridge reads the app's own database, so its
+         database name must equal postgresql.auth.database. Helm cannot derive one
+         subchart value from a parent one, so instead of silently duplicating it we
+         fail loudly when the two drift. */}}
+{{- $chLwql := (.Values.clickhouse.lwqlAccessModel | default dict) }}
+{{- if and .Values.lwql.enabled .Values.clickhouse.chartManaged $chLwql.enabled }}
+  {{- $bridge := ($chLwql.postgres | default dict) }}
+  {{- if not .Values.postgresql.chartManaged }}
+    {{- if empty $bridge.host }}
+      {{- $bridgeDb := $bridge.database | default "langwatch" }}
+      {{- $bridgeUser := $bridge.user | default "lwql_ro" }}
+      {{- $bridgePwKey := $bridge.passwordSecretKey | default "lwql_pg_password" }}
+      {{- if or (ne $bridgeDb "langwatch") (ne $bridgeUser "lwql_ro") (ne $bridgePwKey "lwql_pg_password") }}
+        {{- $errors = append $errors "clickhouse.lwqlAccessModel.postgres.host is empty but .database, .user or .passwordSecretKey was changed from its default — that looks like a partial external-PostgreSQL bridge configuration, not a deliberate disable. Set clickhouse.lwqlAccessModel.postgres.host too, or remove the other overrides to leave the bridge disabled (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387)." }}
+      {{- end }}
+    {{- else }}
+      {{- /* External PostgreSQL with an EXPLICIT (non-empty) bridge host: the
+             operator deliberately wants the lwql_postgres bridge live against
+             their own PostgreSQL, dialing as the read-only role lwql_ro. Two
+             credentials ride on the operator's own Secret here, not one:
+
+               - lwql_pg_password — the lwql_ro reader password ClickHouse dials
+                 PostgreSQL with. The app never runs role DDL against a PostgreSQL
+                 it does not own (LWQL_MANAGE_POSTGRES_READER is gated on
+                 postgresql.chartManaged, so it is absent here), and
+                 url-secret.yaml's autogenerated value is a password nobody set on
+                 that PostgreSQL.
+
+               - lwql_password — the langwatch_lwql ClickHouse identity password.
+                 clickhouse.lwqlAccessModel.existingSecret redirects BOTH the
+                 subchart's mount (which the owning ClickHouse pod creates the
+                 langwatch_lwql identity from) AND this chart's lwqlSecretName
+                 (which the app/workers read LWQL_CLICKHOUSE_PASSWORD from). So the
+                 operator's Secret becomes the single source of the query identity
+                 too — an existingSecret carrying only lwql_pg_password leaves
+                 langwatch_lwql with a password nobody set.
+
+             Both mounts are optional:true (charts/clickhouse-serverless
+             statefulset.yaml and _helpers.tpl LWQL_CLICKHOUSE_PASSWORD /
+             LWQL_POSTGRES_READER_PASSWORD), so a Secret missing either key renders
+             without error and the missing key is silently omitted at mount time —
+             LangWatchQL is then dead on arrival with no signal. Hence this guard
+             names BOTH keys, and the lookup-based check below fails the render
+             when the operator's Secret actually exists but is missing one. */}}
+      {{- if empty $chLwql.existingSecret }}
+        {{- $bridgeUser := $bridge.user | default "lwql_ro" }}
+        {{- $bridgePwKey := $bridge.passwordSecretKey | default "lwql_pg_password" }}
+        {{- $lwqlKey := $chLwql.passwordSecretKey | default "lwql_password" }}
+        {{- $resolvedHost := tpl $bridge.host . }}
+        {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.host is set (%[1]q) with postgresql.chartManaged=false, so the lwql_postgres bridge dials YOUR external PostgreSQL as the read-only role %[2]q — the chart never provisions that role on a PostgreSQL it does not own and will not autogenerate a password nobody set there. Before installing: (1) create %[2]s on your PostgreSQL, read-only, granted SELECT on the approved lwql_* views only — e.g. CREATE ROLE %[2]s LOGIN; ALTER ROLE %[2]s WITH LOGIN PASSWORD '<pw>' CONNECTION LIMIT <n>; ALTER ROLE %[2]s SET default_transaction_read_only = on; REVOKE ALL ON SCHEMA public FROM %[2]s; REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %[2]s; GRANT USAGE ON SCHEMA public TO %[2]s; GRANT SELECT ON public.lwql_traces TO %[2]s (one GRANT SELECT per approved lwql_* view, never the superuser); and (2) supply clickhouse.lwqlAccessModel.existingSecret pointing at a Secret you own that carries BOTH the %[3]q key (the lwql_ro reader password) AND the %[4]q key (the langwatch_lwql ClickHouse identity password). That one Secret is the source of both: ClickHouse mounts it for the lwql_postgres collection AND creates the langwatch_lwql identity from it, and the app/workers read LWQL_CLICKHOUSE_PASSWORD from it. Both mounts are optional:true, so a Secret missing either key renders without error and silently leaves that identity with a password nobody set. To disable the bridge instead, set clickhouse.lwqlAccessModel.postgres.host to \"\"." $resolvedHost $bridgeUser $bridgePwKey $lwqlKey) }}
+      {{- else }}
+        {{- /* existingSecret IS set: when installing/upgrading against a live
+               cluster, lookup can read it and confirm both keys are present.
+               Because both consuming mounts are optional:true, a Secret missing
+               either key would otherwise render clean and fail silently at
+               runtime — this is the only place that surfaces the omission before
+               it bites. lookup returns nil under `helm template` and under an
+               ArgoCD server-side render with lookup disabled; there is no live
+               API server to read, so the check is skipped (same known limitation
+               as templates/redis/secret.yaml's lookup-based branch). */}}
+        {{- $secretName := tpl $chLwql.existingSecret . }}
+        {{- $existing := lookup "v1" "Secret" .Release.Namespace $secretName }}
+        {{- if $existing }}
+          {{- $bridgePwKey := $bridge.passwordSecretKey | default "lwql_pg_password" }}
+          {{- $lwqlKey := $chLwql.passwordSecretKey | default "lwql_password" }}
+          {{- $missing := list }}
+          {{- if not (index ($existing.data | default dict) $lwqlKey) }}
+            {{- $missing = append $missing $lwqlKey }}
+          {{- end }}
+          {{- if not (index ($existing.data | default dict) $bridgePwKey) }}
+            {{- $missing = append $missing $bridgePwKey }}
+          {{- end }}
+          {{- if $missing }}
+            {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.existingSecret %q exists but is missing required key(s): %s. It must carry %q (the langwatch_lwql ClickHouse identity password, read by the app/workers as LWQL_CLICKHOUSE_PASSWORD and used by the owning ClickHouse pod to create the identity) AND %q (the lwql_ro reader password ClickHouse dials your external PostgreSQL with). Both mounts are optional:true, so a missing key is silently omitted and LangWatchQL is dead on arrival — add the missing key(s) to the Secret." $secretName (join ", " $missing) $lwqlKey $bridgePwKey) }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- else }}
+    {{- /* These two guards protect the case where the bridge dials the chart's
+           OWN managed PostgreSQL: its database and reader user must match what
+           the app provisions, since Helm cannot derive one subchart value from a
+           parent one. They fire ONLY when the bridge host resolves to the
+           release-derived default Service (the chart's own primary). An operator
+           who points the bridge at an EXPLICIT other host — a read replica, a
+           separate instance — owns that instance's database and reader, so the
+           guards do not apply there. NB: postgres.host is NOT empty on the
+           chart-managed default path; it defaults to the release-derived tpl
+           string, so the discriminator is "resolves to the chart's own Service",
+           not "empty" (an empty host disables the bridge, leaving nothing to
+           drift against). */}}
+    {{- $resolvedHost := tpl ($bridge.host | default "") . }}
+    {{- $ownHost := printf "%s-postgresql" .Release.Name }}
+    {{- if eq $resolvedHost $ownHost }}
+      {{- $bridgeDb := $bridge.database | default "langwatch" }}
+      {{- $pgDb := (.Values.postgresql.auth | default dict).database | default "langwatch" }}
+      {{- if ne $bridgeDb $pgDb }}
+        {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.database (%q) must equal postgresql.auth.database (%q) for chart-managed PostgreSQL: the lwql_postgres bridge reads the app's own database, and Helm cannot derive one subchart value from a parent one. Set both to the same name." $bridgeDb $pgDb) }}
+      {{- end }}
+      {{- $bridgeUser := $bridge.user | default "lwql_ro" }}
+      {{- if ne $bridgeUser "lwql_ro" }}
+        {{- $errors = append $errors (printf "clickhouse.lwqlAccessModel.postgres.user (%q) must be \"lwql_ro\" for the chart-managed PostgreSQL bridge: the app converges exactly that dedicated read-only reader from LWQL_POSTGRES_READER_PASSWORD and grants it the approved views, so a different user is never provisioned and the bridge fails to authenticate. Keep user=lwql_ro, or point the bridge at an external host if you provision your own reader." $bridgeUser) }}
+      {{- end }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -535,19 +753,41 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not $chartWritesIt }}
     {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
     {{- $hint := printf "Either add the key to that Secret (kubectl -n %s create secret generic %s --from-literal=%s=$(openssl rand -hex 32), or patch it if it already exists), point langyagent.secrets.existingSecretName at the Secret that does hold it, or let the chart generate it by leaving autogen.enabled=true with no secrets.existingSecret override." .Release.Namespace $langySecretName $langyKey }}
-    {{- if not $found }}
-      {{/* Every lookup comes back empty during `helm template` and dry runs, so
-           "Secret not found" there means "we cannot see the cluster", not "it is
-           missing". Probe with an object every real cluster has: if kube-system
-           is invisible too, stay quiet rather than failing a plain render. */}}
-      {{- if lookup "v1" "Namespace" "" "kube-system" }}
-        {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
-      {{- end }}
-    {{- else if not (index ($found.data | default dict) $langyKey) }}
+    {{/* Only the "Secret is readable but the key is missing" case is reported,
+         and reporting it needs no permission beyond the read on the line above.
+
+         A Secret that is absent is deliberately NOT reported. `lookup` returns
+         the same empty result for "not there" and "no cluster behind this
+         render", so telling them apart takes a SECOND read whose only job is to
+         prove the cluster is visible — and every candidate for that read costs
+         a permission the chart otherwise does not need. kube-system was
+         cluster-scoped, which is the bug this whole change exists to remove.
+         The namespace's own default ServiceAccount is at least namespaced, but
+         `get serviceaccounts` is still a distinct grant a role can withhold,
+         so it reintroduces the same class of failure in a smaller blast radius.
+         Neither is worth a hard render failure for an operator whose setup is
+         correct, in service of a message.
+
+         What that costs: a completely absent Secret is no longer named at
+         render time. It surfaces as CreateContainerConfigError on the pods,
+         which is exactly where it surfaced before this guard existed. What it
+         keeps is the case operators actually hit — the Secret is there and the
+         one key was never added — reported precisely, for free. */}}
+    {{- if and $found (not (index ($found.data | default dict) $langyKey)) }}
       {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q in namespace %q has no %q key. The app, the workers, and the agent pod all read that one key to authenticate to each other. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
     {{- end }}
   {{- end }}
 {{- end }}
+
+{{/* No LWQL Secret-name guard is needed under Design C. For chart-managed
+     ClickHouse the LWQL passwords live in the ClickHouse credentials Secret, and
+     clickhouse.lwqlAccessModel.existingSecret DEFAULTS EMPTY so both the subchart mount and
+     the app/workers env resolve that Secret by the same fallback — renaming the
+     app Secret can no longer point either side at the wrong place. When an
+     operator explicitly overrides clickhouse.lwqlAccessModel.existingSecret they own that
+     Secret's keys (external-secrets, terraform), and langwatch.clickhouse.lwqlSecretName
+     keeps the app reading the very Secret they named, so there is nothing to
+     refuse. The old guard fired on a hardcoded default that no longer exists. */}}
 
 {{/* Output errors and warnings */}}
 {{- if $errors }}
@@ -560,6 +800,37 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{- end }}
+
+{{/* True ("true") when chart-managed ClickHouse + LWQL enabled leaves the
+     lwql_postgres bridge host cancelled to "" — i.e. the bridge is deliberately
+     disabled rather than failing the render (no shipped LangWatchQL view reads
+     through it yet, langwatch-saas#7387). An empty host disables the bridge on
+     BOTH PostgreSQL postures: an external PostgreSQL cancels the parent's
+     release-derived default, and an operator can equally point the host at "" on
+     chart-managed PostgreSQL to switch the bridge off deliberately — either way
+     the disabled state gets the same loud signal. Shared by NOTES.txt and the
+     app Deployment's annotation so the condition is surfaced instead of silent. */}}
+{{- define "langwatch.lwql.postgresBridgeDisabled" -}}
+{{- $chLwql := (.Values.clickhouse.lwqlAccessModel | default dict) }}
+{{- if and .Values.lwql.enabled .Values.clickhouse.chartManaged $chLwql.enabled }}
+  {{- $bridge := ($chLwql.postgres | default dict) }}
+  {{- if empty $bridge.host }}true{{- end }}
+{{- end }}
+{{- end }}
+
+{{/* True ("true") when chart-managed ClickHouse + LWQL enabled + EXTERNAL
+     PostgreSQL keeps the lwql_postgres bridge host non-empty — i.e. the bridge
+     is live against the operator's own PostgreSQL. Reaching a successful render
+     in this posture means the operator complied with the P2-3 guard
+     (clickhouse.lwqlAccessModel.existingSecret is set), so NOTES.txt uses this to
+     remind them of the reader role and password they had to supply. */}}
+{{- define "langwatch.lwql.externalPostgresBridgeActive" -}}
+{{- $chLwql := (.Values.clickhouse.lwqlAccessModel | default dict) }}
+{{- if and .Values.lwql.enabled .Values.clickhouse.chartManaged $chLwql.enabled (not .Values.postgresql.chartManaged) }}
+  {{- $bridge := ($chLwql.postgres | default dict) }}
+  {{- if not (empty $bridge.host) }}true{{- end }}
+{{- end }}
 {{- end }}
 
 {{/* ============================================================ */}}
@@ -608,6 +879,72 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* ============================================================ */}}
+{{/* nlpgo timeout coordination                                    */}}
+{{/* ============================================================ */}}
+
+{{/* The engine's code-block ceiling, range-checked, as a bare number.
+
+     The check lives WITH the value rather than in the NLP Deployment because
+     `langwatch.sharedEnv` hands the same number to the app and the workers,
+     and those render even when `langwatch_nlp.enabled` is false (an external,
+     shared or serverless nlpgo). A guard placed inside the optional Deployment
+     does not run in that supported mode, so an out-of-range ceiling would
+     reach the app and workers unchecked and their derived client deadline
+     would cut every turn short of the engine's own ceiling.
+
+     710 is the ceiling — the engine's stream idle timeout default, 720
+     (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, `httpapi.DefaultStreamIdleTimeout`
+     in services/nlpgo; `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS` in
+     platform/app/src/server/nlpgo/timeouts.ts), minus the same 10s margin
+     (`CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS`, also in timeouts.ts) that
+     `clampCodeBlockTimeoutSeconds`
+     (platform/app/src/optimization_studio/server/lambda/index.ts) subtracts
+     before it silently clamps a Lambda's env override. Anything above 710
+     races the stream shutting down with no margin left for nlpgo to report
+     its own timeout first — and, left at 720, would sail through here and
+     be silently cut to 710 on the Lambda path, the exact two-numbers drift
+     this pair exists to prevent.
+
+     With `langwatch_nlp.enabled` false the engine is external and the chart
+     cannot impose the ceiling, only report it to the clients. The value is
+     passed through as given: the operator sets the real ceiling on the external
+     service and matches it here, and the chart has no way to check that pairing,
+     so it does not pretend to. */}}
+{{- define "langwatch.codeBlockTimeoutSeconds" -}}
+{{- $raw := .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 -}}
+{{- $seconds := int $raw -}}
+{{- $streamIdleTimeoutSeconds := 720 -}}
+{{- $safetyMarginSeconds := 10 -}}
+{{- $maxSeconds := sub $streamIdleTimeoutSeconds $safetyMarginSeconds -}}
+{{/* An explicit 0 never reaches this check: `default` above counts it as empty and
+     substitutes 600, so 0 is indistinguishable from unset by the time we get here.
+     Everything else unusable does reach it — `int` reads a value it cannot parse as
+     a whole number as 0, and passes a negative one straight through. */}}
+{{- if lt $seconds 1 -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must be a positive whole number of seconds, at most %d. Got %v. Helm reads a value it cannot parse as a whole number — text, a fraction, exponent notation, or a number past int64 — as 0, and passes a negative one through unchanged, so without this check either would reach every nlpgo caller as its ceiling." $maxSeconds $raw) -}}
+{{- end -}}
+{{- if gt $seconds $maxSeconds -}}
+{{- fail (printf "langwatch_nlp.codeBlockTimeoutSeconds must stay at or below %d — the engine's %ds stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS) minus the %ds safety margin (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS in platform/app/src/server/nlpgo/timeouts.ts) that lets nlpgo report its own timeout before the enclosing Lambda deadline fires. Got %d." $maxSeconds $streamIdleTimeoutSeconds $safetyMarginSeconds $seconds) -}}
+{{- end -}}
+{{- $seconds -}}
+{{- end -}}
+
+{{/* Refuses an extraEnvs list that sets a timeout variable the chart owns.
+     Two of them are reserved: setting either by hand puts a second, unchecked
+     number next to `langwatch_nlp.codeBlockTimeoutSeconds` in exactly the
+     processes that must agree on one.
+
+     Call with (dict "envs" <list> "path" "<values path>"); `path` only names
+     the offending list in the message. */}}
+{{- define "langwatch.assertNoReservedTimeoutEnvs" -}}
+{{- range .envs }}
+{{- if or (eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS") (eq .name "NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS") }}
+{{- fail (printf "%s must not set %s — it is a reserved timeout env var; use langwatch_nlp.codeBlockTimeoutSeconds instead" $.path .name) }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -640,6 +977,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default (printf "%s-langwatch-nlp" .Release.Name) }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
 - name: LANGEVALS_ENDPOINT
   value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default (printf "%s-langevals" .Release.Name) }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
+
+# Engine code-block timeout (seconds), propagated to all processes that invoke
+# nlpgo. Range-checked by the helper, which is why this is emitted through it
+# and not read straight from values.
+- name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+  value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
 
 # PostgreSQL connection string
 {{- if .Values.postgresql.chartManaged }}
@@ -703,7 +1046,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # ClickHouse connection
 {{- if .Values.clickhouse.chartManaged }}
 {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
-{{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+{{- $chDefaultName := include "langwatch.clickhouse.serviceName" . }}
 {{- if eq $chSecretName $chDefaultName }}
 {{/* Langwatch-owned secret — URL is stored as a secret key */}}
 - name: CLICKHOUSE_URL
@@ -719,7 +1062,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ $chSecretName }}
       key: {{ include "langwatch.clickhouse.secretKey" . }}
 - name: CLICKHOUSE_URL
-  value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ .Release.Name }}-clickhouse:8123/langwatch"
+  value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ include "langwatch.clickhouse.serviceName" . }}:8123/langwatch"
 {{- end }}
 {{- if gt (int (.Values.clickhouse).replicas) 1 }}
 - name: CLICKHOUSE_CLUSTER
@@ -757,6 +1100,108 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $chBackup := (.Values.clickhouse).backup }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
   value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
+
+{{/* LangWatchQL passwords + provisioning switch (issue #6635; ownership model
+     from langwatch-saas#1168, Design C).
+
+     Two DIFFERENT gates on purpose:
+
+     - The two passwords are needed at QUERY time on EVERY path. The app always
+       authenticates to ClickHouse as langwatch_lwql and dials PostgreSQL
+       through the lwql_postgres reader, no matter who PROVISIONED those
+       identities (the subchart for chart-managed ClickHouse, the app itself for
+       external/BYO). So they are gated on `lwql.enabled` alone — cut them for
+       the chart-managed case and every LWQL query fails to authenticate even
+       though the identity exists.
+
+     - LWQL_SELF_PROVISION is the DDL switch, and only the app-owned (external)
+       path may run that DDL. It is gated on selfProvisionActive so a
+       chart-managed server — whose access model the subchart owns as config —
+       never has a second SQL owner wedging the same entity names.
+
+     `optional: true` is deliberate: an operator Secret without these keys means
+     LangWatchQL simply stays unprovisioned (fail-closed refusals) instead of the
+     pod dying in CreateContainerConfigError — a default-on feature must degrade,
+     not brick an upgrade. */}}
+{{- if .Values.lwql.enabled }}
+{{- if (include "langwatch.lwql.selfProvisionActive" .) }}
+- name: LWQL_SELF_PROVISION
+  value: "true"
+{{- end }}
+{{- /* Design C: whoever owns the ClickHouse server owns the langwatch_lwql
+       password, and every process that queries as langwatch_lwql reads it from
+       that one owner so the query password can never disagree with the password
+       the identity was created with.
+         - chart-managed: the clickhouse-serverless pod CREATES langwatch_lwql
+           from the ClickHouse credentials Secret, so the app+workers read the
+           same keys from the same Secret. langwatch.clickhouse.lwqlSecretName
+           resolves that name IDENTICALLY to the subchart's own mount.
+         - external/BYO: the app SELF-PROVISIONS, so the passwords live in the
+           app Secret under LWQL_CLICKHOUSE_PASSWORD / LWQL_POSTGRES_READER_PASSWORD. */}}
+{{- if .Values.clickhouse.chartManaged }}
+{{- $lwql := .Values.clickhouse.lwqlAccessModel | default dict }}
+{{- /* The four non-secret halves of the restricted connection. With
+       LWQL_SELF_PROVISION off (chart-managed), lwqlConnectionFromEnv requires
+       ALL of URL, USER, DATABASE and TENANT_SETTING alongside the password, and
+       returns null on any missing one — so emitting only the passwords refused
+       every query. These four are the SAME values the subchart provisions the
+       langwatch_lwql identity with, sourced once (helpers below) so the query
+       side can never disagree with the provisioned side. The URL carries no
+       credentials or path: username, password and database are passed
+       separately by the client. */}}
+- name: LWQL_CLICKHOUSE_URL
+  value: {{ include "langwatch.lwql.inClusterClickhouseUrl" . | quote }}
+- name: LWQL_CLICKHOUSE_USER
+  value: {{ include "langwatch.lwql.restrictedUser" . | quote }}
+- name: LWQL_DATABASE
+  value: {{ $lwql.database | default "langwatch" | quote }}
+- name: LWQL_TENANT_SETTING
+  value: {{ include "langwatch.lwql.tenantSetting" . | quote }}
+- name: LWQL_CLICKHOUSE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.clickhouse.lwqlSecretName" . }}
+      key: {{ $lwql.passwordSecretKey | default "lwql_password" }}
+      optional: true
+{{- /* The PostgreSQL reader role (lwql_ro) is owned by whoever owns the
+       PostgreSQL the bridge dials. The app CREATEs/ALTERs it ONLY for
+       chart-managed ClickHouse PAIRED WITH chart-managed PostgreSQL — the one
+       deployment where nothing else provisions it. That ownership is stated
+       EXPLICITLY (LWQL_MANAGE_POSTGRES_READER), never inferred by the app from
+       "a reader password arrived": an external PostgreSQL owns lwql_ro out of
+       band, and the app running CREATE/ALTER ROLE against it as the DATABASE_URL
+       user would either crashloop a default-on feature (a non-superuser
+       connection) or rotate the operator's own reader password. So the manage
+       flag AND the reader password are handed over together, and only here;
+       anywhere else the app re-grants the approved views only (a no-op where the
+       role is absent). Emitting the password only in this condition also avoids
+       handing the app a credential it must not use. */}}
+{{- if .Values.postgresql.chartManaged }}
+- name: LWQL_MANAGE_POSTGRES_READER
+  value: "true"
+- name: LWQL_POSTGRES_READER_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.clickhouse.lwqlSecretName" . }}
+      key: {{ ($lwql.postgres | default dict).passwordSecretKey | default "lwql_pg_password" }}
+      optional: true
+{{- end }}
+{{- else }}
+{{- $lwqlSecretName := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
+- name: LWQL_CLICKHOUSE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlSecretName }}
+      key: LWQL_CLICKHOUSE_PASSWORD
+      optional: true
+- name: LWQL_POSTGRES_READER_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlSecretName }}
+      key: LWQL_POSTGRES_READER_PASSWORD
+      optional: true
+{{- end }}
+{{- end }}
 
 # Credentials encryption key
 {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
@@ -806,29 +1251,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if eq .Values.app.dataplane.provider "azureBlob" }}
 # Azure Blob backend (AC37, issue #4133). STORED_OBJECTS_BACKEND is the
 # EXPLICIT toggle resolveProjectStorageDestination reads — AZURE_BLOB_* env
-# presence alone never selects this backend, only this value does.
+# presence alone never selects this backend, only this value does, which is
+# why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
-{{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
-{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
-{{- end }}
-{{- if .Values.app.dataplane.legacyS3ReadBucket }}
-# S3->Azure migration: new writes go to Azure, but objects written before the
-# switch still carry s3:// URIs / bucket+key spool refs. createS3Client keeps
-# serving this bucket for those reads (it fails loud only when no S3 bucket is
-# configured at all), so pre-migration media, datasets, and staged payloads
-# stay readable. Omit on a greenfield Azure install.
-- name: S3_BUCKET_NAME
-  value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
+{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# The ADR-022 trace spool stays off on Azure until the operator states that the
+# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
+# days. That policy is management-plane; the app holds a data-plane key and
+# cannot read it back, so this is an assertion, not a check. Left unset, an
+# oversized span keeps its payload inline instead of leaving an object behind
+# that nothing reaps. Emitted here, beside the write toggle rather than with
+# the connection settings below, because it gates only the spool WRITE path —
+# a legacyAzureRead migration reads existing spool objects without it.
+- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+  value: "true"
 {{- end }}
 {{- else }}
+- name: STORED_OBJECTS_BACKEND
+  value: "s3"
 - name: USE_S3_STORAGE
   value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
@@ -838,6 +1279,52 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.bucket | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
+{{- end }}
+{{/* The active provider's WRITE configuration above never depends on the
+     legacy read flags below — an Azure->S3 migration must configure S3
+     writes exactly like a plain S3 install, or new writes silently fall
+     back to local storage while the operator believes S3 is live.
+
+     Azure connection settings are emitted when Azure is the active write
+     backend OR when legacyAzureRead is set for an Azure->S3 migration. The
+     app's driver registration resolves these for READS independently of the
+     write toggle, so keeping them after the switch is what lets already
+     written azure-blob:// objects stay readable — the mirror of
+     legacyS3ReadBucket in the other direction. */}}
+{{- if or (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
+- name: AZURE_BLOB_AUTH_MODE
+  value: {{ .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" | quote }}
+{{- if eq (.Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey") "sharedKey" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
+{{- end }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
+{{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
+{{- end }}
+{{- if or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_AUTHORITY_HOST" "fieldValues" .Values.app.dataplane.providers.azureBlob.authorityHost) }}
+{{- end }}
+{{- if or .Values.app.dataplane.providers.azureBlob.tokenAudience.value .Values.app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_TOKEN_AUDIENCE" "fieldValues" .Values.app.dataplane.providers.azureBlob.tokenAudience) }}
+{{- end }}
+{{- end }}
+{{/* Gated on azureBlob being ACTIVE, not just on the bucket being set: when
+     S3 is the active provider its write block above already emits
+     S3_BUCKET_NAME, and a second entry with a different value would be a
+     duplicate env var whose winner is undefined. */}}
+{{- if and (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyS3ReadBucket }}
+# Retains reads for persisted s3:// stored-object URIs and legacy consumers
+# that already carry an S3 bucket/key after writes switch to Azure. This does
+# not route provider-derived dataset chunks or GroupQueue durable payloads:
+# migrate every dataset and drain GroupQueue before cutover. Omit on a
+# greenfield Azure install.
+- name: S3_BUCKET_NAME
+  value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
@@ -975,17 +1462,71 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* ============================================================ */}}
 
 {{/* ClickHouse: Secret name — langwatch chart owns the secret (passed to subchart via auth.existingSecret) */}}
+{{/* The chart-managed ClickHouse Service name — its in-cluster DNS name and the
+     stem of the credentials-Secret name. Must equal clickhouse-serverless.fullname
+     EXACTLY: the subchart truncates the release name to 36 chars (leaving room for
+     a -keeper-headless suffix), so any parent reference that did NOT truncate would
+     name a Service that does not exist on a release name past 36 chars — every
+     in-cluster URL would dial a closed host and the default-Secret-name comparison
+     would flip. Single source for both, so the parent and subchart cannot disagree. */}}
+{{- define "langwatch.clickhouse.serviceName" -}}
+  {{- printf "%s-clickhouse" (.Release.Name | trunc 36 | trimSuffix "-") -}}
+{{- end -}}
+
 {{- define "langwatch.clickhouse.secretName" -}}
   {{- if .Values.clickhouse.auth.existingSecret -}}
     {{- tpl .Values.clickhouse.auth.existingSecret . -}}
   {{- else -}}
-    {{- printf "%s-clickhouse" .Release.Name -}}
+    {{- include "langwatch.clickhouse.serviceName" . -}}
   {{- end -}}
 {{- end -}}
 
 {{/* ClickHouse: Password secret key */}}
 {{- define "langwatch.clickhouse.secretKey" -}}
   {{- .Values.clickhouse.auth.secretKeys.passwordKey | default "password" -}}
+{{- end -}}
+
+{{/* LangWatchQL Secret for chart-managed ClickHouse. Resolves to the SAME Secret
+     the clickhouse-serverless subchart mounts the langwatch_lwql user from, so
+     the app/workers read the query password from exactly where the pod created
+     it: clickhouse.lwqlAccessModel.existingSecret (tpl'd) when set, else the ClickHouse
+     credentials Secret.
+
+     Both this helper and the subchart's clickhouse-serverless.lwqlSecretName key
+     off `clickhouse.auth.existingSecret` for that credentials Secret, and the
+     parent's default for it (langwatch.clickhouse.serviceName, see values.yaml)
+     is shared and NON-empty — so on every supported path the two resolve to the
+     same name. Both fallbacks now truncate the release name to 36 chars
+     identically (this helper via langwatch.clickhouse.serviceName, the subchart
+     via clickhouse-serverless.fullname), so a >36-char release name no longer
+     diverges even if clickhouse.auth.existingSecret is hand-emptied. */}}
+{{- define "langwatch.clickhouse.lwqlSecretName" -}}
+  {{- $lwql := .Values.clickhouse.lwqlAccessModel | default dict -}}
+  {{- if $lwql.existingSecret -}}
+    {{- tpl $lwql.existingSecret . -}}
+  {{- else -}}
+    {{- include "langwatch.clickhouse.secretName" . -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* LangWatchQL restricted-connection constants for chart-managed ClickHouse.
+
+     The identity name and the tenant setting are NOT chart values: the
+     clickhouse-serverless image bakes them into the access-model config it
+     renders (langwatch_lwql user, custom_api_key_hash setting — see the
+     subchart README and infra/clickhouse-serverless/internal/render), and the
+     app carries the exact same pair as LWQL_CONNECTION_DEFAULTS
+     (platform/app/src/server/analytics/lwql/connection.ts). They are constants
+     of the access model, so they live in ONE place here rather than being
+     retyped at each env var, and any change to the baked identity changes with
+     them. The in-cluster URL mirrors the CLICKHOUSE_URL host the chart already
+     dials (langwatch.clickhouse.serviceName :8123), stripped of credentials and
+     database path — the client is handed user, password and database
+     separately. */}}
+{{- define "langwatch.lwql.restrictedUser" -}}langwatch_lwql{{- end -}}
+{{- define "langwatch.lwql.tenantSetting" -}}custom_api_key_hash{{- end -}}
+{{- define "langwatch.lwql.inClusterClickhouseUrl" -}}
+  {{- printf "http://%s:8123" (include "langwatch.clickhouse.serviceName" .) -}}
 {{- end -}}
 
 {{/* ============================================================ */}}
@@ -1083,6 +1624,56 @@ true
 {{- end -}}
 
 {{/*
+  Whether the APPLICATION self-provisions the LangWatchQL backend via SQL DDL
+  (issue #6635; ownership model from langwatch-saas#1168, Design C).
+
+  One rule: whoever owns the ClickHouse server owns the access model. For
+  chart-managed ClickHouse the clickhouse-serverless subchart renders the LWQL
+  user, profile, grants, row filters and the lwql_postgres named collection as
+  config at pod boot, so the app must NOT also issue that DDL — a second owner
+  of the same entity names wedges access entities (495 on every repair statement)
+  or blocks server boot (named-collection collision). App self-provisioning is
+  therefore the EXTERNAL/BYO ClickHouse path only: the chart cannot render config
+  into a server it does not run, so the app issues the DDL and degrades to a
+  logged, fail-closed refusal if the server rejects it.
+
+  This is genuinely mutually exclusive with the subchart's config rendering, not
+  merely default-off: it is gated on `not clickhouse.chartManaged`, the same
+  switch that decides whether the subchart exists at all.
+*/}}
+{{- define "langwatch.lwql.selfProvisionActive" -}}
+{{- if and .Values.lwql.enabled (not .Values.clickhouse.chartManaged) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+  Guard the one combination where LangWatchQL silently goes unprovisioned.
+
+  For chart-managed ClickHouse the app does NOT self-provision (selfProvisionActive
+  is false), so the ONLY provisioner is the clickhouse-serverless subchart, and it
+  renders the access model only when clickhouse.lwqlAccessModel.enabled is true. Helm cannot
+  derive a subchart value from a parent one, so the parent's values.yaml sets
+  clickhouse.lwqlAccessModel.enabled: true to match lwql.enabled's default — but an operator
+  can still turn one off and leave the other on. If they do (lwql.enabled=true,
+  clickhouse.chartManaged=true, clickhouse.lwqlAccessModel.enabled=false) NOBODY provisions
+  LWQL and the feature fails closed with no signal. Fail loudly instead.
+
+  The vendored clickhouse-serverless-0.3.0.tgz carries these lwql values in its
+  own values.yaml (lwqlAccessModel), so the subchart declares
+  clickhouse.lwqlAccessModel.enabled and this guard reads exactly the value the
+  subchart renders from — it never fires on the stock default path
+  (clickhouse.lwqlAccessModel.enabled=true).
+*/}}
+{{- define "langwatch.lwql.provisioningGuard" -}}
+{{- $ch := .Values.clickhouse | default dict }}
+{{- $chLwql := $ch.lwqlAccessModel | default dict }}
+{{- if and .Values.lwql.enabled $ch.chartManaged (not $chLwql.enabled) }}
+{{- fail "lwql.enabled=true with clickhouse.chartManaged=true requires clickhouse.lwqlAccessModel.enabled=true: for chart-managed ClickHouse the app does not self-provision, so the clickhouse-serverless subchart is the only provisioner and it renders the LWQL access model only when clickhouse.lwqlAccessModel.enabled is true. Leaving it false silently disables LangWatchQL. Set clickhouse.lwqlAccessModel.enabled=true (the chart default), or disable the feature with lwql.enabled=false." }}
+{{- end }}
+{{- end -}}
+
+{{/*
   Default podAffinity co-locating a pod with the app pod, for consumers of the
   app's RWO stored-objects PVC (workers Deployment, dataset-s3-migration Job).
   An RWO volume attaches to ONE node, so a consumer scheduled on any other node
@@ -1102,6 +1693,169 @@ podAffinity:
           app.kubernetes.io/name: {{ .Release.Name }}-app
           app.kubernetes.io/instance: {{ .Release.Name }}
       topologyKey: kubernetes.io/hostname
+{{- end -}}
+
+{{/*
+  Shared pod spec for the stored-objects upgrade hook Jobs, up to and including
+  the `containers:` key. Both the pre-upgrade and the post-upgrade Job run the
+  same image with the same identity, so the parts that are not the script live
+  here rather than being written twice.
+
+  automountServiceAccountToken is true on purpose. These Jobs are the only
+  workloads in the release that call the Kubernetes API, so they need the token
+  global.automountServiceAccountToken withholds from the rest.
+
+  nodeSelector, tolerations, affinity and priorityClassName come from
+  global.scheduling so the Jobs land where the rest of the release lands. On a
+  cluster whose nodes are tainted or whose workloads carry a required node
+  affinity, a hook that ignored them would sit Pending and stall every upgrade.
+
+  global.scheduling.topologySpreadConstraints is deliberately NOT copied. A
+  spread constraint describes how the replicas of a service should be
+  distributed; on a single-run Job it can only make the pod unschedulable when
+  whenUnsatisfiable is DoNotSchedule, which for a fail-closed pre-upgrade hook
+  means a blocked upgrade.
+
+  imagePullSecrets are their own value rather than a chart-wide one, because
+  these Jobs run under their OWN ServiceAccount. Pull secrets an operator
+  attached to the namespace's `default` ServiceAccount, which is what the rest
+  of the release uses when global.serviceAccount.create is false, do not reach
+  them.
+
+  See templates/app/stored-objects-serialize-upgrade.yaml.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookPodSpec" -}}
+restartPolicy: Never
+serviceAccountName: {{ .Release.Name }}-stored-objects-upgrade
+automountServiceAccountToken: true
+{{- with .Values.app.storedObjects.localFilesystem.serializeUpgradesPullSecrets }}
+imagePullSecrets:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.affinity }}
+affinity:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.scheduling.priorityClassName }}
+priorityClassName: {{ . | quote }}
+{{- end }}
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  seccompProfile:
+    type: RuntimeDefault
+containers:
+{{- end -}}
+
+{{/*
+  Shell functions both stored-objects upgrade hook Jobs use. They read the
+  `ns`, `deploy` and `selector` variables the Job's script sets above them.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookShellHelpers" -}}
+deployment_exists() {
+  kubectl -n "$ns" get deployment "$deploy" >/dev/null 2>&1
+}
+
+scale_workers() {
+  kubectl -n "$ns" patch deployment "$deploy" --subresource=scale --type=merge -p "{\"spec\":{\"replicas\":${1}}}"
+}
+
+wait_for_workers_gone() {
+  printf 'serialize-upgrade: waiting up to %ss for the %s pods to go away\n' "${1}" "$deploy"
+  out=$(kubectl -n "$ns" wait --for=delete pod --selector="$selector" --timeout="${1}s" 2>&1)
+  status=$?
+  printf '%s\n' "$out"
+  [ "$status" -eq 0 ] && return 0
+  # kubectl below 1.31 reports an empty selector result as an error. No pods
+  # left IS the state this waits for, so it must not read as a failure.
+  case "$out" in
+    *'no matching resources found'*) return 0 ;;
+  esac
+  return 1
+}
+{{- end -}}
+
+{{/*
+  The post-upgrade hook's wait for the app rollout. Reads `ns` and `app`.
+
+  It polls rather than calling `kubectl rollout status`, which LISTs
+  Deployments. Kubernetes ignores resourceNames on `list`, so `rollout status`
+  cannot run under a Role restricted to two Deployments by name, and using it
+  would mean granting read access to every Deployment in the namespace. The
+  condition below is the one `rollout status` itself applies.
+
+  All four parts are needed to prove the NEW app pod, not the one it replaced,
+  is the pod holding the volume:
+
+    observedGeneration >= generation   the controller has seen the new spec
+    updatedReplicas    == replicas     every pod asked for is from the new spec
+    statusReplicas     == updated      no pod from the old spec is left
+    available          >= updated      the new pods are ready
+
+  readyReplicas alone is not enough, and getting that wrong would reintroduce
+  the wedge this hook exists to prevent: it counts ready pods across EVERY
+  ReplicaSet, so during a kill-then-start rollout there is a window where the
+  controller has already recorded the new generation while the still-Ready OLD
+  pod satisfies the count. The workers would then come back against the node
+  the app is leaving.
+*/}}
+{{- define "langwatch.storedObjects.upgradeHookAppRolloutHelper" -}}
+is_number() {
+  case "${1:-}" in
+    '' | *[!0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+app_rollout_done() {
+  # Pipe-separated, not space-separated. A status field that is absent (which
+  # is how the API reports zero) renders as nothing, so on whitespace splitting
+  # every later field shifts left and is read as the wrong one. With an
+  # explicit separator the empty field keeps its place, and an empty field
+  # fails is_number below, which reads as "not done yet" and keeps waiting.
+  state=$(kubectl -n "$ns" get deployment "$app" -o jsonpath='{.metadata.generation}|{.status.observedGeneration}|{.spec.replicas}|{.status.updatedReplicas}|{.status.replicas}|{.status.availableReplicas}|' 2>/dev/null)
+  old_ifs=$IFS
+  IFS='|'
+  set -- $state
+  IFS=$old_ifs
+  # The three status counters default to 0, because the API omits a zero-valued
+  # one and an app parked at replicaCount 0 is a finished rollout, not one that
+  # never starts. The desired count stays mandatory: with it missing there is
+  # nothing to compare against. Defaulting the counters does not weaken the
+  # check, since a rollout that has not produced its pods yet reports 0 against
+  # a desired count above 0 and still reads as unfinished.
+  generation="${1:-}"; observed="${2:-}"; want="${3:-}"; updated="${4:-0}"; current="${5:-0}"; available="${6:-0}"
+  is_number "$generation" || return 1
+  is_number "$observed" || return 1
+  is_number "$want" || return 1
+  is_number "$updated" || return 1
+  is_number "$current" || return 1
+  is_number "$available" || return 1
+  [ "$observed" -ge "$generation" ] || return 1
+  [ "$updated" -eq "$want" ] || return 1
+  [ "$current" -eq "$updated" ] || return 1
+  [ "$available" -ge "$updated" ] || return 1
+  return 0
+}
+
+wait_for_app_rollout() {
+  deadline=$(( $(date +%s) + ${1} ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if app_rollout_done; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
 {{- end -}}
 
 {{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}
@@ -1204,3 +1958,132 @@ here, once, by name, so both consuming templates agree.
   {{- end -}}
   {{- $normalised | uniq | toJson -}}
 {{- end -}}
+
+{{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
+     render when it cannot cover that component's shutdown drain.
+
+     The Node processes run four nested shutdown clocks — the GroupQueue
+     drain, App.close's backstop, the entrypoint watchdog, and this one. They
+     are derived from a single number in
+     platform/app/src/server/shutdown/budget.ts:
+
+       processDeadlineMs = drain + 5s (App.close) + 15s (process teardown)
+       required grace    = processDeadlineMs + 10s of kubelet slack
+
+     So a drain of D seconds needs a grace period of at least D + 30. The
+     workers Deployment had no grace period at all and ran on the k8s default
+     of 30s, which a 20s drain plus teardown does not fit inside; the kubelet
+     answered with SIGKILL mid-drain, severing in-flight ClickHouse statements
+     and producing `Broken pipe ... ParallelFormattingOutputFormat` on the
+     server. See specs/event-sourcing/worker-graceful-shutdown.feature.
+
+     Validated rather than derived, matching the gateway subchart: an operator
+     draining behind a slow load balancer wants a wider margin than a formula
+     would pick, so the number stays theirs to set — the chart only refuses to
+     install a release the kubelet would kill mid-drain.
+
+     Set shutdownDrainSeconds and the app's SHUTDOWN_DRAIN_TIMEOUT_MS together;
+     this helper validates the pod against what the process will actually do. */}}
+{{/* The process side of the same number the pod is sized for.
+
+     Emitted per component rather than in sharedEnv because app and workers
+     each carry their own shutdownDrainSeconds, and a process told a budget its
+     pod was not sized for is exactly the drift this pair exists to prevent:
+     the kubelet SIGKILLs a drain the process still believes it has time for.
+     One value in values.yaml now drives both. */}}
+{{/* Reads a whole-second count, refusing anything that is not one.
+
+     `int` is the trap this exists for: it silently yields 0 for a value Helm
+     kept as a string, which `--set-string x=abc` and `--set x=25.9` both
+     produce. A zero drain then renders SHUTDOWN_DRAIN_TIMEOUT_MS="0" — which
+     the app rejects at boot, crashlooping every pod — while ALSO collapsing
+     the required grace period to the bare margin, so the guard below happily
+     passes and the release installs looking correct. A silent 0 is the worst
+     of both: the render says fine and the fleet does not come up. */}}
+{{- define "langwatch.positiveSeconds" -}}
+{{/* Presence, not truthiness. Helm's `default` treats 0 as empty, so a
+     deliberate `shutdownDrainSeconds: 0` would be silently rewritten to the
+     default — an operator asking for immediate kills would instead get the
+     full wait on every delete, with nothing to tell them why. Only an ABSENT
+     (nil) value falls back; an explicit 0 reaches the check below and is
+     refused. */}}
+{{- $raw := .value -}}
+{{- if kindIs "invalid" $raw -}}
+{{- $raw = .fallback -}}
+{{- end -}}
+{{- $s := toString $raw -}}
+{{- if not (regexMatch "^[1-9][0-9]*$" $s) -}}
+{{- fail (printf "%s must be a whole number of seconds greater than zero, got %q. Helm keeps a quoted or fractional value as a string and `int` turns it into 0, which would render a zero shutdown budget and crashloop the pod." .name $s) -}}
+{{- end -}}
+{{- $s -}}
+{{- end -}}
+
+{{- define "langwatch.shutdownEnv" -}}
+{{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
+{{/* extraEnvs renders after this block, and the kubelet takes the LAST
+     duplicate — so setting SHUTDOWN_DRAIN_TIMEOUT_MS there silently wins over
+     the value the pod was sized for, which is the exact drift the pair exists
+     to prevent, and invisible because the grace period still looks right. Set
+     shutdownDrainSeconds instead; it moves both. */}}
+{{- range (default (list) .component.extraEnvs) -}}
+{{- if eq .name "SHUTDOWN_DRAIN_TIMEOUT_MS" -}}
+{{- fail (printf "SHUTDOWN_DRAIN_TIMEOUT_MS must not be set through extraEnvs — it would override the drain budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both.") -}}
+{{- end -}}
+{{- end -}}
+- name: SHUTDOWN_DRAIN_TIMEOUT_MS
+  value: {{ mul (int $drain) 1000 | quote }}
+{{- end -}}
+
+{{- define "langwatch.terminationGracePeriod" -}}
+{{- $component := .component -}}
+{{- $drain := int (include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" $component.shutdownDrainSeconds "fallback" 25)) -}}
+{{- $required := add $drain 30 -}}
+{{- $granted := int (include "langwatch.positiveSeconds" (dict "name" (printf "%s.terminationGracePeriodSeconds" .name) "value" $component.terminationGracePeriodSeconds "fallback" $required)) -}}
+{{- if lt $granted $required -}}
+{{- fail (printf "%s.terminationGracePeriodSeconds is %d, too short for a %ds shutdown drain: App.close adds 5s, process teardown 15s and the kubelet 10s of slack, so it needs at least %d. Raise it to %d or more, or lower %s.shutdownDrainSeconds." .name $granted $drain $required $required .name) -}}
+{{- end -}}
+{{- $granted -}}
+{{- end -}}
+
+{{/*
+ServiceAccount name for the first-party workloads that touch object storage
+(app and workers). The cron pods never name it — see the comment in
+cronjobs/cronjobs.yaml.
+
+Explicit name wins; otherwise the release name when we create one; otherwise
+empty, which callers treat as "omit serviceAccountName and use `default`".
+*/}}
+{{- define "langwatch.serviceAccountName" -}}
+{{- if ((.Values.global).serviceAccount).name -}}
+{{- ((.Values.global).serviceAccount).name -}}
+{{- else if ((.Values.global).serviceAccount).create -}}
+{{- .Release.Name -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Pod labels that activate cloud workload identity.
+
+Azure's admission webhook only mutates pods carrying
+`azure.workload.identity/use: "true"` — without it the projected federated
+token is never injected, the pod boots healthy, and every storage write then
+fails at runtime claiming the cluster is misconfigured. Rendering the label
+from the same value that selects the auth mode keeps those two facts from
+drifting apart.
+
+Renders nothing unless the azureBlob provider is active in workloadIdentity
+mode, so no other install gains a label.
+*/}}
+{{- define "langwatch.cloudIdentityPodLabels" -}}
+{{- $dp := .Values.app.dataplane | default dict -}}
+{{/* legacyAzureRead counts as "Azure is in use": after an Azure->S3 migration
+     the active provider is awsS3, but the pod still resolves reads of
+     historical azure-blob:// objects and so still needs an injected token.
+     Gating on the active provider alone stranded exactly those objects. */}}
+{{- if and $dp.enabled (or (eq ($dp.provider | default "") "azureBlob") $dp.legacyAzureRead) -}}
+{{- $azure := (($dp.providers | default dict).azureBlob | default dict) -}}
+{{- if eq ($azure.authMode | default "sharedKey") "workloadIdentity" -}}
+azure.workload.identity/use: "true"
+{{- end -}}
+{{- end -}}
+{{- end }}

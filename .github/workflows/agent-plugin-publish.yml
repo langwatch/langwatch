@@ -17,6 +17,12 @@ on:
       - "agent-plugin@v*"
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. Tag pushes are unique, so the
+# collision this actually guards is a re-dispatch of a tag already publishing.
+concurrency:
+  group: agent-plugin-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

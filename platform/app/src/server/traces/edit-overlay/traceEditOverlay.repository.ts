@@ -1,5 +1,9 @@
 import { generate } from "@langwatch/ksuid";
-import type { Prisma, PrismaClient, TraceEditOverlay } from "@prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  TraceEditOverlay,
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { TraceEditOverlayPatch } from "./traceEditOverlay.schemas";
 

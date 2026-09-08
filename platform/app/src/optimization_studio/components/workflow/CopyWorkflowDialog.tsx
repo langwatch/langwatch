@@ -17,7 +17,7 @@ export const CopyWorkflowDialog = ({
   workflowName: string;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const copyWorkflow = api.workflow.copy.useMutation();
   const projects = useProjectsForCopy("workflows:create");
   const [copyDatasets, setCopyDatasets] = useState(false);
@@ -43,7 +43,7 @@ export const CopyWorkflowDialog = ({
           copyDatasets: Boolean(copyDs),
         });
       }}
-      isLoading={copyWorkflow.isLoading}
+      isLoading={copyWorkflow.isPending}
       extraContent={
         <Checkbox
           checked={copyDatasets}

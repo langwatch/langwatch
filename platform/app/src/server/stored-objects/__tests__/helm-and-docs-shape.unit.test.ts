@@ -187,9 +187,11 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       expect(values).toContain("legacyS3ReadBucket");
-      // Emitted from inside the azureBlob branch, gated on the opt-in value.
+      // Emitted when azureBlob is the ACTIVE provider AND the opt-in value is
+      // set — the double gate is what prevents a duplicate S3_BUCKET_NAME
+      // when S3 is active (its own write block already emits one).
       expect(helpers).toMatch(
-        /if \.Values\.app\.dataplane\.legacyS3ReadBucket[\s\S]*?S3_BUCKET_NAME/,
+        /if and \(eq \.Values\.app\.dataplane\.provider "azureBlob"\) \.Values\.app\.dataplane\.legacyS3ReadBucket[\s\S]*?S3_BUCKET_NAME/,
       );
     });
   });
@@ -292,6 +294,33 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
       expect(example).toContain("AZURE_BLOB_CONTAINER");
       // The explicit-toggle rationale must be documented, not just the vars.
       expect(example).toMatch(/EXPLICIT toggle|explicit toggle/);
+    });
+
+    /** @scenario "Self-hosting docs describe the enterprise authentication path" */
+    it("documents every auth mode, the required role assignment, and the AKS-only limit", () => {
+      const doc = readRepoFile(
+        "docs/self-hosting/configuration/environment-variables.mdx",
+      );
+
+      expect(doc).toContain("AZURE_BLOB_AUTH_MODE");
+      for (const mode of [
+        "sharedKey",
+        "workloadIdentity",
+        "managedIdentity",
+        "azureCli",
+      ]) {
+        expect(doc).toContain(mode);
+      }
+
+      // The role that actually grants data access, and the trap of granting
+      // the control-plane role instead.
+      expect(doc).toContain("Storage Blob Data Contributor");
+      expect(doc).toMatch(/Contributor.*does \*not\* grant data access/);
+
+      // Shared-key config is unnecessary in token modes, and federated
+      // Kubernetes identity is AKS-only.
+      expect(doc).toMatch(/no fallback|There is no fallback/i);
+      expect(doc).toMatch(/AKS only|AKS\*\* only/i);
     });
   });
 

@@ -1,5 +1,4 @@
 import { HStack, IconButton, Table, Text } from "@chakra-ui/react";
-import type { Scenario } from "@prisma/client";
 import {
   type ColumnFiltersState,
   createColumnHelper,
@@ -16,6 +15,7 @@ import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Scenario } from "~/generated/prisma/client";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Checkbox } from "../ui/checkbox";
 import { Menu } from "../ui/menu";

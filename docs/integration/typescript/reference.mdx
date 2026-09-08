@@ -257,7 +257,7 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 </ParamField>
 
 <ParamField path="setRequestModel" type="(model: string) => this">
-  Set the request model name for the span. This is typically the model name sent in the API request (e.g., 'gpt-5', 'claude-3').
+  Set the request model name for the span. This is typically the model name sent in the API request (e.g., 'gpt-5', 'claude-sonnet-5').
 </ParamField>
 
 <ParamField path="setResponseModel" type="(model: string) => this">
@@ -316,6 +316,8 @@ const langwatch = new LangWatch({
 <ParamField path="options" type="LangWatchConstructorOptions" default="{}">
   Configuration options for the LangWatch client.
 </ParamField>
+
+GET and HEAD requests follow redirects, up to five hops, and drop credential headers when the target is another origin. Every other request only follows an `http://` endpoint's redirect to the same URL over `https://`, once, with a warning asking you to configure the https URL directly. A refused redirect throws a `LangWatchRedirectError` that names the request URL, the `Location` and the status. Set the endpoint to the final URL to fix it.
 
 #### Properties
 
@@ -1151,7 +1153,7 @@ For practical examples and advanced usage patterns, see:
 - **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Advanced span management techniques
 - **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - Standardized attribute naming guidelines
 - **[Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript)** - Troubleshoot integration issues
-- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific setup and examples
+- **[Framework Integrations](/integration/overview)** - Framework-specific setup and examples
 
 <Tip>
 Start with the [Integration Guide](/integration/typescript/guide) for a quick setup, then refer to this API reference for detailed configuration options.

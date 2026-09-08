@@ -99,7 +99,7 @@ def _build_response(
 def sync_detailed(
     id_or_slug: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiEvaluatorsByIdOrSlugResponse200
     | GetApiEvaluatorsByIdOrSlugResponse400
@@ -135,7 +135,7 @@ def sync_detailed(
 def sync(
     id_or_slug: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiEvaluatorsByIdOrSlugResponse200
     | GetApiEvaluatorsByIdOrSlugResponse400
@@ -167,7 +167,7 @@ def sync(
 async def asyncio_detailed(
     id_or_slug: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiEvaluatorsByIdOrSlugResponse200
     | GetApiEvaluatorsByIdOrSlugResponse400
@@ -201,7 +201,7 @@ async def asyncio_detailed(
 async def asyncio(
     id_or_slug: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiEvaluatorsByIdOrSlugResponse200
     | GetApiEvaluatorsByIdOrSlugResponse400

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { nanoid } from "nanoid";
+import { z } from "zod";
 /**
  * AiToolEntryService - owns the AI Tools Portal catalog (Phase 7).
  *
  * The portal lives at /me as a card grid (3 sections - coding
  * assistants, model providers, external tools) and is managed by org
- * admins at /settings/governance/tool-catalog.
+ * admins at /governance/tool-catalog.
  *
  * Scoping (read resolution):
  *   - org-scoped entries ("scope":"organization") are visible to ALL
@@ -33,13 +35,17 @@
  *
  * Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
-import { z } from "zod";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { modelProviders as supportedModelProviders } from "~/server/modelProviders/registry";
 
-import type { PlatformToolSlug } from "./platformToolPolicy.service";
+import {
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+  PLATFORM_TOOL_SLUGS,
+  type PlatformToolPolicy,
+  type PlatformToolPolicyMap,
+  type PlatformToolSlug,
+} from "./platformToolPolicy.service";
 
 export const SUPPORTED_TILE_TYPES = [
   "coding_assistant",
@@ -523,6 +529,44 @@ export class AiToolEntryService {
     }
 
     return overrides;
+  }
+
+  /**
+   * {@link resolveToolPolicyOverrides} merged over
+   * {@link PLATFORM_TOOL_POLICY_DEFAULTS}, so every known slug carries a
+   * policy whether or not the org publishes a tile for it. This is the
+   * effective policy: the login ceremony caches it for the CLI to gate on,
+   * and the ingestion-key mint enforces it against a CLI that did not.
+   */
+  async resolveToolPolicyMap({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<PlatformToolPolicyMap> {
+    const overrides = await this.resolveToolPolicyOverrides({
+      organizationId,
+      userId,
+    });
+    const map = {} as PlatformToolPolicyMap;
+    for (const slug of PLATFORM_TOOL_SLUGS) {
+      map[slug] = overrides[slug] ?? { ...PLATFORM_TOOL_POLICY_DEFAULTS[slug] };
+    }
+    return map;
+  }
+
+  /** One slug's effective policy. See {@link resolveToolPolicyMap}. */
+  async resolveToolPolicy({
+    organizationId,
+    userId,
+    slug,
+  }: {
+    organizationId: string;
+    userId: string;
+    slug: PlatformToolSlug;
+  }): Promise<PlatformToolPolicy> {
+    return (await this.resolveToolPolicyMap({ organizationId, userId }))[slug];
   }
 
   /**
@@ -1052,7 +1096,8 @@ export class AiToolEntryService {
         // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void,
         // which $queryRaw fails to deserialize. The lock releases at
         // commit / rollback.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
+        await tx.$executeRaw`-- @tenancy: advisory-lock helper, key is organization-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${organizationId}`}, 0))`;
         const countUnderLock = await tx.aiToolEntry.count({
           where: { organizationId },
         });

@@ -69,7 +69,7 @@ export function VirtualKeyRoutingSection({
         <SmallLabel>Routing</SmallLabel>
         <FieldInfoTooltip
           description="What happens when the provider serving a request fails. 'No fallback' surfaces the provider's error to the caller. 'Fall back' retries the request on the next eligible provider, which sends it to a different vendor. A routing policy pins an explicit ordered provider list."
-          docHref="/ai-gateway/routing-policies"
+          docHref="/ai-gateway/governance/routing-policies"
           testId="vk-routing-info"
         />
       </HStack>

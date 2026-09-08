@@ -17,20 +17,23 @@
  * hand-building the rows, so the shape under test is the one a signup
  * actually produces.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
+} from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
+
+wireDefaultTestApp();
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -162,7 +165,7 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
 
       // Exactly what the hook does with no localStorage team and no
       // project slug in the URL, which is the case on /settings/*.
-      const ambientTeam = selectAmbientTeam(teams);
+      const ambientTeam = selectAmbientTeam({ teams });
       const ambientProject = ambientTeam ? ambientTeam.projects[0] : undefined;
 
       expect(ambientTeam?.isPersonal).toBe(false);
@@ -175,7 +178,7 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
         include: { projects: true },
       });
 
-      expect(selectAmbientTeam(teams)?.id).toBe(
+      expect(selectAmbientTeam({ teams })?.id).toBe(
         teams.find((t) => !t.isPersonal)!.id,
       );
     });

@@ -8,6 +8,7 @@ import {
   ScopeChipPicker,
   type ScopeTriadEntry,
 } from "../settings/ScopeChipPicker";
+import { ViewTracesButton } from "./ViewTracesButton";
 
 /**
  * Where a virtual key lives: who can see and manage it, and where its
@@ -311,6 +312,7 @@ export function VirtualKeyOwnershipReadOnly({
   principal,
   traceProjectId,
   traceProjectArchived,
+  viewTracesHref,
   ctx,
 }: {
   scopes: Array<{
@@ -321,6 +323,12 @@ export function VirtualKeyOwnershipReadOnly({
   /** The key's stored destination. Null only for keys that predate it. */
   traceProjectId: string | null;
   traceProjectArchived: boolean;
+  /**
+   * Where the destination's traces can be read, when the caller resolved a
+   * project the viewer may open. Left off for a destination that is deleted
+   * or outside the viewer's teams.
+   */
+  viewTracesHref?: string;
   ctx: Pick<
     OwnershipContext,
     "organizationName" | "availableTeams" | "availableProjects"
@@ -375,6 +383,9 @@ export function VirtualKeyOwnershipReadOnly({
           >
             Deleted
           </Badge>
+        )}
+        {viewTracesHref && !traceProjectArchived && (
+          <ViewTracesButton href={viewTracesHref} />
         )}
       </HStack>
       {traceProjectArchived && (

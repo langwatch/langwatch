@@ -5,10 +5,11 @@
  * part of a trace: every comment by default, each carrying its anchor, with the
  * trace-only read available to a caller that asks for it.
  */
-import type { Organization, Project, Team } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { app } from "../annotations";

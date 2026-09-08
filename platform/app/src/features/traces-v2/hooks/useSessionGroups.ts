@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -18,7 +19,7 @@ export interface SessionGroupsResult {
   nextCursor: string | null;
   isLoading: boolean;
   isFetching: boolean;
-  isPreviousData: boolean;
+  isPlaceholderData: boolean;
   isError: boolean;
   error: unknown;
 }
@@ -71,7 +72,7 @@ const settledResult = (groups: ConversationGroup[]): SessionGroupsResult => ({
   nextCursor: null,
   isLoading: false,
   isFetching: false,
-  isPreviousData: false,
+  isPlaceholderData: false,
   isError: false,
   error: null,
 });
@@ -154,7 +155,7 @@ export function useSessionGroups(): SessionGroupsResult {
         sampleGroups === null &&
         (page === 1 || sessionCursor !== undefined),
       staleTime: 60_000,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -171,7 +172,7 @@ export function useSessionGroups(): SessionGroupsResult {
     nextCursor: query.data?.nextCursor ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
-    isPreviousData: query.isPreviousData,
+    isPlaceholderData: query.isPlaceholderData,
     isError: query.isError,
     error: query.error,
   };

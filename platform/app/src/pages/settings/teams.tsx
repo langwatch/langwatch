@@ -12,7 +12,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
 import {
   ChevronDown,
   ChevronRight,
@@ -29,6 +28,7 @@ import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import {
@@ -143,7 +143,7 @@ function AddToTeamDialog({
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const orgMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -329,7 +329,7 @@ function AddToProjectDialog({
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const orgMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -478,7 +478,7 @@ function ProjectSection({
   const [expanded, setExpanded] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
   const { openDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const deleteBinding = api.roleBinding.delete.useMutation({
     onSuccess: () => {
@@ -753,7 +753,7 @@ function TeamCard({
   const [addingMember, setAddingMember] = useState(false);
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const department = useDepartmentColumn(organizationId);
 
   const deleteBinding = api.roleBinding.delete.useMutation({

@@ -12,8 +12,8 @@ import type {
 } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types";
 import type { ProcessManagerDefinition } from "./processManagerDefinition";
 import type { PipelineMetadata } from "./types";
 
@@ -158,16 +158,22 @@ export interface StaticPipelineDefinition<
     options?: CommandHandlerOptions;
   }>;
 
-  /** Reactors attached to fold projections (post-fold side-effect handlers) */
-  foldReactors: Map<
+  /** Subscribers attached to fold projections (post-fold side-effect handlers) */
+  foldSubscribers: Map<
     string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
+    {
+      projectionName: string;
+      definition: SubscriberDispatchDefinition<EventType>;
+    }
   >;
 
-  /** Reactors attached to map projections (post-map side-effect handlers) */
-  mapReactors: Map<
+  /** Subscribers attached to map projections (post-map side-effect handlers) */
+  mapSubscribers: Map<
     string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
+    {
+      projectionName: string;
+      definition: SubscriberDispatchDefinition<EventType>;
+    }
   >;
 
   /** Live event consumers that are independent of fold/map projections. */

@@ -36,7 +36,7 @@ describe("createService", () => {
     it("responds to versioned path", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", { output: z.array(z.string()) }, async () => {
+          v.get("/items", { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) }, async () => {
             return ["a", "b"];
           });
         })
@@ -52,7 +52,7 @@ describe("createService", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => {
               return { ok: true };
             },
@@ -70,7 +70,7 @@ describe("createService", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => {
               return { ok: true };
             },
@@ -88,7 +88,7 @@ describe("createService", () => {
     it("returns 404", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/items", {}, async (c) => c.json({ ok: true }));
+          v.get("/items", { noPermission: { reason: "framework test endpoint" } }, async (c) => c.json({ ok: true }));
         })
         .build();
 
@@ -120,7 +120,7 @@ describe("createService", () => {
       ).toThrow(/basePath must start/);
       expect(() =>
         buildTestService().version("2025-03-15", (v) => {
-          v.get("items", {}, async (c) => c.body(null, 204));
+          v.get("items", { noPermission: { reason: "framework test endpoint" } }, async (c) => c.body(null, 204));
         }),
       ).toThrow(/Endpoint path must start/);
     });
@@ -134,7 +134,7 @@ describe("createService", () => {
       ]) {
         expect(() =>
           buildTestService().version("2025-03-15", (v) => {
-            v.get(path, {}, async (c) => c.body(null, 204));
+            v.get(path, { noPermission: { reason: "framework test endpoint" } }, async (c) => c.body(null, 204));
           }),
         ).toThrow(/reserved API version namespace/);
       }
@@ -147,7 +147,7 @@ describe("createService", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/:id/:child",
-            { params: z.object({ id: z.string(), child: z.string() }) },
+            { noPermission: { reason: "framework test endpoint" }, params: z.object({ id: z.string(), child: z.string() }) },
             async (c, { params }) => c.json(params),
           );
         })
@@ -180,7 +180,7 @@ describe("provide", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/greet",
-            { output: z.object({ message: z.string() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ message: z.string() }) },
             async (_c, { app }) => {
               return { message: app.greeting };
             },
@@ -205,7 +205,7 @@ describe("provide", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/data",
-            { output: z.object({ loaded: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ loaded: z.boolean() }) },
             async (_c, { app }) => {
               return app.data;
             },
@@ -225,7 +225,7 @@ describe("provide", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/health",
-            { output: z.literal("ok") },
+            { noPermission: { reason: "framework test endpoint" }, output: z.literal("ok") },
             async () => "ok" as const,
           );
         })
@@ -260,7 +260,7 @@ describe("provide", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/context",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               output: z.object({
                 organizationId: z.string(),
                 projectId: z.string(),
@@ -297,7 +297,7 @@ describe("input validation", () => {
         .version("2025-03-15", (v) => {
           v.post(
             "/items",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               input: z.object({ name: z.string() }),
               output: z.object({ created: z.string() }),
             },
@@ -325,7 +325,7 @@ describe("input validation", () => {
         .version("2025-03-15", (v) => {
           v.post(
             "/items",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               input: z.object({ name: z.string().min(1) }),
               output: z.object({ created: z.string() }),
             },
@@ -364,7 +364,7 @@ describe("output validation", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ id: z.number(), name: z.string() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.number(), name: z.string() }) },
             async () => {
               return { id: 1, name: "item", extraField: "stripped" };
             },
@@ -385,7 +385,7 @@ describe("output validation", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ id: z.number() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.number() }) },
             async () => ({ id: "not-a-number" }) as never,
           );
         })
@@ -417,7 +417,7 @@ describe("params validation", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items/:id",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               params: z.object({ id: z.string() }),
               output: z.object({ id: z.string() }),
             },
@@ -442,7 +442,7 @@ describe("query validation", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               query: z.object({ page: z.string() }),
               output: z.object({ page: z.string() }),
             },
@@ -479,12 +479,12 @@ describe("per-endpoint auth option", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/public",
-            { auth: "none", output: z.object({ open: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, auth: "none", output: z.object({ open: z.boolean() }) },
             async () => ({ open: true }),
           );
           v.get(
             "/private",
-            { output: z.object({ secret: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ secret: z.boolean() }) },
             async () => ({ secret: true }),
           );
         })
@@ -522,7 +522,7 @@ describe("per-endpoint auth option", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/public",
-            { auth: "none", output: z.object({ open: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, auth: "none", output: z.object({ open: z.boolean() }) },
             async () => ({ open: true }),
           );
         })
@@ -550,7 +550,7 @@ describe("per-endpoint middleware", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               middleware: [customMiddleware],
               output: z.object({ ok: z.boolean() }),
             },
@@ -588,7 +588,7 @@ describe("resource limit middleware", () => {
         .version("2025-03-15", (v) => {
           v.post(
             "/items",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               resourceLimit: "items",
               output: z.object({ ok: z.boolean() }),
             },
@@ -605,7 +605,7 @@ describe("resource limit middleware", () => {
   describe("when a resource limit is declared without its middleware factory", () => {
     it("fails closed while building the service", () => {
       const service = buildTestService().version("2025-03-15", (v) => {
-        v.post("/items", { resourceLimit: "items" }, async (c) =>
+        v.post("/items", { noPermission: { reason: "framework test endpoint" }, resourceLimit: "items" }, async (c) =>
           c.body(null, 204),
         );
       });
@@ -626,7 +626,7 @@ describe("version forward-copying via builder", () => {
         .version("2025-01-01", (v) => {
           v.get(
             "/items",
-            { output: z.object({ from: z.string() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ from: z.string() }) },
             async () => ({
               from: "v1",
             }),
@@ -635,7 +635,7 @@ describe("version forward-copying via builder", () => {
         .version("2025-06-01", (v) => {
           v.get(
             "/new",
-            { output: z.object({ from: z.string() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ from: z.string() }) },
             async () => ({
               from: "v2",
             }),
@@ -661,14 +661,14 @@ describe("version forward-copying via builder", () => {
         .version("2025-01-01", (v) => {
           v.get(
             "/old",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => ({
               ok: true,
             }),
           );
           v.get(
             "/kept",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => ({
               ok: true,
             }),
@@ -709,7 +709,7 @@ describe("version forward-copying via builder", () => {
 
       const app = createService({ name: "test", basePath: "/api/test", auth })
         .version("2025-01-01", (v) => {
-          v.get("/old", { middleware: [endpointMiddleware] }, async (c) =>
+          v.get("/old", { noPermission: { reason: "framework test endpoint" }, middleware: [endpointMiddleware] }, async (c) =>
             c.json({ ok: true }),
           );
         })
@@ -736,7 +736,7 @@ describe("OpenAPI responses", () => {
       .version("2025-03-15", (v) => {
         v.post(
           "/items",
-          { output: z.object({ id: z.string() }), status: 201 },
+          { noPermission: { reason: "framework test endpoint" }, output: z.object({ id: z.string() }), status: 201 },
           async () => ({ id: "item-1" }),
         );
       })
@@ -757,7 +757,7 @@ describe("OpenAPI responses", () => {
   it("adds a default success response for description-only routes", async () => {
     const app = buildTestService()
       .version("2025-03-15", (v) => {
-        v.get("/health", { description: "Health check" }, async (c) =>
+        v.get("/health", { noPermission: { reason: "framework test endpoint" }, description: "Health check" }, async (c) =>
           c.text("ok"),
         );
       })
@@ -781,7 +781,7 @@ describe("version response headers", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => ({
               ok: true,
             }),
@@ -801,7 +801,7 @@ describe("version response headers", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => ({
               ok: true,
             }),
@@ -821,7 +821,7 @@ describe("version response headers", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => ({
               ok: true,
             }),
@@ -846,7 +846,7 @@ describe("preview", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ stable: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ stable: z.boolean() }) },
             async () => ({
               stable: true,
             }),
@@ -855,7 +855,7 @@ describe("preview", () => {
         .preview((v) => {
           v.get(
             "/beta",
-            { output: z.object({ preview: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ preview: z.boolean() }) },
             async () => ({
               preview: true,
             }),
@@ -873,7 +873,7 @@ describe("preview", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ stable: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ stable: z.boolean() }) },
             async () => ({
               stable: true,
             }),
@@ -882,7 +882,7 @@ describe("preview", () => {
         .preview((v) => {
           v.get(
             "/beta",
-            { output: z.object({ preview: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ preview: z.boolean() }) },
             async () => ({
               preview: true,
             }),
@@ -906,7 +906,7 @@ describe("error handling", () => {
     it("catches and formats the error", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/fail", {}, async () => {
+          v.get("/fail", { noPermission: { reason: "framework test endpoint" } }, async () => {
             throw new Error("something broke");
           });
         })
@@ -923,7 +923,7 @@ describe("error handling", () => {
     it("serializes it correctly", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/fail", {}, async () => {
+          v.get("/fail", { noPermission: { reason: "framework test endpoint" } }, async () => {
             throw new NotFoundError("thing_not_found", "Thing", "123");
           });
         })
@@ -946,7 +946,7 @@ describe("error handling", () => {
       // `serialize()`. Only real HandledError instances are trusted.
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/fail", {}, async () => {
+          v.get("/fail", { noPermission: { reason: "framework test endpoint" } }, async () => {
             throw Object.assign(new Error("Not found"), {
               code: "thing_not_found",
               httpStatus: 404,
@@ -992,7 +992,7 @@ describe("global middleware", () => {
         .version("2025-03-15", (v) => {
           v.get(
             "/items",
-            { output: z.object({ ok: z.boolean() }) },
+            { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }) },
             async () => {
               calls.push("handler");
               return { ok: true };
@@ -1015,21 +1015,21 @@ describe("HTTP methods", () => {
   function buildMethodApp() {
     return buildTestService()
       .version("2025-03-15", (v) => {
-        v.get("/r", { output: z.literal("get") }, async () => "get" as const);
+        v.get("/r", { noPermission: { reason: "framework test endpoint" }, output: z.literal("get") }, async () => "get" as const);
         v.post(
           "/r",
-          { output: z.literal("post") },
+          { noPermission: { reason: "framework test endpoint" }, output: z.literal("post") },
           async () => "post" as const,
         );
-        v.put("/r", { output: z.literal("put") }, async () => "put" as const);
+        v.put("/r", { noPermission: { reason: "framework test endpoint" }, output: z.literal("put") }, async () => "put" as const);
         v.delete(
           "/r",
-          { output: z.literal("del") },
+          { noPermission: { reason: "framework test endpoint" }, output: z.literal("del") },
           async () => "del" as const,
         );
         v.patch(
           "/r",
-          { output: z.literal("patch") },
+          { noPermission: { reason: "framework test endpoint" }, output: z.literal("patch") },
           async () => "patch" as const,
         );
       })
@@ -1089,7 +1089,7 @@ describe("raw Response return", () => {
     it("allows the handler to return a raw Response", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/raw", {}, async (c) => {
+          v.get("/raw", { noPermission: { reason: "framework test endpoint" } }, async (c) => {
             return c.text("raw response", 201);
           });
         })
@@ -1111,7 +1111,7 @@ describe("null return", () => {
     it("serializes as JSON null", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/nullable", { output: z.null() }, async () => {
+          v.get("/nullable", { noPermission: { reason: "framework test endpoint" }, output: z.null() }, async () => {
             return null;
           });
         })
@@ -1127,12 +1127,76 @@ describe("null return", () => {
     it("returns 204 No Content", async () => {
       const app = buildTestService()
         .version("2025-03-15", (v) => {
-          v.get("/void", { output: z.undefined() }, async () => undefined);
+          v.get("/void", { noPermission: { reason: "framework test endpoint" }, output: z.undefined() }, async () => undefined);
         })
         .build();
 
       const res = await makeRequest(app, "/api/test/2025-03-15/void");
       expect(res.status).toBe(204);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The access declaration, at boot
+// ---------------------------------------------------------------------------
+
+describe("the endpoint access declaration", () => {
+  describe("when an endpoint reaches build() with no declaration", () => {
+    /**
+     * The types already refuse this (AccessDeclaration, @langwatch/authz);
+     * the boot check is what stops a JS-level bypass from mounting a route
+     * that reads as guarded.
+     */
+    /** @scenario "A service endpoint without an access declaration refuses to boot" */
+    it("refuses to build, naming the endpoint", () => {
+      expect(() =>
+        buildTestService()
+          .version("2025-03-15", (v) => {
+            (v.get as (p: string, c: unknown, h: unknown) => void)(
+              "/bare",
+              { description: "slipped past the types" },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/GET \/bare must declare exactly one of/);
+    });
+  });
+
+  describe("when an endpoint opts out with a blank reason", () => {
+    /** @scenario "A service endpoint opting out of its permission check carries a written reason" */
+    it("refuses to build", () => {
+      expect(() =>
+        buildTestService()
+          .version("2025-03-15", (v) => {
+            v.get(
+              "/blank",
+              { noPermission: { reason: "   " } },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/opts out of its permission check with a blank reason/);
+    });
+  });
+
+  describe("when an endpoint declares both a permission and an opt-out", () => {
+    it("refuses to build", () => {
+      expect(() =>
+        buildTestService()
+          .version("2025-03-15", (v) => {
+            (v.get as (p: string, c: unknown, h: unknown) => void)(
+              "/both",
+              {
+                permission: "organization:manage",
+                noPermission: { reason: "contradiction" },
+              },
+              async () => ({ ok: true }),
+            );
+          })
+          .build(),
+      ).toThrow(/GET \/both must declare exactly one of/);
     });
   });
 });

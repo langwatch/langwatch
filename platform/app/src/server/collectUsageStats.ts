@@ -1,3 +1,4 @@
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { getApp } from "~/server/app-layer/app";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import { prisma } from "~/server/db";
@@ -57,8 +58,11 @@ export async function collectUsageStats({
     prisma.batchEvaluation.count({
       where: { projectId: { in: projectIds } },
     }),
+    // Builder charts only, so the figure keeps meaning what it has always
+    // meant. Saved workbench charts share the table but are a different
+    // product; folding them in would show as growth in chart-builder usage.
     prisma.customGraph.count({
-      where: { projectId: { in: projectIds } },
+      where: { projectId: { in: projectIds }, kind: BUILDER_CHART_KIND },
     }),
     prisma.dataset.count({
       where: { projectId: { in: projectIds } },

@@ -16,7 +16,6 @@
  * Requires: PostgreSQL database (Prisma)
  */
 
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -27,6 +26,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../../db";
 import {
   createSeatChangeFixture,

@@ -28,9 +28,14 @@
     "dotenv-cli": "^10.0.0"
   },
   "overrides": {
-    "axios": "^1.15.0",
+    "@grpc/grpc-js": ">=1.14.4",
+    "@opentelemetry/core": ">=2.8.0 <3",
+    "@opentelemetry/propagator-jaeger": ">=2.9.0 <3",
+    "axios": ">=1.16.0 <2",
+    "js-yaml": ">=4.3.1 <5",
     "langsmith@<0.6.0": "0.6.0",
-    "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.0",
-    "@grpc/grpc-js": ">=1.14.4"
+    "linkify-it": ">=5.0.2 <6",
+    "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.6",
+    "uuid@<11.1.1": ">=11.1.1 <12"
   }
 }

@@ -1,4 +1,4 @@
-import type { AnnotationScoreDataType } from "@prisma/client";
+import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
 import type { RouterOutputs } from "~/utils/api";
 

@@ -6,13 +6,7 @@
  * because "stays active" and "is paused with a reason" are claims about what is
  * actually in the database, not about what a mock was called with.
  */
-import {
-  type Organization,
-  type Project,
-  type Team,
-  TriggerAction,
-  TriggerKind,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { register } from "prom-client";
 import {
@@ -24,6 +18,13 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  type Organization,
+  type Project,
+  type Team,
+  TriggerAction,
+  TriggerKind,
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 
 // Registers the counters the metric assertions read back.

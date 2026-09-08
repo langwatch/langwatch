@@ -23,10 +23,8 @@ vi.mock("~/server/dataplane-s3", () => ({
 }));
 
 import { getS3ConfigForProject } from "~/server/dataplane-s3";
-import {
-  AzureBackendMisconfiguredError,
-  resolveProjectStorageDestination,
-} from "../project-storage-destination";
+import { AzureBackendMisconfiguredError } from "../azure-credentials";
+import { resolveProjectStorageDestination } from "../project-storage-destination";
 
 const mockGetS3ConfigForProject = vi.mocked(getS3ConfigForProject);
 
@@ -146,8 +144,12 @@ describe("resolveProjectStorageDestination", () => {
   });
 
   describe("given no S3 bucket and no Azure config are present", () => {
-    it("falls back to a file destination", async () => {
+    /** @scenario "The legacy S3 selector keeps its existing fallback behavior" */
+    it("falls back to a file destination when the legacy s3 selector has no bucket", async () => {
+      mockEnv.STORED_OBJECTS_BACKEND = "s3";
+
       const destination = await resolveProjectStorageDestination("proj_x");
+
       expect(destination.kind).toBe("file");
     });
   });

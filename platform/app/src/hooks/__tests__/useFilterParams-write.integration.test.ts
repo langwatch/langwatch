@@ -121,6 +121,64 @@ describe("useFilterParams() write operations", () => {
     });
   });
 
+  // A keyset cursor describes a position in the result set it was minted
+  // against. Carrying one across a filter change resumes the NEW list partway
+  // down, so the first rows matching the filter just applied are the ones the
+  // user never sees — and the footer still says "page 3", so nothing signals
+  // it. Every write path here changes which rows match, so every one drops it.
+  describe("given a scroll already in progress", () => {
+    const withCursor = () => {
+      mockRouterQuery = { scrollId: "cursor-token", metadata_key: "env" };
+      mockRouterAsPath =
+        "/test-project/messages?scrollId=cursor-token&metadata_key=env";
+    };
+
+    describe("when a filter is applied", () => {
+      it("drops the cursor so the list starts from the filtered first page", () => {
+        withCursor();
+
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("metadata.value", { env: ["prod"] });
+
+        expect(lastPushUrl()).not.toContain("scrollId");
+        // The filter itself still lands — this is not a blanket URL wipe.
+        expect(lastPushUrl()).toContain("metadata.env=prod");
+      });
+
+      it("keeps it out of the router query too, not just the display URL", () => {
+        withCursor();
+
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("metadata.value", { env: ["prod"] });
+
+        const [url] = mockPush.mock.lastCall as [{ query: object }];
+        expect(url.query).not.toHaveProperty("scrollId");
+      });
+    });
+
+    describe("when filters are cleared", () => {
+      it("drops the cursor", () => {
+        withCursor();
+
+        const { result } = renderHook(() => useFilterParams());
+        result.current.clearFilters();
+
+        expect(lastPushUrl()).not.toContain("scrollId");
+      });
+    });
+
+    describe("when filters are negated", () => {
+      it("drops the cursor", () => {
+        withCursor();
+
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setNegateFilters(true);
+
+        expect(lastPushUrl()).not.toContain("scrollId");
+      });
+    });
+  });
+
   describe("clearFilters()", () => {
     describe("when URL has filters and a search query", () => {
       it("clears both filter params and query param", () => {

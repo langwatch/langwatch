@@ -1,4 +1,6 @@
 {{- include "langwatch.validateSecrets" . }}
+{{- include "langwatch.lwql.provisioningGuard" . }}
+{{- $lwqlBridgeDisabled := eq (include "langwatch.lwql.postgresBridgeDisabled" .) "true" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,9 +12,14 @@ metadata:
     {{- if .Values.app.deployment.labels }}
     {{- toYaml .Values.app.deployment.labels | nindent 4 }}
     {{- end }}
-  {{- with .Values.app.deployment.annotations }}
+  {{- if or .Values.app.deployment.annotations $lwqlBridgeDisabled }}
   annotations:
+    {{- with .Values.app.deployment.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $lwqlBridgeDisabled }}
+    langwatch.io/lwql-postgres-bridge: "disabled"
+    {{- end }}
   {{- end }}
 spec:
   replicas: {{ .Values.app.replicaCount }}
@@ -61,6 +68,9 @@ spec:
         {{- if .Values.app.pod.labels }}
         {{- toYaml .Values.app.pod.labels | nindent 8 }}
         {{- end }}
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       annotations:
         {{- with (coalesce .Values.app.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
@@ -70,8 +80,19 @@ spec:
         prometheus.io/port: "{{ .Values.app.service.port }}"
         {{- end }}
     spec:
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       # The app does not call the Kubernetes API, so don't mount the SA token.
+      # Cloud workload identity is unaffected by this flag: the platform
+      # webhook injects its own projected token volume, which the chart
+      # deliberately does not hand-roll.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      # The app runs the same shutdown budget as the workers, because it can be
+      # the process hosting the worker stack (the `all` process role) and its
+      # entrypoint watchdog is the same one. Even web-only, the drain finishes
+      # in well under this — the grace period is a ceiling, not a wait.
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app") }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
@@ -124,6 +145,7 @@ spec:
               protocol: TCP
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.app "name" "app") | nindent 12 }}
 
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,
@@ -220,10 +242,10 @@ spec:
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}
-            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # Langy agent pod. The app POSTs chats to LANGY_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
             # against the same Secret. Subchart values key read via index (aliased subchart).
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
@@ -317,6 +339,7 @@ spec:
             {{- end }}
 
             {{- with .Values.app.extraEnvs}}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 

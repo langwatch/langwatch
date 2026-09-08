@@ -84,7 +84,7 @@ vi.mock("../useCorrectionMarks", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     useQueries: () => [{ data: [], isLoading: false, isError: false }],
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: vi.fn() },
         getByTraceIds: { invalidate: vi.fn() },

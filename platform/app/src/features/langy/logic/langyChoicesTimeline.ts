@@ -5,8 +5,13 @@
  * the right answer for free: scrub before the selection and the question is
  * open, scrub past it and the card is locked.
  *
+ * A choices card reaches the panel two ways, and both are message PARTS: the
+ * `question` tool call the agent makes mid-turn, and a stamped card part read
+ * back from the durable record. Prose is never one of them, so the timeline
+ * reads parts only.
+ *
  * Per message, in conversation order:
- *   - an assistant message contributes a `question` entry per choices block
+ *   - an assistant message contributes a `question` entry per choices card
  *     it carries (its OWN prose never supersedes its own question);
  *   - a user message carrying selection parts contributes those selections
  *     (its "Chose: X" text is part of the answer, not a second exchange);
@@ -24,6 +29,8 @@ import { isQuestionToolPart, questionToolCardParts } from "./langyQuestionTool";
 interface MessageLike {
   role: string;
   parts?: readonly unknown[];
+  /** `{recorded: true}` marks a message read back from the durable fold. */
+  metadata?: unknown;
 }
 
 export function langyChoicesTimeline(

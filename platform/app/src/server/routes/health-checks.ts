@@ -7,20 +7,28 @@
  * - GET /api/health/processor   (sends canary traces + polls until processed)
  * - GET /api/health/triggers    (checks a trigger fired within the last hour)
  * - GET /api/health/workflows   (runs a sample workflow)
+ * - GET /api/health/scenarios   (runs a scenario plan and waits for the judge)
+ * - GET /api/health/langy       (sends Langy one greeting turn and waits for it)
  *
  * NOTE: The simple GET /api/health (204) is already handled in health.ts.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type {
   ESpanKind,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import crypto from "crypto";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { authorizeLangyApiKey } from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { prisma } from "~/server/db";
+import { sendCanary } from "~/server/health-probes/canary.service";
+import { runLangyHealthCanary } from "~/server/health-probes/langy-canary.service";
+import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
 
@@ -138,38 +146,22 @@ secured
       ],
     };
 
-    const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
+    const [, otelCollectorResponse] = await Promise.all([
+      sendCanary({
+        probe: "collector",
+        transport: "rest",
+        url: `${env.BASE_HOST}/api/collector`,
+        authToken,
+        body: restParams,
       }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
+      sendCanary({
+        probe: "collector",
+        transport: "otlp",
+        url: `${env.BASE_HOST}/api/otel/v1/traces`,
+        authToken,
+        body: otelParams,
       }),
     ]);
-
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
 
     const otelBody = await otelCollectorResponse.json();
     return c.json({
@@ -322,21 +314,19 @@ secured
     );
 
     const [restCollectorResponse, otelResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
+      sendCanary({
+        probe: "processor",
+        transport: "rest",
+        url: `${env.BASE_HOST}/api/collector`,
+        authToken,
+        body: restParams,
       }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
+      sendCanary({
+        probe: "processor",
+        transport: "otlp",
+        url: `${env.BASE_HOST}/api/otel/v1/traces`,
+        authToken,
+        body: otelParams,
       }),
     ]);
 
@@ -351,20 +341,6 @@ secured
       },
       "Canary traces sent",
     );
-
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
 
     const otelBody = await otelResponse.json();
 
@@ -560,6 +536,194 @@ secured
       status: response?.status,
       body: await response?.json(),
     });
+  });
+
+// ── GET /scenarios ───────────────────────────────────────────────────
+
+// Authenticated exactly like its siblings: a project API key in `X-Auth-Token`
+// (or `Authorization: Bearer`), resolved by `authenticateProject` BEFORE the
+// run plan is read or any run is queued. The project comes from the key, never
+// from the query string; the plan is looked up scoped to that project (the
+// multitenancy guard rejects an unscoped read) and the plan's own row supplies
+// the scenario and target — a runPlanId that belongs to another project
+// resolves to nothing and reports `run_failed` with no run launched.
+//
+// Every response carries `Cache-Control: no-store` — a monitor must see each
+// run's real result, never a cached one.
+//
+// @see specs/scenarios/scenario-canary-healthcheck.feature
+
+// Neither an id nor a slug is ever this long in practice, so a value past this
+// length is a malformed or hostile request — reject it here, before it ever
+// reaches a DB query, rather than let an oversized param ride all the way down
+// to the multitenancy-scoped `findFirst`.
+const MAX_CANARY_QUERY_PARAM_LENGTH = 128;
+
+// Trims and validates the one required query param in one place so the
+// handler's cognitive complexity stays low; a missing/blank value and an
+// implausibly long one are distinct 400s.
+function readCanaryQuery(
+  c: Context,
+): { runPlanId: string } | { missing: true } | { invalid: true } {
+  const runPlanId = c.req.query("runPlanId")?.trim();
+  if (runPlanId && runPlanId.length > MAX_CANARY_QUERY_PARAM_LENGTH) {
+    return { invalid: true };
+  }
+  if (runPlanId) {
+    return { runPlanId };
+  }
+  return { missing: true };
+}
+
+// Maps the canary's result union to its HTTP response so the handler itself
+// only has to call it — keeps the branching out of the handler's complexity.
+function canaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runScenarioHealthCanary>>;
+}) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, { status: 429 });
+  }
+  if (result.healthy) {
+    return c.json({
+      status: "ok",
+      scenarioRunId: result.scenarioRunId,
+      durationMs: result.durationMs,
+    });
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      scenarioRunId: result.scenarioRunId,
+      durationMs: result.durationMs,
+    },
+    { status: 503 },
+  );
+}
+
+secured
+  .access(publicEndpoint("subsystem health probe"))
+  .get("/scenarios", async (c) => {
+    // A monitor may poll this on an interval; a cached 200/503 would hide the
+    // next run's real result, so no response on any path is cacheable. Set once
+    // before the branches so every return below inherits it.
+    c.header("Cache-Control", "no-store");
+
+    const auth = await authenticateProject(c);
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, { status: auth.status });
+    }
+    const { project } = auth;
+
+    // `runPlanId` (the plan's id or its slug) is the only query param; the
+    // project scoping the lookup comes from the API key. A missing/blank value
+    // is a bad request, distinct from the 503 a plan that does not resolve
+    // reports.
+    const query = readCanaryQuery(c);
+    if ("invalid" in query) {
+      return c.json(
+        { message: "runPlanId query parameter is invalid." },
+        { status: 400 },
+      );
+    }
+    if ("missing" in query) {
+      return c.json(
+        { message: "runPlanId query parameter is required." },
+        { status: 400 },
+      );
+    }
+
+    const result = await runScenarioHealthCanary({
+      projectId: project.id,
+      runPlanId: query.runPlanId,
+    });
+    return canaryResultToResponse({ c, result });
+  });
+
+/**
+ * The Langy probe's auth, in the shape of `authenticateProject` above: the
+ * shared Langy chain (credential, surface flag, `langy:create` ceiling,
+ * cohort, actor) answers a refusal as `{ error, status }` for the handler to
+ * serialise like its siblings, a dark surface as `{ dark: true }`, and a
+ * pass as the actor the turn runs as. It is the key's OWNER who sends the
+ * greeting, so a plain project key with no owner is refused here.
+ */
+async function authenticateLangyActor(
+  c: Context,
+): Promise<
+  | { error: string; status: 401 | 403 }
+  | Awaited<ReturnType<typeof authorizeLangyApiKey>>
+> {
+  try {
+    return await authorizeLangyApiKey(c);
+  } catch (error) {
+    if (error instanceof HandledError) {
+      // The chain refuses with 401 (no or unknown credential) or 403 (ceiling,
+      // cohort, actor); Hono's json init needs the literal union, not `number`.
+      return { error: error.message, status: error.httpStatus as 401 | 403 };
+    }
+    throw error;
+  }
+}
+
+// Same job as `canaryResultToResponse` for the Langy probe, whose ids are a
+// conversation and a turn rather than a scenario run.
+function langyCanaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runLangyHealthCanary>>;
+}) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, { status: 429 });
+  }
+  const { healthy, conversationId, turnId, durationMs } = result;
+  if (healthy) {
+    return c.json({ status: "ok", conversationId, turnId, durationMs });
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      conversationId,
+      turnId,
+      durationMs,
+    },
+    { status: 503 },
+  );
+}
+
+secured
+  .access(publicEndpoint("subsystem health probe"))
+  .get("/langy", async (c) => {
+    // A monitor polls this on an interval; a cached 200/503 would hide the
+    // next turn's real result, so no response on any path is cacheable.
+    c.header("Cache-Control", "no-store");
+
+    const auth = await authenticateLangyActor(c);
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, { status: auth.status });
+    }
+    // The Langy API surface is dark for this project: answer as the turn
+    // routes do, with the same 404 an unmounted path gives. Headers included:
+    // the no-store set above would itself reveal that the surface exists, and
+    // Hono's not-found keeps headers already staged on the context.
+    if (auth.dark) {
+      c.header("Cache-Control", undefined);
+      return c.notFound();
+    }
+
+    const result = await runLangyHealthCanary({
+      projectId: auth.projectId,
+      session: auth.session,
+    });
+    auth.markUsed();
+    return langyCanaryResultToResponse({ c, result });
   });
 
 export const app = secured.hono;

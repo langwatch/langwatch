@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
@@ -20,12 +21,12 @@ export function useTraceEditOverlay() {
     {
       enabled: isReady && !shared,
       staleTime: 300_000,
-      cacheTime: 1_800_000,
-      keepPreviousData: true,
+      gcTime: 1_800_000,
+      placeholderData: keepPreviousData,
     },
   );
 
-  // Guard against `keepPreviousData`: on a trace switch the previous trace's
+  // Guard against `placeholderData: keepPreviousData`: on a trace switch the previous trace's
   // correction lingers in `query.data` until the new read lands. Handing it on
   // would apply one trace's correction to another, and adopt it as the editing
   // baseline for a trace it was never written against.

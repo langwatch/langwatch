@@ -147,8 +147,8 @@ func ExampleDatasetsService_AllRecords() {
 	}
 }
 
-// ExampleTracesService_All streams every trace matching a search, paging
-// transparently via pageOffset/pageSize until the result set is exhausted.
+// ExampleTracesService_All streams every trace matching a search, following the
+// scroll cursor each response carries until the result set is exhausted.
 func ExampleTracesService_All() {
 	lw, err := client.New()
 	if err != nil {

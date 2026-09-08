@@ -22,6 +22,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import type { FeatureFlagRules } from "~/server/featureFlag";
 import { api } from "~/utils/api";
 import { FeatureFlagRulesDialog } from "./FeatureFlagRulesDialog";
+import { summarizeTargeting, targetingLabel } from "./targetingSummary";
 
 interface FlagRow {
   key: string;
@@ -93,19 +94,22 @@ export function FeatureFlagsContent() {
     <Stack gap={8} paddingY={4} maxWidth="1200px">
       <Box>
         <Text fontSize="sm" color="fg.muted">
-          System-scoped flags are kill switches and pipeline toggles served from
-          this LangWatch postgres database. They never round-trip to PostHog, so
-          flipping them is fast and free.{" "}
-          {isSaas
-            ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests; postgres values here only apply as an emergency override."
-            : "Product-scoped flags fall back to this postgres store when PostHog is not configured."}
+          Every flag is served from this LangWatch postgres database, whichever
+          scope it carries, so flipping one is fast and free. Scope says who the
+          flag is for: product-scoped flags are customer-facing features,
+          system-scoped flags are kill switches and pipeline toggles. Targeting
+          rules work the same for both.
         </Text>
       </Box>
 
       <ScopeSection
-        heading="System"
-        description="Backend kill switches and pipeline toggles. Always resolved from postgres, env, or registry default. PostHog is never consulted."
-        rows={grouped.system}
+        heading="Product"
+        description={
+          isSaas
+            ? "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured; set a targeting rule to reach a subset of organizations."
+            : "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured."
+        }
+        rows={grouped.product}
         canManage={canManage}
         isSaas={isSaas}
         onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
@@ -117,13 +121,9 @@ export function FeatureFlagsContent() {
       />
 
       <ScopeSection
-        heading="Product"
-        description={
-          isSaas
-            ? "UI features and A/B tests. Source of truth is PostHog; postgres value here is an emergency override only."
-            : "UI features. On this self-hosted install, the postgres value here is the source of truth."
-        }
-        rows={grouped.product}
+        heading="System"
+        description="Backend kill switches and pipeline toggles. Resolved from env, this postgres store, then the registry default."
+        rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
         onToggle={({ key, enabled }) => setFlag.mutateAsync({ key, enabled })}
@@ -234,6 +234,23 @@ function ScopeSection({
   );
 }
 
+/**
+ * Blast-radius note for a PRODUCT flag on a shared install. Held as one
+ * constant because it is rendered twice: as the tooltip content for a sighted
+ * operator, and as screen-reader-only text inside the badge for everyone else.
+ * Tooltip content is not in the DOM until hover, so a note kept only there
+ * reaches neither a screen reader nor any assertion — which is how the
+ * previous wording survived being replaced wholesale with "x" while its bound
+ * test stayed green.
+ *
+ * The srOnly copy is deliberate rather than an `aria-label` on the badge:
+ * Chakra renders Badge as a role-less <span>, and ARIA prohibits naming a
+ * generic element, so an aria-label there is ignored by screen readers even
+ * though Testing Library's getByLabelText happily matches it.
+ */
+const FLEET_REACH_NOTE =
+  "This flag gates a customer-facing feature, and a value set here applies to every organization that no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.";
+
 function FlagRowView({
   row,
   canManage,
@@ -262,58 +279,12 @@ function FlagRowView({
         ? "postgres"
         : "registry default";
 
-  // Walk rules honoring first-match-wins, so a disabled rule earlier in
-  // the list correctly shadows a later enabled rule for the same scope.
-  // An empty-match rule matches every context, so once one is seen, no
-  // later rule can ever fire and we stop.
-  let everyoneViaRule: boolean | null = null;
-  const orgDecisions = new Map<string, boolean>();
-  const projectDecisions = new Map<string, boolean>();
-  for (const r of row.rules) {
-    const isEveryone = !r.match.organizationId && !r.match.projectId;
-    if (isEveryone) {
-      everyoneViaRule = r.enabled;
-      break;
-    }
-    if (r.match.organizationId && !orgDecisions.has(r.match.organizationId)) {
-      orgDecisions.set(r.match.organizationId, r.enabled);
-    }
-    if (r.match.projectId && !projectDecisions.has(r.match.projectId)) {
-      projectDecisions.set(r.match.projectId, r.enabled);
-    }
-  }
-  const enabledOrgIds = new Set(
-    Array.from(orgDecisions.entries())
-      .filter(([, v]) => v)
-      .map(([k]) => k),
-  );
-  const enabledProjectIds = new Set(
-    Array.from(projectDecisions.entries())
-      .filter(([, v]) => v)
-      .map(([k]) => k),
-  );
-  const enabledEveryoneViaRule = everyoneViaRule === true;
-  const partialEnabled =
-    !effective &&
-    (enabledEveryoneViaRule ||
-      enabledOrgIds.size > 0 ||
-      enabledProjectIds.size > 0);
-  const targetingSummary = enabledEveryoneViaRule
-    ? "Enabled for everyone via rule"
-    : [
-        enabledOrgIds.size > 0 &&
-          `${enabledOrgIds.size} organization${enabledOrgIds.size === 1 ? "" : "s"}`,
-        enabledProjectIds.size > 0 &&
-          `${enabledProjectIds.size} project${enabledProjectIds.size === 1 ? "" : "s"}`,
-      ]
-        .filter(Boolean)
-        .join(", ");
-  const targetingLabel =
-    !effective && targetingSummary
-      ? enabledEveryoneViaRule
-        ? targetingSummary
-        : `Enabled for ${targetingSummary}`
-      : null;
+  const summary = summarizeTargeting(row.rules);
+  const ruleTargetingLabel = targetingLabel(summary);
+  // The toggle reads off but a rule has switched the flag on for someone:
+  // paint it as on so the row does not read as "nobody has this".
+  const partialEnabled = !effective && ruleTargetingLabel !== null;
+  const targetingNote = effective ? null : ruleTargetingLabel;
 
   const onChange = async (next: boolean) => {
     setOptimistic(next);
@@ -338,9 +309,10 @@ function FlagRowView({
             </Text>
             <ScopeBadge scope={row.scope} />
             {showProductWarning && (
-              <Tooltip content="PRODUCT flags normally resolve through PostHog. Setting a postgres value here will override PostHog for every caller; emergency use only.">
+              <Tooltip content={FLEET_REACH_NOTE}>
                 <Badge colorPalette="yellow" size="sm" variant="subtle">
-                  PostHog managed
+                  All customers
+                  <Text srOnly>{FLEET_REACH_NOTE}</Text>
                 </Badge>
               </Tooltip>
             )}
@@ -396,9 +368,9 @@ function FlagRowView({
               </Tooltip>
             )}
           </HStack>
-          {targetingLabel && (
+          {targetingNote && (
             <Text fontSize="xs" color="fg.muted">
-              {targetingLabel}
+              {targetingNote}
             </Text>
           )}
         </VStack>

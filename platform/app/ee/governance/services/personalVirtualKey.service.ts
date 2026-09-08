@@ -21,7 +21,7 @@
  * Authorization is the caller's responsibility — this service never
  * checks permissions. tRPC routers + Hono handlers gate access first.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 

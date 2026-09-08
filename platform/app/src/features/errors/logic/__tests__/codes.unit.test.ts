@@ -88,7 +88,48 @@ const RELAYED_META_CODES = new Set(["missing_provider"]);
  * instead and do not enumerate it — which is exactly why the sibling
  * `langy_codex_session_expired` is absent from `APP_ERROR_CODES`.
  */
-const CLIENT_MINTED_CODES = new Set(["langy_codex_plan_limit"]);
+const CLIENT_MINTED_CODES = new Set([
+  "langy_codex_plan_limit",
+  // Thrown by the open workbench page, not by a handled error anywhere in
+  // these trees: the page refuses an agent's action when the server already
+  // holds a newer version, and the UI-action channel relays that code to the
+  // agent inside `langy_ui_handler_failed`. A customer sees it too, in the
+  // toast the page raises for a failed action.
+  "langy_ui_page_out_of_date",
+  // The sibling refusal from the same page, for a write that did not land for
+  // any other reason. Also thrown in the browser, and relayed the same way.
+  "langy_ui_save_failed",
+  // Same shape, from `promoteModelUnavailableError`: the gateway's
+  // `model_provider_not_bound` tells whoever configures a virtual key to bind
+  // a provider to it or drop the prefix from the model name. In the panel the
+  // model came from a menu, so the remediation is a different one and needs
+  // its own words.
+  "langy_model_unavailable",
+]);
+
+/**
+ * Codes passed as a constructor PARAMETER — the shape the docblock above names
+ * as the one this scanner cannot see, because there is no string literal at the
+ * declaration to match.
+ *
+ * `LangyApiIdentityDeniedError` (`src/server/app-layer/langy/errors.ts`) is one
+ * class over three codes on purpose: all three are the same 403 with the same
+ * body, and only the remediation differs (mint a personal key / ask an admin
+ * for Langy access / the owner is gone). Its caller picks the code, so the
+ * declaration is a union in the signature and every CODE_PATTERNS entry misses
+ * it.
+ *
+ * These therefore enter `APP_ERROR_CODES` by hand, and the "raised but not
+ * listed" assertion will NOT notice if a fourth is added to that union and left
+ * off the list. That is the cost of the shape; the entry below is the record of
+ * it. Adding a code here is a decision to hand-maintain it — prefer a subclass
+ * with a literal unless the family genuinely shares one body.
+ */
+const PARAMETERIZED_CODES = new Set([
+  "langy_api_key_unowned",
+  "langy_api_key_no_langy_access",
+  "langy_api_actor_missing",
+]);
 
 /**
  * A path typo turns this whole guard into a no-op, and it reports that as a
@@ -242,7 +283,8 @@ describe("APP_ERROR_CODES", () => {
           !declared.has(code) &&
           !PACKAGE_OWNED_CODES.has(code) &&
           !RELAYED_META_CODES.has(code) &&
-          !CLIENT_MINTED_CODES.has(code),
+          !CLIENT_MINTED_CODES.has(code) &&
+          !PARAMETERIZED_CODES.has(code),
       );
 
       expect(

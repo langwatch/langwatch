@@ -236,7 +236,7 @@ export function NewVersionFields({
           <InputGroup
             width="full"
             endElement={
-              generateCommitMessage.isLoading ? (
+              generateCommitMessage.isPending ? (
                 <AISparklesLoader />
               ) : canSave &&
                 resolvedDefault.isFetched &&
@@ -275,7 +275,7 @@ export function NewVersionFields({
                 },
               })}
               placeholder={
-                generateCommitMessage.isLoading
+                generateCommitMessage.isPending
                   ? "Generating..."
                   : "What changes have you made?"
               }

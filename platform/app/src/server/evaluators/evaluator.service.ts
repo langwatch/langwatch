@@ -1,4 +1,4 @@
-import type { Evaluator, PrismaClient } from "@prisma/client";
+import type { Evaluator, PrismaClient } from "~/generated/prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import {
   getWorkflowEndInputs,

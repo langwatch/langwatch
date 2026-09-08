@@ -1,7 +1,7 @@
 Feature: Personal CLI sessions / devices inventory
   As a developer who runs `langwatch login` from one or more machines (laptop,
   workstation, dev container, CI runner)
-  I want a "logged-in devices" surface at /me/devices
+  I want a "logged-in devices" surface on the /me/configure devices tab
   So that I can see where my CLI is signed in, identify each session by device,
   and revoke any session that's stale, lost, or compromised
 

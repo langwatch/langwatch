@@ -51,8 +51,9 @@ const EXCLUDED_COMMANDS = new Set([
   // frame and deliberately renders NO card (see
   // specs/langy/langy-agent-driven-navigation.feature).
   "navigate",
-  "init-shell",
-  "request-increase",
+  // Local telemetry-wiring setup: writes agent config files on the user's
+  // machine (settings.json, config.toml, shell rc), not a platform resource.
+  "instrument",
   // Documentation fetchers: their output is prose for the agent, and the
   // docs helpers already render as clean activity lines.
   "docs",
@@ -87,6 +88,11 @@ const EXCLUDED_COMMANDS = new Set([
   // Help topics: renders other commands' help or a static topic page — no
   // platform resource a card could deep-link.
   "help",
+  // Shares a folder from the developer's own machine with one Langy
+  // conversation (ADR-129). It holds a session open and prints permission
+  // prompts in the terminal; the panel's own code access card and workspace
+  // chip are what the reader sees, so there is no result document to card.
+  "langy",
 ]);
 
 /**

@@ -21,25 +21,44 @@
  * Anomaly counts (`openAnomalyCount` / `anomalyBreakdown`) read from
  * `prisma.anomalyAlert` - unaffected by the trace-store path.
  *
+ * ClickHouse queries live in `activityMonitor.clickhouse.repository.ts`;
+ * this file is orchestration (PG joins, department rollup, time-series
+ * bucketing) and the public API surface.
+ *
  * Spec contracts:
  *   - specs/ai-gateway/governance/folds.feature
  *     (governance fold projection on trace_summaries / log_records)
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { PrismaClient } from "@prisma/client";
+import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import {
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "~/server/gateway/wireMoney";
 import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
-import {
-  GOVERNANCE_ATTR,
-  GOVERNANCE_ORIGIN_KIND_VALUE,
-} from "../governanceAttributeKeys";
 import { PROJECT_KIND } from "../governanceProject.service";
+import type { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
+import type {
+  PulledEventChRow,
+  PushedEventChRow,
+  SortDir,
+  SpendByDepartmentChRow,
+  SpendByTeamSourceChRow,
+  SpendOverTimeChRow,
+  SpendOverTimeGroupBy,
+  SpendSortField,
+  WindowCountChRow,
+} from "./activityMonitor.clickhouse.schemas";
+
+// ---------------------------------------------------------------------------
+// Public interfaces — the service's API contract
+// ---------------------------------------------------------------------------
 
 export interface SummaryResult {
   spentThisWindowUsd: number;
@@ -59,7 +78,7 @@ export interface SummaryResult {
 
 export interface SpendByUserRow {
   actor: string;
-  spendUsd: number;
+  spendUsd: string;
   requests: number;
   lastActivityIso: string;
   trendVsPreviousPct: number;
@@ -79,7 +98,7 @@ export interface SpendByTeamRow {
   teamId: string | null;
   /** Team.name, or "Org-wide" for non-team-scoped sources. */
   teamName: string;
-  spendUsd: number;
+  spendUsd: string;
   requestCount: number;
   /**
    * Spend change vs the previous equal-length window (e.g. last 30
@@ -107,7 +126,7 @@ export interface SpendByDepartmentRow {
   departmentId: string | null;
   /** Department.name, or "Unassigned". */
   departmentName: string;
-  spendUsd: number;
+  spendUsd: string;
   requestCount: number;
   lastActivityIso: string | null;
 }
@@ -138,7 +157,7 @@ export interface SpendOverTimeBucket {
     key: string;
     /** Human-readable label for legend / tooltip. */
     label: string;
-    spendUsd: number;
+    spendUsd: string;
   }>;
 }
 
@@ -146,51 +165,13 @@ export interface SpendOverTimeResult {
   buckets: SpendOverTimeBucket[];
 }
 
-export type SpendOverTimeGroupBy = "team" | "user" | "model";
-
-/** Sort field accepted by `spendByUser` / `spendByTeam`. */
-export type SpendSortField = "spend" | "requests" | "lastActivity";
-export type SortDir = "asc" | "desc";
-
-/**
- * Whitelist mapping from external sort field names to the aggregate
- * expressions we splice into the ORDER BY clause. CH parameter binding
- * does NOT support column-name interpolation; this whitelist is the
- * boundary that prevents injection through the public API.
- */
-const SORT_FIELD_TO_AGG_EXPR: Record<SpendSortField, string> = {
-  spend: "sum(spendUsd)",
-  requests: "count()",
-  lastActivity: "max(occurredAt)",
-};
-
-/**
- * Per-row sort key extractors for the in-memory `spendByTeam` ranker.
- * Pagination + sort happen post-aggregation in TS because the team
- * rollup happens after a PG join (CH only sees sourceId, the team
- * mapping is in PG). All keys are numeric so the comparator stays
- * stable regardless of locale.
- */
-const TEAM_ROW_SORT_KEYS: Record<
-  SpendSortField,
-  (row: {
-    thisSpend: number;
-    requestCount: number;
-    lastActivityMs: number;
-  }) => number
-> = {
-  spend: (r) => r.thisSpend,
-  requests: (r) => r.requestCount,
-  lastActivity: (r) => r.lastActivityMs,
-};
-
 export interface ActivityEventDetailRow {
   eventId: string;
   eventType: string;
   actor: string;
   action: string;
   target: string;
-  costUsd: number;
+  costUsd: string;
   tokensInput: number;
   tokensOutput: number;
   eventTimestampIso: string;
@@ -225,6 +206,10 @@ export interface SourceHealthMetrics {
   lastSuccessIso: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Constants + helpers
+// ---------------------------------------------------------------------------
+
 const EMPTY_SUMMARY: SummaryResult = {
   spentThisWindowUsd: 0,
   windowOverPreviousPct: 0,
@@ -235,10 +220,25 @@ const EMPTY_SUMMARY: SummaryResult = {
   anomalyBreakdown: { critical: 0, warning: 0, info: 0 },
 };
 
-const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
-const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
-const ATTR_USER_ID = GOVERNANCE_ATTR.USER_ID;
-const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
+/**
+ * Per-row sort key extractors for the in-memory `spendByTeam` ranker.
+ * Pagination + sort happen post-aggregation in TS because the team
+ * rollup happens after a PG join (CH only sees sourceId, the team
+ * mapping is in PG). All keys are numeric so the comparator stays
+ * stable regardless of locale.
+ */
+const TEAM_ROW_SORT_KEYS: Record<
+  SpendSortField,
+  (row: {
+    thisSpendNano: bigint;
+    requestCount: number;
+    lastActivityMs: number;
+  }) => number
+> = {
+  spend: (r) => Number(r.thisSpendNano),
+  requests: (r) => r.requestCount,
+  lastActivity: (r) => r.lastActivityMs,
+};
 
 function pctChange(current: number, previous: number): number {
   if (previous === 0) return current === 0 ? 0 : 100;
@@ -265,6 +265,107 @@ function startOfUtcDay(ms: number): number {
   );
 }
 
+/**
+ * The usage numbers carried on a stored pulled OCSF row's
+ * `metadata.extension`.
+ *
+ * Parsed rather than cast because the extension object is only partly ours.
+ * `mapToOcsfRow` writes these three fields and then spreads the adapter's
+ * `extra` over them, and `extra` is typed `z.record(z.unknown())` — so an
+ * adapter can land a string, an object, or nothing at all where a number
+ * belongs. A bare `Number(...)` turns each of those into `NaN` and puts it on
+ * the dashboard. Each field catches independently so one bad value does not
+ * zero the other two, and the object catches so a non-object extension is a 0
+ * rather than a throw.
+ *
+ * Deliberately NOT `.nonnegative()`. This reads the stored OCSF row, which is
+ * the audit record, and a view of an audit record must not quietly disagree
+ * with it: the generic HTTP and S3 pollers resolve `cost_usd` from a
+ * customer-configured JSONPath and carry a credit or adjustment line through
+ * verbatim, so a negative here is a figure someone actually reported, not
+ * corruption. Rendering it as 0 would hide money that the row plainly
+ * contains. Only unrepresentable values — `NaN`, `Infinity`, a string, an
+ * object — collapse to 0, because those have no figure to show.
+ */
+const ZERO_PULLED_USAGE = {
+  cost_usd: "0",
+  tokens_input: 0,
+  tokens_output: 0,
+};
+
+const pulledUsageExtensionSchema = z
+  .object({
+    cost_usd: z
+      .union([z.string(), z.number()])
+      .transform((v) => {
+        const s = String(v).trim();
+        return s !== "" && Number.isFinite(Number(s)) ? s : "0";
+      })
+      .catch("0"),
+    tokens_input: z.coerce.number().finite().catch(0),
+    tokens_output: z.coerce.number().finite().catch(0),
+  })
+  .catch(ZERO_PULLED_USAGE);
+
+function pulledUsageFromRawOcsf(rawPayload: string): {
+  costUsd: string;
+  tokensInput: number;
+  tokensOutput: number;
+} {
+  let extension: unknown;
+  try {
+    extension = (
+      JSON.parse(rawPayload) as { metadata?: { extension?: unknown } }
+    )?.metadata?.extension;
+  } catch {
+    extension = null;
+  }
+  const usage = pulledUsageExtensionSchema.parse(extension ?? {});
+  return {
+    costUsd: usage.cost_usd,
+    tokensInput: usage.tokens_input,
+    tokensOutput: usage.tokens_output,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// CH row → service DTO mappers
+// ---------------------------------------------------------------------------
+
+function toPushedEvent(row: PushedEventChRow): ActivityEventDetailRow {
+  return {
+    eventId: row.eventId,
+    eventType: row.eventType,
+    actor: row.actor,
+    action: "trace.recorded",
+    target: row.target ?? "",
+    costUsd: row.costUsd,
+    tokensInput: row.tokensInput,
+    tokensOutput: row.tokensOutput,
+    eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
+    ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
+    rawPayload: "",
+  };
+}
+
+function toPulledEvent(row: PulledEventChRow): ActivityEventDetailRow {
+  return {
+    eventId: row.eventId,
+    eventType: row.eventType,
+    actor: row.actorEmail || row.actorUserId || row.actorEnduserId || "",
+    action: row.action,
+    target: row.target,
+    ...pulledUsageFromRawOcsf(row.rawPayload),
+    eventTimestampIso: new Date(Number(row.occurredMs)).toISOString(),
+    ingestedAtIso: new Date(Number(row.createdMs)).toISOString(),
+    rawPayload: row.rawPayload,
+  };
+}
+
+function emptySourceHealthMetrics(): SourceHealthMetrics {
+  return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
+}
+
 function emptyDenseBuckets(
   windowStartMs: number,
   windowDays: number,
@@ -280,11 +381,38 @@ function emptyDenseBuckets(
   return buckets;
 }
 
-export class ActivityMonitorService {
-  constructor(private readonly prisma: PrismaClient) {}
+// ---------------------------------------------------------------------------
+// Service class
+// ---------------------------------------------------------------------------
 
-  static create(prisma: PrismaClient): ActivityMonitorService {
-    return new ActivityMonitorService(prisma);
+export class ActivityMonitorService {
+  private readonly prisma: PrismaClient;
+  /**
+   * The activity-monitor read side, from the App. `undefined` on a
+   * deployment without ClickHouse — every method degrades to its
+   * empty-state shape, same as the pre-repository "no client" fallback.
+   */
+  private readonly repository?: ActivityMonitorClickHouseRepository;
+
+  constructor({
+    prisma,
+    repository,
+  }: {
+    prisma: PrismaClient;
+    repository?: ActivityMonitorClickHouseRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+  }
+
+  static create({
+    prisma,
+    repository,
+  }: {
+    prisma: PrismaClient;
+    repository?: ActivityMonitorClickHouseRepository;
+  }): ActivityMonitorService {
+    return new ActivityMonitorService({ prisma, repository });
   }
 
   /**
@@ -306,11 +434,9 @@ export class ActivityMonitorService {
     return project?.id ?? null;
   }
 
-  private async getClickhouse(
-    organizationId: string,
-  ): Promise<ClickHouseClient | null> {
-    return await getClickHouseClientForOrganization(organizationId);
-  }
+  // -----------------------------------------------------------------------
+  // Summary
+  // -----------------------------------------------------------------------
 
   async summary(input: {
     organizationId: string;
@@ -328,9 +454,7 @@ export class ActivityMonitorService {
     if (!govProjectId) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
+    if (!this.repository) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
 
@@ -339,58 +463,22 @@ export class ActivityMonitorService {
     const thisWindowStart = now - windowMs;
     const previousWindowStart = now - 2 * windowMs;
 
-    const result = await ch.query({
-      query: `
-        SELECT
-          sumIf(coalesce(ts.TotalCost, 0), ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})) AS thisSpend,
-          sumIf(coalesce(ts.TotalCost, 0), ts.OccurredAt < fromUnixTimestamp64Milli({thisStart:UInt64})) AS prevSpend,
-          uniqExactIf(
-            ts.Attributes[{userKey:String}],
-            ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})
-              AND ts.Attributes[{userKey:String}] != ''
-          ) AS thisUsers
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
-          AND ts.Attributes[{originKey:String}] = {originValue:String}
-          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM trace_summaries
-            WHERE TenantId = {tenantId:String}
-              AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
-            GROUP BY TenantId, TraceId
-          )
-      `,
-      query_params: {
-        tenantId: govProjectId,
-        thisStart: thisWindowStart,
-        prevStart: previousWindowStart,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        userKey: ATTR_USER_ID,
-      },
-      format: "JSONEachRow",
+    const row = await this.repository.findSummarySpend({
+      tenantId: govProjectId,
+      thisStart: thisWindowStart,
+      prevStart: previousWindowStart,
     });
-    const rows = (await result.json()) as Array<{
-      thisSpend: number | string | null;
-      prevSpend: number | string | null;
-      thisUsers: number | string | null;
-    }>;
-    const row = rows[0];
-    const thisSpend = Number(row?.thisSpend ?? 0);
-    const prevSpend = Number(row?.prevSpend ?? 0);
-    const thisUsers = Number(row?.thisUsers ?? 0);
 
     return {
-      spentThisWindowUsd: thisSpend,
-      windowOverPreviousPct: pctChange(thisSpend, prevSpend),
-      hasPriorBaseline: prevSpend > 0,
-      activeUsersThisWindow: thisUsers,
+      spentThisWindowUsd: row.thisSpend,
+      windowOverPreviousPct: pctChange(row.thisSpend, row.prevSpend),
+      hasPriorBaseline: row.prevSpend > 0,
+      activeUsersThisWindow: row.thisUsers,
       // newUsers requires a baseline-window comparison query which is a
       // follow-up (3b: governance_kpis fold materialises the per-user
       // first-seen). For now the dashboard renders the field but the value
       // is conservative - treat all active as new only when prev=0.
-      newUsersThisWindow: prevSpend === 0 ? thisUsers : 0,
+      newUsersThisWindow: row.prevSpend === 0 ? row.thisUsers : 0,
       openAnomalyCount,
       anomalyBreakdown,
     };
@@ -412,6 +500,10 @@ export class ActivityMonitorService {
     return breakdown;
   }
 
+  // -----------------------------------------------------------------------
+  // Spend by user
+  // -----------------------------------------------------------------------
+
   async spendByUser(input: {
     organizationId: string;
     windowDays: number;
@@ -422,81 +514,23 @@ export class ActivityMonitorService {
   }): Promise<SpendByUserRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
+    if (!this.repository) return [];
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
-    const limit = input.limit ?? 50;
-    const offset = Math.max(0, input.offset ?? 0);
-    const sortBy = input.sortBy ?? "spend";
-    const sortDir = input.sortDir ?? "desc";
-    // Whitelist the ORDER BY expression - the sortBy/sortDir values come
-    // from a Zod enum at the route layer but we re-validate here so a
-    // direct service-layer caller (tests, scripts) can't smuggle SQL.
-    const orderExpr = SORT_FIELD_TO_AGG_EXPR[sortBy];
-    const orderDir = sortDir === "asc" ? "ASC" : "DESC";
 
-    // ClickHouse 25.x resolves bare column names in ORDER BY to outer
-    // aliases when the alias shadows a subquery column - so
-    // `ORDER BY sum(spendUsd)` against an outer alias of `spendUsd =
-    // toString(sum(...))` evaluates as sum-over-String and fails with
-    // ILLEGAL_TYPE_OF_ARGUMENT (43). Aliasing the outer string to a
-    // disjoint name (`spendUsdStr`) keeps the ORDER BY referring to the
-    // subquery's Float64 spendUsd column.
-    const result = await ch.query({
-      query: `
-        SELECT
-          actor,
-          toString(sum(spendUsd)) AS spendUsdStr,
-          toString(count()) AS requests,
-          toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs,
-          any(model) AS mostUsedTarget
-        FROM (
-          SELECT
-            ts.Attributes[{userKey:String}] AS actor,
-            coalesce(ts.TotalCost, 0) AS spendUsd,
-            ts.OccurredAt AS occurredAt,
-            arrayElement(ts.Models, 1) AS model
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
-            AND ts.Attributes[{userKey:String}] != ''
-            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-              GROUP BY TenantId, TraceId
-            )
-        )
-        GROUP BY actor
-        ORDER BY ${orderExpr} ${orderDir}
-        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-      `,
-      query_params: {
-        tenantId: govProjectId,
-        windowStart: now - windowMs,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        userKey: ATTR_USER_ID,
-        limit,
-        offset,
-      },
-      format: "JSONEachRow",
+    const rows = await this.repository.findSpendByUser({
+      tenantId: govProjectId,
+      windowStart: now - windowMs,
+      sortBy: input.sortBy ?? "spend",
+      sortDir: input.sortDir ?? "desc",
+      limit: input.limit ?? 50,
+      offset: Math.max(0, input.offset ?? 0),
     });
-    const rows = (await result.json()) as Array<{
-      actor: string;
-      spendUsdStr: string;
-      requests: string;
-      lastActivityMs: string;
-      mostUsedTarget: string | null;
-    }>;
+
     return rows.map((r) => ({
       actor: r.actor,
-      spendUsd: Number(r.spendUsdStr),
+      spendUsd: r.spendUsdStr,
       requests: Number(r.requests),
       lastActivityIso: new Date(Number(r.lastActivityMs)).toISOString(),
       // Trend-vs-previous needs a windowed CTE comparison; deferred to 3b.
@@ -506,6 +540,10 @@ export class ActivityMonitorService {
         r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
     }));
   }
+
+  // -----------------------------------------------------------------------
+  // Spend by department
+  // -----------------------------------------------------------------------
 
   /**
    * Spend rolled up by department across EVERY project in the org - the
@@ -539,9 +577,7 @@ export class ActivityMonitorService {
       select: { id: true, departmentId: true },
     });
     if (projects.length === 0) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
+    if (!this.repository) return [];
 
     const projectDepartmentById = new Map(
       projects.map((p) => [p.id, p.departmentId] as const),
@@ -557,90 +593,18 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowStart = now - input.windowDays * 24 * 60 * 60 * 1000;
 
-    const result = await ch.query({
-      query: `
-        SELECT
-          ts.TenantId AS projectId,
-          ts.Attributes[{userKey:String}] AS actor,
-          toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr,
-          toString(count()) AS requests,
-          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs
-        FROM trace_summaries ts
-        WHERE ts.TenantId IN ({tenantIds:Array(String)})
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM trace_summaries
-            WHERE TenantId IN ({tenantIds:Array(String)})
-              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-            GROUP BY TenantId, TraceId
-          )
-        GROUP BY projectId, actor
-      `,
-      query_params: {
-        tenantIds,
-        windowStart,
-        userKey: ATTR_USER_ID,
-      },
-      format: "JSONEachRow",
+    const rows = await this.repository.findSpendByDepartment({
+      tenantIds,
+      windowStart,
     });
-    const rows = (await result.json()) as Array<{
-      projectId: string;
-      actor: string;
-      spendUsdStr: string;
-      requests: string;
-      lastActivityMs: string;
-    }>;
 
-    const acc = new Map<
-      string,
-      { spendUsd: number; requestCount: number; lastActivityMs: number }
-    >();
-    for (const r of rows) {
-      const hasPrincipalUser = r.actor !== "";
-      const departmentId = resolveTraceDepartmentId({
-        hasPrincipalUser,
-        userDepartmentId: userDepartmentByEmail.get(r.actor),
-        userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
-        projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
-      });
-      // An archived or otherwise-unknown department rolls up as Unassigned
-      // without a backfill: it is simply absent from the active name map.
-      const key =
-        departmentId !== UNASSIGNED_DEPARTMENT &&
-        activeDepartmentNames.has(departmentId)
-          ? departmentId
-          : UNASSIGNED_DEPARTMENT;
-      const prior = acc.get(key) ?? {
-        spendUsd: 0,
-        requestCount: 0,
-        lastActivityMs: 0,
-      };
-      acc.set(key, {
-        spendUsd: prior.spendUsd + Number(r.spendUsdStr),
-        requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(
-          prior.lastActivityMs,
-          Number(r.lastActivityMs),
-        ),
-      });
-    }
-
-    return [...acc.entries()]
-      .map(([key, v]) => ({
-        departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
-        departmentName:
-          key === UNASSIGNED_DEPARTMENT
-            ? "Unassigned"
-            : activeDepartmentNames.get(key)!,
-        spendUsd: v.spendUsd,
-        requestCount: v.requestCount,
-        lastActivityIso:
-          v.lastActivityMs > 0
-            ? new Date(v.lastActivityMs).toISOString()
-            : null,
-      }))
-      .sort((a, b) => b.spendUsd - a.spendUsd);
+    return assembleDepartmentRows({
+      rows,
+      projectDepartmentById,
+      userDepartmentByEmail,
+      userTeamDepartmentByEmail,
+      activeDepartmentNames,
+    });
   }
 
   private async activeDepartmentNames(
@@ -699,6 +663,10 @@ export class ActivityMonitorService {
     return { userDepartmentByEmail, userTeamDepartmentByEmail };
   }
 
+  // -----------------------------------------------------------------------
+  // Spend by team
+  // -----------------------------------------------------------------------
+
   /**
    * Per-team spend rollup for the admin governance home - the
    * organization-wide bird's-eye view that complements `spendByUser`
@@ -731,63 +699,21 @@ export class ActivityMonitorService {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
 
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
-
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
     const limit = input.limit ?? 50;
     const offset = Math.max(0, input.offset ?? 0);
     const sortBy = input.sortBy ?? "spend";
     const sortDir = input.sortDir ?? "desc";
+    if (!this.repository) return [];
 
     const previousWindowStart = now - 2 * windowMs;
-    const result = await ch.query({
-      query: `
-        SELECT
-          sourceId,
-          toString(sumIf(spendUsd, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisSpendStr,
-          toString(sumIf(spendUsd, occurredAt < fromUnixTimestamp64Milli({thisStart:UInt64}))) AS prevSpendStr,
-          toString(countIf(occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisRequests,
-          toString(toUnixTimestamp64Milli(maxIf(occurredAt, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})))) AS lastActivityMs
-        FROM (
-          SELECT
-            ts.Attributes[{sourceKey:String}] AS sourceId,
-            coalesce(ts.TotalCost, 0) AS spendUsd,
-            ts.OccurredAt AS occurredAt
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
-            AND ts.Attributes[{sourceKey:String}] != ''
-            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
-              GROUP BY TenantId, TraceId
-            )
-        )
-        GROUP BY sourceId
-      `,
-      query_params: {
-        tenantId: govProjectId,
-        thisStart: now - windowMs,
-        prevStart: previousWindowStart,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        sourceKey: ATTR_INGESTION_SOURCE_ID,
-      },
-      format: "JSONEachRow",
-    });
 
-    const sourceRows = (await result.json()) as Array<{
-      sourceId: string;
-      thisSpendStr: string;
-      prevSpendStr: string;
-      thisRequests: string;
-      lastActivityMs: string;
-    }>;
+    const sourceRows = await this.repository.findSpendByTeamSource({
+      tenantId: govProjectId,
+      thisStart: now - windowMs,
+      prevStart: previousWindowStart,
+    });
     if (sourceRows.length === 0) return [];
 
     const sourceIds = sourceRows
@@ -803,71 +729,13 @@ export class ActivityMonitorService {
     });
     const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
 
-    const ORG_WIDE_KEY = "__org_wide__";
-    const byTeam = new Map<
-      string,
-      {
-        teamId: string | null;
-        teamName: string;
-        thisSpend: number;
-        prevSpend: number;
-        requestCount: number;
-        lastActivityMs: number;
-        sourceCount: number;
-      }
-    >();
-    for (const row of sourceRows) {
-      const team = teamBySource.get(row.sourceId) ?? null;
-      const key = team ? team.id : ORG_WIDE_KEY;
-      const teamId = team?.id ?? null;
-      const teamName = team?.name ?? "Org-wide";
-      const thisSpend = Number(row.thisSpendStr);
-      const prevSpend = Number(row.prevSpendStr);
-      const requestCount = Number(row.thisRequests);
-      const lastActivityMs = Number(row.lastActivityMs);
-      const existing = byTeam.get(key);
-      if (existing) {
-        existing.thisSpend += thisSpend;
-        existing.prevSpend += prevSpend;
-        existing.requestCount += requestCount;
-        existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(
-          existing.lastActivityMs,
-          lastActivityMs,
-        );
-      } else {
-        byTeam.set(key, {
-          teamId,
-          teamName,
-          thisSpend,
-          prevSpend,
-          requestCount,
-          lastActivityMs,
-          sourceCount: 1,
-        });
-      }
-    }
-
-    const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
-    const sign = sortDir === "asc" ? 1 : -1;
-    return [...byTeam.values()]
-      .filter((t) => t.thisSpend > 0 || t.requestCount > 0)
-      .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
-      .slice(offset, offset + limit)
-      .map((t) => ({
-        teamId: t.teamId,
-        teamName: t.teamName,
-        spendUsd: t.thisSpend,
-        requestCount: t.requestCount,
-        deltaPctVsPriorWindow: pctChange(t.thisSpend, t.prevSpend),
-        hasPriorBaseline: t.prevSpend > 0,
-        lastActivityIso:
-          t.lastActivityMs > 0
-            ? new Date(t.lastActivityMs).toISOString()
-            : null,
-        sourceCount: t.sourceCount,
-      }));
+    const byTeam = rollUpSourcesByTeam({ sourceRows, teamBySource });
+    return formatTeamRows({ byTeam, sortBy, sortDir, offset, limit });
   }
+
+  // -----------------------------------------------------------------------
+  // Spend over time
+  // -----------------------------------------------------------------------
 
   /**
    * Time-series spend rollup for the bird's-eye `<SpendOverTimeChart>`.
@@ -908,162 +776,38 @@ export class ActivityMonitorService {
       return { buckets: emptyDenseBuckets(windowStart, windowDays) };
     }
 
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
+    if (!this.repository) {
       return { buckets: emptyDenseBuckets(windowStart, windowDays) };
     }
 
-    const groupExpr =
-      input.groupBy === "team"
-        ? `ts.Attributes[{sourceKey:String}]`
-        : input.groupBy === "user"
-          ? `ts.Attributes[{userKey:String}]`
-          : `arrayElement(ts.Models, 1)`;
-
-    // `OccurredAt` is DateTime64(3, 'UTC'). `toStartOfDay()` returns
-    // plain `DateTime` (seconds resolution), and `toUnixTimestamp64Milli`
-    // refuses anything but DateTime64 - so we go the other way:
-    // `toUnixTimestamp()` gives seconds, then multiply by 1000 to get
-    // millisecond ticks. Same wire shape as `toUnixTimestamp64Milli`
-    // would produce; matches the JS-side `windowStart`/dayMs math.
-    //
-    // Two earlier shapes that DON'T work:
-    //   `toUnixTimestamp64Milli(toStartOfDay(OccurredAt))` → type error
-    //     (DateTime, not DateTime64)
-    //   `toUnixTimestamp64Milli(toStartOfDay(toDateTime64(OccurredAt/1000, 3)))`
-    //     → divides ms-precision by 1000 then re-wraps, double-shifting
-    //     every bucket far outside the window
-    const result = await ch.query({
-      query: `
-        SELECT
-          toString(toUnixTimestamp(toStartOfDay(ts.OccurredAt)) * 1000) AS bucketMs,
-          ${groupExpr} AS groupKey,
-          toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-          AND ts.Attributes[{originKey:String}] = {originValue:String}
-          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM trace_summaries
-            WHERE TenantId = {tenantId:String}
-              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
-            GROUP BY TenantId, TraceId
-          )
-        GROUP BY bucketMs, groupKey
-        ORDER BY bucketMs ASC
-      `,
-      query_params: {
-        tenantId: govProjectId,
-        windowStart,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        sourceKey: ATTR_INGESTION_SOURCE_ID,
-        userKey: ATTR_USER_ID,
-      },
-      format: "JSONEachRow",
+    const rows = await this.repository.findSpendOverTime({
+      tenantId: govProjectId,
+      windowStart,
+      groupBy: input.groupBy,
     });
-    const rows = (await result.json()) as Array<{
-      bucketMs: string;
-      groupKey: string | null;
-      spendUsdStr: string;
-    }>;
 
-    let labelByKey: Map<string, { key: string; label: string }>;
-    let rolledRows: Array<{ bucketMs: number; key: string; spendUsd: number }>;
-
-    if (input.groupBy === "team") {
-      const sourceIds = Array.from(
-        new Set(
-          rows
-            .map((r) => r.groupKey)
-            .filter((s): s is string => typeof s === "string" && s !== ""),
-        ),
-      );
-      const sources = sourceIds.length
-        ? await this.prisma.ingestionSource.findMany({
-            where: {
-              id: { in: sourceIds },
-              organizationId: input.organizationId,
-            },
-            select: {
-              id: true,
-              team: { select: { id: true, name: true } },
-            },
+    const { labelByKey, rolledRows } =
+      input.groupBy === "team"
+        ? await this.resolveTeamSpendOverTimeRows({
+            rows,
+            organizationId: input.organizationId,
           })
-        : [];
-      const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
-      const ORG_WIDE_KEY = "__org_wide__";
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const sourceId = row.groupKey ?? "";
-        if (!sourceId) continue;
-        const team = teamBySource.get(sourceId) ?? null;
-        const key = team?.id ?? ORG_WIDE_KEY;
-        const label = team?.name ?? "Org-wide";
-        labelByKey.set(key, { key, label });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendUsd: Number(row.spendUsdStr),
-        });
-      }
-    } else {
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const key = row.groupKey ?? "";
-        if (!key) continue;
-        labelByKey.set(key, { key, label: key });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendUsd: Number(row.spendUsdStr),
-        });
-      }
-    }
+        : resolveDirectSpendOverTimeRows({ rows });
 
-    // Roll up (bucket, key) duplicates that come out of the team-side
-    // sourceId → teamId remapping (multiple sources can share one team).
-    const aggregated = new Map<string, number>();
-    for (const r of rolledRows) {
-      const k = `${r.bucketMs}::${r.key}`;
-      aggregated.set(k, (aggregated.get(k) ?? 0) + r.spendUsd);
-    }
-
-    const buckets = emptyDenseBuckets(windowStart, windowDays);
-    const bucketIndexByMs = new Map(
-      buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
-    );
-    for (const [composite, spendUsd] of aggregated.entries()) {
-      const sep = composite.indexOf("::");
-      const bucketMs = Number(composite.slice(0, sep));
-      const key = composite.slice(sep + 2);
-      const idx = bucketIndexByMs.get(bucketMs);
-      if (idx === undefined) continue;
-      const meta = labelByKey.get(key);
-      if (!meta) continue;
-      if (spendUsd <= 0) continue;
-      buckets[idx]!.points.push({
-        key: meta.key,
-        label: meta.label,
-        spendUsd,
-      });
-    }
-
-    // Stable per-bucket ordering - descending spend so the largest
-    // contributor renders at the bottom of the stacked area (Recharts
-    // stacks in array order; bottom-up = largest-first).
-    for (const bucket of buckets) {
-      bucket.points.sort((a, b) => b.spendUsd - a.spendUsd);
-    }
-
-    return { buckets };
+    return fillSpendOverTimeBuckets({
+      rolledRows,
+      labelByKey,
+      windowStart,
+      windowDays,
+    });
   }
 
+  // -----------------------------------------------------------------------
+  // Recent anomalies (Prisma only)
+  // -----------------------------------------------------------------------
+
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Recent anomaly alerts produced by the anomaly-detection subscriber.
    * Read-only snapshot of `prisma.anomalyAlert` rows for the org,
    * sorted by detectedAt DESC. Returns `[]` for orgs with no alerts
    * - callers render the empty-state in the dashboard.
@@ -1101,6 +845,10 @@ export class ActivityMonitorService {
     }));
   }
 
+  // -----------------------------------------------------------------------
+  // Ingestion source health
+  // -----------------------------------------------------------------------
+
   async ingestionSourcesHealth(input: {
     organizationId: string;
   }): Promise<IngestionSourceHealthRow[]> {
@@ -1111,72 +859,29 @@ export class ActivityMonitorService {
     if (sources.length === 0) return [];
 
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    const ch = govProjectId
-      ? await this.getClickhouse(input.organizationId)
-      : null;
 
     const eventsBySource = new Map<string, number>();
-    if (ch && govProjectId) {
+    if (this.repository && govProjectId) {
       const sourceIds = sources.map((s) => s.id);
       const since = Date.now() - 24 * 60 * 60 * 1000;
-      const [traceCounts, logCounts] = await Promise.all([
-        ch.query({
-          query: `
-            SELECT ts.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
-            FROM trace_summaries ts
-            WHERE ts.TenantId = {tenantId:String}
-              AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-              AND ts.Attributes[{originKey:String}] = {originValue:String}
-              AND ts.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
-              AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-                SELECT TenantId, TraceId, max(UpdatedAt)
-                FROM trace_summaries
-                WHERE TenantId = {tenantId:String}
-                  AND OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-                GROUP BY TenantId, TraceId
-              )
-            GROUP BY sourceId
-          `,
-          query_params: {
-            tenantId: govProjectId,
-            since,
-            originKey: ATTR_ORIGIN_KIND,
-            originValue: ORIGIN_KIND_VALUE,
-            sourceKey: ATTR_INGESTION_SOURCE_ID,
-            sourceIds,
-          },
-          format: "JSONEachRow",
+      const counts = await Promise.all([
+        this.repository.countTracedEventsBySource({
+          tenantId: govProjectId,
+          sourceIds,
+          since,
         }),
-        ch.query({
-          query: `
-            SELECT lr.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
-            FROM stored_log_records lr
-            WHERE lr.TenantId = {tenantId:String}
-              AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since:UInt64})
-              AND lr.Attributes[{originKey:String}] = {originValue:String}
-              AND lr.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
-            GROUP BY sourceId
-          `,
-          query_params: {
-            tenantId: govProjectId,
-            since,
-            originKey: ATTR_ORIGIN_KIND,
-            originValue: ORIGIN_KIND_VALUE,
-            sourceKey: ATTR_INGESTION_SOURCE_ID,
-            sourceIds,
-          },
-          format: "JSONEachRow",
+        this.repository.countLoggedEventsBySource({
+          tenantId: govProjectId,
+          sourceIds,
+          since,
+        }),
+        this.repository.countPulledEventsBySource({
+          tenantId: govProjectId,
+          sourceIds,
+          since,
         }),
       ]);
-      const traceRows = (await traceCounts.json()) as Array<{
-        sourceId: string;
-        c: string;
-      }>;
-      const logRows = (await logCounts.json()) as Array<{
-        sourceId: string;
-        c: string;
-      }>;
-      for (const row of [...traceRows, ...logRows]) {
+      for (const row of counts.flat()) {
         eventsBySource.set(
           row.sourceId,
           (eventsBySource.get(row.sourceId) ?? 0) + Number(row.c),
@@ -1194,6 +899,10 @@ export class ActivityMonitorService {
     }));
   }
 
+  // -----------------------------------------------------------------------
+  // Events for source (pushed + pulled, merged)
+  // -----------------------------------------------------------------------
+
   async eventsForSource(input: {
     organizationId: string;
     sourceId: string;
@@ -1202,184 +911,354 @@ export class ActivityMonitorService {
   }): Promise<ActivityEventDetailRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
+    if (!this.repository) return [];
 
     const limit = input.limit ?? 50;
-    const beforeMs = input.beforeIso
+    const parsedBeforeMs = input.beforeIso
       ? new Date(input.beforeIso).getTime()
+      : Number.NaN;
+    const beforeMs = Number.isFinite(parsedBeforeMs)
+      ? parsedBeforeMs
       : Date.now();
 
-    // Pull recent traces for the source. Webhook log_records are out of
-    // scope for this endpoint (the per-source detail page renders trace
-    // shape; the log shape gets its own viewer in 3b).
-    const result = await ch.query({
-      query: `
-        SELECT
-          ts.TraceId AS eventId,
-          ts.Attributes[{sourceTypeKey:String}] AS eventType,
-          ts.Attributes[{userKey:String}] AS actor,
-          arrayElement(ts.Models, 1) AS target,
-          coalesce(ts.TotalCost, 0) AS costUsd,
-          coalesce(ts.TotalPromptTokenCount, 0) AS tokensInput,
-          coalesce(ts.TotalCompletionTokenCount, 0) AS tokensOutput,
-          toString(toUnixTimestamp64Milli(ts.OccurredAt)) AS occurredMs,
-          toString(toUnixTimestamp64Milli(ts.CreatedAt)) AS createdMs
-        FROM trace_summaries ts
-        WHERE ts.TenantId = {tenantId:String}
-          AND ts.OccurredAt < fromUnixTimestamp64Milli({beforeMs:UInt64})
-          AND ts.Attributes[{originKey:String}] = {originValue:String}
-          AND ts.Attributes[{sourceKey:String}] = {sourceId:String}
-          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM trace_summaries
-            WHERE TenantId = {tenantId:String}
-            GROUP BY TenantId, TraceId
-          )
-        ORDER BY ts.OccurredAt DESC, ts.TraceId DESC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: {
-        tenantId: govProjectId,
-        beforeMs,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
-        sourceKey: ATTR_INGESTION_SOURCE_ID,
-        sourceTypeKey: GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE,
-        userKey: ATTR_USER_ID,
-        sourceId: input.sourceId,
-        limit,
-      },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as Array<{
-      eventId: string;
-      eventType: string;
-      actor: string;
-      target: string | null;
-      costUsd: number | string;
-      tokensInput: number | string;
-      tokensOutput: number | string;
-      occurredMs: string;
-      createdMs: string;
-    }>;
-    return rows.map((r) => ({
-      eventId: r.eventId,
-      eventType: r.eventType ?? "",
-      actor: r.actor ?? "",
-      action: "trace.recorded",
-      target: r.target ?? "",
-      costUsd: Number(r.costUsd ?? 0),
-      tokensInput: Number(r.tokensInput ?? 0),
-      tokensOutput: Number(r.tokensOutput ?? 0),
-      eventTimestampIso: new Date(Number(r.occurredMs)).toISOString(),
-      ingestedAtIso: new Date(Number(r.createdMs)).toISOString(),
-      rawPayload: "",
-    }));
+    const [pushedEvents, pulledEvents] = await Promise.all([
+      this.repository
+        .findPushedEventsForSource({
+          tenantId: govProjectId,
+          sourceId: input.sourceId,
+          beforeMs,
+          limit,
+        })
+        .then((rows) => rows.map(toPushedEvent)),
+      this.repository
+        .findPulledEventsForSource({
+          tenantId: govProjectId,
+          sourceId: input.sourceId,
+          beforeMs,
+          limit,
+        })
+        .then((rows) => rows.map(toPulledEvent)),
+    ]);
+
+    const seen = new Set<string>();
+    return [...pushedEvents, ...pulledEvents]
+      .sort(
+        (a, b) =>
+          new Date(b.eventTimestampIso).getTime() -
+            new Date(a.eventTimestampIso).getTime() ||
+          b.eventId.localeCompare(a.eventId),
+      )
+      .filter((event) => {
+        if (seen.has(event.eventId)) return false;
+        seen.add(event.eventId);
+        return true;
+      })
+      .slice(0, limit);
   }
+
+  // -----------------------------------------------------------------------
+  // Source health metrics (24h / 7d / 30d)
+  // -----------------------------------------------------------------------
 
   async sourceHealthMetrics(input: {
     organizationId: string;
     sourceId: string;
   }): Promise<SourceHealthMetrics> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) {
-      return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
-    }
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
-      return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
-    }
+    if (!govProjectId) return emptySourceHealthMetrics();
+    if (!this.repository) return emptySourceHealthMetrics();
 
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
-    const since30d = now - 30 * day;
+    const windowParams = {
+      tenantId: govProjectId,
+      sourceId: input.sourceId,
+      since24h: now - day,
+      since7d: now - 7 * day,
+      since30d: now - 30 * day,
+    };
 
-    const [traceResult, logResult] = await Promise.all([
-      ch.query({
-        query: `
-          SELECT
-            countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
-            countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
-            count() AS c30,
-            toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastMs
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
-            AND ts.Attributes[{sourceKey:String}] = {sourceId:String}
-            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
-              GROUP BY TenantId, TraceId
-            )
-        `,
-        query_params: {
-          tenantId: govProjectId,
-          since24h: now - day,
-          since7d: now - 7 * day,
-          since30d,
-          originKey: ATTR_ORIGIN_KIND,
-          originValue: ORIGIN_KIND_VALUE,
-          sourceKey: ATTR_INGESTION_SOURCE_ID,
-          sourceId: input.sourceId,
-        },
-        format: "JSONEachRow",
-      }),
-      ch.query({
-        query: `
-          SELECT
-            countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
-            countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
-            count() AS c30,
-            toString(toUnixTimestamp64Milli(max(lr.TimeUnixMs))) AS lastMs
-          FROM stored_log_records lr
-          WHERE lr.TenantId = {tenantId:String}
-            AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since30d:UInt64})
-            AND lr.Attributes[{originKey:String}] = {originValue:String}
-            AND lr.Attributes[{sourceKey:String}] = {sourceId:String}
-        `,
-        query_params: {
-          tenantId: govProjectId,
-          since24h: now - day,
-          since7d: now - 7 * day,
-          since30d,
-          originKey: ATTR_ORIGIN_KIND,
-          originValue: ORIGIN_KIND_VALUE,
-          sourceKey: ATTR_INGESTION_SOURCE_ID,
-          sourceId: input.sourceId,
-        },
-        format: "JSONEachRow",
-      }),
+    const windows = await Promise.all([
+      this.repository.findTracedEventWindowCounts(windowParams),
+      this.repository.findLoggedEventWindowCounts(windowParams),
+      this.repository.findPulledEventWindowCounts(windowParams),
     ]);
-    const traceRows = (await traceResult.json()) as Array<{
-      c24: number | string;
-      c7: number | string;
-      c30: number | string;
-      lastMs: string | null;
-    }>;
-    const logRows = (await logResult.json()) as Array<{
-      c24: number | string;
-      c7: number | string;
-      c30: number | string;
-      lastMs: string | null;
-    }>;
-    const t = traceRows[0];
-    const l = logRows[0];
 
-    const events24h = Number(t?.c24 ?? 0) + Number(l?.c24 ?? 0);
-    const events7d = Number(t?.c7 ?? 0) + Number(l?.c7 ?? 0);
-    const events30d = Number(t?.c30 ?? 0) + Number(l?.c30 ?? 0);
+    const total = (pick: (row: WindowCountChRow) => number) =>
+      windows.reduce((sum, row) => sum + (row ? pick(row) : 0), 0);
 
-    const traceLastMs = t?.lastMs ? Number(t.lastMs) : 0;
-    const logLastMs = l?.lastMs ? Number(l.lastMs) : 0;
-    const lastMs = Math.max(traceLastMs, logLastMs);
-    const lastSuccessIso = lastMs > 0 ? new Date(lastMs).toISOString() : null;
+    const lastMs = Math.max(
+      0,
+      ...windows.map((row) => (row?.lastMs ? Number(row.lastMs) : 0)),
+    );
 
-    return { events24h, events7d, events30d, lastSuccessIso };
+    return {
+      events24h: total((r) => r.c24),
+      events7d: total((r) => r.c7),
+      events30d: total((r) => r.c30),
+      lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
+    };
   }
+
+  private async resolveTeamSpendOverTimeRows({
+    rows,
+    organizationId,
+  }: {
+    rows: SpendOverTimeChRow[];
+    organizationId: string;
+  }): Promise<SpendOverTimeRolled> {
+    const sourceIds = Array.from(
+      new Set(
+        rows
+          .map((r) => r.groupKey)
+          .filter((s): s is string => typeof s === "string" && s !== ""),
+      ),
+    );
+    const sources = sourceIds.length
+      ? await this.prisma.ingestionSource.findMany({
+          where: { id: { in: sourceIds }, organizationId },
+          select: { id: true, team: { select: { id: true, name: true } } },
+        })
+      : [];
+    const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
+    const ORG_WIDE_KEY = "__org_wide__";
+    const labelByKey = new Map<string, { key: string; label: string }>();
+    const rolledRows: RolledSpendRow[] = [];
+    for (const row of rows) {
+      const sourceId = row.groupKey ?? "";
+      if (!sourceId) continue;
+      const team = teamBySource.get(sourceId) ?? null;
+      const key = team?.id ?? ORG_WIDE_KEY;
+      const label = team?.name ?? "Org-wide";
+      labelByKey.set(key, { key, label });
+      rolledRows.push({
+        bucketMs: Number(row.bucketMs),
+        key,
+        spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+      });
+    }
+    return { labelByKey, rolledRows };
+  }
+}
+
+interface RolledSpendRow {
+  bucketMs: number;
+  key: string;
+  spendNanoUsd: bigint;
+}
+
+interface SpendOverTimeRolled {
+  labelByKey: Map<string, { key: string; label: string }>;
+  rolledRows: RolledSpendRow[];
+}
+
+function assembleDepartmentRows({
+  rows,
+  projectDepartmentById,
+  userDepartmentByEmail,
+  userTeamDepartmentByEmail,
+  activeDepartmentNames,
+}: {
+  rows: SpendByDepartmentChRow[];
+  projectDepartmentById: ReadonlyMap<string, string | null>;
+  userDepartmentByEmail: ReadonlyMap<string, string | null>;
+  userTeamDepartmentByEmail: ReadonlyMap<string, string | null>;
+  activeDepartmentNames: ReadonlyMap<string, string>;
+}): SpendByDepartmentRow[] {
+  const acc = new Map<
+    string,
+    { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
+  >();
+  for (const r of rows) {
+    const hasPrincipalUser = r.actor !== "";
+    const departmentId = resolveTraceDepartmentId({
+      hasPrincipalUser,
+      userDepartmentId: userDepartmentByEmail.get(r.actor),
+      userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
+      projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
+    });
+    const key =
+      departmentId !== UNASSIGNED_DEPARTMENT &&
+      activeDepartmentNames.has(departmentId)
+        ? departmentId
+        : UNASSIGNED_DEPARTMENT;
+    const prior = acc.get(key) ?? {
+      spendNanoUsd: 0n,
+      requestCount: 0,
+      lastActivityMs: 0,
+    };
+    acc.set(key, {
+      spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
+      requestCount: prior.requestCount + Number(r.requests),
+      lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+    });
+  }
+
+  return [...acc.entries()]
+    .map(([key, v]) => ({
+      departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
+      departmentName:
+        key === UNASSIGNED_DEPARTMENT
+          ? "Unassigned"
+          : activeDepartmentNames.get(key)!,
+      spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
+      requestCount: v.requestCount,
+      lastActivityIso:
+        v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
+    }))
+    .sort((a, b) => {
+      const aNano = usdToNanoUsd(a.spendUsd);
+      const bNano = usdToNanoUsd(b.spendUsd);
+      return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
+    });
+}
+
+function rollUpSourcesByTeam({
+  sourceRows,
+  teamBySource,
+}: {
+  sourceRows: SpendByTeamSourceChRow[];
+  teamBySource: Map<string, { id: string; name: string } | null>;
+}): Map<string, TeamAccumulator> {
+  const ORG_WIDE_KEY = "__org_wide__";
+  const byTeam = new Map<string, TeamAccumulator>();
+  for (const row of sourceRows) {
+    const team = teamBySource.get(row.sourceId) ?? null;
+    const key = team ? team.id : ORG_WIDE_KEY;
+    const existing = byTeam.get(key);
+    if (existing) {
+      existing.thisSpendNano += usdToNanoUsd(row.thisSpendStr);
+      existing.prevSpendNano += usdToNanoUsd(row.prevSpendStr);
+      existing.requestCount += Number(row.thisRequests);
+      existing.sourceCount += 1;
+      existing.lastActivityMs = Math.max(
+        existing.lastActivityMs,
+        Number(row.lastActivityMs),
+      );
+    } else {
+      byTeam.set(key, {
+        teamId: team?.id ?? null,
+        teamName: team?.name ?? "Org-wide",
+        thisSpendNano: usdToNanoUsd(row.thisSpendStr),
+        prevSpendNano: usdToNanoUsd(row.prevSpendStr),
+        requestCount: Number(row.thisRequests),
+        lastActivityMs: Number(row.lastActivityMs),
+        sourceCount: 1,
+      });
+    }
+  }
+  return byTeam;
+}
+
+interface TeamAccumulator {
+  teamId: string | null;
+  teamName: string;
+  thisSpendNano: bigint;
+  prevSpendNano: bigint;
+  requestCount: number;
+  lastActivityMs: number;
+  sourceCount: number;
+}
+
+function formatTeamRows({
+  byTeam,
+  sortBy,
+  sortDir,
+  offset,
+  limit,
+}: {
+  byTeam: Map<string, TeamAccumulator>;
+  sortBy: SpendSortField;
+  sortDir: SortDir;
+  offset: number;
+  limit: number;
+}): SpendByTeamRow[] {
+  const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
+  const sign = sortDir === "asc" ? 1 : -1;
+  return [...byTeam.values()]
+    .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
+    .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
+    .slice(offset, offset + limit)
+    .map((t) => ({
+      teamId: t.teamId,
+      teamName: t.teamName,
+      spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
+      requestCount: t.requestCount,
+      deltaPctVsPriorWindow: pctChange(
+        Number(t.thisSpendNano),
+        Number(t.prevSpendNano),
+      ),
+      hasPriorBaseline: t.prevSpendNano > 0n,
+      lastActivityIso:
+        t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
+      sourceCount: t.sourceCount,
+    }));
+}
+
+function resolveDirectSpendOverTimeRows({
+  rows,
+}: {
+  rows: SpendOverTimeChRow[];
+}): SpendOverTimeRolled {
+  const labelByKey = new Map<string, { key: string; label: string }>();
+  const rolledRows: RolledSpendRow[] = [];
+  for (const row of rows) {
+    const key = row.groupKey ?? "";
+    if (!key) continue;
+    labelByKey.set(key, { key, label: key });
+    rolledRows.push({
+      bucketMs: Number(row.bucketMs),
+      key,
+      spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+    });
+  }
+  return { labelByKey, rolledRows };
+}
+
+function fillSpendOverTimeBuckets({
+  rolledRows,
+  labelByKey,
+  windowStart,
+  windowDays,
+}: {
+  rolledRows: RolledSpendRow[];
+  labelByKey: Map<string, { key: string; label: string }>;
+  windowStart: number;
+  windowDays: number;
+}): SpendOverTimeResult {
+  const aggregated = new Map<string, bigint>();
+  for (const r of rolledRows) {
+    const k = `${r.bucketMs}::${r.key}`;
+    aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
+  }
+
+  const buckets = emptyDenseBuckets(windowStart, windowDays);
+  const bucketIndexByMs = new Map(
+    buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
+  );
+  for (const [composite, spendNanoUsd] of aggregated.entries()) {
+    const sep = composite.indexOf("::");
+    const bucketMs = Number(composite.slice(0, sep));
+    const key = composite.slice(sep + 2);
+    const idx = bucketIndexByMs.get(bucketMs);
+    if (idx === undefined) continue;
+    const meta = labelByKey.get(key);
+    if (!meta) continue;
+    if (spendNanoUsd <= 0n) continue;
+    buckets[idx]!.points.push({
+      key: meta.key,
+      label: meta.label,
+      spendUsd: nanoUsdToDecimalString(spendNanoUsd),
+    });
+  }
+
+  for (const bucket of buckets) {
+    bucket.points.sort((a, b) => {
+      const aN = usdToNanoUsd(a.spendUsd);
+      const bN = usdToNanoUsd(b.spendUsd);
+      return bN > aN ? 1 : bN < aN ? -1 : 0;
+    });
+  }
+
+  return { buckets };
 }

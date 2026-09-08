@@ -197,7 +197,7 @@ interface ErrorBody {
 }
 
 /**
- * Read the platform's error body. The REST surface speaks this in THREE
+ * Read the platform's error body. The REST surface speaks this in FOUR
  * dialects, and all are real — verified against the routes, not assumed:
  *
  *   1. THE COMMON ONE, from the shared Hono error handler every `SecuredApp`
@@ -219,6 +219,14 @@ interface ErrorBody {
  *      code rather than a sentence: a handled error's own message is server copy
  *      and never crosses the boundary (ADR-045). Prose, when the server
  *      deliberately authored some, arrives as `meta.message` and wins.
+ *
+ *   4. THE CANONICAL ONE, from every `SecuredApp` that publishes the canonical
+ *      envelope (`app/api/shared/schemas.ts`): the failure NESTED under `error`
+ *      — `{ error: { type, code, message, meta?, trace_id?, span_id? } }`, with
+ *      the trace ids in snake_case. Unreadable until this dialect existed, so
+ *      an agent got no code and a customer's card printed the whole envelope
+ *      verbatim under "this step couldn't be completed", with the one sentence
+ *      that explained the failure buried in the middle of it.
  *
  * `code` is the name TypeScript uses, `type` the OpenAI-compatible name Go
  * emits; the framework sets all three to the same value (`errors.ts` assigns
@@ -277,6 +285,43 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
           : typeof serialized.docUrl === "string"
             ? serialized.docUrl
             : undefined,
+    };
+  }
+
+  // Dialect 4: THE CANONICAL ONE, from the shared REST envelope
+  // (`app/api/shared/schemas.ts`) that the analytics-sql families and every
+  // new canonical-envelope route answer with:
+  // `{ error: { type, code, message, meta?, trace_id?, span_id? } }` — the
+  // whole failure NESTED under `error` as an object, so none of the flat
+  // readings below can see it. `code` is the discriminant, `type` the
+  // status-class alias the Go plane also emits; reasons ride inside
+  // `meta.reasons` and are lifted out. The Go plane's 402 additionally
+  // carries `tips` / `docs_url` at the same level.
+  const canonical = asRecord(record.error);
+  if (
+    canonical &&
+    !isSystemError(canonical) &&
+    (typeof canonical.code === "string" || typeof canonical.type === "string")
+  ) {
+    const code =
+      typeof canonical.code === "string"
+        ? canonical.code
+        : (canonical.type as string);
+    const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
+    return {
+      code,
+      message:
+        typeof canonical.message === "string" && canonical.message !== code
+          ? canonical.message
+          : undefined,
+      meta,
+      traceId:
+        typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+      reasons: asReasons(metaReasons),
+      suggestions:
+        asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
+      docUrl:
+        typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
     };
   }
 

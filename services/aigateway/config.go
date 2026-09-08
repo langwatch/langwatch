@@ -154,12 +154,21 @@ func defaultConfig() Config {
 		Environment: "local",
 		Server: config.Server{
 			Addr: ":5563",
-			// Sits above DefaultNonStreamingHeartbeatInterval so a stock
-			// deployment can finish the slow-but-legitimate non-streaming
-			// requests the heartbeat mechanism exists to keep alive, instead
-			// of cutting them off mid-flight on every rolling deploy. See
+			// Sized off the longest request that can legitimately still be
+			// in flight when SIGTERM lands. Nothing gateway-side bounds a
+			// streaming response, so that is the upstream ceiling,
+			// providers.ProviderRequestTimeoutSeconds at 14 minutes, plus a
+			// minute for the response to finish flushing and for the spend
+			// spool to seal behind it. A deployment that sets nothing then
+			// finishes its long streams instead of severing them on every
+			// rolling deploy. This is a ceiling, not a sleep: with nothing
+			// in flight, Shutdown returns at once and the process exits
+			// immediately, so an idle gateway is unaffected. It also cannot
+			// outlive the platform's own clock, since the kubelet still
+			// SIGKILLs at terminationGracePeriodSeconds. The chart sets this
+			// explicitly from shutdown.timeoutSeconds and is unaffected. See
 			// warnIfGracefulShutdownTooShort in serve.go.
-			GracefulSeconds: 60,
+			GracefulSeconds: 900,
 			// Matches pkg/lifecycle's own defaultDrainDelay, so a deployment
 			// that does not set SERVER_DRAIN_DELAY_SECONDS drains exactly as
 			// the lifecycle package would on its own.

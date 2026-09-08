@@ -34,6 +34,8 @@ export const CONTENT_KEY_CATALOG: Record<ContentCategory, readonly string[]> = {
   output: [
     "gen_ai.output.messages",
     "gen_ai.completion",
+    "gen_ai.response.choices",
+    "gen_ai.response.finish_reasons",
     "ai.response",
     "ai.response.text",
     "ai.response.object",

@@ -9,6 +9,9 @@ from attrs import field as _attrs_field
 from ..models.get_api_gateway_v1_budgets_by_id_response_200_budget_on_breach import (
     GetApiGatewayV1BudgetsByIdResponse200BudgetOnBreach,
 )
+from ..models.get_api_gateway_v1_budgets_by_id_response_200_budget_scope_reach import (
+    GetApiGatewayV1BudgetsByIdResponse200BudgetScopeReach,
+)
 from ..models.get_api_gateway_v1_budgets_by_id_response_200_budget_scope_type import (
     GetApiGatewayV1BudgetsByIdResponse200BudgetScopeType,
 )
@@ -54,14 +57,18 @@ class GetApiGatewayV1BudgetsByIdResponse200Budget:
             budget this is its own cycle's start, not the calendar period's.
         resets_at (str): When the current period gives way to the next. Far-future for total and manual windows, which
             do not roll on their own.
-        cycle_anchor_at (None | str): The instant this budget's cycle is phased to, or null when the window is calendar
-            aligned.
+        cycle_anchor_at (None | str): The instant this budget's cycle is phased to. Null means no anchor: a calendar-
+            aligned cyclic window, or one of the two windows that do not cycle (total, manual).
         last_reset_at (None | str):
         archived_at (None | str):
         created_at (str):
         member_count (int | Unset):
         end_users_seen (int | Unset):
         end_users_over (int | Unset):
+        scope_reach (GetApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset): Whether any active key in the
+            organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block
+            as configured: scope a key to its target, or move the budget where the keys already run. This is the only field
+            that tells a budget nothing can reach apart from one that simply has not been breached.
     """
 
     id: str
@@ -89,6 +96,7 @@ class GetApiGatewayV1BudgetsByIdResponse200Budget:
     member_count: int | Unset = UNSET
     end_users_seen: int | Unset = UNSET
     end_users_over: int | Unset = UNSET
+    scope_reach: GetApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -152,6 +160,10 @@ class GetApiGatewayV1BudgetsByIdResponse200Budget:
 
         end_users_over = self.end_users_over
 
+        scope_reach: str | Unset = UNSET
+        if not isinstance(self.scope_reach, Unset):
+            scope_reach = self.scope_reach.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -186,6 +198,8 @@ class GetApiGatewayV1BudgetsByIdResponse200Budget:
             field_dict["end_users_seen"] = end_users_seen
         if end_users_over is not UNSET:
             field_dict["end_users_over"] = end_users_over
+        if scope_reach is not UNSET:
+            field_dict["scope_reach"] = scope_reach
 
         return field_dict
 
@@ -296,6 +310,13 @@ class GetApiGatewayV1BudgetsByIdResponse200Budget:
 
         end_users_over = d.pop("end_users_over", UNSET)
 
+        _scope_reach = d.pop("scope_reach", UNSET)
+        scope_reach: GetApiGatewayV1BudgetsByIdResponse200BudgetScopeReach | Unset
+        if isinstance(_scope_reach, Unset):
+            scope_reach = UNSET
+        else:
+            scope_reach = GetApiGatewayV1BudgetsByIdResponse200BudgetScopeReach(_scope_reach)
+
         get_api_gateway_v1_budgets_by_id_response_200_budget = cls(
             id=id,
             organization_id=organization_id,
@@ -322,6 +343,7 @@ class GetApiGatewayV1BudgetsByIdResponse200Budget:
             member_count=member_count,
             end_users_seen=end_users_seen,
             end_users_over=end_users_over,
+            scope_reach=scope_reach,
         )
 
         get_api_gateway_v1_budgets_by_id_response_200_budget.additional_properties = d

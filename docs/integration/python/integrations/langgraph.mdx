@@ -7,7 +7,7 @@ keywords: langgraph, instrumentation, callback, langwatch, python, tracing
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with LangGraph to provide detailed observability into your graph-based agents, LLM calls, and tool usage.
@@ -58,7 +58,7 @@ def add(a: int, b: int) -> int:
 
 
 # Model with tools
-model = init_chat_model("gpt-4o-mini", temperature=0)
+model = init_chat_model("gpt-5-mini")
 tools = [add]
 tools_by_name = {t.name: t for t in tools}
 model_with_tools = model.bind_tools(tools)

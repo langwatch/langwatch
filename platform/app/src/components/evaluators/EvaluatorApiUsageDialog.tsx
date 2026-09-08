@@ -6,9 +6,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Evaluator } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
+import type { Evaluator } from "~/generated/prisma/client";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,

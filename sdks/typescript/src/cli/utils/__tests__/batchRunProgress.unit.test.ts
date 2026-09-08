@@ -31,7 +31,10 @@ const json = (body: unknown, status = 200): Response =>
 		headers: { "content-type": "application/json" },
 	});
 
-const run = (status: string, verdict?: string | null) => ({
+// The real endpoint stamps every run with its batch id; the stub does too,
+// because fetchBatchRuns keeps only the batch's own runs.
+const run = (status: string, verdict?: string | null, batchRunId = "batch_1") => ({
+	batchRunId,
 	status,
 	results: verdict === undefined ? null : { verdict },
 });
@@ -101,6 +104,39 @@ describe("batch run progress", () => {
 		});
 	});
 
+	describe("given a server that answers with the whole project's runs", () => {
+		/** @scenario "Runs from other batches never count toward the wait" */
+		it("keeps only the batch's own runs", async () => {
+			// Deployed servers apply the batchRunId filter only when scenarioSetId
+			// is also present. Left unfiltered, the stale IN_PROGRESS run below
+			// would count as in flight forever and hold the wait open until its
+			// timeout.
+			serveRuns({
+				"": {
+					runs: [
+						run("SUCCESS", "success"),
+						run("IN_PROGRESS", undefined, "batch_stale"),
+						run("FAILED", "failure", "batch_other"),
+					],
+				},
+			});
+
+			const runs = await fetchBatchRuns({
+				endpoint: "https://app.langwatch.test",
+				batchRunId: "batch_1",
+				headers: {},
+			});
+
+			expect(runs).toHaveLength(1);
+			expect(tallyBatchRuns(runs)).toEqual({
+				total: 1,
+				completed: 1,
+				passed: 1,
+				failed: 0,
+			});
+		});
+	});
+
 	describe("when the endpoint has no route for the path", () => {
 		/** @scenario "A status endpoint that answers 404 ends the wait" */
 		it("raises rather than reporting an empty batch as finished", async () => {
@@ -155,6 +191,24 @@ describe("batch run progress", () => {
 
 		it("counts an inconclusive verdict as failed", () => {
 			expect(tallyBatchRuns([run("SUCCESS", "inconclusive")]).failed).toBe(1);
+		});
+
+		/** @scenario "The command line wait does not count a pending run as finished" */
+		it("counts a run waiting on its evaluators as still going", () => {
+			// The judge said success, but a required evaluator can still fail the
+			// run. Counting it as finished is what let `--wait` exit green on a
+			// batch that was about to turn red.
+			const progress = tallyBatchRuns([
+				run("SUCCESS", "success"),
+				run("PENDING_EVALUATION", "success"),
+			]);
+
+			expect(progress).toEqual({
+				total: 2,
+				completed: 1,
+				passed: 1,
+				failed: 0,
+			});
 		});
 	});
 });

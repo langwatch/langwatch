@@ -18,11 +18,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { WorkflowVersion } from "@prisma/client";
 import { GitCompare, X } from "lucide-react";
-
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { WorkflowVersion } from "~/generated/prisma/client";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
 import { getRunDisplayName, RunDisplayName } from "./getRunDisplayName";

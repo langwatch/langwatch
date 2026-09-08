@@ -9,8 +9,9 @@
  * Langy, because the gateway keeps authenticating against the secret Langy
  * still holds.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { VirtualKeyService } from "../virtualKey.service";
 

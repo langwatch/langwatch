@@ -35,7 +35,7 @@ type Props = {
 
 export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
   const { organization } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const updateMutation = api.gatewayCacheRules.update.useMutation({
     onSuccess: async () => {

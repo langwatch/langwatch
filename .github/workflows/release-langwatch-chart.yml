@@ -10,6 +10,21 @@ permissions:
   contents: write
   pages: write
 
+# Shared with release-clickhouse-serverless-chart on purpose. Both run
+# `cr index --push`, and `cr index` rebuilds index.yaml from the repository's
+# release list and force-pushes it to the same gh-pages branch of the same
+# repo. Run the two together and the loser pushes an index it built before the
+# winner's `cr upload` registered, so a chart version that published
+# successfully disappears from the index — the release exists, `helm repo
+# update` just stops seeing it. A per-workflow group would not help: the race
+# is between the two workflows, not between runs of either.
+concurrency:
+  group: helm-chart-index
+  # A publish run drains. Cancelling lands between `cr upload` and `cr index`
+  # often enough to matter, and leaves exactly the same missing-from-index
+  # state with nothing to reconcile it.
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest

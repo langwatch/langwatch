@@ -30,7 +30,7 @@ func mirrorWorkerBatch(t *testing.T) ptrace.Traces {
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
 	res := rs.Resource().Attributes()
-	res.PutStr("service.name", "opencode")
+	res.PutStr("service.name", "langy-worker")
 	res.PutStr("k8s.pod.name", "langy-worker-7")
 	res.PutStr("telemetry.sdk.name", "opentelemetry")
 	// A prompt-injectable worker branding itself platform-internal.

@@ -1,7 +1,15 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { graphsRouter } from "../graphs";
+
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -17,12 +25,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 
@@ -61,6 +66,24 @@ describe("graph dashboard references", () => {
       where: { id: "dashboard_2", projectId: "project_1" },
       select: { id: true },
     });
+    expect(graphCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a create input whose column and span overflow the grid", () => {
+  it("refuses the placement instead of persisting an off-grid card", async () => {
+    await expect(
+      createCaller().create({
+        projectId: "project_1",
+        name: "Graph",
+        graph: "{}",
+        // Each passes its own bound (column < 8, span <= 8) yet 7 + 2 = 9
+        // overruns the grid's right edge — the same rule `layoutSchema` refuses.
+        gridColumn: 7,
+        colSpan: 2,
+      }),
+    ).rejects.toThrow();
+
     expect(graphCreate).not.toHaveBeenCalled();
   });
 });

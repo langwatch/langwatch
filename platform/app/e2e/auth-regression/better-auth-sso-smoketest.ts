@@ -21,7 +21,8 @@
  *     npx tsx scripts/better-auth-sso-smoketest.ts
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../src/server/prismaPgAdapter";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 let exitCode = 0;
@@ -38,7 +39,9 @@ const check = (label: string, condition: boolean, detail?: string): void => {
 async function main() {
   assertLocalhostDatabaseUrl();
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
 
   // ADR-027: the ssoDomain auto-join rides the platform SSO gate, which
   // requires a genuine (signature-valid) license. Mint one with a throwaway
@@ -265,6 +268,7 @@ async function main() {
       userId: "sso_smoke_existing2",
       type: "oauth",
       provider: "okta",
+      issuer: "local:oauth:okta",
       providerAccountId: "okta-dave-456-original",
     },
   });
@@ -370,6 +374,9 @@ async function main() {
       userId: "sso_smoke_existing4",
       type: "oauth",
       provider: "google",
+      // Google declares a real issuer of its own, so this is NOT the
+      // synthetic `local:oauth:google` the other providers get.
+      issuer: "https://accounts.google.com",
       providerAccountId: "google-oauth2|frank-OLD-id",
     },
   });

@@ -10,6 +10,11 @@ on:
         required: false
         default: 'next'
 
+# A publish run drains — see publish-docker-app.
+concurrency:
+  group: publish-docker-clickhouse-serverless-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   extract-version:
     runs-on: ubuntu-latest

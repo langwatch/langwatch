@@ -60,6 +60,7 @@ Feature: S3PollingPullerAdapter (universal S3-polling adapter)
     When the adapter reads a file and parses it
     Then it emits the expected event count regardless of format
 
+  @unit
   Scenario: Malformed file skipped, run continues
     Given key `anthropic/compliance/2026-05-03-bad.ndjson` contains an unparseable line
     When the adapter encounters the bad line

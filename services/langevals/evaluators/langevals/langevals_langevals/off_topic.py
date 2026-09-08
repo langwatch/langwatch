@@ -7,8 +7,8 @@ from litellm.utils import trim_messages, get_max_tokens
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal, cast
 import json
-import os
 
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluatorEntry,
@@ -67,10 +67,6 @@ class OffTopicEvaluator(BaseEvaluator[OffTopicEntry, OffTopicSettings, OffTopicR
 
     def evaluate(self, entry: OffTopicEntry) -> SingleEvaluationResult:
         vendor, model = self.settings.model.split("/")
-        if vendor == "azure":
-            os.environ["AZURE_API_KEY"] = self.get_env("AZURE_API_KEY")
-            os.environ["AZURE_API_BASE"] = self.get_env("AZURE_API_BASE")
-            os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
 
         content = entry.input or ""
         if not content:
@@ -109,6 +105,7 @@ class OffTopicEvaluator(BaseEvaluator[OffTopicEntry, OffTopicSettings, OffTopicR
         )
 
         response = litellm.completion(
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             model=litellm_model,
             messages=messages,
             tools=[

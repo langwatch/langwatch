@@ -111,20 +111,22 @@ function crossRangeFacet(
 const evaluatorStatusRead: CategoricalRead = (t) =>
   t.evaluations == null ? UNSUPPORTED : t.evaluations.map((e) => e.status);
 
-// Re-expresses the `evaluatorVerdict` multiIf in JS — `error` wins, then the
-// 0/1/null `Passed` maps to fail/pass/unknown. Kept in lockstep with the SQL
-// expression on the `evaluatorVerdict` facet.
+// Re-expresses the `evaluatorVerdict` multiIf in JS — `error` and `skipped`
+// win, then the 0/1/null `Passed` maps to fail/pass/unknown. Kept in lockstep
+// with the SQL expression on the `evaluatorVerdict` facet.
 const evaluatorVerdictRead: CategoricalRead = (t) =>
   t.evaluations == null
     ? UNSUPPORTED
     : t.evaluations.map((e) =>
         e.status === "error"
           ? "error"
-          : e.passed === true
-            ? "pass"
-            : e.passed === false
-              ? "fail"
-              : "unknown",
+          : e.status === "skipped"
+            ? "skipped"
+            : e.passed === true
+              ? "pass"
+              : e.passed === false
+                ? "fail"
+                : "unknown",
       );
 
 const evaluatorScoreRead: RangeRead = (t) =>

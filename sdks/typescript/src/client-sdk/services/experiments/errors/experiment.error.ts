@@ -56,6 +56,23 @@ export class TargetMetadataConflictError extends ExperimentError {
 }
 
 /**
+ * Thrown when a comparison cannot produce a verdict the caller asked for
+ *
+ * A row that is simply too thin to judge is skipped instead, so this is
+ * reserved for a mismatch between what the caller named and what the run
+ * actually recorded.
+ */
+export class ComparisonError extends ExperimentError {
+  constructor(
+    message: string,
+    public readonly missingTargets: string[] = []
+  ) {
+    super(message);
+    this.name = "ComparisonError";
+  }
+}
+
+/**
  * Thrown when an evaluator call fails
  */
 export class EvaluatorError extends ExperimentError {

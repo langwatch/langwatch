@@ -16,8 +16,11 @@
  * read of its own scenarios.
  */
 
-import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import type {
+  ModelDefaultScopeType,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import { CODEX_DEFAULT_MODEL } from "../codexRestrictions";
 import { ModelNotConfiguredError } from "../modelNotConfiguredError";

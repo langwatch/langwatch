@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   type UseMutationOptions,
   type UseQueryOptions,
   useMutation,
@@ -37,7 +38,7 @@ export function useAdminList<T>(
   return useQuery<ListResult<T>, Error>({
     queryKey: listKey(resource, params),
     queryFn: () => adminClient.getList<T>(resource, params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     ...options,
   });
 }
@@ -74,9 +75,9 @@ export function useAdminUpdate<T>(
   >({
     mutationFn: ({ id, data }) => adminClient.update<T>(resource, id, data),
     ...options,
-    onSuccess: async (res, vars, ctx) => {
+    onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: rootKey(resource) });
-      options?.onSuccess?.(res, vars, ctx);
+      options?.onSuccess?.(...args);
     },
   });
 }
@@ -89,9 +90,9 @@ export function useAdminCreate<T>(
   return useMutation<DataResult<T>, Error, Record<string, unknown>>({
     mutationFn: (data) => adminClient.create<T>(resource, data),
     ...options,
-    onSuccess: async (res, vars, ctx) => {
+    onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: rootKey(resource) });
-      options?.onSuccess?.(res, vars, ctx);
+      options?.onSuccess?.(...args);
     },
   });
 }

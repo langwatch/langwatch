@@ -1,6 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
@@ -8,7 +8,6 @@ import {
   PromptTagService,
   PromptTagValidationError,
 } from "~/server/prompt-config/prompt-tag.service";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -64,7 +63,7 @@ export const promptTagsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("prompts:view"))
+    .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,
@@ -80,7 +79,7 @@ export const promptTagsRouter = createTRPCRouter({
    */
   create: protectedProcedure
     .input(z.object({ projectId: z.string(), name: z.string() }))
-    .use(checkProjectPermission("prompts:manage"))
+    .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,
@@ -110,7 +109,7 @@ export const promptTagsRouter = createTRPCRouter({
         newName: z.string(),
       }),
     )
-    .use(checkProjectPermission("prompts:manage"))
+    .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,
@@ -134,7 +133,7 @@ export const promptTagsRouter = createTRPCRouter({
    */
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), name: z.string() }))
-    .use(checkProjectPermission("prompts:manage"))
+    .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
       const organizationId = await resolveOrganizationId(
         ctx.prisma,

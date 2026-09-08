@@ -10,6 +10,10 @@
  *       specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *       specs/ai-governance/admin-ottl-authoring.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { projectFactory } from "~/factories/project.factory";
 import {
   type Organization,
   OrganizationUserRole,
@@ -18,11 +22,7 @@ import {
   type Team,
   TeamUserRole,
   type User,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { projectFactory } from "~/factories/project.factory";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";

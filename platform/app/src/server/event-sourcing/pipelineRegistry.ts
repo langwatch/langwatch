@@ -4,23 +4,47 @@ import {
 } from "@ee/event-sourcing/pipelineSet";
 import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
-  createGovernanceKpisSyncReactor,
-  type GovernanceKpisSyncReactorDeps,
-} from "@ee/governance/reactors/governanceKpisSync.reactor";
+  createGovernanceKpisSyncHandler,
+  GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+  type GovernanceKpisSyncSubscriberDeps,
+  isGovernanceKpiTrace,
+} from "@ee/governance/subscribers/governanceKpisSync.subscriber";
 import {
-  createGovernanceOcsfEventsSyncReactor,
-  type GovernanceOcsfEventsSyncReactorDeps,
-} from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+  createGovernanceOcsfEventsSyncHandler,
+  GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+  type GovernanceOcsfEventsSyncSubscriberDeps,
+  isGovernanceOcsfTrace,
+} from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type {
+  IdentityHeadsRepository,
+  IdentityReservationRepository,
+  IdentityUsersRepository,
+  JoinRequestReadRepository,
+  MfaEnrollmentRepository,
+  ScimSyncReadRepository,
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
+} from "@langwatch/identity-server";
+import {
+  IdentityGuards,
+  JoinRequestGuards,
+  MfaGuards,
+  ScimSyncGuards,
+  SsoConnectionGuards,
+} from "@langwatch/identity-server";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
@@ -78,6 +102,8 @@ import { TraceReadDerivationService } from "../app-layer/traces/trace-read-deriv
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
+import type { EvaluatorTypes } from "../evaluations/evaluators.generated";
+import { runEvaluation } from "../evaluations/runEvaluation";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
@@ -86,11 +112,30 @@ import type {
   TopicClusteringOutcomeCommands,
   TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
+import { publishCancellation } from "../scenarios/cancellation-channel";
+import { SCENARIO_EVALUATIONS_JOB } from "../scenarios/evaluations/constants";
+import {
+  loadRunAttachments,
+  type RunScenarioEvaluationsDeps,
+  runScenarioEvaluations,
+} from "../scenarios/evaluations/runScenarioEvaluations";
+import {
+  createScenarioEvaluationsJobHandler,
+  scenarioEvaluationsJobId,
+} from "../scenarios/evaluations/scenarioEvaluations.job";
+import type { ScenarioEvaluationsJobPayload } from "../scenarios/evaluations/types";
+import type { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
+import { ScenarioService } from "../scenarios/scenario.service";
+import { SuiteService } from "../suites/suite.service";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import { createTenantId } from "./domain/tenantId";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { createAgentSandboxMaintenancePipeline } from "./pipelines/agent-sandbox-maintenance/pipeline";
+import { createAuthzGrantsPipeline } from "./pipelines/authz-grants/pipeline";
+import type { GrantProjectionWriteStore } from "./pipelines/authz-grants/projections/authzGrantsWrite.projection";
+import type { AuthzAuditTrailStore } from "./pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -101,18 +146,20 @@ import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipe
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
+import { createCodingAgentSessionSeenTouch } from "./pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch";
 import {
   CodingAgentSessionEventsAppendStore,
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
-import {
-  createPullRequestMappingReactor,
-  type PullRequestMappingReactorDeps,
-} from "./pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
+import { RedisSessionContextMemo } from "./pipelines/coding-agent-processing/services/session-context-memo";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
+import {
+  createPullRequestMappingHandler,
+  type PullRequestMappingSubscriberDeps,
+} from "./pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
   createEvaluationProcessingPipeline,
@@ -122,6 +169,7 @@ import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/
 import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
+import type { ReportEvaluationCommandData } from "./pipelines/evaluation-processing/schemas/commands";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
@@ -130,11 +178,20 @@ import type { ExperimentIdLookup } from "./pipelines/experiment-run-processing/r
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "./pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
+import type { OpenAdmission } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
+import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
+import { createIdentityPipeline } from "./pipelines/identity/pipeline";
+import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
+import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
+import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -149,20 +206,27 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
+import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
+import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
+import { FinishRunCommand } from "./pipelines/simulation-processing/commands/finishRun.command";
+import { QueueRunCommand } from "./pipelines/simulation-processing/commands/queueRun.command";
+import { RecordEvaluationsCommand } from "./pipelines/simulation-processing/commands/recordEvaluations.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
+import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
+import type { SimulationRunMetricsProjectionRecord } from "./pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
-import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
-import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
+import { SimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
+import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
+import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
+import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
+import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -181,22 +245,23 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
-import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
+import { createCustomEvaluationSyncHandler } from "./pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
+import { createEvaluationTriggerSubscriber } from "./pipelines/trace-processing/subscribers/evaluationTrigger.subscriber";
+import { createExperimentMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
 import {
   createDeferredOriginHandler,
-  createOriginGateReactor,
+  createOriginGateHandler,
   DEFERRED_CHECK_DELAY_MS,
   type DeferredOriginPayload,
   makeDeferredJobId,
-} from "./pipelines/trace-processing/reactors/originGate.reactor";
-import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
-import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
-import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
-import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import { createTrackedEventSyncReactor } from "./pipelines/trace-processing/reactors/trackedEventSync.reactor";
-import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+} from "./pipelines/trace-processing/subscribers/originGate.subscriber";
+import { createProjectMetadataHandler } from "./pipelines/trace-processing/subscribers/projectMetadata.subscriber";
+import { createSimulationMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
+import { createSpanStorageBroadcastHandler } from "./pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
+import { createTraceUpdateBroadcastHandler } from "./pipelines/trace-processing/subscribers/traceUpdateBroadcast.subscriber";
+import { createTrackedEventSyncHandler } from "./pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
 import type { ProcessStore } from "./process-manager";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
@@ -204,6 +269,7 @@ import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
+import { throttledWindow } from "./subscribers/throttleWindow";
 import {
   generateKillSwitchKey,
   type KillSwitchComponentType,
@@ -257,6 +323,28 @@ function createInMemoryDeferredFallback<P>({
 }
 
 /**
+ * Late-bound holder for this pod's scenario execution pool. Owned by the
+ * registry; the simulationRunExecution process manager's execute intent reads
+ * it via `getPool`, and worker startup (startWorkers.bootScenarioProcessor)
+ * sets the pool once the ScenarioExecutionPool exists — after the pipeline
+ * registry has been built.
+ */
+export interface ScenarioExecutionPoolHolder {
+  get(): ScenarioExecutionPool | null;
+  set(pool: ScenarioExecutionPool): void;
+}
+
+function createScenarioExecutionPoolHolder(): ScenarioExecutionPoolHolder {
+  let pool: ScenarioExecutionPool | null = null;
+  return {
+    get: () => pool,
+    set: (p) => {
+      pool = p;
+    },
+  };
+}
+
+/**
  * Pre-constructed repositories, resolved at the composition root (presets.ts).
  * The registry consumes these directly — no ClickHouse client resolution here.
  */
@@ -264,6 +352,8 @@ export interface PipelineRepositories {
   suiteRunState: SuiteRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   simulationRunState: SimulationRunStateRepository;
+  /** Write side of the simulationRunMetrics map projection (migration 00078). */
+  simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
   /** Primary replica for read-after-write consistency. */
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
@@ -310,6 +400,54 @@ export interface PipelineRepositories {
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   langyTurnAdmission: LangyTurnAdmissionRepository;
+  /** Where the grants pipeline's write instructions land (ADR-110). */
+  authzGrantsWrite: GrantProjectionWriteStore;
+  /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
+  authzAuditTrail: AuthzAuditTrailStore;
+  /** The identity pipeline's `Identifier` head + cursor (ADR-101 §3). */
+  identityProjection: StateProjectionStore<IdentityFoldState>;
+  /** Postgres reads the identity guards run against (ADR-101 §2). */
+  identityHeads: IdentityHeadsRepository;
+  /**
+   * The `User` reads the same guards run against. The staged re-run has to
+   * ask the cross-population collision question the calling path asked
+   * (ADR-116 §6) — a guard that could only see the projection here would let
+   * the queue state a fact the caller was refused.
+   */
+  identityUsers: IdentityUsersRepository;
+  /**
+   * The address lock the same guards claim before stating a fact (ADR-116
+   * §6). The staged re-run arrives with the caller's own command id, so its
+   * claim is the same claim rather than a second one.
+   */
+  identityReservations: IdentityReservationRepository;
+  /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
+  mfaProjection: StateProjectionStore<MfaFoldState>;
+  /** Postgres reads the two-step verification guards run against (D06). */
+  mfaEnrollments: MfaEnrollmentRepository;
+  /** The connection pipeline's `SsoConnection` head + cursor (D04). */
+  ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
+  /** Postgres reads the connection guards run against (ADR-117 §5). */
+  ssoConnectionReads: SsoConnectionReadRepository;
+  /** Who a teardown would strand, read over the identity heads. */
+  ssoConnectionStranding: SsoConnectionStrandingRepository;
+  /** Activation's break-glass precondition (D05 hardens it). */
+  ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** Whether an actor is a LangWatch platform operator — what makes deciding
+   *  a domain claim and attesting a domain operator acts (D05 tier 1). */
+  ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** How the teardown grace wake dispatches its completion command. */
+  ssoConnectionTeardown: ConnectionTeardownPort;
+  /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
+  scimSyncProjection: StateProjectionStore<ScimSyncFoldState>;
+  /** Postgres reads the directory-sync guards run against (D08). */
+  scimSyncReads: ScimSyncReadRepository;
+  /** The join-request pipeline's `JoinRequest` head + cursor (D12). */
+  joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
+  /** Postgres reads the join-request guards run against (ADR-117, D12). */
+  joinRequestReads: JoinRequestReadRepository;
+  /** How the reminder and expiry wakes reach the world. */
+  joinRequestLifecycle: JoinRequestLifecyclePort;
 }
 
 export interface PipelineRegistryDeps {
@@ -319,7 +457,7 @@ export interface PipelineRegistryDeps {
   broadcast: BroadcastService;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
-    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+    handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash" | "isStopped">;
     worker: Pick<LangyWorkerPort, "dispatch">;
     titleGenerator: LangyTitleGenerator;
   };
@@ -355,8 +493,8 @@ export interface PipelineRegistryDeps {
    * best-effort DELETEd after event_log INSERT succeeds.
    */
   blobStore?: BlobStore;
-  governanceKpisSync?: GovernanceKpisSyncReactorDeps;
-  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
+  governanceKpisSync?: GovernanceKpisSyncSubscriberDeps;
+  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncSubscriberDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
   codingAgent?: {
     /**
@@ -365,7 +503,7 @@ export interface PipelineRegistryDeps {
      * connection), so presets passes a `Deferred`'s callable proxy here.
      * Omitted where there is no GitHub connection to ask.
      */
-    pullRequestMapping: PullRequestMappingReactorDeps;
+    pullRequestMapping: PullRequestMappingSubscriberDeps;
   };
   /**
    * The fleet-wide GitHub linkage maintenance the scheduled process manager
@@ -377,18 +515,15 @@ export interface PipelineRegistryDeps {
   github?: {
     /** One recheck pass; returns how many branches were re-asked about. */
     recheckDueBranches: () => Promise<number>;
-    /** One retention pass over the two linkage tables. */
-    pruneStaleBranchLinkage: () => Promise<{
-      branchChecks: number;
-      pullRequests: number;
-    }>;
+    /** One retention pass over the branch bookkeeping. */
+    pruneStaleBranchLinkage: () => Promise<{ branchChecks: number }>;
   };
 }
 
 /**
  * Composition root for all event-sourcing pipelines.
  *
- * Creates store adapters, builds reactors and command classes, then registers
+ * Creates store adapters, builds subscribers and command classes, then registers
  * all pipelines with the EventSourcing runtime. Pipelines receive only
  * store interfaces and pre-built artifacts — never raw deps like prisma or ClickHouse clients.
  */
@@ -396,7 +531,7 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   /**
-   * ADR-051: the trace pipeline's projectMetadata reactor bootstraps a
+   * ADR-051: the trace pipeline's projectMetadata subscriber bootstraps a
    * project's clustering schedule on its first real trace, but the topic
    * clustering pipeline (whose command it dispatches) registers later —
    * late-bound like the other cross-pipeline dispatchers.
@@ -415,12 +550,12 @@ export class PipelineRegistry {
   }
 
   registerAll() {
-    // TODO: Customer.io reactors are implemented but not yet registered.
-    // Counting strategy needs to be finalised (per-event ClickHouse queries)
-    // before enabling.
-    // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
-    //      customerIoSimulationSyncReactor
-
+    // TODO: The Customer.io simulation subscriber is implemented but not yet
+    // registered — the counting strategy needs finalising (per-event
+    // ClickHouse queries) before enabling. See
+    // customerIoSimulationSync.subscriber.ts. Its trace and evaluation
+    // siblings migrated with the reactor retirement (ADR-098) and are
+    // likewise implemented but unregistered, pending that same decision.
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
       "trace_summaries",
@@ -490,6 +625,20 @@ export class PipelineRegistry {
         sessionKeyReap: {
           reap: () =>
             reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Code agent credential maintenance, on the same footing. A sandbox key is
+    // minted per run and nothing revokes it at the end of one, so this sweep
+    // is what retires it.
+    this.deps.eventSourcing.register(
+      createAgentSandboxMaintenancePipeline({
+        sandboxKeyReap: {
+          reap: () =>
+            reapExpiredAgentSandboxApiKeys({ prisma: this.deps.prisma }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
@@ -576,11 +725,12 @@ export class PipelineRegistry {
       ],
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionHandle } =
+    const { pipeline: simulationPipeline, scenarioExecutionPool } =
       this.registerSimulationPipeline({
         suiteRunPipeline,
         traceSummaryStore,
         simComputeRunMetrics,
+        reportEvaluation: mapCommands(evalPipeline.commands).reportEvaluation,
       });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({
@@ -595,6 +745,89 @@ export class PipelineRegistry {
       eventSourcing: this.deps.eventSourcing,
     });
     const billingPipeline = this.registerBillingReportingPipeline();
+    // The grants ledger (ADR-092 §13). The write paths emit through the
+    // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
+    // organization whose genesis import has landed (its
+    // SystemMigrationTenantState row, read by the engine gate) sends
+    // these commands; every other organization still takes the imperative
+    // Prisma path, and an operator's `rolled_back` flip returns one there
+    // with no deploy.
+    this.deps.eventSourcing.register(
+      createAuthzGrantsPipeline({
+        authzGrantsWriteStore: this.deps.repositories.authzGrantsWrite,
+        authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
+      }),
+    );
+    // The identity pipeline (ADR-101, D01 PR 1). Ships dark: no production
+    // writer dispatches these commands until the identity adapter lands, and
+    // the adapter's per-user write gate itself ships closed until a user's
+    // backfill (PR 2) latches — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createIdentityPipeline({
+        identityProjectionStore: this.deps.repositories.identityProjection,
+        identityGuards: new IdentityGuards(
+          this.deps.repositories.identityHeads,
+          this.deps.repositories.identityUsers,
+          this.deps.repositories.identityReservations,
+        ),
+        // Two-step verification rides this same aggregate (D06), so its
+        // commands share the per-person lane rather than racing it. Ships
+        // dark: `MFA_ENROLLMENT_OPEN` defaults to `off`, so the two-factor
+        // plugin is not registered and nothing dispatches these.
+        mfaProjectionStore: this.deps.repositories.mfaProjection,
+        mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
+      }),
+    );
+    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
+    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
+    // projection and no `Organization.ssoDomain` write stops. Its only
+    // production writer until D05 is the grandfather migration, which is
+    // paced by per-organization enrollment like every other in-place
+    // migration — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createSsoConnectionPipeline({
+        connectionProjectionStore:
+          this.deps.repositories.ssoConnectionProjection,
+        connectionGuards: new SsoConnectionGuards({
+          connections: this.deps.repositories.ssoConnectionReads,
+          breakGlass: this.deps.repositories.ssoBreakGlassBindings,
+          stranding: this.deps.repositories.ssoConnectionStranding,
+          platformOperators: this.deps.repositories.ssoPlatformOperators,
+        }),
+        teardown: this.deps.repositories.ssoConnectionTeardown,
+      }),
+    );
+    // The directory-sync pipeline (D08). Ships dark: `SCIM_V2_GRANTS`
+    // defaults off, so no SCIM request path dispatches these commands and
+    // the previous write path is unchanged — a deploy changes nothing on its
+    // own. Its projection is what makes a failed apply visible with the
+    // connection, the operation and a reason code, so it is registered
+    // whether the flag is on or not: a history nobody writes to costs
+    // nothing, and one that only exists once the flag flips would have no
+    // past to show on the day it mattered.
+    this.deps.eventSourcing.register(
+      createScimSyncPipeline({
+        scimSyncProjectionStore: this.deps.repositories.scimSyncProjection,
+        scimSyncGuards: new ScimSyncGuards({
+          syncs: this.deps.repositories.scimSyncReads,
+        }),
+      }),
+    );
+
+    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
+    // defaults off, so nothing dispatches a join command, no interstitial
+    // renders and no admin panel appears — a deploy changes nothing on its
+    // own, and rollback is the flag.
+    this.deps.eventSourcing.register(
+      createJoinRequestPipeline({
+        joinRequestProjectionStore:
+          this.deps.repositories.joinRequestProjection,
+        joinRequestGuards: new JoinRequestGuards({
+          requests: this.deps.repositories.joinRequestReads,
+        }),
+        lifecycle: this.deps.repositories.joinRequestLifecycle,
+      }),
+    );
 
     logger.info("All pipelines registered");
 
@@ -612,8 +845,8 @@ export class PipelineRegistry {
       ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
-      /** Late-bind the execution pool for scenario execution reactor. */
-      scenarioExecutionHandle,
+      /** Late-bind the execution pool for the simulationRunExecution process manager. */
+      scenarioExecutionPool,
     };
   }
 
@@ -659,7 +892,7 @@ export class PipelineRegistry {
       recordClusteringRunFailed: (args) =>
         commands.recordClusteringRunFailed(args),
     };
-    // Level-triggered bootstrap: the projectMetadata reactor asks on every
+    // Level-triggered bootstrap: the projectMetadata subscriber asks on every
     // real ingest, and this claim keeps that to one commit per project per
     // window. See createRateLimitedBootstrap for why re-asking is safe.
     this.bootstrapTopicClustering.resolve(
@@ -875,6 +1108,49 @@ export class PipelineRegistry {
             };
             await pipeline.commands.settleSpend.send(data);
           },
+          // Every configured instance, shared and private alike: one sweeper
+          // settles the whole install, so it cannot hold a single client.
+          //
+          // Settled per instance, never all-or-nothing. `Promise.all` is
+          // fail-fast, so one unreachable private ClickHouse would reject the
+          // whole read, fail the sweep intent, burn its attempts and keep
+          // failing every wake while that instance was down — taking the
+          // SHARED instance's open admissions with it. That contradicts the
+          // rule the sweep already states for a single tenant's failure, so
+          // it applies at the instance level too: the reachable instances
+          // settle, the unreachable one is reported and retried next sweep.
+          findOpenAdmissions: async (params) => {
+            const finders = await getOpenAdmissionFindersByInstance();
+            const results = await Promise.allSettled(
+              finders.map(({ finder }) => finder.findOpenAdmissions(params)),
+            );
+            const open: OpenAdmission[] = [];
+            results.forEach((result, index) => {
+              if (result.status === "fulfilled") {
+                open.push(...result.value);
+                return;
+              }
+              logger.warn(
+                {
+                  target: finders[index]?.target,
+                  error: result.reason,
+                },
+                "settlement sweep could not read one ClickHouse instance; its open admissions wait for the next sweep",
+              );
+            });
+            // The cap bounds ONE SWEEP, and each instance applies it to its own
+            // query — so N instances would hand the sweeper N times the cap.
+            // Re-applying it here is what makes the documented bound true of
+            // the number the sweeper actually settles.
+            //
+            // Oldest first, across instances, so the cap sheds the newest rows
+            // rather than whichever instance happened to answer last. Each
+            // query already returns its own rows oldest-first; this is what
+            // extends that ordering to the merge, and it keeps the sweep
+            // draining a backlog from the end that has waited longest.
+            open.sort((a, b) => a.admittedAtMs - b.admittedAtMs);
+            return open.slice(0, MAX_OPEN_ADMISSIONS_PER_SWEEP);
+          },
         },
       }),
     );
@@ -890,6 +1166,14 @@ export class PipelineRegistry {
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
           new CodingAgentSessionStore(
             this.deps.repositories.codingAgentSession,
+            {
+              // The Sessions-destination stamp, inline at the commit seam with
+              // its own per-process window — a read-model write, not a subscriber.
+              onSessionsStored: createCodingAgentSessionSeenTouch({
+                touchCodingAgentSessionSeen: (params) =>
+                  this.deps.projects.touchCodingAgentSessionSeen(params),
+              }),
+            },
           ),
           "coding_agent_sessions",
         ),
@@ -904,9 +1188,10 @@ export class PipelineRegistry {
           new CodingAgentSessionEventsAppendStore(
             this.deps.repositories.codingAgentSessionEvents,
           ),
+        sessionContextMemo: new RedisSessionContextMemo(this.deps.redis),
         ...(this.deps.codingAgent
           ? {
-              pullRequestMappingReactor: createPullRequestMappingReactor(
+              pullRequestMappingHandler: createPullRequestMappingHandler(
                 this.deps.codingAgent.pullRequestMapping,
               ),
             }
@@ -959,6 +1244,9 @@ export class PipelineRegistry {
           {
             distinctId: "evaluator-settings-recovery",
             defaultValue: false,
+            // A pipeline-wide switch, flipped for the fleet and not per tenant.
+            projectId: NOT_TARGETED,
+            organizationId: NOT_TARGETED,
           },
         ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
@@ -979,7 +1267,13 @@ export class PipelineRegistry {
           try {
             disabled = await featureFlagService.isEnabled(
               "ops_evaluation_payload_offload_disabled",
-              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+              {
+                distinctId: "evaluation-inputs-offload",
+                defaultValue: false,
+                // A pipeline-wide switch, flipped for the fleet.
+                projectId: NOT_TARGETED,
+                organizationId: NOT_TARGETED,
+              },
             );
           } catch {
             // Unreadable kill switch: stay on the default (offload enabled).
@@ -1055,48 +1349,50 @@ export class PipelineRegistry {
       CommandDispatcher<ComputeRunMetricsCommandData>
     >("simComputeRunMetrics");
 
-    const originGateReactor = createOriginGateReactor({
+    const originGateHandler = createOriginGateHandler({
       scheduleDeferred: scheduleDeferred.fn,
     });
 
-    const evaluationTriggerReactor = createEvaluationTriggerReactor({
+    const evaluationTrigger = createEvaluationTriggerSubscriber({
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
     });
 
-    const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
+    const customEvaluationSyncHandler = createCustomEvaluationSyncHandler({
       reportEvaluation: evalCommands.reportEvaluation,
     });
 
     // Live span feedback (langwatch.event) → tracked event. Routes through the
     // same recordTrackedEventSpan path as REST POST /api/events/track so an
     // SDK-emitted thumbs_up_down lands identically to a REST call.
-    const trackedEventSyncReactor = createTrackedEventSyncReactor({
+    const trackedEventSyncHandler = createTrackedEventSyncHandler({
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         recordTrackedEventSpan({ project: { id: tenantId }, body, eventId }),
     });
 
-    const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
+    // Without Redis, the worker-to-web pub/sub bridge is unavailable, so both
+    // broadcast subscribers register inert.
+    const broadcastDisabled = !this.deps.eventSourcing.redisConnection;
+
+    const traceUpdateBroadcastHandler = createTraceUpdateBroadcastHandler({
       broadcast: this.deps.broadcast,
-      hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    const spanStorageBroadcastReactor = createSpanStorageBroadcastReactor({
+    const spanStorageBroadcastHandler = createSpanStorageBroadcastHandler({
       broadcast: this.deps.broadcast,
-      hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    const projectMetadataReactor = createProjectMetadataReactor({
+    const projectMetadataHandler = createProjectMetadataHandler({
       projects: this.deps.projects,
       bootstrapTopicClustering: (projectId) =>
         this.bootstrapTopicClustering.fn(projectId),
     });
 
-    const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
+    const simulationMetricsSyncHandler = createSimulationMetricsSyncHandler({
       computeRunMetrics: simComputeRunMetrics.fn,
     });
 
-    // Late-bound reference for experiment metrics sync reactor.
+    // Late-bound reference for experiment metrics sync subscriber.
     // The experiment pipeline is registered after the trace pipeline,
     // so computeExperimentRunMetrics is wired after experiment pipeline registration.
     let expComputeRunMetrics:
@@ -1106,7 +1402,7 @@ export class PipelineRegistry {
       | ((tenantId: string, runId: string) => Promise<string | null>)
       | null = null;
 
-    const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
+    const experimentMetricsSyncHandler = createExperimentMetricsSyncHandler({
       computeExperimentRunMetrics: async (data) => {
         if (!expComputeRunMetrics) {
           logger.warn(
@@ -1127,14 +1423,34 @@ export class PipelineRegistry {
       },
     });
 
-    const governanceKpisSyncReactor = this.deps.governanceKpisSync
-      ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
+    // EE governance rollups, composed here as full subscriber specs so the
+    // OSS pipeline definition stays free of `@ee` imports.
+    const governanceKpisSync = this.deps.governanceKpisSync
+      ? {
+          fold: "traceSummary",
+          when: isGovernanceKpiTrace,
+          ...throttledWindow<TraceProcessingEvent>({
+            makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
+            windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+          }),
+          handler: createGovernanceKpisSyncHandler(
+            this.deps.governanceKpisSync,
+          ),
+        }
       : undefined;
 
-    const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
-      ? createGovernanceOcsfEventsSyncReactor(
-          this.deps.governanceOcsfEventsSync,
-        )
+    const governanceOcsfEventsSync = this.deps.governanceOcsfEventsSync
+      ? {
+          fold: "traceSummary",
+          when: isGovernanceOcsfTrace,
+          ...throttledWindow<TraceProcessingEvent>({
+            makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
+            windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+          }),
+          handler: createGovernanceOcsfEventsSyncHandler(
+            this.deps.governanceOcsfEventsSync,
+          ),
+        }
       : undefined;
 
     const tracePipeline = this.deps.eventSourcing.register(
@@ -1152,16 +1468,17 @@ export class PipelineRegistry {
           "trace_analytics",
         ),
         traceSummaryStore,
-        originGateReactor,
-        evaluationTriggerReactor,
+        originGateHandler,
+        evaluationTrigger,
         automations,
-        customEvaluationSyncReactor,
-        trackedEventSyncReactor,
-        traceUpdateBroadcastReactor,
-        projectMetadataReactor,
-        simulationMetricsSyncReactor,
-        experimentMetricsSyncReactor,
-        spanStorageBroadcastReactor,
+        customEvaluationSyncHandler,
+        trackedEventSyncHandler,
+        traceUpdateBroadcastHandler,
+        projectMetadataHandler,
+        simulationMetricsSyncHandler,
+        experimentMetricsSyncHandler,
+        spanStorageBroadcastHandler,
+        broadcastDisabled,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
@@ -1171,8 +1488,8 @@ export class PipelineRegistry {
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
         ),
-        governanceKpisSyncReactor,
-        governanceOcsfEventsSyncReactor,
+        governanceKpisSync,
+        governanceOcsfEventsSync,
         subscribers: codingAgentSubscribers,
       }),
     );
@@ -1182,7 +1499,7 @@ export class PipelineRegistry {
     resolveOrigin.resolve(traceCommands.resolveOrigin);
 
     // Wire the deferred origin resolution queue (GroupQueue-backed, survives process restart).
-    // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
+    // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → subscriber.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
     const deferredOriginQueue =
       tracePipeline.service.registerJob<DeferredOriginPayload>({
@@ -1218,7 +1535,7 @@ export class PipelineRegistry {
     }
 
     // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
-    // (pure Postgres + S3, no fold/reactor). Per-group concurrency is inherent
+    // (pure Postgres + S3, no fold/subscriber). Per-group concurrency is inherent
     // and the group key is the datasetId (framework prepends tenantId=projectId)
     // → exactly one normalize in flight per dataset. The enqueue side is wired
     // into the dataset domain via `registerDatasetNormalizeEnqueue`; when the
@@ -1252,7 +1569,7 @@ export class PipelineRegistry {
       simComputeRunMetrics,
       /**
        * Wires late-bound experiment computeExperimentRunMetrics and
-       * lookupExperimentId into the trace-side experimentMetricsSync reactor.
+       * lookupExperimentId into the trace-side experimentMetricsSync subscriber.
        * Called after the experiment pipeline is registered.
        */
       wireExperimentDeps: (deps: {
@@ -1288,38 +1605,29 @@ export class PipelineRegistry {
     suiteRunPipeline,
     traceSummaryStore,
     simComputeRunMetrics,
+    reportEvaluation,
   }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     simComputeRunMetrics: Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >;
+    /** Writes a scenario evaluation on the run's trace (evaluation pipeline). */
+    reportEvaluation: CommandDispatcher<ReportEvaluationCommandData>;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
-      new RepositoryFoldStore<SimulationRunStateData>(
-        this.deps.repositories.simulationRunState,
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      new SimulationRunStateFoldStore({
+        repository: this.deps.repositories.simulationRunState,
+        version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      }),
       "simulation_runs",
     );
-    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
-      {
-        broadcast: this.deps.broadcast,
-        hasRedis: !!this.deps.eventSourcing.redisConnection,
-      },
-    );
 
-    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
-      publisher: this.deps.eventSourcing.redisConnection ?? null,
-    });
-
-    const scenarioExecutionHandle = createScenarioExecutionReactor();
+    // Late-bound pool holder — worker startup sets the pool after the
+    // pipeline is built; the process manager's execute intent reads it.
+    const scenarioExecutionPool = createScenarioExecutionPoolHolder();
 
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
-    const suiteRunSyncReactor = createSuiteRunSyncReactor({
-      recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
-      completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
-    });
 
     // Deferred dispatchers — resolved after pipeline registration.
     const selfComputeRunMetrics = new Deferred<
@@ -1328,6 +1636,11 @@ export class PipelineRegistry {
     const scheduleRetry = new Deferred<
       (payload: ComputeRunMetricsCommandData) => Promise<void>
     >("scheduleRetry");
+    // The process manager's finish intent reports through this same
+    // pipeline's commands, which exist only after `.build()`.
+    const selfExecutionCommands = new Deferred<
+      () => SimulationRunExecutionCommands
+    >("selfExecutionCommands");
 
     const traceReadDerivation = new TraceReadDerivationService(
       this.deps.traces.spans,
@@ -1339,25 +1652,195 @@ export class PipelineRegistry {
         traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
-    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
-      computeRunMetrics: selfComputeRunMetrics.fn,
+    // ECST backfill: FinishRunCommand and RecordEvaluationsCommand load the
+    // run's prior events straight from the canonical event store
+    // (aggregateType "simulation_run").
+    const loadSimulationRunEvents = async ({
+      tenantId,
+      scenarioRunId,
+    }: {
+      tenantId: string;
+      scenarioRunId: string;
+    }): Promise<readonly SimulationProcessingEvent[]> => {
+      const eventStore =
+        this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
+      if (!eventStore) return [];
+      return eventStore.getEvents(
+        scenarioRunId,
+        { tenantId: createTenantId(tenantId) },
+        "simulation_run",
+      );
+    };
+    // Resolves the evaluators a run is graded with. Read when the run is
+    // queued, so an edit to the suite or the plan mid-batch cannot change what
+    // an already scheduled run is graded against, and again when a run that
+    // never passed through the queue command finishes.
+    const loadRunEvaluators = (params: {
+      projectId: string;
+      scenarioId: string;
+      planId: string | null;
+    }) => loadRunAttachments({ deps: scenarioEvaluationDeps, ...params });
+    const queueRunCommand = new QueueRunCommand({
+      loadRunAttachments: loadRunEvaluators,
     });
+    const finishRunCommand = new FinishRunCommand({
+      loadPriorEvents: loadSimulationRunEvents,
+      loadRunAttachments: loadRunEvaluators,
+    });
+    const recordEvaluationsCommand = new RecordEvaluationsCommand({
+      loadPriorEvents: loadSimulationRunEvents,
+    });
+
+    // Scenario evaluations: the subscriber queues one job per finished run,
+    // the job grades the run with the evaluators its suite and plan attach.
+    // The suite service needs the app's suite run service, which exists only
+    // after the app is built, so it is created on first use.
+    const scenarioService = ScenarioService.create(this.deps.prisma);
+    let suiteService: SuiteService | undefined;
+    const suites = (): SuiteService => {
+      suiteService ??= SuiteService.create({
+        prisma: this.deps.prisma,
+        suiteRunService: getApp().suiteRuns.runs,
+      });
+      return suiteService;
+    };
+    const enqueueScenarioEvaluations = new Deferred<
+      CommandDispatcher<ScenarioEvaluationsJobPayload>
+    >("enqueueScenarioEvaluations");
+    const scenarioEvaluationDeps: RunScenarioEvaluationsDeps = {
+      scenarios: scenarioService,
+      suites: {
+        getRunAttachments: (params) => suites().getRunAttachments(params),
+        getAttachedEvaluators: (params) =>
+          suites().getAttachedEvaluators(params),
+      },
+      runs: {
+        getRunState: async ({ tenantId, scenarioRunId }) => {
+          const state = await simulationRunStore.get(scenarioRunId, {
+            tenantId: createTenantId(tenantId),
+            aggregateId: scenarioRunId,
+          });
+          if (!state) return null;
+          return {
+            messages: state.Messages.map((row) => ({
+              role: row.Role,
+              content: row.Content,
+            })),
+            traceIds: state.TraceIds,
+          };
+        },
+      },
+      spans: this.deps.traces.spans,
+      runEvaluation: (params) =>
+        runEvaluation({
+          ...params,
+          evaluatorType: params.evaluatorType as EvaluatorTypes,
+        }),
+      reportEvaluation: (report) => reportEvaluation(report),
+      recordEvaluations: (data) => simCommands.recordEvaluations(data),
+    };
 
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
-        snapshotUpdateBroadcastReactor,
-        cancellationBroadcastReactor,
-        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
-        suiteRunSyncReactor,
-        traceMetricsSyncReactor,
+        simulationRunMetricsStore:
+          this.deps.repositories.simulationRunMetricsStore,
+        queueRunCommand,
+        finishRunCommand,
+        recordEvaluationsCommand,
         computeRunMetricsCommand,
+        simulationRunExecution: {
+          getAttachedEvaluators: (params) =>
+            scenarioEvaluationDeps.suites.getAttachedEvaluators(params),
+          getPool: () => scenarioExecutionPool.get(),
+          publishCancellation: async ({ projectId, scenarioRunId }) => {
+            const publisher = this.deps.eventSourcing.redisConnection ?? null;
+            if (!publisher) {
+              logger.warn(
+                { scenarioRunId },
+                "No Redis publisher available, cancellation broadcast skipped",
+              );
+              return;
+            }
+            await publishCancellation({
+              publisher,
+              message: { projectId, scenarioRunId },
+            });
+          },
+          commands: selfExecutionCommands.fn,
+        },
+        snapshotUpdateBroadcast: {
+          broadcast: this.deps.broadcast,
+          hasRedis: !!this.deps.eventSourcing.redisConnection,
+        },
+        suiteRunSync: {
+          recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
+          completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+          regradeSuiteRunItem: suiteRunCommands.regradeSuiteRunItem,
+        },
+        traceMetricsSync: {
+          computeRunMetrics: selfComputeRunMetrics.fn,
+        },
+        scenarioEvaluations: {
+          loadRunAttachments: loadRunEvaluators,
+          enqueue: enqueueScenarioEvaluations.fn,
+        },
       }),
     );
 
     // Resolve self-referencing command
     const simCommands = mapCommands(simulationPipeline.commands);
     selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
+    selfExecutionCommands.resolve(() => simCommands);
+
+    // The scenario evaluations job. One group per run; a repeat of the same
+    // attempt inside the window is dropped, a retry carries the next attempt.
+    const scenarioEvaluationsHandler = createScenarioEvaluationsJobHandler({
+      run: (params) =>
+        runScenarioEvaluations({ deps: scenarioEvaluationDeps, ...params }),
+      reschedule: ({ payload, delayMs }) =>
+        enqueueScenarioEvaluations.fn(payload, { delay: delayMs }),
+    });
+    const scenarioEvaluationsQueue =
+      simulationPipeline.service.registerJob<ScenarioEvaluationsJobPayload>({
+        name: SCENARIO_EVALUATIONS_JOB.NAME,
+        process: scenarioEvaluationsHandler,
+        groupKeyFn: (payload) => payload.scenarioRunId,
+        deduplication: {
+          makeId: scenarioEvaluationsJobId,
+          ttlMs: SCENARIO_EVALUATIONS_JOB.DEDUP_TTL_MS,
+          extend: false,
+          replace: false,
+          shouldSurviveDispatch: true,
+        },
+        spanAttributes: (payload) => ({
+          "scenario_evaluations.tenant_id": payload.tenantId,
+          "scenario_evaluations.scenario_run_id": payload.scenarioRunId,
+          "scenario_evaluations.attempt": payload.attempt,
+        }),
+      });
+    if (scenarioEvaluationsQueue) {
+      enqueueScenarioEvaluations.resolve((payload, options) =>
+        scenarioEvaluationsQueue.send(payload, options),
+      );
+    } else {
+      // Event sourcing disabled: run in-process after the requested delay.
+      enqueueScenarioEvaluations.resolve(async (payload, options) => {
+        const timer = setTimeout(() => {
+          scenarioEvaluationsHandler(payload).catch((error: unknown) => {
+            logger.error(
+              {
+                tenantId: payload.tenantId,
+                scenarioRunId: payload.scenarioRunId,
+                error,
+              },
+              "Scenario evaluations failed",
+            );
+          });
+        }, options?.delay ?? 0);
+        if (typeof timer === "object" && "unref" in timer) timer.unref();
+      });
+    }
 
     // Resolve cross-pipeline deferred (trace → simulation)
     simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
@@ -1404,7 +1887,7 @@ export class PipelineRegistry {
       );
     }
 
-    return { pipeline: simulationPipeline, scenarioExecutionHandle };
+    return { pipeline: simulationPipeline, scenarioExecutionPool };
   }
 
   private registerBillingReportingPipeline() {
@@ -1450,7 +1933,7 @@ export class PipelineRegistry {
       }),
     );
 
-    // Wire the trace-side experimentMetricsSync reactor's late-bound deps
+    // Wire the trace-side experimentMetricsSync subscriber's late-bound deps
     const expCommands = mapCommands(experimentRunPipeline.commands);
 
     // The experimentId lookup, pre-built at the composition root (presets.ts)
@@ -1488,6 +1971,7 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // Introspection — derived from the live EventSourcing runtime
 // ============================================================================
 
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { getApp } from "../app-layer/app";
 // StaticPipelineDefinition is already imported at the top of the file.
 
@@ -1497,11 +1981,11 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
-  kind: "fold" | "map";
+  kind: "fold" | "map" | "state";
 }
 
-export interface ReactorMetadata {
-  reactorName: string;
+export interface SubscriberMetadata {
+  subscriberName: string;
   pipelineName: string;
   aggregateType: string;
   afterProjection: string;
@@ -1553,16 +2037,28 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
         kind: "map" as const,
       }),
     );
-    return [...folds, ...maps];
+    const states = Array.from(def.stateProjections?.entries() ?? []).map(
+      ([name]) => ({
+        projectionName: name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline" as const,
+        // State projections enqueue with `__jobType=stateProjection`; the
+        // dispatcher matches the pause key against that raw segment.
+        pauseKey: `${pipelineName}/stateProjection/${name}`,
+        kind: "state" as const,
+      }),
+    );
+    return [...folds, ...maps, ...states];
   });
 }
 
-export function getReactorMetadata(): ReactorMetadata[] {
+export function getSubscriberMetadata(): SubscriberMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldReactors.values()).map(
+    return Array.from(def.foldSubscribers.values()).map(
       ({ projectionName, definition }) => ({
-        reactorName: definition.name,
+        subscriberName: definition.name,
         pipelineName,
         aggregateType,
         afterProjection: projectionName,
@@ -1654,63 +2150,82 @@ export interface KillSwitchDescriptor {
 }
 
 export function getKillSwitchDescriptors(): KillSwitchDescriptor[] {
+  return getDefinitions().flatMap(killSwitchDescriptorsOf);
+}
+
+function killSwitchDescriptorsOf(
+  def: StaticPipelineDefinition<any, any, any>,
+): KillSwitchDescriptor[] {
   const out: KillSwitchDescriptor[] = [];
-  for (const def of getDefinitions()) {
-    const { name: pipelineName, aggregateType } = def.metadata;
-    for (const { definition } of def.foldProjections.values()) {
-      out.push({
-        key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
-        aggregateType,
-        componentType: "projection",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
-    for (const { definition } of def.mapProjections.values()) {
-      out.push({
-        key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
-        aggregateType,
-        componentType: "mapProjection",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
-    for (const cmd of def.commands) {
-      out.push({
-        key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
-        aggregateType,
-        componentType: "command",
-        componentName: cmd.name,
-        pipelineName,
-      });
-    }
-    // Subscribers belong here MORE than the others do, not less: the enqueue
-    // seam decides relevance and DISCARDS what it judges irrelevant, and
-    // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
-    // those events for good. `ops.setFeatureFlag` rejects any key that is
-    // neither a registry entry nor a live descriptor, so a switch missing from
-    // this list is not merely unlisted — it is unsettable, leaving a revert as
-    // the only way to stop the seam it guards.
-    //
-    // A subscriber may override its key via `options.killSwitch.customKey`;
-    // emit the key the router will actually read, or the page would offer one
-    // nothing consults.
-    for (const definition of def.eventSubscribers.values()) {
-      out.push({
-        // Generated, never re-spelled: the comment above is the reason. A
-        // hand-built key that drifts from `generateKillSwitchKey` is not a
-        // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
-        // neither a registry entry nor a live descriptor, so the switch
-        // becomes unsettable.
-        key:
-          definition.options?.killSwitch?.customKey ??
-          generateKillSwitchKey(aggregateType, "subscriber", definition.name),
-        aggregateType,
-        componentType: "subscriber",
-        componentName: definition.name,
-        pipelineName,
-      });
-    }
+  const { name: pipelineName, aggregateType } = def.metadata;
+  for (const { definition } of def.foldProjections.values()) {
+    out.push({
+      key: `es-${aggregateType}-projection-${definition.name}-killswitch`,
+      aggregateType,
+      componentType: "projection",
+      componentName: definition.name,
+      pipelineName,
+    });
+  }
+  for (const { definition } of def.mapProjections.values()) {
+    out.push({
+      key: `es-${aggregateType}-mapProjection-${definition.name}-killswitch`,
+      aggregateType,
+      componentType: "mapProjection",
+      componentName: definition.name,
+      pipelineName,
+    });
+  }
+  // State projections check `componentType: "projection"` at runtime (the
+  // router reuses the fold-shaped key), so the descriptor must match it —
+  // a "stateProjection" segment here would list a switch nothing reads.
+  // Same for a custom key: emit the one the router consults.
+  for (const [name, definition] of def.stateProjections?.entries() ?? []) {
+    out.push({
+      key:
+        definition.options?.killSwitch?.customKey ??
+        generateKillSwitchKey(aggregateType, "projection", name),
+      aggregateType,
+      componentType: "projection",
+      componentName: name,
+      pipelineName,
+    });
+  }
+  for (const cmd of def.commands) {
+    out.push({
+      key: `es-${aggregateType}-command-${cmd.name}-killswitch`,
+      aggregateType,
+      componentType: "command",
+      componentName: cmd.name,
+      pipelineName,
+    });
+  }
+  // Subscribers belong here MORE than the others do, not less: the enqueue
+  // seam decides relevance and DISCARDS what it judges irrelevant, and
+  // subscriber fan-out is never replayed (ADR-069), so a bad filter loses
+  // those events for good. `ops.setFeatureFlag` rejects any key that is
+  // neither a registry entry nor a live descriptor, so a switch missing from
+  // this list is not merely unlisted — it is unsettable, leaving a revert as
+  // the only way to stop the seam it guards.
+  //
+  // A subscriber may override its key via `options.killSwitch.customKey`;
+  // emit the key the router will actually read, or the page would offer one
+  // nothing consults.
+  for (const definition of def.eventSubscribers.values()) {
+    out.push({
+      // Generated, never re-spelled: the comment above is the reason. A
+      // hand-built key that drifts from `generateKillSwitchKey` is not a
+      // cosmetic mismatch — `ops.setFeatureFlag` refuses a key that is
+      // neither a registry entry nor a live descriptor, so the switch
+      // becomes unsettable.
+      key:
+        definition.options?.killSwitch?.customKey ??
+        generateKillSwitchKey(aggregateType, "subscriber", definition.name),
+      aggregateType,
+      componentType: "subscriber",
+      componentName: definition.name,
+      pipelineName,
+    });
   }
   return out;
 }

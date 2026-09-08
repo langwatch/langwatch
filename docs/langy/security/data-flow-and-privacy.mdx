@@ -57,7 +57,7 @@ Regardless of the allow-list, these are blocked at L3/L4:
 - **CGNAT (`100.64.0.0/10`).** Blocks the node-local addresses some managed Kubernetes networking uses.
 - **The cloud metadata endpoint.** Blocks IMDS credential theft.
 
-For the full picture of what the sandbox can and cannot reach, and the honest note that the stock L7 adapter is cooperative rather than mandatory, see [How Langy is isolated](/langy/security/sandbox).
+For the full picture of what the sandbox can and cannot reach, and why the stock L7 adapter is cooperative rather than mandatory, see [How Langy is isolated](/langy/security/sandbox).
 
 ## Secret and PII redaction keeps secrets out of what Langy reads
 

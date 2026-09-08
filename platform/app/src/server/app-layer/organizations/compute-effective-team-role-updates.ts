@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
 
 export const LITE_MEMBER_VIEWER_ONLY_ERROR =

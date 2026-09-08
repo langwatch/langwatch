@@ -70,6 +70,7 @@ import {
 } from "./session-context-hooks";
 import {
 	extractLookupIdFromToken,
+	isExpiredSession,
 	listIngestionKeys,
 	mintIngestionKey,
 } from "./cli-api";
@@ -80,9 +81,12 @@ import {
 	telemetryEnvVarNames,
 } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { runningCodeRestartNotice } from "./running-code";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	buildScopedToolFunction,
 	type DetectedShell,
+	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
 	rcPath,
@@ -128,6 +132,17 @@ export interface IngestionKeyResolution {
 	endpoint: string;
 	/** True when a fresh key was minted (vs a cached one reused). */
 	minted: boolean;
+	/**
+	 * True when the platform rejected this device's session, so the cached
+	 * key was reused without anything confirming it is still live.
+	 *
+	 * A device that cannot authenticate can neither check its key nor mint a
+	 * replacement, and the key it holds may have been revoked weeks ago. The
+	 * resolution still carries that key, because wiring the tool with a key
+	 * that may work beats wiring it with nothing, but the caller must say so
+	 * instead of reporting a working setup.
+	 */
+	sessionExpired?: boolean;
 }
 
 /**
@@ -174,7 +189,21 @@ export async function resolveLiveIngestionKey({
 	const cached = cfg.default_personal_ingest_keys?.[sourceType];
 	if (cached?.secret) {
 		const cachedLookupId = extractLookupIdFromToken(cached.secret);
+		if (cachedLookupId === undefined) {
+			// Not a personal `ik-lw-` token: the user placed this credential
+			// here by hand (a project `sk-lw-` key, a legacy shape). It cannot
+			// be matched against the personal key listing, so probing it would
+			// always read "revoked" and re-mint over the user's explicit
+			// choice. Pinned: use as-is, never probe, never overwrite.
+			return {
+				token: cached.secret,
+				prefix: cached.prefix,
+				endpoint: otlpEndpointFor(cfg.control_plane_url),
+				minted: false,
+			};
+		}
 		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
+		let sessionExpired = false;
 		try {
 			const liveKeys = await listIngestionKeys(cfg);
 			// Server resolved - verify the cached lookupId is still present
@@ -186,12 +215,17 @@ export async function resolveLiveIngestionKey({
 				// Key was revoked or rotated on the platform - treat as no cache.
 				cacheIsLive = false;
 			}
-		} catch {
+		} catch (error) {
 			// Network error / older server without the endpoint: reuse cache
-			// as-is (offline-first fallback - hard-cut rotation is a
-			// re-mint-kills-old invariant, so a genuinely revoked key will
-			// self-correct next time the device is online) - unless the
-			// caller disabled that fallback.
+			// as-is (offline-first fallback - a device that is merely offline
+			// keeps exporting with the key it has) - unless the caller
+			// disabled that fallback.
+			//
+			// A session the platform rejected is not that case. Nothing about
+			// the cached key was confirmed and nothing can replace it, so the
+			// fallback still hands the key back but marks the resolution: the
+			// key may have been dead for weeks and only the caller can say so.
+			sessionExpired = isExpiredSession(error);
 			cacheIsLive = allowOfflineFallback;
 		}
 		if (cacheIsLive) {
@@ -200,6 +234,7 @@ export async function resolveLiveIngestionKey({
 				prefix: cached.prefix,
 				endpoint: otlpEndpointFor(cfg.control_plane_url),
 				minted: false,
+				...(sessionExpired ? { sessionExpired: true } : {}),
 			};
 		}
 	}
@@ -210,6 +245,52 @@ export async function resolveLiveIngestionKey({
 		endpoint: r.endpoint,
 		minted: true,
 	};
+}
+
+export interface IngestionCredentialResolution extends IngestionKeyResolution {
+	/** Where the credential is scoped: the personal workspace or a pinned project. */
+	scope: "personal" | "project";
+	/** Slug (preferred) or id of the pinned project; unset for pasted keys. */
+	projectLabel?: string;
+}
+
+/**
+ * Resolve the ingest credential for a tool: the project pin when one
+ * exists (`tool_project_keys[tool]`, written by `--project` / `instrument`),
+ * else the personal path via `resolveLiveIngestionKey`.
+ *
+ * A pinned credential is used verbatim with no server round trip: it may
+ * belong to a project the device session cannot list (or the device may
+ * have no session at all), and revocation surfaces on the ingest side.
+ * Re-running `langwatch instrument <tool> --project ...` replaces it.
+ */
+export async function resolveIngestionCredential({
+	cfg,
+	tool,
+	sourceType,
+	allowOfflineFallback = true,
+}: {
+	cfg: GovernanceConfig;
+	tool: string;
+	sourceType: string;
+	allowOfflineFallback?: boolean;
+}): Promise<IngestionCredentialResolution> {
+	const pinned = cfg.tool_project_keys?.[tool];
+	if (pinned?.secret) {
+		return {
+			token: pinned.secret,
+			endpoint: otlpEndpointFor(pinned.endpoint ?? cfg.control_plane_url),
+			minted: false,
+			scope: "project",
+			projectLabel: pinned.project_slug ?? pinned.project_id,
+		};
+	}
+	const personal = await resolveLiveIngestionKey({
+		cfg,
+		sourceType,
+		allowOfflineFallback,
+	});
+	return { ...personal, scope: "personal" };
 }
 
 /**
@@ -305,10 +386,15 @@ export function refreshCodexOtelBlockTo({
 }): string | null {
 	if (!codexHasOtelBlock(defaultCodexConfigPath())) return null;
 	const result = writeCodexOtelBlock({
-		endpoint: codexTraceEndpoint(endpoint),
+		baseEndpoint: endpoint,
 		ingestionToken: token,
 		environment,
 	});
+	// The exporters carry no conversation; the harvest recovers it, so a
+	// refresh that keeps the exporters healthy heals the harvest wiring too
+	// (idempotent and quiet while the notify block is already in place).
+	assertCodexTurnHarvest();
+	assertCodexAgentGuidance();
 	if (result.action === "unchanged") return null;
 	return `codex [otel] block (${displayCodexConfigPath()})`;
 }
@@ -481,6 +567,8 @@ export interface LoginTelemetryRefreshResult {
 	 * cfg.default_personal_ingest_keys) - the caller should saveConfig.
 	 */
 	mintedAny: boolean;
+	/** Restart advice when a live launcher predates successfully changed wiring. */
+	warnings?: string[];
 }
 
 /**
@@ -501,16 +589,31 @@ export async function refreshTelemetryWiringForLogin(
 ): Promise<LoginTelemetryRefreshResult> {
 	const labels: string[] = [];
 	let mintedAny = false;
+	const warnings: string[] = [];
 	const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
 
 	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
 		try {
-			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
+			if (cfg.tool_project_keys?.[tool]?.secret) {
+				// Project-pinned wiring is deliberate scope, not stale personal
+				// wiring; a new login never re-points it at the personal path.
+				continue;
+			}
 			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
 				// The new org forbids direct OTLP for this tool; the wrapper
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
+			// codex's notify hook is what recovers the conversation, and it does
+			// not depend on the exporter endpoint. A config already pointing at
+			// this login skips the refresh below, so a device whose [otel] block
+			// predates the hook would never be given one. Idempotent and quiet
+			// when the hook is already in place.
+			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
+				assertCodexTurnHarvest();
+				assertCodexAgentGuidance();
+			}
+			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
 			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
 			// This caller only gets here because the persisted endpoint
 			// already differs from the new login, so a network hiccup must
@@ -539,7 +642,12 @@ export async function refreshTelemetryWiringForLogin(
 				});
 				if (label) labels.push(label);
 			} else {
-				labels.push(...refreshScopedShellFunctions({ tool, vars }));
+				const refreshed = refreshScopedShellFunctions({ tool, vars });
+				labels.push(...refreshed);
+				if (tool === "code" && refreshed.length > 0) {
+					const notice = runningCodeRestartNotice();
+					if (notice) warnings.push(notice);
+				}
 			}
 		} catch {
 			// Best-effort per tool: one failed mint must not block the login
@@ -561,5 +669,5 @@ export async function refreshTelemetryWiringForLogin(
 		// Best-effort, same as above.
 	}
 
-	return { labels, mintedAny };
+	return { labels, mintedAny, ...(warnings.length > 0 ? { warnings } : {}) };
 }

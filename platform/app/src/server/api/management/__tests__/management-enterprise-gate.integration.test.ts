@@ -12,13 +12,13 @@
  */
 
 import { FREE_PLAN } from "@ee/licensing/constants";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
 import { app as roleBindingsApp } from "~/app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "~/app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";

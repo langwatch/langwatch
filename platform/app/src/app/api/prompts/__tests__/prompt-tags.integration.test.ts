@@ -1,10 +1,3 @@
-import type {
-  LlmPromptConfig,
-  LlmPromptConfigVersion,
-  Organization,
-  Project,
-  Team,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -12,8 +5,18 @@ import {
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
+import type {
+  LlmPromptConfig,
+  LlmPromptConfigVersion,
+  Organization,
+  Project,
+  Team,
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+wireDefaultTestApp();
 
 describe("Prompt Tags REST API (/api/prompts/tags)", () => {
   let testOrganization: Organization;

@@ -22,7 +22,12 @@ export type BroadcastEventType =
   // panel subscribes and cancels + invalidates its slim conversation list /
   // detail queries, refetching the projection — the signal carries only the
   // conversation id, never message content.
-  | "langy_conversation_updated";
+  | "langy_conversation_updated"
+  // Fires when an experiment's workbench state is saved through the service
+  // seam, whoever wrote it: a person, the agent, or an API caller. The payload
+  // carries the experiment id, slug and new version only — clients refetch, so
+  // no workbench state rides the tenant-wide channel.
+  | "experiment_updated";
 
 const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
@@ -32,6 +37,7 @@ const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "presence_cursor",
   "discover_updated",
   "langy_conversation_updated",
+  "experiment_updated",
 ];
 
 function redisChannel(eventType: BroadcastEventType): string {

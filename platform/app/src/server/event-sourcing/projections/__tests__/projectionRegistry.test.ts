@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../queues";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
@@ -10,6 +9,7 @@ import {
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
 import type { JobRegistryEntry } from "../../services/queues/queueManager";
+import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types";
 import { ProjectionRegistry } from "../projectionRegistry";
 
 function createMockGlobalQueue(): {
@@ -27,7 +27,9 @@ function createMockGlobalQueue(): {
   };
 }
 
-function createMockReactor(name: string): ReactorDefinition<Event> {
+function createMockSubscriber(
+  name: string,
+): SubscriberDispatchDefinition<Event> {
   return {
     name,
     handle: vi.fn().mockResolvedValue(void 0),
@@ -171,53 +173,58 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("registerReactor", () => {
+  describe("registerSubscriber", () => {
     describe("when fold exists", () => {
       it("registers successfully", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
-        const reactor = createMockReactor("myReactor");
-        expect(() => registry.registerReactor("myFold", reactor)).not.toThrow();
+        const subscriber = createMockSubscriber("mySubscriber");
+        expect(() =>
+          registry.registerSubscriber("myFold", subscriber),
+        ).not.toThrow();
       });
     });
 
     describe("when fold does not exist", () => {
       it("throws immediately", () => {
         const registry = new ProjectionRegistry();
-        const reactor = createMockReactor("myReactor");
+        const subscriber = createMockSubscriber("mySubscriber");
 
-        expect(() => registry.registerReactor("missingFold", reactor)).toThrow(
-          /fold "missingFold" — fold not registered/,
-        );
+        expect(() =>
+          registry.registerSubscriber("missingFold", subscriber),
+        ).toThrow(/fold "missingFold" — fold not registered/);
       });
     });
 
-    describe("when reactor name is duplicate", () => {
+    describe("when subscriber name is duplicate", () => {
       it("throws ConfigurationError", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
-        const reactor1 = createMockReactor("sameName");
-        const reactor2 = createMockReactor("sameName");
+        const subscriber1 = createMockSubscriber("sameName");
+        const subscriber2 = createMockSubscriber("sameName");
 
-        registry.registerReactor("myFold", reactor1);
-        expect(() => registry.registerReactor("myFold", reactor2)).toThrow(
-          /already registered/,
-        );
+        registry.registerSubscriber("myFold", subscriber1);
+        expect(() =>
+          registry.registerSubscriber("myFold", subscriber2),
+        ).toThrow(/already registered/);
       });
     });
   });
 
   describe("hasProjections", () => {
-    describe("when reactors are registered alongside their folds", () => {
+    describe("when subscribers are registered alongside their folds", () => {
       it("returns true", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
-        registry.registerReactor("myFold", createMockReactor("myReactor"));
+        registry.registerSubscriber(
+          "myFold",
+          createMockSubscriber("mySubscriber"),
+        );
 
         expect(registry.hasProjections).toBe(true);
       });
@@ -231,13 +238,16 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("initialize with reactors", () => {
-    describe("when reactors are registered", () => {
-      it("creates reactor queues", () => {
+  describe("initialize with subscribers", () => {
+    describe("when subscribers are registered", () => {
+      it("creates subscriber queues", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
-        registry.registerReactor("myFold", createMockReactor("myReactor"));
+        registry.registerSubscriber(
+          "myFold",
+          createMockSubscriber("mySubscriber"),
+        );
 
         const { globalQueue, globalJobRegistry } = createMockGlobalQueue();
         expect(() =>

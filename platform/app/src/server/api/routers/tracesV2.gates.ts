@@ -1,6 +1,9 @@
 import type { Evaluation } from "~/server/tracer/types";
 import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes";
-import type { Protections } from "~/server/traces/protections";
+import {
+  canReadCapturedContent,
+  type Protections,
+} from "~/server/traces/protections";
 
 import type {
   SpanTreeNode,
@@ -73,11 +76,10 @@ export function gateSessionCost<T extends { totalCost: number }>({
  * may not read captured content.
  *
  * The title is written BY the model FROM the conversation, a one-line summary
- * of what the human asked for, so it follows content visibility, not the cost
- * permission, and needs BOTH sides: a title routinely paraphrases the prompt
- * and the reply together, so a viewer allowed only one could read the other
- * out of it. The git identity on the same object is operational metadata about
- * where the session ran and is deliberately untouched.
+ * of what the human asked for, so it follows content visibility
+ * (`canReadCapturedContent`) rather than the cost permission. The git identity
+ * on the same object is operational metadata about where the session ran and
+ * is deliberately untouched.
  *
  * `titleRedacted` is set only when there WAS a title, mirroring
  * `redactV2Content`: an ordinary session that never had one must not render
@@ -98,9 +100,7 @@ export function gateSessionTitle<
       | null;
   }
 > {
-  const contentVisible =
-    protections.canSeeCapturedInput === true &&
-    protections.canSeeCapturedOutput === true;
+  const contentVisible = canReadCapturedContent(protections);
   return sessions.map((session) => {
     const codingAgent = session.codingAgent as NonNullable<
       T["codingAgent"]

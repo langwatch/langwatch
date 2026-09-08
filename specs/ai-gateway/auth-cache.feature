@@ -351,6 +351,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the confirmed entry keeps serving its credentials with its staleness clock restarted
       And a key that did change comes back with the new config and the new token, which the next refresh offers in turn
       And a response that carried no token leaves the next refresh unconditional
+      And a control plane that changed the config without changing the token keeps confirming a bundle that is no longer current, which is why the token covers the provider rows and not only the key
 
     @unit
     Scenario: a refresh the control plane cannot answer leaves the cached config serving
@@ -385,6 +386,190 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When a request is answered from the cache
       Then a bundle inside its own expiry is served without consulting the control plane, whether the window is positive, zero or negative
       And a bundle past its own expiry goes to the control plane before it serves
+
+  Rule: A key's own expiration date bounds the cache, and grace never crosses it
+    Stale-while-error covers a control plane the gateway cannot reach. An
+    expiration date is a different thing: the control plane already published
+    it, on the token itself, so the gateway can enforce it alone and needs no
+    round trip to know the key has stopped. Both cache deadlines are therefore
+    capped at that instant, and a request that arrives after it is refused with
+    the key's own error rather than served from grace or answered with a
+    retryable upstream failure.
+
+    Revoked and disabled keys keep the full grace window on purpose. A
+    revocation happens after the token was minted and cannot be predicted; a
+    date can. The operator opt-out for both is the same negative
+    LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS.
+
+    @unit
+    Scenario: the token carries the key's expiration date to the gateway
+      Given a token minted for a key that expires in five minutes
+      When the gateway reads its claims
+      Then the resolved bundle carries that expiration date
+      And a token with no such claim, or a null one, describes a key that never expires
+
+    @unit
+    Scenario: the hard cap never outlives the key's expiration date
+      Given a key that expires in five minutes
+      When its bundle is cached
+      Then the entry's hard cap is the key's expiration date, not the token expiry plus the grace window
+      And a bundle for a key with no expiration date keeps the deadlines it always had
+
+    @unit
+    Scenario: an outage across the expiration date fails closed
+      Given a cached entry for a key whose expiration date has passed
+      And the control plane is unreachable
+      When I send a request with that key
+      Then the request is rejected with error.type "virtual_key_expired"
+      And the cached bundle is not served
+      And the control plane is not called, because the date came with the token
+      And the entry is evicted
+
+    @unit
+    Scenario: an outage before the expiration date still serves stale
+      Given a cached entry past its token expiry for a key that expires in an hour
+      And the control plane is unreachable
+      When I send a request with that key
+      Then the cached bundle is served
+      And its soft expiry is bumped, transport-failure style
+
+  Rule: A changed expiration date reaches the gateway on the config channel
+
+    The date travels on two channels, because each covers what the other
+    cannot. The token claim is the mint-time floor: it needs no control plane to
+    be true, so a full outage still stops the key at the last date the gateway
+    was told. The config response carries the date as well, and that is the
+    update path: the config version token moves on every mutation, so a date an
+    admin shortens or extends arrives on the next config revalidation, inside
+    the config TTL, even while the change feed is unavailable.
+
+    Both directions matter. Shortening a date has to take effect, or a key keeps
+    calling providers after it ran out. Extending one has to take effect too, or
+    a request at the old boundary is refused for a date the control plane has
+    already moved.
+
+    A response that carries no expiration field comes from a control plane older
+    than the field. The gateway then keeps the date it holds. Reading an absent
+    field as "this key never expires" would lift the cap off a key whose own
+    token says it expires.
+
+    @integration
+    Scenario: the config endpoint carries the key's expiration date
+      Given a key that expires on a date, and a key that never expires
+      When the gateway fetches each key's config
+      Then the first carries its date in unix seconds
+      And the second carries an explicit null, which is not the same answer as no field at all
+
+    @integration
+    Scenario: changing only the date moves the config version token
+      Given a key the gateway holds config for
+      When an administrator changes only its expiration date
+      Then the config version token changes
+      And the next revalidation answers with the config and the new date instead of confirming the old one
+
+    @unit
+    Scenario: a shortened date is followed while the change feed is unavailable
+      Given a cached key the gateway holds no expiration date for
+      And the change feed is not wired
+      When the config refresh answers with a date that has passed
+      Then the next request with that key is rejected with error.type "virtual_key_expired"
+      And the entry is evicted
+
+    @unit
+    Scenario: an extended date is followed the same way
+      Given a cached key whose expiration date is a moment away
+      When the config refresh answers with a later date before that moment
+      Then a request after the old date serves normally
+      And both cache deadlines move past the old date
+
+    @unit
+    Scenario: a config response with no expiration field keeps the date the gateway holds
+      Given a cached key that expires in five minutes
+      When the config refresh comes from a control plane that sends no expiration field
+      Then the entry keeps the expiration date it had
+      And its hard cap stays at that date
+
+    @unit
+    Scenario: the config wire tells a null date apart from a missing one
+      Given a config response
+      When the gateway decodes its expiration field
+      Then a unix timestamp is the date the key stops
+      And an explicit null is a key that never expires
+      And a missing field says nothing about expiry, so the caller keeps what it holds
+
+  Rule: A budget period that ends invalidates the spend the gateway is holding
+
+    # The bundle carries each budget's spend for the period it was read in, and
+    # the config version token is built from the key's revision and its
+    # provider set. Neither of those moves when a period ends, so a conditional
+    # revalidation confirms figures that describe a period that is over.
+    #
+    # For a budget that reached its limit, that leaves the key rejecting on
+    # money it did not spend this period. What clears it is a BUDGET_UPDATED
+    # event, and the only one that arrives without an admin touching something
+    # is emitted by a debit — by a request that got through. The blocked key
+    # cannot produce one itself.
+    #
+    # Eviction on that event is project-wide (org-wide when the event carries
+    # no project), so a sibling key with traffic in the same project clears the
+    # block for everyone within a poll cycle. The keys that stay stuck are the
+    # ones whose project has no other traffic — a CI key, a scheduled job, a
+    # single-key project — and they stay stuck until an admin edits something
+    # or the gateway restarts. That is the case this Rule closes; it is not
+    # closed by the change feed, which is why the boundary has to be a schedule
+    # the gateway keeps on its own.
+
+    @unit
+    Scenario: a bundle knows when its spend figures stop describing the current period
+      Given a config response carrying budgets that reset at different instants
+      When the gateway decodes it
+      Then the bundle is valid until the earliest of those instants
+      And a budget with no limit does not shorten that, because it can never block
+      And a budget the control plane sent no boundary for does not shorten it either
+
+    @unit
+    Scenario: the refresh at a period boundary asks for the config instead of confirming it
+      Given a cached key whose budget period ended after its config was read
+      When the next request arrives
+      Then the config refresh carries no version token
+      And the new period's spend replaces the old period's
+
+    @unit
+    Scenario: a period still running is revalidated the ordinary way
+      Given a cached key whose budget is exhausted inside its own period
+      And a config read within the staleness TTL
+      When the next request arrives
+      Then no config refresh is triggered
+      And the request is judged against the spend the gateway holds
+
+    @unit
+    Scenario: a boundary that is already behind the gateway is asked about once
+      Given a cached key carrying a budget boundary that never moves
+      When request after request arrives
+      Then only the first triggers a config re-read
+      And the rest fall back to the ordinary staleness clock
+
+    @unit
+    Scenario: a refresh the control plane never answered leaves the period unresolved
+      Given a cached key whose budget period ended after its config was read
+      And a config refresh that fails to reach the control plane
+      When a later request arrives
+      Then the entry still holds the ended period's spend
+      And the next refresh is unconditional too, so it cannot be confirmed as unchanged
+      And the period counts as resolved only once an answer arrives
+
+    @unit
+    Scenario: a confirmation taken before the boundary does not count as reading past it
+      Given a cached key whose config was confirmed unchanged inside its budget period
+      When that period ends and the next request arrives
+      Then the boundary still forces an unconditional re-read
+      And the new period's spend replaces the old
+
+    @unit
+    Scenario: a bundle with no budgets keeps the ordinary staleness clock
+      Given a cached key with no budgets
+      When its config passes the staleness TTL
+      Then the refresh revalidates against the version token as before
 
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 

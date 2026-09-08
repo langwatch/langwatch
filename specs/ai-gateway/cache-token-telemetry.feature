@@ -54,6 +54,19 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
     Then the span records no cache-read or cache-write tokens
     And the input-token count is the full prompt
 
+  # A streamed response reaches the gateway as a sequence of network reads,
+  # and a read boundary can land in the middle of the provider's usage
+  # report. The report must survive that split: the input and cache counts
+  # arrive exactly once, at the very start of the stream, so losing them
+  # meters and bills the whole call at zero input.
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A usage report split across stream reads still counts
+    Given a streamed response whose usage report arrives split across two reads
+    When the stream completes
+    Then the span records the full input-token count
+    And the cache-read and cache-write token counts from that report
+
   # A cache write is priced by how long its entry lives: Anthropic charges twice
   # the input rate for an hour-long entry against 1.25 times for a five-minute
   # one, and states which is which only in its own `usage.cache_creation`
@@ -143,6 +156,20 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
   # ==========================================================================
   # Cost: cache reads priced cheap, not as fresh input
   # ==========================================================================
+
+  # Two surfaces price the same request: the trace, from the span the gateway
+  # emits, and the budget, from the spend record it emits. Both feed the same
+  # rate table, so they can only disagree when the two records state different
+  # quantities. They did: the span took the cached tokens out of its input
+  # count and the spend record did not, so the Usage page and the budget
+  # reported different money for the same virtual key.
+
+  @bdd @cost @cache-telemetry @unit
+  Scenario: The trace and the bill price a cached request at the same number
+    Given one cached request's usage as the gateway measured it
+    When the trace surface and the spend surface each price it
+    Then both arrive at the same cost
+    And an input count that still holds the cached tokens costs more than both
 
   @bdd @cost @cache-telemetry @integration
   Scenario: Cost reflects cache pricing, not the full input price

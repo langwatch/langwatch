@@ -26,6 +26,7 @@ import chalk from "chalk";
 import {
 	codexOtelBlockAuthToken,
 	codexOtelBlockEndpoint,
+	codexOtelBlockLogsEndpoint,
 	defaultCodexConfigPath,
 	displayCodexConfigPath,
 } from "@/cli/utils/codex-config-toml";
@@ -69,13 +70,19 @@ interface TurnCompletePayload {
  * honest answer: with no endpoint and key persisted, codex is not exporting
  * spans either, so there is no trace for this content to join.
  */
-function resolveTarget(
-	configPath: string,
-): { endpoint: string; token: string } | null {
+function resolveTarget(configPath: string): {
+	endpoint: string;
+	logsEndpoint: string | null;
+	token: string;
+} | null {
 	const endpoint = codexOtelBlockEndpoint(configPath);
 	const token = codexOtelBlockAuthToken(configPath);
 	if (!endpoint || !token) return null;
-	return { endpoint, token };
+	return {
+		endpoint,
+		logsEndpoint: codexOtelBlockLogsEndpoint(configPath),
+		token,
+	};
 }
 
 function threadIdFrom(payload: string): string | null {

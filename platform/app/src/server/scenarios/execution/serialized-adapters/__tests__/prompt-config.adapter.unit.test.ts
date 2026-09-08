@@ -493,4 +493,33 @@ describe("SerializedPromptConfigAdapter", () => {
       });
     });
   });
+
+  describe("given a run that resolved parameter values", () => {
+    /** @scenario "A prompt target reads params in its prompt template" */
+    it("sends the model a prompt that reads the resolved value", async () => {
+      const adapter = new SerializedPromptConfigAdapter({
+        config: {
+          ...defaultConfig,
+          systemPrompt:
+            "You serve a {{ params.account_tier }} customer in {{ params.region }}.",
+          messages: [
+            { role: "user", content: "Tier: {{ params.account_tier }}" },
+          ],
+        },
+        litellmParams: defaultLitellmParams,
+        nlpServiceUrl: "http://localhost:8080",
+        parameters: { account_tier: "platinum", region: "eu-central" },
+      });
+
+      await adapter.call(defaultInput);
+
+      const promptMessages = mockGenerateText.mock.calls[0]![0]
+        .messages as Array<{ role: string; content: string }>;
+
+      expect(promptMessages[0]?.content).toBe(
+        "You serve a platinum customer in eu-central.",
+      );
+      expect(promptMessages[1]?.content).toBe("Tier: platinum");
+    });
+  });
 });

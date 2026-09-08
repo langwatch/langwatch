@@ -75,7 +75,10 @@ export function EvalCard({
   // for them and fetch on open.
   const canLazyLoadInputs =
     !!eval_.evaluationId &&
-    (status === "pass" || status === "fail" || status === "error");
+    (status === "pass" ||
+      status === "fail" ||
+      status === "processed" ||
+      status === "error");
   const mightHaveInputs = hasListInputs || canLazyLoadInputs;
   const hasRetries = (eval_.retries ?? 0) > 0;
   // The labeled categorical/boolean verdict is sometimes more informative
@@ -183,7 +186,7 @@ export function EvalCard({
         {eval_.runHistory && eval_.runHistory.length > 1 && (
           <RunHistorySparkline runs={eval_.runHistory} />
         )}
-        {!noVerdict && !categoryOnly && (
+        {!noVerdict && !categoryOnly && scoreLabel !== "" && (
           <HStack gap={0.5} align="baseline" flexShrink={0}>
             <Text
               textStyle="lg"
@@ -203,24 +206,27 @@ export function EvalCard({
       </HStack>
 
       {/* Score bar (numeric, only when the eval actually produced a score) */}
-      {!noVerdict && !categoryOnly && scoreType === "numeric" && (
-        <Box
-          height="3px"
-          bg="bg.subtle"
-          position="relative"
-          borderBottomWidth={
-            hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
-          }
-          borderColor="border.muted"
-        >
+      {!noVerdict &&
+        !categoryOnly &&
+        scoreType === "numeric" &&
+        typeof score === "number" && (
           <Box
-            height="100%"
-            bg={tone.color}
-            width={`${barFill}%`}
-            transition="width 0.3s ease"
-          />
-        </Box>
-      )}
+            height="3px"
+            bg="bg.subtle"
+            position="relative"
+            borderBottomWidth={
+              hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
+            }
+            borderColor="border.muted"
+          >
+            <Box
+              height="100%"
+              bg={tone.color}
+              width={`${barFill}%`}
+              transition="width 0.3s ease"
+            />
+          </Box>
+        )}
 
       {/* Reasoning / status message */}
       {(hasReasoning || (noVerdict && primaryStatusText)) && (

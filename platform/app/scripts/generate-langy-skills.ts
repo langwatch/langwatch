@@ -65,7 +65,7 @@ function normalizeDest(dest: string): string {
 }
 
 export interface GeneratedSkill {
-  /** The opencode skill name — the directory, and what the agent loads. */
+  /** The skill name — the directory, and what the agent loads. */
   id: string;
   /** Human label. Typography only: derived from the id, never a claim. */
   label: string;
@@ -75,6 +75,20 @@ export interface GeneratedSkill {
   category: "skill" | "recipe";
   /** The suggested opener some skills declare, if any. */
   userPrompt?: string;
+  /**
+   * The feature flag gating this skill's offer, if it declares one in its
+   * front-matter (`feature-flag: <key>`). Absent = always offered, the
+   * default for every skill today except `dashboard-widgets`.
+   */
+  featureFlag?: string;
+  /**
+   * The feature flag that, when ON, excludes this skill instead — the
+   * inverse of `featureFlag` (`exclude-when-flag: <key>` in front-matter).
+   * `lwql-charts` declares this for `release_custom_chart_playground`, so
+   * the two chart skills are mutually exclusive: exactly one is ever in
+   * Langy's set, never both, never a choice for the agent to get wrong.
+   */
+  excludedByFlag?: string;
 }
 
 /**
@@ -139,6 +153,8 @@ function readSkill(dir: string): GeneratedSkill | null {
     raw.split("---")[1] ?? "",
   );
   const userPrompt = frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
+  const featureFlag = frontmatter["feature-flag"];
+  const excludedByFlag = frontmatter["exclude-when-flag"];
 
   return {
     id,
@@ -146,6 +162,8 @@ function readSkill(dir: string): GeneratedSkill | null {
     description,
     category: isRecipe ? "recipe" : "skill",
     ...(userPrompt ? { userPrompt } : {}),
+    ...(featureFlag ? { featureFlag } : {}),
+    ...(excludedByFlag ? { excludedByFlag } : {}),
   };
 }
 
@@ -198,7 +216,9 @@ if (isMain) {
     process.exit(0);
   }
   const skills = deriveSkills(REPO_ROOT);
-  fs.writeFileSync(OUT, JSON.stringify(skills, null, 2) + "\n");
+  // Tab indentation matches the biome formatter, so a regenerated file
+  // never trips the format gate.
+  fs.writeFileSync(OUT, JSON.stringify(skills, null, "\t") + "\n");
   const counts = skills.reduce<Record<string, number>>((acc, s) => {
     acc[s.category] = (acc[s.category] ?? 0) + 1;
     return acc;

@@ -9,6 +9,7 @@
  * noticing, and the join can be exercised without a page of rollups.
  */
 import { assignSessionsToPullRequests } from "../coding-agent/pull-request-assignment";
+import { normalizeGithubHost } from "../github/githubHost";
 
 /** Identity only: the number, where it lives, and what it is called. */
 export interface SessionGroupPullRequestDto {
@@ -213,7 +214,7 @@ const repositoryBucketOf = (key: {
 /** The session's git identity as the mapping stores it: default host, lowercased repository. */
 function branchKeyOf(coding: LinkableCodingAgent): PullRequestBranchKey {
   return {
-    repositoryHost: (coding.repositoryHost ?? "github.com").toLowerCase(),
+    repositoryHost: normalizeGithubHost(coding.repositoryHost ?? ""),
     repositoryFullName:
       `${coding.repositoryOwner}/${coding.repositoryName}`.toLowerCase(),
     headBranch: coding.gitBranch!,

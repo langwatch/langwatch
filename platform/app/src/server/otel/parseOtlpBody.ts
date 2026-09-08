@@ -332,10 +332,81 @@ function parseWithFallback<T>(
       );
       return { ok: true, request };
     } catch (jsonErr) {
+      // The size is context for the numbers printed beside it, not a verdict of
+      // its own: `index out of range: 57 + 1307648 > 2070` only means something
+      // against how much actually arrived, and a JSON position says little
+      // without the end it stopped short of. It is also the one fact about the
+      // body we can state without quoting a byte of it.
       return {
         ok: false,
-        error: `Failed to parse OTLP body: ${(firstErr as Error).message} (json fallback: ${(jsonErr as Error).message})`,
+        error: (
+          `Failed to parse OTLP body (${body.byteLength} bytes): ` +
+          `${describeParseFailure(firstErr)}` +
+          ` (json fallback: ${describeParseFailure(jsonErr)})`
+        ).slice(0, MAX_FAILURE_MESSAGE),
       };
     }
   }
+}
+
+/** Long enough to keep a decoder's structural detail, short enough to log. */
+const MAX_FAILURE_DETAIL = 120;
+
+/**
+ * The whole reported failure is bounded here rather than left to add up from
+ * the parts. Two details and a byte count already sum to within a few
+ * characters of this, so the guarantee is stated once instead of re-derived
+ * every time one of the pieces changes width.
+ */
+const MAX_FAILURE_MESSAGE = 300;
+
+/**
+ * A parser's error message, reduced to the part that is ours to repeat.
+ *
+ * Nothing here logs the request body — and the body reached the log sink
+ * anyway, because V8's `JSON.parse` SyntaxError quotes about ten characters of
+ * its input inside the message and we passed that message straight through.
+ * Those characters are arbitrary bytes, so they were routinely not valid UTF-8,
+ * which broke consumers that parse a log record's own metadata.
+ *
+ * A JSON failure is therefore rebuilt rather than filtered: only a fixed phrase
+ * and, where the parser gives one, a numeric position. Nothing from the input
+ * can survive a construction that never reads it.
+ *
+ * A protobuf failure keeps its own words, because "index out of range: 57 +
+ * 1307648 > 2070" is the sentence that says whether the sender truncated the
+ * body or we mis-read it — and protobufjs describes structure, never content.
+ * It is still stripped of quoted spans and anything unprintable, so a future
+ * decoder that starts echoing bytes cannot reopen this.
+ */
+function describeParseFailure(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (err instanceof SyntaxError || /is not valid JSON/.test(message)) {
+    return describeJsonFailure(message);
+  }
+
+  return message
+    .replace(/"(?:[^"\\]|\\.)*"/g, '"…"')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "'…'")
+    .replace(/`(?:[^`\\]|\\.)*`/g, "`…`")
+    .replace(/[^\x20-\x7e]/g, "")
+    .trim()
+    .slice(0, MAX_FAILURE_DETAIL);
+}
+
+/**
+ * Built from the parser's verdict, never from its quotation of the input.
+ * The position is the one detail worth keeping: it says how far into the body
+ * the sender got before the bytes stopped making sense.
+ */
+function describeJsonFailure(message: string): string {
+  if (/Unexpected end of JSON input/.test(message)) {
+    return "invalid JSON: unexpected end of input";
+  }
+
+  const position = /position (\d+)/.exec(message)?.[1];
+  return position
+    ? `invalid JSON at position ${position}`
+    : "invalid JSON: unexpected token";
 }

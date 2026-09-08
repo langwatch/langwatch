@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
@@ -8,8 +9,8 @@ import {
   type TemplateMatchInput,
 } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
-import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
+import { TriggerAction } from "~/generated/prisma/client";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
@@ -37,6 +38,7 @@ import {
   DispatchError,
   isDispatchError,
 } from "~/server/event-sourcing/queues/dispatchError";
+import { pMapLimited } from "~/server/event-sourcing/replay/pMapLimited";
 import {
   sendRenderedTriggerEmail,
   sendTriggerEmail,
@@ -222,23 +224,29 @@ export function createNotifyDigestHandler(
   };
 }
 
-/** `persist-match` handler for the withProcess declaration. */
+/**
+ * `persist-match` handler for the withProcess declaration. Accepts both
+ * payload shapes: the paged `{ traceIds }` and the legacy single
+ * `{ traceId }` still pending in the outbox from before the paging change.
+ */
 export function createPersistMatchHandler(
   deps: TriggerSettlementDispatchDeps,
 ): IntentExecutor<PersistMatchIntent> {
   return async (payload, context) => {
+    const traceIds =
+      "traceIds" in payload ? payload.traceIds : [payload.traceId];
     try {
-      await dispatchPersistMatch({
+      await dispatchPersistMatchPage({
         deps,
         projectId: context.projectId,
         triggerId: payload.triggerId,
-        traceId: payload.traceId,
+        traceIds,
       });
     } catch (error) {
       rethrowIfRetryable(error, {
         projectId: context.projectId,
         triggerId: payload.triggerId,
-        traceId: payload.traceId,
+        traceCount: traceIds.length,
         intent: TRIGGER_SETTLEMENT_INTENT_TYPES.PERSIST_MATCH,
         attempt: context.attempt,
       });
@@ -711,14 +719,23 @@ async function allowedByDailyCeiling({
   trigger,
   projectId,
   traceId,
+  cap,
+  claimBreachReport,
 }: {
   deps: TriggerSettlementDispatchDeps;
   trigger: TriggerSummary;
   projectId: string;
   traceId: string;
+  /** Resolved once per page — the plan lookup does not vary per trace. */
+  cap: number;
+  /**
+   * Page-scoped once-guard for breach containment: true means this call
+   * reports the breach (email + pause), false means a page-mate already
+   * did. Every refused trace stays dropped either way.
+   */
+  claimBreachReport: () => boolean;
 }): Promise<boolean> {
   const triggerId = trigger.id;
-  const cap = await deps.resolvePersistDailyCap(projectId);
   const slot = await deps.consumePersistCapSlot({
     projectId,
     triggerId,
@@ -736,6 +753,7 @@ async function allowedByDailyCeiling({
     "Automation passed its daily match ceiling — skipping this match for " +
       "the rest of the UTC day",
   );
+  if (!claimBreachReport()) return false;
   // Containment is bookkeeping ABOUT a match that has already been dropped.
   // Letting it throw would send the whole dispatch back through the outbox's
   // retry ladder, and every one of those attempts would reach this same point
@@ -769,43 +787,97 @@ async function allowedByDailyCeiling({
   return false;
 }
 
-/**
- * Persist-class dispatch (ADR-035): one settled match per intent. The
- * per-trace message key makes retries independent; `TriggerSent` claims
- * keep the side effect at-most-once, written AFTER a successful dispatch.
- */
-async function dispatchPersistMatch({
-  deps,
-  projectId,
-  triggerId,
-  traceId,
-}: {
+/** Traces confirmed concurrently inside one persist page. */
+const PERSIST_CONFIRM_CONCURRENCY = 4;
+
+/** Everything one trace of a page needs, resolved once for the whole page. */
+interface PersistPageContext {
   deps: TriggerSettlementDispatchDeps;
   projectId: string;
   triggerId: string;
-  traceId: string;
-}): Promise<void> {
-  const triggersForProject =
-    await deps.triggers.getActiveTraceTriggersForProject(projectId);
-  const trigger = triggersForProject.find((t) => t.id === triggerId);
-  if (!trigger) {
-    logger.info(
-      { projectId, triggerId, traceId },
-      "Trigger gone / deactivated since match — dropping persist dispatch",
-    );
-    return;
+  trigger: TriggerSummary;
+  project: NonNullable<
+    Awaited<ReturnType<TriggerSettlementDispatchDeps["projects"]["getById"]>>
+  >;
+  cap: Awaited<
+    ReturnType<TriggerSettlementDispatchDeps["resolvePersistDailyCap"]>
+  >;
+  brandedTenantId: ReturnType<typeof createTenantId>;
+  claimBreachReport: () => boolean;
+  /**
+   * A trace that dispatched but could not write its `TriggerSent` claim, not
+   * even after the short retries. Nothing records the side effect, so a page
+   * retry runs it a second time: see `throwIfPageShouldRetry`.
+   */
+  unclaimed: string[];
+}
+
+/** Waits before each extra attempt of a claim write, in milliseconds. */
+const CLAIM_RETRY_DELAYS_MS = [200, 500];
+
+/**
+ * Write the trace's `TriggerSent` claim, with short retries.
+ *
+ * The claim is the only record that stops a page retry from running the same
+ * side effect again, so a transient write failure is worth about a second of
+ * the page lease. This function never throws: the side effect already landed,
+ * so failing the trace here would report a success as a failure. A trace that
+ * cannot claim after every attempt is recorded as unclaimed instead.
+ */
+async function claimPersistDispatch(
+  page: PersistPageContext,
+  traceId: string,
+): Promise<void> {
+  const { deps, projectId, triggerId } = page;
+  const attempts = CLAIM_RETRY_DELAYS_MS.length + 1;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await deps.triggers.claimSend({ triggerId, traceId, projectId });
+      return;
+    } catch (claimErr) {
+      const waitMs = CLAIM_RETRY_DELAYS_MS[attempt];
+      if (waitMs !== undefined) {
+        await sleep(waitMs);
+        continue;
+      }
+      page.unclaimed.push(traceId);
+      logger.warn(
+        {
+          projectId,
+          triggerId,
+          traceId,
+          attempts,
+          error:
+            claimErr instanceof Error ? claimErr.message : String(claimErr),
+        },
+        "claimSend failed on every attempt after a persist dispatch. The " +
+          "side effect landed and no claim records it, so a retry of the " +
+          "page runs it a second time.",
+      );
+      captureException(toError(claimErr), {
+        extra: {
+          projectId,
+          triggerId,
+          traceId,
+          phase: "claimSend-post-persist-dispatch",
+        },
+      });
+    }
   }
+}
 
-  const alreadySent = await deps.triggers.isSendClaimed({
-    triggerId,
-    traceId,
-    projectId,
-  });
-  if (alreadySent) return;
-
-  const brandedTenantId = createTenantId(projectId);
+/**
+ * One trace of a persist page: confirm the match still holds, spend the daily
+ * ceiling, run the action, then claim.
+ */
+async function dispatchOnePersistTrace(
+  page: PersistPageContext,
+  traceId: string,
+): Promise<void> {
+  const { deps, projectId, triggerId, trigger, project, cap } = page;
   const foldState = await deps.traceSummaryStore.get(traceId, {
-    tenantId: brandedTenantId,
+    tenantId: page.brandedTenantId,
     aggregateId: traceId,
   });
   if (!foldState) {
@@ -829,16 +901,25 @@ async function dispatchPersistMatch({
 
   // THE CEILING SITS EXACTLY HERE, and the position is the policy.
   //
-  // After `confirmSettledMatch`, so only CUSTOMER-ATTRIBUTABLE volume counts: a
-  // match that no longer passes its filters returned above and consumed
-  // nothing. Before `dispatchTriggerAction`, so passing the ceiling costs the
-  // customer the action, not a half-written one.
+  // After `confirmSettledMatch`, so only CUSTOMER-ATTRIBUTABLE volume
+  // counts: a match that no longer passes its filters returned above and
+  // consumed nothing. Before `dispatchTriggerAction`, so passing the
+  // ceiling costs the customer the action, not a half-written one.
   //
-  // Match RECORDING is deliberately not capped. Our pipeline records a match
-  // for every active trigger on every trace and only evaluates filters later,
-  // so that volume is our amplification and pressing the customer about it
-  // would be charging them for our design.
-  if (!(await allowedByDailyCeiling({ deps, trigger, projectId, traceId }))) {
+  // Match RECORDING is deliberately not capped. Our pipeline records a
+  // match for every active trigger on every trace and only evaluates
+  // filters later, so that volume is our amplification and pressing the
+  // customer about it would be charging them for our design.
+  if (
+    !(await allowedByDailyCeiling({
+      deps,
+      trigger,
+      projectId,
+      traceId,
+      cap,
+      claimBreachReport: page.claimBreachReport,
+    }))
+  ) {
     return;
   }
 
@@ -848,29 +929,221 @@ async function dispatchPersistMatch({
     traceId,
     tenantId: projectId,
     foldState,
+    project,
   });
 
-  // Post-dispatch at-most-once write. Best-effort: the side effect already
-  // landed; throwing would let the outbox retry and double-dispatch.
-  try {
-    await deps.triggers.claimSend({ triggerId, traceId, projectId });
-  } catch (claimErr) {
+  await claimPersistDispatch(page, traceId);
+}
+
+/**
+ * Settle one trace's failure locally so its page-mates still run: a retryable
+ * failure joins the page-level decision, a terminal one is recorded and
+ * dropped here.
+ */
+function recordPersistTraceFailure(params: {
+  error: unknown;
+  projectId: string;
+  triggerId: string;
+  traceId: string;
+  retryableFailures: unknown[];
+}): void {
+  const { error, projectId, triggerId, traceId, retryableFailures } = params;
+  if (isDispatchError(error) ? error.retryable : true) {
+    retryableFailures.push(error);
+    return;
+  }
+  logger.error(
+    {
+      projectId,
+      triggerId,
+      traceId,
+      error: error instanceof Error ? error.message : String(error),
+    },
+    "Persist dispatch failed terminally for one trace of a page",
+  );
+  captureException(toError(error), {
+    extra: { projectId, triggerId, traceId },
+  });
+}
+
+/**
+ * Decide whether the page may be retried, and rethrow one representative
+ * retryable error if it may.
+ *
+ * A page retry re-runs every trace that has no `TriggerSent` claim, so a
+ * trace that dispatched and could not claim runs its side effect a second
+ * time. Persist actions accept that duplicate, because the alternative is
+ * worse: a retryable failure that is never retried loses that dataset row or
+ * annotation-queue item for good, and a settled trace has no guaranteed next
+ * match. Persist dispatch is therefore at-least-once. A duplicate row is
+ * visible to the customer and can be removed; a lost row is not visible at
+ * all. The unclaimed traces are logged and reported before the page retries.
+ */
+function throwIfPageShouldRetry(params: {
+  projectId: string;
+  triggerId: string;
+  pageSize: number;
+  retryableFailures: unknown[];
+  unclaimed: string[];
+}): void {
+  const { projectId, triggerId, pageSize, retryableFailures, unclaimed } =
+    params;
+  if (retryableFailures.length === 0) return;
+
+  if (unclaimed.length > 0) {
     logger.warn(
       {
         projectId,
         triggerId,
-        traceId,
-        error: claimErr instanceof Error ? claimErr.message : String(claimErr),
+        pageSize,
+        failed: retryableFailures.length,
+        unclaimed,
       },
-      "claimSend failed post-persist-dispatch — swallowing to avoid double-dispatch on retry",
+      "Persist page retries with traces that dispatched but hold no claim. " +
+        "Those traces can run their side effect again on the retry, which " +
+        "is accepted so the traces that failed are not lost.",
     );
-    captureException(toError(claimErr), {
-      extra: {
-        projectId,
-        triggerId,
-        traceId,
-        phase: "claimSend-post-persist-dispatch",
+    captureException(
+      new Error("Persist page retry re-runs traces that hold no claim"),
+      {
+        extra: {
+          projectId,
+          triggerId,
+          pageSize,
+          unclaimed,
+          phase: "persist-page-retry-unclaimed",
+        },
       },
+    );
+  }
+
+  const representative = retryableFailures[0];
+  logger.warn(
+    {
+      projectId,
+      triggerId,
+      failed: retryableFailures.length,
+      pageSize,
+      // The cause, not only the count. A retryable failure is rethrown into
+      // the outbox, which redacts the message before it logs the attempt, so
+      // without this line a page that retries to its attempt ceiling reports
+      // "failed: 1" and nothing an operator can act on.
+      errorType:
+        representative instanceof Error
+          ? representative.name
+          : typeof representative,
+      errorMessage:
+        representative instanceof Error
+          ? representative.message
+          : String(representative),
+    },
+    "Persist page had retryable failures. Retrying the page; claimed traces no-op on the retry",
+  );
+  throw representative;
+}
+
+/**
+ * Persist-class dispatch (ADR-035, paged): one page of settled matches per
+ * intent. The fixed per-dispatch reads (trigger row, prior claims, plan cap,
+ * project) run once per page; the per-trace confirm and action run through a
+ * small pool. `TriggerSent` claims are written AFTER a successful dispatch,
+ * so a retry of the page re-runs only the traces that hold no claim. The
+ * claim write can itself fail, which makes persist dispatch at-least-once:
+ * see `claimPersistDispatch` and `throwIfPageShouldRetry`.
+ */
+async function dispatchPersistMatchPage({
+  deps,
+  projectId,
+  triggerId,
+  traceIds,
+}: {
+  deps: TriggerSettlementDispatchDeps;
+  projectId: string;
+  triggerId: string;
+  traceIds: string[];
+}): Promise<void> {
+  const triggersForProject =
+    await deps.triggers.getActiveTraceTriggersForProject(projectId);
+  const trigger = triggersForProject.find((t) => t.id === triggerId);
+  if (!trigger) {
+    logger.info(
+      { projectId, triggerId, pageSize: traceIds.length },
+      "Trigger gone / deactivated since match — dropping persist dispatch",
+    );
+    return;
+  }
+
+  const uniqueTraceIds = [...new Set(traceIds)];
+  const alreadySent = await deps.triggers.filterSendClaimed({
+    triggerId,
+    traceIds: uniqueTraceIds,
+    projectId,
+  });
+  const remaining = uniqueTraceIds.filter(
+    (traceId) => !alreadySent.has(traceId),
+  );
+  if (remaining.length === 0) return;
+
+  const cap = await deps.resolvePersistDailyCap(projectId);
+  // The action layer needs the project row; resolving it once here keeps a
+  // page at one read instead of one per trace.
+  const project = await deps.projects.getById(projectId);
+  if (!project) {
+    throw new DispatchError({
+      message: `project ${projectId} not found at dispatch time`,
+      retryable: false,
     });
   }
+
+  // Breach containment (email + pause) fires at most once per page; every
+  // refused trace still stays dropped.
+  let breachReported = false;
+  const page: PersistPageContext = {
+    deps,
+    projectId,
+    triggerId,
+    trigger,
+    project,
+    cap,
+    brandedTenantId: createTenantId(projectId),
+    claimBreachReport: () => {
+      if (breachReported) return false;
+      breachReported = true;
+      return true;
+    },
+    unclaimed: [],
+  };
+
+  // A terminal failure for one trace must not fail its page-mates, and a
+  // retryable failure must retry the page exactly once, after every other
+  // trace had its chance. Each pooled run therefore settles locally and
+  // reports; the page decides on the retry once the pool has drained.
+  const retryableFailures: unknown[] = [];
+
+  await pMapLimited({
+    items: remaining,
+    concurrency: PERSIST_CONFIRM_CONCURRENCY,
+    fn: async (traceId) => {
+      try {
+        await dispatchOnePersistTrace(page, traceId);
+      } catch (error) {
+        // Terminal for this trace only: recorded, page-mates unaffected.
+        recordPersistTraceFailure({
+          error,
+          projectId,
+          triggerId,
+          traceId,
+          retryableFailures,
+        });
+      }
+    },
+  });
+
+  throwIfPageShouldRetry({
+    projectId,
+    triggerId,
+    pageSize: remaining.length,
+    retryableFailures,
+    unclaimed: page.unclaimed,
+  });
 }

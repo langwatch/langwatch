@@ -231,7 +231,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       prompts: {
         getAllPromptsForProject: { invalidate: vi.fn() },
         getByIdOrHandle: { invalidate: vi.fn() },

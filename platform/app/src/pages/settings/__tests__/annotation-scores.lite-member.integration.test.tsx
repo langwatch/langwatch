@@ -205,7 +205,7 @@ vi.mock("~/components/ui/tooltip", () => ({
   ),
 }));
 
-vi.mock("@prisma/client", () => ({
+vi.mock("~/generated/prisma/client", () => ({
   AnnotationScoreDataType: {
     CATEGORICAL: "CATEGORICAL",
     CHECKBOX: "CHECKBOX",

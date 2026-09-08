@@ -6,7 +6,7 @@ description: Use the LangWatch REST API to send traces, evaluations, and interac
 keywords: LangWatch, REST API, HTTP API, curl, integration, observability, evaluation, prompts, datasets, workflows, automation
 ---
 
-If your preferred programming language or platform is not directly supported by the existing LangWatch libraries, you can use the REST API with `curl` to send trace data. This guide will walk you through how to integrate LangWatch with any system that allows HTTP requests.
+If your preferred programming language or platform is not directly supported by the existing LangWatch libraries, you can use the REST API with `curl` to send trace data from any system that can make HTTP requests.
 
 import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
@@ -100,11 +100,11 @@ All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` 
 
 For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/sdks/python/src/langwatch/types.py).
 
-It's optional but highly recommended to pass the `user_id` on the metadata if you want to leverage user-specific analytics and the `thread_id` to group related traces together. To connect it to an event later on. Read more about those and other concepts [here](../concepts).
+It's optional but highly recommended to pass the `user_id` on the metadata if you want to use user-specific analytics and the `thread_id` to group related traces together. Read more about those and other concepts [here](../concepts).
 
 3.  Execute the `curl` command. If successful, LangWatch will process your trace data.
 
-This method of integration offers a flexible approach for sending traces from any system capable of making HTTP requests. Whether you're using a less common programming language or a custom-built platform, this RESTful approach ensures you can benefit from LangWatch's capabilities.
+This method of integration sends traces from any system capable of making HTTP requests, including a less common programming language or a custom-built platform.
 
 Remember to handle errors and retries as needed. You might need to script additional logic around the `curl` command to handle these cases.
 

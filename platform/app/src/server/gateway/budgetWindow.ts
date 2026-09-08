@@ -6,7 +6,7 @@
  * the roadmap (see contract §12 open question); when we add it, this module
  * gets a `timezone?: string` parameter and defers to a date library.
  */
-import type { GatewayBudgetWindow } from "@prisma/client";
+import type { GatewayBudgetWindow } from "~/generated/prisma/client";
 
 export function nextResetAt(
   window: GatewayBudgetWindow,

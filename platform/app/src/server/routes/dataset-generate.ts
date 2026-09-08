@@ -16,10 +16,9 @@ import {
   type UIMessage,
 } from "ai";
 import { tools } from "~/app/api/dataset/generate/tools";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 
 const logger = createLogger("langwatch:api:dataset:generate");
@@ -53,8 +52,8 @@ secured
       return c.json({ error: "Missing projectId header" }, { status: 400 });
     }
 
-    const hasPermission = await hasProjectPermission(
-      { prisma, session },
+    const hasPermission = await probeProjectPermission(
+      { session },
       projectId,
       "datasets:manage",
     );

@@ -1,11 +1,11 @@
 ---
 title: Groq Integration
 sidebarTitle: Groq
-description: Instrument Groq API calls in Go using LangWatch for fast LLM observability, cost tracking, and agent evaluation insights.
+description: Instrument Groq API calls in Go using LangWatch for LLM observability, cost tracking, and agent evaluation insights.
 keywords: go, golang, groq, instrumentation, langwatch, openai-compatible
 ---
 
-LangWatch can trace calls to the Groq API, allowing you to monitor its high-speed inference capabilities. Groq provides an OpenAI-compatible endpoint, so you reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at Groq's base URL and label the spans with `WithGenAIProvider`.
+LangWatch traces calls to the Groq API. Groq provides an OpenAI-compatible endpoint, so you reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at Groq's base URL and label the spans with `WithGenAIProvider`.
 
 ## Installation
 

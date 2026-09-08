@@ -11,14 +11,20 @@
  * TTL does not slide, and that a retry re-reads rather than re-counts.
  */
 
+import {
+  type RedisConnection,
+  RedisConnectionService,
+} from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { connection } from "~/server/redis";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   consumePersistCapSlot,
   persistCapClaimKey,
   persistCapKey,
 } from "../persistCap";
+
+/** Injected into every call, so this suite needs no App (ADR-093). */
+let connection: RedisConnection | null = null;
 
 const PROJECT_ID = `proj-${nanoid(8)}`;
 const NOW = new Date("2026-08-09T12:00:00.000Z");
@@ -53,15 +59,25 @@ function consume({
     now: NOW,
     cap,
     dedupKey,
+    redis: connection,
   });
 }
 
 beforeAll(() => {
+  connection = new RedisConnectionService().connect({
+    url: process.env.REDIS_URL,
+    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+    dbIndex: process.env.REDIS_DB_INDEX,
+  });
   if (!connection) {
     throw new Error(
       "This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in platform/app/.env.",
     );
   }
+});
+
+afterAll(() => {
+  connection?.disconnect();
 });
 
 afterEach(async () => {

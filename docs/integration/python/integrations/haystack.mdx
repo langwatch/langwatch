@@ -1,7 +1,7 @@
 ---
 title: Haystack Instrumentation
 sidebarTitle: Haystack
-description: Learn how to instrument Haystack pipelines with LangWatch using community OpenTelemetry instrumentors.
+description: Instrument Haystack pipelines with LangWatch using community OpenTelemetry instrumentors.
 keywords: haystack, deepset, instrumentation, openinference, langwatch, python
 ---
 
@@ -39,7 +39,7 @@ from openinference.instrumentation.haystack import HaystackInstrumentor
 langwatch.setup(instrumentors=[HaystackInstrumentor()])
 
 basic_agent = Agent(
-    chat_generator=OpenAIChatGenerator(model="gpt-4o-mini"),
+    chat_generator=OpenAIChatGenerator(model="gpt-5-mini"),
     system_prompt="You are a helpful web agent.",
     tools=[],
 )

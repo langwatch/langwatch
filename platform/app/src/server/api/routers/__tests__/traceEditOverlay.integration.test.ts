@@ -5,8 +5,9 @@
  * real Postgres: one row per trace, authored, replaceable, removable, and safe
  * to read when the stored patch no longer matches the contract.
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";

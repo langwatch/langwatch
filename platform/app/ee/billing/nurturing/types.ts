@@ -1,7 +1,7 @@
 /**
  * Customer.io trait schema contract.
  *
- * Defines the complete data model pushed to Customer.io by reactors and hooks.
+ * Defines the complete data model pushed to Customer.io by subscribers and hooks.
  * All call sites use these typed parameters instead of ad-hoc Record<string, unknown>.
  */
 
@@ -40,7 +40,7 @@ export interface CioPersonTraits {
   utm_content?: string;
   referrer?: string;
 
-  // Trace milestones (customerIoTraceSync reactor)
+  // Trace milestones (customerIoTraceSync subscriber)
   has_traces: boolean;
   sdk_language: string;
   sdk_framework: string;
@@ -50,7 +50,7 @@ export interface CioPersonTraits {
   last_trace_at: string;
   trace_count_updated_at: string;
 
-  // Evaluation milestones (customerIoEvaluationSync reactor)
+  // Evaluation milestones (customerIoEvaluationSync subscriber)
   has_evaluations: boolean;
   evaluation_count: number;
   first_evaluation_at: string;
@@ -60,7 +60,7 @@ export interface CioPersonTraits {
   has_prompts: boolean;
   prompt_count: number;
 
-  // Simulation milestones (customerIoSimulationSync reactor)
+  // Simulation milestones (customerIoSimulationSync subscriber)
   has_simulations: boolean;
   simulation_count: number;
   first_simulation_at: string;

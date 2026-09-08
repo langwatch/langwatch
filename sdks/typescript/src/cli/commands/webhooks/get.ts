@@ -16,7 +16,22 @@ export const getWebhookCommand = async (id: string): Promise<CommandResult | voi
       table: () => {
         console.log();
         console.log(`ID:            ${endpoint.id}`);
-        console.log(`URL:           ${endpoint.url}`);
+        if (endpoint.destination_kind === "sqs" && endpoint.sqs) {
+          console.log(`Destination:   Amazon SQS queue`);
+          console.log(`Queue URL:     ${endpoint.sqs.queue_url}`);
+          console.log(`Region:        ${endpoint.sqs.region}`);
+          console.log(`Account:       ${endpoint.sqs.account_id}`);
+          console.log(`Credentials:   ${endpoint.sqs.credential_mode}`);
+          if (endpoint.sqs.role_arn) {
+            console.log(`Role:          ${endpoint.sqs.role_arn}`);
+          }
+          if (endpoint.sqs.external_id) {
+            console.log(`External id:   ${endpoint.sqs.external_id}`);
+          }
+        } else {
+          console.log(`Destination:   HTTPS endpoint`);
+          console.log(`URL:           ${endpoint.url}`);
+        }
         console.log(`Status:        ${endpoint.status}${endpoint.disabled_reason ? ` (${endpoint.disabled_reason})` : ""}`);
         console.log(`Events:        ${endpoint.enabled_events.join(", ")}`);
         console.log(`Last success:  ${endpoint.last_success_at ?? "never"}`);

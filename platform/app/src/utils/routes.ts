@@ -11,10 +11,6 @@ export const projectRoutes = {
     path: "/[project]/workflows",
     title: "Workflows",
   },
-  messages: {
-    path: "/[project]/messages",
-    title: "Traces",
-  },
   traces_v2: {
     path: "/[project]/traces",
     title: "Trace Explorer",
@@ -31,6 +27,14 @@ export const projectRoutes = {
   online_evaluations: {
     path: "/[project]/online-evaluations",
     title: "Online Evaluations",
+  },
+  coding_agent_sessions: {
+    path: "/[project]/sessions",
+    title: "Sessions",
+  },
+  coding_agent_pull_requests: {
+    path: "/[project]/pull-requests",
+    title: "Pull requests",
   },
   evaluations_new_choose: {
     path: "/[project]/evaluations/new/choose",
@@ -71,20 +75,23 @@ export const projectRoutes = {
     title: "Experiment Details",
     parent: "experiments",
   },
+  // Legacy /messages trace paths. These render redirects to the Trace
+  // Explorer, so they parent onto it rather than onto a list page that no
+  // longer exists.
   message: {
     path: "/[project]/messages/[trace]",
     title: "Trace",
-    parent: "messages",
+    parent: "traces_v2",
   },
   message_open_tab: {
-    path: "/[project]/messages/[trace]/[opentab]",
+    path: "/[project]/messages/[trace]/[openTab]",
     title: "trace",
-    parent: "messages",
+    parent: "traces_v2",
   },
   message_open_tab_span: {
-    path: "/[project]/messages/[trace]/[opentab]/[span]",
+    path: "/[project]/messages/[trace]/[openTab]/[span]",
     title: "trace",
-    parent: "messages",
+    parent: "traces_v2",
   },
   settings: {
     path: "/settings",
@@ -123,10 +130,6 @@ export const projectRoutes = {
     title: "My Queue",
     parent: "annotations",
   },
-  triggers: {
-    path: "/[project]/triggers",
-    title: "Triggers",
-  },
   automations: {
     path: "/[project]/automations",
     title: "Automations",
@@ -158,6 +161,25 @@ export const projectRoutes = {
   simulations: {
     path: "/[project]/simulations",
     title: "Simulations",
+  },
+  agent_testing: {
+    path: "/[project]/agent-testing",
+    title: "Agent Testing",
+  },
+  agent_testing_suite: {
+    path: "/[project]/agent-testing/suites/[suiteSlug]",
+    title: "Test Suite",
+    parent: "agent_testing",
+  },
+  agent_testing_results: {
+    path: "/[project]/agent-testing/results",
+    title: "Results",
+    parent: "agent_testing",
+  },
+  agent_testing_plan: {
+    path: "/[project]/agent-testing/results/[planSlug]",
+    title: "Run Plan",
+    parent: "agent_testing_results",
   },
   agents: {
     path: "/[project]/agents",
@@ -208,36 +230,36 @@ export const projectRoutes = {
     title: "Evaluators",
   },
   gateway: {
-    path: "/settings/gateway",
+    path: "/gateway",
     title: "AI Gateway",
   },
   gateway_virtual_keys: {
-    path: "/settings/gateway/virtual-keys",
+    path: "/gateway/virtual-keys",
     title: "Virtual Keys",
     parent: "gateway",
   },
   gateway_virtual_key_detail: {
-    path: "/settings/gateway/virtual-keys/[id]",
+    path: "/gateway/virtual-keys/[id]",
     title: "Virtual Key",
     parent: "gateway_virtual_keys",
   },
   gateway_budgets: {
-    path: "/settings/gateway/budgets",
+    path: "/gateway/budgets",
     title: "Budgets",
     parent: "gateway",
   },
   gateway_budget_detail: {
-    path: "/settings/gateway/budgets/[id]",
+    path: "/gateway/budgets/[id]",
     title: "Budget",
     parent: "gateway_budgets",
   },
   gateway_usage: {
-    path: "/settings/gateway/usage",
+    path: "/gateway/usage",
     title: "Usage",
     parent: "gateway",
   },
   gateway_cache_rules: {
-    path: "/settings/gateway/cache-rules",
+    path: "/gateway/cache-rules",
     title: "Cache Rules",
     parent: "gateway",
   },
@@ -315,8 +337,8 @@ export function buildRoutePath(
  *      org-scope WorkspaceSwitcher wants).
  *
  * `routePattern` is the Next.js route pattern (`router.pathname`, e.g.
- * `/[project]/messages`); `resolvedPathname` is the concrete URL path
- * (`window.location.pathname`, e.g. `/acme/messages`) used for the literal-slug
+ * `/[project]/traces`); `resolvedPathname` is the concrete URL path
+ * (`window.location.pathname`, e.g. `/acme/traces`) used for the literal-slug
  * and return_to branches.
  */
 export function buildProjectSwitchHref({

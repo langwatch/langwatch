@@ -18,7 +18,6 @@ import {
   applyOverlayToTraceHeader,
   changedSpanFields,
   changedTraceMetadataKeys,
-  overlayTouchesSpan,
 } from "../applyTraceEditOverlayToViews";
 import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
 
@@ -468,8 +467,8 @@ describe("applying a correction to the drawer views", () => {
         "output",
       ]);
       expect(changedSpanFields({ patch, spanId: "span-3" })).toEqual([]);
-      expect(overlayTouchesSpan({ patch, spanId: "span-2" })).toBe(true);
-      expect(overlayTouchesSpan({ patch, spanId: "span-3" })).toBe(false);
+      // Removing a span replaces none of its fields, so it names none.
+      expect(changedSpanFields({ patch, spanId: "span-2" })).toEqual([]);
     });
   });
 });

@@ -52,6 +52,13 @@ Feature: Langy remembers what this conversation already did
     Then the turn carries the earlier exchange, so Langy can answer from it
 
   @unit
+  Scenario: A resumed session is never re-seeded
+    Given a worker resumed the session its home still held
+    When the next turn is posted
+    Then the prompt carries no conversation transcript block
+    And the session's own history remains the single copy of what was said
+
+  @unit
   Scenario: Carrying the conversation does not defeat prompt caching
     Given a conversation that keeps growing turn over turn
     When two consecutive turns are sent

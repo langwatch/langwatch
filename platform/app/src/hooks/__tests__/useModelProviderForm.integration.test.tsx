@@ -15,7 +15,7 @@ const mockInvalidate = vi.fn();
 
 vi.mock("../../utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       organization: {
         getAll: {
           invalidate: mockInvalidate,

@@ -11,6 +11,17 @@ on:
       - ".github/release-please-config.json"
   workflow_dispatch:
 
+# The heaviest superseder in the repo: 29 of its last 100 runs were still
+# going when a newer run for the same branch started. `edited`, `labeled` and
+# `unlabeled` are in the trigger list, so re-titling a PR or toggling a label
+# starts a run — and the guard reads the PR's CURRENT title and labels, which
+# means an in-flight run is already answering a question about a state that no
+# longer exists.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Never on main: a commit that lands keeps its own verdict.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
   pull-requests: read

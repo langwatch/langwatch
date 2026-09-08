@@ -50,7 +50,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       gatewayBudgets: {
         list: { invalidate: async () => undefined },
         listForProject: { invalidate: async () => undefined },

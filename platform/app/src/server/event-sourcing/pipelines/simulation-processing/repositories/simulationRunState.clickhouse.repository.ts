@@ -8,6 +8,12 @@ import {
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
+import {
+  type ClickHouseEvaluationColumns,
+  columnsToEvaluations,
+  EVALUATION_COLUMNS_SQL,
+  evaluationsToColumns,
+} from "~/server/simulations/simulation-evaluations.columns";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -26,7 +32,7 @@ const logger = createLogger(
   "langwatch:simulation-processing:run-state-repository",
 );
 
-interface ClickHouseSimulationRunRecord {
+interface ClickHouseSimulationRunRecord extends ClickHouseEvaluationColumns {
   ProjectionId: string;
   TenantId: string;
   ScenarioRunId: string;
@@ -111,6 +117,7 @@ export class SimulationRunStateRepositoryClickHouse<
       MetCriteria: record.MetCriteria ?? [],
       UnmetCriteria: record.UnmetCriteria ?? [],
       Error: record.Error,
+      Evaluations: columnsToEvaluations(record),
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
       TotalCost: record.TotalCost ?? null,
       RoleCosts: record.RoleCosts ?? {},
@@ -167,6 +174,7 @@ export class SimulationRunStateRepositoryClickHouse<
       MetCriteria: data.MetCriteria,
       UnmetCriteria: data.UnmetCriteria,
       Error: data.Error,
+      ...evaluationsToColumns(data.Evaluations),
       DurationMs: data.DurationMs?.toString() ?? null,
       TotalCost: data.TotalCost,
       RoleCosts: data.RoleCosts,
@@ -247,6 +255,7 @@ export class SimulationRunStateRepositoryClickHouse<
             t.Verdict AS Verdict, t.Reasoning AS Reasoning,
             t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
             t.Error AS Error,
+            ${EVALUATION_COLUMNS_SQL.replaceAll("`Evaluations.", "t.`Evaluations.")},
             toString(t.DurationMs) AS DurationMs,
             t.TotalCost AS TotalCost, t.RoleCosts AS RoleCosts,
             t.RoleLatencies AS RoleLatencies,
@@ -291,8 +300,8 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
-        { scenarioRunId, tenantId: context.tenantId, error: errorMessage },
+      logger.warn(
+        { scenarioRunId, tenantId: context.tenantId, error },
         "Failed to get projection from ClickHouse",
       );
       throw new StoreError(
@@ -353,20 +362,28 @@ export class SimulationRunStateRepositoryClickHouse<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
+        // The fold reads this row back through `getProjection` when the state
+        // store misses, so the write has to be visible before it returns.
+        // Without the wait, the next event for the same run folds from an
+        // empty state and rewrites the row without the identity the first
+        // event carried: a finished run then holds no ScenarioId, BatchRunId
+        // or ScenarioSetId, which drops it out of every set and batch listing
+        // while it stays reachable by run id. `storeProjectionBatch` below
+        // already waits.
         clickhouse_settings: {
           async_insert: 1,
-          wait_for_async_insert: 0,
+          wait_for_async_insert: 1,
         },
       });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: context.tenantId,
           scenarioRunId: String(projection.aggregateId),
           projectionId: projection.id,
-          error: errorMessage,
+          error,
         },
         "Failed to store projection in ClickHouse",
       );
@@ -435,11 +452,11 @@ export class SimulationRunStateRepositoryClickHouse<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: context.tenantId,
           count: projections.length,
-          error: errorMessage,
+          error,
         },
         "Failed to batch store simulation projections in ClickHouse",
       );

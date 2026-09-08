@@ -1,10 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
-import {
-  batchScopePermissions,
-  hasOrganizationPermission,
-  hasProjectPermission,
-} from "~/server/api/rbac";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { batchScopePermissions } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+} from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 import type {
@@ -15,7 +15,7 @@ import { canConfigureRetention } from "./dataRetentionPolicy.authz";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
 
-// hasOrganizationPermission / hasProjectPermission narrow their ctx to a
+// probeOrganizationPermission / probeProjectPermission narrow their ctx to a
 // non-null session (they early-return false when absent). protectedProcedure
 // guarantees a session at runtime; mirror the model-defaults read cast.
 type AuthedCtx = { prisma: PrismaClient; session: Session };
@@ -87,7 +87,7 @@ export async function getRetentionPolicySnapshot(
 
   if (!organizationId) {
     // Personal-account project (no org/team): only its own PROJECT scope.
-    const canWrite = await hasProjectPermission(
+    const canWrite = await probeProjectPermission(
       ctx as AuthedCtx,
       projectId,
       "project:update",
@@ -131,7 +131,7 @@ export async function getRetentionPolicySnapshot(
         orderBy: { name: "asc" },
       }),
       app.dataRetention.policy.listOrganizationRules(organizationId),
-      hasOrganizationPermission(
+      probeOrganizationPermission(
         ctx as AuthedCtx,
         organizationId,
         "organization:manage",

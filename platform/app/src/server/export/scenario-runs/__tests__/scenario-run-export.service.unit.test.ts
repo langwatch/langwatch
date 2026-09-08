@@ -201,9 +201,10 @@ describe("ScenarioRunExportService", () => {
 
   describe("when a pass/fail filter is applied", () => {
     /**
-     * Applied after mapping, not in SQL: STALLED is derived from timestamps by
-     * resolveRunStatus rather than stored, so only a post-mapping filter can
-     * reproduce what the list on screen shows.
+     * Applied after mapping, not in SQL: outcome categories group several
+     * stored statuses (ERROR and FAILED are both "failure") via
+     * categorizeRunStatus, so the post-mapping filter reproduces exactly what
+     * the list on screen shows.
      */
     /** @scenario Export honours the pass/fail filter */
     it("keeps only the runs in the requested outcome category", async () => {

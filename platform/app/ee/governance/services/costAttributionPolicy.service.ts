@@ -21,7 +21,7 @@ import { createLogger } from "@langwatch/observability";
  * is bursty, so a brief window sharply cuts Prisma load while keeping an admin's
  * flip visible within ~30s.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma as defaultPrismaClient } from "~/server/db";
 
 const logger = createLogger("langwatch:cost-attribution-policy");

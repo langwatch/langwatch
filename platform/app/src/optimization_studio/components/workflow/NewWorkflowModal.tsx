@@ -87,7 +87,6 @@ export const NewWorkflowModal = ({
           title: "File too large",
           description: "File size must be less than 5MB",
           type: "error",
-          meta: { closable: true },
         });
         return;
       }
@@ -108,7 +107,6 @@ export const NewWorkflowModal = ({
               title: "Invalid workflow file",
               description: problems,
               type: "error",
-              meta: { closable: true },
             });
             return;
           }
@@ -129,7 +127,6 @@ export const NewWorkflowModal = ({
                 ? readFailure.message
                 : String(readFailure),
             type: "error",
-            meta: { closable: true },
           });
         }
       };

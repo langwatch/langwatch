@@ -10,9 +10,10 @@
  * the product. Driven against the real repository and a real database,
  * because the failure only exists between two live transactions.
  */
-import { OrganizationUserRole } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";

@@ -14,6 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as cliApi from "../cli-api";
 import * as configMod from "../config";
 import type { GovernanceConfig } from "../config";
+import { runningCodeRestartNotice } from "../running-code";
+import { buildOtelEnvBlock } from "../otel-env-block";
+import { buildScopedToolFunction, persistBlockToRc, toolMarkers } from "../shell-rc";
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 
 vi.mock("../cli-api", async () => {
 	const actual = await vi.importActual<typeof cliApi>("../cli-api");
@@ -21,6 +26,7 @@ vi.mock("../cli-api", async () => {
 		...actual,
 		mintIngestionKey: vi.fn(),
 		listIngestionKeys: vi.fn(),
+		issuePersonalVirtualKey: vi.fn(),
 	};
 });
 
@@ -40,6 +46,7 @@ let originalUserprofile: string | undefined;
 let originalCodexHome: string | undefined;
 
 beforeEach(() => {
+	vi.mocked(runningCodeRestartNotice).mockReset();
 	tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-wrapper-mode-"));
 	originalHome = process.env.HOME;
 	originalUserprofile = process.env.USERPROFILE;
@@ -90,6 +97,45 @@ function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
 }
 
 describe("resolveWrapperMode", () => {
+	describe("when a project switch changes code telemetry while another launcher is running", () => {
+		const restartNotice =
+			"Restart `langwatch code` to apply the updated telemetry settings.";
+		const endpoint = "http://app.example.com/api/otel";
+		const replacementKey = "ik-lw-projectb_secret";
+		const persistCode = (token: string) =>
+			persistBlockToRc(
+				"zsh",
+				buildScopedToolFunction("code", buildOtelEnvBlock("code", endpoint, token), "zsh"),
+				toolMarkers("code"),
+			);
+		const pinnedConfig = () =>
+			baseCfg({
+				tool_project_keys: {
+					code: { secret: replacementKey, project_slug: "project-b" },
+				},
+			});
+
+		beforeEach(() => {
+			vi.mocked(runningCodeRestartNotice).mockReturnValue(restartNotice);
+		});
+
+		/** @scenario "Switching projects through the wrapper reports restart advice" */
+		it("returns restart advice alongside the refreshed wiring", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			persistCode("ik-lw-projecta_secret");
+			const result = await resolveWrapperMode(pinnedConfig(), "code", {});
+			expect(result.refreshedWiring).toContain("code shell function (~/.zshrc)");
+			expect(result.notice).toContain(restartNotice);
+		});
+
+		it("does not inspect processes when the wiring already matches", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			persistCode(replacementKey);
+			const result = await resolveWrapperMode(pinnedConfig(), "code", {});
+			expect(result.notice ?? "").not.toContain(restartNotice);
+			expect(runningCodeRestartNotice).not.toHaveBeenCalled();
+		});
+	});
 	describe("when a personal VK is configured", () => {
 		it("returns gateway mode with the gateway env vars unchanged", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -142,7 +188,8 @@ describe("resolveWrapperMode", () => {
 			expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=codex");
 		});
 
-		it("writes the [otel] block to the codex config.toml as a side effect", async () => {
+		/** @scenario "codex wiring persists the Authorization header inline" */
+		it("writes the [otel] block with the Authorization header to the codex config.toml", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
 			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
 				token: "sk-lw-test-token",
@@ -158,8 +205,30 @@ describe("resolveWrapperMode", () => {
 			// codex 0.137+ separates trace_exporter from exporter (logs).
 			// Wrapper writes [otel.trace_exporter.otlp-http] so traces emit.
 			expect(contents).toContain("[otel.trace_exporter.otlp-http]");
-			// Authorization header must NOT land on disk.
-			expect(contents).not.toContain("sk-lw-test-token");
+			// The Authorization header persists inline (0600 file), so a
+			// plain `codex` run captures without the wrapper's env.
+			expect(contents).toContain(
+				`headers = { "Authorization" = "Bearer sk-lw-test-token" }`,
+			);
+		});
+
+		/** @scenario "Every seam that persists the codex exporters wires the turn harvest" */
+		it("wires the turn harvest beside the exporters it persisted", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+				token: "sk-lw-test-token",
+				prefix: "sk-lw-test",
+				endpoint: "http://app.example.com/api/otel",
+			});
+
+			const out = await resolveWrapperMode(baseCfg(), "codex", {});
+
+			// The exporters carry tokens and timing but no conversation; the
+			// notify harvest is what recovers it, so persisting one without the
+			// other leaves plain codex runs with nothing to read.
+			const contents = fs.readFileSync(out.codexConfigPath!, "utf8");
+			expect(contents).toContain("langwatch codex notify begin");
+			expect(contents).toContain('"ingest", "codex"');
 		});
 
 		it("reuses the cached key rather than minting again when one is already stored", async () => {
@@ -260,11 +329,21 @@ describe("resolveWrapperMode", () => {
 	describe("when the tool has no ingestion template (e.g. cursor)", () => {
 		it("falls back to gateway mode without erroring", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			// No VK stored: the gateway path now issues one lazily.
+			(
+				cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>
+			).mockResolvedValue({
+				id: "vk1",
+				secret: "vk-lw-issued",
+				prefix: "vk-lw-iss",
+			});
 			const out = await resolveWrapperMode(baseCfg(), "cursor", {
 				OPENAI_BASE_URL: "http://gw",
 			});
 			expect(out.mode).toBe("gateway");
-			expect(out.vars.OPENAI_BASE_URL).toBe("http://gw");
+			// The vars are recomputed from the freshly issued key.
+			expect(out.vars.OPENAI_API_KEY).toBe("vk-lw-issued");
+			expect(out.vars.OPENAI_BASE_URL).toContain("http://gw.example.com");
 		});
 	});
 
@@ -631,8 +710,16 @@ describe("resolveWrapperMode", () => {
 		 * gate sits ABOVE the mint: the wrapper must route through the
 		 * gateway instead and never mint an ingestion key.
 		 */
-		it("routes through the gateway and does NOT mint an ingestion key", async () => {
+		/** @scenario "The personal virtual key is issued on first gateway use, not at login" */
+		it("routes through the gateway, issuing the VK lazily, and does NOT mint an ingestion key", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			(
+				cliApi.issuePersonalVirtualKey as ReturnType<typeof vi.fn>
+			).mockResolvedValue({
+				id: "vk1",
+				secret: "vk-lw-issued",
+				prefix: "vk-lw-iss",
+			});
 
 			const cfg = baseCfg({
 				tool_policies: { claude: { allowVk: true, allowOtelDirect: false } },
@@ -644,6 +731,8 @@ describe("resolveWrapperMode", () => {
 			expect(out.mode).toBe("gateway");
 			expect(out.newKeyMinted).toBeUndefined();
 			expect(out.notice).toContain("direct OTLP ingestion is disabled");
+			expect(cliApi.issuePersonalVirtualKey).toHaveBeenCalledTimes(1);
+			expect(out.vars.ANTHROPIC_AUTH_TOKEN).toBe("vk-lw-issued");
 			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
 		});
 
@@ -933,6 +1022,82 @@ describe("resolveWrapperMode", () => {
 			expect(
 				fs.existsSync(path.join(tmpCwd, ".claude", "settings.local.json")),
 			).toBe(false);
+		});
+	});
+});
+
+describe("resolveWrapperMode with a project pin", () => {
+	describe("given the tool is pinned to a team project", () => {
+		/** @scenario "The wrapper keeps a pinned tool on the pinned project" */
+		it("forces ingestion with the pinned secret, over a remembered gateway preference", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			const cfg = baseCfg({
+				// Both a VK and a remembered gateway preference are present; the
+				// pin is the later, more specific choice and must win.
+				default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+				tool_mode: { codex: "gateway" },
+				tool_project_keys: {
+					codex: {
+						secret: "ik-lw-pinnedproj000000_secret",
+						project_id: "proj_1",
+						project_slug: "acme-app",
+					},
+				},
+			});
+
+			const out = await resolveWrapperMode(cfg, "codex", {
+				OPENAI_API_KEY: "vk-lw-secret",
+			});
+
+			expect(out.mode).toBe("ingestion");
+			expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toBe(
+				"Authorization=Bearer ik-lw-pinnedproj000000_secret",
+			);
+			expect(out.projectScope).toEqual({ label: "acme-app" });
+			expect(out.newKeyMinted).toBe(false);
+			// The pinned credential is used verbatim: no probe, no mint.
+			expect(cliApi.listIngestionKeys).not.toHaveBeenCalled();
+			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+		});
+
+		it("routes to the pin's endpoint override when one is stored", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+			const cfg = baseCfg({
+				tool_project_keys: {
+					codex: { secret: "sk-lw-pasted", endpoint: "https://lw.acme.dev" },
+				},
+			});
+
+			const out = await resolveWrapperMode(cfg, "codex", {});
+
+			expect(out.vars.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+				"https://lw.acme.dev/api/otel",
+			);
+			expect(out.endpoint).toBe("https://lw.acme.dev/api/otel");
+			expect(out.ingestionToken).toBe("sk-lw-pasted");
+		});
+
+		describe("when the org policy disables direct OTLP for the tool", () => {
+			/** @scenario "A pinned tool fails rather than rerouting onto the gateway" */
+			it("throws otel_direct_disabled instead of silently rerouting to the gateway", async () => {
+				const { resolveWrapperMode } = await import("../wrapper-mode.js");
+				const cfg = baseCfg({
+					default_personal_vk: { id: "vk1", secret: "vk-lw-secret" },
+					tool_policies: {
+						codex: { allowVk: true, allowOtelDirect: false },
+					},
+					tool_project_keys: {
+						codex: { secret: "sk-lw-pinned" },
+					},
+				});
+
+				// Rerouting silently would move telemetry (and billing) off the
+				// pinned team project onto the personal gateway path.
+				await expect(
+					resolveWrapperMode(cfg, "codex", { OPENAI_API_KEY: "vk-lw-secret" }),
+				).rejects.toMatchObject({ code: "otel_direct_disabled" });
+				expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+			});
 		});
 	});
 });

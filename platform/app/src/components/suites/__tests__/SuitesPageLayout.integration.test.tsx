@@ -18,11 +18,7 @@ vi.mock("~/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-import type { SimulationSuite } from "@prisma/client";
-
-// The existing `vi.mock("~/hooks/useOrganizationTeamProject", ...)` below
-// (richer shape with slug / hasAnyPermission / isLoading) covers
-// VoiceAgentsCallout's `project.id` requirement — no separate mock needed here.
+import type { SimulationSuite } from "~/generated/prisma/client";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
@@ -44,7 +40,7 @@ vi.mock("~/hooks/useSSESubscription", () => ({
 // Mock tRPC api
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
         getSummaries: { invalidate: vi.fn() },
@@ -151,6 +147,10 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     projectId: "project_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "run_plan",
+    fields: null,
+    evaluators: null,
+    scope: null,
     description: null,
     scenarioIds: [],
     targets: [],

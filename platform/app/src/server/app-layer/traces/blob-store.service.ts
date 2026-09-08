@@ -1,16 +1,56 @@
+import { createHash } from "node:crypto";
+import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
-  PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { Ksuid } from "@langwatch/ksuid";
+import type { Logger } from "@langwatch/observability";
 import { z } from "zod";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { mintUriForDestination } from "~/server/stored-objects/uri";
+import { streamToBuffer } from "~/utils/streamToBuffer";
 
 export interface S3ClientResolution {
   s3Client: S3Client;
   s3Bucket: string;
+}
+
+/**
+ * Cap on a spool object read. The spool holds one over-threshold command, and
+ * `capOversizedAttributes` already bounds a span well below this — the cap
+ * exists so a tampered or corrupt object cannot OOM the worker, not to enforce
+ * a product limit.
+ */
+export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
+
+/**
+ * The slice of the stored-objects registry the spool needs. Declared here
+ * rather than imported so this module depends on a shape, not on the registry
+ * class — the registry satisfies it structurally.
+ */
+export interface SpoolObjectStore {
+  put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
+  get(uri: string): Promise<Readable>;
+  delete(uri: string): Promise<void>;
+}
+
+/**
+ * Destination-agnostic storage for the trace spool, injected so `BlobStore`
+ * carries no env coupling and the tests run without infrastructure.
+ */
+export interface SpoolStorage {
+  /** Per-project so BYOC tenants resolve their own bucket and credentials. */
+  objectStoreFor(projectId: string): SpoolObjectStore;
+  resolveDestination(projectId: string): Promise<ProjectStorageDestination>;
+  /**
+   * The operator's assertion that the Azure container has the orphan-reaping
+   * lifecycle rule. Injected rather than read from env here so this class keeps
+   * its no-env-coupling property; the composition root owns the env read.
+   */
+  azureRetentionConfirmed: boolean;
 }
 
 /**
@@ -128,40 +168,211 @@ const eventPayloadSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Transient spool S3 key shape (single source of truth)
+// Transient spool object path (single source of truth)
 // ---------------------------------------------------------------------------
 
-/** Prefix for all transient spool object keys. */
-const SPOOL_KEY_PREFIX = "trace-blobs/spool";
-/** Leading "/"-segment count of SPOOL_KEY_PREFIX, so the decode index tracks the prefix. */
-const SPOOL_PREFIX_SEGMENTS = SPOOL_KEY_PREFIX.split("/").length;
-
-/** Builds a transient spool object key. The ONLY place the key shape is encoded. */
-function buildSpoolKey(
-  projectId: string,
-  traceId: string,
-  spanId: string,
-): string {
-  return `${SPOOL_KEY_PREFIX}/${projectId}/${traceId}/${spanId}`;
-}
-
 /**
- * Extracts the projectId from a spool key produced by {@link buildSpoolKey}.
- * Indexes off SPOOL_PREFIX_SEGMENTS so a change to the prefix can't silently
- * desync the encode (`putSpool`) and decode (`getSpool`/`deleteSpool`) paths.
+ * Prefix for all transient spool objects, kept at the TOP of the object path
+ * (above the tenant segment) so a bucket/container lifecycle rule can match it
+ * with a plain prefix filter. S3 lifecycle prefix filters cannot wildcard a
+ * leading tenant segment, so `{projectId}/trace-blobs/spool/…` would be
+ * unexpirable and orphans would accumulate forever. Do not reorder.
  */
-function projectIdFromSpoolKey(spoolRef: string): string {
-  return spoolRef.split("/")[SPOOL_PREFIX_SEGMENTS] ?? "";
+const SPOOL_KEY_PREFIX = "trace-blobs/spool";
+
+/**
+ * Marker carried by a spooled command instead of a storage path.
+ *
+ * The v1 format put the raw object key in the command and the read path parsed
+ * the tenant id back out of that string to pick a bucket — so whoever could
+ * influence the queue message could steer a read at another tenant's object.
+ * v2 carries no location at all: `getSpool`/`deleteSpool` re-derive it from the
+ * command's own trusted `tenantId` + span ids, exactly as `putSpool` derived it
+ * (the same discipline `TieredBlobStore`'s `BlobRef` follows — ADR-030 §5).
+ */
+export const SPOOL_REF_V2 = "spool:v2";
+
+/**
+ * Raised when the project's storage destination cannot host the spool. Distinct
+ * from a storage failure so the fail-open warn can say "this deployment has no
+ * spool" rather than implying an outage the operator should go chase.
+ */
+export class SpoolDestinationUnsupportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SpoolDestinationUnsupportedError";
+  }
 }
 
 /**
- * Provides transient S3 spool operations (ADR-022 write path) and event_log
+ * Ids that are safe to use verbatim as one path segment: the normal case, since
+ * OTLP ids normalise to hex. Excludes `.` and `..` explicitly — both match the
+ * character class but are directory references, not names.
+ */
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Reduces one id to a single path component.
+ *
+ * Percent-encoding is NOT sufficient on its own. It survives URI construction,
+ * but `LocalFilesystemDriver.parseFileUri` round-trips through
+ * `decodeURIComponent`, which turns `..%2F..%2F` straight back into `../../`
+ * before `mkdir`/`writeFile` see it — so an id of `../../…` escaped the object
+ * root entirely. `idSchema` accepts arbitrary strings, so anyone able to ingest
+ * a span could pick that path.
+ *
+ * Anything outside the safe class is replaced by a hash of the id rather than
+ * escaped: a hash cannot contain a separator or a `..` no matter what decodes
+ * it downstream, and it stays deterministic, so the read and delete paths
+ * re-derive the identical location. Ordinary hex ids are untouched and remain
+ * legible in a bucket listing.
+ */
+function safePathSegment(id: string): string {
+  if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") return id;
+  return createHash("sha256").update(id, "utf8").digest("hex");
+}
+
+/**
+ * Builds the transient spool object path. The ONLY place the shape is encoded.
+ */
+function buildSpoolObjectPath({
+  projectId,
+  traceId,
+  spanId,
+}: {
+  projectId: string;
+  traceId: string;
+  spanId: string;
+}): string {
+  return [
+    SPOOL_KEY_PREFIX,
+    safePathSegment(projectId),
+    safePathSegment(traceId),
+    safePathSegment(spanId),
+  ].join("/");
+}
+
+/**
+ * True when `spoolRef` has the shape of a v1 reference — a raw S3 key minted
+ * before this deployment. Commands already queued when the new code rolls out
+ * still carry these, so both formats must resolve for one release.
+ *
+ * Matched by prefix rather than by "not v2": treating every unrecognised string
+ * as a v1 key would send it to the raw bucket+key read below, which is the very
+ * dereference this change exists to remove. An unrecognised reference instead
+ * falls through to the v2 path, where the location is derived and the reference
+ * ignored.
+ *
+ * TODO(langwatch/langwatch-saas#837): drop the v1 branch one release after this
+ * ships. By then no in-flight command can still carry a v1 ref — the spool's
+ * own lifecycle expiry is 3 days, so nothing can resolve one after that.
+ */
+function isLegacySpoolRef(spoolRef: string): boolean {
+  return spoolRef.startsWith(`${SPOOL_KEY_PREFIX}/`);
+}
+
+/**
+ * Extracts the projectId segment from a v1 spool key.
+ *
+ * The caller must check it against the command's authenticated tenant before
+ * dereferencing — see {@link assertLegacySpoolKeyBelongsTo}.
+ */
+function projectIdFromLegacySpoolKey(spoolRef: string): string {
+  return spoolRef.split("/")[SPOOL_KEY_PREFIX.split("/").length] ?? "";
+}
+
+/**
+ * Refuses a v1 key whose tenant segment is not the tenant the command was
+ * authenticated as.
+ *
+ * The v1 format is the one place a location still travels inside the command,
+ * so it is the one place a tampered reference could still steer a read. Pinning
+ * it to the command's own tenant keeps the compatibility window from reopening
+ * the hole the v2 format closes.
+ */
+function assertLegacySpoolKeyBelongsTo(
+  spoolRef: string,
+  projectId: string,
+): void {
+  const keyProjectId = projectIdFromLegacySpoolKey(spoolRef);
+  if (keyProjectId !== projectId) {
+    throw new Error(
+      `Refusing to read spool object: reference names tenant "${keyProjectId}" but the command is authenticated as "${projectId}".`,
+    );
+  }
+}
+
+/**
+ * Refuses a destination that cannot bound an orphaned spool object.
+ *
+ * WRITE PATH ONLY. This is a rule about creating new objects, not about the
+ * ones already out there — see the `purpose` note on `BlobStore.mintSpoolUri`.
+ */
+function assertDestinationCanHostSpool({
+  destination,
+  azureRetentionConfirmed,
+}: {
+  destination: ProjectStorageDestination;
+  azureRetentionConfirmed: boolean;
+}): void {
+  // The spool is the one stored-objects consumer that depends on something
+  // OUTSIDE the object store to stay bounded: it deletes eagerly after the
+  // event_log INSERT, and leans on a lifecycle rule to reap whatever a crash
+  // between those two steps leaves behind. A filesystem has no such rule, so
+  // on this destination an orphan is permanent and the volume is what fills.
+  //
+  // Refusing here is not a regression. Before this consumer moved onto the
+  // shared layer it built an S3 client, and on a local install that resolved
+  // to the hardcoded "langwatch" bucket, which does not exist — so the PUT
+  // failed and `maybeSpool` fell open to an inline payload every time. This
+  // makes that same outcome explicit and loud instead of incidental.
+  if (destination.kind === "file") {
+    throw new SpoolDestinationUnsupportedError(
+      "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
+        "bucket/container lifecycle rule, which a filesystem cannot express, so a crash between " +
+        "the write and its delete would leave the object forever. Ingestion continues with the " +
+        "full payload inline. Configure S3 or Azure Blob storage to get oversize protection.",
+    );
+  }
+
+  // Same rule, applied consistently. Azure CAN express the lifecycle policy
+  // the orphan bound depends on — but nothing here can confirm it exists.
+  // The policy is a MANAGEMENT-plane resource
+  // (Microsoft.Storage/storageAccounts/managementPolicies); this deployment
+  // holds a data-plane key only, so reading it back would mean asking every
+  // operator for ARM credentials and a subscription id the feature otherwise
+  // has no use for. Refusing to check is not the same as refusing to care:
+  // the operator asserts it at deploy time, in the same config that turns the
+  // spool on, and the default is off. An Azure install that enables the flag
+  // without provisioning retention therefore degrades to inline payloads
+  // rather than accumulating customer trace data nothing will ever reap.
+  if (destination.kind === "azure" && !azureRetentionConfirmed) {
+    throw new SpoolDestinationUnsupportedError(
+      "The trace spool is disabled on Azure Blob until orphan retention is provisioned. A crash " +
+        "between the spool write and its delete leaves the object behind, and only a lifecycle " +
+        "rule reaps it. Create a lifecycle management policy on this container that deletes " +
+        "blobs under the `trace-blobs/spool/` prefix after 3 days, then set " +
+        "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=true (chart: " +
+        "`app.dataplane.providers.azureBlob.spoolRetentionConfirmed`). Ingestion continues with " +
+        "the full payload inline until then.",
+    );
+  }
+}
+
+/**
+ * Provides transient spool operations (ADR-022 write path) and event_log
  * read operations (ADR-022 read path).
  *
- * Spool: a per-span transient S3 object used to carry over-threshold command
+ * Spool: a per-span transient object used to carry over-threshold command
  * payloads from the edge to the command worker. Eagerly deleted after the
  * event_log INSERT succeeds; 3-day lifecycle policy as safety net for orphans
  * (3 days covers weekend incidents that need catch-up time).
+ *
+ * Spool writes go through the shared `stored-objects` layer, so the spool
+ * lands wherever the project's storage destination points — S3, Azure Blob, or
+ * the local filesystem. It used to speak the AWS SDK directly, which made it
+ * the one byte-writing surface that silently ignored a deployment's Azure
+ * configuration (langwatch/langwatch-saas#800).
  *
  * Event log: the durable source of truth. `getFromEventLog` performs a
  * SELECT on `event_log` keyed by (TenantId, AggregateType, AggregateId,
@@ -170,16 +381,90 @@ function projectIdFromSpoolKey(spoolRef: string): string {
  */
 export class BlobStore {
   /**
-   * @param resolveS3Client - Resolver for per-org S3 client + bucket.
+   * @param resolveS3Client - Resolver for per-org S3 client + bucket. Used ONLY
+   *   to read back v1 spool refs written before this deployment; every new
+   *   write goes through `objectStoreFor`.
    * @param resolveClickHouseClient - Optional per-tenant ClickHouseClient resolver for ADR-022
    *   event_log reads. When provided, `getFromEventLog` resolves the correct client for the
    *   given tenantId (supporting multi-cluster tenants). When absent, `getFromEventLog` throws
    *   "ClickHouseClient not configured".
+   * @param spoolStorage - The destination-agnostic object store the spool
+   *   writes to, injected so this class stays free of env coupling and the
+   *   tests exercise it without infrastructure. When absent, spool writes
+   *   throw — `maybeSpool` is fail-open, so ingestion degrades to inline
+   *   payloads rather than breaking.
+   * @param logger - Optional; used only to surface a refused cross-tenant
+   *   delete, which `deleteSpool`'s best-effort swallow would otherwise hide.
    */
-  constructor(
-    private readonly resolveS3Client: S3ClientResolver,
-    private readonly resolveClickHouseClient?: ClickHouseClientResolver,
-  ) {}
+  private readonly resolveS3Client: S3ClientResolver;
+  private readonly resolveClickHouseClient?: ClickHouseClientResolver;
+  private readonly spoolStorage?: SpoolStorage;
+  private readonly logger?: Logger;
+
+  constructor({
+    resolveS3Client,
+    resolveClickHouseClient,
+    spoolStorage,
+    logger,
+  }: {
+    resolveS3Client: S3ClientResolver;
+    resolveClickHouseClient?: ClickHouseClientResolver;
+    spoolStorage?: SpoolStorage;
+    logger?: Logger;
+  }) {
+    this.resolveS3Client = resolveS3Client;
+    this.resolveClickHouseClient = resolveClickHouseClient;
+    this.spoolStorage = spoolStorage;
+    this.logger = logger;
+  }
+
+  /**
+   * Re-derives the spool object's URI from server-trusted inputs. Never reads a
+   * location out of the command.
+   *
+   * `purpose` decides whether the destination guards below apply. They exist to
+   * stop a NEW object landing where nothing will reap it, so they are a
+   * write-time rule only. Applying them to a read or a delete would punish the
+   * objects already on disk: an operator who turns the retention assertion back
+   * off — the documented remediation, and what a chart rollback does — would
+   * make every in-flight spooled span permanently unreadable (`getSpool` does
+   * not fail open, and the edge already cleared the attributes), and would stop
+   * the eager delete that is the spool's FIRST line of cleanup, manufacturing
+   * exactly the orphan the guard is there to prevent.
+   */
+  private async mintSpoolUri({
+    projectId,
+    traceId,
+    spanId,
+    purpose,
+  }: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    purpose: "write" | "access";
+  }): Promise<{ uri: string; objectStore: SpoolObjectStore }> {
+    if (!this.spoolStorage) {
+      throw new Error(
+        "BlobStore has no spool storage configured — cannot resolve the trace spool destination.",
+      );
+    }
+    const destination = await this.spoolStorage.resolveDestination(projectId);
+
+    if (purpose === "write") {
+      assertDestinationCanHostSpool({
+        destination,
+        azureRetentionConfirmed: this.spoolStorage.azureRetentionConfirmed,
+      });
+    }
+
+    return {
+      uri: mintUriForDestination({
+        destination,
+        objectPath: buildSpoolObjectPath({ projectId, traceId, spanId }),
+      }),
+      objectStore: this.spoolStorage.objectStoreFor(projectId),
+    };
+  }
 
   /**
    * Fetches a field value from the event_log ClickHouse table (ADR-022 read path).
@@ -335,40 +620,82 @@ export class BlobStore {
   }
 
   /**
-   * Fetches the full span body from a transient S3 spool object.
+   * Fetches the full span body from the transient spool object.
    * Called by the command worker when a command carries a `spoolRef`.
    *
-   * The spool key is the raw S3 object key (no bucket prefix). The S3 bucket is
-   * resolved via the key's projectId segment (decoded by `projectIdFromSpoolKey`).
+   * The object's location is re-derived from `projectId` / `traceId` / `spanId`
+   * — all read from the command itself, which the queue authenticated — rather
+   * than from `spoolRef`. A tampered reference therefore cannot redirect this
+   * read at another tenant's bytes; the worst it can do is name a v1 format and
+   * miss.
    *
-   * @param spoolRef - The spool reference string (S3 key) returned by `putSpool`.
+   * NOT fail-open, deliberately: the edge cleared `span.attributes` before
+   * spooling, so returning nothing here would write an empty span to
+   * `event_log` — permanent, silent loss in the sole source of truth. Throwing
+   * lets the command retry.
+   *
    * @returns The raw body buffer as stored by `putSpool`.
-   * @throws {Error} If S3 returns a response with no body — surfaced here so the
-   *   failure is legible rather than an opaque downstream parse error on an empty buffer.
-   * @throws The underlying S3 error if the object does not exist or access fails.
+   * @throws {Error} If the object is absent, unreadable, or exceeds
+   *   {@link MAX_SPOOL_BYTES}.
    */
-  async getSpool(spoolRef: string): Promise<Buffer> {
-    const projectId = projectIdFromSpoolKey(spoolRef);
+  async getSpool({
+    spoolRef,
+    projectId,
+    traceId,
+    spanId,
+  }: {
+    spoolRef: string;
+    projectId: string;
+    traceId: string;
+    spanId: string;
+  }): Promise<Buffer> {
+    if (isLegacySpoolRef(spoolRef)) {
+      assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+      return this.getLegacySpool(spoolRef, projectId);
+    }
+    const { uri, objectStore } = await this.mintSpoolUri({
+      projectId,
+      traceId,
+      spanId,
+      purpose: "access",
+    });
+    return streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
+  }
+
+  /**
+   * v1 read path: the reference IS the S3 key. Retained for one release so
+   * commands queued across the deploy still resolve. See {@link isLegacySpoolRef}.
+   */
+  private async getLegacySpool(
+    spoolRef: string,
+    projectId: string,
+  ): Promise<Buffer> {
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     const { Body } = await s3Client.send(
       new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
     );
-    const bytes = await Body?.transformToByteArray();
-    if (bytes == null) {
+    if (!Body) {
       throw new Error(
         `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,
       );
     }
-    return Buffer.from(bytes);
+    // Read through the same bounded helper the v2 path uses. `transformToByteArray()`
+    // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
+    // entirely — and a v1 reference points at an object written before this
+    // deploy, which is exactly the input the cap exists to distrust.
+    return streamToBuffer(Body as unknown as Readable, MAX_SPOOL_BYTES);
   }
 
   /**
-   * Writes a transient S3 spool object for an over-threshold command payload.
-   * Returns the spool reference string (the S3 key) that the command will carry.
+   * Writes the transient spool object for an over-threshold command payload and
+   * returns the reference the command will carry.
    *
-   * Key shape: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` — transient,
-   * eagerly DELETEd after event_log INSERT succeeds. Bucket MUST have a 3-day
-   * lifecycle policy as a safety net for orphans (covers weekend incidents).
+   * The object lands at whichever backend the project's storage destination
+   * names. Object path: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` —
+   * transient, eagerly deleted after the event_log INSERT succeeds. The
+   * bucket/container MUST have a 3-day lifecycle rule on the
+   * `trace-blobs/spool/` prefix as the safety net for orphans (3 days covers
+   * weekend incidents that need catch-up time).
    */
   async putSpool({
     projectId,
@@ -381,34 +708,61 @@ export class BlobStore {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
-    const key = buildSpoolKey(projectId, traceId, spanId);
-    const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: key,
-        Body: body,
-        ContentType: "application/octet-stream",
-      }),
-    );
-    return key;
+    const { uri, objectStore } = await this.mintSpoolUri({
+      projectId,
+      traceId,
+      spanId,
+      purpose: "write",
+    });
+    await objectStore.put(uri, body, "application/octet-stream");
+    return SPOOL_REF_V2;
   }
 
   /**
-   * Best-effort deletion of a transient S3 spool object.
-   * Called after event_log INSERT succeeds. Errors are swallowed — the 3-day lifecycle
-   * policy is the safety net for orphans. Returns void in all cases.
+   * Best-effort deletion of the transient spool object.
+   * Called after the event_log INSERT succeeds. Errors are swallowed — the
+   * 3-day lifecycle rule is the safety net for orphans. Returns void in all cases.
    *
-   * @param spoolRef - The spool reference string returned by `putSpool`.
    * @throws Never — all errors are swallowed internally.
    */
-  async deleteSpool(spoolRef: string): Promise<void> {
+  async deleteSpool({
+    spoolRef,
+    projectId,
+    traceId,
+    spanId,
+  }: {
+    spoolRef: string;
+    projectId: string;
+    traceId: string;
+    spanId: string;
+  }): Promise<void> {
     try {
-      const projectId = projectIdFromSpoolKey(spoolRef);
-      const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-      await s3Client.send(
-        new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
-      );
+      if (isLegacySpoolRef(spoolRef)) {
+        // A refusal here is a tamper indicator, not a storage blip. The
+        // best-effort swallow below is meant for the latter, so log this one
+        // explicitly rather than letting it disappear into the same catch.
+        try {
+          assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+        } catch {
+          this.logger?.warn(
+            { projectId, traceId, spanId },
+            "Refused a cross-tenant v1 spool delete",
+          );
+          return;
+        }
+        const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
+        await s3Client.send(
+          new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
+        );
+        return;
+      }
+      const { uri, objectStore } = await this.mintSpoolUri({
+        projectId,
+        traceId,
+        spanId,
+        purpose: "access",
+      });
+      await objectStore.delete(uri);
     } catch {
       // Best-effort — swallow all errors; lifecycle policy is the safety net.
     }

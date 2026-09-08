@@ -16,7 +16,7 @@
  *
  * Strategy:
  *  - The files route calls `createStoredObjectsService` which calls
- *    `StoredObjectsRepository` → `getClickHouseClientForProject`.
+ *    `StoredObjectsRepository` → `getClickHouseClientForTenant`.
  *  - We mock `createStoredObjectsService` so individual service methods can
  *    be stubbed per case without needing a live ClickHouse.
  *  - Real Prisma projects are created so the authMiddleware resolves API keys.

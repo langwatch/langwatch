@@ -16,6 +16,22 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Boundary mocks for the palette's flag gate: the skills palette now reads
+// the project/org context and the playground flag to decide which skills to
+// show. Both hooks reach tRPC, which this tree mounts no provider for; the
+// palette's rendering (not the flag's resolution) is what these tests pin, so
+// the gate resolves to its off/default shape — the pre-playground skill set.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "p_demo" },
+    organization: { id: "o_demo" },
+  }),
+}));
+
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false }),
+}));
+
 vi.mock("~/components/ModelSelector", () => ({
   ModelSelector: ({ model }: { model: string }) => (
     <div data-testid="model-selector">{model}</div>
@@ -61,7 +77,6 @@ beforeEach(() => {
   useLangyStore.setState({
     turnPhase: "idle",
     draft: "",
-    contextHintDismissed: true,
     isOpen: false,
   });
   useLangyContextTargetStore.getState().reset();
@@ -282,38 +297,11 @@ describe("given a page with something Langy can be given", () => {
     ref: "wf_1",
   };
 
-  describe("when the user has never handed Langy anything", () => {
-    it("teaches the # gesture once", () => {
-      useLangyStore.setState({ contextHintDismissed: false });
+  describe("when the composer renders above it", () => {
+    it("shows no teaching banner", () => {
       useLangyContextTargetStore.getState().register(target);
       renderComposer();
 
-      const hint = screen.getByTestId("langy-context-gesture-hint");
-      expect(hint).toHaveTextContent(
-        "Type # to add anything on this page to Langy context",
-      );
-    });
-
-    it("says nothing on a page with nothing to point at", () => {
-      useLangyStore.setState({ contextHintDismissed: false });
-      renderComposer();
-
-      expect(screen.queryByTestId("langy-context-gesture-hint")).toBeNull();
-    });
-  });
-
-  describe("when the user dismisses the hint", () => {
-    it("does not show it again", async () => {
-      const user = userEvent.setup();
-      useLangyStore.setState({ contextHintDismissed: false });
-      useLangyContextTargetStore.getState().register(target);
-      const { unmount } = renderComposer();
-
-      await user.click(screen.getByRole("button", { name: /dismiss hint/i }));
-      expect(screen.queryByTestId("langy-context-gesture-hint")).toBeNull();
-
-      unmount();
-      renderComposer();
       expect(screen.queryByTestId("langy-context-gesture-hint")).toBeNull();
     });
   });

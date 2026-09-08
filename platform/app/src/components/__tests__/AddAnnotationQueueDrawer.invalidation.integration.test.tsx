@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getOptimizedAnnotationQueues: {
           invalidate: mocks.invalidate.optimizedQueues,

@@ -563,6 +563,48 @@ describe("Persistence", () => {
       expect(result.success).toBe(true);
     });
 
+    describe("when the caller clears the results", () => {
+      // The API hands a caller the whole state and takes the whole state
+      // back. Emptying `results` is how a run is dropped from outside the
+      // editor, and the load path already reads a missing group as empty, so
+      // the write path has to accept the same thing.
+      it("accepts an empty results object and reads it as no results", () => {
+        const state = {
+          name: "Test",
+          datasets: [],
+          activeDatasetId: "ds-1",
+          evaluators: [],
+          targets: [],
+          results: {},
+        };
+
+        const parsed = persistedEvaluationsV3StateSchema.parse(state);
+
+        expect(parsed.results).toEqual({
+          targetOutputs: {},
+          targetMetadata: {},
+          evaluatorResults: {},
+          errors: {},
+        });
+      });
+
+      it("keeps the groups the caller did send", () => {
+        const state = {
+          name: "Test",
+          datasets: [],
+          activeDatasetId: "ds-1",
+          evaluators: [],
+          targets: [],
+          results: { targetOutputs: { t1: ["out"] } },
+        };
+
+        const parsed = persistedEvaluationsV3StateSchema.parse(state);
+
+        expect(parsed.results?.targetOutputs).toEqual({ t1: ["out"] });
+        expect(parsed.results?.errors).toEqual({});
+      });
+    });
+
     it("validates state with sparse arrays containing null values", () => {
       const state = {
         name: "Test",

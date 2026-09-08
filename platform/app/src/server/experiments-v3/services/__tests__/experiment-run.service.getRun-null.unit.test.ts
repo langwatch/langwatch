@@ -23,11 +23,26 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getClickHouseClientForProjectMock = vi.fn();
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: (...args: unknown[]) =>
-    getClickHouseClientForProjectMock(...args),
-}));
+const getClickHouseClientForTenantMock = vi.fn();
+// Enabled stays true so the null-client cases exercise the resolver path
+// itself; the service treats a null resolution as "not ready", not an error.
+const clickHouseEnabledMock = vi.fn(() => true);
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      get enabled() {
+        return clickHouseEnabledMock();
+      },
+      resolveClient: (...args: unknown[]) =>
+        getClickHouseClientForTenantMock(...args),
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 import { ExperimentRunService } from "../experiment-run.service";
 
@@ -37,12 +52,12 @@ function makeService() {
 
 describe("ExperimentRunService.getRun", () => {
   beforeEach(() => {
-    getClickHouseClientForProjectMock.mockReset();
+    getClickHouseClientForTenantMock.mockReset();
   });
 
   describe("when the ClickHouse client is unavailable", () => {
     it("returns null instead of throwing so the UI can poll without 500-cascade", async () => {
-      getClickHouseClientForProjectMock.mockResolvedValue(null);
+      getClickHouseClientForTenantMock.mockResolvedValue(null);
 
       const result = await makeService().getRun({
         projectId: "project_x",
@@ -56,7 +71,7 @@ describe("ExperimentRunService.getRun", () => {
 
   describe("when the run row has not been folded into ClickHouse yet", () => {
     it("returns null so the UI can poll until the projection lands", async () => {
-      getClickHouseClientForProjectMock.mockResolvedValue({
+      getClickHouseClientForTenantMock.mockResolvedValue({
         query: vi.fn().mockResolvedValue({
           json: vi.fn().mockResolvedValue([]),
         }),

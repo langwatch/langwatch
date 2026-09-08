@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -11,11 +12,13 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import { AutomationDrawer } from "../AutomationDrawer";
 import { useAutomationStore } from "../state/automationStore";
+import { keepDraftOnSubFlowReturn } from "../state/subFlow";
 
 // The saved row the edit-mode query resolves to. Mutable so a test can
 // emulate a tRPC background refetch handing back a *different* row after the
@@ -31,7 +34,9 @@ const {
   mockGraphsGetAllInvalidate,
   mockGraphsGetByIdInvalidate,
   mockUpsertMutate,
+  mockDrawerStack,
 } = vi.hoisted(() => ({
+  mockDrawerStack: [] as { drawer: string; params: Record<string, unknown> }[],
   mockGetTriggerByIdQuery: vi.fn(() => ({
     data: mockTriggerRow,
     isLoading: false,
@@ -56,6 +61,9 @@ vi.mock("~/hooks/useDrawer", () => ({
     goBack: vi.fn(),
   }),
   useDrawerParams: () => ({}),
+  // The drawer reads the navigation stack to tell a sub-flow apart from a
+  // close. An open drawer is in it; `closeDrawer` empties it.
+  getDrawerStack: () => mockDrawerStack,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -145,7 +153,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isFetching: false, error: null }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       automation: { getTriggers: { invalidate: mockInvalidate } },
       graphs: {
         getAll: { invalidate: mockGraphsGetAllInvalidate },
@@ -231,6 +239,9 @@ describe("AutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTriggerRow = null;
+    // The drawer under test is the open one, so it sits in the stack.
+    mockDrawerStack.length = 0;
+    mockDrawerStack.push({ drawer: "automation", params: {} });
     // Restore the default resolved-query shape — tests that emulate a
     // loading / errored edit query override this per-test.
     mockGetTriggerByIdQuery.mockImplementation(() => ({
@@ -273,6 +284,58 @@ describe("AutomationDrawer", () => {
             ),
           ).toBeInTheDocument();
         });
+      });
+    });
+  });
+
+  // React replays every effect once on mount in development (StrictMode):
+  // setup, cleanup, setup. The draft outlives the drawer in a singleton store,
+  // so anything that decides "reset or keep" has to answer the same way each
+  // time or the replay wipes a draft the author is coming back to.
+  describe("given React replays the drawer's effects, as it does in development", () => {
+    // StrictMode has to sit OUTSIDE the Chakra provider. Nested inside it, the
+    // replay never runs and the test passes against the bug it is written for.
+    // That also rules out the `wrapper` render option, which always puts the
+    // provider on the outside.
+    const renderReplayed = () =>
+      render(
+        <StrictMode>
+          <Wrapper>
+            <AutomationDrawer />
+          </Wrapper>
+        </StrictMode>,
+      );
+
+    const writeDraft = (name: string) =>
+      act(() => {
+        useAutomationStore
+          .getState()
+          .dispatch({ type: "SET_NAME", value: name });
+      });
+
+    describe("when the drawer comes back from a dataset sub-flow", () => {
+      /** @scenario "Creating a dataset from the automation is offered and works" */
+      it("keeps the draft written before leaving", () => {
+        writeDraft("Nightly digest");
+        // The sub-flow pushed the dataset drawer on top of this one and the
+        // return leg announced itself just before `goBack` popped it off, so
+        // the authoring drawer is alone in the stack again.
+        keepDraftOnSubFlowReturn();
+
+        renderReplayed();
+
+        expect(useAutomationStore.getState().draft.name).toBe("Nightly digest");
+      });
+    });
+
+    describe("when the drawer opens fresh instead", () => {
+      /** @scenario "An abandoned sub-flow does not seed the next automation" */
+      it("starts blank, so an abandoned draft cannot seed it", () => {
+        writeDraft("Abandoned draft");
+
+        renderReplayed();
+
+        expect(useAutomationStore.getState().draft.name).toBe("");
       });
     });
   });

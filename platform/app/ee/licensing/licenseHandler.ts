@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { USAGE_UNKNOWN, type UsageCount } from "~/server/traces/usage-count";
 import { getApp } from "../../src/server/app-layer/app";

@@ -65,15 +65,15 @@ const hasTestcontainers = !!(
 );
 
 // Mock the ClickHouse routing module so BOTH the read path
-// (ClickHouseTraceService.resolveClient -> getClickHouseClientForProject) AND the
+// (ClickHouseTraceService.resolveClient -> getClickHouseClientForTenant) AND the
 // blob resolver (buildTraceBlobResolutionDeps -> defaultResolveClickHouseClient ->
-// getClickHouseClientForProject, wired only when isClickHouseEnabled()) resolve to
+// getClickHouseClientForTenant, wired only when isClickHouseEnabled()) resolve to
 // the testcontainer client. importOriginal keeps every other export intact.
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("~/server/clickhouse/clickhouseClient")
   >()),
-  getClickHouseClientForProject: vi.fn(),
+  getClickHouseClientForTenant: vi.fn(),
   // Must be true so buildTraceBlobResolutionDeps wires the CH resolver onto the
   // BlobStore — otherwise getFromEventLog throws and every read degrades to the
   // preview, which would mask the very fix this test proves.
@@ -337,7 +337,7 @@ describe.skipIf(!hasTestcontainers)(
       // Wire the mocked routing module to the testcontainer client, so both the
       // read path and the blob resolver dial the real `ch`.
       vi.mocked(
-        clickhouseClientModule.getClickHouseClientForProject,
+        clickhouseClientModule.getClickHouseClientForTenant,
       ).mockResolvedValue(client);
 
       // buildTraceBlobResolutionDeps()'s no-arg call — the exact shape the
@@ -347,7 +347,7 @@ describe.skipIf(!hasTestcontainers)(
       await resetApp();
       installClickHouseTestApp({
         resolveClient: (tenantId) =>
-          clickhouseClientModule.getClickHouseClientForProject(tenantId),
+          clickhouseClientModule.getClickHouseClientForTenant(tenantId),
       });
     }, 60_000);
 

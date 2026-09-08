@@ -1,10 +1,10 @@
-import type { PromptScope } from "@prisma/client";
+import type { PromptScope } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
 
 export const usePromptHandleCheck = () => {
   const { project } = useOrganizationTeamProject();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const checkHandleUniqueness = async (params: {
     handle: string;

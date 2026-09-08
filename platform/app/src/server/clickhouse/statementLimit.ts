@@ -1,7 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  type ConcurrencyLimiter,
-  createConcurrencyLimiter,
+  ConcurrencyLimiter,
   QueueFullError,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
@@ -99,7 +98,7 @@ export function withStatementLimit<T extends ClickHouseClient>({
     MIN_QUEUE_DEPTH,
     maxConcurrent * QUEUE_DEPTH_PER_SLOT,
   );
-  const limiter = createConcurrencyLimiter({ maxConcurrent, maxQueued });
+  const limiter = new ConcurrencyLimiter({ maxConcurrent, maxQueued });
 
   registerClickHouseLimiter(instance, () => limiter.stats());
 
@@ -235,18 +234,21 @@ async function run({
   const wait = armWait({ limiter, maxConcurrent, signal, waitTimeoutMs });
 
   try {
-    return await limiter.run(() => {
-      admitted = true;
-      // The wait is over the moment the slot is taken; holding the timer past
-      // here would abort nothing and keep one alive per admitted statement.
-      wait.dispose();
-      observeClickHouseStatementWait(
-        instance,
-        operation,
-        (performance.now() - queuedAt) / 1000,
-      );
-      return task();
-    }, wait.signal);
+    return await limiter.run({
+      task: () => {
+        admitted = true;
+        // The wait is over the moment the slot is taken; holding the timer past
+        // here would abort nothing and keep one alive per admitted statement.
+        wait.dispose();
+        observeClickHouseStatementWait(
+          instance,
+          operation,
+          (performance.now() - queuedAt) / 1000,
+        );
+        return task();
+      },
+      signal: wait.signal,
+    });
   } catch (error) {
     // Only a refusal is translated. Once admitted, the statement's own errors
     // belong to the layers below - translating them here would relabel a

@@ -60,13 +60,27 @@ import {
   readFingerprint,
   stateFilePath,
   writeFingerprint,
-} from "./hook-state";
+} from "@/cli/utils/governance/hook-state";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import {
+  type HealOutcome,
+  healRevokedIngestKey,
+} from "@/cli/utils/governance/ingest-key-heal";
+import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
+import {
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
 import {
   buildSessionContextLogPayload,
+  normalizeSessionName,
   parseOtlpHeaders,
   parseTraceparent,
   sessionContextFingerprint,
-} from "./session-context";
+} from "@/cli/utils/governance/session-context";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * What each accepted tool argument means: the agent the record declares, plus
@@ -79,9 +93,13 @@ import {
  * `CLAUDE_PROJECT_DIR` in its environment, and reading either would report the
  * wrong session, on the wrong checkout, under the wrong agent.
  *
- * `projectDirVar` matters because a session can `cd` away from where it
- * started: Claude Code exports the root it was launched in, so that beats the
- * payload's `cwd`. Codex and opencode publish no such variable, and their
+ * The payload's `cwd` beats `projectDirVar`. Claude Code's payload `cwd` is
+ * the harness's own working directory: a `cd` inside the Bash tool never moves
+ * it, and a native worktree switch (EnterWorktree) does. `CLAUDE_PROJECT_DIR`
+ * stays pinned to the directory the session was launched in, so preferring it
+ * would keep reporting the launch checkout after the session moved into a
+ * worktree to work on another branch. It remains the fallback for a payload
+ * with no `cwd`. Codex and opencode publish no such variable, and their
  * payload `cwd` is already the session's own directory.
  */
 const TOOLS: Record<
@@ -112,8 +130,19 @@ export interface HookCommandOptions {
   now?: () => number;
   /** Where per-session fingerprints live. Defaults under the config home. */
   stateDir?: string;
+  /** Claude's live session registry. Defaults under claude's config home. */
+  claudeRegistryDir?: string;
   /** Reads the CLI's device config, the fallback telemetry target. */
   readCliConfig?: () => CliTelemetryConfig;
+  /**
+   * Repairs a personal ingest key the collector rejected: re-mints, rewrites
+   * the wiring, returns the target to retry with. Injectable so a test needs
+   * no login; defaults to the real healer.
+   */
+  healRevokedKey?: (params: {
+    agent: string;
+    rejectedToken: string | undefined;
+  }) => Promise<HealOutcome>;
 }
 
 /**
@@ -122,12 +151,12 @@ export interface HookCommandOptions {
  * plane: a CLI that was never signed in has neither, and that is the
  * "no telemetry configured" case rather than an error.
  */
-type CliTelemetryConfig = Partial<
+export type CliTelemetryConfig = Partial<
   Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys">
 >;
 
 /** Where one record goes and what authenticates it. */
-interface TelemetryTarget {
+export interface TelemetryTarget {
   endpoint: string;
   headers: Record<string, string>;
 }
@@ -141,10 +170,12 @@ export async function hookCommand({
   env = process.env,
   readInput = readStdin,
   runGit = runGitCommand,
-  fetchImpl = fetch,
+  fetchImpl = langwatchFetch,
   now = Date.now,
   stateDir = defaultStateDir(),
+  claudeRegistryDir,
   readCliConfig = loadConfig,
+  healRevokedKey = healRevokedIngestKey,
 }: HookCommandOptions): Promise<void> {
   try {
     await runHook({
@@ -155,7 +186,9 @@ export async function hookCommand({
       fetchImpl,
       now,
       stateDir,
+      claudeRegistryDir,
       readCliConfig,
+      healRevokedKey,
     });
   } catch (error) {
     debug({ message: `hook failed: ${(error as Error).message}`, env });
@@ -170,7 +203,9 @@ async function runHook({
   fetchImpl,
   now,
   stateDir,
+  claudeRegistryDir,
   readCliConfig,
+  healRevokedKey,
 }: {
   tool: string;
   env: NodeJS.ProcessEnv;
@@ -179,7 +214,9 @@ async function runHook({
   fetchImpl: typeof fetch;
   now: () => number;
   stateDir: string;
+  claudeRegistryDir?: string;
   readCliConfig: () => CliTelemetryConfig;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
 }): Promise<void> {
   const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
   if (!spec) {
@@ -215,24 +252,298 @@ async function runHook({
     env,
   });
 
+  const own = await postOwnSessionContext({
+    spec,
+    agent,
+    sessionId,
+    input,
+    env,
+    runGit,
+    fetchImpl,
+    now,
+    stateDir,
+    claudeRegistryDir,
+    target,
+  });
+
+  // A 401 means the key this device exports with is dead: revoked on the
+  // platform, rotated by an older server, evicted by the cap. The agent's own
+  // exporter fails the same way and says nothing, so this is the one place
+  // the device finds out. Re-mint, rewrite the wiring, retry, and tell the
+  // user to restart the agent: the running process still holds the old key.
+  let liveTarget = target;
+  if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
+    const outcome = await healRevokedKey({
+      agent,
+      rejectedToken: bearerOf(target.headers),
+    }).catch((error: Error) => {
+      debug({ message: `heal failed: ${error.message}`, env });
+      return { status: "failed" } as const;
+    });
+    // Only an attempt spends the window. A decline is read off the config
+    // without touching the platform, so holding the window would cost nothing
+    // to repeat and would silence the next 401 that this device CAN repair.
+    if (outcome.status === "declined") {
+      releaseHealWindow({ stateDir, agent });
+    }
+    if (outcome.status === "healed") {
+      liveTarget = outcome.target;
+      debug({ message: "ingest key re-minted and wiring rewritten", env });
+      await own.retry?.(outcome.target);
+      if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
+    } else if (outcome.status === "withheld") {
+      // The platform did not revoke this key itself, so a person may have.
+      // The device stays dead until a person sets it up again, so the only
+      // repair is to say so.
+      debug({ message: "ingest key was revoked by a person; not re-minted", env });
+      if (agent === "claude_code") notifyClaude(REVOKED_NOTICE);
+    } else if (outcome.status === "expired") {
+      // The platform refused the device's session, so nothing here can mint.
+      // Without this line the session ends with telemetry silently going
+      // nowhere and no sign of why.
+      debug({ message: "device session is signed out; not re-minted", env });
+      if (agent === "claude_code") notifyClaude(SIGNED_OUT_NOTICE);
+    }
+  }
+
+  // Whatever this hook had to say about its own directory is said. Anything
+  // the agent declared from a shell that could not reach the collector goes
+  // out now, last, so the declared checkout is the session's current one.
+  await drainSessionContextSpool({
+    stateDir,
+    now,
+    post: async (payload) =>
+      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl }))
+        .ok,
+  });
+}
+
+/** What the user reads after a heal; Claude Code shows `systemMessage`. */
+const HEAL_NOTICE =
+  "LangWatch: the ingest key this machine exports with had been revoked. A new key was minted and wired; restart Claude Code so telemetry resumes.";
+
+/** What the user reads when the key was revoked on purpose and stays dead. */
+const REVOKED_NOTICE =
+  "LangWatch: the ingest key this machine exports with was revoked and was not replaced. Run `langwatch instrument claude` to set this machine up again.";
+
+/** What the user reads when the device is signed out of LangWatch. */
+const SIGNED_OUT_NOTICE =
+  "LangWatch: this machine is signed out, so its ingest key could not be checked or replaced and telemetry is not being recorded. Run `langwatch login --device` and then `langwatch instrument claude`.";
+
+/** How long one heal attempt stands before the hook tries again. */
+const HEAL_THROTTLE_MS = 10 * 60 * 1000;
+
+function healStateFile({
+  stateDir,
+  agent,
+}: {
+  stateDir: string;
+  agent: string;
+}): string {
+  return path.join(stateDir, `heal-${agent}.json`);
+}
+
+/**
+ * Take this agent's heal window, or report that another attempt holds it.
+ *
+ * The window is claimed before the mint and with an exclusive create, so two
+ * sessions that start together and read the same 401 cannot both ask the
+ * platform to replace the same dead key: the second finds the first one's
+ * claim and stands down.
+ *
+ * A claim older than the window belonged to a run that died mid-heal, and
+ * replacing it is a delete followed by a create, which two hooks holding the
+ * same stale reading could interleave into two winners. So the right to
+ * replace it is itself an exclusive create: whoever lands the takeover marker
+ * does the delete, and the hooks that lose the marker stand down instead of
+ * racing it. The marker is held across two filesystem calls rather than the
+ * whole heal, so a run has to die inside those to strand one, and its own
+ * staleness is bounded by the same window.
+ *
+ * A state directory that cannot be written claims nothing and costs one extra
+ * attempt, the same trade the fingerprints make.
+ */
+function claimHealWindow({
+  stateDir,
+  agent,
+  now,
+}: {
+  stateDir: string;
+  agent: string;
+  now: () => number;
+}): boolean {
+  const file = healStateFile({ stateDir, agent });
+  const marker = `${file}.takeover`;
+  const claim = JSON.stringify({ attemptedAt: now() });
+  const write = (at: string): "claimed" | "taken" | "unwritable" => {
+    try {
+      fs.writeFileSync(at, claim, { flag: "wx" });
+      return "claimed";
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "EEXIST"
+        ? "taken"
+        : "unwritable";
+    }
+  };
+
+  try {
+    fs.mkdirSync(stateDir, { recursive: true });
+  } catch {
+    return true;
+  }
+
+  if (write(file) !== "taken") return true;
+  if (standingClaimIsFresh({ file, now })) return false;
+  if (!claimTakeover({ marker, now, write })) return false;
+  try {
+    fs.rmSync(file, { force: true });
+    return write(file) !== "taken";
+  } finally {
+    try {
+      fs.rmSync(marker, { force: true });
+    } catch {
+      // The next stale claim reclaims it by its own age; a marker left behind
+      // costs this device one heal window, never the heal itself.
+    }
+  }
+}
+
+/** Whether this hook won the right to replace a claim it read as stale. */
+function claimTakeover({
+  marker,
+  now,
+  write,
+}: {
+  marker: string;
+  now: () => number;
+  write: (at: string) => "claimed" | "taken" | "unwritable";
+}): boolean {
+  if (write(marker) !== "taken") return true;
+  if (standingClaimIsFresh({ file: marker, now })) return false;
+  try {
+    fs.rmSync(marker, { force: true });
+  } catch {
+    return false;
+  }
+  return write(marker) !== "taken";
+}
+
+/** Whether the claim on disk is young enough to still stand for its run. */
+function standingClaimIsFresh({
+  file,
+  now,
+}: {
+  file: string;
+  now: () => number;
+}): boolean {
+  try {
+    const raw = fs.readFileSync(file, "utf8");
+    const attemptedAt = Number((JSON.parse(raw) as { attemptedAt?: number }).attemptedAt);
+    return Number.isFinite(attemptedAt) && now() - attemptedAt < HEAL_THROTTLE_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** Hand the window back, for an outcome that never reached the platform. */
+function releaseHealWindow({
+  stateDir,
+  agent,
+}: {
+  stateDir: string;
+  agent: string;
+}): void {
+  try {
+    fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
+  } catch {
+    // A claim we cannot clear stands for the window, costing one repair.
+  }
+}
+
+/** The bearer token in a target's headers, without the scheme. */
+function bearerOf(headers: Record<string, string>): string | undefined {
+  const value = headers.Authorization ?? headers.authorization;
+  const token = value?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return undefined;
+  return token;
+}
+
+/**
+ * The one line the hook ever writes to stdout. Claude Code reads a hook's
+ * stdout as JSON and shows `systemMessage` to the user; it carries no
+ * `additionalContext`, so nothing reaches the model.
+ */
+function notifyClaude(message: string): void {
+  process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
+}
+
+/**
+ * Post the context of the directory this hook runs in. Every reason not to
+ * post is a debug line and a return: a hook is never allowed to be why a
+ * session broke.
+ */
+async function postOwnSessionContext({
+  spec,
+  agent,
+  sessionId,
+  input,
+  env,
+  runGit,
+  fetchImpl,
+  now,
+  stateDir,
+  claudeRegistryDir,
+  target,
+}: {
+  spec: (typeof TOOLS)[string];
+  agent: string;
+  sessionId: string;
+  input: ReturnType<typeof parseHookInput>;
+  env: NodeJS.ProcessEnv;
+  runGit: GitRunner;
+  fetchImpl: typeof fetch;
+  now: () => number;
+  stateDir: string;
+  claudeRegistryDir?: string;
+  target: TelemetryTarget;
+}): Promise<OwnContextOutcome> {
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
-  const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();
-  const context = readSessionContext({ directory, runGit });
-  if (!context) {
+  const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
+  // The session's own name, as claude itself holds it. The SessionStart
+  // payload carries it at start; the live registry is what makes a
+  // mid-session /rename observable from the Stop hook, which runs after
+  // every turn. Codex and opencode hold no such registry, so for them the
+  // record carries no name and the harvest names their sessions instead.
+  const name =
+    agent === "claude_code"
+      ? normalizeSessionName(
+          input.sessionTitle ??
+            readClaudeSessionName({
+              sessionId,
+              registryDir:
+                claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+            }),
+        )
+      : null;
+  // Outside a repository the record can still carry the session's name, and
+  // the name alone is worth a post: it is what labels the session before its
+  // first prompt. With neither identity nor a name there is nothing to say.
+  const context = readSessionContext({ directory, runGit }) ?? {};
+  if (!context.repository && !name) {
     debug({
       message: `no git repository with an origin remote at ${directory}`,
       env,
     });
-    return;
+    return { httpStatus: null };
   }
 
-  const fingerprint = sessionContextFingerprint(context);
+  const fingerprint = sessionContextFingerprint(context, { name });
   pruneStaleState({ stateDir, now });
 
   const stateFile = stateFilePath({ stateDir, agent, sessionId });
   if (readFingerprint(stateFile) === fingerprint) {
     debug({ message: "context unchanged since the last post", env });
-    return;
+    return { httpStatus: null };
   }
 
   const payload = buildSessionContextLogPayload({
@@ -243,7 +554,21 @@ async function runHook({
     timeUnixNano: `${now()}000000`,
     scopeVersion: LANGWATCH_SDK_VERSION,
     trace: parseTraceparent(env.TRACEPARENT),
+    name,
   });
+
+  const recordFingerprint = (): void => {
+    try {
+      writeFingerprint({ stateFile, fingerprint, now });
+    } catch (error) {
+      // A fingerprint we cannot record costs one duplicate record next time.
+      debug({
+        message: `could not record the fingerprint: ${(error as Error).message}`,
+        env,
+      });
+    }
+    debug({ message: `posted ${fingerprint}`, env });
+  };
 
   const posted = await postSessionContext({
     target,
@@ -251,18 +576,34 @@ async function runHook({
     payload,
     fetchImpl,
   });
-  if (!posted) return;
-
-  try {
-    writeFingerprint({ stateFile, fingerprint, now });
-  } catch (error) {
-    // A fingerprint we cannot record costs one duplicate record next time.
-    debug({
-      message: `could not record the fingerprint: ${(error as Error).message}`,
-      env,
-    });
+  if (!posted.ok) {
+    return {
+      httpStatus: posted.status,
+      retry: async (healed) => {
+        const again = await postSessionContext({
+          target: healed,
+          env,
+          payload,
+          fetchImpl,
+        });
+        if (again.ok) recordFingerprint();
+        return again.ok;
+      },
+    };
   }
-  debug({ message: `posted ${fingerprint}`, env });
+
+  recordFingerprint();
+  return { httpStatus: posted.status };
+}
+
+/**
+ * How the hook's own post went: the collector's status (null when nothing
+ * was sent), and, after a rejection, a way to send the same record again to
+ * a healed target and record its fingerprint on success.
+ */
+interface OwnContextOutcome {
+  httpStatus: number | null;
+  retry?: (target: TelemetryTarget) => Promise<boolean>;
 }
 
 /**
@@ -279,8 +620,11 @@ async function runHook({
  * and `langwatch ingest install`: the control plane the CLI is signed in to,
  * and the ingest key minted for this agent. Null when neither source can name
  * a collector, which is the "no telemetry configured" no-op.
+ *
+ * Shared with `langwatch ingest context`, which posts the same record from
+ * the same sources when the agent declares its context itself.
  */
-function resolveTarget({
+export function resolveTarget({
   env,
   agent,
   readCliConfig,
@@ -308,7 +652,7 @@ function resolveTarget({
   };
 }
 
-async function postSessionContext({
+export async function postSessionContext({
   target,
   env,
   payload,
@@ -318,7 +662,7 @@ async function postSessionContext({
   env: NodeJS.ProcessEnv;
   payload: unknown;
   fetchImpl: typeof fetch;
-}): Promise<boolean> {
+}): Promise<{ ok: boolean; status: number | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
   try {
@@ -335,12 +679,12 @@ async function postSessionContext({
     });
     if (!response.ok) {
       debug({ message: `collector answered ${response.status}`, env });
-      return false;
+      return { ok: false, status: response.status };
     }
-    return true;
+    return { ok: true, status: response.status };
   } catch (error) {
     debug({ message: `post failed: ${(error as Error).message}`, env });
-    return false;
+    return { ok: false, status: null };
   } finally {
     clearTimeout(timer);
   }

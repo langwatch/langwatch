@@ -89,7 +89,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: {
         getAllForProject: { invalidate: vi.fn() },

@@ -15,7 +15,81 @@ const STUB_PLAN: PlanInfo = {
   maxMessagesPerMonth: 100_000,
 };
 
+const ENTERPRISE_PLAN: PlanInfo = {
+  ...STUB_PLAN,
+  type: "ENTERPRISE",
+  name: "Enterprise",
+};
+
 describe("PlanProviderService", () => {
+  describe("when the source answers an enterprise plan", () => {
+    /** @scenario An enterprise license signed before the flag existed is entitled */
+    it("entitles a plan whose payload never mentioned webhook endpoints", async () => {
+      const service = PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue(ENTERPRISE_PLAN),
+      });
+
+      const plan = await service.getActivePlan({ organizationId: "org_1" });
+
+      expect(plan.webhookEndpointsEnabled).toBe(true);
+    });
+
+    /** @scenario An enterprise subscription with no license is entitled */
+    it("entitles it the same way whichever leg resolved it", async () => {
+      const service = PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          ...ENTERPRISE_PLAN,
+          planSource: "subscription",
+        }),
+      });
+
+      const plan = await service.getActivePlan({ organizationId: "org_1" });
+
+      expect(plan.webhookEndpointsEnabled).toBe(true);
+      expect(plan.planSource).toBe("subscription");
+    });
+
+    /** @scenario An entitlement switched off in the payload stays off */
+    it("leaves an entitlement the plan switched off switched off", async () => {
+      const service = PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          ...ENTERPRISE_PLAN,
+          webhookEndpointsEnabled: false,
+        }),
+      });
+
+      const plan = await service.getActivePlan({ organizationId: "org_1" });
+
+      expect(plan.webhookEndpointsEnabled).toBe(false);
+    });
+
+    /** @scenario Impersonation powers are not an entitlement of the enterprise tier */
+    it("does not hand it the power to add limitations", async () => {
+      const service = PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue(ENTERPRISE_PLAN),
+      });
+
+      const plan = await service.getActivePlan({ organizationId: "org_1" });
+
+      // The source said false. Authorization is not a tier entitlement, so
+      // resolving an enterprise plan must not turn it on.
+      expect(plan.overrideAddingLimitations).toBe(false);
+    });
+  });
+
+  describe("when the source answers a plan below enterprise", () => {
+    /** @scenario A plan below enterprise is not entitled */
+    it("adds no entitlement to it", async () => {
+      const service = PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue(STUB_PLAN),
+      });
+
+      const plan = await service.getActivePlan({ organizationId: "org_1" });
+
+      expect(plan.webhookEndpointsEnabled).toBeUndefined();
+    });
+  });
+
   describe("when created with a SaaS-style source", () => {
     it("delegates getActivePlan with organizationId and user", async () => {
       const source: PlanProvider = {

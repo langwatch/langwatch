@@ -14,6 +14,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
+import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
@@ -21,6 +22,7 @@ import { codingAgentsRouter } from "./routers/codingAgents";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
+import { dashboardWidgetsRouter } from "./routers/dashboardWidgets";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
@@ -31,6 +33,7 @@ import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
+import { frontDoorRouter } from "./routers/frontDoor";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
@@ -41,7 +44,9 @@ import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
+import { identityRouter } from "./routers/identity";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { licenseRouter } from "./routers/license";
@@ -70,9 +75,11 @@ import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
+import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
+import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -92,6 +99,7 @@ const coreRouters = {
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
+  joinRequests: joinRequestsRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -108,6 +116,7 @@ const coreRouters = {
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  dashboardWidgets: dashboardWidgetsRouter,
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
@@ -115,6 +124,9 @@ const coreRouters = {
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,
+  authz: authzRouter,
+  identity: identityRouter,
+  frontDoor: frontDoorRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,
@@ -122,8 +134,10 @@ const coreRouters = {
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
   bugReports: bugReportsRouter,
+  ssoConnections: ssoConnectionsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
+  setupSkills: setupSkillsRouter,
   share: shareRouter,
   sharedTrace: sharedTraceRouter,
   pinnedTrace: pinnedTraceRouter,

@@ -89,7 +89,7 @@ vi.mock("~/components/DashboardLayout", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       limits: { getUsage: { invalidate: vi.fn() } },
       licenseEnforcement: { checkLimit: { invalidate: vi.fn() } },
     }),

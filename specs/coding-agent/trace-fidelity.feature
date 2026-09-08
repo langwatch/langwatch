@@ -18,11 +18,43 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     And the per-span detail still shows the usage on each span
 
   @unit
+  Scenario: Codex exec turn tokens are counted once when the rollup repeats the response spans' usage
+    Given a codex exec turn whose turn rollup span repeats the usage its response spans already report per call
+    When the spans are canonicalised
+    Then the rollup defers and the response spans are what the trace totals count
+
+  @unit
   Scenario: Codex reasoning output tokens are captured
     Given a codex Path B turn span reporting reasoning output tokens
     When the span is canonicalised
     Then the span carries the reasoning tokens under the canonical usage key
     And the trace summary reasoning token total includes them
+
+  @unit
+  Scenario: A codex turn's cached input is priced once, not twice
+    Given a codex turn span whose reported input includes its cached tokens
+    When the span is canonicalised
+    Then the span's input tokens are the part that was not cached
+    And the cached tokens stay on their own keys, at their own rates
+    # Codex reports the whole input, cache included. Lifting that straight
+    # across charged the cached tokens at the full input rate and again at
+    # the cache rate, which priced such a turn about four times over.
+
+  # --- Which conversation a codex turn belongs to ---------------------------
+
+  # A codex turn span names two ids: the session it belongs to, and the turn
+  # itself. Filing the trace under the turn gave every turn a conversation of
+  # its own, so a session's turns never grouped and the session, which is keyed
+  # by the session id, resolved none of its own traces. A reader opening such a
+  # session was told nothing had been stored, while the traces were there under
+  # ids nothing looked up.
+
+  @unit
+  Scenario: A codex turn is filed under its session, not under itself
+    Given a codex turn span that names both its session and the turn
+    When the span is canonicalised
+    Then the trace belongs to the session's conversation
+    And a turn span that names no session keeps the turn's own id
 
   # --- Reasoning effort (the request setting, not the token count) -----------
 

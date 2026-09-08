@@ -23,6 +23,7 @@ const OUTBOX_PALETTE: Record<
   pending: "yellow",
   dispatched: "green",
   dead: "red",
+  discarded: "gray",
 };
 
 function instanceStatus(instance: AggregateProcessManagerInstance | null): {

@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -54,7 +55,7 @@ export function useTraceFacets() {
       // Keep prior facets visible across time-range / filter refetches so
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       // Discover must not batch with `list`: the list query is the slow one
       // on heavy projects (10–30s) and batching makes the sidebar wait the
       // full duration even though discover itself returns in ~2s.
@@ -66,7 +67,8 @@ export function useTraceFacets() {
       // we'd sit on the synthetic skeleton forever. Poll while pending with
       // 2s/4s/8s/15s backoff so the first warm response always settles.
       // Cleared as soon as a non-pending payload arrives.
-      refetchInterval: (data) => {
+      refetchInterval: (query) => {
+        const data = query.state.data;
         if (!data?.pending) {
           pendingPollAttemptsRef.current = 0;
           return false;
@@ -94,10 +96,10 @@ export function useTraceFacets() {
   // and treat anything older as a loading state.
   const dataProjectIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (query.isSuccess && !query.isPreviousData) {
+    if (query.isSuccess && !query.isPlaceholderData) {
       dataProjectIdRef.current = projectId;
     }
-  }, [query.isSuccess, query.isPreviousData, projectId]);
+  }, [query.isSuccess, query.isPlaceholderData, projectId]);
 
   // "Other project" only fires when there *was* a previous fresh
   // response and its project no longer matches — initial mount (ref
@@ -114,10 +116,10 @@ export function useTraceFacets() {
   // only; we don't bother caching `{ pending: true }` placeholders.
   useEffect(() => {
     if (!projectId) return;
-    if (!query.isSuccess || query.isPreviousData) return;
+    if (!query.isSuccess || query.isPlaceholderData) return;
     if (!query.data || query.data.pending) return;
     setCachedDiscover({ projectId, facets: query.data.facets });
-  }, [projectId, query.isSuccess, query.isPreviousData, query.data]);
+  }, [projectId, query.isSuccess, query.isPlaceholderData, query.data]);
 
   // Warm-start: hand the sidebar the previous session's descriptors so
   // it renders something USEFUL (real keys + real labels, not a

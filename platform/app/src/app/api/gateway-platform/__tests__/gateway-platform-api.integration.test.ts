@@ -26,13 +26,13 @@
 import crypto from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import {
   readStoredBody,
@@ -40,6 +40,7 @@ import {
   withIdempotency,
 } from "~/server/api/idempotency";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -346,6 +347,11 @@ async function seedUserWithRole(args: {
   });
   return created.token;
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("gateway platform REST API (real PG + real CH)", () => {
   beforeAll(async () => {

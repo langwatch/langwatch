@@ -1,8 +1,12 @@
-import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import {
+  DispatchError,
+  isDispatchError,
+} from "~/server/event-sourcing/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 import {
   createLogOverflowHandler,
@@ -136,6 +140,7 @@ function makeDeps(activeTrigger: TriggerSummary) {
       .fn()
       .mockResolvedValue([activeTrigger]),
     isSendClaimed: vi.fn().mockResolvedValue(false),
+    filterSendClaimed: vi.fn().mockResolvedValue(new Set<string>()),
     claimSend: vi.fn().mockResolvedValue(undefined),
     updateLastRunAt: vi.fn().mockResolvedValue(undefined),
   };
@@ -360,6 +365,7 @@ describe("trigger settlement intent handlers integration", () => {
   });
 
   describe("given a persist-match intent", () => {
+    /** @scenario "An old single-trace persist intent still dispatches after the paging change" */
     it("confirms the settled trace, writes the dataset, then claims the match", async () => {
       const activeTrigger = trigger(TriggerAction.ADD_TO_DATASET, {
         actionParams: {
@@ -531,6 +537,325 @@ describe("trigger settlement intent handlers integration", () => {
 
       expect(raw.addToDataset).toHaveBeenCalledTimes(1);
       expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a paged persist-match intent", () => {
+    const datasetTrigger = () =>
+      trigger(TriggerAction.ADD_TO_DATASET, {
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: { mapping: {}, expansions: [] },
+        },
+      });
+
+    /** @scenario "Settled persist matches dispatch in bounded pages" */
+    it("dispatches every trace of the page and re-runs only unclaimed traces on a retry", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      const handler = createPersistMatchHandler(deps);
+      const payload = {
+        triggerId: "trigger-1",
+        traceIds: ["trace-1", "trace-2"],
+      };
+
+      await handler(payload, context("process:trigger-1:persist:page-1"));
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(2);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(2);
+      // The fixed per-dispatch reads are paid once per page, not per trace.
+      expect(triggers.getActiveTraceTriggersForProject).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(raw.resolvePersistDailyCap).toHaveBeenCalledTimes(1);
+      expect(raw.projects.getById).toHaveBeenCalledTimes(1);
+      expect(triggers.filterSendClaimed).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceIds: ["trace-1", "trace-2"],
+        projectId: "project-1",
+      });
+
+      // The retry presents the same page; the claim filter suppresses the
+      // trace that already dispatched.
+      triggers.filterSendClaimed.mockResolvedValue(new Set(["trace-1"]));
+      await handler(payload, {
+        ...context("process:trigger-1:persist:page-1"),
+        attempt: 2,
+      });
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(3);
+      const retriedClaims = triggers.claimSend.mock.calls.slice(2);
+      expect(retriedClaims).toEqual([
+        [
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-2",
+            projectId: "project-1",
+          },
+        ],
+      ]);
+    });
+
+    /** @scenario "A terminal failure for one trace does not fail its page-mates" */
+    it("records a non-retryable trace failure and still dispatches the rest", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-1")) {
+            throw new DispatchError({
+              message: "dataset gone",
+              retryable: false,
+            });
+          }
+        },
+      );
+
+      await expect(
+        createPersistMatchHandler(deps)(
+          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+          context("process:trigger-1:persist:page-1"),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
+    });
+
+    it("retries the whole page once when a trace fails retryably, after the others ran", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-1")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      // The classification, not the copy, is what the outbox acts on.
+      expect(isDispatchError(thrown)).toBe(true);
+      expect((thrown as DispatchError).retryable).toBe(true);
+
+      // The page-mate was not abandoned by the failure: it dispatched and
+      // claimed, so the outbox retry of the page re-runs only trace-1.
+      expect(triggers.claimSend).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
+    });
+
+    it("treats an unclassified failure as retryable and retries the page", async () => {
+      const { deps, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-1")) {
+            throw new Error("connection reset");
+          }
+        },
+      );
+
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(isDispatchError(thrown)).toBe(false);
+    });
+
+    /** @scenario "A retrying page names the failure that caused the retry" */
+    it("names the failing error on the page retry record", async () => {
+      const { deps, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockRejectedValue(
+        new DispatchError({
+          message: "clickhouse read timed out",
+          retryable: true,
+        }),
+      );
+
+      await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch(() => undefined);
+
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          triggerId: "trigger-1",
+          failed: 1,
+          pageSize: 1,
+          errorType: "DispatchError",
+          errorMessage: "clickhouse read timed out",
+        }),
+        "Persist page had retryable failures. Retrying the page; claimed traces no-op on the retry",
+      );
+    });
+
+    it("dispatches a repeated trace of a page only once", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+
+      await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-1"] },
+        context("process:trigger-1:persist:page-1"),
+      );
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+      expect(triggers.filterSendClaimed).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceIds: ["trace-1"],
+        projectId: "project-1",
+      });
+    });
+
+    /** @scenario "A failed claim write does not cancel a page-mate's retry" */
+    it("retries the page for the failed trace when a page-mate lost its claim write", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      // trace-1 dispatches and then loses its claim write on every attempt;
+      // trace-2 fails in a way that must retry the whole page.
+      triggers.claimSend.mockRejectedValue(new Error("claim write failed"));
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-2")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      // The retry runs trace-1 again, because no claim suppresses it. That
+      // duplicate is accepted: dropping the retry would lose trace-2's
+      // dataset row for good, and a settled trace has no next match.
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      expect(isDispatchError(thrown)).toBe(true);
+      expect((thrown as DispatchError).retryable).toBe(true);
+      expect(raw.addToDataset).toHaveBeenCalledTimes(2);
+      // Three attempts for one trace: the first write plus the two retries.
+      expect(triggers.claimSend).toHaveBeenCalledTimes(3);
+    });
+
+    it("claims on an inline retry so only the failed trace runs again", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      let claimAttempts = 0;
+      triggers.claimSend.mockImplementation(async () => {
+        claimAttempts += 1;
+        if (claimAttempts === 1) throw new Error("claim write failed");
+      });
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-2")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      const payload = {
+        triggerId: "trigger-1",
+        traceIds: ["trace-1", "trace-2"],
+      };
+      const thrown = await createPersistMatchHandler(deps)(
+        payload,
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      // The claim landed on the second attempt, so the page still retries for
+      // trace-2 and trace-1 carries a claim into that retry.
+      expect(isDispatchError(thrown)).toBe(true);
+      expect(triggers.claimSend).toHaveBeenCalledTimes(2);
+      expect(triggers.claimSend).toHaveBeenLastCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-1",
+        projectId: "project-1",
+      });
+
+      // The outbox redelivers the page: the claim filter now holds trace-1,
+      // so only trace-2 runs its action again.
+      triggers.filterSendClaimed.mockResolvedValue(new Set(["trace-1"]));
+      raw.addToDataset.mockClear();
+      raw.addToDataset.mockResolvedValue(undefined);
+      await createPersistMatchHandler(deps)(payload, {
+        ...context("process:trigger-1:persist:page-1"),
+        attempt: 2,
+      });
+
+      expect(raw.addToDataset).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenLastCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
+    });
+
+    it("still retries the page when every dispatched trace claimed", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      raw.addToDataset.mockImplementation(
+        async ({ datasetRecords }: { datasetRecords: { id: string }[] }) => {
+          if (datasetRecords[0]!.id.includes("trace-1")) {
+            throw new DispatchError({
+              message: "database unavailable",
+              retryable: true,
+            });
+          }
+        },
+      );
+
+      const thrown = await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+        context("process:trigger-1:persist:page-1"),
+      ).catch((error: unknown) => error);
+
+      // trace-2 dispatched and claimed, trace-1 never reached its claim, so
+      // no trace holds a side effect without a claim and the retry is clean.
+      expect(triggers.claimSend).toHaveBeenCalledTimes(1);
+      expect(triggers.claimSend).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        traceId: "trace-2",
+        projectId: "project-1",
+      });
+      expect(isDispatchError(thrown)).toBe(true);
+      expect((thrown as DispatchError).retryable).toBe(true);
+    });
+
+    /** @scenario "A daily-ceiling breach is reported once per page" */
+    it("drops every over-ceiling trace and runs breach containment once", async () => {
+      const { deps, triggers, raw } = makeDeps(datasetTrigger());
+      raw.consumePersistCapSlot.mockResolvedValue({
+        allowed: false,
+        count: 101,
+        cap: 100,
+        skipped: 1,
+      });
+
+      await expect(
+        createPersistMatchHandler(deps)(
+          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+          context("process:trigger-1:persist:page-1"),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(raw.addToDataset).not.toHaveBeenCalled();
+      expect(triggers.claimSend).not.toHaveBeenCalled();
+      expect(raw.handlePersistCapBreach).toHaveBeenCalledTimes(1);
     });
   });
 

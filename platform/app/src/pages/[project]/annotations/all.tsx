@@ -1,14 +1,15 @@
 import { Flex } from "@chakra-ui/react";
-import type { Annotation } from "@prisma/client";
 import { useMemo } from "react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
   type AnnotationWithUser,
+  annotationRatingExportLabel,
   groupedAnnotationsToRows,
   suggestionExportLine,
 } from "~/components/annotations/annotationRow";
 import { usePeriodSelector } from "~/components/PeriodSelector";
+import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -155,7 +156,7 @@ export default function Annotations() {
           suggestionExportLine({ annotation, traceId: annotation.traceId }),
           annotation.comment ?? "",
           annotation.traceId ?? "",
-          annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+          annotationRatingExportLabel(annotation.isThumbsUp),
           JSON.stringify(annotation.scoreOptions ?? {}),
           annotation.createdAt?.toLocaleString() ?? "",
         ];

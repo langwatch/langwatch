@@ -126,7 +126,10 @@ describe("NotificationService", () => {
       organizationName: "Acme",
       adminName: "Jane",
       adminEmail: "jane@acme.com",
-      planName: "free",
+      planName: "Free",
+      limitType: "Monthly Traces",
+      current: 12000,
+      max: 10000,
     };
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
@@ -140,14 +143,64 @@ describe("NotificationService", () => {
     });
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
-      it("sends a Slack message with plan limit info", async () => {
+      /** @scenario "Plan limit alert names the monthly trace cap and the numbers" */
+      /** @scenario "Plan limit alert names the monthly event cap and the numbers" */
+      it.each([
+        {
+          limitType: "Monthly Traces",
+          expected:
+            "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Traces: 12000/10000",
+        },
+        {
+          limitType: "Monthly Events",
+          expected:
+            "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Events: 12000/10000",
+        },
+      ])("names the $limitType cap and the numbers behind it", async ({
+        limitType,
+        expected,
+      }) => {
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+
+        await service.sendSlackPlanLimitAlert({ ...context, limitType });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
+      });
+
+      /** @scenario "Plan limit alert still sends when the organization has no admin email" */
+      it("falls back to unknown when the org has no admin email", async () => {
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+
+        await service.sendSlackPlanLimitAlert({
+          ...context,
+          adminEmail: undefined,
+        });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          text: "Plan limit reached: Acme, unknown, Plan: Free, Monthly Traces: 12000/10000",
+        });
+      });
+
+      /** @scenario "Plan limit alert reads the same way as the resource limit alert" */
+      it("keeps the same field order as the resource limit alert", async () => {
         config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         await service.sendSlackPlanLimitAlert(context);
-
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          text: expect.stringContaining("Plan limit reached: Acme"),
+        await service.sendSlackResourceLimitAlert({
+          ...context,
+          limitType: "Team Members",
+          current: 2,
+          max: 2,
         });
+
+        const sentTexts = mockSlackSend.mock.calls.map(
+          (args: unknown[]) => (args[0] as { text: string }).text,
+        );
+
+        expect(sentTexts).toEqual([
+          "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Traces: 12000/10000",
+          "Resource limit reached: Acme, jane@acme.com, Plan: Free, Team Members: 2/2",
+        ]);
       });
     });
 
@@ -208,6 +261,70 @@ describe("NotificationService", () => {
 
         await service.sendSlackResourceLimitAlert(context);
 
+        expect(captureException).toHaveBeenCalledWith(error);
+      });
+    });
+  });
+
+  describe("sendSlackBillingThresholdFailureAlert()", () => {
+    const context = {
+      stripeSubscriptionId: "sub_stripe_1",
+      reason: "stripe down",
+    };
+
+    describe("when SLACK_CHANNEL_SUBSCRIPTIONS is set", () => {
+      it("sends to the subscriptions channel with the subscription and reason", async () => {
+        // Inject the webhook factory so the channel URL is observable: the
+        // suite-wide @slack/webhook mock discards the constructor argument,
+        // which would let a wrong-channel regression pass unnoticed.
+        const createSlackWebhook = vi.fn(() => ({ send: mockSlackSend }));
+        const scopedService = NotificationService.create({
+          config: {
+            ...config,
+            slackSubscriptionsChannel: "https://hooks.slack.com/subs",
+            slackPlanLimitChannel: "https://hooks.slack.com/limits",
+          },
+          createSlackWebhook,
+        });
+
+        await scopedService.sendSlackBillingThresholdFailureAlert(context);
+
+        expect(createSlackWebhook).toHaveBeenCalledWith(
+          "https://hooks.slack.com/subs",
+        );
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining("sub_stripe_1"),
+          }),
+        );
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining("stripe down"),
+          }),
+        );
+      });
+    });
+
+    describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
+      it("returns without sending", async () => {
+        config.slackSubscriptionsChannel = undefined;
+
+        await service.sendSlackBillingThresholdFailureAlert(context);
+
+        expect(mockSlackSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Slack webhook fails", () => {
+      it("catches the error so checkout is never affected", async () => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+        const error = new Error("webhook error");
+        mockSlackSend.mockRejectedValueOnce(error);
+
+        await expect(
+          service.sendSlackBillingThresholdFailureAlert(context),
+        ).resolves.toBeUndefined();
         expect(captureException).toHaveBeenCalledWith(error);
       });
     });
@@ -463,6 +580,9 @@ describe("NotificationService", () => {
       adminName: "Jane",
       adminEmail: "jane@acme.com",
       planName: "free",
+      limitType: "Monthly Traces",
+      current: 12000,
+      max: 10000,
     };
 
     describe("when HubSpot env vars are not set", () => {

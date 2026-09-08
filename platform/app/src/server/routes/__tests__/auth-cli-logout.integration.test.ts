@@ -14,17 +14,22 @@
  *
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
 
 import { app } from "../auth-cli";
 
 const suffix = nanoid(8);
+
+/** The container's connection, handed to the test App so the route shares it. */
+let redisConnection: Redis | null = null;
 
 async function callLogout(body: Record<string, unknown>) {
   return await app.request("/api/auth/cli/logout", {
@@ -50,10 +55,15 @@ async function exists(prefix: string, token: string): Promise<boolean> {
 
 describe("POST /api/auth/cli/logout", () => {
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
+    // The route reads its connection off the App, so the App has to carry the
+    // container's (ADR-093).
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
   }, 60_000);
 
   afterAll(async () => {
+    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

@@ -1,5 +1,5 @@
-import { OrganizationUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import {
   classifyMemberType,
   getRoleChangeType,

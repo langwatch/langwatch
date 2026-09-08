@@ -1,5 +1,5 @@
-import type { OrganizationIntent } from "@prisma/client";
 import type { z } from "zod";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 
 import { getApp } from "../../../../src/server/app-layer/app";
 import type { signUpDataSchema } from "../../../../src/server/schemas/sign-up-data.schema";

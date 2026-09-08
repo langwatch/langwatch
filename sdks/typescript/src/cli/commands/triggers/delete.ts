@@ -1,12 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
@@ -23,14 +24,13 @@ export const deleteTriggerCommand = async (
   const spinner = createSpinner(`Deleting trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `delete trigger "${id}"` });
+      await failSpinnerFromResponse({ spinner, response, action: `delete trigger "${id}"` });
       process.exit(1);
     }
 

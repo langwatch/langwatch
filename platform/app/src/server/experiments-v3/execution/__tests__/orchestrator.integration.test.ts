@@ -1,4 +1,3 @@
-import type { Project } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type {
   DatasetColumn,
@@ -11,6 +10,7 @@ import {
   createInitialResults,
   createInitialUIState,
 } from "~/experiments-v3/types";
+import type { Project } from "~/generated/prisma/client";
 import { resetApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { getTestProject } from "~/utils/testUtils";

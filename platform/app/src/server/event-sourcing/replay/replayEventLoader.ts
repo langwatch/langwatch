@@ -1,4 +1,6 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient, Row } from "@clickhouse/client";
+import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import type { Event } from "../domain/types";
 import { compareOrdinal } from "../utils/compareOrdinal";
 
 /** ClickHouse event_log row shape. */
@@ -46,7 +48,12 @@ export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
   eventTypes: string[];
 }
 
-function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
+/**
+ * Materialize a raw `event_log` row into the event shape every replay path
+ * consumes — including the ADR-022 lean, applied here exactly once (see the
+ * comment on the return).
+ */
+export function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
   const data =
     row.EventPayload && row.EventPayload.length > 0
       ? JSON.parse(row.EventPayload)
@@ -57,7 +64,7 @@ function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
       ? row.EventOccurredAt
       : row.EventTimestamp;
 
-  return {
+  const event: ReplayEvent = {
     id: row.EventId,
     aggregateId: row.AggregateId,
     aggregateType: row.AggregateType,
@@ -73,6 +80,13 @@ function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
       ? { processingTraceparent: row.ProcessingTraceparent }
       : undefined,
   };
+
+  // ADR-022: lean ONCE, at materialization — the same interposition live
+  // dispatch applies before its handlers. Every replay path consumes events
+  // through this function, so a single lean here replaces one lean per
+  // (event × projection) inside the accumulators while keeping replayed
+  // output byte-identical to live.
+  return leanForProjection(event as unknown as Event) as unknown as ReplayEvent;
 }
 
 /**
@@ -394,26 +408,45 @@ export async function getBoundedCutoffs({
 }
 
 /**
- * Load ALL events for a set of aggregates in a single ClickHouse query.
- * No eventTypes filter — different projections may need different event types,
- * so we load everything and let callers filter by cutoff per aggregate.
+ * Stream every event a replay batch must apply for a set of aggregates, in a
+ * single ClickHouse query, invoking `onEvent` per row in per-aggregate
+ * `(EventTimestamp, EventId)` order.
  *
- * Returns events grouped by aggregate key (`{tenantId}:{aggregateType}:{aggregateId}`).
+ * Two deliberate properties over the previous materialize-then-filter load:
+ *
+ * - **Union event-type filter.** Only events of the selected projections'
+ *   types leave ClickHouse. The cutoffs were computed over the same union, so
+ *   the boundary stays consistent — and payload bytes for types no projection
+ *   consumes are never read, decompressed, or JSON-parsed.
+ * - **Streaming.** Rows are applied as they arrive rather than collected into
+ *   one array; memory stays bounded by the accumulators (fold states + write
+ *   buffer), not the batch's event count, and CPU apply time overlaps the
+ *   network read.
+ *
+ * Events past an aggregate's cutoff are dropped row-by-row (the cutoff map is
+ * per aggregate; the query's bound is the batch-wide occurred-at range).
+ * `onEvent` may return a promise ONLY when it needs to flush (the map
+ * accumulator's incremental drain) — returning undefined on the hot path
+ * keeps the loop free of per-row await overhead.
  */
-export async function loadEventsForAggregatesBulk({
+export async function streamEventsForAggregatesBulk({
   client,
   tenantId,
   aggregateIds,
+  eventTypes,
   cutoffs,
   occurredAtBounds,
+  onEvent,
 }: {
   client: ClickHouseClient;
   tenantId: string;
   aggregateIds: string[];
+  eventTypes: readonly string[];
   cutoffs: Map<string, CutoffInfo>;
   occurredAtBounds?: OccurredAtBounds;
-}): Promise<Map<string, ReplayEvent[]>> {
-  if (aggregateIds.length === 0) return new Map();
+  onEvent: (event: ReplayEvent) => void | Promise<void>;
+}): Promise<{ eventsApplied: number }> {
+  if (aggregateIds.length === 0) return { eventsApplied: 0 };
 
   const pruning = occurredAtPredicate(occurredAtBounds);
   const result = await client.query({
@@ -423,41 +456,49 @@ export async function loadEventsForAggregatesBulk({
              IdempotencyKey
       FROM event_log
       WHERE TenantId = {tenantId:String}
+        AND EventType IN ({eventTypes:Array(String)})
         AND AggregateId IN ({aggregateIds:Array(String)})
         ${pruning.sql}
       ORDER BY AggregateId, EventTimestamp ASC, EventId ASC
     `,
-    query_params: { tenantId, aggregateIds, ...pruning.params },
+    query_params: {
+      tenantId,
+      eventTypes: [...eventTypes],
+      aggregateIds,
+      ...pruning.params,
+    },
     format: "JSONEachRow",
   });
 
-  const rows = (await result.json()) as ClickHouseEventRow[];
-  const grouped = new Map<string, ReplayEvent[]>();
+  let eventsApplied = 0;
+  const stream = result.stream();
+  for await (const rows of stream) {
+    for (const streamedRow of rows as Row[]) {
+      const row = streamedRow.json() as ClickHouseEventRow;
+      const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
+      if (isRowBeyondCutoff(row, cutoffs.get(key))) continue;
 
-  for (const row of rows) {
-    const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
-    const cutoff = cutoffs.get(key);
-
-    // Skip events beyond the cutoff for this aggregate
-    if (cutoff) {
-      const eventTimestamp =
-        typeof row.EventTimestamp === "string"
-          ? parseInt(row.EventTimestamp, 10)
-          : row.EventTimestamp;
-      if (eventTimestamp > cutoff.timestamp) continue;
-      if (eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId)
-        continue;
+      const maybePromise = onEvent(rowToEvent(row));
+      if (maybePromise instanceof Promise) await maybePromise;
+      eventsApplied++;
     }
-
-    let list = grouped.get(key);
-    if (!list) {
-      list = [];
-      grouped.set(key, list);
-    }
-    list.push(rowToEvent(row));
   }
 
-  return grouped;
+  return { eventsApplied };
+}
+
+/** Whether a row falls past its aggregate's cutoff (skip it, live owns it). */
+function isRowBeyondCutoff(
+  row: ClickHouseEventRow,
+  cutoff: CutoffInfo | undefined,
+): boolean {
+  if (!cutoff) return false;
+  const eventTimestamp =
+    typeof row.EventTimestamp === "string"
+      ? parseInt(row.EventTimestamp, 10)
+      : row.EventTimestamp;
+  if (eventTimestamp > cutoff.timestamp) return true;
+  return eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId;
 }
 
 /**

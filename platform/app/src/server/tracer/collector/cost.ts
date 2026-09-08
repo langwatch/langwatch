@@ -17,6 +17,10 @@ export function estimateCost({
   cacheReadTokens,
   cacheCreationTokens,
   cacheCreation1hTokens,
+  inputAudioTokens,
+  outputAudioTokens,
+  inputImageTokens,
+  outputImageTokens,
   inputCharacters,
   audioSeconds,
 }: {
@@ -38,6 +42,23 @@ export function estimateCost({
   // at the short-lived rate, which is what the whole cost path did before this
   // bucket existed.
   cacheCreation1hTokens?: number;
+  // Audio tokens, billed several times above text tokens: OpenAI charges $32
+  // per million audio input tokens against $4 for text on gpt-realtime, and
+  // twice the audio input rate for audio output. These are SEPARATE from
+  // `inputTokens` / `outputTokens` — the caller passes the disjoint split, so
+  // each token prices once. A model that declares no audio rate prices them
+  // at its text rate, which makes a split payload cost exactly what the flat
+  // total did.
+  inputAudioTokens?: number;
+  outputAudioTokens?: number;
+  // Image tokens, billed at their own rates by the token-priced image
+  // models: OpenAI charges $30 to $40 per million output image tokens on
+  // gpt-image against $5 for text input. These are DISJOINT from
+  // `inputTokens` / `outputTokens`, the same exclusive split as the audio
+  // buckets, so each token prices once. There is no text fallback: a model
+  // with no image rate prices image tokens at zero.
+  inputImageTokens?: number;
+  outputImageTokens?: number;
   // Audio usage: characters synthesized by TTS and seconds transcribed by
   // STT, billed at their own per-character / per-second rates. Sourced
   // from the gateway's gen_ai.usage.input_chars / gen_ai.usage.audio_seconds
@@ -56,10 +77,20 @@ export function estimateCost({
     !!llmModelCost?.inputCostPerSecond ||
     !!llmModelCost?.cacheReadCostPerToken ||
     !!llmModelCost?.cacheCreationCostPerToken ||
-    !!llmModelCost?.cacheCreation1hCostPerToken;
+    !!llmModelCost?.cacheCreation1hCostPerToken ||
+    !!llmModelCost?.inputAudioCostPerToken ||
+    !!llmModelCost?.outputAudioCostPerToken ||
+    !!llmModelCost?.inputImageCostPerToken ||
+    !!llmModelCost?.outputImageCostPerToken;
   if (!hasAnyRate) return undefined;
 
   const inputRate = llmModelCost.inputCostPerToken ?? 0;
+  const outputRate = llmModelCost.outputCostPerToken ?? 0;
+  // A model with no audio rate prices audio tokens at its text rate, so a
+  // caller that starts reporting the split charges exactly what it charged
+  // when it reported one flat total.
+  const inputAudioRate = llmModelCost.inputAudioCostPerToken ?? inputRate;
+  const outputAudioRate = llmModelCost.outputAudioCostPerToken ?? outputRate;
   const cacheReadRate = llmModelCost.cacheReadCostPerToken ?? inputRate;
   const cacheCreationRate = llmModelCost.cacheCreationCostPerToken ?? inputRate;
   // A model that never had the hour-long distinction prices both buckets the
@@ -82,7 +113,11 @@ export function estimateCost({
 
   return (
     (inputTokens ?? 0) * inputRate +
-    (outputTokens ?? 0) * (llmModelCost.outputCostPerToken ?? 0) +
+    (outputTokens ?? 0) * outputRate +
+    (inputAudioTokens ?? 0) * inputAudioRate +
+    (outputAudioTokens ?? 0) * outputAudioRate +
+    (inputImageTokens ?? 0) * (llmModelCost.inputImageCostPerToken ?? 0) +
+    (outputImageTokens ?? 0) * (llmModelCost.outputImageCostPerToken ?? 0) +
     (cacheReadTokens ?? 0) * cacheReadRate +
     cacheWriteCost +
     (inputCharacters ?? 0) * (llmModelCost.inputCostPerCharacter ?? 0) +

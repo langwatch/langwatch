@@ -68,7 +68,7 @@ vi.mock("~/hooks/useLocalStorageSelectedDataSetId", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       dataset: { getAll: { invalidate: vi.fn() } },
       datasetRecord: { getAll: { invalidate: vi.fn() } },
     }),

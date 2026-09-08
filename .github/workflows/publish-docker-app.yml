@@ -10,6 +10,15 @@ on:
         required: false
         default: 'next'
 
+# A publish run drains — the reasoning is spelled out in prerelease-charts-oci.
+# Re-running a release (or dispatching the same tag twice) otherwise has two
+# runs pushing one image tag and signing whichever digest won, and a cancel
+# between `docker push` and `cosign sign` leaves an unsigned image in the
+# registry that reports "cancelled" rather than failed, so nothing retries it.
+concurrency:
+  group: publish-docker-app-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   extract-version:
     runs-on: ubuntu-latest

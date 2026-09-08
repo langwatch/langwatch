@@ -31,10 +31,23 @@ Feature: Process-manager inbox and outbox rows are reaped on a schedule
   # layer against a double side effect even if a marker were somehow dropped
   # early.
   #
-  # EXPLICIT NON-GOAL: ProcessManagerInstance is not swept. It is bounded by
-  # entity population rather than by traffic, and deleting an instance row
-  # resets its revision and state, which is a correctness hazard rather than a
-  # cleanup. It stays out of scope until something makes it grow.
+  # STILL A NON-GOAL: ProcessManagerInstance is not swept. Deleting an
+  # instance row resets its revision and state, which is a correctness hazard
+  # rather than a cleanup.
+  #
+  # This exemption was granted on the premise that the table is bounded by
+  # entity population rather than by traffic, and it stated its own exit
+  # condition: it holds "until something makes it grow". The gateway spend
+  # pipeline was that something. Its aggregate is one per gateway REQUEST, so
+  # every process manager mounted on it was keyed per request, and three of
+  # them wrote a permanent row per LLM call into the one table with no
+  # retention.
+  #
+  # The answer was to stop writing the rows rather than to start deleting
+  # them: an evolution that keeps its initial state and arms no wake now
+  # commits its intents alone (see transient-process-instances.feature). That
+  # restores the premise instead of working around it, which is why this stays
+  # a non-goal rather than becoming a fourth family.
 
   Rule: The sweep deletes completed bookkeeping and nothing else
 

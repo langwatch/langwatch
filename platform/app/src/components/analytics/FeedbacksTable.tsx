@@ -59,7 +59,7 @@ export const FeedbacksTable = () => {
               <Table.Row
                 key={index}
                 onClick={() => {
-                  openDrawer("traceDetails", {
+                  openDrawer("traceV2Details", {
                     traceId: event.trace_id,
                   });
                 }}
@@ -85,7 +85,7 @@ export const FeedbacksTable = () => {
                     {event.trace_id && (
                       <Link
                         onClick={() => {
-                          openDrawer("traceDetails", {
+                          openDrawer("traceV2Details", {
                             traceId: event.trace_id,
                           });
                         }}

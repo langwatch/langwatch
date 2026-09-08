@@ -315,8 +315,8 @@ describe.skipIf(!hasCredentialsSecret)(
             referenceId: referenceId(),
           };
 
-          const result = await prefetchScenarioData(
-            {
+          const result = await prefetchScenarioData({
+            context: {
               projectId,
               scenarioId,
               setId: `set_${ns}_${label}`,
@@ -324,7 +324,7 @@ describe.skipIf(!hasCredentialsSecret)(
             },
             target,
             deps,
-          );
+          });
 
           expect(
             result.success,

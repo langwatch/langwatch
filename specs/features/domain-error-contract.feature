@@ -83,6 +83,19 @@ Feature: Handled errors — the handled-error boundary
     And the failing fields ride in its meta, not a separate zodError field
     So clients read validation detail exactly where they read every other fact
 
+  # The repo runs two zod majors while schemas migrate to `zod/v4` a leaf at a
+  # time, and each major ships its own `ZodError` class. A boundary that asks
+  # `instanceof` recognises only the major it imported, so moving one schema
+  # turned its rejections into unnamed 500s — the customer lost the reason
+  # their input was refused, and the platform wore the 5xx.
+  @unit @bdd @domain-errors
+  Scenario: Validation failures travel that channel whichever zod threw them
+    Given a schema authored against a different zod major than the boundary imports
+    When its rejection reaches that boundary
+    Then it is still a handled error of code "validation_error"
+    And the failing fields still ride in its meta
+    So which zod a schema was written against is invisible to the caller
+
   # --------------------------------------------------------------------------
   # Request validation — the REST boundary's own schema failures
   #

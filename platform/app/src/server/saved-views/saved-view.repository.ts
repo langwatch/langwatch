@@ -1,4 +1,8 @@
-import type { Prisma, PrismaClient, SavedView } from "@prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  SavedView,
+} from "~/generated/prisma/client";
 
 /**
  * Input types for saved view operations.
@@ -14,10 +18,9 @@ export type CreateSavedViewInput = {
   order: number;
   /**
    * Storage shape discriminator. Omit to keep the SavedView default
-   * ("v1-traces-filter"), which is what the legacy /messages page
-   * writes. The new traces v2 lens system sends "v2-traces-lens" so
-   * the two clients can share this table without seeing each other's
-   * rows.
+   * ("v1-traces-filter"), which is what the v1 filter bar writes.
+   * The traces v2 lens system sends "v2-traces-lens" so the two
+   * clients can share this table without seeing each other's rows.
    */
   kind?: string;
 };

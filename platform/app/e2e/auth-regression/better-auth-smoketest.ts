@@ -27,8 +27,9 @@
  *     npx tsx scripts/better-auth-smoketest.ts
  */
 
-import { PrismaClient } from "@prisma/client";
 import { hash } from "bcrypt";
+import { PrismaClient } from "../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../src/server/prismaPgAdapter";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 const check = (label: string, condition: boolean, detail?: string): void => {
@@ -67,7 +68,9 @@ const parseSetCookie = (
 async function main() {
   assertLocalhostDatabaseUrl();
 
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
 
   // Clean up any prior smoketest runs so the script is idempotent.
   await prisma.session.deleteMany({
@@ -104,6 +107,10 @@ async function main() {
       userId: SMOKETEST_USER_ID,
       type: "credential",
       provider: "credential",
+      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+      // credential provider's issuer is `local:credential`, not
+      // `local:oauth:credential`. Without it sign-in cannot find this row.
+      issuer: "local:credential",
       providerAccountId: SMOKETEST_USER_ID,
       password: passwordHash,
     },
@@ -123,6 +130,7 @@ async function main() {
       userId: DEACTIVATED_USER_ID,
       type: "credential",
       provider: "credential",
+      issuer: "local:credential",
       providerAccountId: DEACTIVATED_USER_ID,
       password: passwordHash,
     },
@@ -440,6 +448,7 @@ async function main() {
       userId: "smoketest_legacy",
       type: "credential",
       provider: "credential",
+      issuer: "local:credential",
       providerAccountId: "smoketest_legacy",
       password: legacyHash,
     },
@@ -513,6 +522,7 @@ async function main() {
         userId: created.id,
         type: "credential",
         provider: "credential",
+        issuer: "local:credential",
         providerAccountId: created.id,
         password: trpcHashedPassword,
       },

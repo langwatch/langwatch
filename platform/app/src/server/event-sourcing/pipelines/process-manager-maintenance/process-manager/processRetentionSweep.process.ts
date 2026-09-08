@@ -27,6 +27,24 @@ export const PROCESS_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
  * Dispatched outbox rows are completed work. 24h is long enough that an
  * operator debugging this morning's incident still finds the rows, and short
  * enough that the steady-state table is a day of traffic rather than a year.
+ *
+ * LOAD-BEARING BEYOND DEBUGGABILITY. A TRANSIENT evolution writes no inbox
+ * marker, so for those processes the dispatched row IS the idempotency
+ * record and this window is how long a redelivery stays suppressed. That is
+ * a weaker guarantee than the inbox below gives, and knowingly so: this
+ * number was picked for table size, it is SHORTER than the ~25h redelivery
+ * horizon that number is reasoned against, and raising it would give back
+ * the row growth the transient path exists to remove.
+ *
+ * What makes it safe is a precondition on `.transient()` rather than this
+ * constant: a transient process's intent handlers must be idempotent at
+ * their own sink, so a redelivery past this window costs a duplicate
+ * DISPATCH and never a duplicate EFFECT. Both current transient processes
+ * satisfy it — gateway debits collapse on
+ * `(TenantId, BudgetId, GatewayRequestId)` in the ledger, and webhook
+ * delivery claims its idempotency key before sending. Before making a
+ * process transient, confirm its sinks do the same; see
+ * specs/event-sourcing/transient-process-instances.feature.
  */
 export const DISPATCHED_OUTBOX_RETENTION_MS = 24 * 60 * 60 * 1000;
 

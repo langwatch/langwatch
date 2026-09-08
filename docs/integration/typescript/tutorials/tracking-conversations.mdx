@@ -72,7 +72,7 @@ app.post("/chat", async (req, res) => {
     const history = await getConversationHistory(threadId);
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1",
+      model: "gpt-5-mini",
       messages: [...history, { role: "user", content: message }],
     });
 
@@ -90,6 +90,6 @@ The `threadId` is typically the conversation or session ID from your application
 Once traces share a `thread_id`, you can:
 
 - **View the full conversation** in the LangWatch dashboard by clicking on any trace in the thread
-- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/by-thread))
+- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/setup-monitors))
 - **Build datasets from threads** for testing multi-turn scenarios (see [Dataset Threads](/datasets/dataset-threads))
 - **Filter and search** traces by conversation in the messages view

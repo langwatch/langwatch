@@ -1,9 +1,17 @@
+import { builtinRolePermissions } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
+import {
+  categorizablePermissions,
+  categoryPermissions,
+  PERMISSION_CATEGORIES,
+} from "../../../server/api-key/permission-categories";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
   bindingsToSelections,
+  clampSelectionsToAvailability,
   computeBindings,
+  getUserPermissionsAcrossScopes,
   getUserPermissionsAtScope,
   permissionLabelToRole,
   permissionsSummary,
@@ -301,7 +309,7 @@ describe("permissionsSummary()", () => {
         permissionsSummary({
           permissionMode: "all",
           grantedCount: 0,
-          totalCount: 14,
+          totalCount: PERMISSION_CATEGORIES.length,
         }),
       ).toBe("All");
     });
@@ -314,9 +322,11 @@ describe("permissionsSummary()", () => {
         permissionsSummary({
           permissionMode: "restricted",
           grantedCount: 3,
-          totalCount: 14,
+          totalCount: PERMISSION_CATEGORIES.length,
         }),
-      ).toBe("3 of 14 permissions");
+        // The denominator is the number of categories a key can be given,
+        // read from the registry so it cannot drift as categories are added.
+      ).toBe(`3 of ${PERMISSION_CATEGORIES.length} permissions`);
     });
   });
 });
@@ -572,7 +582,7 @@ describe("getUserPermissionsAtScope()", () => {
   const orgProjects = [{ id: "proj-1", teamId: "team-1" }];
 
   describe("when isServiceKey is true", () => {
-    it("returns ADMIN permissions regardless of bindings", () => {
+    it("returns everything grantable regardless of bindings", () => {
       const result = getUserPermissionsAtScope({
         myBindings: undefined,
         scopeType: "PROJECT",
@@ -582,7 +592,9 @@ describe("getUserPermissionsAtScope()", () => {
         isServiceKey: true,
         getTeamRolePermissions: mockGetPerms,
       });
-      expect(result).toEqual(["project:manage", "project:view"]);
+      // The team-role bags carry no organization, gateway, governance or
+      // playground permissions, so they understate a service key's ceiling.
+      expect(result).toEqual(categorizablePermissions());
     });
   });
 
@@ -635,8 +647,8 @@ describe("getUserPermissionsAtScope()", () => {
     });
   });
 
-  describe("when org-level binding covers a project scope", () => {
-    it("falls back to the org binding", () => {
+  describe("when an org-level ADMIN binding covers a project scope", () => {
+    it("returns everything grantable, not the team-role bag", () => {
       const result = getUserPermissionsAtScope({
         myBindings: [
           { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
@@ -648,7 +660,248 @@ describe("getUserPermissionsAtScope()", () => {
         isServiceKey: false,
         getTeamRolePermissions: mockGetPerms,
       });
-      expect(result).toEqual(["project:manage", "project:view"]);
+      // The resolver short-circuits an ORGANIZATION-scoped ADMIN binding to
+      // full access, so the ceiling shown here has to match it.
+      expect(result).toEqual(categorizablePermissions());
+    });
+  });
+
+  describe("when an org-level MEMBER binding covers a project scope", () => {
+    it("returns nothing: the whole org-member bag is org-exclusive", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "PROJECT",
+        scopeId: "proj-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      // The org-member bag (organization:view, aiTools:view) targets
+      // org-tier-only resources, and the mint strips org-exclusive
+      // permissions from any selection with no ORGANIZATION binding
+      // (`filterToGrantable`). Offering them on a PROJECT chip made the
+      // approve request carry only permissions the server then dropped,
+      // failing with "Select at least one permission".
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when an org-level MEMBER binding covers a team scope", () => {
+    it("returns nothing: no org-exclusive permission is grantable there", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "TEAM",
+        scopeId: "team-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when an org-level MEMBER binding is checked at org scope", () => {
+    it("returns the org-member bag", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([...builtinRolePermissions("org-member")]);
+    });
+  });
+
+  describe("when an org-level VIEWER binding is checked at org scope", () => {
+    it("returns the org-member bag, mirroring the resolver's non-ADMIN branch", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "VIEWER" },
+        ],
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([...builtinRolePermissions("org-member")]);
+    });
+  });
+
+  describe("when an org-level CUSTOM binding is checked at org scope", () => {
+    it("keeps the injected role bag (custom roles resolve their own permissions)", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "CUSTOM" },
+        ],
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual(["project:view"]);
+    });
+  });
+});
+
+describe("getUserPermissionsAcrossScopes()", () => {
+  const mockGetPerms = (role: string) => {
+    if (role === "ADMIN") return ["project:manage", "project:view"];
+    if (role === "MEMBER") return ["project:view", "project:update"];
+    return ["project:view"];
+  };
+
+  const orgProjects = [
+    { id: "proj-1", teamId: "team-1" },
+    { id: "proj-2", teamId: "team-2" },
+  ];
+
+  describe("when the caller holds different roles on the selected scopes", () => {
+    it("offers only what every scope grants", () => {
+      const result = getUserPermissionsAcrossScopes({
+        myBindings: [
+          { scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" },
+          { scopeType: "TEAM", scopeId: "team-2", role: "VIEWER" },
+        ],
+        scopes: [
+          { scopeType: "TEAM", scopeId: "team-1" },
+          { scopeType: "TEAM", scopeId: "team-2" },
+        ],
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      // One permission list serves every binding, and the VIEWER team would
+      // refuse project:manage at save time.
+      expect(result).toEqual(["project:view"]);
+    });
+  });
+
+  describe("when a selected scope carries nothing", () => {
+    it("offers nothing at all", () => {
+      const result = getUserPermissionsAcrossScopes({
+        myBindings: [{ scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" }],
+        scopes: [
+          { scopeType: "TEAM", scopeId: "team-1" },
+          { scopeType: "TEAM", scopeId: "team-unbound" },
+        ],
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when a single scope is selected", () => {
+    it("matches the single-scope ceiling", () => {
+      const args = {
+        myBindings: [{ scopeType: "TEAM", scopeId: "team-1", role: "ADMIN" }],
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      };
+      expect(
+        getUserPermissionsAcrossScopes({
+          ...args,
+          scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
+        }),
+      ).toEqual(
+        getUserPermissionsAtScope({
+          ...args,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+        }),
+      );
+    });
+  });
+});
+
+describe("clampSelectionsToAvailability()", () => {
+  const tracesRead = categoryPermissions({ key: "traces", level: "read" });
+  const tracesWrite = categoryPermissions({ key: "traces", level: "write" });
+
+  describe("when the ceiling still covers the chosen level", () => {
+    it("keeps the selection untouched", () => {
+      const result = clampSelectionsToAvailability({
+        selections: { traces: "write" },
+        userPermissions: tracesWrite,
+      });
+      expect(result).toEqual({ traces: "write" });
+    });
+  });
+
+  describe("when the ceiling shrank to read only", () => {
+    /** @scenario Customized permissions follow the scopes that are selected */
+    it("falls back to read instead of sending a refused write", () => {
+      const result = clampSelectionsToAvailability({
+        selections: { traces: "write" },
+        userPermissions: tracesRead,
+      });
+      expect(result).toEqual({ traces: "read" });
+    });
+  });
+
+  describe("when the ceiling no longer covers the category at all", () => {
+    it("drops the selection to none", () => {
+      expect(
+        clampSelectionsToAvailability({
+          selections: { traces: "write" },
+          userPermissions: [],
+        }),
+      ).toEqual({ traces: "none" });
+      expect(
+        clampSelectionsToAvailability({
+          selections: { traces: "read" },
+          userPermissions: [],
+        }),
+      ).toEqual({ traces: "none" });
+    });
+  });
+
+  describe("when a selection names a category that does not exist", () => {
+    it("drops it rather than passing it through", () => {
+      const result = clampSelectionsToAvailability({
+        selections: { "not-a-category": "write" },
+        userPermissions: categorizablePermissions(),
+      });
+      expect(result).toEqual({ "not-a-category": "none" });
+    });
+  });
+
+  describe("when the caller holds everything", () => {
+    it("leaves every category at the level it was set to", () => {
+      const selections = Object.fromEntries(
+        PERMISSION_CATEGORIES.map((category) => [
+          category.key,
+          category.accessLevels.includes("write")
+            ? ("write" as const)
+            : ("read" as const),
+        ]),
+      );
+      expect(
+        clampSelectionsToAvailability({
+          selections,
+          userPermissions: categorizablePermissions(),
+        }),
+      ).toEqual(selections);
     });
   });
 });

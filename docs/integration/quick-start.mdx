@@ -6,12 +6,10 @@ mode: "wide"
 import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
-LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved. We've made getting started super smooth.
-
-Let's get cracking.
+LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved.
 
 <Steps>
   <Step title="Create your LangWatch account">
@@ -80,7 +78,7 @@ go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
   </Step>
 
   <Step title="Add LangWatch to your project">
-    Time to connect LangWatch. Initialize the SDK within your project. Here's how you can set it up:
+    Initialize the SDK within your project:
 
     <CodeGroup>
 ```python Python
@@ -184,7 +182,7 @@ func main() {
   </Step>
 
   <Step title="Start observing!">
-    You're all set! Jump into your LangWatch dashboard to see your data flowing in. You'll find **Traces** (individual AI tasks) and their detailed **Spans** (the steps within), all organized into **Threads** (complete user sessions). Start exploring and use **User IDs** or custom **Labels** to dive deeper!
+    Open your LangWatch dashboard to see your data. You'll find **Traces** (individual AI tasks) and their detailed **Spans** (the steps within), all organized into **Threads** (complete user sessions). Add **User IDs** or custom **Labels** to filter and group them.
 
     <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
   </Step>

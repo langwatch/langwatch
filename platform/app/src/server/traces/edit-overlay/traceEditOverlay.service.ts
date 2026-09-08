@@ -1,5 +1,5 @@
 import { ValidationError } from "@langwatch/handled-error";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   type TraceEditOverlayAuthor,
   TraceEditOverlayRepository,

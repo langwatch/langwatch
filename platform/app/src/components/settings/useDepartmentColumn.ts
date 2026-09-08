@@ -1,4 +1,5 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { api, type RouterOutputs } from "~/utils/api";
 
 export type DepartmentOption = RouterOutputs["departments"]["list"][number];
@@ -13,6 +14,9 @@ export type DepartmentOption = RouterOutputs["departments"]["list"][number];
  */
 export function useDepartmentColumn(organizationId: string) {
   const { enabled: ffOn } = useFeatureFlag("release_ui_ai_governance_enabled", {
+    // Members and departments are organization settings. No project takes
+    // part in the read.
+    projectId: NOT_TARGETED,
     organizationId,
     enabled: !!organizationId,
   });

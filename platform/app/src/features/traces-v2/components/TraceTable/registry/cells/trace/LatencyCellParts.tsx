@@ -1,4 +1,5 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
+import { MeterBar } from "~/components/ui/MeterBar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatDuration } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
@@ -25,38 +26,18 @@ function LatencyBar({
   width,
   height,
 }: LatencyBarProps) {
-  if (!hasStats || valueMs <= 0) {
-    return (
-      <Box
-        width={width}
-        height={height}
-        bg="border.subtle"
-        borderRadius="full"
-      />
-    );
-  }
-  const ratio = valueMs / p95Ms;
-  const isOverP95 = ratio >= 1;
-  const fillRatio = Math.min(ratio, 1);
+  const ratio = hasStats && valueMs > 0 ? valueMs / p95Ms : null;
   return (
-    <Box
+    // Right-anchored fill, because latency columns are right-aligned so the bar
+    // visually connects to the value above it rather than floating off to
+    // the left side of the cell.
+    <MeterBar
+      fillRatio={ratio}
       width={width}
       height={height}
-      bg="border.subtle"
-      borderRadius="full"
-      display="flex"
-      justifyContent="flex-end"
-    >
-      {/* Right-anchored fill — latency columns are right-aligned, so
-          the bar visually connects to the value above it rather than
-          floating off to the left side of the cell. */}
-      <Box
-        height="full"
-        width={`${fillRatio * 100}%`}
-        bg={isOverP95 ? "red.fg" : "blue.fg"}
-        borderRadius="full"
-      />
-    </Box>
+      fillColor={ratio !== null && ratio >= 1 ? "red.fg" : "blue.fg"}
+      align="end"
+    />
   );
 }
 

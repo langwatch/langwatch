@@ -14,12 +14,11 @@ import {
   type WebhookEndpointView,
 } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
-import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";

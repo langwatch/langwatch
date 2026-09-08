@@ -112,7 +112,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       agents: { getById: { fetch: vi.fn() } },
       prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
       evaluators: {

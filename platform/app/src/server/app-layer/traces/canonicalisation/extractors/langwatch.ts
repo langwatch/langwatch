@@ -498,7 +498,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Evaluation Events (langwatch.evaluation.custom) → GenAI semconv
     // SDK sends span events with name "langwatch.evaluation.custom".
-    // The reactor reads these directly from the OTLP span events to sync
+    // The subscriber reads these directly from the OTLP span events to sync
     // to evaluation_runs. Here we only map to GenAI semconv span attributes.
     // ─────────────────────────────────────────────────────────────────────────
     for (const event of ctx.bag.events.all()) {

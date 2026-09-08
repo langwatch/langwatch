@@ -463,7 +463,11 @@ export const TreeRow = memo(function TreeRow({
               <Text
                 textStyle="xs"
                 color={isError ? "red.fg" : "fg"}
-                textDecoration={isDraftDeleted ? "line-through" : undefined}
+                textDecoration={
+                  isDraftDeleted || isDeletedByCorrection
+                    ? "line-through"
+                    : undefined
+                }
                 truncate
                 minWidth={0}
                 lineHeight={1.2}
@@ -566,6 +570,14 @@ export const TreeRow = memo(function TreeRow({
                   truncate
                   maxWidth="100%"
                   bg="bg.subtle"
+                  // The pill names the model or tool the row ran. On a row the
+                  // correction removes it goes with the row, so it is struck
+                  // through with the name rather than reading as a live one.
+                  textDecoration={
+                    isDraftDeleted || isDeletedByCorrection
+                      ? "line-through"
+                      : undefined
+                  }
                 >
                   {isLlm ? span.model! : span.toolName}
                 </Text>

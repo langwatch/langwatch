@@ -24,7 +24,7 @@ import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/p
 import { ProcessRuntime } from "./process-manager/processRuntime";
 import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
 import type { ProcessStore } from "./process-manager/stores/processStore.types";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
+import { createBillingMeterDispatchSubscriber } from "./projections/global/billingMeterDispatch.subscriber";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
@@ -133,9 +133,9 @@ export class EventSourcing {
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
-      this.projectionRegistry.registerMapReactor(
+      this.projectionRegistry.registerMapSubscriber(
         "orgBillableEventsMeter",
-        createBillingMeterDispatchReactor({
+        createBillingMeterDispatchSubscriber({
           getDispatch: () => {
             const pipeline = this.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
             return (data) => pipeline.commands.reportUsageForMonth.send(data);
@@ -349,12 +349,21 @@ export class EventSourcing {
         logger.error({ pipeline: name, error }, "Failed to close pipeline");
       }
     }
-    if (this.projectionRegistry.isInitialized) {
-      await this.projectionRegistry.close();
-    }
     // Close the global queue after all consumers are shut down
     if (this._globalQueue) {
       await this._globalQueue.close();
+    }
+    // AFTER the queue, never before. Closing the registry only releases its
+    // router, and every dispatch that arrives afterwards drops its events with
+    // nothing above it to retry them — `eventSourcingService` catches the
+    // dispatch failure and carries on. While the queue is still draining it is
+    // very much still storing events, so a registry closed first is a registry
+    // discarding real work for the whole length of the drain: all 55 dropped
+    // batches in the 48h to 2026-08-17 landed after their pod's SIGTERM, the
+    // latest 26s into it. Ordering costs nothing here — `QueueManager.close()`
+    // is a no-op for the globally-owned queue.
+    if (this.projectionRegistry.isInitialized) {
+      await this.projectionRegistry.close();
     }
     this.pipelines.clear();
   }
@@ -607,23 +616,36 @@ export class EventSourcing {
           return true;
         });
         if (survivors.length === 0) return;
-        const first = this.lookupEntry(survivors[0]!);
-        const resolved = survivors.map((payload) => this.lookupEntry(payload));
-        const homogeneous =
-          !!first?.entry.processBatch &&
-          resolved.every((r) => r?.entry === first.entry);
-        if (!homogeneous) {
-          for (const [index, result] of resolved.entries()) {
-            if (!result) {
-              this.rejectUnroutableJob(survivors[index]!, queueName);
-            }
+
+        // Reject unroutable payloads UP FRONT so everything below works with a
+        // fully-resolved list. `rejectUnroutableJob` returns `never`, so this
+        // narrows `routed` to non-null for the compiler rather than for the
+        // reader only — which is what lets the rest of this function drop its
+        // non-null assertions (#6699). Behaviour is unchanged: a null entry
+        // could only ever reach the heterogeneous branch, which rejected it
+        // there anyway.
+        const routed = survivors.map((payload) => {
+          const result = this.lookupEntry(payload);
+          if (!result) this.rejectUnroutableJob(payload, queueName);
+          return result;
+        });
+
+        // A coalesced batch is always one group → one registry entry. Guard
+        // against a mixed batch (should never happen — the GroupQueue only
+        // coalesces same-group jobs — but a stray payload must never be
+        // misrouted to the wrong handler) and fall back to per-item processing.
+        const firstEntry = routed[0]?.entry;
+        const batchHandler = firstEntry?.processBatch;
+        if (!batchHandler || !routed.every((r) => r.entry === firstEntry)) {
+          for (const result of routed) {
             await result.entry.process(result.clean, delivery);
           }
           return;
         }
+
         // Forward the delivery — see the `process` wrapper above (#6578).
-        await first.entry.processBatch!(
-          resolved.map((r) => r!.clean),
+        await batchHandler(
+          routed.map((r) => r.clean),
           delivery,
         );
       },
@@ -737,22 +759,24 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const foldReactorList = Array.from(definition.foldReactors.values()).map(
-    (entry) => ({
-      foldName: entry.projectionName as string,
-      definition: entry.definition,
-    }),
-  );
+  const foldSubscriberList = Array.from(
+    definition.foldSubscribers.values(),
+  ).map((entry) => ({
+    foldName: entry.projectionName as string,
+    definition: entry.definition,
+  }));
 
-  const mapReactorList = Array.from(definition.mapReactors.values()).map(
+  const mapSubscriberList = Array.from(definition.mapSubscribers.values()).map(
     (entry) => ({
       mapName: entry.projectionName as string,
       definition: entry.definition,
     }),
   );
 
-  const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
-  const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;
+  const foldSubscribers =
+    foldSubscriberList.length > 0 ? foldSubscriberList : undefined;
+  const mapSubscribers =
+    mapSubscriberList.length > 0 ? mapSubscriberList : undefined;
   const subscribers =
     definition.eventSubscribers.size > 0
       ? Array.from(definition.eventSubscribers.values())
@@ -764,8 +788,8 @@ function buildServiceOptions<
       stateProjections.length > 0 ? stateProjections : undefined,
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
-    reactors,
-    mapReactors,
+    foldSubscribers,
+    mapSubscribers,
     subscribers,
   };
 }

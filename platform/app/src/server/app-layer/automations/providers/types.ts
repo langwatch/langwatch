@@ -1,5 +1,5 @@
 import type { SharedDef } from "@langwatch/automations/providers/types";
-import type { TriggerAction } from "@prisma/client";
+import type { TriggerAction } from "~/generated/prisma/client";
 
 /**
  * Server-side halves of the automation provider system. A ServerDef owns the

@@ -213,7 +213,7 @@ export interface SetupObservabilityOptions {
    * Use this when you need full control over batching, filtering, or
    * custom processing logic.
    *
-   * @example [new BatchLogRecordProcessor(exporter, { maxExportBatchSize: 100 })]
+   * @example [new BatchLogRecordProcessor({ exporter, maxExportBatchSize: 100 })]
    */
   logRecordProcessors?: LogRecordProcessor[];
 
@@ -383,12 +383,38 @@ export interface SetupObservabilityOptions {
      * drains), `SIGINT` (Ctrl+C), and `SIGTERM` (external kill / Docker stop) to flush
      * pending traces before the process exits.
      *
+     * The SDK never terminates your process. Node runs every listener registered for a
+     * signal, so once the flush is done the SDK stands aside and lets your own shutdown
+     * logic decide when the process ends. The one exception keeps one-shot scripts
+     * working: if the SDK's handler turns out to be the only listener for that signal,
+     * it removes itself and re-raises the signal, so the process ends on the signal
+     * exactly as it would have if the SDK were not installed.
+     *
      * Note: `process.exit()` calls (e.g. from test runners like vitest) bypass these
      * handlers. In those environments, call `shutdown()` explicitly in your teardown.
      *
      * @default false
      */
     disableAutoShutdown?: boolean;
+
+    /**
+     * Exit the process with status 0 as soon as the automatic shutdown has flushed.
+     *
+     * WARNING: this terminates your application from inside the observability SDK. Any
+     * other `SIGINT` / `SIGTERM` listener that has not finished — a queue drain, in-flight
+     * database writes, connection teardown — is cut off mid-flight, and the process
+     * reports success even though it was signalled. This is what the SDK used to do
+     * unconditionally; the option exists only so an application that depended on it can
+     * keep the old behaviour while it moves the exit into its own signal handler, where
+     * it belongs.
+     *
+     * Leave this off unless your process now fails to exit on a signal, which happens
+     * only when you register a signal handler of your own that never terminates the
+     * process. Ignored when `disableAutoShutdown` is set.
+     *
+     * @default false
+     */
+    UNSAFE_exitProcessAfterAutoShutdown?: boolean;
   };
 }
 

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { TtlCache } from "~/server/utils/ttlCache";

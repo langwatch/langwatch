@@ -6,14 +6,15 @@
  * restricted reviewer the structural edits and nothing else, while a reviewer
  * the policy allows gets the whole thing.
  */
-import type { Project } from "@prisma/client";
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";

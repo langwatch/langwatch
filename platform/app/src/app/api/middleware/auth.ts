@@ -1,7 +1,7 @@
-import type { Project } from "@prisma/client";
+import type { AuthzPermission } from "@langwatch/authz";
 import type { MiddlewareHandler } from "hono";
 import type { ApiErrorEnvelope } from "~/app/api/shared/canonical-error";
-import type { Permission } from "~/server/api/rbac";
+import type { Project } from "~/generated/prisma/client";
 import {
   requireApiKeyPermission as createRequireApiKeyPermission,
   createUnifiedAuthMiddleware,
@@ -53,8 +53,8 @@ export const canonicalAuthMiddleware: MiddlewareHandler =
  * service/user API keys are checked against their role bindings.
  */
 export function requirePermission(
-  permission: Permission,
+  permission: AuthzPermission,
   errorEnvelope: ApiErrorEnvelope = "legacy",
 ): MiddlewareHandler {
-  return createRequireApiKeyPermission({ prisma, permission, errorEnvelope });
+  return createRequireApiKeyPermission({ permission, errorEnvelope });
 }

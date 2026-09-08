@@ -81,6 +81,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						end(spanCtx, domain.AITraceParams{
 							ProjectID:          call.Bundle.ProjectID,
 							Model:              call.Request.Resolved.ModelID,
+							RequestedModel:     rewrittenFrom(call.Request),
 							ProviderID:         call.Request.Resolved.ProviderID,
 							InternalModel:      internalModel,
 							InternalProviderID: internalProviderID,
@@ -102,6 +103,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					end(spanCtx, domain.AITraceParams{
 						ProjectID:          call.Bundle.ProjectID,
 						Model:              call.Request.Resolved.ModelID,
+						RequestedModel:     rewrittenFrom(call.Request),
 						ProviderID:         call.Request.Resolved.ProviderID,
 						InternalModel:      internalModel,
 						InternalProviderID: internalProviderID,
@@ -137,6 +139,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						end(spanCtx, domain.AITraceParams{
 							ProjectID:          call.Bundle.ProjectID,
 							Model:              call.Request.Resolved.ModelID,
+							RequestedModel:     rewrittenFrom(call.Request),
 							ProviderID:         call.Request.Resolved.ProviderID,
 							InternalModel:      internalModel,
 							InternalProviderID: internalProviderID,
@@ -176,6 +179,30 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 // internalTraceMetadata selects model metadata that is safe for LangWatch's
 // operational span. A raw request model is arbitrary customer input unless it
 // exactly names a control-plane alias or a finite allowed-model entry.
+// rewrittenFrom reports the name the client sent when a routing policy sent
+// the request somewhere else, and "" when the caller got what they asked for.
+// The trace records the model that was dispatched, so this is the only place
+// the caller's own name survives.
+func rewrittenFrom(req *domain.Request) string {
+	if req == nil || req.Resolved == nil || req.Model == "" {
+		return ""
+	}
+	// A provider prefix has several accepted spellings, and the resolver
+	// normalises them, so comparing against the canonical form alone reads
+	// "azure_openai/gpt-5-mini" as a rewrite of itself. Split the sent name
+	// the same way the resolver did and compare what each side means.
+	if provider, model, ok := domain.SplitModelSpelling(req.Model); ok {
+		if provider == req.Resolved.ProviderID && model == req.Resolved.ModelID {
+			return ""
+		}
+		return req.Model
+	}
+	if req.Model == req.Resolved.ModelID {
+		return ""
+	}
+	return req.Model
+}
+
 func internalTraceMetadata(config domain.BundleConfig, rawModel string) (string, domain.ProviderID) {
 	if alias, ok := config.ModelAliases[rawModel]; ok {
 		return alias.Model, alias.ProviderID
@@ -294,6 +321,7 @@ func (w *traceStreamWrapper) onClose() {
 			w.end(ctx, domain.AITraceParams{
 				ProjectID:          w.bundle.ProjectID,
 				Model:              w.req.Resolved.ModelID,
+				RequestedModel:     rewrittenFrom(w.req),
 				ProviderID:         w.req.Resolved.ProviderID,
 				InternalModel:      w.internalModel,
 				InternalProviderID: w.internalProviderID,

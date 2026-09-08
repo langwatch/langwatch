@@ -2,8 +2,8 @@
  * Shared types and helpers for the subscription page components.
  */
 
-import { Currency as PrismaCurrency } from "@prisma/client";
 import { z } from "zod";
+import { Currency as PrismaCurrency } from "~/generated/prisma/client";
 import type { MemberType } from "~/server/license-enforcement/member-classification";
 import type { Currency } from "./billing-plans";
 

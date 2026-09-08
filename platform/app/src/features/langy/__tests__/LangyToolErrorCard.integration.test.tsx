@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { describe, expect, it } from "vitest";
 
@@ -169,6 +169,49 @@ describe("Langy tool failure card", () => {
     expect(failure?.presentation.detail).toContain("connection to server");
     // It claims no code it was never given.
     expect(failure?.presentation.code).toBeUndefined();
+  });
+
+  // A count that hit a malformed response printed a Python traceback, and the
+  // card lifted "json.decoder.JSONDecodeError: ..." out of it and drew it as the
+  // body. The engine's own words are never card copy.
+  describe("given a Python traceback and no structured failure", () => {
+    const TRACEBACK = [
+      "Traceback (most recent call last):",
+      '  File "/app/langwatch_nlp/count.py", line 42, in count_rows',
+      "    payload = json.loads(response.text)",
+      "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    ].join("\n");
+
+    /** @scenario "The traceback stays reachable behind the disclosure" */
+    it("keeps the traceback out of the card body", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={message(TRACEBACK)} />
+        </ChakraProvider>,
+      );
+
+      const alert = screen.getByRole("alert");
+      expect(alert.textContent).toContain("This step couldn't be completed.");
+      expect(alert.textContent).not.toContain("JSONDecodeError");
+      expect(alert.textContent).not.toContain(
+        "Traceback (most recent call last)",
+      );
+    });
+
+    /** @scenario "The traceback stays reachable behind the disclosure" */
+    it("reveals the whole traceback behind the disclosure", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={message(TRACEBACK)} />
+        </ChakraProvider>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /show details/i }));
+
+      const alert = screen.getByRole("alert");
+      expect(alert.textContent).toContain("JSONDecodeError");
+      expect(alert.textContent).toContain("Traceback (most recent call last)");
+    });
   });
 
   it("renders a failure's code so it can be quoted", () => {

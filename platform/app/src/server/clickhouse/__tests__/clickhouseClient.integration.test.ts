@@ -14,7 +14,10 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
-import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
+import {
+  privateRouteOrgId,
+  startTestClickHouseEndpoints,
+} from "~/test-utils/clickhouseTestEndpoints";
 
 const TEST_TABLE = "routing_test";
 
@@ -22,8 +25,13 @@ let sharedClient: ClickHouseClient;
 let privateClient: ClickHouseClient;
 
 // The org IDs we'll use — set the env var BEFORE importing clickhouseClient
-const PRIVATE_ORG_ID = `test-private-org-${nanoid(6)}`;
-const SHARED_ORG_ID = `test-shared-org-${nanoid(6)}`;
+const PRIVATE_ORG_ID = privateRouteOrgId("test-private-org");
+const SHARED_ORG_ID = privateRouteOrgId("test-shared-org");
+// An organization that owns no project, because it is the tenant itself: the
+// grants ledger's aggregate is one organization (ADR-092 §13).
+const PRIVATE_ORG_ID_WITHOUT_PROJECTS = privateRouteOrgId(
+  "test-private-org-tenant",
+);
 
 // Table names stay unqualified throughout: each endpoint's client carries its
 // own database in the connection URL, and that is precisely the separation
@@ -77,13 +85,27 @@ async function createTestOrgWithProject({
   const teamSlug = `--test-ch-team-${namespace}-${nanoid(6)}`;
   const projectSlug = `--test-ch-proj-${namespace}-${nanoid(6)}`;
 
-  const organization = await prisma.organization.create({
-    data: {
-      ...(organizationId ? { id: organizationId } : {}),
-      name: `Test CH Routing Org ${namespace}`,
-      slug: orgSlug,
-    },
-  });
+  // Upserted rather than created when the caller names the id, because two
+  // scenarios want a routed organization at the SAME id — the routing env var
+  // is keyed by it — and the rows live until `afterAll`. Creating twice made
+  // whichever ran second fail on the primary key, which is an ordering
+  // dependency rather than anything either scenario is about.
+  const organization = organizationId
+    ? await prisma.organization.upsert({
+        where: { id: organizationId },
+        update: {},
+        create: {
+          id: organizationId,
+          name: `Test CH Routing Org ${namespace}`,
+          slug: orgSlug,
+        },
+      })
+    : await prisma.organization.create({
+        data: {
+          name: `Test CH Routing Org ${namespace}`,
+          slug: orgSlug,
+        },
+      });
 
   const team = await prisma.team.create({
     data: {
@@ -114,6 +136,7 @@ async function createTestOrgWithProject({
 const createdProjectIds: string[] = [];
 const createdTeamIds: string[] = [];
 const createdOrgIds: string[] = [];
+const createdUserIds: string[] = [];
 
 /**
  * Mock the shared client to return our shared test container client.
@@ -134,6 +157,9 @@ describe("ClickHouse routing via env vars", () => {
 
     // Set the private CH env var BEFORE importing clickhouseClient
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
+    process.env[
+      `CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`
+    ] = privateUrl;
 
     sharedClient = createClient({
       url: sharedUrl,
@@ -152,12 +178,19 @@ describe("ClickHouse routing via env vars", () => {
   }, 300_000);
 
   afterAll(async () => {
-    const { clearCustomClientCache, clearProjectOrgCache } = await import(
+    const { clearCustomClientCache, clearTenantOrgCache } = await import(
       "../clickhouseClient"
     );
     await clearCustomClientCache();
-    clearProjectOrgCache();
+    clearTenantOrgCache();
 
+    // Memberships name both an organization and a user, so they have to go
+    // before either does; nothing cascades here.
+    if (createdOrgIds.length > 0) {
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: { in: createdOrgIds } },
+      });
+    }
     if (createdProjectIds.length > 0) {
       await prisma.project.deleteMany({
         where: { id: { in: createdProjectIds } },
@@ -171,11 +204,17 @@ describe("ClickHouse routing via env vars", () => {
         where: { id: { in: createdOrgIds } },
       });
     }
+    if (createdUserIds.length > 0) {
+      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    }
 
     await Promise.all([sharedClient?.close(), privateClient?.close()]);
 
     // Clean up env var
     delete process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`];
+    delete process.env[
+      `CLICKHOUSE_URL__grantsledger__${PRIVATE_ORG_ID_WITHOUT_PROJECTS}`
+    ];
   }, 60_000);
 
   describe("when org has no private ClickHouse env var", () => {
@@ -184,7 +223,7 @@ describe("ClickHouse routing via env vars", () => {
     /** @scenario Project in a standard org routes to the shared instance */
     /** @scenario Data written for a standard org does not appear in private */
     it("returns the shared (default) client", async () => {
-      const { getClickHouseClientForProject } = await import(
+      const { getClickHouseClientForTenant } = await import(
         "../clickhouseClient"
       );
 
@@ -197,7 +236,7 @@ describe("ClickHouse routing via env vars", () => {
       createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
 
-      const client = await getClickHouseClientForProject(projectId);
+      const client = await getClickHouseClientForTenant(projectId);
       expect(client).toBe(sharedClient);
 
       const rowId = `shared-${nanoid(8)}`;
@@ -226,7 +265,7 @@ describe("ClickHouse routing via env vars", () => {
     /** @scenario Project in a private-CH org routes to the private instance */
     /** @scenario Data written for a private-CH org does not appear in shared */
     it("returns a client connected to the private instance", async () => {
-      const { getClickHouseClientForProject } = await import(
+      const { getClickHouseClientForTenant } = await import(
         "../clickhouseClient"
       );
 
@@ -239,7 +278,7 @@ describe("ClickHouse routing via env vars", () => {
       createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
 
-      const client = await getClickHouseClientForProject(projectId);
+      const client = await getClickHouseClientForTenant(projectId);
       expect(client).not.toBe(sharedClient);
 
       const rowId = `private-${nanoid(8)}`;
@@ -261,6 +300,134 @@ describe("ClickHouse routing via env vars", () => {
         projectId,
       });
       expect(sharedRows).toHaveLength(0);
+    });
+  });
+
+  describe("when the tenant is an organization rather than a project", () => {
+    /** @scenario An organization is a tenant in its own right */
+    it("routes by that organization, with no project of that id", async () => {
+      const { getClickHouseClientForTenant } = await import(
+        "../clickhouseClient"
+      );
+
+      // The grants ledger's aggregate is an organization, so this is the id
+      // its event-store writes arrive with — no project carries it, and the
+      // resolver used to refuse it and park the tenant.
+      const privateOrganization = await prisma.organization.create({
+        data: {
+          id: PRIVATE_ORG_ID_WITHOUT_PROJECTS,
+          name: "Test CH Routing Org grants-ledger",
+          slug: `--test-ch-routing-orgtenant-${nanoid(6)}`,
+        },
+      });
+      createdOrgIds.push(privateOrganization.id);
+
+      const client = await getClickHouseClientForTenant(privateOrganization.id);
+      expect(client).not.toBeNull();
+
+      const rowId = `org-tenant-${nanoid(8)}`;
+      await insertTestRow(client!, {
+        id: rowId,
+        projectId: privateOrganization.id,
+        data: "org-tenant-data",
+      });
+
+      const privateRows = await queryTestRow(privateClient, {
+        id: rowId,
+        projectId: privateOrganization.id,
+      });
+      expect(privateRows).toHaveLength(1);
+
+      const sharedRows = await queryTestRow(sharedClient, {
+        id: rowId,
+        projectId: privateOrganization.id,
+      });
+      expect(sharedRows).toHaveLength(0);
+    });
+  });
+
+  describe("when the tenant is a user rather than a project", () => {
+    /**
+     * The identity aggregate is keyed by USER (D01, ADR-101 §6), so this is
+     * the id its event-store writes arrive with. The resolver knew two kinds
+     * of tenant and refused this one, which meant no identity event ever
+     * appended, the fold never ran, and the backfill's parity proof reported
+     * `identifier_missing` for every user on every pass — forever.
+     *
+     * A user is not resolved into an organization, and deliberately so: a
+     * tenant is a PROJECT id, one user reaches many projects across many
+     * organizations, and there is no single one of them to call theirs.
+     * Identity history is platform-level, so it routes to the shared
+     * instance.
+     */
+    /** @scenario A user is a tenant in its own right */
+    it("routes a user to the shared instance", async () => {
+      const { getClickHouseClientForTenant } = await import(
+        "../clickhouseClient"
+      );
+
+      const user = await prisma.user.create({
+        data: { email: `ch-routing-${nanoid(8)}@example.com`, name: "CH User" },
+      });
+      createdUserIds.push(user.id);
+
+      expect(await getClickHouseClientForTenant(user.id)).toBe(sharedClient);
+    });
+
+    /**
+     * The case that decides whether membership enters into it at all. They
+     * still route to the shared instance, because what is being written is
+     * how they sign in rather than any organization's data — true of them
+     * before, across and after every organization they belong to.
+     *
+     * Pinned because the cheap reading is that a private-dataplane member
+     * must follow their organization, and a membership lookup here would be
+     * both a query per resolution and an answer that changes under a join.
+     */
+    describe("given the user belongs to a private-dataplane organization", () => {
+      /** @scenario A user in a private-dataplane organization still routes to shared */
+      it("routes that user to the shared instance", async () => {
+        const { getClickHouseClientForTenant } = await import(
+          "../clickhouseClient"
+        );
+
+        const { organizationId, teamId, projectId } =
+          await createTestOrgWithProject({
+            namespace: "private-member",
+            organizationId: PRIVATE_ORG_ID,
+          });
+        createdProjectIds.push(projectId);
+        createdTeamIds.push(teamId);
+        createdOrgIds.push(organizationId);
+
+        const user = await prisma.user.create({
+          data: {
+            email: `ch-private-${nanoid(8)}@example.com`,
+            name: "CH Private User",
+          },
+        });
+        createdUserIds.push(user.id);
+        await prisma.organizationUser.create({
+          data: { userId: user.id, organizationId, role: "MEMBER" },
+        });
+
+        expect(await getClickHouseClientForTenant(user.id)).toBe(sharedClient);
+      });
+    });
+  });
+
+  describe("when the tenant names no project, organization or user", () => {
+    /** @scenario A tenant that names no project, organization or user is refused */
+    it("refuses rather than falling back to the shared client", async () => {
+      const { getClickHouseClientForTenant } = await import(
+        "../clickhouseClient"
+      );
+
+      const strangerId = `not-a-tenant-${nanoid(8)}`;
+
+      await expect(getClickHouseClientForTenant(strangerId)).rejects.toThrow(
+        strangerId,
+      );
     });
   });
 

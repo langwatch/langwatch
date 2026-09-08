@@ -6,10 +6,11 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { cliAuthHeaders } from "../../utils/authHeaders";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseOriginOption } from "./origin-filter";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
@@ -64,9 +65,11 @@ export const exportTracesCommand = async (options: {
   output?: string;
   limit?: string;
   origin?: string;
+  errorsOnly?: boolean;
   includeSpans?: boolean;
+  project?: string;
 }): Promise<void> => {
-  await resolveCredentials();
+  await resolveCredentials({ project: options.project });
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -95,6 +98,10 @@ export const exportTracesCommand = async (options: {
     process.exit(1);
   }
   const originFilter = parseOriginOption(options.origin);
+  const filters = {
+    ...(originFilter ? { "traces.origin": originFilter } : {}),
+    ...(options.errorsOnly ? { "traces.error": ["true"] } : {}),
+  };
   const spinner = createSpinner(`Exporting traces (${format})...`).start();
   const events = createCommandEvents({ resource: "trace", verb: "export" });
 
@@ -116,12 +123,12 @@ export const exportTracesCommand = async (options: {
         options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
       );
 
-      const response = await fetch(`${endpoint}/api/traces/search`, {
+      const response = await langwatchFetch(`${endpoint}/api/traces/search`, {
         method: "POST",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
+          ...cliAuthHeaders({ apiKey }),
         },
         body: JSON.stringify({
           query: options.query,
@@ -131,7 +138,7 @@ export const exportTracesCommand = async (options: {
           format: "json",
           ...(options.includeSpans ? { includeSpans: true } : {}),
           ...(scrollId ? { scrollId } : {}),
-          ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
+          ...(Object.keys(filters).length > 0 ? { filters } : {}),
         }),
       });
 

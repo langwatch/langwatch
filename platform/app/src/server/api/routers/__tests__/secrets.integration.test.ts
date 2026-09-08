@@ -13,11 +13,14 @@ import {
   it,
   vi,
 } from "vitest";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { decrypt } from "../../../../utils/encryption";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {

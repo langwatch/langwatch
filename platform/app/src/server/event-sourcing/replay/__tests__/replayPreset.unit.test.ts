@@ -9,6 +9,8 @@ vi.mock("ioredis", () => ({
 }));
 
 vi.mock("../../../app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(),
 }));
 
@@ -40,6 +42,11 @@ vi.mock(
 vi.mock(
   "../../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository",
   () => ({ SimulationRunStateRepositoryClickHouse: class {} }),
+);
+
+vi.mock(
+  "../../pipelines/simulation-processing/projections/simulationRunState.store",
+  () => ({ SimulationRunStateFoldStore: class {} }),
 );
 
 vi.mock("../../pipelines/simulation-processing/schemas/constants", () => ({

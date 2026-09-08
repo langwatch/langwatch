@@ -35,6 +35,12 @@ interface ApiMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
+  /**
+   * The recorded parts, when the message is more than prose — a turn's own
+   * `todowrite` call, for one. Absent, the text is the whole message, which is
+   * what the record holds for an ordinary answer.
+   */
+  parts?: unknown[];
 }
 
 interface Snapshot {
@@ -185,9 +191,8 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "./support/langyApiMock"
-  );
+  const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
+    await import("./support/langyApiMock");
 
   /** A minimal, `enabled`-honouring stand-in for a tRPC query. */
   const useSnapshotQuery = <TData,>(resolve: () => TData, enabled: boolean) => {
@@ -219,9 +224,8 @@ vi.mock("~/utils/api", async () => {
     return {
       data: state.data,
       isLoading: enabled && state.status === "loading",
-      isInitialLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: state.status === "success",
       isSuccess: state.status === "success",
       isError: false,
@@ -262,7 +266,9 @@ vi.mock("~/utils/api", async () => {
                 messages: snapshot.messages.map((message) => ({
                   id: message.id,
                   role: message.role,
-                  parts: [{ type: "text", text: message.text }],
+                  parts: message.parts ?? [
+                    { type: "text", text: message.text },
+                  ],
                   createdAtMs: 0,
                 })),
                 lastError: null,
@@ -283,17 +289,7 @@ vi.mock("~/utils/api", async () => {
     }),
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: {
-      getResolvedDefault: {
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
-      },
-    },
+    modelProvider: modelProviderRouter(),
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
@@ -629,5 +625,177 @@ describe("given the streamed answer is on screen", () => {
         screen.getByText("The retriever regressed after the reindex."),
       ).toBeTruthy();
     });
+  });
+});
+
+describe("given a running turn that is following a plan", () => {
+  const PLAN = [
+    { content: "Read the failing rows", status: "completed" },
+    { content: "Rewrite the prompt", status: "in_progress" },
+    { content: "Rerun and compare", status: "pending" },
+  ];
+
+  /** The agent's own todo call — the durable half of a plan. */
+  const todoPart = {
+    type: "tool-todowrite",
+    toolCallId: "todo-1",
+    state: "output-available",
+    input: { todos: PLAN },
+    output: "ok",
+  };
+
+  /** Drive the panel into the middle of a turn that has written a plan. */
+  function renderPanelMidPlan() {
+    snapshotRef.current = {
+      messages: [
+        { id: "m1", role: "user", text: "improve this prompt" },
+        {
+          id: "m2",
+          role: "assistant",
+          text: "Rewriting the prompt now.",
+          parts: [
+            todoPart,
+            { type: "text", text: "Rewriting the prompt now." },
+          ],
+        },
+      ],
+      isTurnInFlight: true,
+      inFlightTurnId: "turn-live",
+      eventCursor: null,
+      currentTurnId: "turn-live",
+    };
+    engine.messages = [
+      {
+        id: "m1",
+        role: "user",
+        parts: [{ type: "text", text: "improve this prompt" }],
+      },
+      {
+        id: "m2",
+        role: "assistant",
+        // The durable half of the plan rides here too: it is what the settled
+        // message folds its checklist from once the live snapshot is gone.
+        parts: [todoPart, { type: "text", text: "Rewriting the prompt now." }],
+      },
+    ];
+    engine.status = "streaming";
+    const rendered = renderReloadedPanel();
+    act(() => {
+      useLangyStore.setState({ turnPlan: PLAN });
+    });
+    return rendered;
+  }
+
+  /** The composer's own field — the thing the plan has to stay above. */
+  const composerBox = (): Element => {
+    const field = composerField();
+    const box = field.closest("form") ?? field.parentElement;
+    if (!box) throw new Error("the composer is not on screen");
+    return box;
+  };
+
+  const planCard = (): Element => screen.getByLabelText("Langy plan");
+
+  /** The element the conversation scrolls inside. */
+  const conversationScroller = (): Element => {
+    const scroller = [...document.querySelectorAll("*")].find(
+      (node) =>
+        getComputedStyle(node).overflowY === "auto" &&
+        node.contains(screen.getByText("improve this prompt")),
+    );
+    if (!scroller)
+      throw new Error("the conversation scroller is not on screen");
+    return scroller;
+  };
+
+  /** @scenario The checklist stays in view while the turn works */
+  it("holds the checklist above the message box, out of the conversation", async () => {
+    renderPanelMidPlan();
+
+    const card = await waitFor(planCard);
+    expect(screen.getByText("Rewrite the prompt")).toBeTruthy();
+
+    // Above the composer…
+    expect(
+      card.compareDocumentPosition(composerBox()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // …and outside the scroller, so it is a row of the column rather than a
+    // layer over the conversation: nothing above it is covered.
+    expect(conversationScroller().contains(card)).toBe(false);
+  });
+
+  /** @scenario The checklist rejoins the conversation once the turn is over */
+  it("gives the checklist back to the turn once it settles", async () => {
+    renderPanelMidPlan();
+    const held = await waitFor(planCard);
+    const scroller = conversationScroller();
+    expect(scroller.contains(held)).toBe(false);
+
+    act(() => {
+      engine.status = "ready";
+      notifyEngine();
+    });
+
+    // Still readable, and now part of the turn it belongs to rather than a row
+    // held above the composer.
+    await waitFor(() => {
+      expect(conversationScroller().contains(planCard())).toBe(true);
+    });
+    expect(screen.getByText("Plan · 1 of 3 done")).toBeTruthy();
+  });
+
+  /**
+   * The turn's plan is written to its durable record end to end, and nothing
+   * in the panel read it back. A reader who refreshed mid-turn had no live
+   * snapshot and no `todowrite` part on the message yet, so the checklist
+   * disappeared until the turn finished.
+   *
+   * @scenario "A reload in the middle of a turn keeps the checklist" */
+  it("reads the plan off the turn's record when the live snapshot is gone", async () => {
+    snapshotRef.current = {
+      messages: [{ id: "m1", role: "user", text: "improve this prompt" }],
+      isTurnInFlight: true,
+      inFlightTurnId: "turn-live",
+      eventCursor: null,
+      currentTurnId: "turn-live",
+    };
+    engine.messages = [
+      {
+        id: "m1",
+        role: "user",
+        parts: [{ type: "text", text: "improve this prompt" }],
+      },
+    ];
+    engine.status = "streaming";
+    renderReloadedPanel();
+
+    // The catch-up tail a refreshed tab reads: the turn, and the plan it has
+    // reached. Nothing else on screen carries the plan.
+    act(() => {
+      useLangyStore.getState().applyTurnEvents([
+        recordedAccepted({
+          id: "event-1",
+          createdAt: 1_000,
+          turnId: "turn-live",
+        }),
+        {
+          id: "event-2",
+          createdAt: 2_000,
+          occurredAt: 2_000,
+          type: LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
+          data: {
+            conversationId: CONVERSATION_ID,
+            turnId: "turn-live",
+            items: PLAN,
+          },
+        },
+      ]);
+    });
+
+    expect(useLangyStore.getState().turnPlan).toBeNull();
+    await waitFor(planCard);
+    expect(screen.getByText("Rewrite the prompt")).toBeTruthy();
+    expect(screen.getByText("Plan · 1 of 3 done")).toBeTruthy();
   });
 });

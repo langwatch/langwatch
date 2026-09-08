@@ -125,11 +125,39 @@ gets in. A spoofable rate limit does not let anyone authenticate.
 
 | Tool | Description |
 |------|-------------|
-| `platform_list_scenarios` | List all scenarios |
+| `platform_list_scenarios` | List all scenarios, or only the ones filed in a test suite |
 | `platform_get_scenario` | Get scenario details |
-| `platform_create_scenario` | Create a new scenario |
-| `platform_update_scenario` | Update a scenario |
+| `platform_create_scenario` | Create a new scenario, optionally filed in a test suite |
+| `platform_update_scenario` | Update a scenario, or file it in another test suite |
 | `platform_archive_scenario` | Archive a scenario |
+
+### Test suites and run plans (requires API key)
+
+A test suite is a folder of scenarios. A run plan is what you run, and its
+name identifies it: running a name that exists replaces that plan's
+configuration, running a new name creates the plan. Running a test suite is
+sugar over a run plan, and creates or joins the plan `<suite name> <target name>`.
+
+| Tool | Description |
+|------|-------------|
+| `platform_run_plan` | Run scenarios against targets, by plan name |
+| `platform_list_run_plans` | List the run plans of the project |
+| `platform_get_run_plan` | Get the full configuration of a run plan |
+| `platform_rerun_run_plan` | Run a plan again with the configuration it holds |
+| `platform_archive_run_plan` | Archive a run plan |
+| `platform_list_test_suites` | List the test suites of the project |
+| `platform_create_test_suite` | Create a test suite |
+| `platform_get_test_suite` | Get a test suite and the scenarios filed in it |
+| `platform_rename_test_suite` | Rename a test suite |
+| `platform_archive_test_suite` | Archive a test suite and the scenarios filed in it |
+| `platform_run_test_suite` | Run every scenario of a test suite against targets |
+
+### Simulation runs (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_simulation_runs` | List simulation run results |
+| `platform_get_simulation_run` | Get one run with its conversation and verdict |
 
 ### Evaluators (requires API key)
 

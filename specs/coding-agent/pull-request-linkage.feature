@@ -2,9 +2,12 @@
 #
 # Implementation:
 #   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
+#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
+#   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
 #   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor.ts (fold trigger)
+#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
+#   platform/app/src/server/app-layer/coding-agent/pull-request-share.ts                (the proportional rule: one session's cost split across the PRs it drove)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
 #   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
 #   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
@@ -28,7 +31,10 @@
 # survives branch recycling and sessions that ran before the PR was opened.
 # PR STATUS is always fetched live by the reader, never maintained by the queue;
 # the stored state is only a fallback label. The usage rollup is organization
-# first and RBAC-scoped: numbers only, never content. Work is attributed to a
+# first and RBAC-scoped, and carries numbers only. The DETAIL read adds the
+# one-line title a session generated for itself, which travels under the content
+# visibility of the project that session ran in and is the only content on that
+# surface. Work is attributed to a
 # PROJECT, named by the person who owns it when the project is one person's
 # workspace; the id an agent reports about its own user names nobody and is
 # never shown.
@@ -81,19 +87,9 @@ Rule: Branches map to their pull requests through the organization connection
     When the tick fires
     Then one sweep runs and the others stand down
 
-  # Nothing removed a branch's bookkeeping or its pull requests, ever, at one
-  # row per agent branch per repository.
   @unit
-  Scenario: Linkage rows nobody asks about stop accumulating
-    Given a branch outside the sweep's activity window
-    When the retention prune runs
-    Then its bookkeeping is removed
-    And the pull requests it was the only reason to keep are removed
-    And a reader asking again re-maps the branch from GitHub
-
-  @unit
-  Scenario: A repository on a non-GitHub host never triggers a GitHub call
-    Given a session whose repository host is not github.com
+  Scenario: A repository on a host this instance cannot answer for never triggers a GitHub call
+    Given a session whose repository host is not the instance's GitHub host
     When the mapping trigger evaluates the session
     Then no mapping is requested
 
@@ -102,6 +98,153 @@ Rule: Branches map to their pull requests through the organization connection
     Given sessions with repo and branch folded before any GitHub connection existed
     When the organization connects GitHub
     Then the recent branches are mapped without waiting for new sessions
+
+Rule: Demand is what a session asks for, and only demand keeps a branch in the sweep
+
+  # The column the sweep selects on was also written by the sweep itself, so a
+  # branch that never gets a pull request renewed its own place in the sweep and
+  # was asked about every day for as long as the connection existed.
+  @integration
+  Scenario: The sweep does not renew the demand it selects on
+    Given a branch with no pull request that the sweep asks GitHub about
+    When the sweep records the empty answer
+    Then the branch's last demand time is unchanged
+
+  @integration
+  Scenario: A session folding on a branch records demand for it
+    Given a branch with no pull request
+    When a session folds on that branch and the mapping runs
+    Then the branch's last demand time moves to the time of the fold
+
+  @integration
+  Scenario: A branch with no session demand for a week leaves the sweep
+    Given a branch whose last session demand is older than the activity window
+    When the periodic recheck selects branches
+    Then that branch is not selected
+
+Rule: Bookkeeping is pruned, and the pull requests it found are kept
+
+  # One bookkeeping row per agent branch per repository, and nothing removed
+  # them, so the table grew for as long as the connection existed.
+  @integration
+  Scenario: Bookkeeping for a branch outside the activity window is removed
+    Given a branch outside the sweep's activity window
+    When the retention prune runs
+    Then its bookkeeping is removed
+    And a session folding on that branch again re-maps it from GitHub
+
+  # A pull request is a record of work that was done. Removing it when the
+  # branch went quiet took merged work off the Pull Requests page, which is the
+  # work people most want to look back at.
+  @integration
+  Scenario: A linked pull request stays after its branch goes quiet
+    Given a branch outside the sweep's activity window whose pull request is linked
+    When the retention prune runs
+    Then the pull request is still stored for the organization
+
+Rule: A pull request links itself the moment GitHub announces it
+
+  # Polling alone linked a branch up to a day after its pull request was
+  # opened, because a branch is at its most backed-off exactly when the pull
+  # request finally appears: people and coding agents branch first, work for
+  # hours, and open the pull request last.
+  @integration
+  Scenario: A pull request opened on a branch is linked without waiting for a recheck
+    Given an organization whose GitHub connection covers a repository
+    And a branch with no pull request yet
+    When GitHub announces that a pull request was opened for that branch
+    Then the pull request is stored for the branch straight away
+    And GitHub is not asked to list the branch's pull requests
+
+  @integration
+  Scenario: The announcement clears the branch's backoff
+    Given a branch whose repeated empty answers armed the longest backoff
+    When GitHub announces a pull request for that branch
+    Then the branch is no longer waiting to be asked again
+    And a later empty answer arms the shortest backoff rather than the longest
+
+  @integration
+  Scenario: A pull request that merges is announced as merged
+    Given a stored pull request that is open
+    When GitHub announces that it was merged
+    Then the stored pull request reads as merged
+
+  @unit
+  Scenario: An announcement for a connection this instance does not hold is dropped
+    Given an announcement carrying an installation with no local record
+    When it arrives
+    Then nothing is stored for it
+
+  @unit
+  Scenario: An announcement that changes nothing the page shows is dropped
+    Given an announcement that a label was added to a pull request
+    When it arrives
+    Then nothing is written
+
+  # The head of a pull request from a fork lives in another repository, which
+  # is a repository a session on this one never names.
+  @unit
+  Scenario: An announcement for a pull request opened from a fork is dropped
+    Given an announcement whose head branch lives in a different repository
+    When it arrives
+    Then nothing is stored for it
+
+  @integration
+  Scenario: Every announcement is acknowledged, applied or not
+    Given a signed announcement this instance has nothing to do with
+    When GitHub delivers it
+    Then GitHub is told the delivery succeeded
+
+  @integration
+  Scenario: A redelivered announcement changes nothing
+    Given an announcement that has already been applied
+    When GitHub delivers it a second time
+    Then the branch still carries exactly one pull request, unchanged
+
+  # GitHub does not promise the order it delivers announcements in, and a
+  # pull request's close and merge times are what decide which sessions are
+  # priced under it. A late announcement written over a newer one reopens a
+  # merged pull request and takes the sessions that ran after it closed.
+  @integration
+  Scenario: A late delivery about an earlier state does not roll the pull request back
+    Given a pull request stored as merged
+    When an announcement about its earlier state arrives after the merge
+    Then the pull request still reads as merged
+    And its close and merge times are unchanged
+    And its title is not put back to the earlier one
+
+  @integration
+  Scenario: A listing that answers after a newer announcement does not roll it back
+    Given a listing of a branch's pull requests still waiting on GitHub
+    When the pull request is announced as merged before the listing answers
+    Then the listing's older answer leaves the stored pull request as merged
+
+  # Deliveries get missed, installations get suspended and resumed, and a
+  # self-hosted instance may never be reachable by GitHub at all. The recheck
+  # is the floor under the announcement, not something it replaces.
+  @integration
+  Scenario: A branch whose announcement never arrived is still linked by the recheck
+    Given a pull request opened for a branch and no announcement delivered
+    When the periodic recheck runs after the branch's backoff elapses
+    Then the pull request is linked
+
+Rule: A branch a session just ran on is asked about again soon
+
+  # The backoff grew on the theory that a branch empty four times is a branch
+  # whose work never became a pull request. A session folding on that branch is
+  # the plainest evidence to the contrary, so it brings the next question
+  # forward instead of inheriting a day-long wait.
+  @integration
+  Scenario: A new session on a branch brings its next question forward
+    Given a branch sitting on the longest backoff with no pull request
+    When a coding-agent session folds on that branch
+    Then the branch is due to be asked about again within the shortest backoff
+
+  @integration
+  Scenario: Repeated folds on one branch still ask GitHub once per backoff
+    Given a branch a session just folded on and asked GitHub about
+    When more sessions fold on it before the backoff elapses
+    Then GitHub is not asked again
 
 Rule: Sessions attach to pull requests by the pull request's lifetime
 
@@ -156,11 +299,118 @@ Rule: Pull request status is read live, never maintained by the queue
 Rule: The Pull Requests page prices each pull request's lifetime
 
   @integration
-  Scenario: The page rolls up sessions, tokens and cost per pull request
+  Scenario: The page rolls up tokens and cost per pull request
     Given mapped pull requests with sessions attached across their lifetimes
     When the pull request usage is read for the caller's project
-    Then each pull request reports its sessions count, tokens and assistant cost
+    Then each pull request reports its tokens and assistant cost
     And the figures cover the pull request's lifetime, not a time picker window
+
+  # One session often drives several pull requests: it lands a change, moves to
+  # the next branch and opens another. Reading a pull request's price off the
+  # branch a session ENDED on charges the whole session to its last pull request
+  # and leaves the earlier ones looking free.
+
+  @integration
+  Scenario: A session that moved to another branch is still read for the branch it left
+    Given a session that worked on one branch and then moved to another
+    When the sessions of the first branch are read
+    Then that session is among them
+
+  @unit
+  Scenario: A session that moved to another branch counts toward the pull request it drove first
+    Given a session that drove a pull request's branch and then moved to another
+    When that pull request's usage is read
+    Then the session's tokens and cost are counted toward it
+
+  @unit
+  Scenario: The personal page discovers pull requests from every branch a session drove
+    Given a session that drove two branches, each with a live pull request
+    When the personal pull requests are read
+    Then both pull requests become rows
+
+Rule: A session's cost splits across the pull requests it drove, by the work stamped on each
+
+  # A session records one set of cumulative token and cost totals for its
+  # whole life; its per-call fact rows each carry the repository and branch
+  # that were active when the call happened. The fact rows set the RATIO, the
+  # cumulative totals stay the amount, and the buckets partition — so one
+  # session's shares never sum past its own total, and a repository's pull
+  # requests never sum to more than was ever spent.
+
+  @unit
+  Scenario: A session that drove two pull requests splits its cost between them
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows stamp a quarter of its tokens on one branch and the rest on the other
+    When each pull request's usage is read
+    Then the first reports a quarter of the session's totals
+    And the second reports the remaining three quarters
+
+  @unit
+  Scenario: Tokens stamped with no context follow the legacy whole-session rule
+    Given a session whose fact rows carry no stamped context
+    When its pull requests' usage is read
+    Then its whole total lands on the pull request it opened first
+    And the other pull requests report none of it
+
+  @unit
+  Scenario: A session with no fact rows at all keeps the legacy rule whole
+    Given a session that recorded totals but logged no per-call facts
+    When its pull requests' usage is read
+    Then its whole total lands on the pull request it opened first
+
+  @unit
+  Scenario: Tokens stamped on another repository stay out of this one
+    Given a session whose fact rows stamp work on two repositories
+    When one repository's pull request usage is read
+    Then only the tokens stamped on that repository count toward its pull request
+    And the other repository's tokens reduce the session's share rather than joining it
+
+  @unit
+  Scenario: A session found only by its stamps still counts toward the pull request
+    Given a session whose row moved on to another repository
+    And fact rows stamped on the pull request's own branch
+    When the pull request's usage is read
+    Then the session's stamped share is counted toward it
+
+  @unit
+  Scenario: The unstamped bucket is priced only where the session's row lives
+    Given a session whose row points at one repository and whose stamps name another
+    When the other repository's pull request usage is read
+    Then the session's unstamped tokens are not priced there
+
+  @unit
+  Scenario: Two pull requests on one branch split by era, not by double counting
+    Given a branch that hosted a merged pull request and later a new one
+    And a session whose fact rows stamp that branch
+    When both pull requests' usage is read
+    Then the stamped tokens count toward the branch's tenure winner only
+
+  @unit
+  Scenario: A session too small to divide is never counted twice
+    Given a session that spent one token, split evenly across two pull requests
+    When each pull request's usage is read
+    Then the two together report the one token, not one each
+
+  @unit
+  Scenario: A discovered pull request with no stamped work still dates itself
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows stamp all of its tokens on one branch
+    When the personal pull requests are read
+    Then the other pull request is still a row, reporting no tokens and no cost
+    And that row is dated by the pull request itself rather than by the epoch
+
+  @unit
+  Scenario: A session that priced its calls without reporting tokens splits by cost
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows report cost but no token counts
+    When each pull request's usage is read
+    Then each reports the share of the cost stamped on its branch
+
+  @unit
+  Scenario: The model breakdown reports only the pull request's own calls
+    Given a session that called two models, each stamped on a different pull request
+    When one pull request's usage is read
+    Then its model breakdown reports only the model stamped on it
 
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation
@@ -226,10 +476,10 @@ Rule: A personal row asks a personal question and answers with the organization'
     Then the branch reports only the viewer's own sessions
 
   @unit @integration
-  Scenario: A row names who worked on the pull request
+  Scenario: The drawer names who worked on the pull request
     Given a pull request worked on by two contributors
-    When the Pull Requests page lists it
-    Then the row names each contributor once and how many sessions they ran
+    When the reader opens its detail
+    Then the detail names each contributor once and how many sessions they ran
 
 Rule: A contributor is a person or a project, never an agent-reported id
 
@@ -281,6 +531,14 @@ Rule: A contributor is a person or a project, never an agent-reported id
     When the caller's project scope is resolved
     Then the workspace is named by itself
     And the name still opens nothing
+
+  # The schema has no foreign keys, so a membership row can outlive its user.
+  @integration
+  Scenario: A membership row that outlives its user still resolves the scope
+    Given a personal workspace whose membership row points at a deleted user
+    When the caller's project scope is resolved
+    Then the read does not fail
+    And the workspace is named by itself
 
   # Members answer "who worked here" only where the answer is one person, and
   # reading them for every team would cost a query nothing displays.
@@ -397,7 +655,7 @@ Rule: Each pull request reports what every model consumed
     When the table is sorted by model
     Then both kinds of row take their place by the model they name
 
-Rule: The pull request detail answers with facts and never with content
+Rule: The pull request detail answers with facts, and names its sessions
 
   @unit
   Scenario: The detail carries its contributors, models and sessions
@@ -406,11 +664,32 @@ Rule: The pull request detail answers with facts and never with content
     Then it carries the totals, one row per contributor, the per-model totals and the sessions
     And the sessions are the most recent first
 
+  # A session's title is the one thing that tells two of a person's sessions
+  # apart, and a detail that lists three anonymous rows makes the reader open
+  # each one to find out which is which. It is conversation-derived content, so
+  # it travels under the same content visibility every other session surface
+  # applies, resolved per contributing project: a reader may be trusted with
+  # one project's conversations and not another's, and the detail spans both.
+
   @unit
-  Scenario: The sessions list never carries a session title
-    Given sessions with titles and transcripts
+  Scenario: The sessions list names each session by its generated title
+    Given a pull request whose sessions generated titles
     When the pull request detail is read
-    Then each session carries its start time, contributor, agent, tokens and cost only
+    Then each session carries its title alongside its start time, contributor, agent, tokens and cost
+
+  @unit
+  Scenario: A session whose project hides captured content is listed without its title
+    Given a pull request with sessions from a project whose captured content this reader may not see
+    When the pull request detail is read
+    Then that project's sessions carry no title
+    And the sessions of a project the reader may read keep theirs
+
+  @integration
+  Scenario: The drawer names each session by its title, or says it has none
+    Given a pull request whose sessions include one with a title and one without
+    When the detail is read
+    Then the titled session is named by its title
+    And the untitled one is named as an untitled session
 
   # A reader knows their assistants by the names their makers gave them, not by
   # the spelling that happened to arrive on the wire.
@@ -721,3 +1000,98 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     When the pull request usage is read for that workspace
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
+
+# The question is organization-wide, so the v1 door authenticates at the
+# organization: an sk-lw organization key alone, with no project named
+# anywhere. The personal-workspace indirection on the legacy path existed only
+# to recover a calling user, which a user-bound key already carries — and a
+# service key, which carries none, is scoped by its own bindings instead.
+Rule: The v1 usage read needs only an organization credential
+
+  @integration
+  Scenario: An organization key reads pull request usage without naming a project
+    Given a user-bound organization API key
+    When the v1 pull request usage is read with no project id anywhere in the request
+    Then the answer is the caller's organization-wide rollup
+    And the read is recorded against the caller, the organization and the pull request
+
+  # A key can carry bindings NARROWER than its holder's own — that ceiling is
+  # the whole point of a restricted key — so the rollup intersects the
+  # holder's cut with the key's, the same key-plus-holder decision every
+  # other REST door asks.
+  @integration
+  Scenario: A narrowed key reads with its own scope, not its holder's
+    Given a holder who may view traces in two projects
+    And their organization key is bound to only one of them
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  @integration
+  Scenario: A key whose binding lacks the cost grant reads tokens with no cost
+    Given an organization key bound to one project with a role that cannot price
+    When the v1 pull request usage is read with that key
+    Then the bound project's rows carry token counts
+    And every cost in the answer is absent
+
+  # An organization service key acts as nobody — it is the credential a
+  # continuous integration job holds, where there is no person to mint a key
+  # for — so its scope is its own bindings alone: the projects they grant
+  # traces:view appear, and cost only where they grant cost:view. The read is
+  # still recorded, attributed to the key identity rather than an invented
+  # person.
+  @integration
+  Scenario: An organization service key reads the rollup scoped by its own bindings
+    Given an organization API key created without a user, bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project the bindings may view
+    And the read is recorded against the key identity, the organization and the pull request
+
+  @integration
+  Scenario: A service key without the cost grant reads tokens with every cost null
+    Given a service key whose bindings grant viewing but not pricing
+    When the v1 pull request usage is read with that key
+    Then the rows carry token counts
+    And every cost in the answer is absent
+
+  @integration
+  Scenario: A service key bound to one project sees only that project's rows
+    Given a service key bound to one project of the organization
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  # One collected grant snapshot decides every project. Deciding per project
+  # opened a database pass of several queries per project per permission, and
+  # a large organization's concurrent fan-out exhausted the connection pool —
+  # the rollup answered a ten-second 500 before it had even looked the pull
+  # request up.
+  @integration
+  Scenario: A large organization's rollup is decided from one grant snapshot
+    Given an organization on the authorization engine with dozens of projects
+    And an organization service key bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project of the organization
+    And the ceiling reads the same number of rows for dozens of projects as for a few
+    And the key's grants are collected once, not once per project
+
+  # A legacy project key carries no organization and no user, so it cannot
+  # authenticate at the organization door at all. The refusal names the
+  # credential class to swap, because the caller is holding a working key of
+  # the wrong family, not a typo.
+  @integration
+  Scenario: A legacy project key cannot reach the v1 usage read
+    Given a legacy project API key
+    When the v1 pull request usage is read
+    Then the refusal carries the credential class mismatch code
+    And the refusal names the organization key as the class this door needs
+
+  # The mapping is per organization, so another organization's key holds no
+  # question this instance can answer for that pull request — and learning
+  # whether the mapping exists elsewhere is not its to learn.
+  @integration
+  Scenario: An organization key from another organization learns nothing
+    Given a user-bound organization API key from a different organization
+    When the v1 pull request usage is read for a pull request mapped elsewhere
+    Then the caller receives the pull request not mapped failure
+    And nothing says the pull request is mapped for anyone else

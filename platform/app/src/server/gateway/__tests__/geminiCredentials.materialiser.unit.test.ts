@@ -8,8 +8,8 @@
  * specs/model-providers/google-agent-platform.feature.
  */
 
-import type { ModelProvider } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import type { ModelProvider } from "~/generated/prisma/client";
 import { buildCredentials } from "../config.materialiser";
 
 const geminiRow = (customKeys: Record<string, string>): ModelProvider =>

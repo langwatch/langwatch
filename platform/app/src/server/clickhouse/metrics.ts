@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { Counter, Gauge, Histogram, register } from "prom-client";
-import { getSharedClickHouseClient } from "./clickhouseClient";
+import { _getSharedClickHouseClient } from "./client";
 
 const logger = createLogger("langwatch:clickhouse:metrics");
 
@@ -631,7 +631,7 @@ export function stopStorageStatsCollection(): void {
 export function startStorageStatsCollectionFromSharedClient(
   intervalMs?: number,
 ): boolean {
-  const client = getSharedClickHouseClient();
+  const client = _getSharedClickHouseClient();
   if (!client) return false;
   startStorageStatsCollection(client, intervalMs);
   return true;

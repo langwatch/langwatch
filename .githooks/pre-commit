@@ -15,7 +15,10 @@ regenerated_docs_pages=0
 if echo "$staged_before" | grep -qE '^skills/.*\.mdx?$|^skills/_shared/|^docs/skills/skills-pages-manifest\.json$'; then
   echo "pre-commit: Regenerating docs/skills pages from skill sources..."
   bash docs/scripts/sync-prompts.sh
-  git add docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx
+  # The manifest decides which pages carry generated blocks, and it has grown
+  # past docs/skills/. Ask the generator which pages it wrote rather than
+  # keeping a second copy of the list here, which went stale once already.
+  node docs/scripts/generate-skills-pages.mjs --list-pages | xargs git add
   regenerated_docs_pages=1
 fi
 

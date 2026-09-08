@@ -3,6 +3,7 @@
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
 import { HandledError } from "@langwatch/handled-error";
+import { remediation } from "../app-layer/error-remediation";
 
 export class DatasetNotFoundError extends Error {
   constructor(message = "Dataset not found") {
@@ -245,6 +246,53 @@ export class DatasetNotReadyError extends HandledError {
 }
 
 /**
+ * A search was asked for over more of a dataset than one search will read —
+ * more rows, or more bytes of content.
+ *
+ * One error and one code for both limits, because they are one thing to the
+ * user: the dataset is past what a search reads, and the way through is the
+ * same either way. Which limit fired is carried in `meta` for the log, not
+ * shown — "too many bytes" is not a distinction a user can act on differently
+ * from "too many rows".
+ *
+ * Distinct from DatasetTooLargeToExportError on purpose: the presentation
+ * registry is keyed by code, so reusing the export error would show the user a
+ * message about exporting a dataset they were trying to search.
+ */
+export class DatasetTooLargeToSearchError extends HandledError {
+  declare readonly code: "dataset_too_large_to_search";
+
+  readonly measured: number;
+  readonly limit: number;
+  readonly dimension: "rows" | "bytes";
+
+  constructor(
+    params:
+      | { rowCount: number; maxRows: number }
+      | { sizeBytes: number; maxBytes: number },
+  ) {
+    const isRows = "rowCount" in params;
+    const measured = isRows ? params.rowCount : params.sizeBytes;
+    const limit = isRows ? params.maxRows : params.maxBytes;
+    const dimension = isRows ? "rows" : "bytes";
+
+    super(
+      "dataset_too_large_to_search",
+      `Dataset holds ${measured} ${dimension}, more than the ${limit} a single search will read`,
+      {
+        meta: { measured, limit, dimension },
+        httpStatus: 413,
+        fault: "customer",
+      },
+    );
+    this.name = "DatasetTooLargeToSearchError";
+    this.measured = measured;
+    this.limit = limit;
+    this.dimension = dimension;
+  }
+}
+
+/**
  * Thrown when a manual normalize retry is requested on a dataset that can't be
  * re-run: it's not in a recoverable state (`failed`/`processing`) or it carries
  * no staging key to re-read (no source to normalize). The route maps it to 409
@@ -379,14 +427,30 @@ export class DatasetChunkCountMissingError extends Error {
 /**
  * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
  * storage made a writable backend mandatory, so this is a deployment-config
- * error, not a transient failure. Typed (vs a bare `Error`) so the upload route
- * can surface its actionable message to the client (configure S3 / set
- * `LANGWATCH_LOCAL_STORAGE_PATH`) instead of letting it collapse into a generic
- * 500 that the browser then mistakes for "no object storage".
+ * error, not a transient failure. We can name the cause and we can name the
+ * fix, so per ADR-045 it crosses the boundary as a handled error under
+ * `storage_not_writable` rather than as an unattributed 500.
+ *
+ * `fault: "platform"`, because provisioning object storage is ours: nothing
+ * the caller changes about the request makes the write land.
+ *
+ * The message is customer-safe by construction. The storage root and the
+ * environment variables that set it are operator detail: they ride the log
+ * line at the throw site and the remediation tips, never the response body.
  */
-export class StorageNotWritableError extends Error {
-  constructor(message: string) {
-    super(message);
+export class StorageNotWritableError extends HandledError {
+  declare readonly code: "storage_not_writable";
+
+  constructor() {
+    super(
+      "storage_not_writable",
+      "Dataset storage is not writable, so nothing was saved",
+      {
+        httpStatus: 500,
+        fault: "platform",
+        ...remediation("storage_not_writable"),
+      },
+    );
     this.name = "StorageNotWritableError";
   }
 }

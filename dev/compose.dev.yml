@@ -44,7 +44,7 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  # Customer-egress policy is sourced from langwatch/.env. Do not override it
+  # Customer-egress policy is sourced from platform/app/.env. Do not override it
   # here: local/self-hosted setups may intentionally use private HTTP endpoints.
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
@@ -448,7 +448,7 @@ volumes:
   root_modules:
     name: ${VOLUME_PREFIX:-langwatch}-root-modules
   # mcp-server's install + build run in the `init` container against the
-  # `./mcp-server` bind mount. Without isolation the container install writes
+  # `./mcp/typescript` bind mount. Without isolation the container install writes
   # container-shaped pnpm symlinks into the host tree, which then dangle and
   # break a host-side build (#5144). It is a plain workspace member since
   # ADR-076 (its store rides in root_modules), but its own node_modules links

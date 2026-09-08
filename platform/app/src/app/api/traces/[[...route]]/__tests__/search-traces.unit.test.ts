@@ -323,6 +323,38 @@ describe("POST /search", () => {
       expect(body.pagination.scrollId).toBe("next-page-token");
     });
 
+    describe("when the service reports an updated-axis snapshot boundary", () => {
+      it("puts it on the wire, since a client cannot resume safely without it", async () => {
+        mockGetAllTracesForProject.mockResolvedValue({
+          groups: [sampleTraces],
+          totalHits: 2,
+          traceChecks: {},
+          scrollId: "next-page-token",
+          updatedThrough: 1_700_000_123_456,
+        });
+
+        const res = await searchRequest({ startDate: 0, endDate: 10000 });
+
+        const body = await res.json();
+        expect(body.pagination.updatedThrough).toBe(1_700_000_123_456);
+      });
+    });
+
+    describe("when the service reports no snapshot boundary", () => {
+      it("omits the field rather than sending a null a client might resume from", async () => {
+        mockGetAllTracesForProject.mockResolvedValue({
+          groups: [sampleTraces],
+          totalHits: 2,
+          traceChecks: {},
+        });
+
+        const res = await searchRequest({ startDate: 0, endDate: 10000 });
+
+        const body = await res.json();
+        expect(body.pagination).not.toHaveProperty("updatedThrough");
+      });
+    });
+
     it("returns valid JSON for empty result set", async () => {
       mockGetAllTracesForProject.mockResolvedValue({
         groups: [[]],

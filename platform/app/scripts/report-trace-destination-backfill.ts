@@ -35,7 +35,8 @@
  * Usage:
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-trace-destination-backfill.ts
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 type Resolution =
   | "explicit-live"
@@ -69,7 +70,9 @@ async function main(): Promise<void> {
   // A client of its own rather than the app's singleton: this runs against a
   // DATABASE_URL the operator points at, and must not pick up whatever the
   // surrounding environment had configured.
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
   try {
     const projects = await loadProjects(prisma);
     const byId = new Map(projects.map((project) => [project.id, project]));

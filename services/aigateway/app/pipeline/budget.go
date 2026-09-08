@@ -15,7 +15,7 @@ import (
 type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 
 // Budget creates an interceptor that prechecks budget before dispatch.
-// Cost recording is NOT done here — the trace-fold reactor on the control
+// Cost recording is NOT done here — the trace-fold subscriber on the control
 // plane folds OTel span usage attributes into the ClickHouse budget ledger.
 //
 // Provider-filtered budgets (contract §4.6) do not block here: their breach

@@ -6,11 +6,11 @@ sidebarTitle: REST API
 
 <Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
 
-<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. Sergey's Lane B-5 commit at `8fffad4ad` locked the invariant for the governance resources shipped in v1: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
 ## Why a separate REST API alongside tRPC
 
-LangWatch's dashboard already uses tRPC, type-safe, but coupled to the Next.js, React render path. The Hono-mounted REST API exists for the surfaces that *aren't* the dashboard:
+LangWatch's dashboard already uses tRPC, type-safe, but coupled to the Vite React app that renders it. The Hono-mounted REST API exists for the surfaces outside the dashboard:
 
 - **Agentic workflows**: Claude Code, Codex, Cursor running `langwatch governance …` commands need a stable, OpenAPI-described surface they can call directly.
 - **CI, scripting**: the same OpenAPI spec is consumed by the TypeScript and Python SDKs (auto-regen on build), so any pipeline language with a generated client gets the full governance feature set.
@@ -31,19 +31,19 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 ## Resource × verb matrix
 
-Every governance resource exposes the full CRUD triple, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server. The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
+Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
 | Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
-| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/ai-governance/audit-log) |
+| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/platform/audit-log) |
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
 | Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
 | Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
-| Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
-| Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
+| Members | `/api/governance/members` | [Members and Teams](/platform/members-and-teams) |
+| Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
+| Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
 | AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
 | Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
 | Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
@@ -52,7 +52,7 @@ Every governance resource exposes the full CRUD triple, `list`, `get`, `create`,
 
 ## Verb shape: worked example
 
-The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). The verb set:
+The first surface to ship is `ingestion-templates` (Lane B-1 commit). The verb set:
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
@@ -70,7 +70,7 @@ A few resource-shape notes that generalise across the namespace:
 - **Resource-specific verbs**: `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain, admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
 - **Error mapping**: `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType`, validation. All map to a common `errorSchema` with `{ type, code, message }`.
 
-The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
+The second resource to ship is `ingestion-keys` (Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
@@ -79,7 +79,7 @@ The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `52
 | `install` | tRPC `ingestionKey.install` | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once) | `aiTools:manage` |
 | `rotate` | tRPC `ingestionKey.rotate` | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately) | `aiTools:manage` |
 
-Two consequences worth noting:
+Two consequences:
 
 - **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `sk-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
@@ -126,7 +126,7 @@ SELECT * FROM "AuditLog"
 
 All four rows have **identical** payload shapes apart from the `metadata.surface` field, same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
 
-The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of Sergey's Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
+The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of the Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
 
 ## Verifying the contract
 
@@ -148,7 +148,9 @@ The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:man
 
 **Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
 
-**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
+**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`, and asserts all three audit rows fall back to `metadata.surface === "hono"`.
+
+That locks the `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags. The only value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test, this pins the umbrella spec's `@audit-uniform` invariant for v1.
 
 To run locally:
 
@@ -167,8 +169,8 @@ Use these files as the authoritative reference when implementing a CLI command o
 
 - [Governance CLI](/ai-governance/cli): `langwatch governance <resource> <verb>` thin shell
 - [Governance MCP server](/ai-governance/mcp): same surface as MCP tools for agent use
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes that gate each verb
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes that gate each verb
+- [Audit log](/platform/audit-log): where state-change rows land
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)

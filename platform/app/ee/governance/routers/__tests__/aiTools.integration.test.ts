@@ -19,14 +19,15 @@
  *   specs/ai-governance/personal-portal/tool-catalog-scoping.feature
  *   specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -238,7 +239,7 @@ describe("aiToolsRouter integration", () => {
             linkUrl: "https://wiki.example.com",
           },
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     /** @scenario "External (lite) members can also list (portal must work for everyone)" */
@@ -850,7 +851,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.importStarterPack({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
     it("merges iconAsset into pre-existing admin-created tiles by displayName", async () => {
@@ -1098,7 +1099,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.providerOptions({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -1333,7 +1334,6 @@ describe("aiToolsRouter integration", () => {
           },
           name: `Drawer Default ${nanoid(4)}`,
           modelProviderIds: [],
-          strategy: "priority",
           isDefault: true,
           createdById: adminUserId,
           updatedById: adminUserId,
@@ -1359,7 +1359,7 @@ describe("aiToolsRouter integration", () => {
         callerFor(memberPlatformUserId).aiTools.routingPolicyOptions({
           organizationId,
         }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 });

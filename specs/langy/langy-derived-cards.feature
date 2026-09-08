@@ -118,3 +118,23 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
     When the turn settles and the stamped part arrives
     Then exactly one card renders, reconciled by the card's identity
     And on any disagreement the settled part's content wins
+
+  @integration
+  Scenario: A settled turn's cards reach the reader who watched it stream
+    Given a turn this browser streamed whose reply carried card fences
+    When the turn settles and the panel keeps the copy it streamed
+    Then the reader sees the same cards a reader who opened it later sees
+    And the reader never has to reload the page to see them
+
+  @integration
+  Scenario: A loosely written opening still draws a card
+    Given a turn streaming a card whose opening fence carries a space before the tag
+    When the fence validates
+    Then a forming card renders
+    And the reader never sees the card's JSON as a code block
+
+  @unit
+  Scenario: The pre-scan accepts every opening the grammar accepts
+    Given text that the fence grammar opens a card block in
+    When the cheap pre-scan is asked whether the text could hold a card
+    Then it answers yes for every such opening

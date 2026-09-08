@@ -1,6 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 
@@ -48,6 +48,19 @@ vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
   };
 });
 
+// A key's grants and its private role are ledger commands (ADR-092
+// delivery-plan PR 2), so the writer is the seam these cases observe.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -62,7 +75,9 @@ const USER_ID = "user_1";
 const CUSTOM_ROLE_ID = "cr_1";
 
 function buildMockPrisma() {
-  const mockTx = {
+  // One flat client: the service no longer opens a transaction, because
+  // everything it used to write inside one is a ledger command now.
+  const client = {
     apiKey: {
       create: vi.fn().mockResolvedValue({
         id: "ak_1",
@@ -80,43 +95,26 @@ function buildMockPrisma() {
         updatedAt: new Date(),
       }),
       findUnique: vi.fn(),
-      update: vi.fn(),
-    },
-    roleBinding: {
-      createMany: vi.fn().mockResolvedValue({ count: 1 }),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-    customRole: {
-      create: vi.fn().mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        name: "API Key: Test",
-        permissions: ["traces:view", "annotations:manage"],
-      }),
-      update: vi.fn().mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        name: "API Key: Old Key",
-        permissions: ["traces:view", "annotations:manage"],
-      }),
-      findUnique: vi.fn().mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        permissions: ["traces:view", "annotations:manage"],
-      }),
-      findFirst: vi.fn().mockResolvedValue({ id: CUSTOM_ROLE_ID }),
-    },
-  };
-
-  return {
-    $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
-      fn(mockTx),
-    ),
-    organizationUser: {
-      findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
-    },
-    apiKey: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
-      update: vi.fn(),
+      // Activation reads back the row it flips live, the way Prisma's update
+      // answers with the updated record.
+      update: vi.fn().mockImplementation(({ data }: { data: object }) =>
+        Promise.resolve({
+          id: "ak_1",
+          name: "Test Key",
+          userId: USER_ID,
+          organizationId: ORG_ID,
+          lookupId: "testlookup1234",
+          hashedSecret: "hashedsecret123",
+          permissionMode: "restricted",
+          createdByUserId: null,
+          expiresAt: null,
+          revokedAt: null,
+          lastUsedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...data,
+        }),
+      ),
     },
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({
@@ -125,31 +123,37 @@ function buildMockPrisma() {
         scopeId: ORG_ID,
       }),
       findMany: vi.fn().mockResolvedValue([]),
-      createMany: vi.fn(),
-      deleteMany: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
     },
+    teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
-      create: vi.fn().mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        name: "API Key: Test",
-        permissions: ["traces:view", "annotations:manage"],
-      }),
-      update: vi.fn().mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        name: "API Key: Old Key",
-        permissions: ["traces:view", "annotations:manage"],
-      }),
-      findUnique: vi.fn().mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        permissions: ["traces:view", "annotations:manage"],
-      }),
+      // The natural-key check asks by (organizationId, name) and finds the
+      // name free; a redefine asks by id and finds the role it rewrites.
+      findUnique: vi.fn().mockImplementation(({ where }: any) =>
+        where?.organizationId_name
+          ? null
+          : {
+              id: where?.id ?? CUSTOM_ROLE_ID,
+              organizationId: ORG_ID,
+              name: "API Key: Old Key",
+              description: null,
+              permissions: ["traces:view", "annotations:manage"],
+              kind: "system_api_key",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+      ),
+      findFirst: vi.fn().mockResolvedValue({ id: CUSTOM_ROLE_ID }),
       findMany: vi.fn().mockResolvedValue([]),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    organizationUser: {
+      findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
     },
     team: {
       findFirst: vi.fn(),
     },
     project: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn(),
     },
     user: {
@@ -158,8 +162,9 @@ function buildMockPrisma() {
     organization: {
       findMany: vi.fn().mockResolvedValue([]),
     },
-    _mockTx: mockTx,
-  } as any;
+  };
+
+  return client as unknown as PrismaClient;
 }
 
 function buildCaller(prisma: PrismaClient) {
@@ -180,6 +185,11 @@ describe("apiKey router — restricted permissions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindings.mockResolvedValue(undefined);
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
+    ledger.defineRole.mockResolvedValue(undefined);
+    ledger.deleteRole.mockResolvedValue(undefined);
     prisma = buildMockPrisma();
     caller = buildCaller(prisma);
   });
@@ -221,21 +231,25 @@ describe("apiKey router — restricted permissions", () => {
           ],
         });
 
-        expect(prisma._mockTx.roleBinding.createMany).toHaveBeenCalledWith({
-          data: [
-            expect.objectContaining({
-              role: TeamUserRole.CUSTOM,
-              customRoleId: CUSTOM_ROLE_ID,
-            }),
-          ],
-        });
+        // The role is defined first, and the grant carries the id it minted.
+        const definedRoleId = ledger.defineRole.mock.calls[0]![0].roleId;
+        expect(ledger.attachBindings).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bindings: [
+              expect.objectContaining({
+                role: TeamUserRole.CUSTOM,
+                customRoleId: definedRoleId,
+              }),
+            ],
+          }),
+        );
       });
     });
 
     describe("when creating a restricted key with camelCase permissions", () => {
       /** @scenario Restricted key with camelCase permissions saves without error */
       it("accepts auditLog:view without malformed error", async () => {
-        prisma._mockTx.customRole.create.mockResolvedValue({
+        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
           id: CUSTOM_ROLE_ID,
           name: "API Key: Audit Key",
           permissions: ["auditLog:view"],
@@ -283,24 +297,11 @@ describe("apiKey router — restricted permissions", () => {
     describe("when switching from all to restricted (no existing CustomRole)", () => {
       /** @scenario Updating a key from All to Restricted upserts a CustomRole */
       it("succeeds and returns the updated key", async () => {
-        prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
-          ...existingKey,
-          permissionMode: "restricted",
-        });
-        prisma._mockTx.apiKey.findUnique.mockResolvedValue({
-          ...existingKey,
-          permissionMode: "restricted",
-          roleBindings: [
-            {
-              id: "rb_new",
-              role: TeamUserRole.CUSTOM,
-              customRoleId: CUSTOM_ROLE_ID,
-              scopeType: RoleBindingScopeType.ORGANIZATION,
-              scopeId: ORG_ID,
-            },
-          ],
-        });
+        // The pre-read sees the key as it was; the read-back after the write
+        // sees the row the update left.
+        (prisma.apiKey.findUnique as unknown as Mock)
+          .mockResolvedValueOnce(existingKey)
+          .mockResolvedValue({ ...existingKey, permissionMode: "restricted" });
 
         const result = await caller.update({
           organizationId: ORG_ID,
@@ -336,10 +337,15 @@ describe("apiKey router — restricted permissions", () => {
         ],
       };
 
-      it("updates the existing CustomRole instead of creating a new one", async () => {
-        prisma.apiKey.findUnique.mockResolvedValue(restrictedKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue(restrictedKey);
-        prisma._mockTx.apiKey.findUnique.mockResolvedValue(restrictedKey);
+      it("mints a fresh CustomRole and deletes the one it replaces", async () => {
+        // A fresh role is minted rather than the existing exclusive role
+        // being updated in place: mutating it first left a crash window
+        // where the key held new permissions with stale binding state. The
+        // orphan cleanup after replaceRoleBindings deletes the superseded
+        // role.
+        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(
+          restrictedKey,
+        );
 
         await caller.update({
           organizationId: ORG_ID,
@@ -355,35 +361,25 @@ describe("apiKey router — restricted permissions", () => {
           ],
         });
 
-        expect(prisma._mockTx.customRole.update).toHaveBeenCalled();
-        expect(prisma._mockTx.customRole.create).not.toHaveBeenCalled();
+        expect(ledger.defineRole).toHaveBeenCalledTimes(1);
+        expect(ledger.defineRole).not.toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: CUSTOM_ROLE_ID }),
+        );
+        expect(ledger.deleteRole).toHaveBeenCalledWith(
+          expect.objectContaining({ roleId: CUSTOM_ROLE_ID }),
+        );
       });
     });
 
     describe("when updating restricted key with camelCase permissions", () => {
       it("accepts auditLog:view without malformed error", async () => {
-        prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.customRole.create.mockResolvedValue({
+        (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(
+          existingKey,
+        );
+        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
           id: CUSTOM_ROLE_ID,
           name: "API Key: Old Key",
           permissions: ["auditLog:view"],
-        });
-        prisma._mockTx.apiKey.update.mockResolvedValue({
-          ...existingKey,
-          permissionMode: "restricted",
-        });
-        prisma._mockTx.apiKey.findUnique.mockResolvedValue({
-          ...existingKey,
-          permissionMode: "restricted",
-          roleBindings: [
-            {
-              id: "rb_new",
-              role: TeamUserRole.CUSTOM,
-              customRoleId: CUSTOM_ROLE_ID,
-              scopeType: RoleBindingScopeType.ORGANIZATION,
-              scopeId: ORG_ID,
-            },
-          ],
         });
 
         const result = await caller.update({

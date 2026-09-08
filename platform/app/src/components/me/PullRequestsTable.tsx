@@ -1,19 +1,12 @@
 import {
   Button,
   HStack,
-  Icon,
   Skeleton,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  ChevronDown,
-  ChevronUp,
-  GitPullRequest,
-  MoreVertical,
-} from "lucide-react";
-import numeral from "numeral";
+import { GitPullRequest, MoreVertical } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { LuLink } from "react-icons/lu";
@@ -52,6 +45,7 @@ import {
   derivePullRequestStatus,
   type PullRequestStatus,
 } from "./pullRequestStatus";
+import { SortableColumnHeader } from "./SortableColumnHeader";
 import {
   type PullRequestSortColumn,
   type PullRequestSortState,
@@ -121,13 +115,6 @@ type UnlinkedBranchPayload = UsagePayload["unlinked"][number];
 /** What one model consumed on a pull request. */
 type ModelUsage = MappedPullRequestPayload["modelBreakdown"][number];
 
-/**
- * Who worked on a pull request. A contributor is a person when the work ran in
- * their own workspace, and the project itself when it ran in a shared one.
- */
-type ContributorSummary =
-  MappedPullRequestPayload["contributorsSummary"][number];
-
 /** A period the reader picked, and which way they picked it. */
 interface PeriodSelection {
   period: Period;
@@ -153,13 +140,11 @@ interface PullRequestListRow {
   snapshotStatus: PullRequestStatus | null;
   /** When this row's counted work last ran, epoch ms, 0 when unknown. */
   lastActivityAtMs: number;
-  sessionsCount: number;
   totalTokens: number;
   costUsd: number | null;
   nonBilledCostUsd: number | null;
   billedCostUsd: number | null;
   modelBreakdown: ModelUsage[];
-  contributorsSummary: ContributorSummary[];
   /** Whether the organization's connection reaches this repository. */
   repositoryCovered: boolean;
 }
@@ -602,13 +587,6 @@ const TableHeaderRow: React.FC<{
         onSort={onSort}
       />
       <SortableColumnHeader
-        label="Sessions"
-        column="sessions"
-        sort={sort}
-        onSort={onSort}
-        align="end"
-      />
-      <SortableColumnHeader
         label="Models"
         column="models"
         sort={sort}
@@ -632,87 +610,6 @@ const TableHeaderRow: React.FC<{
     </Table.Row>
   </Table.Header>
 );
-
-/**
- * A heading that sorts, drawn the way the trace table draws one: the column in
- * force reads as the one in charge, with a tinted band, a darker label and a
- * chevron pointing the way it is ordered. Every other sortable column keeps a
- * faint chevron so a reader can tell at a glance which headings do something,
- * without hovering each one to find out.
- *
- * `aria-sort` on the header says the same thing to a reader who cannot see the
- * chevron: without it someone could sort the table by keyboard and have no way
- * to learn that they had.
- */
-const SortableColumnHeader: React.FC<{
-  label: string;
-  column: PullRequestSortColumn;
-  sort: PullRequestSortState;
-  onSort: (column: PullRequestSortColumn) => void;
-  align?: "start" | "end";
-}> = ({ label, column, sort, onSort, align = "start" }) => {
-  const active = sort.column === column;
-
-  return (
-    <Table.ColumnHeader
-      aria-sort={
-        active
-          ? sort.direction === "asc"
-            ? "ascending"
-            : "descending"
-          : "none"
-      }
-      // The band and the darker label do the highlighting. Weight is left to
-      // the table's own heading style, which is already bold: overriding it
-      // here made the sorted column read LIGHTER than the rest.
-      bg={active ? "bg.muted" : undefined}
-      color={active ? "fg" : undefined}
-    >
-      <Button
-        type="button"
-        variant="plain"
-        aria-label={`Sort by ${label}`}
-        onClick={() => onSort(column)}
-        width="full"
-        height="auto"
-        minHeight="unset"
-        paddingX={0}
-        paddingY={0}
-        gap={1}
-        // The right-aligned columns keep their label pinned to the edge, so it
-        // does not shift sideways when the chevron changes.
-        justifyContent={align === "end" ? "flex-end" : "flex-start"}
-        // The header band owns the type; the button only carries the click.
-        color="inherit"
-        fontSize="inherit"
-        fontWeight="inherit"
-        letterSpacing="inherit"
-        textTransform="inherit"
-        userSelect="none"
-        _hover={{ color: "fg" }}
-        css={{ "&:hover [data-sort-hint]": { opacity: 0.85 } }}
-      >
-        {label}
-        {active ? (
-          <Icon boxSize="12px" color="fg" flexShrink={0}>
-            {sort.direction === "asc" ? <ChevronUp /> : <ChevronDown />}
-          </Icon>
-        ) : (
-          <Icon
-            data-sort-hint
-            boxSize="12px"
-            color="fg.muted"
-            opacity={0.35}
-            flexShrink={0}
-            transition="opacity 0.1s ease"
-          >
-            <ChevronDown />
-          </Icon>
-        )}
-      </Button>
-    </Table.ColumnHeader>
-  );
-};
 
 const NotConnectedState: React.FC<{
   installUrl: string | null;
@@ -807,9 +704,6 @@ const PullRequestRow: React.FC<{
         ? MISSING_VALUE
         : formatLastUpdate({ timestampMs: row.lastActivityAtMs })}
     </Table.Cell>
-    <Table.Cell textAlign="end" fontSize="sm">
-      <SessionsCell row={row} />
-    </Table.Cell>
     <Table.Cell maxWidth="160px">
       <ModelsCell models={row.modelBreakdown} />
     </Table.Cell>
@@ -902,33 +796,6 @@ const StatusCell: React.FC<{
 
   return (
     <PullRequestStatusBadge status={row.snapshotStatus} source="payload" />
-  );
-};
-
-/** The session count, with who ran them behind a hover. */
-const SessionsCell: React.FC<{ row: PullRequestListRow }> = ({ row }) => {
-  const count = numeral(row.sessionsCount).format("0,0");
-  if (row.contributorsSummary.length === 0) return <>{count}</>;
-  return (
-    <Tooltip
-      content={
-        <VStack align="start" gap={0.5} maxWidth="full">
-          {row.contributorsSummary.map((contributor) => (
-            <Text key={contributor.projectId}>
-              {contributor.contributorLabel}: {contributor.sessionsCount}{" "}
-              {contributor.sessionsCount === 1 ? "session" : "sessions"}
-            </Text>
-          ))}
-        </VStack>
-      }
-      positioning={{ placement: "left" }}
-    >
-      {/* Who ran the sessions is written down nowhere else on this row, so the
-          hover has a tab stop behind it. */}
-      <Text as="span" cursor="help" tabIndex={0}>
-        {count}
-      </Text>
-    </Tooltip>
   );
 };
 
@@ -1118,13 +985,11 @@ function toMappedListRow(row: MappedPullRequestPayload): PullRequestListRow {
       prMergedAtMs: row.prMergedAtMs,
     }),
     lastActivityAtMs: row.lastActivityAtMs,
-    sessionsCount: row.sessionsCount,
     totalTokens: row.totalTokens,
     costUsd: row.costUsd,
     billedCostUsd: row.billedCostUsd,
     nonBilledCostUsd: row.nonBilledCostUsd,
     modelBreakdown: row.modelBreakdown,
-    contributorsSummary: row.contributorsSummary,
     // A mapped pull request came through the connection, so the repository it
     // lives in is covered by definition.
     repositoryCovered: true,
@@ -1140,13 +1005,11 @@ function toBranchListRow(row: UnlinkedBranchPayload): PullRequestListRow {
     pullRequest: null,
     snapshotStatus: null,
     lastActivityAtMs: row.lastActivityAtMs,
-    sessionsCount: row.sessionsCount,
     totalTokens: row.totalTokens,
     costUsd: row.costUsd,
     billedCostUsd: row.billedCostUsd,
     nonBilledCostUsd: row.nonBilledCostUsd,
     modelBreakdown: row.modelBreakdown,
-    contributorsSummary: [],
     repositoryCovered: row.repoCovered,
   };
 }

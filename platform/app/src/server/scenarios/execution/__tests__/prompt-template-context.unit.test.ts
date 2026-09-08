@@ -200,7 +200,7 @@ describe("buildPromptTemplateContext", () => {
         ]),
       });
 
-      expect(JSON.parse(context.messagesJson!)).toEqual([
+      expect(JSON.parse(context.messagesJson as string)).toEqual([
         { role: "user", content: "I need a refund" },
         { role: "assistant", content: "Sure, let me help" },
       ]);
@@ -269,6 +269,40 @@ describe("templateReferencesVariable", () => {
       expect(
         templateReferencesVariable("{% assign x = 'messages' %}", "messages"),
       ).toBe(false);
+    });
+  });
+});
+
+describe("run parameters in the prompt template context", () => {
+  describe("given a run that resolved values", () => {
+    /** @scenario "A prompt target reads params in its prompt template" */
+    it("makes each one reachable as params.NAME", () => {
+      const { context } = buildPromptTemplateContext({
+        input: turn([{ role: "user", content: "hi" }]),
+        parameters: { account_tier: "platinum", seats: 12 },
+      });
+
+      expect(context.params).toEqual({ account_tier: "platinum", seats: 12 });
+    });
+
+    it("leaves the conversation bindings alone", () => {
+      const { context } = buildPromptTemplateContext({
+        input: turn([{ role: "user", content: "hi" }]),
+        parameters: { input: "not the conversation", messages: "nor this" },
+      });
+
+      expect(context.input).toBe("hi");
+      expect(context.messages).toBe("user: hi");
+    });
+  });
+
+  describe("given a run that resolved none", () => {
+    it("binds an empty namespace rather than nothing", () => {
+      const { context } = buildPromptTemplateContext({
+        input: turn([{ role: "user", content: "hi" }]),
+      });
+
+      expect(context.params).toEqual({});
     });
   });
 });

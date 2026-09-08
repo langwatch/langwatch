@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 
 export const queueRunCommandDataSchema = z.object({
@@ -9,11 +11,16 @@ export const queueRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
-  /** Target for execution. Used by the execution reactor to spawn the right adapter. */
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * The run's secret parameter values, encrypted, keyed by name. A sibling of
+   * `metadata` so the fold projection cannot copy it into the runs store.
+   */
+  secretParameters: runSecretCiphertextSchema.optional(),
+  /** Target for execution. Used by the process manager's execute intent to spawn the right adapter. */
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow"]),
+      type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
       referenceId: z.string(),
     })
     .optional(),
@@ -29,7 +36,7 @@ export const startRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
@@ -50,11 +57,44 @@ export const finishRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   results: simulationResultsSchema.optional(),
+  /**
+   * Failure reason from infrastructure callers (the stall watchdog and
+   * cancel-grace intents) that have no judge verdict to report. When
+   * `results` is absent, FinishRunCommand synthesizes the failure-results
+   * envelope from this so the reason is recorded on the event instead of
+   * being dropped at the schema boundary. Ignored when `results` is given.
+   */
+  error: z.string().optional(),
   durationMs: z.number().optional(),
   status: z.string().optional(),
+  /**
+   * ECST fields for the RunFinished event. Optional: FinishRunCommand
+   * backfills any gap from the run's prior events (identity from RunQueued,
+   * traceIds from MessageSnapshot/TextMessageEnd) when omitted.
+   */
+  scenarioId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+  traceIds: z.array(z.string()).optional(),
   occurredAt: z.number(),
 });
 export type FinishRunCommandData = z.infer<typeof finishRunCommandDataSchema>;
+
+/**
+ * Records the evaluator results of a finished run. The verdict after the
+ * gate, the identity and the verdict the run held before are all read from
+ * the run's prior events by RecordEvaluationsCommand, so the caller sends
+ * only the results.
+ */
+export const recordEvaluationsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  evaluations: z.array(scenarioEvaluationResultSchema),
+  occurredAt: z.number(),
+});
+export type RecordEvaluationsCommandData = z.infer<
+  typeof recordEvaluationsCommandDataSchema
+>;
 
 export const textMessageStartCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -74,7 +114,7 @@ export const textMessageEndCommandDataSchema = z.object({
   messageId: z.string(),
   role: z.string(),
   content: z.string(),
-  message: z.record(z.unknown()).optional(),
+  message: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
   occurredAt: z.number(),
@@ -87,7 +127,7 @@ export const computeRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   traceId: z.string(),
-  /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
+  /** ECST payload: metrics carried from trace-side subscriber. Omitted in pull mode. */
   metrics: z
     .object({
       totalCost: z.number(),

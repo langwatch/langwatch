@@ -169,11 +169,16 @@ res, err := lw.Traces.Search(ctx, client.TraceSearchParams{
 	Query:   "timeout",
 	Filters: map[string][]string{"metadata.user_id": {"u_123"}},
 })
-if res.Traces != nil {
-	for _, t := range *res.Traces {
-		fmt.Println(*t.TraceId)
-	}
+for _, t := range res.Traces {
+	fmt.Println(*t.TraceId)
 }
+
+// Trace search pages by cursor only. Feed the previous response's ScrollID
+// back in, and stop when a response carries none — or let lw.Traces.All do it.
+next, err := lw.Traces.Search(ctx, client.TraceSearchParams{
+	Query:    "timeout",
+	ScrollID: res.Pagination.ScrollID,
+})
 
 trace, err := lw.Traces.Get(ctx, "trace_abc123")
 ```
@@ -388,7 +393,7 @@ for rec, err := range lw.Datasets.AllRecords(ctx, "golden-examples", client.List
 |----------|--------|----------|
 | `lw.Datasets.AllRecords(ctx, slugOrID, params)` | `map[string]any` | offset (`page`/`limit`) |
 | `lw.Datasets.All(ctx, params)` | `client.Dataset` | offset (`page`/`limit`) |
-| `lw.Traces.All(ctx, params)` | `client.Trace` | offset (`pageOffset`/`pageSize`) |
+| `lw.Traces.All(ctx, params)` | `client.Trace` | cursor (`scrollId`) |
 | `lw.Scenarios.AllRuns(ctx, params)` | `map[string]any` | cursor (`nextCursor`) |
 | `lw.Projects.All(ctx, params)` | `client.Project` | offset (`page`/`limit`) |
 

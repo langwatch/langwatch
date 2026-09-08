@@ -107,31 +107,31 @@ Feature: GroupQueue content-addressed tiered payload store
   # The headline waste: one event today fans out to a dozen-plus jobs each
   # carrying its own copy. After this change the event is stored once.
   Scenario: One event fanned out to many jobs stores the shared payload once
-    Given an event is dispatched to a fold projection, several map projections, and a chain of reactors
+    Given an event is dispatched to a fold projection, several map projections, and a chain of subscribers
     When the resulting jobs are staged
     Then the shared event is stored under a single content-addressed key
     And every staged job references that key rather than embedding the event
     And the number of stored copies of the event is one regardless of the fan-out width
 
   @integration @track2 @unimplemented
-  Scenario: A reactor job references the shared event and its fold state separately
-    Given a fold whose reactors each receive the event and the same fold state
-    When the reactor jobs are staged
+  Scenario: A subscriber job references the shared event and its fold state separately
+    Given a fold whose subscribers each receive the event and the same fold state
+    When the subscriber jobs are staged
     Then the event is stored once under its content hash
     And the fold state is stored once under its content hash
-    And each reactor job carries a ref to the event and a ref to the fold state
+    And each subscriber job carries a ref to the event and a ref to the fold state
     And the handler still receives a payload deep-equal to { event, foldState }
 
   @integration @track2 @unimplemented
-  # The producer-hoist payoff: a projection job (event sent spread) and a reactor
+  # The producer-hoist payoff: a projection job (event sent spread) and a subscriber
   # job (event nested in { event, foldState }) carry DIFFERENT shapes, yet the
   # event is lifted at the fan-out point before the shapes diverge, so both
   # reference one stored copy. A per-job encoder hoist would miss this.
-  Scenario: A projection and a reactor for the same event share one stored event
-    Given one event dispatched to both a map projection and a reactor
+  Scenario: A projection and a subscriber for the same event share one stored event
+    Given one event dispatched to both a map projection and a subscriber
     When their jobs are staged
     Then the event is hoisted at the fan-out point and stored once
-    And the projection job and the reactor job both reference that single copy
+    And the projection job and the subscriber job both reference that single copy
     And the event was serialized and stored once for the fan-out, not once per job
 
   @integration @track2 @unimplemented
@@ -459,13 +459,13 @@ Feature: GroupQueue content-addressed tiered payload store
   #   AC2.1 "One event fanned out N ways is stored once" (the headline win)
   #     -> One event fanned out to many jobs stores the shared payload once
   #   AC2.2 "Event and fold state are hoisted and referenced separately"
-  #     -> A reactor job references the shared event and its fold state separately
+  #     -> A subscriber job references the shared event and its fold state separately
   #   AC2.3 "Flat job round-trips its payload unchanged"
   #     -> A flat job round-trips its payload through ref resolution unchanged
   #   AC2.4 "Blob keys namespaced by tenant; tenants never share a blob; purge by prefix"
   #     -> Blob keys are namespaced by tenant so tenants never share a blob
   #   AC2.5 "Producer-hoist: cross-shape dedup + serialize-once per fan-out"
-  #     -> A projection and a reactor for the same event share one stored event
+  #     -> A projection and a subscriber for the same event share one stored event
   # Track 3 — lease lifecycle and TTL backstop
   #   AC3.1 "Blob lives while any referencing job renews its lease"
   #     -> A shared blob survives while any referencing job renews its lease

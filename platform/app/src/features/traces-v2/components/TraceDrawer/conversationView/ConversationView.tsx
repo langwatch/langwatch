@@ -33,8 +33,8 @@ import {
   useAnnotationDraftStore,
 } from "../../../stores/annotationDraftStore";
 import type { TraceListItem } from "../../../types/trace";
+import { FormatSelect } from "../FormatSelect";
 import { RenderedMarkdown } from "../markdownView";
-import { SegmentedToggle } from "../SegmentedToggle";
 import {
   extractReadableText,
   extractReasoningText,
@@ -605,10 +605,11 @@ const ConversationHeader: React.FC<{
           {isExpandAllEnabled ? "Collapse all" : "Expand all"}
         </Button>
       )}
-      <SegmentedToggle
+      <FormatSelect
         value={mode}
-        onChange={(v) => onModeChange(v as Mode)}
+        onChange={onModeChange}
         options={CONVERSATION_MODES}
+        ariaLabel="Conversation view format"
       />
     </HStack>
   );

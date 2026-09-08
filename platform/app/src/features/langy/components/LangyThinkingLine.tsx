@@ -4,7 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import type { LangyThinkingTone } from "../logic/langyThinkingLine";
 import { langyThinkingLine } from "../logic/langyThinkingLine";
+import { useLangyStore } from "../stores/langyStore";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
 import { STATUS_LINE_ROW, StatusOrb } from "./StreamingStatusLine";
@@ -27,9 +29,8 @@ const MotionText = motion.create(Box);
  * (`logic/langyThinkingLine.ts`):
  *
  *   - a tool is running   → say which, from the tool stream's own command;
- *   - tokens are arriving → "Writing…", and whimsy is allowed, because the model
- *                           really is thinking and a joke about its character
- *                           claims nothing about the work;
+ *   - tokens are arriving → render NOTHING: the streaming answer is on screen
+ *                           and speaks for itself;
  *   - reasoning is flowing → "Thinking…", plainly;
  *   - nothing at all      → say we are still starting, and ESCALATE. Cycling
  *                           implies progress, so it stops. A stuck turn ends up
@@ -55,51 +56,91 @@ const ELAPSED_TICK_MS = 1_000;
 export function LangyThinkingLine({
   messages,
   hasLiveReasoning = false,
+  workerReady = false,
+  awaitingAnswer = false,
+  terminalConnected = false,
+  activityKey = "",
 }: {
   messages: UIMessage[];
   /**
+   * A fingerprint of everything the turn has produced so far
+   * (`logic/langyThinkingLine`'s `langyTurnActivityKey`). The clock below
+   * restarts whenever it changes, so the escalation measures how long the turn
+   * has been SILENT rather than how long it has been running.
+   */
+  activityKey?: string;
+  /**
+   * A card is holding the turn for the developer's answer (ADR-129), so the
+   * line says that instead of escalating toward "Langy may be stuck".
+   */
+  awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that holds the turn is open
+   * there too and the line says both places.
+   */
+  terminalConnected?: boolean;
+  /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts, so without this signal a reasoning-but-no-prose
-   * turn would read as "Starting up…" — a false claim. The text itself is never
+   * turn would read as a startup wait — a false claim. The text itself is never
    * shown; see the module doc.
    */
   hasLiveReasoning?: boolean;
+  /**
+   * A panel-open warm proved this conversation's worker alive, so a first
+   * message reads "Thinking…" instead of the startup ladder. See
+   * `logic/langyThinkingLine`.
+   */
+  workerReady?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
 
-  // Time since this line appeared, which is when the turn went in flight (the
-  // panel mounts it on `isBusy`). This is what lets silence escalate.
+  // What the page Langy is driving says it is doing. Subscribed, not read
+  // once: the report changes as rows come back, and the line is the only
+  // place that shows it. It is also one of the turn's events, so it belongs in
+  // the clock below.
+  const pageActivity = useLangyStore((state) => state.pageActivity);
+
+  // How long the turn has been silent. The clock starts when the line appears
+  // and starts again on every event the turn produces, so "This is taking
+  // longer than usual" and "Langy may be stuck" describe silence rather than
+  // turn length. Without that, a turn running a local command for two minutes,
+  // with its output arriving in the terminal, was told it may be stuck.
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
     const startedAt = Date.now();
+    setElapsedMs(0);
     const id = setInterval(
       () => setElapsedMs(Date.now() - startedAt),
       ELAPSED_TICK_MS,
     );
     return () => clearInterval(id);
-  }, []);
+  }, [activityKey, pageActivity]);
 
   const line = langyThinkingLine({
     messages,
     elapsedMs,
     hasLiveReasoning,
+    workerReady,
+    pageActivity,
+    awaitingAnswer,
+    terminalConnected,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely
   // generating. Everywhere else the text is the honest, static line.
   const cyclingVerb = useCyclingVerb(
-    line.allowWhimsy,
+    line?.allowWhimsy ?? false,
     LANGY_THINKING_VERBS,
     THINKING_VERB_DWELL_MS,
   );
-  const text = line.allowWhimsy ? `${cyclingVerb}…` : line.text;
 
-  // A stuck turn should not shimmer like a working one — the shimmer says
-  // "alive", and by this point that is the one thing we cannot claim.
-  const shimmerCss =
-    reduceMotion || line.tone === "stuck"
-      ? { ...langyThinkingShimmerStyles, animation: "none" }
-      : langyThinkingShimmerStyles;
+  // No line at all: the streaming answer is on screen and speaks for itself —
+  // any row under it (orb included) reads as the panel still waiting for the
+  // reply that is visibly arriving. After the hooks, so their order is stable.
+  if (!line) return null;
+
+  const text = line.allowWhimsy ? `${cyclingVerb}…` : line.text;
 
   return (
     // Stretch to the column, not shrink-to-fit: a `flex-start` box grows to the
@@ -109,8 +150,8 @@ export function LangyThinkingLine({
     //
     // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
     // StreamingStatusLine): same gap, same padding, and the same leading orb
-    // slot as the status rows this line alternates with — so "Starting up…" →
-    // "Waking Langy up…" → "Thinking…" reads as one line changing its words,
+    // slot as the status rows this line alternates with — so "Preparing Langy's
+    // workspace…" → "Starting Langy…" → "Thinking…" reads as one line changing its words,
     // never a line hopping between layouts.
     <HStack
       gap={STATUS_LINE_ROW.gap}
@@ -123,56 +164,80 @@ export function LangyThinkingLine({
       {/* A stuck turn keeps the slot but not the glow: the orb claims
           "alive", and by then that is the one thing we cannot claim. */}
       <StatusOrb active={line.tone !== "stuck"} />
-      <Box
-        position="relative"
-        minHeight="1.5em"
-        display="flex"
-        alignItems="center"
-        // The verb is a single nowrap line (the crossfade can't reflow mid-swap),
-        // so a long tool line — "Using the GitHub skill — <the skill's whole
-        // summary>" — used to run straight off the panel's right edge. Clamp it
-        // to the available width and mark the cut with an ellipsis. NO fade
-        // mask: it applied to short lines too, so "Thinking…" dissolved to
-        // near-invisible at its tail and read as broken text, not chrome.
-        flexShrink={1}
-        minWidth={0}
-        maxWidth="100%"
-        overflow="hidden"
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <MotionText
-            key={text}
-            role="status"
-            aria-live="polite"
-            fontSize="13px"
-            fontWeight="500"
-            letterSpacing="-0.005em"
-            lineHeight="1.5"
-            whiteSpace="nowrap"
-            minWidth={0}
-            maxWidth="100%"
-            overflow="hidden"
-            textOverflow="ellipsis"
-            // The stuck line is a statement of fact, not ambient chrome: it drops
-            // the gradient and reads as plain muted text.
-            {...(line.tone === "stuck"
-              ? { color: "fg.muted" }
-              : { css: shimmerCss })}
-            initial={
-              reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }
-            }
-            animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, filter: "blur(5px)", y: -5 }
-            }
-            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-          >
-            {text}
-          </MotionText>
-        </AnimatePresence>
-      </Box>
+      <ThinkingLineText
+        text={text}
+        tone={line.tone}
+        reduceMotion={reduceMotion}
+      />
     </HStack>
+  );
+}
+
+/** The clamped, crossfading text half of the row. */
+function ThinkingLineText({
+  text,
+  tone,
+  reduceMotion,
+}: {
+  text: string;
+  tone: LangyThinkingTone;
+  reduceMotion: boolean;
+}) {
+  // A stuck turn should not shimmer like a working one — the shimmer says
+  // "alive", and by this point that is the one thing we cannot claim.
+  const shimmerCss =
+    reduceMotion || tone === "stuck"
+      ? { ...langyThinkingShimmerStyles, animation: "none" }
+      : langyThinkingShimmerStyles;
+
+  return (
+    <Box
+      position="relative"
+      minHeight="1.5em"
+      display="flex"
+      alignItems="center"
+      // The verb is a single nowrap line (the crossfade can't reflow mid-swap),
+      // so a long tool line — "Using the GitHub skill — <the skill's whole
+      // summary>" — used to run straight off the panel's right edge. Clamp it
+      // to the available width and mark the cut with an ellipsis. NO fade
+      // mask: it applied to short lines too, so "Thinking…" dissolved to
+      // near-invisible at its tail and read as broken text, not chrome.
+      flexShrink={1}
+      minWidth={0}
+      maxWidth="100%"
+      overflow="hidden"
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        <MotionText
+          key={text}
+          role="status"
+          aria-live="polite"
+          fontSize="13px"
+          fontWeight="500"
+          letterSpacing="-0.005em"
+          lineHeight="1.5"
+          whiteSpace="nowrap"
+          minWidth={0}
+          maxWidth="100%"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          // The stuck line is a statement of fact, not ambient chrome: it drops
+          // the gradient and reads as plain muted text.
+          {...(tone === "stuck" ? { color: "fg.muted" } : { css: shimmerCss })}
+          initial={
+            reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }
+          }
+          animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+          exit={
+            reduceMotion
+              ? { opacity: 0 }
+              : { opacity: 0, filter: "blur(5px)", y: -5 }
+          }
+          transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+        >
+          {text}
+        </MotionText>
+      </AnimatePresence>
+    </Box>
   );
 }

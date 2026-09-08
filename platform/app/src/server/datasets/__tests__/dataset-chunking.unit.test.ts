@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { chunkedMeta, chunkKey, toJsonlChunks } from "../dataset-chunking";
+import {
+  chunkedMeta,
+  chunkKey,
+  readValidChunkOffsets,
+  toJsonlChunks,
+} from "../dataset-chunking";
 
 describe("toJsonlChunks", () => {
   describe("given records that fit under the cap", () => {
@@ -88,6 +93,53 @@ describe("chunkKey", () => {
       expect(chunkKey("proj1", "ds1", 42)).toBe(
         "datasets/proj1/ds1/chunk-00042.jsonl",
       );
+    });
+  });
+});
+
+describe("readValidChunkOffsets", () => {
+  const contiguous = [
+    { index: 0, startRow: 0, endRow: 2, byteSize: 10 },
+    { index: 1, startRow: 2, endRow: 4, byteSize: 10 },
+  ];
+
+  describe("given a well-formed index", () => {
+    it("returns it unchanged", () => {
+      expect(readValidChunkOffsets(contiguous)).toEqual(contiguous);
+    });
+  });
+
+  describe("given two entries naming the same chunk", () => {
+    it("rejects the whole index rather than let the readers disagree", () => {
+      // The two readers of this array key off different parts of it, so a
+      // duplicate index makes the same dataset answer two ways. Paging selects
+      // entries by row range and reads the `index` each one names, so it
+      // fetches chunk 0 twice — once as rows 0-1 and again as rows 2-3 — and
+      // never reads chunk 1 at all. A search deduplicates the indexes, so it
+      // reads chunk 0 once and finds no trace of the rows the grid is showing.
+      // Neither is right, and the disagreement is the part a user cannot
+      // explain: the row is on screen and the search says there is no match.
+      expect(
+        readValidChunkOffsets([
+          { index: 0, startRow: 0, endRow: 2, byteSize: 10 },
+          { index: 0, startRow: 2, endRow: 4, byteSize: 10 },
+        ]),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given an entry naming a chunk that cannot exist", () => {
+    it("rejects the whole index rather than ask storage for it", () => {
+      // Chunk keys are built by zero-padding the index, so a negative one
+      // addresses no object. `Number.isInteger` lets it through, the read comes
+      // back empty, and the rows of that chunk go silently missing from a
+      // dataset that still reports having them.
+      expect(
+        readValidChunkOffsets([
+          { index: -1, startRow: 0, endRow: 2, byteSize: 10 },
+          { index: 1, startRow: 2, endRow: 4, byteSize: 10 },
+        ]),
+      ).toEqual([]);
     });
   });
 });

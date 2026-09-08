@@ -14,7 +14,7 @@ import { api } from "~/utils/api";
  */
 export function useAnnotationInvalidation({ traceId }: { traceId: string }) {
   const { project } = useOrganizationTeamProject();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   return useCallback(() => {
     void trpc.annotation.getByTraceId.invalidate();

@@ -73,7 +73,7 @@ vi.mock("~/utils/api", () => ({
     licenseEnforcement: {
       checkLimit: { useQuery: () => ({ data: null, isLoading: false }) },
     },
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 
@@ -577,7 +577,7 @@ describe("given a saved dataset larger than one page", () => {
     /** @scenario Move between pages */
     it("stays on the requested page instead of bouncing back to page 1", async () => {
       // react-query holds the previous page's result while the next page's key
-      // loads (keepPreviousData), flagging it `isPreviousData: true`. Simulate
+      // loads (keepPreviousData), flagging it `isPlaceholderData: true`. Simulate
       // that faithfully: page 2 is not yet "ready", so the hook returns page 1's
       // data marked as held — the page count must NOT momentarily reset and snap
       // navigation back to page 1, and the held data must not re-hydrate the
@@ -587,7 +587,7 @@ describe("given a saved dataset larger than one page", () => {
       const fresh = new Map<number, unknown>();
       const held = new Map<number, unknown>();
       let lastReady = 1;
-      const pageResult = (p: number, isPreviousData: boolean) => ({
+      const pageResult = (p: number, isPlaceholderData: boolean) => ({
         data: {
           id: "dataset_paged",
           name: "paged",
@@ -603,7 +603,7 @@ describe("given a saved dataset larger than one page", () => {
           ],
         },
         isLoading: false,
-        isPreviousData,
+        isPlaceholderData,
         refetch: vi.fn(),
       });
       getAllQuery.mockReset();
@@ -614,7 +614,7 @@ describe("given a saved dataset larger than one page", () => {
           if (!fresh.has(p)) fresh.set(p, pageResult(p, false));
           return fresh.get(p);
         }
-        // Previous page held while page p loads → flagged isPreviousData.
+        // Previous page held while page p loads → flagged isPlaceholderData.
         if (!held.has(lastReady))
           held.set(lastReady, pageResult(lastReady, true));
         return held.get(lastReady);
@@ -737,7 +737,7 @@ describe("given a saved dataset larger than one page", () => {
 // dataset's rows into another when the editor is pointed at a different
 // datasetId while the previous result is still being served.
 describe("given the editor is switched to a different dataset", () => {
-  const datasetAResult = (isPreviousData: boolean) => ({
+  const datasetAResult = (isPlaceholderData: boolean) => ({
     data: {
       id: "dataset_a",
       name: "A",
@@ -751,7 +751,7 @@ describe("given the editor is switched to a different dataset", () => {
     },
     isLoading: false,
     // react-query sets this while keepPreviousData serves the prior key's data.
-    isPreviousData,
+    isPlaceholderData,
     refetch: vi.fn(),
   });
 
@@ -774,7 +774,7 @@ describe("given the editor is switched to a different dataset", () => {
       await screen.findByText("alpha");
 
       // Point the editor at dataset B; keepPreviousData still serves A's rows
-      // (isPreviousData), so the grid keeps showing them until B settles.
+      // (isPlaceholderData), so the grid keeps showing them until B settles.
       getAllQuery.mockReturnValue(datasetAResult(true));
       rerender(<DatasetEditorTable datasetId="dataset_b" />);
 
@@ -825,7 +825,7 @@ describe("given rows are deleted from a paginated dataset", () => {
           ],
         },
         isLoading: false,
-        isPreviousData: false,
+        isPlaceholderData: false,
         refetch: refetchSpy,
       });
 
@@ -854,11 +854,17 @@ describe("given rows are deleted from a paginated dataset", () => {
       // too, or a committed delete leaves the pager count stale. (Settling the
       // delete synchronously would hide the bug, since ops would hit zero on the
       // delete's own success.)
-      let resolveDelete: (() => void) | undefined;
-      let rejectUpdate: ((e: { message: string }) => void) | undefined;
+      //
+      // Every dispatched callback is collected, not just the most recent one. A
+      // stall longer than the 500ms sync debounce splits the typing across two
+      // flushes, so the edit can reach the server as two updates. Keeping only
+      // the last one leaves a pending op outstanding, the batch never drains,
+      // and the assertion below fails for a reason this test is not about.
+      const resolveDeletes: (() => void)[] = [];
+      const rejectUpdates: ((e: { message: string }) => void)[] = [];
       deleteManyMutate.mockImplementation(
         (_args: unknown, opts?: { onSuccess?: () => void }) => {
-          resolveDelete = opts?.onSuccess;
+          if (opts?.onSuccess) resolveDeletes.push(opts.onSuccess);
         },
       );
       updateMutate.mockImplementation(
@@ -866,7 +872,7 @@ describe("given rows are deleted from a paginated dataset", () => {
           _args: unknown,
           opts?: { onError?: (e: { message: string }) => void },
         ) => {
-          rejectUpdate = opts?.onError;
+          if (opts?.onError) rejectUpdates.push(opts.onError);
         },
       );
       const refetchSpy = vi.fn();
@@ -885,7 +891,7 @@ describe("given rows are deleted from a paginated dataset", () => {
           ],
         },
         isLoading: false,
-        isPreviousData: false,
+        isPlaceholderData: false,
         refetch: refetchSpy,
       });
 
@@ -893,8 +899,8 @@ describe("given rows are deleted from a paginated dataset", () => {
       render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
       await screen.findByText("a");
 
-      // Queue a delete (row 1) and an edit (row 2, now at index 0) into the same
-      // debounce batch.
+      // Queue a delete (row 1) and an edit (row 2, now at index 0). The debounce
+      // normally carries them in one batch.
       await user.click(screen.getByLabelText("Select row 1"));
       await user.click(await screen.findByTestId("delete-selected-rows"));
       await user.dblClick(screen.getByTestId("cell-0-input_0"));
@@ -905,12 +911,16 @@ describe("given rows are deleted from a paginated dataset", () => {
       // Both mutations dispatched; settle them delete-then-update so ops reaches
       // zero through the error path.
       await waitFor(() => {
-        expect(resolveDelete).toBeDefined();
-        expect(rejectUpdate).toBeDefined();
+        expect(resolveDeletes.length).toBeGreaterThan(0);
+        expect(rejectUpdates.length).toBeGreaterThan(0);
       });
+      // Deletes first, updates after, so the batch can only reach zero pending
+      // ops through the error path however many flushes the debounce produced.
       await act(async () => {
-        resolveDelete?.();
-        rejectUpdate?.({ message: "boom" });
+        for (const resolveDelete of resolveDeletes) resolveDelete();
+        for (const rejectUpdate of rejectUpdates) {
+          rejectUpdate({ message: "boom" });
+        }
       });
 
       expect(refetchSpy).toHaveBeenCalled();

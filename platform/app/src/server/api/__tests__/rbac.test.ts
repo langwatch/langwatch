@@ -1,7 +1,7 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { Actions, Resources } from "~/utils/rbacVocabulary";
 import {
-  Actions,
   canCreate,
   canDelete,
   canManage,
@@ -13,7 +13,6 @@ import {
   isDemoProjectId,
   organizationRoleHasPermission,
   type Permission,
-  Resources,
   teamRoleHasPermission,
 } from "../rbac";
 

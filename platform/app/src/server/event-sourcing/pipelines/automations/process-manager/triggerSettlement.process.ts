@@ -10,6 +10,13 @@ import type {
 
 export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 export const MAX_PENDING_MATCHES = 1_000;
+/**
+ * Traces per persist-match outbox message. Sized so a page stays well
+ * inside the outbox lease even when the per-trace confirm degrades to
+ * seconds: 25 traces through the handler's 4-wide pool at a degraded ~4s
+ * per trace is ~25-30s against a 300s lease.
+ */
+export const PERSIST_PAGE_MAX = 25;
 export type SettlementState = TriggerSettlementState;
 
 export const INITIAL_SETTLEMENT_STATE: SettlementState = {
@@ -90,6 +97,48 @@ export function digestBatchKey(traceIds: readonly string[]): string {
     .slice(0, 16);
 }
 
+/** One persist-match outbox message: a bounded page of settled traces. */
+export interface PersistPage {
+  traceIds: string[];
+  /**
+   * Deterministic message-key body. The settle window bucket is INSIDE the
+   * hash on purpose: keyed on traceIds alone, a later settlement round over
+   * the same traces would collide with the completed page's outbox row and
+   * be swallowed by the outbox dedup.
+   */
+  pageKey: string;
+}
+
+/**
+ * Chunks settled persist matches into deterministic pages: sorted by
+ * traceId, sliced by PERSIST_PAGE_MAX. Evolve retries and event redelivery
+ * re-run this on identical state, so identical input must produce
+ * byte-identical page keys — the sort is what guarantees it regardless of
+ * pending-map insertion order.
+ */
+export function pagePersistMatches({
+  matches,
+}: {
+  matches: Array<{ traceId: string; settleWindowBucket: string }>;
+}): PersistPage[] {
+  // Byte order, not localeCompare: the page key must never depend on the
+  // process locale or ICU version.
+  const sorted = [...matches].sort((left, right) =>
+    left.traceId < right.traceId ? -1 : left.traceId > right.traceId ? 1 : 0,
+  );
+  const pages: PersistPage[] = [];
+  for (let start = 0; start < sorted.length; start += PERSIST_PAGE_MAX) {
+    const page = sorted.slice(start, start + PERSIST_PAGE_MAX);
+    pages.push({
+      traceIds: page.map((match) => match.traceId),
+      pageKey: digestBatchKey(
+        page.map((match) => `${match.traceId}@${match.settleWindowBucket}`),
+      ),
+    });
+  }
+  return pages;
+}
+
 export function drainDue(state: SettlementState, at: number) {
   const remaining: SettlementState["pendingMatches"] = {};
   const notifyByBoundary = new Map<number, string[]>();
@@ -120,7 +169,7 @@ export function drainDue(state: SettlementState, at: number) {
       key,
       traceIds: traceIds.sort(),
     })),
-    settledMatches,
+    persistPages: pagePersistMatches({ matches: settledMatches }),
     nextBoundary: nextWakeFrom(nextState),
   };
 }

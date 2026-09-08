@@ -1,5 +1,4 @@
-import type { Prisma } from "@prisma/client";
-
+import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
 
 // Looks for `projectId`, `organizationId`, or `tenantId` anywhere in
@@ -22,6 +21,9 @@ function extractRawSql(args: unknown): string | null {
   // depending on Prisma version and call site.
   if (typeof a.query === "string") return a.query;
   if (Array.isArray(a.strings)) return a.strings.join(" ? ");
+  // The query-extension era adds one more shape: `$queryRawUnsafe` /
+  // `$executeRawUnsafe` deliver `[sql, ...values]`.
+  if (Array.isArray(args) && typeof args[0] === "string") return args[0];
   return null;
 }
 
@@ -39,6 +41,40 @@ const GLOBAL_MODELS = [
   "Session",
   "User",
   "VerificationToken",
+  // Identity pipeline projection tables (ADR-101, D01): per-user, not
+  // per-project/org, and the D03 router's lookup is by identifier VALUE
+  // before any user is known - inherently cross-user, the same posture as
+  // `User` by email above.
+  "Identifier",
+  "IdentityProjectionCursor",
+  // The credential half of the old `Account` row (ADR-116) - the same posture
+  // as `Account` above, which it replaces: per-user, keyed by the pinned
+  // account id, and read on the sign-in path before any tenant is known.
+  "AccountCredential",
+  // The address lock (ADR-116 §6): keyed by a normalized identifier value
+  // and claimed BEFORE any user is known to hold it, which is the whole
+  // point - it is what decides who gets to.
+  "IdentifierReservation",
+  // Credential tables, per-user in exactly the sense `Account` is. A passkey
+  // and a TOTP enrollment belong to a person, not to a project — and the
+  // ceremonies that read them are keyed by credential id BEFORE any user is
+  // known (a discoverable passkey names its own account, which is what makes
+  // it a way IN), so there is no tenancy column a query could carry.
+  //
+  // Listing them here is what makes passkeys work at all: without it the
+  // guard rejected every `findMany` the plugin issues, and the whole feature
+  // answered 500.
+  "Passkey",
+  "TwoFactor",
+  // The MFA aggregate's projection is keyed `tenantId = userId` (D06), so it
+  // is per-user by construction like the identity projections above.
+  "MfaEnrollment",
+  // The directory's `(connectionId, externalId) -> userId` map (D08). Not
+  // project-scoped and carries no organizationId; a SCIM push resolves a
+  // person through it before anything org-shaped is in hand. Cross-org safety
+  // comes from the token's connection scope, which is checked at the endpoint
+  // rather than here.
+  "ScimExternalId",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",
@@ -110,8 +146,15 @@ const LICENSE_COUNTED_PROJECT_MODELS = [
  * working until the sweep PR drops the column).
  */
 type ScopedModelConfig = {
-  /** Where-clause validator. Returns `null` if OK, error message otherwise. */
-  validateWhere: (where: any) => string | null;
+  /**
+   * Where-clause validator. Returns `null` if OK, error message otherwise.
+   *
+   * `action` is the Prisma action being guarded, so a model can hold bulk
+   * writes (`updateMany` / `deleteMany`) to a stricter predicate than reads:
+   * a where clause that is merely a bounded *view* of many tenants is still
+   * an unbounded *edit* of them.
+   */
+  validateWhere: (where: any, action?: string) => string | null;
   /** Data validator for create / createMany. */
   validateCreateData: (data: any) => string | null;
 };
@@ -641,6 +684,50 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // In-place system migration state (@langwatch/system-migrations). Its
+  // tenancy column is `tenantId` - deliberately not an FK, because the runner
+  // is generic over whatever a migration calls a tenant (an organization, for
+  // ADR-092 stage B). Two shapes are legitimately bounded: one tenant's row
+  // (what the runner and the authz fallback gate read), and one migration's
+  // rows across tenants (the platform-scope ops rollup, which is the whole
+  // point of the dashboard). A query naming neither would walk every
+  // migration's every tenant, so it throws.
+  SystemMigrationTenantState: {
+    validateWhere: (where, action) => {
+      // A migration-wide predicate is a legitimate way to READ (the ops
+      // rollup lists one migration across tenants) and never a legitimate
+      // way to WRITE: `deleteMany({ where: { migrationName } })` would drop
+      // every tenant's row at once, and the rows it drops include the
+      // `finalized` latches - silently returning every switched-over
+      // organization to its legacy path. Bulk writes must name a tenant.
+      const bulkWrite = action === "updateMany" || action === "deleteMany";
+      const reason = bulkWrite
+        ? "requires a tenantId in the where clause (a migration-wide bulk write would rewrite every tenant's migration state)"
+        : "requires a migrationName or tenantId in the where clause (compound key included)";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.tenantId === "string" ||
+          typeof c.migrationName_tenantId?.tenantId === "string" ||
+          (!bulkWrite && typeof c.migrationName === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (
+          typeof d.migrationName !== "string" ||
+          typeof d.tenantId !== "string"
+        ) {
+          return "create requires a migrationName and tenantId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 /**
@@ -681,7 +768,7 @@ const EXEMPT_MODELS = new Set<string>([
   ...ORG_DERIVED_EXEMPT,
 ]);
 
-const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
+const _guardProjectId = ({ params }: { params: GuardParams }) => {
   const action = params.action;
 
   // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
@@ -729,7 +816,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
         throw new Error(`The ${action} action on the ${model} model ${err}.`);
       }
     } else {
-      const err = config.validateWhere(params.args?.where);
+      const err = config.validateWhere(params.args?.where, action);
       if (err) {
         throw new Error(`The ${action} action on the ${model} model ${err}.`);
       }
@@ -820,7 +907,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   }
 };
 
-export const guardProjectId: Prisma.Middleware = async (params, next) => {
+export const guardProjectId: GuardMiddleware = async (params, next) => {
   _guardProjectId({ params });
   return next(params);
 };

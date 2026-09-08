@@ -43,7 +43,7 @@ vi.mock("~/components/ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: mocks.invalidateAnnotations },
         getByTraceIds: { invalidate: mocks.invalidateAnnotationFeed },

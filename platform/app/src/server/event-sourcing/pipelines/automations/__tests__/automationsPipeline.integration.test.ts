@@ -1,4 +1,3 @@
-import { TriggerAction } from "@prisma/client";
 import type { Redis } from "ioredis";
 import {
   afterAll,
@@ -9,6 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 
 import {
   getTestRedisConnection,

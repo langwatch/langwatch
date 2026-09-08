@@ -124,7 +124,6 @@ secured
       // read-only API keys from ingesting traces.
       try {
         await enforceApiKeyCeiling({
-          prisma,
           resolved,
           permission: "traces:create",
         });
@@ -177,6 +176,9 @@ secured
           await getApp().usageLimits.notifyPlanLimitReached({
             organizationId: project.team.organizationId,
             planName: activePlan.name ?? "free",
+            usageUnit: limitResult.usageUnit,
+            current: limitResult.count,
+            max: limitResult.maxMessagesPerMonth,
           });
         } catch (error) {
           logger.error(
@@ -710,6 +712,12 @@ secured
               evaluationNameAutoslug(evaluation.name);
             const status =
               evaluation.status ?? (evaluation.error ? "error" : "processed");
+            // A verdict is only real when the evaluator ran to completion —
+            // an errored/skipped run's stray passed/score/label must not
+            // reach analytics or triggers as a real result (#6833). Same
+            // gate as the shared verdictGate helpers applied at the
+            // executeEvaluation command boundary.
+            const hasVerdict = status === "processed";
 
             await app.evaluations.reportEvaluation({
               tenantId: project.id,
@@ -720,9 +728,9 @@ secured
               traceId,
               isGuardrail: evaluation.is_guardrail ?? undefined,
               status,
-              score: evaluation.score ?? null,
-              passed: evaluation.passed ?? null,
-              label: evaluation.label ?? null,
+              score: hasVerdict ? (evaluation.score ?? null) : null,
+              passed: hasVerdict ? (evaluation.passed ?? null) : null,
+              label: hasVerdict ? (evaluation.label ?? null) : null,
               details: evaluation.details ?? null,
               error: evaluation.error?.message ?? null,
               occurredAt,

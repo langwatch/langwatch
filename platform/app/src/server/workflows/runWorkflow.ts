@@ -130,7 +130,7 @@ export async function runEvaluationWorkflow(
       // the parent trace so they show in Studio's waterfall as a
       // child sub-tree. This was historically `true` to avoid an
       // eval-of-eval loop (pre-2026-05-11 fix), but loop prevention
-      // now lives in the depth-attribute reactor — the do_not_trace
+      // now lives in the depth-attribute subscriber — the do_not_trace
       // path is now actively harmful: it skips parent-context setup
       // in nlpgo's startStudioSpan so eval child spans (LLM calls,
       // execute_component) get a fresh trace_id and land as a

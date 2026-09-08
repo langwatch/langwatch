@@ -23,11 +23,10 @@
  * Spec: specs/ai-gateway/governance/c3-alert-dispatch.feature
  */
 import { createHmac } from "node:crypto";
-
-import type { AnomalyAlert, AnomalyRule } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { AnomalyAlert, AnomalyRule } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";

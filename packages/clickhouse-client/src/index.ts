@@ -14,13 +14,13 @@ export {
 } from "./logging";
 export type {
   AbortSignalLike,
-  QueryExecutor,
+  QueryDriver,
   QueryKind,
-  QueryMiddleware,
   QueryRequest,
   QueryResult,
-} from "./pipeline";
-export { compose } from "./pipeline";
+} from "./query";
+export type { ClickHouseQueryClientOptions } from "./client";
+export { ClickHouseQueryClient } from "./client";
 export type {
   PoolSizeSource,
   PoolSizingDecision,
@@ -29,6 +29,7 @@ export type {
 export {
   DEFAULT_CLIENTS_PER_PROCESS,
   DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
+  DEFAULT_SERVER_NODES,
   deriveFleetPoolCeiling,
   FALLBACK_POOL_SIZE,
   FLEET_SAFETY_FACTOR,
@@ -37,16 +38,11 @@ export {
   poolSizingFromEnv,
   resolvePoolSize,
 } from "./pool";
-export type {
-  ConcurrencyLimiter,
-  ConcurrencyLimiterOptions,
-  LimiterStats,
-} from "./rateLimit";
+export type { ConcurrencyLimiterOptions, LimiterStats } from "./rateLimit";
 export {
   AcquireAbortedError,
-  createConcurrencyLimiter,
+  ConcurrencyLimiter,
   QueueFullError,
-  rateLimit,
 } from "./rateLimit";
 export type {
   BackoffInput,
@@ -67,7 +63,7 @@ export type {
   RetryOptions,
   RunWithRetryOptions,
 } from "./retry";
-export { retry, runWithRetry } from "./retry";
+export { RetryPolicy, runWithRetry } from "./retry";
 export type {
   RoutingTable,
   TenantDirectory,
@@ -83,7 +79,22 @@ export {
   UnknownTenantError,
 } from "./tenancy";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
-export { checkTenantScope, TenantScopeError, tenantGuard } from "./tenantGuard";
+export type {
+  StatementLogSink,
+  StatementMetrics,
+  StatementOutcome,
+} from "./statementReporting";
+export type { VendorQueryType } from "./statementShape";
+export type {
+  VendorClientResilienceOptions,
+  VendorStatementClient,
+} from "./vendorClient";
+export { VendorClientResilience } from "./vendorClient";
+export {
+  checkTenantScope,
+  TenantGuard,
+  TenantScopeError,
+} from "./tenantGuard";
 export type {
   QueryErrorDescriptor,
   QueryOutcome,
@@ -91,4 +102,20 @@ export type {
   TraceOptions,
   TracerPort,
 } from "./tracing";
-export { describeQueryError, SPAN_ATTRIBUTES, trace } from "./tracing";
+export {
+  describeQueryError,
+  QueryTracer,
+  SPAN_ATTRIBUTES,
+} from "./tracing";
+export type {
+  RetentionDaysProvider,
+  RetentionFloorLogger,
+  RetentionFloorQuery,
+  RetentionFloorServiceOptions,
+} from "./retentionFloor";
+export {
+  DEFAULT_RETENTION_CACHE_MAX_ENTRIES,
+  DEFAULT_RETENTION_CACHE_TTL_MS,
+  DEFAULT_RETENTION_FLOOR_MARGIN_MS,
+  RetentionFloorService,
+} from "./retentionFloor";

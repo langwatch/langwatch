@@ -24,7 +24,30 @@ export interface PersistedProcessInstance<State = unknown> {
   updatedAt: number;
 }
 
-export type OutboxMessageStatus = "pending" | "dispatched" | "dead";
+export type OutboxMessageStatus =
+  | "pending"
+  | "dispatched"
+  | "dead"
+  /** Operator-marked never-to-be-sent (specs/ops/dead-letter-recovery.feature).
+   *  A mark, not a delete: the row stays as its own audit trail. */
+  | "discarded";
+
+/**
+ * One FAILED delivery attempt, recorded so a dead letter can say why it died
+ * without a span lookup (specs/ops/dead-letter-recovery.feature). Successes
+ * write nothing.
+ */
+export interface FailedOutboxAttempt {
+  /** 1-based attempt number, as the dispatcher counts it. */
+  attempt: number;
+  occurredAt: number;
+  /** Whether this failure retired the message or scheduled a retry. */
+  outcome: "retry_scheduled" | "dead";
+  errorType: string;
+  /** The safe failure diagnostic — never a raw provider body. */
+  errorMessage: string;
+  retryAfterMs?: number;
+}
 
 export interface NewOutboxMessage {
   messageKey: string;
@@ -46,7 +69,14 @@ export interface OutboxMessageRecord extends NewOutboxMessage {
   /** The inbox identity that produced this intent; null for wake commits. */
   sourceEventId: string | null;
   status: OutboxMessageStatus;
-  /** Completed delivery attempts so far. */
+  /**
+   * Delivery attempts STARTED so far — incremented at lease time, not at
+   * acknowledgement. Counting starts instead of conclusions is what lets a
+   * message whose lease keeps lapsing (handler never acknowledges) cross
+   * `maxAttempts` and retire, instead of redelivering as attempt 1 forever.
+   * A message released un-attempted by `releaseLease` hands its increment
+   * back.
+   */
   attempts: number;
   /** Epoch ms before which the message must not be leased. */
   nextAttemptAt: number;
@@ -94,6 +124,36 @@ export type CommitResult =
   | { outcome: "duplicateEvent" }
   | { outcome: "revisionConflict"; actualRevision: number };
 
+/**
+ * The transient append: intents only, no instance row, no inbox row, and no
+ * transaction.
+ *
+ * `commit` is transactional because it has something to lose. It writes an
+ * inbox marker AND outbox messages, and the damaging interleaving is real: a
+ * marker that lands without its messages says the event was consumed while
+ * nothing was ever enqueued, which is silent loss. The other order is
+ * harmless — messages without a marker are redelivered, re-derive the same
+ * keys, and are suppressed.
+ *
+ * An evolution that keeps no state has nothing to lose in the first place.
+ * Its outbox `messageKey` is already a pure function of the event (the
+ * builder qualifies every key with the process key), so the outbox's own
+ * uniqueness IS the consumption record, and a second marker for the same fact
+ * buys nothing. What is left is a set of idempotent inserts, which need no
+ * lock, no compare-and-swap, and no transaction to be correct under crash,
+ * redelivery, or two workers racing the same event.
+ *
+ * The contract that replaces the transaction: every `messageKey` handed here
+ * MUST be derivable from the event alone. A key built from a clock or a
+ * random value cannot be re-derived by a redelivery, which turns the
+ * suppression into a duplicate side effect. `processTransientKeys` in the
+ * pipeline test suite holds definitions to that rule.
+ */
+export interface AppendIntentsResult {
+  insertedMessageKeys: string[];
+  duplicateMessageKeys: string[];
+}
+
 /** Identity of one outbox message within its uniqueness contract. */
 export interface OutboxMessageIdentity {
   processName: string;
@@ -116,6 +176,24 @@ export interface ProcessStore {
   /** Atomically: consume inbox row, bump revision, persist state + wake, insert deduped messages. */
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
+  /**
+   * Appends a transient evolution's intents. See {@link AppendIntentsResult}
+   * for why this is neither transactional nor inbox-backed.
+   *
+   * Idempotent: a key that already exists is reported as duplicate rather
+   * than inserted, so a partial write followed by a redelivery converges on
+   * exactly the intended set.
+   */
+  appendIntents(params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    /** Recorded on each row for diagnostics; nothing keys off it here. */
+    sourceEventId: string | null;
+    messages: NewOutboxMessage[];
+    now: number;
+  }): Promise<AppendIntentsResult>;
+
   /** All messages for one process, primarily for diagnostics and tests. */
   findMessagesByRef(params: {
     ref: ProcessRef;
@@ -123,7 +201,8 @@ export interface ProcessStore {
 
   /**
    * Lease pending, due messages for exclusive dispatch until
-   * `now + leaseDurationMs`.
+   * `now + leaseDurationMs`. Leasing increments `attempts` — the returned
+   * records carry the attempt number of the delivery that is about to start.
    */
   leaseDueMessages(params: {
     now: number;
@@ -139,11 +218,17 @@ export interface ProcessStore {
     processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]>;
 
+  /**
+   * `applied: false` means the update matched no row: the lease lapsed and
+   * a newer token superseded this one. Callers must surface that — a fenced
+   * acknowledgement means the effect may have run more than once and the
+   * message is still pending under someone else's lease.
+   */
   markDispatched(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
-  }): Promise<void>;
+  }): Promise<{ applied: boolean }>;
 
   /** Record a failed attempt; `dead: true` retires the message permanently. */
   markFailed(params: {
@@ -152,7 +237,30 @@ export interface ProcessStore {
     now: number;
     nextAttemptAt: number;
     dead: boolean;
+  }): Promise<{ applied: boolean }>;
+
+  /**
+   * Append one failed attempt to the message's history. Best-effort by
+   * contract: callers wrap it so a history write that fails never fails the
+   * delivery accounting (the attempt entry is the only loss).
+   */
+  recordFailedAttempt(params: {
+    identity: OutboxMessageIdentity;
+    attempt: FailedOutboxAttempt;
   }): Promise<void>;
+
+  /**
+   * Return a leased message to the pool WITHOUT running it: clears the lease
+   * and hands back the attempt the lease charged, leaving the row
+   * immediately due. For batch tails whose lease budget ran out before their
+   * delivery started — releasing instead of dispatching is what keeps a slow
+   * batch from ever running past its own lease.
+   */
+  releaseLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+  }): Promise<{ applied: boolean }>;
 
   /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
   findDueWakes(params: {

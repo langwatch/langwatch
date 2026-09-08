@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 
 import type {
@@ -50,6 +50,7 @@ type PullRequestRecord = {
   prCreatedAt: Date;
   prClosedAt: Date | null;
   prMergedAt: Date | null;
+  prUpdatedAt: Date | null;
   mappedAt: Date;
   lastCheckedAt: Date;
 };
@@ -82,9 +83,33 @@ function toPullRequestRow(record: PullRequestRecord): GithubPullRequestRow {
     prCreatedAt: record.prCreatedAt,
     prClosedAt: record.prClosedAt,
     prMergedAt: record.prMergedAt,
+    prUpdatedAt: record.prUpdatedAt,
     mappedAt: record.mappedAt,
     lastCheckedAt: record.lastCheckedAt,
   };
+}
+
+/**
+ * The predicate that makes a snapshot write monotonic: accept it only when the
+ * stored row has no source timestamp, or has one at or before the incoming
+ * snapshot's.
+ *
+ * `lte` rather than `lt` on purpose. GitHub redelivers, and two events can
+ * share one `updated_at` (a label added in the same second as an edit, say), so
+ * refusing an equal timestamp would make the winner depend on which delivery
+ * arrived first.
+ */
+function freshnessGuard(prUpdatedAt: Date) {
+  return {
+    OR: [{ prUpdatedAt: null }, { prUpdatedAt: { lte: prUpdatedAt } }],
+  };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
 }
 
 function toBranchCheckRow(record: BranchCheckRecord): GithubBranchCheckRow {
@@ -113,38 +138,66 @@ export class PrismaGithubPullRequestsRepository
     pullRequests: readonly UpsertGithubPullRequestInput[];
   }): Promise<void> {
     for (const pullRequest of pullRequests) {
-      const repositoryFullName = normalizeFullName(
-        pullRequest.repositoryFullName,
-      );
-      const snapshot = {
-        headBranch: pullRequest.headBranch,
-        htmlUrl: pullRequest.htmlUrl,
-        title: pullRequest.title,
-        state: pullRequest.state,
-        isDraft: pullRequest.isDraft,
-        authorLogin: pullRequest.authorLogin,
-        prCreatedAt: pullRequest.prCreatedAt,
-        prClosedAt: pullRequest.prClosedAt,
-        prMergedAt: pullRequest.prMergedAt,
-        lastCheckedAt: new Date(),
-      };
-      await this.prisma.githubPullRequest.upsert({
-        where: {
-          organizationId_repositoryHost_repositoryFullName_prNumber: {
-            organizationId: pullRequest.organizationId,
-            repositoryHost: normalizeHost(pullRequest.repositoryHost),
-            repositoryFullName,
-            prNumber: pullRequest.prNumber,
-          },
-        },
-        create: {
-          organizationId: pullRequest.organizationId,
-          repositoryHost: normalizeHost(pullRequest.repositoryHost),
-          repositoryFullName,
-          prNumber: pullRequest.prNumber,
-          ...snapshot,
-        },
-        update: snapshot,
+      await this.writeSnapshot(pullRequest);
+    }
+  }
+
+  /**
+   * One pull request, written only when its snapshot is at least as fresh as
+   * the stored one.
+   *
+   * Prisma's `upsert` cannot express it: its `update` is unconditional, and the
+   * whole point is that an older snapshot must match nothing. So the write is
+   * a guarded `updateMany` first, and a `create` only when that matched no row.
+   *
+   * `create` racing another writer is expected rather than exceptional, and the
+   * unique index is what decides it. The loser catches the violation and runs
+   * the same guarded update against the winner's committed row, so whichever
+   * order the two arrive in, the fresher snapshot is the one left stored.
+   *
+   * A strictly older snapshot walks all three steps and changes nothing, which
+   * is the intended outcome and is not reported: a late delivery is ordinary,
+   * not a failure the caller can act on.
+   */
+  private async writeSnapshot(
+    pullRequest: UpsertGithubPullRequestInput,
+  ): Promise<void> {
+    const key = {
+      organizationId: pullRequest.organizationId,
+      repositoryHost: normalizeHost(pullRequest.repositoryHost),
+      repositoryFullName: normalizeFullName(pullRequest.repositoryFullName),
+      prNumber: pullRequest.prNumber,
+    };
+    const snapshot = {
+      headBranch: pullRequest.headBranch,
+      htmlUrl: pullRequest.htmlUrl,
+      title: pullRequest.title,
+      state: pullRequest.state,
+      isDraft: pullRequest.isDraft,
+      authorLogin: pullRequest.authorLogin,
+      prCreatedAt: pullRequest.prCreatedAt,
+      prClosedAt: pullRequest.prClosedAt,
+      prMergedAt: pullRequest.prMergedAt,
+      prUpdatedAt: pullRequest.prUpdatedAt,
+      lastCheckedAt: new Date(),
+    };
+    const guard = freshnessGuard(pullRequest.prUpdatedAt);
+
+    const updated = await this.prisma.githubPullRequest.updateMany({
+      where: { ...key, ...guard },
+      data: snapshot,
+    });
+    if (updated.count > 0) return;
+
+    try {
+      await this.prisma.githubPullRequest.create({
+        data: { ...key, ...snapshot },
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      await this.prisma.githubPullRequest.updateMany({
+        where: { ...key, ...guard },
+        data: snapshot,
       });
     }
   }
@@ -232,6 +285,9 @@ export class PrismaGithubPullRequestsRepository
         repositoryHost: normalizeHost(input.repositoryHost),
         repositoryFullName: normalizeFullName(input.repositoryFullName),
         prNumber: input.prNumber,
+        // A live read is answered while a page is open, so a webhook can store
+        // a newer snapshot between the read and this write.
+        ...freshnessGuard(input.prUpdatedAt),
       },
       data: {
         title: input.title,
@@ -239,6 +295,7 @@ export class PrismaGithubPullRequestsRepository
         isDraft: input.isDraft,
         prClosedAt: input.prClosedAt,
         prMergedAt: input.prMergedAt,
+        prUpdatedAt: input.prUpdatedAt,
         lastCheckedAt: new Date(),
       },
     });
@@ -268,6 +325,16 @@ export class PrismaGithubPullRequestsRepository
     return record ? toBranchCheckRow(record) : null;
   }
 
+  /**
+   * The bookkeeping write. `lastRequestedAt` is the one column a caller may
+   * decline to write: null leaves whatever demand is stored, which is what
+   * keeps the sweep from renewing the signal it selects on.
+   *
+   * A create still needs a value, because the column is not nullable, so it
+   * falls back to `lastCheckedAt`, the same instant. That only applies to a
+   * row a sweep somehow creates, and the sweep reads its branches off rows that
+   * already exist, so in practice every create comes from demand.
+   */
   async upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void> {
     const repositoryFullName = normalizeFullName(input.repositoryFullName);
     const bookkeeping = {
@@ -276,7 +343,6 @@ export class PrismaGithubPullRequestsRepository
       notFoundAt: input.notFoundAt,
       recheckAfter: input.recheckAfter,
       attempts: input.attempts,
-      lastRequestedAt: input.lastRequestedAt,
     };
     await this.prisma.githubBranchPullRequestCheck.upsert({
       where: {
@@ -293,8 +359,11 @@ export class PrismaGithubPullRequestsRepository
         repositoryFullName,
         headBranch: input.headBranch,
         ...bookkeeping,
+        lastRequestedAt: input.lastRequestedAt ?? input.lastCheckedAt,
       },
-      update: bookkeeping,
+      update: input.lastRequestedAt
+        ? { ...bookkeeping, lastRequestedAt: input.lastRequestedAt }
+        : bookkeeping,
     });
   }
 
@@ -312,6 +381,10 @@ export class PrismaGithubPullRequestsRepository
    * Both concurrent callers reach the same conflict target; Postgres serializes
    * them on the unique index, so the second evaluates its predicate against the
    * first's committed row and updates zero rows.
+   *
+   * `shouldRecordDemand` picks whether the conflict path refreshes
+   * `lastRequestedAt` or keeps the stored value. A CASE rather than two
+   * statements, so the claim stays the one write it has to be.
    */
   async claimBranchLookup({
     organizationId,
@@ -321,6 +394,7 @@ export class PrismaGithubPullRequestsRepository
     now,
     freshMappingMs,
     leaseMs,
+    shouldRecordDemand,
   }: {
     organizationId: string;
     repositoryHost: string;
@@ -329,6 +403,7 @@ export class PrismaGithubPullRequestsRepository
     now: Date;
     freshMappingMs: number;
     leaseMs: number;
+    shouldRecordDemand: boolean;
   }): Promise<boolean> {
     const fullName = normalizeFullName(repositoryFullName);
     const host = normalizeHost(repositoryHost);
@@ -355,7 +430,10 @@ export class PrismaGithubPullRequestsRepository
       ON CONFLICT ("organizationId", "repositoryHost", "repositoryFullName", "headBranch")
       DO UPDATE SET
         "recheckAfter" = ${leaseUntil}::timestamp,
-        "lastRequestedAt" = ${at}::timestamp,
+        "lastRequestedAt" = CASE
+          WHEN ${shouldRecordDemand}::boolean THEN ${at}::timestamp
+          ELSE "GithubBranchPullRequestCheck"."lastRequestedAt"
+        END,
         "updatedAt" = ${at}::timestamp
       WHERE
         ("GithubBranchPullRequestCheck"."recheckAfter" IS NULL
@@ -395,6 +473,34 @@ export class PrismaGithubPullRequestsRepository
     });
   }
 
+  async bringBranchRecheckForward({
+    organizationId,
+    repositoryHost,
+    repositoryFullName,
+    headBranch,
+    dueAt,
+  }: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    dueAt: Date;
+  }): Promise<void> {
+    await this.prisma.githubBranchPullRequestCheck.updateMany({
+      where: {
+        organizationId,
+        repositoryHost: normalizeHost(repositoryHost),
+        repositoryFullName: normalizeFullName(repositoryFullName),
+        headBranch,
+        // Only a branch waiting longer than this. A row already due sooner is
+        // left alone, which is also what keeps a live lookup claim, whose lease
+        // sits seconds away, from being extended by a concurrent fold.
+        recheckAfter: { gt: dueAt },
+      },
+      data: { recheckAfter: dueAt, attempts: 0 },
+    });
+  }
+
   /**
    * The cross-organization sweep read. The three predicates below are matched
    * LITERALLY by the org-tenancy guard's bound for this model, so a change here
@@ -424,9 +530,10 @@ export class PrismaGithubPullRequestsRepository
   }
 
   /**
-   * The retention prune. Two statements, in this order: the branch bookkeeping
-   * past the horizon, then the pull requests whose branch no longer has a row
-   * at all. Reversing them would leave a pull request orphaned for a day.
+   * The retention prune: the branch bookkeeping past the horizon, and nothing
+   * else. `GithubPullRequest` rows are kept for good, because they are the
+   * answer the Pull Requests page reads and their count is bounded by the pull
+   * requests the organization actually opened.
    *
    * Raw SQL, with the `-- @tenancy:` opt-out every other retention sweep in the
    * platform uses. Retention is system-owned maintenance and cannot name an
@@ -434,15 +541,13 @@ export class PrismaGithubPullRequestsRepository
    * a delete per tenant, which is a query per tenant to do one table scan's
    * work.
    *
-   * Both are single unbounded DELETEs over a predicate with no index of its
-   * own, and that is the deliberate trade: this runs once a day, while an index
-   * to serve it would be paid on every write to a table that takes a row per
-   * agent branch. Measured on 200k rows: 254 ms for the branch checks, 32 ms
-   * for the anti-join (which does use the branch table's unique index).
+   * One unbounded DELETE over a predicate with no index of its own, and that is
+   * the deliberate trade: this runs once a day, while an index to serve it
+   * would be paid on every write to a table that takes a row per agent branch.
+   * Measured on 200k rows: 254 ms.
    */
   async deleteStaleBefore({ before }: { before: Date }): Promise<{
     branchChecks: number;
-    pullRequests: number;
   }> {
     const cutoff = toPgTimestampUtc(before);
     const branchChecks = await this.prisma.$executeRaw`
@@ -450,17 +555,6 @@ export class PrismaGithubPullRequestsRepository
       WHERE "lastRequestedAt" < ${cutoff}::timestamp
       -- @tenancy: GitHub branch bookkeeping retention sweep (system-owned maintenance)
     `;
-    const pullRequests = await this.prisma.$executeRaw`
-      DELETE FROM "GithubPullRequest" pr
-      WHERE NOT EXISTS (
-        SELECT 1 FROM "GithubBranchPullRequestCheck" bc
-        WHERE bc."organizationId" = pr."organizationId"
-          AND bc."repositoryHost" = pr."repositoryHost"
-          AND bc."repositoryFullName" = pr."repositoryFullName"
-          AND bc."headBranch" = pr."headBranch"
-      )
-      -- @tenancy: GitHub pull-request retention sweep (system-owned maintenance)
-    `;
-    return { branchChecks, pullRequests };
+    return { branchChecks };
   }
 }

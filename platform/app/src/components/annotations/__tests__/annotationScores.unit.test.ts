@@ -2,8 +2,9 @@
  * The scores one reviewer gave, as a row reads them.
  * See specs/traces-v2/trace-list-annotations-column.feature.
  */
-import type { Annotation } from "@prisma/client";
+
 import { describe, expect, it } from "vitest";
+import type { Annotation } from "~/generated/prisma/client";
 import {
   annotationScores,
   annotationScoresLine,

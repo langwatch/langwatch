@@ -4,7 +4,7 @@ import {
   getDisplayKeysForProvider,
   getRequiredCredentialKeys,
   getSchemaShape,
-  isApiKeyField,
+  isSecretCredentialField,
 } from "../utils/modelProviderHelpers";
 
 export type ServerModelProviderKey = keyof typeof serverModelProviders;
@@ -20,7 +20,7 @@ export interface DerivedFieldMeta {
 }
 
 function deriveTypeFromKey(key: string): DerivedFieldType {
-  return isApiKeyField(key) ? "password" : "text";
+  return isSecretCredentialField(key) ? "password" : "text";
 }
 
 export interface UseModelProviderFieldsResult {

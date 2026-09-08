@@ -104,7 +104,7 @@ vi.mock("~/components/ui/toaster", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
         getPendingItemsCount: { invalidate: vi.fn() },

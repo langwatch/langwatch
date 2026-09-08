@@ -117,7 +117,7 @@ export class ProcessWakeWorker {
       }
     } catch (error) {
       const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
-      this.logger.error(
+      this.logger.warn(
         { errorType, errorMessage },
         "ProcessWakeWorker scan failed; the next poll will retry",
       );
@@ -151,7 +151,7 @@ export class ProcessWakeWorker {
     } catch (error) {
       // The wake stays due; the next poll retries it.
       const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
-      this.logger.error(
+      this.logger.warn(
         {
           processName: wake.ref.processName,
           projectId: wake.ref.projectId,

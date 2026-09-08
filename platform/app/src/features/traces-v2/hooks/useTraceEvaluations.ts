@@ -61,7 +61,7 @@ function readEvaluationInputs(
     : undefined;
 }
 
-function mapStatus(ev: Evaluation): EvalSummary["status"] {
+export function mapStatus(ev: Evaluation): EvalSummary["status"] {
   // Preserve the distinction between "evaluator failed to run" and
   // "evaluator ran and the verdict was fail". Earlier this collapsed
   // skipped/error into warning/fail, which produced misleading "WARN
@@ -71,7 +71,10 @@ function mapStatus(ev: Evaluation): EvalSummary["status"] {
   if (ev.status === "processed") {
     if (ev.passed === true) return "pass";
     if (ev.passed === false) return "fail";
-    return "pass";
+    // No verdict is not a pass. "processed" is the shared neutral status
+    // (`utils/evaluationResults.ts` normalizes processed + passed == null the
+    // same way), so score-only and verdict-less runs render neutral.
+    return "processed";
   }
   return "warning";
 }
@@ -83,10 +86,12 @@ function mapScoreType(ev: Evaluation): EvalSummary["scoreType"] {
   return "numeric";
 }
 
-function mapScore(ev: Evaluation): number | boolean {
+export function mapScore(ev: Evaluation): number | boolean | null {
   if (typeof ev.score === "number") return ev.score;
   if (ev.passed != null) return ev.passed;
-  return 0;
+  // Neither score nor verdict: null, never a fabricated 0 — a zero here
+  // renders as a real "0.00 / 1.00" on the card and header chip.
+  return null;
 }
 
 export function useTraceEvaluations(): TraceEvaluationsResult {

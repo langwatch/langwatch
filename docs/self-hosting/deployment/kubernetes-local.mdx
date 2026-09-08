@@ -7,7 +7,7 @@ Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) clus
 
 > **Looking for production deployment?** If you want to deploy LangWatch to a real cluster with prebuilt images (no local build required), see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) instead. This page covers the local Kind workflow which builds images from source.
 
-> **Developing LangWatch itself?** The `make dev` commands in the repo root use docker-compose and are faster for day-to-day development. This Kind workflow is for testing the Helm chart packaging and Kubernetes-specific behavior.
+> **Developing LangWatch itself?** `make quickstart` in the repo root starts only the services you pick and is faster for day-to-day development. This Kind workflow is for testing the Helm chart packaging and Kubernetes-specific behavior.
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ cd langwatch/charts/langwatch
 make example-up
 ```
 
-This will:
+This runs four steps:
 1. Create a Kind cluster named `lw-local` (if it doesn't exist)
 2. Build all Docker images locally (if not already built, first build takes 15-30 min)
 3. Load images into the Kind cluster

@@ -291,6 +291,13 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 	if ns.Metrics != nil {
 		es["metrics"] = ns.Metrics
 	}
+	// What an HTTP node saw on the wire: the status, the response headers and
+	// the body the engine rendered. The agent editor's test button shows these
+	// so the author reads the endpoint's actual answer rather than inferring
+	// it, and it can only show what this projection carries.
+	if ns.HTTP != nil {
+		es["http"] = ns.HTTP
+	}
 	if ns.Error != nil {
 		es["error"] = ns.Error.Message
 		addNodeErrorCode(es, ns.Error)

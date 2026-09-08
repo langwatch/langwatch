@@ -46,13 +46,21 @@ function correctedTreeNode({
  * Applies a correction to the v2 waterfall/flame nodes: deleted spans (and
  * their descendants) drop out, renames and type changes land. Node payloads
  * carry no content, so nothing here is privacy-sensitive.
+ *
+ * `shouldKeepDeleted` is for the tree the reader looks at rather than the trace
+ * the correction describes. A span that simply vanished reads as one that was
+ * never captured, so the waterfall keeps it on the row it had, for the caller to
+ * mark and strike through. Everything that asks what the corrected trace IS --
+ * its span count, whether a comment still points at something -- leaves it off.
  */
 export function applyOverlayToSpanTreeNodes({
   nodes,
   patch,
+  shouldKeepDeleted = false,
 }: {
   nodes: SpanTreeNode[];
   patch: TraceEditOverlayPatch | null | undefined;
+  shouldKeepDeleted?: boolean;
 }): SpanTreeNode[] {
   if (!patch || !patchHasAnyEdit(patch)) return nodes;
 
@@ -65,18 +73,23 @@ export function applyOverlayToSpanTreeNodes({
   });
   const patchesBySpanId = indexSpanPatches(patch);
 
-  let changed = false;
-  const nextNodes: SpanTreeNode[] = [];
-  for (const node of nodes) {
-    if (deleted.has(node.spanId)) {
-      changed = true;
-      continue;
-    }
-    const spanPatch = patchesBySpanId.get(node.spanId);
-    const corrected = spanPatch ? correctedTreeNode({ node, spanPatch }) : node;
-    if (corrected !== node) changed = true;
-    nextNodes.push(corrected);
-  }
+  // A removed row that is kept is kept as captured: a rename the same
+  // correction made would dress up a row whose whole point is showing what the
+  // trace had.
+  const keptNodes = shouldKeepDeleted
+    ? nodes
+    : nodes.filter((node) => !deleted.has(node.spanId));
+
+  const nextNodes = keptNodes.map((node) => {
+    const spanPatch = deleted.has(node.spanId)
+      ? undefined
+      : patchesBySpanId.get(node.spanId);
+    return spanPatch ? correctedTreeNode({ node, spanPatch }) : node;
+  });
+
+  const changed =
+    keptNodes.length !== nodes.length ||
+    nextNodes.some((node, index) => node !== keptNodes[index]);
 
   return changed ? nextNodes : nodes;
 }
@@ -256,20 +269,6 @@ export function applyOverlayToTraceHeader({
     changed = true;
   }
   return changed ? next : header;
-}
-
-/** True when the correction changes or removes this span. Drives the changed
- *  highlight on rows and fields. */
-export function overlayTouchesSpan({
-  patch,
-  spanId,
-}: {
-  patch: TraceEditOverlayPatch | null | undefined;
-  spanId: string;
-}): boolean {
-  if (!patch) return false;
-  if (patch.deletedSpanIds.includes(spanId)) return true;
-  return changedSpanFields({ patch, spanId }).length > 0;
 }
 
 /** The span fields this correction replaces, in presentation order. */

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
-import { connection as redisConnection } from "~/server/redis";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:better-auth:revoke");
 
@@ -50,6 +50,7 @@ export const revokeAllSessionsForUser = async ({
   // index first (faster, single read), but fall back to scanning the
   // Postgres `Session` table if the index is missing or stale.
   const cleared: string[] = [];
+  const redisConnection = getApp().redis;
   if (redisConnection) {
     try {
       const indexKey = `better-auth:active-sessions-${userId}`;
@@ -128,6 +129,7 @@ export const revokeOtherSessionsForUser = async ({
   });
   const keepToken = keepSession?.sessionToken;
 
+  const redisConnection = getApp().redis;
   if (redisConnection) {
     try {
       const indexKey = `better-auth:active-sessions-${userId}`;

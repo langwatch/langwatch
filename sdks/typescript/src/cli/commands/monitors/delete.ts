@@ -7,6 +7,7 @@ import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
@@ -27,7 +28,7 @@ export const deleteMonitorCommand = async (
     deleted: boolean;
   };
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/monitors/${id}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

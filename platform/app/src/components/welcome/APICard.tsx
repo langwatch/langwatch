@@ -43,14 +43,12 @@ const APICard: React.FC = () => {
         title: "Copied",
         description: "API key copied to clipboard",
         type: "success",
-        meta: { closable: true },
       });
     } catch {
       toaster.create({
         title: "Copy failed",
         description: "Couldn't copy the API key. Please try again.",
         type: "error",
-        meta: { closable: true },
       });
     }
   }
@@ -71,14 +69,12 @@ const APICard: React.FC = () => {
         title: "Copied",
         description: "Endpoint copied to clipboard",
         type: "success",
-        meta: { closable: true },
       });
     } catch {
       toaster.create({
         title: "Copy failed",
         description: "Couldn't copy the endpoint. Please try again.",
         type: "error",
-        meta: { closable: true },
       });
     }
   }

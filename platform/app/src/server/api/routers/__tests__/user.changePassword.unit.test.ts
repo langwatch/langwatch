@@ -15,8 +15,6 @@ vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "google", BASE_HOST: "http://localhost:5560" },
 }));
 
-vi.mock("~/server/redis", () => ({ connection: undefined }));
-
 vi.mock("~/server/rateLimit", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));

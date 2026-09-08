@@ -9,23 +9,27 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { SectionNavigationFrame } from "../SectionNavigationLayout";
 
+function renderFrame() {
+  return render(
+    <MemoryRouter initialEntries={["/automations"]}>
+      <ChakraProvider value={defaultSystem}>
+        <SectionNavigationFrame
+          sectionLabel="Automations"
+          navigationItems={[
+            { label: "Overview", href: "/automations" },
+            { label: "Alerts", href: "/automations/alerts" },
+          ]}
+        >
+          <h1>Overview</h1>
+        </SectionNavigationFrame>
+      </ChakraProvider>
+    </MemoryRouter>,
+  );
+}
+
 describe("SectionNavigationFrame", () => {
   it("keeps the section title and links beside the page content", () => {
-    render(
-      <MemoryRouter initialEntries={["/automations"]}>
-        <ChakraProvider value={defaultSystem}>
-          <SectionNavigationFrame
-            sectionLabel="Automations"
-            navigationItems={[
-              { label: "Overview", href: "/automations" },
-              { label: "Alerts", href: "/automations/alerts" },
-            ]}
-          >
-            <h1>Overview</h1>
-          </SectionNavigationFrame>
-        </ChakraProvider>
-      </MemoryRouter>,
-    );
+    renderFrame();
 
     const navigation = screen.getByRole("navigation", {
       name: "Automations navigation",

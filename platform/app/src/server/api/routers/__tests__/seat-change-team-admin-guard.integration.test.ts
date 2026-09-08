@@ -16,11 +16,6 @@
  * Requires: PostgreSQL database (Prisma)
  */
 
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -31,6 +26,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { prisma } from "../../../db";
 import {
   createSeatChangeFixture,

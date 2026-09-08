@@ -255,6 +255,126 @@ describe("AttributeTable editing", () => {
 
         expect(queryByLabelText(/edited\. Original/)).not.toBeInTheDocument();
       });
+
+      // A correction rewrites the whole attribute record, so an attribute
+      // holding JSON comes back re-serialised whether or not anyone touched it.
+      /** @scenario "JSON that only changed its formatting is not marked as edited" */
+      it("leaves an attribute the correction only re-serialised unmarked", () => {
+        const toolCalls = [
+          {
+            type: "tool-call",
+            toolName: "bash",
+            toolCallId: "call_VXJC9uzjpxa99ESxuMwQPEyF",
+            input: { command: "langwatch trace search", timeout: 120000 },
+          },
+        ];
+
+        const { queryByText } = renderCorrected(
+          { "ai.response.toolCalls": JSON.stringify(toolCalls, null, 2) },
+          { "ai.response.toolCalls": JSON.stringify(toolCalls) },
+        );
+
+        expect(queryByText("Edited")).not.toBeInTheDocument();
+      });
+
+      /** @scenario "JSON that only changed its formatting is not marked as edited" */
+      it("still marks one whose content the correction changed", () => {
+        const { getByText } = renderCorrected(
+          { "ai.response.toolCalls": '[{"toolName":"read"}]' },
+          { "ai.response.toolCalls": '[{"toolName":"bash"}]' },
+        );
+
+        expect(getByText("Edited")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a stored correction that removed an attribute", () => {
+    describe("when the corrected trace renders", () => {
+      /** @scenario "An attribute the correction removes is listed struck through" */
+      it("still lists it, marked as removed and struck through", () => {
+        const { getByText, getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "gen_ai.request.model": "gpt-5" }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(getByText("user.email")).toBeInTheDocument();
+        expect(getByText("someone@acme.test")).toBeInTheDocument();
+        expect(
+          getByLabelText("user.email, removed by an edit"),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario "An attribute the correction removes is listed struck through" */
+      it("does not call the removal an edit", () => {
+        const { queryByText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "gen_ai.request.model": "gpt-5" }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(queryByText("Edited")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the corrected span's attributes are copied", () => {
+      /** @scenario "Copying the attributes leaves out the ones the correction removed" */
+      it("hands on what the span carries, without the removed row", () => {
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: { writeText },
+        });
+        const { getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "gen_ai.request.model": "gpt-5" }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        fireEvent.click(getByLabelText("Copy all attributes"));
+
+        expect(writeText).toHaveBeenCalledTimes(1);
+        const copied = JSON.parse(writeText.mock.calls[0]![0] as string);
+        expect(copied).toEqual({ gen_ai: { request: { model: "gpt-5" } } });
+      });
+    });
+
+    describe("when the captured trace renders", () => {
+      /** @scenario "An attribute the correction removes reads plainly in the captured trace" */
+      it("reads like any other row, with nothing said about the removal", () => {
+        const { getByText, queryByText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(getByText("user.email")).toBeInTheDocument();
+        expect(queryByText("Removed")).not.toBeInTheDocument();
+      });
     });
   });
 

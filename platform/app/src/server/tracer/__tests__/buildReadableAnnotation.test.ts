@@ -2,8 +2,9 @@
  * One reviewer's annotation as a single readable line.
  * See specs/datasets/dataset-annotations-mapping.feature.
  */
-import type { AnnotationScore } from "@prisma/client";
+
 import { describe, expect, it } from "vitest";
+import type { AnnotationScore } from "~/generated/prisma/client";
 import {
   buildReadableAnnotation,
   type TraceAnnotation,

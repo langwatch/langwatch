@@ -1,9 +1,9 @@
+import { describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { batchProjectPermissions, resolveTeamPermission } from "../rbac";
 
@@ -96,9 +96,10 @@ function makePrisma({
       findUnique: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
     },
     organizationUser: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue({ role: OrganizationUserRole.MEMBER }),
+      findFirst: vi.fn().mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+      }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: { findMany: vi.fn().mockResolvedValue(bindings) },

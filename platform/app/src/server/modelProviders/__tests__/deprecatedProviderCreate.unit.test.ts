@@ -12,8 +12,9 @@
  * Covers @unit scenarios from
  * specs/model-providers/google-agent-platform.feature.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { ModelProviderService } from "../modelProvider.service";
 
 const STORED_ROW = {
@@ -85,6 +86,11 @@ const fakePrisma = ({ existingRow }: { existingRow: object | null }) => {
     organization: {
       findUnique: vi.fn(async () => ({ id: "org_acme" })),
       findMany: vi.fn(async () => [{ id: "org_acme" }]),
+    },
+    // Editing a stored row tells the gateway to drop its cached copy of the
+    // credential, and that write rides the same transaction.
+    gatewayChangeEvent: {
+      create: vi.fn(async () => ({ revision: 1n })),
     },
   };
   return {

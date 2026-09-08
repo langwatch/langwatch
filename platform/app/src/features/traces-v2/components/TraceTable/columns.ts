@@ -307,7 +307,7 @@ const conversationColumnDefs: Record<
 > = {
   conversation: convCol.accessor("conversationId", {
     id: "conversation",
-    header: "Session",
+    header: "Conversation",
     size: 9999,
     minSize: 320,
     meta: flex,

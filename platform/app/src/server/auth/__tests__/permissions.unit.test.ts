@@ -1,5 +1,5 @@
-import { OrganizationUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 
 const resolveProjectPermissionMock = vi.fn();
 
@@ -8,10 +8,16 @@ vi.mock("~/server/api/rbac", () => ({
     resolveProjectPermissionMock(...args),
 }));
 
+// The wrapper resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 import { requireProjectPermission } from "../permissions";
-
-const prisma = {} as any;
 
 beforeEach(() => {
   resolveProjectPermissionMock.mockReset();
@@ -30,7 +36,6 @@ describe("requireProjectPermission", () => {
           userId: "user_1",
           projectId: "proj_1",
           permission: "traces:view",
-          prisma,
         }),
       ).resolves.toBeUndefined();
     });
@@ -56,7 +61,6 @@ describe("requireProjectPermission", () => {
           userId: "user_not_member",
           projectId: "proj_1",
           permission: "traces:view",
-          prisma,
         }),
       ).rejects.toMatchObject({
         code: "project_permission_denied",
@@ -79,7 +83,6 @@ describe("requireProjectPermission", () => {
           userId: "user_viewer",
           projectId: "proj_1",
           permission: "project:delete",
-          prisma,
         }),
       ).rejects.toMatchObject({ code: "project_permission_denied" });
     });
@@ -97,7 +100,6 @@ describe("requireProjectPermission", () => {
           userId: "user_lite",
           projectId: "proj_1",
           permission: "scenarios:manage",
-          prisma,
         }),
       ).rejects.toBeInstanceOf(LiteMemberRestrictedError);
     });

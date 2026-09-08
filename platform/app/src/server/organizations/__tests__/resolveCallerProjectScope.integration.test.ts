@@ -9,15 +9,15 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   type Team,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -34,6 +34,8 @@ let namedWorkspaceId: string;
 let unnamedWorkspaceId: string;
 /** A personal workspace nobody is a member of. */
 let memberlessWorkspaceId: string;
+/** A workspace whose membership row points at a user that no longer exists. */
+let orphanedWorkspaceId: string;
 /** A project belonging to the whole team rather than to one person. */
 let sharedProjectId: string;
 let personalTeamIds: string[];
@@ -151,7 +153,19 @@ beforeAll(async () => {
     member: { id: absent.id, join: false },
   });
   memberlessWorkspaceId = memberless.projectId;
-  personalTeamIds = [named.teamId, withoutName.teamId, memberless.teamId];
+  // No foreign keys in the schema, so this membership row simply dangles,
+  // the way a real one does after its user row is deleted.
+  const orphaned = await createPersonalWorkspace({
+    name: "Orphaned workspace",
+    member: { id: `user_gone_${ns}`, join: true },
+  });
+  orphanedWorkspaceId = orphaned.projectId;
+  personalTeamIds = [
+    named.teamId,
+    withoutName.teamId,
+    memberless.teamId,
+    orphaned.teamId,
+  ];
 
   const shared = await createProject({
     name: "Gateway",
@@ -228,6 +242,20 @@ describe("Feature: the caller's project scope", () => {
 
       expect(scope.projects[memberlessWorkspaceId]).toMatchObject({
         contributorLabel: "Abandoned workspace",
+        isLinkable: false,
+      });
+    });
+
+    /** @scenario "A membership row that outlives its user still resolves the scope" */
+    it("names the workspace by itself when its membership row outlives its user", async () => {
+      const scope = await resolveCallerProjectScope({
+        userId: callerUserId,
+        organizationId: organization.id,
+        prisma,
+      });
+
+      expect(scope.projects[orphanedWorkspaceId]).toMatchObject({
+        contributorLabel: "Orphaned workspace",
         isLinkable: false,
       });
     });

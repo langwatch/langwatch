@@ -1,5 +1,5 @@
-import { PricingModel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PricingModel } from "~/generated/prisma/client";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
@@ -59,7 +59,7 @@ const { mockRedisStore } = vi.hoisted(() => {
   return { mockRedisStore };
 });
 
-vi.mock("~/server/redis", () => {
+vi.mock("~/server/app-layer/app", () => {
   const fakeRedis = {
     get: vi.fn(async (key: string) => mockRedisStore.get(key) ?? null),
     setex: vi.fn(async (_key: string, _ttl: number, value: string) => {
@@ -69,7 +69,12 @@ vi.mock("~/server/redis", () => {
       mockRedisStore.delete(key);
     }),
   };
-  return { isBuildOrNoRedis: false, connection: fakeRedis };
+  return {
+    getApp: () => ({ redis: fakeRedis }),
+    // The service's TtlCache reads through this one; same fake connection, so
+    // the cache is exercised rather than skipped.
+    tryGetApp: () => ({ redis: fakeRedis }),
+  };
 });
 
 vi.mock("../../tracing", () => ({
@@ -78,7 +83,7 @@ vi.mock("../../tracing", () => ({
 
 vi.mock("../../../clickhouse/clickhouseClient", () => ({
   isClickHouseEnabled: () => false,
-  getClickHouseClientForProject: () => Promise.resolve(null),
+  getClickHouseClientForTenant: () => Promise.resolve(null),
 }));
 
 const { mockEnv } = vi.hoisted(() => {
@@ -278,6 +283,13 @@ describe("UsageService", () => {
           "upgrade your plan at https://app.langwatch.ai/settings/subscription",
         );
       });
+
+      it("reports the unit the cap is metered in", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        assertExceeded(result);
+        expect(result.usageUnit).toBe("traces");
+      });
     });
 
     describe("when paid TIERED org exceeds limit on self-hosted", () => {
@@ -333,6 +345,13 @@ describe("UsageService", () => {
         expect(result.count).toBe(1000);
         expect(result.maxMessagesPerMonth).toBe(1000);
         expect(result.planName).toBe("Free");
+      });
+
+      it("reports the unit the cap is metered in", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        assertExceeded(result);
+        expect(result.usageUnit).toBe("events");
       });
 
       it("calls planResolver with organizationId", async () => {

@@ -1,4 +1,4 @@
-import type { Annotation } from "@prisma/client";
+import type { Annotation } from "~/generated/prisma/client";
 import { readableAnnotationAnchor } from "~/server/annotations/annotationAnchor";
 import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import type { Trace } from "~/server/tracer/types";
@@ -50,6 +50,21 @@ export function suggestionExportLine({
   return label
     ? `${label}: ${annotation.expectedOutput}`
     : annotation.expectedOutput;
+}
+
+/**
+ * The rating cell as the CSV export writes it. `isThumbsUp` is tri-state:
+ * comment-only annotations never carry a rating (the drawer doesn't send one
+ * and the router stores null), and the export doubles as labelled ground
+ * truth — so no rating exports as an empty cell, never a fabricated
+ * "Thumbs Down" (#6835).
+ */
+export function annotationRatingExportLabel(
+  isThumbsUp: boolean | null | undefined,
+): string {
+  if (isThumbsUp === true) return "Thumbs Up";
+  if (isThumbsUp === false) return "Thumbs Down";
+  return "";
 }
 
 /** One score a reviewer gave, named the way the project names it. */

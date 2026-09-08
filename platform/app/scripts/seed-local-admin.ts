@@ -18,9 +18,13 @@
  *   SEED_TEAM_NAME     — team name (default: Local Dev Team)
  *   SEED_PROJECT_NAME  — project name (default: Local Dev Project)
  */
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+
 import { hash } from "bcrypt";
 import { nanoid } from "nanoid";
+import {
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../src/generated/prisma/client";
 import { prisma } from "../src/server/db";
 import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY } from "./localDevLicense";
 
@@ -67,6 +71,10 @@ async function main() {
       data: {
         userId: user.id,
         provider: "credential",
+        // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+        // credential provider's issuer is `local:credential`, not
+        // `local:oauth:credential`. Without it sign-in cannot find this row.
+        issuer: "local:credential",
         providerAccountId: user.id,
         type: "credentials",
         password: hashed,

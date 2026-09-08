@@ -31,7 +31,24 @@ type (
 )
 
 // TraceSearchResponse is the paginated result of [TracesService.Search].
-type TraceSearchResponse = openapi.SearchResponse
+//
+// It is written out here rather than aliased to the shared openapi.SearchResponse,
+// which describes a page/limit/total envelope that /api/traces/search does not
+// send. Decoding into it silently dropped the scroll cursor, so ScrollID could
+// be sent but never received and a manual scroll was impossible to drive.
+type TraceSearchResponse struct {
+	Traces     []Trace               `json:"traces"`
+	Pagination TraceSearchPagination `json:"pagination"`
+}
+
+// TraceSearchPagination carries where a search left off.
+type TraceSearchPagination struct {
+	// ScrollID is the cursor for the NEXT page. Its absence means this page is
+	// the last one — that is the only end-of-results signal the API gives.
+	ScrollID string `json:"scrollId,omitempty"`
+	// TotalHits counts everything matching the search, not just this page.
+	TotalHits int `json:"totalHits"`
+}
 
 // TraceSearchParams describes a trace search. All fields are optional; an empty
 // params searches recent traces with server defaults.
@@ -45,19 +62,25 @@ type TraceSearchParams struct {
 	Filters map[string][]string
 	// PageSize caps the number of traces returned.
 	PageSize int
-	// ScrollID continues a previous search; pass the value the API returned.
+	// ScrollID continues a previous search; pass the ScrollID the previous
+	// response carried in its Pagination. Trace search pages by cursor only —
+	// there is no offset — so this is how a manual walk advances.
 	ScrollID string
 }
 
 // Search runs a trace search and returns matching traces plus pagination
 // metadata. It targets the current /api/traces/search endpoint.
 //
+// To walk more than one page, either use [TracesService.All], or feed each
+// response's Pagination.ScrollID back in as the next request's ScrollID and
+// stop when a response carries none.
+//
 //	res, err := lw.Traces.Search(ctx, client.TraceSearchParams{
 //		Query:   "timeout",
 //		Filters: map[string][]string{"metadata.user_id": {"u_123"}},
 //	})
-//	if err == nil && res.Traces != nil {
-//		for _, t := range *res.Traces { fmt.Println(*t.TraceId) }
+//	if err == nil {
+//		for _, t := range res.Traces { fmt.Println(*t.TraceId) }
 //	}
 func (s *TracesService) Search(ctx context.Context, params TraceSearchParams) (*TraceSearchResponse, error) {
 	body := openapi.SearchRequest{}

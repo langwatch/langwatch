@@ -654,11 +654,28 @@ Feature: Editing a trace in the drawer
       When I open another trace
       Then it opens corrected
 
+    # The corrected trace is where a reader goes to see what the correction did,
+    # so a removal has to be visible there. A span that simply vanished would
+    # read as a span that was never captured, and the reader would have to hold
+    # both views in their head to notice anything went away at all. It stays on
+    # the row it had, struck through and marked, which is the one rendering that
+    # says "this was here and the correction takes it out".
     @integration
-    Scenario: A deleted span is hidden in the corrected trace
+    Scenario: A deleted span is listed and struck through in the corrected trace
       Given the trace has a correction that deletes a span
       When I read the corrected trace
-      Then that span is not listed
+      Then that span is listed and marked as deleted
+      And its name and its type are struck through
+
+    # The tombstone is a row about what the correction did, not a span the
+    # corrected trace has. Everything that asks what the trace now contains
+    # leaves it out, which is what keeps the tombstone from reaching a dataset.
+    @integration
+    Scenario: A deleted span is not part of the corrected trace
+      Given the trace has a correction that deletes a span
+      When the corrected trace is read for what it contains
+      Then that span is not in it
+      And neither are its descendants
 
     @unit
     Scenario: The header counts the spans the corrected trace has
@@ -667,18 +684,32 @@ Feature: Editing a trace in the drawer
       Then the header counts one span fewer than was captured
       And the captured trace still counts them all
 
+    # The captured trace is the trace as it arrived, so a span the correction
+    # does nothing to but remove reads there exactly like every span it never
+    # touched. The changed colour is not a milder way to say removed: it promises
+    # a replaced value the reader can go and compare, and a removal replaces
+    # nothing. A correction that renamed the span before removing it did replace
+    # one, which is the scenario after this.
     @integration
-    Scenario: A deleted span is marked in the captured trace
-      Given the trace has a correction that deletes a span
+    Scenario: A deleted span reads plainly in the captured trace
+      Given the trace has a correction whose only change is deleting a span
       When I switch to the captured trace
-      Then that span is listed and marked as deleted
+      Then that span is listed with no deleted marker
+      And its name is not struck through
+      And it does not carry the changed colour either
 
-    # Removal is the whole of the change, and the deleted marker says it. The
-    # changed colour on the same row argues with it.
+    @integration
+    Scenario: A span the correction both changes and deletes still reads as changed
+      Given the trace has a correction that renames a span and then deletes it
+      When I switch to the captured trace
+      Then that span carries the changed colour
+
+    # When removal is the whole of the change the deleted marker says it, and
+    # the changed colour on the same row argues with it.
     @integration
     Scenario: A deleted span is not also coloured as changed
-      Given the trace has a correction that deletes a span
-      When I switch to the captured trace
+      Given the trace has a correction whose only change is deleting a span
+      When I read the corrected trace
       Then that row does not carry the changed colour
 
     # The markers a correction adds sit beside the span name and take room from
@@ -712,6 +743,56 @@ Feature: Editing a trace in the drawer
     Scenario: An attribute the correction added is marked as added
       Given the trace has a correction that adds a span attribute
       Then that attribute is marked as added by an edit
+
+    # An attribute the correction takes away is the same case as a span it takes
+    # away: the corrected trace is where the removal has to be legible, and a row
+    # that simply stopped existing is not.
+    @integration
+    Scenario: An attribute the correction removes is listed struck through
+      Given the trace has a correction that removes a span attribute
+      When I read the corrected trace
+      Then that attribute is listed with its captured value struck through
+      And it is marked as removed
+
+    @integration
+    Scenario: An attribute the correction removes reads plainly in the captured trace
+      Given the trace has a correction that removes a span attribute
+      When I switch to the captured trace
+      Then that attribute is listed with no removed marker
+      And its value is not struck through
+
+    # A struck-through row is a way of showing what is gone, and only the table
+    # can draw it. Copying the attributes, or reading them as JSON, hands them on
+    # somewhere with nowhere to strike anything through, so a removed attribute
+    # would arrive there looking like one the span still carries.
+    @integration
+    Scenario: Copying the attributes leaves out the ones the correction removed
+      Given the trace has a correction that removes a span attribute
+      When I copy the attributes of the corrected span
+      Then the copied attributes hold everything the corrected span carries
+      And the removed attribute is not among them
+
+    # A correction rewrites a whole attribute record, so an attribute holding
+    # JSON comes back re-serialised even when the reviewer never touched it:
+    # different spacing, different key order, the same data. Marking that as
+    # edited teaches the reader to distrust the marker, which costs more than
+    # the marker is worth.
+    @integration
+    Scenario: JSON that only changed its formatting is not marked as edited
+      Given the trace has a correction that reformats an attribute holding JSON
+      Then that attribute is not marked as edited
+
+    @unit
+    Scenario: Reordered JSON keys are not an edit
+      Given a captured attribute and a corrected one holding the same keys in a
+      different order
+      Then they read as the same value
+
+    @unit
+    Scenario: Reordered JSON array entries are an edit
+      Given a captured attribute and a corrected one holding the same array
+      entries in a different order
+      Then they read as different values
 
     @integration
     Scenario: A corrected span name names its captured name

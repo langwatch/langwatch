@@ -1,7 +1,7 @@
-import type { Prisma, TriggerAction } from "@prisma/client";
-import { TriggerKind } from "@prisma/client";
 import { Cron } from "croner";
 import { z } from "zod";
+import type { Prisma, TriggerAction } from "~/generated/prisma/client";
+import { TriggerKind } from "~/generated/prisma/client";
 
 /**
  * Builder for the `Trigger` row representing a scheduled REPORT (ADR-044). A

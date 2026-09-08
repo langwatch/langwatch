@@ -24,6 +24,33 @@ import type {
 const TABLE_NAME = "coding_agent_sessions" as const;
 
 /**
+ * The columns behind a `CodingAgentBranchSessionRow`: only what the
+ * pull-request rollup adds up, groups by and names, plus the scalar tie-break
+ * keys — never content. Shared by the branch read and the by-id read so the
+ * two can never answer with different shapes.
+ */
+const BRANCH_SESSION_COLUMNS = `
+  SessionId,
+  TenantId,
+  StartedAt,
+  InputTokens,
+  OutputTokens,
+  CacheReadTokens,
+  CacheCreationTokens,
+  CostUsd,
+  Agent,
+  Models,
+  UserId,
+  GitBranch,
+  GitBranches,
+  Title,
+  LastEventOccurredAt,
+  ModelCalls,
+  ToolCalls,
+  Prompts
+`;
+
+/**
  * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten
  * the page.
  *
@@ -70,8 +97,10 @@ interface ClickHouseWriteRecord {
   RepositoryOwner: string;
   RepositoryName: string;
   GitBranch: string;
+  GitBranches: string[];
   GitWorktree: string;
   Title: string;
+  TitleSource: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -96,6 +125,7 @@ interface ClickHouseWriteRecord {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
+  AgentReportedCostUsd: number;
 
   ModelCallMs: string;
   ToolMs: string;
@@ -187,6 +217,8 @@ function toBranchSessionRow(
     models: asStringArray(record.Models),
     userId: String(record.UserId ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
+    title: String(record.Title ?? ""),
   };
 }
 
@@ -227,8 +259,10 @@ function toRecord({
     RepositoryOwner: row.repositoryOwner,
     RepositoryName: row.repositoryName,
     GitBranch: row.gitBranch,
+    GitBranches: row.gitBranches,
     GitWorktree: row.gitWorktree,
     Title: row.title,
+    TitleSource: row.titleSource,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -255,6 +289,7 @@ function toRecord({
     CacheReadTokens: big(row.cacheReadTokens),
     CacheCreationTokens: big(row.cacheCreationTokens),
     CostUsd: row.costUsd,
+    AgentReportedCostUsd: row.agentReportedCostUsd,
 
     ModelCallMs: big(row.modelCallMs),
     ToolMs: big(row.toolMs),
@@ -379,7 +414,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId: row.tenantId, sessionId: row.sessionId },
         "failed to upsert coding agent session",
       );
@@ -706,8 +741,17 @@ export class CodingAgentSessionClickHouseRepository
    * `findManyRecent` documents at length: `StartedAt` moves, so bounding the
    * dedup scope can resolve a session to a superseded version.
    *
-   * Only the columns the rollup adds up are selected, plus the scalar keys the
-   * shared tie-break ranks on. The two array-length keys it also knows about
+   * A session matches on the branch it ENDED on or on any branch it drove
+   * (`GitBranches`, migration 00077). Matching the scalar alone would charge a
+   * session that landed one change and moved on entirely to its last pull
+   * request, leaving the one it opened first reading as free. The set is
+   * selected as well as matched on, because attribution runs the tenure rule
+   * over it again on the way out: a row fetched on a branch it no longer sits
+   * on is only useful if the caller can still see which branch that was.
+   *
+   * Only the columns the rollup adds up are selected, plus the session's title
+   * and the scalar keys the shared tie-break ranks on. The two array-length
+   * keys it also knows about
    * are deliberately absent, because they would mean reading `MetricSeries` and
    * `AppliedEventIds` for every session of a busy repository to break a tie
    * that `nextVersionStamp` already makes unreachable. `preferredOf` treats an
@@ -777,29 +821,16 @@ export class CodingAgentSessionClickHouseRepository
   }): Promise<CodingAgentBranchSessionRow[]> {
     const result = await client.query({
       query: `
-        SELECT
-          SessionId,
-          TenantId,
-          StartedAt,
-          InputTokens,
-          OutputTokens,
-          CacheReadTokens,
-          CacheCreationTokens,
-          CostUsd,
-          Agent,
-          Models,
-          UserId,
-          GitBranch,
-          LastEventOccurredAt,
-          ModelCalls,
-          ToolCalls,
-          Prompts
+        SELECT ${BRANCH_SESSION_COLUMNS}
         FROM ${TABLE_NAME}
         WHERE TenantId IN {tenantIds:Array(String)}
           AND lower(RepositoryHost) = {repositoryHost:String}
           AND lower(RepositoryOwner) = {repositoryOwner:String}
           AND lower(RepositoryName) = {repositoryName:String}
-          AND GitBranch IN {branches:Array(String)}
+          AND (
+            GitBranch IN {branches:Array(String)}
+            OR hasAny(GitBranches, {branches:Array(String)})
+          )
           AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
           AND (TenantId, SessionId, UpdatedAt) IN (
             SELECT TenantId, SessionId, max(UpdatedAt)
@@ -846,6 +877,75 @@ export class CodingAgentSessionClickHouseRepository
     );
   }
 
+  /**
+   * The same row shape as `listByRepositoryBranch`, anchored on session ids:
+   * the second leg of fact-stamp discovery, fetching the session rows for
+   * sessions whose stamped events named a repository their own row has since
+   * moved away from. Same tenant grouping, same unwindowed dedup, same
+   * per-tenant collapse, for the reasons documented there.
+   */
+  async listBySessionIds({
+    tenantIds,
+    sessionIds,
+    startedAtFromMs,
+  }: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
+    if (tenantIds.length === 0 || sessionIds.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionClickHouseRepository.listBySessionIds",
+      );
+    }
+
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      resolveClient: this.resolveClient,
+    });
+    const collected: CodingAgentBranchSessionRow[] = [];
+    for (const group of groups) {
+      const result = await group.client.query({
+        query: `
+          SELECT ${BRANCH_SESSION_COLUMNS}
+          FROM ${TABLE_NAME}
+          WHERE TenantId IN {tenantIds:Array(String)}
+            AND SessionId IN {sessionIds:Array(String)}
+            AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
+            AND (TenantId, SessionId, UpdatedAt) IN (
+              SELECT TenantId, SessionId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId IN {tenantIds:Array(String)}
+              GROUP BY TenantId, SessionId
+            )
+          ORDER BY StartedAt ASC
+        `,
+        query_params: {
+          tenantIds: group.tenantIds,
+          sessionIds,
+          from: startedAtFromMs,
+        },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<Record<string, unknown>>();
+      const byTenant = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) {
+        const tenantId = String(row.TenantId ?? "");
+        const list = byTenant.get(tenantId) ?? [];
+        list.push(row);
+        byTenant.set(tenantId, list);
+      }
+      collected.push(
+        ...[...byTenant.values()].flatMap((tenantRows) =>
+          dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
+        ),
+      );
+    }
+    return collected;
+  }
+
   async upsertBatch(
     entries: Array<{
       row: CodingAgentSessionRow;
@@ -888,7 +988,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId, count: entries.length },
         "failed to upsert coding agent session batch",
       );
@@ -1053,8 +1153,10 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     repositoryOwner: String(record.RepositoryOwner ?? ""),
     repositoryName: String(record.RepositoryName ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
+    titleSource: String(record.TitleSource ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
@@ -1086,6 +1188,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     cacheReadTokens: asNumber(record.CacheReadTokens),
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
+    agentReportedCostUsd: asNumber(record.AgentReportedCostUsd),
 
     modelCallMs: asNumber(record.ModelCallMs),
     toolMs: asNumber(record.ToolMs),

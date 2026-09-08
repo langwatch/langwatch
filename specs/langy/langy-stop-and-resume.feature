@@ -51,6 +51,32 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     And reloading the conversation still shows that partial answer
     And the stopped message is not rendered as a red error
 
+  @integration
+  Scenario: A stop before any words arrive reads as interrupted, not as missing content
+    Given I stop a turn before Langy has written anything
+    Then the empty reply row says "Interrupted"
+    And it does not say "No content", because the emptiness was my own doing
+
+  # A reply with a card or a paragraph in it used to look exactly like a finished
+  # one, so the reader had to remember pressing Stop to read the answer correctly.
+  @unit
+  Scenario: A stopped reply says so, whatever it managed to say first
+    Given Langy had written a paragraph or drawn a card before I stopped the turn
+    Then the reply keeps everything that arrived
+    And it ends with a quiet "Interrupted" line
+
+  # A tool call is only ever closed by its own output, so a call the stop caught
+  # mid-flight stays open for good. It used to keep the running card: a pulsing
+  # dot and "Searching traces…" for the rest of the conversation, for work that
+  # nothing was doing.
+  @unit
+  Scenario: A call left open by a stopped turn reads as interrupted
+    Given a tool call was still running when the turn ended
+    When the reply is drawn again
+    Then its card keeps the rows and the command it had already shown
+    And the card says it was interrupted before it finished
+    And it no longer pulses, shimmers, or claims to be running
+
   # The distinguishing act of THIS spec versus langy-turn-recovery: a stop is
   # neither a success nor a failure. It is its own terminal outcome, carried on the
   # same "the agent responded" event that carries a completed answer (it has an
@@ -92,6 +118,18 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     When I stop the turn
     Then the worker is signalled to cancel the in-flight generation
     And a late result from that worker cannot resurrect or duplicate the stopped turn
+
+  # The manager's half of the signal above: the cancel names the conversation
+  # and the turn, and the manager hands it to the worker actually running that
+  # turn. Fire-and-forget on purpose: the stop is already truthful on the
+  # durable record, so a cancel that finds nothing to halt answers success and
+  # halts nothing.
+  @unit
+  Scenario: A stop makes the manager abort the in-flight generation
+    Given the manager is driving the turn the user stopped
+    When the stop's cancel arrives at the manager
+    Then the manager tells the turn's worker to abort it
+    And the caller is never handed an error for a cancel that had nothing left to do
 
   # Stop must be honest about latency: the click cannot claim success before the
   # backend has confirmed. The button reflects a "stopping…" state until the
@@ -138,16 +176,37 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the stop is dispatched against the turn the durable record names
     And that turn reaches a stopped terminal
 
-  # The honesty rule, made structural: the control moves to "stopping" ONLY on
-  # the branch that dispatches a stop. There is no path that shows the stopping
-  # spinner without a request behind it.
-  @unit
-  Scenario: Stop says nothing it cannot back up
-    Given a turn is in flight but no turn id is known yet
+  # --- Stopping while the turn is still starting up -------------------------
+  #
+  # The turn only gets an id when the create/continue call answers, and on a
+  # cold worker that is 6 to 12 seconds after the send. For that whole window
+  # the composer showed Send, so a message sent by accident could not be called
+  # back, and a stop clicked in it was answered with "try again in a moment".
+  #
+  # Stop is now available from the send itself. A click before the turn has an
+  # id is an intent the panel KEEPS and dispatches the moment the turn is
+  # named — by this tab's own send, or by the durable record.
+
+  @integration
+  Scenario: Stop is available the moment I send
+    Given I send a message to Langy
+    Then the composer shows Stop while the turn is still starting up
+    And I do not have to wait for Langy to answer before I can stop it
+
+  @unit @integration
+  Scenario: Stop during startup is kept and dispatched when the turn is identified
+    Given I sent a message and the turn has no id yet
     When I click Stop
-    Then no stop is dispatched
-    And the control stays on Stop rather than showing it is stopping
-    And I am told the turn cannot be stopped yet
+    Then the control shows it is stopping
+    And the stop is dispatched against that turn as soon as it is identified
+    And I am never told to try stopping it again in a moment
+
+  @unit @integration
+  Scenario: A send that fails before the turn is identified hands the control back
+    Given I clicked Stop while my message was still starting up
+    When the send fails before any turn id exists
+    Then no stop is dispatched, because nothing was ever running
+    And the composer returns to Send with my message back in the field
 
   @unit
   Scenario: A stop that never reached the backend hands the control back
@@ -177,6 +236,17 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     When I ask to stop a turn the conversation does not have in flight
     Then the request is refused
     And no terminal is recorded against that turn
+
+  # A turn is admitted on the record before its worker is running: the dispatch
+  # is fired at the manager, and a re-drive (outbox, liveness) can follow it
+  # seconds later. A stop in that window has to reach the work as well as the
+  # record, or the answer the user stopped is generated anyway.
+  @integration
+  Scenario: A stop before the worker starts still stops the turn
+    Given a turn was admitted but its worker is not running it yet
+    When I stop that turn
+    Then the turn settles as stopped on the durable record
+    And a later dispatch of that turn does not start the work
 
   # ===========================================================================
   # (2) Continue a stopped chat

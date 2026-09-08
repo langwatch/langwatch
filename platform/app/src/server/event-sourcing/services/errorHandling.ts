@@ -1,3 +1,4 @@
+import { TRANSIENT_NETWORK_CODES } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import type { createLogger } from "@langwatch/observability";
 
@@ -477,6 +478,13 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
   "Connection loss",
   "CANNOT_READ_ALL_DATA",
   "Write buffer has been canceled",
+  // The peer closed the connection before answering. Normally carries an
+  // errno matched by TRANSIENT_NETWORK_CODES, but the message is all that
+  // survives an error that crossed a worker or serialisation boundary, and
+  // it is the only form that reaches the logs. "socket hang up" is Node's
+  // http module; "other side closed" is undici's.
+  "socket hang up",
+  "other side closed",
 ] as const;
 
 /**
@@ -521,13 +529,18 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
 }
 
 function isTransientClickHouseError(error: unknown): boolean {
-  if (
-    error != null &&
-    typeof error === "object" &&
-    "code" in error &&
-    CLICKHOUSE_TRANSIENT_CODES.has(String((error as { code: unknown }).code))
-  ) {
-    return true;
+  if (error != null && typeof error === "object" && "code" in error) {
+    const code = String((error as { code: unknown }).code);
+    // Two disjoint namespaces share the one `code` field. ClickHouse's own
+    // numeric codes arrive on server-side exceptions; Node's socket errnos
+    // arrive when the request never got an answer at all. Checking only the
+    // former made `socket hang up` (code ECONNRESET) CRITICAL, so a worker
+    // rollout that aborted an in-flight insert dead-lettered the job instead
+    // of re-staging it. TRANSIENT_NETWORK_CODES is imported rather than
+    // restated so this classifier cannot drift from the retry policy the
+    // shared ClickHouse client already applies to reads.
+    if (CLICKHOUSE_TRANSIENT_CODES.has(code)) return true;
+    if (TRANSIENT_NETWORK_CODES.has(code)) return true;
   }
 
   const message = error instanceof Error ? error.message : String(error);

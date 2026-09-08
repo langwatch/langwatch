@@ -2,42 +2,35 @@
  * Router for running scenarios against targets.
  */
 
-import { generate } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import {
-  createDataPrefetcherDependencies,
-  prefetchScenarioData,
-} from "~/server/scenarios/execution/data-prefetcher";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { checkProjectPermission } from "../../rbac";
+import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
+import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import type { RunActor } from "~/server/scenarios/run-actor";
+import { runNoteSchema } from "~/server/scenarios/run-note";
+import { simulationTargetSchema } from "~/server/scenarios/simulation-target";
 import { projectSchema } from "./schemas";
-
-const logger = createLogger("SimulationRunnerRouter");
-
-/**
- * Target for scenario simulation.
- * Extensible: add new types as needed (llm, workflow, etc.)
- */
-export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
-  referenceId: z.string(),
-});
-
-export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
 
 const runScenarioSchema = projectSchema.extend({
   scenarioId: z.string(),
   target: simulationTargetSchema,
-  /** Optional set ID - defaults to internal on-platform set ID for ad-hoc runs */
+  /**
+   * Where the run is recorded. Defaults to this project's one-off bucket.
+   *
+   * A caller may name an EXTERNAL set, the address its own code pushes
+   * scenario events under. It may not name an internal one: see
+   * `assertWritableSetId` in the launch service.
+   */
   setId: z.string().optional(),
   /** Optional client-generated batch run ID for immediate placeholder feedback */
   batchRunId: z.string().optional(),
+  /**
+   * Constant values for the run. A value supplied here overrides the
+   * scenario's own default for that name.
+   */
+  parameters: runParameterValuesSchema.optional(),
+  /** One short line describing why this run was started. */
+  note: runNoteSchema,
 });
 
 /**
@@ -53,91 +46,20 @@ export const simulationRunnerRouter = createTRPCRouter({
    */
   run: protectedProcedure
     .input(runScenarioSchema)
-    .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ input }) => {
-      const setId = input.setId ?? getOnPlatformSetId(input.projectId);
-      const batchRunId = input.batchRunId ?? generateBatchRunId();
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      const actor: RunActor = { id: ctx.session.user.id, label: "user" };
 
-      // Validate early - prefetch data to catch configuration errors before scheduling
-      const deps = createDataPrefetcherDependencies();
-      const prefetchResult = await prefetchScenarioData(
-        {
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          setId,
-          batchRunId,
-        },
-        input.target,
-        deps,
-      );
-
-      if (!prefetchResult.success) {
-        logger.warn(
-          {
-            projectId: input.projectId,
-            scenarioId: input.scenarioId,
-            error: prefetchResult.error,
-          },
-          "Scenario validation failed",
-        );
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: prefetchResult.error,
-        });
-      }
-
-      const scenarioRunId = generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
-
-      logger.info(
-        {
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          batchRunId,
-          scenarioRunId,
-        },
-        "Scheduling scenario execution",
-      );
-
-      // Dispatch queueRun command first so QUEUED state is written to ClickHouse
-      // before the execution job is scheduled — same pattern as SuiteRunService.startRun()
-      try {
-        await getApp().simulations.queueRun({
-          tenantId: input.projectId,
-          scenarioRunId,
-          scenarioId: input.scenarioId,
-          batchRunId,
-          scenarioSetId: setId,
-          name: prefetchResult.data.scenario.name,
-          target: {
-            type: input.target.type,
-            referenceId: input.target.referenceId,
-          },
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.error(
-          { error, projectId: input.projectId, scenarioRunId, batchRunId },
-          "Failed to queue scenario run",
-        );
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to queue scenario run",
-          cause: error,
-        });
-      }
-
-      // No explicit job scheduling — the execution reactor picks up the queued
-      // event via the GroupQueue and spawns the child process.
-      logger.info(
-        { batchRunId, scenarioRunId },
-        "Scenario queued via event-sourcing",
-      );
-
-      return {
-        scheduled: true,
-        setId,
-        batchRunId,
-        scenarioRunId,
-      };
+      return launchScenarioRun({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        target: input.target,
+        actor,
+        setId: input.setId,
+        batchRunId: input.batchRunId,
+        parameters: input.parameters,
+        note: input.note,
+      });
     }),
 });

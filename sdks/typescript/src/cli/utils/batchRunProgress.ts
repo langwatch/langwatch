@@ -1,3 +1,5 @@
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 /**
  * How far along a batch of simulation runs is.
  *
@@ -12,7 +14,10 @@
  */
 
 /** What the run list gives us. Narrower than the endpoint's full response. */
-interface BatchRun {
+export interface BatchRun {
+	batchRunId?: string;
+	scenarioRunId?: string;
+	scenarioId?: string;
 	status?: string;
 	results?: { verdict?: string | null } | null;
 }
@@ -32,6 +37,12 @@ export interface BatchRunProgress {
  * `STALLED` counts as finished on purpose: a stalled run is not coming back,
  * and treating it as in-flight is what would make `--wait` hang until its
  * timeout rather than report what happened.
+ *
+ * `PENDING_EVALUATION` is deliberately absent. The conversation is over and
+ * the judge has decided, but the evaluators the run's suite and plan attach
+ * have not been recorded yet, so a required one can still turn the run red.
+ * Counting it as finished is what let `--wait` report a green batch a moment
+ * before an evaluator failed it.
  */
 const FINISHED = new Set([
 	"SUCCESS",
@@ -88,7 +99,7 @@ export async function fetchBatchRuns({
 		url.searchParams.set("limit", "100");
 		if (cursor) url.searchParams.set("cursor", cursor);
 
-		const response = await fetch(url, { method: "GET", headers });
+		const response = await langwatchFetch(url, { method: "GET", headers });
 		if (!response.ok) {
 			throw new Error(`status endpoint answered ${response.status}`);
 		}
@@ -99,7 +110,13 @@ export async function fetchBatchRuns({
 			nextCursor?: string;
 		};
 
-		runs.push(...(page.runs ?? []));
+		// Deployed servers apply the batchRunId filter only when scenarioSetId
+		// is also present, and answer with the whole project's runs otherwise.
+		// Keep only the batch's own runs, or a stale in-progress run from an
+		// old batch holds the wait open until its timeout.
+		runs.push(
+			...(page.runs ?? []).filter((run) => run.batchRunId === batchRunId),
+		);
 		cursor = page.hasMore ? page.nextCursor : undefined;
 	} while (cursor);
 

@@ -16,8 +16,12 @@ import { Dialog } from "../ui/dialog";
 type ProrationQueryResult =
   | {
       data?: {
+        amountDueCents: number;
+        formattedAmountDue: string;
+        formattedCreditApplied: string | null;
         formattedRecurringTotal: string;
         billingInterval: string;
+        quotedAt: number;
       };
       isLoading: boolean;
       isError: boolean;
@@ -26,6 +30,29 @@ type ProrationQueryResult =
       error?: unknown;
     }
   | undefined;
+
+/**
+ * The billing period, spelled out next to an amount the customer is about to
+ * confirm.
+ *
+ * Every period the payment provider can report gets its own words. Collapsing
+ * the unknown ones to "per month" would put a wrong period beside a real
+ * charge, so an unrecognised one says nothing rather than something false.
+ */
+function formatBillingPeriod(interval: string): string {
+  switch (interval) {
+    case "year":
+      return " per year";
+    case "month":
+      return " per month";
+    case "week":
+      return " per week";
+    case "day":
+      return " per day";
+    default:
+      return "";
+  }
+}
 
 function SeatsProrationPreview({
   hasSubscriptionApi,
@@ -90,14 +117,43 @@ function SeatsProrationPreview({
       <Separator />
 
       {data && (
-        <HStack justify="space-between" paddingX={2}>
-          <Text fontWeight="normal" fontSize="md" color="gray.500">
-            New billing amount
-          </Text>
-          <Text fontWeight="normal" fontSize="md" color="gray.500">
-            {data.formattedRecurringTotal}
-          </Text>
-        </HStack>
+        <VStack gap={3} align="stretch">
+          {/* Confirming charges this immediately, so it is the headline number
+              rather than a footnote — the recurring total below is what the
+              plan costs from the next invoice onwards. */}
+          <HStack justify="space-between" paddingX={2}>
+            <Text fontWeight="semibold" fontSize="md">
+              {data.amountDueCents < 0 ? "Credit applied today" : "Due today"}
+            </Text>
+            <Text fontWeight="semibold" fontSize="md">
+              {data.formattedAmountDue}
+            </Text>
+          </HStack>
+
+          {/* Why "Due today" is smaller than the change itself. Without this
+              line an account holding credit reads a charge it cannot account
+              for, and the natural conclusion is that the number is wrong. */}
+          {data.formattedCreditApplied && (
+            <HStack justify="space-between" paddingX={2}>
+              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+                Account credit applied
+              </Text>
+              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+                −{data.formattedCreditApplied}
+              </Text>
+            </HStack>
+          )}
+
+          <HStack justify="space-between" paddingX={2}>
+            <Text fontWeight="normal" fontSize="md" color="gray.500">
+              New billing amount
+            </Text>
+            <Text fontWeight="normal" fontSize="md" color="gray.500">
+              {data.formattedRecurringTotal}
+              {formatBillingPeriod(data.billingInterval)}
+            </Text>
+          </HStack>
+        </VStack>
       )}
     </VStack>
   );
@@ -131,7 +187,7 @@ export function SeatsContent({
   const handleConfirm = async () => {
     setIsConfirming(true);
     try {
-      await variant.onConfirm();
+      await variant.onConfirm(prorationQuery?.data?.quotedAt);
       onClose();
     } catch (err) {
       showErrorToast({

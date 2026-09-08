@@ -7,17 +7,8 @@
  * chat messages. Used by the VertexAdk extractor.
  */
 
-import { isNonEmptyString, isRecord } from "./_guards";
+import { isNonEmptyString, isRecord, safeStringify } from "./_guards";
 import { isReplyTextPart } from "./_parts";
-
-export const safeStringify = (value: unknown): string | null => {
-  try {
-    const s = JSON.stringify(value);
-    return typeof s === "string" ? s : null;
-  } catch {
-    return null;
-  }
-};
 
 /**
  * Gemini content roles are "user" | "model"; chat messages use

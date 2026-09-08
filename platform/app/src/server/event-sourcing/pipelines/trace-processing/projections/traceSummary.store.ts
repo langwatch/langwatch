@@ -92,15 +92,30 @@ export class TraceSummaryStore
 }
 
 /**
- * A fold state is worth persisting when it has at least one span OR at
- * least one log record received. Without this, logs-only traces (claude
- * Path B + OTEL_LOGS_EXPORTER without a traces exporter, codex Path B
- * pre-codex-spans, custom gen_ai-on-logs emitters) accumulate state but
- * never reach trace_summaries — handleTraceLogRecordReceived increments
- * langwatch.reserved.log_record_count but spanCount stays 0.
+ * A fold state is worth persisting when it has at least one span, OR log
+ * records that contributed something a reader can see. Log-only traces
+ * (claude Path B + OTEL_LOGS_EXPORTER without a traces exporter, codex
+ * Path B pre-codex-spans, custom gen_ai-on-logs emitters) are a supported
+ * shape, and they reach trace_summaries through the second arm.
+ *
+ * The content check is what keeps ambient process telemetry out: an agent
+ * that starts and dies before its first prompt still emits lifecycle and
+ * error records, which fold into a state with a log count and nothing
+ * else. Persisting those minted span-less rows with no input, no output
+ * and no cost — one per dead agent per boot. The records themselves stay
+ * stored either way; only the row waits for the trace to say something.
  */
 function hasPersistableSignal(state: TraceSummaryData): boolean {
   if (state.spanCount > 0) return true;
   const raw = state.attributes?.["langwatch.reserved.log_record_count"];
-  return typeof raw === "string" && Number(raw) > 0;
+  const hasLogRecords = typeof raw === "string" && Number(raw) > 0;
+  if (!hasLogRecords) return false;
+  return (
+    state.computedInput !== null ||
+    state.computedOutput !== null ||
+    state.totalCost !== null ||
+    state.totalPromptTokenCount !== null ||
+    state.totalCompletionTokenCount !== null ||
+    state.models.length > 0
+  );
 }

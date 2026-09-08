@@ -176,17 +176,28 @@ func (s *ProjectsService) All(ctx context.Context, params ListProjectsParams) it
 //		fmt.Println(*tr.TraceId)
 //	}
 //
-// Pages are walked by advancing pageOffset/pageSize. The page size defaults to
-// the server maximum (1000) when params.PageSize is unset; iteration stops as
-// soon as a page comes back shorter than the requested size (the end of the
-// result set). A page-fetch error is yielded once as (zero, err) and ends
-// iteration; breaking out of the loop stops fetching immediately; the supplied
-// context is honoured between pages.
+// Pages are walked by the scroll cursor each response carries: the first
+// request sends none, and every later one replays the ScrollID the previous
+// response returned. The page size defaults to the server maximum (1000) when
+// params.PageSize is unset; iteration stops when a response carries no cursor,
+// which is how trace search says there is nothing after this page. A page-fetch
+// error is yielded once as (zero, err) and ends iteration; breaking out of the
+// loop stops fetching immediately; the supplied context is honoured between
+// pages.
 //
-// Auto-pagination and scroll cursors are mutually exclusive: a scroll cursor
-// already encodes its own position, so replaying one against an advancing
-// pageOffset would re-serve the same page forever. Passing params.ScrollID here
-// therefore yields a single (zero, err) and stops — drive a scroll by hand with
+// A cursor that comes back unchanged is reported as an error rather than
+// followed, since a walk that is not advancing will not start.
+//
+// It walked by pageOffset until trace search started rejecting a non-zero one.
+// That parameter had been unread since trace storage moved to ClickHouse, so
+// the walk was re-served page one for every request and, since a repeated full
+// page never looks short, never terminated (#6808). The cursor is the only
+// pagination the endpoint has ever actually honoured.
+//
+// Auto-pagination and a caller-supplied cursor remain mutually exclusive: a
+// cursor names a position in a scroll this call did not start, and resuming
+// someone else's scroll is a manual walk by definition. Passing params.ScrollID
+// here therefore yields a single (zero, err) and stops — drive that scroll with
 // [TracesService.Search] instead.
 func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.Seq2[Trace, error] {
 	pageSize := resolvePageSize(params.PageSize)
@@ -195,13 +206,14 @@ func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.
 			yield(Trace{}, fmt.Errorf("langwatch: Traces.All: ScrollID cannot be combined with auto-pagination; use Traces.Search to drive a scroll cursor"))
 			return
 		}
-		offset := 0
+		scrollID := ""
+		pages := 1
 		for {
 			if err := ctx.Err(); err != nil {
 				yield(Trace{}, err)
 				return
 			}
-			traces, err := s.searchPage(ctx, params, offset, pageSize)
+			traces, nextScrollID, err := s.searchPage(ctx, params, scrollID, pageSize)
 			if err != nil {
 				yield(Trace{}, err)
 				return
@@ -211,25 +223,39 @@ func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.
 					return
 				}
 			}
-			// A short (or empty) page is the end of the result set.
-			if len(traces) < pageSize {
+			// No cursor to advance with is the end of the result set. An empty
+			// page ends it too: a server that kept handing back a cursor with
+			// nothing attached would otherwise loop forever.
+			if nextScrollID == "" || len(traces) == 0 {
 				return
 			}
-			offset += pageSize
+			// A cursor that does not move is not pagination, and following it
+			// is an unbounded loop against someone's API quota. #6808 was that
+			// exact failure — the walk had no way to notice it was being served
+			// the same page over and over — so this refuses to repeat it, and
+			// says why rather than stopping silently on a partial result.
+			if nextScrollID == scrollID {
+				yield(Trace{}, fmt.Errorf("langwatch: Traces.All: the API returned the same scroll cursor twice, so pagination is not advancing; stopping after %d page(s) rather than looping", pages))
+				return
+			}
+			pages++
+			scrollID = nextScrollID
 		}
 	}
 }
 
-// searchPage fetches one offset-addressed page of trace-search results. It is
-// the per-page engine behind [TracesService.All]. The request body mirrors
-// [TracesService.Search] but pins pageOffset/pageSize for deterministic paging;
-// the response reuses [TraceSearchResponse]. params.ScrollID is deliberately not
-// forwarded — [TracesService.All] rejects it up front, and a fixed cursor
-// re-sent alongside an advancing offset would pin every request to one page.
-func (s *TracesService) searchPage(ctx context.Context, params TraceSearchParams, offset, pageSize int) ([]Trace, error) {
+// searchPage fetches one cursor-addressed page of trace-search results and
+// returns it alongside the cursor for the page after it (empty when there is
+// none). It is the per-page engine behind [TracesService.All]. The request body
+// mirrors [TracesService.Search] but pins pageSize and carries the walk's own
+// cursor rather than params.ScrollID, which [TracesService.All] rejects up
+// front.
+func (s *TracesService) searchPage(ctx context.Context, params TraceSearchParams, scrollID string, pageSize int) ([]Trace, string, error) {
 	body := map[string]any{
-		"pageOffset": offset,
-		"pageSize":   pageSize,
+		"pageSize": pageSize,
+	}
+	if scrollID != "" {
+		body["scrollId"] = scrollID
 	}
 	if params.Query != "" {
 		body["query"] = params.Query
@@ -246,17 +272,14 @@ func (s *TracesService) searchPage(ctx context.Context, params TraceSearchParams
 
 	reader, err := jsonReader(body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	resp, err := s.client.gen.PostApiTracesSearchWithBody(ctx, contentTypeJSON, reader)
 	var out TraceSearchResponse
 	if derr := decodeInto("Traces.All", resp, err, &out); derr != nil {
-		return nil, derr
+		return nil, "", derr
 	}
-	if out.Traces == nil {
-		return nil, nil
-	}
-	return *out.Traces, nil
+	return out.Traces, out.Pagination.ScrollID, nil
 }
 
 // AllRuns returns an iterator over every simulation run matching the filter,

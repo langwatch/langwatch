@@ -52,7 +52,8 @@ Wire shape (stdin):
       "code":    "<python source>",
       "inputs":  {"name": value, ...},
       "outputs": ["name", ...],
-      "secrets": {"NAME": "value", ...}
+      "secrets": {"NAME": "value", ...},
+      "params":  {"NAME": value, ...}
     }
 
 The optional `secrets` map is the project's decrypted secrets (rides on
@@ -62,6 +63,12 @@ namespace object so `secrets.NAME` resolves as attribute access —
 matching the Studio code-editor hint and the Python executor's
 `build_secrets_preamble`. When absent/empty the name is left undefined,
 mirroring the Python preamble's no-op-on-empty behavior.
+
+The optional `params` map is the run's user-defined parameters (rides on
+the workflow DSL as `workflow.params`) and is exposed the same way, as a
+`params` namespace so `params.NAME` resolves as attribute access. Unlike
+secrets, its values keep their JSON types, so a number configured as a
+number arrives as an int/float and a boolean arrives as a bool.
 
 Wire shape (result file):
     {
@@ -120,6 +127,7 @@ def main() -> int:
     inputs = payload.get("inputs", {}) or {}
     declared_outputs = payload.get("outputs", []) or []
     secrets = payload.get("secrets", {}) or {}
+    params = payload.get("params", {}) or {}
 
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
@@ -139,6 +147,13 @@ def main() -> int:
             # raises NameError on both engines).
             if secrets:
                 module_globals["secrets"] = SimpleNamespace(**secrets)
+            # Expose the run's parameters as `params.NAME`, injected the
+            # same way and left undefined when there are none, so an
+            # unconfigured `params.X` raises NameError exactly as an
+            # unconfigured `secrets.X` does. Values arrive typed, so a
+            # number stays a number and a boolean stays a boolean.
+            if params:
+                module_globals["params"] = SimpleNamespace(**params)
             exec(compile(code, "<code-block>", "exec"), module_globals)
             result = _invoke_user_entrypoint(module_globals, inputs)
             result = _coerce_result(result)

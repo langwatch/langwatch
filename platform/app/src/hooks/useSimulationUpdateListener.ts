@@ -5,6 +5,10 @@ import {
   type ScenarioTabNavigatePayload,
 } from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
+import {
+  isTerminalStatus,
+  type ScenarioRunStatus,
+} from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
 import {
   type CompactStreamingEvent,
@@ -65,8 +69,17 @@ export function useSimulationUpdateListener({
 }: UseSimulationUpdateListenerOptions) {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFireRef = useRef<number>(0);
+  /**
+   * At least one update arrived while the tab was hidden.
+   *
+   * A boolean is enough because the flush refetches current state rather than
+   * replaying events: whether one update or fifty were missed, the work to
+   * catch up is the same single refresh, so there is nothing to count or
+   * queue.
+   */
+  const missedWhileHiddenRef = useRef(false);
   const isVisible = usePageVisibility();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
   const knownBatchRunIdsRef = useRef<Set<string>>(new Set());
 
   const matchesFilter = useCallback(
@@ -91,7 +104,14 @@ export function useSimulationUpdateListener({
   );
 
   const fireUpdate = useCallback(() => {
-    if (!isVisible) return;
+    // Hidden tabs defer rather than drop. A dropped update is never retried —
+    // the broadcast that would have refreshed this run has already been and
+    // gone — so a run that finished while you were on another tab stayed
+    // "running" until the page was reloaded by hand.
+    if (!isVisible) {
+      missedWhileHiddenRef.current = true;
+      return;
+    }
 
     void trpcUtils.scenarios.getScenarioSetBatchHistory.invalidate();
     // Invalidate suite run data queries so RunHistoryPanel refreshes
@@ -104,6 +124,42 @@ export function useSimulationUpdateListener({
       void refetch();
     }
   }, [isVisible, refetch, trpcUtils]);
+
+  /**
+   * Refetch the run, then apply the status the event carried.
+   *
+   * The refetch alone is not enough for a terminal event. The broadcast can
+   * beat the fold commit, so the refetch can read back the pre-terminal row —
+   * and `finished` is the last event, so no later broadcast arrives to correct
+   * it. That is what left cards sitting on "running" until a manual reload.
+   *
+   * The event is authoritative here: it carries the terminal status as
+   * event-carried state, which is exactly why the broadcast includes it. So
+   * the status is stamped AFTER the refetch settles, and only over a
+   * non-terminal cached value, so a settled read is never downgraded.
+   */
+  const applyRunUpdate = useCallback(
+    async ({
+      scenarioRunId,
+      status,
+    }: {
+      scenarioRunId: string;
+      status: string | undefined;
+    }) => {
+      await trpcUtils.scenarios.getRunState.invalidate({ scenarioRunId });
+
+      if (!status || !isTerminalStatus(status as ScenarioRunStatus)) return;
+
+      trpcUtils.scenarios.getRunState.setData(
+        { projectId, scenarioRunId },
+        (previous) =>
+          previous && !isTerminalStatus(previous.status)
+            ? { ...previous, status: status as ScenarioRunStatus }
+            : previous,
+      );
+    },
+    [projectId, trpcUtils],
+  );
 
   const scheduleUpdate = useCallback(() => {
     const now = Date.now();
@@ -132,6 +188,14 @@ export function useSimulationUpdateListener({
       }
     };
   }, []);
+
+  // Flush whatever arrived while the tab was hidden. Without this the deferral
+  // above would just be a slower drop.
+  useEffect(() => {
+    if (!isVisible || !missedWhileHiddenRef.current) return;
+    missedWhileHiddenRef.current = false;
+    fireUpdate();
+  }, [isVisible, fireUpdate]);
 
   const subscriptionInput = useMemo(
     () => (tabKey && tabId ? { projectId, tabKey, tabId } : { projectId }),
@@ -189,8 +253,9 @@ export function useSimulationUpdateListener({
             // Selective invalidation: only the affected card refetches,
             // not all N cards like the old blanket invalidation did.
             if (payload.scenarioRunId) {
-              void trpcUtils.scenarios.getRunState.invalidate({
+              void applyRunUpdate({
                 scenarioRunId: payload.scenarioRunId,
+                status: payload.status,
               });
             }
 

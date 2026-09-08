@@ -23,6 +23,9 @@ import {
 	toolMarkers,
 } from "../shell-rc";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
+import { runningCodeRestartNotice } from "../running-code";
+
+vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 import {
 	baseCfg,
 	CURRENT_ENDPOINT,
@@ -45,6 +48,32 @@ vi.mock("../cli-api", async () => {
 const temp = installTempHomeAndCwd();
 
 describe("refreshTelemetryWiringForLogin", () => {
+	describe("when login changes the instance used by an active langwatch code launcher", () => {
+		/** @scenario "Login refresh reports the same restart advice" */
+		it("returns restart advice with the successful wiring refresh", async () => {
+			const notice =
+				"Restart `langwatch code` to apply the updated telemetry settings.";
+			vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
+			persistBlockToRc(
+				"zsh",
+				buildScopedToolFunction(
+					"code",
+					buildOtelEnvBlock("code", STALE_ENDPOINT, STALE_TOKEN),
+					"zsh",
+				),
+				toolMarkers("code"),
+			);
+			vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+				token: CURRENT_TOKEN,
+				prefix: "ik-lw-test",
+				endpoint: CURRENT_ENDPOINT,
+			});
+
+			const result = await refreshTelemetryWiringForLogin(baseCfg());
+
+			expect(result).toMatchObject({ warnings: [notice] });
+		});
+	});
 	describe("given persisted wiring pointing at a previous instance", () => {
 		beforeEach(() => {
 			// claude → user-level settings env at the stale instance
@@ -55,7 +84,7 @@ describe("refreshTelemetryWiringForLogin", () => {
 			// codex → [otel] marker block at the stale instance
 			writeCodexOtelBlock(
 				{
-					endpoint: `${STALE_ENDPOINT}/v1/traces`,
+					baseEndpoint: STALE_ENDPOINT,
 					ingestionToken: STALE_TOKEN,
 				},
 				{ persistAuthHeader: true },
@@ -104,6 +133,9 @@ describe("refreshTelemetryWiringForLogin", () => {
 					"utf8",
 				);
 				expect(codexToml).not.toContain(STALE_TOKEN);
+				// The refresh heals the harvest wiring beside the exporters: a
+				// device whose block predates the notify seam gains it here.
+				expect(codexToml).toContain("langwatch codex notify begin");
 
 				const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
 				expect(zshrc).toContain(CURRENT_ENDPOINT);
@@ -134,6 +166,29 @@ describe("refreshTelemetryWiringForLogin", () => {
 					"utf8",
 				);
 				expect(codexToml).toMatch(/headers = .*Bearer ik-lw-code/);
+			});
+		});
+
+		describe("when a tool is pinned to a project", () => {
+			/** @scenario "A project-pinned tool is not re-pointed by a new login" */
+			it("leaves that tool's wiring alone and re-points the rest", async () => {
+				const cfg = baseCfg({
+					tool_project_keys: { codex: { secret: "sk-lw-project-pin" } },
+				});
+
+				const result = await refreshTelemetryWiringForLogin(cfg);
+
+				// codex keeps its wiring: the pin is deliberate scope, not stale
+				// personal wiring, so the stale endpoint stays and no codex key
+				// is minted.
+				expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
+				expect(
+					vi.mocked(cliApi.mintIngestionKey).mock.calls.map((c) => c[1]),
+				).not.toContain("codex");
+				// The unpinned tools are still refreshed.
+				expect(result.labels.some((l) => l.includes("claude"))).toBe(true);
+				expect(result.labels.some((l) => l.includes("gemini"))).toBe(true);
+				expect(result.labels.some((l) => l.includes("codex"))).toBe(false);
 			});
 		});
 

@@ -88,10 +88,16 @@ export const SUGGESTION_LABEL: Record<string, string> = {
  * so an evaluator card's offers resolved to bare "Open in Experiments" /
  * "Open in Online Evaluations" chips: navigation noise pretending to be a
  * next step. The card's own "Open in Evaluators" deep link already covers
- * where the result actually lives. Delete a kind from this set the day a
- * destination learns to carry it.
+ * where the result actually lives. `prompts` is the same case: Experiments and
+ * Scenarios consume prompts as features, but neither page can receive a
+ * specific prompt, so a prompt listing grew "Open in Experiments" / "Open in
+ * Scenarios" chips that had nothing to do with what was asked. Delete a kind
+ * from this set the day a destination learns to carry it.
  */
-const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set(["evaluators"]);
+const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set([
+  "evaluators",
+  "prompts",
+]);
 
 /**
  * The offers one settled tool result justifies: every feature that consumes a

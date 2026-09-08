@@ -49,7 +49,7 @@ const (
 	// metadata.<key> attributes to trace-level metadata. See SetTraceMetadata.
 	MetadataPrefix = "metadata."
 
-	// AttributeLangWatchEvaluationCustom names the span event the reactor reads
+	// AttributeLangWatchEvaluationCustom names the span event the subscriber reads
 	// to sync custom evaluations to evaluation_runs.
 	AttributeLangWatchEvaluationCustom = attribute.Key("langwatch.evaluation.custom")
 

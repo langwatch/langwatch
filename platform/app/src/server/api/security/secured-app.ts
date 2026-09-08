@@ -1,6 +1,7 @@
 import { type Env, Hono, type MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
+import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
@@ -22,7 +23,6 @@ import {
   canonicalErrorResponse,
 } from "~/app/api/shared/canonical-error";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
-import { prisma } from "~/server/db";
 
 import {
   type AccessPolicy,
@@ -143,6 +143,7 @@ export class SecuredApp<E extends Env> {
     this.hono = new Hono<E>().basePath(args.basePath);
     this.hono.use(tracerMiddleware({ name: this.family }));
     this.hono.use(loggerMiddleware());
+    this.hono.use(appContextMiddleware);
     // One shape per family, whichever layer refuses. A family can still
     // install its own onError to name its domain errors more precisely.
     this.hono.onError(
@@ -268,7 +269,6 @@ const projectStrategy: AuthStrategy = {
         return [
           auth,
           requireApiKeyPermission({
-            prisma,
             permission: policy.permission,
             errorEnvelope,
           }),
@@ -364,6 +364,12 @@ export function createServiceApp<E extends Env = Env>(args: {
   basePath: string;
   verifySecret?: MiddlewareHandler;
   /**
+   * The error shape this family publishes. New families pass `canonical`;
+   * the default keeps the families that predate the envelope answering
+   * exactly what their consumers already parse.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
+  /**
    * Overrides the credential class the family publishes. Set it only when the
    * secret is one an API client holds and the document declares a scheme for
    * it; leaving it unset keeps the honest default, `internal`, which the spec
@@ -390,6 +396,7 @@ export function createServiceApp<E extends Env = Env>(args: {
   return new SecuredApp<E>({
     basePath: args.basePath,
     strategy,
+    ...(args.errorEnvelope ? { errorEnvelope: args.errorEnvelope } : {}),
     ...(args.credentialClass ? { credentialClass: args.credentialClass } : {}),
   });
 }

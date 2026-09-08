@@ -31,7 +31,7 @@ export function useChoicesRefRows(
   options: LangyDerivedChoicesCard["options"],
 ): ReadonlyMap<string, ChoicesRefRow> {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const projectId = project?.id ?? null;
 
   // Group hydratable refs by type so each type resolves in one byIds call.

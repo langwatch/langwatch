@@ -50,7 +50,12 @@ function toReadable(text: string): Readable {
 
 beforeEach(() => {
   for (const key of Object.keys(mockEnv)) delete mockEnv[key];
+  // resolveAzureCredentials() (called for real — not mocked) reads these
+  // directly, independent of the resolveProjectStorageDestination mock.
+  mockEnv.STORED_OBJECTS_BACKEND = "azure";
+  mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
   mockEnv.AZURE_BLOB_ACCOUNT_KEY = "test-account-key";
+  mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
   resolveProjectStorageDestination.mockReset();
   resolveProjectStorageDestination.mockResolvedValue({
     kind: "azure",

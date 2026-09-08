@@ -5,7 +5,7 @@ description: Instrument OpenRouter model calls in Go with LangWatch to compare m
 keywords: go, golang, openrouter, model router, instrumentation, langwatch, opentelemetry, openai-compatible
 ---
 
-[OpenRouter](https://openrouter.ai) provides a unified API to access a vast range of LLMs from different providers. LangWatch can trace calls made through OpenRouter's OpenAI-compatible endpoint by reusing the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware.
+[OpenRouter](https://openrouter.ai) provides a unified API to access LLMs from many providers. LangWatch traces calls made through OpenRouter's OpenAI-compatible endpoint by reusing the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware.
 
 ## Setup
 
@@ -72,7 +72,7 @@ func main() {
 	)
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "anthropic/claude-sonnet-4-6",
+		Model: "anthropic/claude-sonnet-5",
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage("Hello via OpenRouter!"),
 		},

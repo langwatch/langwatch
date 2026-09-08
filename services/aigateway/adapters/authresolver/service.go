@@ -9,6 +9,13 @@
 // (401/403/404) evicts immediately — bad credentials get no grace window.
 // See specs/ai-gateway/auth-cache.feature, Rule "Cached JWT serves
 // stale-while-error past natural expiry on transport failure".
+//
+// A key that carries its own expiration date bounds all of it: both deadlines
+// are capped at that instant and an entry past it is refused with
+// virtual_key_expired without asking the control plane. Grace covers a control
+// plane we cannot reach, and a date it already told us needs no round trip.
+// Revoked and disabled keys keep the full window on purpose, since neither is
+// knowable in advance.
 package authresolver
 
 import (
@@ -147,6 +154,20 @@ type entry struct {
 	// Empty means we have no token to revalidate with, and the next refresh
 	// goes out unconditional.
 	configETag string
+	// budgetRollAckedFor is the budget boundary whose spend this entry already
+	// carries, set once at construction and never after. It is deliberately not
+	// configFetchedAt: that one is stamped on every refresh outcome, failures
+	// included, so keying the roll on it would let a control plane that could
+	// not be reached count as the re-read and hand the entry back to
+	// conditional revalidation still holding the dead period's spend.
+	//
+	// Only a config the gateway actually received clears a roll, and that
+	// arrives as a new entry through storeL1 rather than a mutation here — so
+	// there is no ack on the refresh path at all. A 304 must not clear one: it
+	// carries no spend, and a 304 taken while the period was still running
+	// would ack a boundary the entry has not reached yet and suppress the roll
+	// when it does.
+	budgetRollAckedFor time.Time
 }
 
 // currentConfigETag reports the ETag of the config this entry is carrying.
@@ -156,15 +177,88 @@ func (e *entry) currentConfigETag() string {
 	return e.configETag
 }
 
-// configStale reports whether the entry's config is older than ttl.
-// ttl <= 0 disables staleness (never stale).
-func (e *entry) configStale(ttl time.Duration) bool {
-	if ttl <= 0 {
-		return false
-	}
+// refreshConfigETag is the If-None-Match a staleness refresh of this entry
+// should send: the carried token normally, and none once the budget period has
+// rolled.
+//
+// Dropping the token there is the whole point of the roll. The token is built
+// from the key's revision and its provider set, and a period ending moves
+// neither, so a conditional refresh of a bundle whose spend figures expired at
+// midnight comes back 304 and leaves those figures in place. Unconditional
+// costs one materialization per key per period.
+func (e *entry) refreshConfigETag() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.budgetPeriodRolled() {
+		return ""
+	}
+	return e.configETag
+}
+
+// configStale reports whether the entry's config needs refreshing: its budget
+// period has rolled, or it is older than ttl. ttl <= 0 disables the age half
+// only — a rolled period is stale whatever the ttl, because the figures it
+// leaves behind are not merely old, they belong to a period that has ended.
+func (e *entry) configStale(ttl time.Duration) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	rolled := e.budgetPeriodRolled()
+	if rolled && e.configFetchedAt.Before(e.bundle.Config.Budget.ValidUntil) {
+		// First look past the boundary: the figures are known dead, go now.
+		return true
+	}
+	if ttl <= 0 {
+		// No staleness clock configured. A period that ended still has to keep
+		// asking, because with the roll unanswered nothing else will replace
+		// spend belonging to a period that is over.
+		return rolled
+	}
+	// A refresh that failed has stamped configFetchedAt, so the retries of an
+	// unanswered roll are paced by the ordinary clock rather than fired on
+	// every request. They stay unconditional until one of them is answered.
 	return time.Since(e.configFetchedAt) > ttl
+}
+
+// budgetPeriodRolled reports whether this entry's spend figures were read in a
+// budget period that has since ended and the control plane has not answered for
+// the new one yet. Caller holds e.mu.
+//
+// Only a config the gateway actually received clears it, which arrives as a new
+// entry. A failed fetch, and a 304 answering the unconditional refresh this
+// forces, both leave the roll standing so the next attempt goes out
+// unconditional too — offering the token instead would be answered 304 and
+// leave the entry enforcing the dead period's spend, the exact deadlock this is
+// here to break.
+//
+// The permanently-past boundary — a MANUAL budget carrying an old stored
+// instant, a clock skewed forward — is handled at construction rather than
+// here: an entry built from a config read after the boundary starts already
+// acked, so it never asks. See ackedBoundaryAtBuild.
+func (e *entry) budgetPeriodRolled() bool {
+	validUntil := e.bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() {
+		return false
+	}
+	if time.Now().Before(validUntil) {
+		return false
+	}
+	return !e.budgetRollAckedFor.Equal(validUntil)
+}
+
+// ackedBoundaryAtBuild is the boundary a freshly built entry should count as
+// already answered: one that had passed by the time this config was read, so
+// the spend it carries was materialized after it. Zero otherwise, which leaves
+// the next roll to be detected normally.
+//
+// Without this a boundary that never moves would re-arm on every entry the
+// refresh creates, turning each staleness refresh into a full materialization
+// forever.
+func ackedBoundaryAtBuild(bundle *domain.Bundle, now time.Time) time.Time {
+	validUntil := bundle.Config.Budget.ValidUntil
+	if validUntil.IsZero() || now.Before(validUntil) {
+		return time.Time{}
+	}
+	return validUntil
 }
 
 // tryBeginConfigRefresh claims the per-entry config-refresh slot.
@@ -199,18 +293,31 @@ const (
 	entryStale
 	// entryDead is past the hard cap and is not servable at all.
 	entryDead
+	// entryKeyExpired is past the virtual key's own expiration date. The key
+	// has stopped, so no grace window applies and the request is refused with
+	// the key's own error rather than an upstream one.
+	entryKeyExpired
 )
 
-// classifyEntry is the one place that decides which of the three an entry is,
+// classifyEntry is the one place that decides which of the four an entry is,
 // so every path through the cache reaches the same verdict about the same
-// bundle. The order is load-bearing: soft expiry is checked BEFORE the hard
-// cap, because a negative HardGrace deliberately puts the cap earlier than
-// the JWT exp (the stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_
-// GRACE_SECONDS), and a bundle that has not reached its own expiry is
-// servable wherever the cap happens to sit. Testing the cap first would
-// throw away perfectly valid credentials under that configuration.
+// bundle. The order matters twice.
+//
+// The key's own expiration date is checked FIRST, ahead of every grace path:
+// the control plane published that date with the token, so the gateway can
+// enforce it alone, and a stale-while-error window that outlives the date
+// would let a key keep calling providers after it ran out.
+//
+// Soft expiry is then checked BEFORE the hard cap, because a negative
+// HardGrace deliberately puts the cap earlier than the JWT exp (the
+// stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS), and a
+// bundle that has not reached its own expiry is servable wherever the cap
+// happens to sit. Testing the cap first would throw away perfectly valid
+// credentials under that configuration.
 func classifyEntry(e *entry) entryState {
 	switch {
+	case e.keyExpired():
+		return entryKeyExpired
 	case !e.softExpired():
 		return entryFresh
 	case !e.hardExpired():
@@ -218,6 +325,13 @@ func classifyEntry(e *entry) entryState {
 	default:
 		return entryDead
 	}
+}
+
+// keyExpired reports whether the cached bundle's virtual key has passed its
+// own expiration date. A bundle carrying no date never expires, which is what
+// keeps every key without one on exactly the behavior it had before.
+func (e *entry) keyExpired() bool {
+	return e.bundle != nil && e.bundle.KeyExpired(time.Now())
 }
 
 func (e *entry) softExpired() bool {
@@ -296,7 +410,14 @@ func classifyRefreshError(err error) refreshErrorClass {
 	if err == nil {
 		return classNone
 	}
-	if errors.Is(err, domain.ErrInvalidAPIKey) || errors.Is(err, domain.ErrKeyRevoked) {
+	// Every refusal the control plane makes about the key itself belongs
+	// here. A disabled or expired key served stale would keep working for
+	// the length of the stale window, which is the one thing an operator
+	// pressing Disable, and a date passing, both have to stop at once.
+	if errors.Is(err, domain.ErrInvalidAPIKey) ||
+		errors.Is(err, domain.ErrKeyRevoked) ||
+		errors.Is(err, domain.ErrKeyDisabled) ||
+		errors.Is(err, domain.ErrKeyExpired) {
 		return classAuthRejection
 	}
 	return classTransportFailure
@@ -406,7 +527,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 		switch classifyEntry(e) {
 		case entryFresh:
 			// Serve, maybe trigger background refresh on near-expiry.
-			s.recordHit(tierL1)
+			s.recordHit()
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
@@ -418,12 +539,27 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			// Soft-expired but within hard grace. A foreground refresh is
 			// needed before the entry can serve, so it counts as a miss
 			// even when stale-while-error ends up serving the old bundle.
-			s.recordMiss(tierL1)
+			s.recordMiss()
 			return s.refreshOrServeStale(ctx, rawKey, h, e)
+
+		case entryKeyExpired:
+			// The key ran out. Fail closed with the key's own error and skip
+			// the control plane: a reachable control plane answers exactly
+			// this, and an unreachable one must not turn a finished key into
+			// a retryable upstream failure that grace keeps serving through.
+			s.recordMiss()
+			s.l1.Remove(h)
+			s.logger.Error("auth_cache_hard_evict",
+				zap.String("vk_id", e.bundle.VirtualKeyID),
+				zap.String("reason", "virtual_key_expired"),
+			)
+			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+				"message": domain.KeyExpiredMessage,
+			})
 
 		default:
 			// Past hard cap: evict, fall through to fresh resolve.
-			s.recordMiss(tierL1)
+			s.recordMiss()
 			s.l1.Remove(h)
 			s.logger.Error("auth_cache_hard_evict",
 				zap.String("vk_id", e.bundle.VirtualKeyID),
@@ -431,7 +567,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			)
 		}
 	} else {
-		s.recordMiss(tierL1)
+		s.recordMiss()
 	}
 
 	return s.resolveFresh(ctx, rawKey, h)
@@ -447,15 +583,18 @@ func (s *Service) recordLookup() {
 	}
 }
 
-func (s *Service) recordHit(tier string) {
+// recordHit and recordMiss stamp the one tier this cache has. The published
+// metrics keep the label, so an operator dashboard built on them survives a
+// second tier arriving; only the call sites are spared repeating it.
+func (s *Service) recordHit() {
 	if s.metrics != nil {
-		s.metrics.RecordAuthCacheHit(tier)
+		s.metrics.RecordAuthCacheHit(tierL1)
 	}
 }
 
-func (s *Service) recordMiss(tier string) {
+func (s *Service) recordMiss() {
 	if s.metrics != nil {
-		s.metrics.RecordAuthCacheMiss(tier)
+		s.metrics.RecordAuthCacheMiss(tierL1)
 	}
 }
 
@@ -625,12 +764,15 @@ func (s *Service) Stop() {
 // after a response that carried none: the next staleness refresh asks for the
 // config outright rather than revalidating against a token we do not have.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
+	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
+	now := time.Now()
 	s.l1.Add(h, &entry{
-		bundle:          bundle,
-		softExpiresAt:   bundle.ExpiresAt,
-		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
-		configFetchedAt: time.Now(),
-		configETag:      configETag,
+		bundle:             bundle,
+		softExpiresAt:      softExpiresAt,
+		hardExpiresAt:      hardExpiresAt,
+		configFetchedAt:    now,
+		configETag:         configETag,
+		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -640,6 +782,30 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
+}
+
+// entryDeadlines computes the two instants a cached entry lives by: the JWT
+// exp it refreshes at, and the hard cap the stale-while-error grace may extend
+// it to.
+//
+// Both are capped at the virtual key's own expiration date when the bundle
+// carries one, because the grace window exists to cover an unreachable control
+// plane and this date needs no control plane to be true. Without the cap, the
+// grace is added to the JWT exp and a key that ran out keeps serving for the
+// length of the window. A bundle with no date is left exactly as it was.
+func entryDeadlines(bundle *domain.Bundle, hardGrace time.Duration) (soft, hard time.Time) {
+	soft = bundle.ExpiresAt
+	hard = bundle.ExpiresAt.Add(hardGrace)
+	if bundle.VirtualKeyExpiresAt.IsZero() {
+		return soft, hard
+	}
+	if soft.After(bundle.VirtualKeyExpiresAt) {
+		soft = bundle.VirtualKeyExpiresAt
+	}
+	if hard.After(bundle.VirtualKeyExpiresAt) {
+		hard = bundle.VirtualKeyExpiresAt
+	}
+	return soft, hard
 }
 
 // changeFeedLoop drives the per-org cache invalidation: long-polls the
@@ -899,6 +1065,18 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // re-downloading. Most of the time it fires, nothing about the key has
 // changed, and the conditional request turns a full config materialization
 // into a 304 the control plane answers from the key's revision.
+//
+// The exception is a rolled budget period, where refreshConfigETag drops the
+// token so the fetch cannot come back 304 — nothing the token is built from
+// moves when a period ends, and the spend figures have to move.
+//
+// It bounds the staleness of the key's own expiration date by the same TTL. The
+// date arrives on the config response as well as on the token, so an admin who
+// shortens it is followed within one TTL even while the change feed is
+// unavailable, and one who extends it stops a request being refused at a
+// boundary the control plane has already moved. The token claim stays the
+// mint-time floor underneath: a control plane the gateway cannot reach at all
+// leaves the last known date in force and the key still stops at it.
 func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer e.endConfigRefresh()
 
@@ -906,7 +1084,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
-	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.currentConfigETag())
+	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
 			zap.String("vk_id", stale.VirtualKeyID),
@@ -926,6 +1104,14 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	fresh := *stale
 	fresh.Config = res.Config
 	fresh.Credentials = res.Config.Credentials
+	// The key's own end date moves in both directions here, and storeL1 rebuilds
+	// both deadlines from it. A response that says nothing about expiry comes
+	// from a control plane older than the field, so the copied date stands: an
+	// absent field read as "no date" would lift the cap off a key whose token
+	// says it expires.
+	if res.VirtualKeyExpiryKnown {
+		fresh.VirtualKeyExpiresAt = res.VirtualKeyExpiresAt
+	}
 
 	// Guard against resurrecting an entry that another path evicted or
 	// replaced while FetchConfig was in flight: a change-feed eviction

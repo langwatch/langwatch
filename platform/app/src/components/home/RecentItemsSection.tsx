@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -181,8 +182,8 @@ export function RecentItemsSection({
       // key): paint instantly from cache, refresh quietly in the background —
       // the section shouldn't sit in a skeleton for ages on every visit.
       staleTime: 60_000,
-      cacheTime: 10 * 60_000,
-      keepPreviousData: true,
+      gcTime: 10 * 60_000,
+      placeholderData: keepPreviousData,
     },
   );
 

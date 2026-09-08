@@ -28,8 +28,13 @@ import {
 import { AlertTriangle, ExternalLink, File, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
-import { isSafeMediaUrl, type MediaPartData } from "~/shared/traces/mediaParts";
+import {
+  isSafeMediaUrl,
+  type MediaPartData,
+  parseNotCapturedMedia,
+} from "~/shared/traces/mediaParts";
 import { api } from "~/utils/api";
+import { formatBytes } from "../ops/shared/formatters";
 import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
 
 // ---------------------------------------------------------------------------
@@ -75,23 +80,45 @@ function mediaNoun(category: "audio" | "image" | "video" | "binary"): string {
   return category === "binary" ? "file" : category;
 }
 
+const UNAVAILABLE_TEST_ID = {
+  missing: "media-part-missing",
+  error: "media-part-error",
+  "not captured": "media-part-not-captured",
+} as const;
+
 /**
- * The one placeholder both unavailable states render. Says what kind of media
+ * The one placeholder every unavailable state renders. Says what kind of media
  * is gone and why, in the viewer's terms: never a status code, a URL, or a
  * probe failure message.
+ *
+ * The three states answer three different questions, and telling them apart is
+ * the whole value: the bytes expired, we could not load them, or they were
+ * never stored in the first place. Only the last one is a capture decision, and
+ * calling it "no longer available" sends the reader looking for something that
+ * never existed.
  */
 function MediaUnavailable({
   category,
   state,
+  sizeBytes,
 }: {
   category: "audio" | "image" | "video" | "binary";
-  state: "missing" | "error";
+  state: "missing" | "error" | "not captured";
+  sizeBytes?: number;
 }) {
+  const noun = mediaNoun(category);
+  const message =
+    state === "missing"
+      ? `This ${noun} is no longer available`
+      : state === "error"
+        ? `This ${noun} could not be loaded`
+        : sizeBytes !== undefined
+          ? `This ${noun} was too large to capture (${formatBytes(sizeBytes)})`
+          : `This ${noun} was not captured`;
+
   return (
     <HStack
-      data-testid={
-        state === "missing" ? "media-part-missing" : "media-part-error"
-      }
+      data-testid={UNAVAILABLE_TEST_ID[state]}
       display="inline-flex"
       gap={2}
       paddingX={3}
@@ -103,12 +130,10 @@ function MediaUnavailable({
     >
       <Icon as={AlertTriangle} boxSize={3.5} color="fg.muted" />
       <Text fontSize="xs" color="fg.muted">
-        {state === "missing"
-          ? `This ${mediaNoun(category)} is no longer available`
-          : `This ${mediaNoun(category)} could not be loaded`}
+        {message}
       </Text>
       <Badge
-        colorPalette={state === "missing" ? "gray" : "red"}
+        colorPalette={state === "error" ? "red" : "gray"}
         size="sm"
         variant="outline"
       >
@@ -191,6 +216,12 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   // anchor href — it renders as the error badge instead, after the hooks
   // below (which all no-op on it).
   const unsafeSrc = src !== "" && !isSafeMediaUrl(src);
+
+  // One shape of unsafe src is not an attack and not a loss: the summary an
+  // engine leaves behind when it decides an attachment is too large to carry
+  // into the trace. Read it so the placeholder can say that, rather than
+  // reporting bytes as expired that were never stored.
+  const notCaptured = unsafeSrc ? parseNotCapturedMedia(src) : null;
 
   const [status, setStatus] = useState<LoadStatus>(
     isUrlBased ? "loading" : "ok",
@@ -333,6 +364,16 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     // the real inputs of this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src, rawUrlFormat]);
+
+  if (notCaptured) {
+    return (
+      <MediaUnavailable
+        category={category}
+        state="not captured"
+        sizeBytes={notCaptured.sizeBytes}
+      />
+    );
+  }
 
   // Missing or error placeholder
   if (unsafeSrc || status === "missing" || (status === "error" && src === "")) {

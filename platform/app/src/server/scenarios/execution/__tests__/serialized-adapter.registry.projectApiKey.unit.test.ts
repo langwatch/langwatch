@@ -22,6 +22,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { guardAgainstGlobalFetch } from "../../../../test-utils/globalFetchGuard";
 import { createAdapter } from "../serialized-adapter.registry";
 import type {
   CodeAgentData,
@@ -30,8 +31,19 @@ import type {
   WorkflowAgentData,
 } from "../types";
 
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// The workflow and code adapters call undici's own fetch, so that export is
+// the interception point. Hoisted, because the vi.mock factory below is
+// hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return { ...actual, fetch: mockFetch };
+});
+
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite.
+guardAgainstGlobalFetch();
 
 const defaultInput = {
   threadId: "thread_1",
@@ -58,15 +70,12 @@ const nlpServiceUrl = "http://localhost:8080";
 function nlpResponse(
   result: Record<string, unknown> | null = { output: "ok" },
 ) {
+  const body = { trace_id: "trace_1", status: "success", result };
   return {
     ok: true,
     status: 200,
-    json: vi.fn().mockResolvedValue({
-      trace_id: "trace_1",
-      status: "success",
-      result,
-    }),
-    text: vi.fn().mockResolvedValue(""),
+    json: vi.fn().mockResolvedValue(body),
+    text: vi.fn().mockResolvedValue(JSON.stringify(body)),
   };
 }
 
@@ -138,6 +147,7 @@ describe("createAdapter — project API key threading", () => {
       url: "https://api.example.com/chat",
       method: "POST",
       headers: [],
+      secrets: {},
     };
 
     /** @scenario "An HTTP target resolves no adapter-role model and consumes no project key" */

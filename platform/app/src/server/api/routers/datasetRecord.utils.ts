@@ -1,6 +1,6 @@
-import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
+import type { Dataset, DatasetRecord, Prisma } from "~/generated/prisma/client";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ChunkOffset } from "../../datasets/dataset-chunking";
 import { appendS3JsonlRecords } from "../../datasets/dataset-mutations";

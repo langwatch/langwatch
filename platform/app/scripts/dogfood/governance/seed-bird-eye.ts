@@ -41,7 +41,7 @@
  *        --org <organizationId> [--days 30] [--rows 240]'
  */
 import { randomBytes } from "crypto";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { ensureHiddenGovernanceProject } from "../../../ee/governance/services/governanceProject.service";
 
@@ -324,7 +324,7 @@ async function seedTraceSummaries({
   sources: { id: string; teamId: string | null; teamName: string }[];
   args: Args;
 }): Promise<{ totalCostUsd: number; rowsInserted: number }> {
-  const ch = await getClickHouseClientForProject(govProjectId);
+  const ch = await getClickHouseClientForTenant(govProjectId);
   if (!ch)
     throw new Error("ClickHouse client unavailable for governance tenant");
 

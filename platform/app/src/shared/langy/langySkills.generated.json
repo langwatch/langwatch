@@ -21,9 +21,37 @@
 		"userPrompt": "How is my agent performing?"
 	},
 	{
+		"id": "code-changes",
+		"label": "Code changes",
+		"description": "Change the user's own program, on their machine or through GitHub. Use when a request needs a change to the user's code (instrument tracing, wire the SDK, fix the agent behind a failing scenario, add a run parameter to a connected agent, version a hardcoded prompt) and not when the platform alone can do it (create a scenario, an evaluation, a prompt version, read traces).",
+		"category": "skill"
+	},
+	{
+		"id": "connect-agent",
+		"label": "Connect agent",
+		"description": "Connect the codebase's AI agent to LangWatch agent simulations, so test suites run against the real agent process. Adds a small connect function beside the service startup that calls the agent already in the codebase, which opens an outbound connection and registers the agent with its environment and its run parameters, confirms the agent is Online, and runs the first test suite. Falls back to an HTTP registration when the agent cannot import the SDK. Use when the user wants platform scenarios to test their real agent.",
+		"category": "skill",
+		"userPrompt": "Connect my agent to LangWatch simulations"
+	},
+	{
+		"id": "context-sweet-spot",
+		"label": "Context sweet spot",
+		"description": "Investigates the context economics of your own coding-agent sessions in LangWatch. Reads real sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn, and delivers a report with the context size your sessions should stay under, with example sessions behind every claim. Use when coding-agent sessions feel expensive or degrade as they grow.",
+		"category": "skill",
+		"userPrompt": "Find my context sweet spot"
+	},
+	{
+		"id": "dashboard-widgets",
+		"label": "Dashboard widgets",
+		"description": "Author a dashboard widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.",
+		"category": "recipe",
+		"userPrompt": "Build me a custom chart widget",
+		"featureFlag": "release_custom_chart_playground"
+	},
+	{
 		"id": "datasets",
 		"label": "Datasets",
-		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive, consultant-style — asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
+		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive and consultant-style. Asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
 		"category": "skill"
 	},
 	{
@@ -35,8 +63,14 @@
 	{
 		"id": "debug-with-langwatch",
 		"label": "Debug with langwatch",
-		"description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production — errors, bad answers, latency spikes.",
+		"description": "Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production (errors, bad answers, latency spikes).",
 		"category": "recipe"
+	},
+	{
+		"id": "drive-the-ui",
+		"label": "Drive the ui",
+		"description": "Drive the page the user has open through live UI actions. List the actions a page accepts, call them with typed payloads, and read the live state including unsaved edits. Use when the user is looking at a page you can operate, such as the evaluations workbench, and a change should happen in front of them rather than behind their back.",
+		"category": "skill"
 	},
 	{
 		"id": "eval-triage",
@@ -73,7 +107,7 @@
 	{
 		"id": "github",
 		"label": "GitHub",
-		"description": "Open a real pull request — clone a repo, branch, commit, push, and open a PR authored by the LangWatch app on behalf of the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.",
+		"description": "Open a real pull request. Clone a repo, branch, commit, push, and open a PR authored by the LangWatch app on behalf of the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.",
 		"category": "skill"
 	},
 	{
@@ -84,11 +118,25 @@
 		"userPrompt": "Take my agent to the next level"
 	},
 	{
+		"id": "lwql-charts",
+		"label": "Lwql charts",
+		"description": "Author a saved analytics chart from a plain question and place it on a dashboard. Discovers the LangWatchQL analytics schema, writes and test-runs the SQL, saves it as a chart with a Vega-Lite specification, and places it where the team already looks. Use when asked to build, save, run, or dashboard a metric or chart.",
+		"category": "recipe",
+		"userPrompt": "Build a chart from a question and put it on my dashboard",
+		"excludedByFlag": "release_custom_chart_playground"
+	},
+	{
 		"id": "online-evaluations",
 		"label": "Online evaluations",
 		"description": "Configure LangWatch online evaluations and guardrails for production traffic. Use when the user wants to score live traces or threads, monitor production quality, sample incoming traffic, or synchronously block unsafe requests and responses. Do not use for batch experiments.",
 		"category": "skill",
 		"userPrompt": "Set up online evaluations for my agent"
+	},
+	{
+		"id": "prompt-optimization",
+		"label": "Prompt optimization",
+		"description": "Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
+		"category": "skill"
 	},
 	{
 		"id": "prompts",
@@ -98,16 +146,23 @@
 		"userPrompt": "Version my prompts with LangWatch"
 	},
 	{
+		"id": "provider-cost-comparison",
+		"label": "Provider cost comparison",
+		"description": "Prices your real LangWatch usage mix against other model providers. Exports your actual token mix per model, including the cache read and write split, fetches current price cards, and reprices the same month of usage under each candidate, with the cache sensitivity stated. Use when someone asks whether a cheaper provider or model would actually save money on your workload.",
+		"category": "skill",
+		"userPrompt": "Would another provider be cheaper for my usage?"
+	},
+	{
 		"id": "scenarios",
 		"label": "Scenarios",
-		"description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
+		"description": "Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI against a connected agent, reading the run parameters that agent declares so the scenarios and comparison runs turn its real levers, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.",
 		"category": "skill",
 		"userPrompt": "Add scenario tests for my agent"
 	},
 	{
 		"id": "setup-lw",
 		"label": "Setup lw",
-		"description": "Set up and troubleshoot the LangWatch CLI — login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
+		"description": "Set up and troubleshoot the LangWatch CLI, covering login (cloud and self-hosted), endpoint configuration, project selection, and connection problems. Use when the CLI isn't authenticated, can't reach LangWatch, or talks to the wrong project.",
 		"category": "recipe"
 	},
 	{

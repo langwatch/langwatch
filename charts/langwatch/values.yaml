@@ -41,6 +41,30 @@ global:
     readOnlyRootFilesystem: true
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+
+  # ServiceAccount for the first-party workloads that touch object storage
+  # (app and workers; the cron pods only curl the app over HTTP, so they are
+  # deliberately left off it). Opt-in: disabled by default, so installs that
+  # do not need it render exactly as they did before and keep using the
+  # namespace `default` account.
+  #
+  # This is what cloud identity attaches to. Both providers grant storage
+  # access to a ServiceAccount rather than to a pod:
+  #   AWS  — annotate with eks.amazonaws.com/role-arn        (IRSA)
+  #   Azure— annotate with azure.workload.identity/client-id (workload identity)
+  #          AND label the pods azure.workload.identity/use: "true"
+  #
+  # Note this is NOT Azure-specific: without it, S3's existing keyless
+  # sign-in (the AWS SDK default provider chain) is unreachable through
+  # chart values too. See issues #6182 and #6087.
+  ## @extra global.serviceAccount ServiceAccount used by app, workers and cronjobs.
+  ## @param global.serviceAccount.create [default: false] Create a ServiceAccount for the first-party workloads.
+  ## @param global.serviceAccount.name [string] Name to use. Defaults to the release name when create is true; set to use an existing account.
+  ## @param global.serviceAccount.annotations [object] Annotations on the ServiceAccount — where the cloud identity binding goes.
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
@@ -119,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.17.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.17.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.17.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -154,6 +178,15 @@ app:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param app.replicaCount [default: 1] Number of application replicas.
   replicaCount: 1
+
+  # Shutdown budget — same shape and the same rule as workers.* below. The app
+  # shares the workers' entrypoint watchdog and can host the worker stack
+  # itself (the `all` process role), so it is sized the same way. A web-only
+  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
@@ -300,7 +333,8 @@ app:
     # Storage provider to use. Options: awsS3 (default), azureBlob.
     # When set to 'awsS3', enables AWS S3 native integration.
     # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
-    # AC37 / issue #4133) — SharedKey auth only, mirrors the awsS3 shape.
+    # AC37 / issue #4133) — shared key or a Microsoft Entra identity, selected
+    # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -331,13 +365,30 @@ app:
           secretKeyRef: { name: "", key: "" }
 
       # Azure Blob Storage configuration for dataset + stored-objects storage
-      # (AC37, issue #4133). SharedKey auth only — workload identity is a later
-      # issue (#6087), per-project Azure BYOC is #6088.
+      # (AC37, issue #4133). Shared key or a Microsoft Entra identity, selected
+      # by authMode below (#6087). Per-project Azure BYOC is still #6088.
       ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
       ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
       azureBlob:
+        # How the app authenticates to Azure Blob. Explicit — never inferred
+        # from which values happen to be filled in (issue #6087).
+        #   sharedKey        the storage account key. Requires accountKey below.
+        #                    Unusable when the account sets
+        #                    allowSharedKeyAccess=false, which many enterprises
+        #                    enforce by policy.
+        #   workloadIdentity AKS workload identity. No key anywhere. Requires
+        #                    global.serviceAccount with the client-id
+        #                    annotation, and the pod label
+        #                    azure.workload.identity/use: "true".
+        #   managedIdentity  IMDS — Azure VM / VMSS / App Service.
+        #   azureCli         a developer's signed-in CLI. Local use only.
+        # Grant the identity "Storage Blob Data Contributor" on the account or
+        # container; the control-plane "Contributor" role does NOT grant data
+        # access.
+        ## @param app.dataplane.providers.azureBlob.authMode [string, default: sharedKey] Azure authentication mode: sharedKey, workloadIdentity, managedIdentity, or azureCli.
+        authMode: sharedKey
         accountName:
           value: ""
           ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
@@ -350,6 +401,8 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
         # emulator. Defaults to https://{accountName}.blob.core.windows.net.
@@ -357,6 +410,21 @@ app:
         endpoint:
           value: ""
           ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
+          secretKeyRef: { name: "", key: "" }
+        # Sovereign clouds (Azure Government, Azure China) issue tokens from a
+        # different identity authority and may use a different storage
+        # audience. Required alongside a non-public endpoint in any
+        # identity-based authMode — the app refuses to guess, because asking
+        # the public-cloud issuer for a sovereign token fails confusingly.
+        ## @param app.dataplane.providers.azureBlob.authorityHost.value [string] Entra authority host for sovereign clouds.
+        authorityHost:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.authorityHost.secretKeyRef [object] Secret ref for the identity authority host.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.tokenAudience.value [string] Storage token audience override for sovereign clouds.
+        tokenAudience:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef [object] Secret ref for the storage token audience.
           secretKeyRef: { name: "", key: "" }
 
       # Migration aid: when provider is azureBlob, the chart still emits the
@@ -366,6 +434,29 @@ app:
       # greenfield Azure install.
       ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
     legacyS3ReadBucket: ""
+
+    # Mirror of legacyS3ReadBucket for the Azure->S3 direction. Set true when
+    # moving writes back to S3 while objects written to Azure must stay
+    # readable: the Azure connection settings under providers.azureBlob keep
+    # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
+    # S3 and historical azure-blob:// URIs still resolve. Leave false unless
+    # Azure objects exist.
+    #
+    # SCOPE — this covers URI-addressed STORED OBJECTS only (externalized byte
+    # content, trace payloads, staged uploads): each one carries an
+    # `azure-blob://` URI whose scheme picks the driver, so a read re-derives
+    # its own provider regardless of the write toggle.
+    #
+    # It does NOT cover DATASET chunks. Those are addressed by
+    # {projectId, datasetId, index} with no provider recorded on the row, so
+    # dataset reads follow the CURRENT toggle and cannot reach chunks written
+    # to Azure. Switching a deployment that already has datasets makes them
+    # unreachable (not deleted — reachable again if the toggle is reverted).
+    # A migration that carries datasets needs per-dataset storage provenance,
+    # tracked in #6323. Do not use this flag on an install with datasets until
+    # that lands.
+    ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
+    legacyAzureRead: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -378,12 +469,59 @@ app:
   ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.
   ## @param app.storedObjects.localFilesystem.size [string, default: 10Gi] PVC size for the stored-objects volume.
   ## @param app.storedObjects.localFilesystem.storageClassName [string] PVC storageClassName (cluster default if empty).
+  ## @param app.storedObjects.localFilesystem.serializeUpgrades [default: true] Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesImage [string, default: alpine/k8s:1.34.9] Image the upgrade hooks run. Needs sh and kubectl. A digest reference works too.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesPullSecrets [array] Pull secrets for that image. The hook Jobs use their own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach them.
   storedObjects:
     localFilesystem:
       enabled: true
       path: /var/lib/langwatch/objects
       size: 10Gi
       storageClassName: ""
+
+      # The app and the workers mount the same ReadWriteOnce PVC in this mode,
+      # and a helm upgrade rolls both Deployments at once. On a cluster with
+      # more than one node the new pod of one Deployment can be scheduled on a
+      # fresh node while the old pod of the other still holds the volume
+      # attachment on the old node, and both wedge in ContainerCreating with a
+      # multi-attach error (issue #7191).
+      #
+      # With this on, a hook Job scales the workers to 0 and waits for their
+      # pods to go away before helm applies the new manifests, and a second
+      # hook Job holds them at 0 until the app rollout finishes and then scales
+      # them back to workers.replicaCount. The app rolls as the only holder of
+      # the volume, and the workers follow the NEW app pod. Both Jobs run on
+      # rollback as well as upgrade.
+      #
+      # One case the chart cannot cover: on a rollback helm runs the hooks
+      # stored in the TARGET revision, so rolling back to a chart version from
+      # before these Jobs existed runs no Jobs at all. Scale the workers
+      # Deployment to 0 by hand before such a downgrade, and back up after it.
+      #
+      # The hooks need a ServiceAccount token and a small Role (get on the app
+      # and the workers Deployments, patch on the workers' scale, read on the
+      # namespace's pods). Turn them off if you order the rollout yourself, if
+      # your cluster forbids that RBAC, or if you moved to app.dataplane (where
+      # they never render anyway, because no volume is shared).
+      serializeUpgrades: true
+      # Needs sh + kubectl. registry.k8s.io/kubectl is distroless and has no
+      # /bin/sh.
+      #
+      # The tag names the kubectl version. kubectl supports one minor version
+      # of skew either way, so change this to match your cluster if it is far
+      # from 1.34. The hook only calls `get deployment`, `patch
+      # deployment --subresource=scale` and `wait --for=delete pod`, which are
+      # long-stable, so a wider skew works in practice.
+      #
+      # Mirror the image into your own registry for an air-gapped install and
+      # point this at your copy. A digest works here too
+      # (`myregistry.example.com/alpine/k8s@sha256:...`) if you pin by digest.
+      serializeUpgradesImage: alpine/k8s:1.34.9
+      # Pull secrets for that image. The hook Jobs run under their own
+      # ServiceAccount, so secrets attached to the namespace's `default`
+      # ServiceAccount, which the rest of the release uses, do not reach them.
+      # Example: [{ name: my-registry }]
+      serializeUpgradesPullSecrets: []
 
   # Email notification configuration
   # Naming a provider is what turns email on, so there is one switch rather
@@ -823,6 +961,24 @@ workers:
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
   replicaCount: 1
 
+  # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
+  # for in-flight jobs to finish their ClickHouse writes; it must match the
+  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  #
+  # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
+  # the drain plus 5s for App.close, 15s for process teardown and 10s of
+  # kubelet slack — so at least shutdownDrainSeconds + 30. Because it is set
+  # here, raising shutdownDrainSeconds alone always fails the render: raise
+  # both together. The chart refuses rather than installing a release the
+  # kubelet kills mid-drain. Both must be whole numbers of seconds greater
+  # than zero — a quoted or fractional value is rejected, because Helm's `int`
+  # would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
+
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
@@ -948,6 +1104,41 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.type [string, default: ClusterIP] Service type.
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
+
+  # Where workflows are allowed to send HTTP requests. This is the service that
+  # runs HTTP agents and workflow HTTP nodes, so this is the setting that
+  # decides whether an agent can reach a service on your own network.
+  #
+  # Keep blockLocalHTTPCalls false for a self-hosted install whose agents are
+  # internal — the common case, and the default. Set it true for a
+  # multi-tenant deployment, where a workflow author is not necessarily
+  # someone you want reaching into the cluster, and list the internal hosts
+  # you do intend to reach in allowedProxyHosts.
+  #
+  # Cloud metadata endpoints are refused either way and cannot be allow-listed.
+  ## @extra langwatch_nlp.security Outbound request policy for workflow HTTP nodes.
+  ## @param langwatch_nlp.security.blockLocalHTTPCalls [default: false] Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.
+  ## @param langwatch_nlp.security.allowedProxyHosts [array, default: []] Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.
+  security:
+    blockLocalHTTPCalls: false
+    allowedProxyHosts: []
+
+  # Ceiling on how long a workflow code block may run inside the sandboxed
+  # Python subprocess before nlpgo kills it. Held at or below 710 on purpose:
+  # 710 is the engine's stream idle timeout (NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS,
+  # 720s default) minus the 10s safety margin the Lambda client clamps to
+  # (CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS) — a ceiling above 710 races the
+  # stream shutting down.
+  #
+  # The app and the workers derive their own fetch deadline from this number
+  # and get it whether or not the NLP service is deployed here, so even with
+  # langwatch_nlp.enabled false the chart still enforces the same ceiling
+  # check — refusing a value that would let the clients' deadline outrun any
+  # engine's real limit — but otherwise passes the value through unchanged;
+  # a shortened value is a legal external-engine config. Configure the real
+  # ceiling on the external service and match it here.
+  ## @param langwatch_nlp.codeBlockTimeoutSeconds [default: 600] Seconds a code block may run before nlpgo kills it. Keep at or below 710 — the engine's stream idle timeout (720s default) minus a 10s safety margin. When langwatch_nlp.enabled is false the engine is external: set the real ceiling there and match it here.
+  codeBlockTimeoutSeconds: 600
 
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox
@@ -1669,6 +1860,88 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
+  # NOT the same as the root `lwql` key (see the LangWatchQL section below):
+  # root `lwql.enabled` is the FEATURE switch (does LangWatchQL run at all, on
+  # either provisioning path); this `clickhouse.lwqlAccessModel` block is the
+  # chart-managed-ClickHouse RENDER switch plus its secret-key wiring — it tells
+  # the clickhouse-serverless subchart to render the access model as config.
+  #
+  # LangWatchQL access model, rendered as ClickHouse config by the
+  # clickhouse-serverless subchart. Helm cannot derive this from the parent's
+  # lwql.enabled, so it is set here to match that default: for chart-managed
+  # ClickHouse the subchart is the ONLY provisioner (the app self-provisions only
+  # for external/BYO ClickHouse), so this must be on or LangWatchQL goes
+  # unprovisioned. langwatch.lwql.provisioningGuard fails the render if this is
+  # turned off while lwql.enabled stays true.
+  lwqlAccessModel:
+    ## @param clickhouse.lwqlAccessModel.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
+    enabled: true
+    # ClickHouse database that holds the LangWatchQL objects. Single source of
+    # truth: the clickhouse-serverless subchart renders the access model into
+    # this database, and the app/workers read it back via LWQL_DATABASE (both
+    # resolve this same value). Matches the app's own `langwatch` default.
+    ## @param clickhouse.lwqlAccessModel.database [default: langwatch] Database holding the LangWatchQL objects; the subchart provisions here and the app queries here (LWQL_DATABASE).
+    database: langwatch
+    # Design C: whoever owns the ClickHouse server owns the LangWatchQL access
+    # model, so for chart-managed ClickHouse the LWQL passwords live in the
+    # ClickHouse credentials Secret — the one templates/clickhouse/url-secret.yaml
+    # writes (autogen) or the operator pre-creates (clickhouse.auth.existingSecret).
+    # Left EMPTY so the clickhouse-serverless subchart falls back to that Secret
+    # by its own default, which tracks the real Secret name across every preset
+    # (no hardcoded name to drift when secrets.existingSecret is renamed). The
+    # app and workers read the SAME Secret/keys via langwatch.clickhouse.lwqlSecretName,
+    # so the query password can never disagree with the one the pod created the
+    # langwatch_lwql user from. Set this only to point the pod at a DIFFERENT
+    # Secret you own (external-secrets, terraform) — you then own its keys too.
+    ## @param clickhouse.lwqlAccessModel.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own — it also redirects langwatch.clickhouse.lwqlSecretName, so the app/workers read LWQL_CLICKHOUSE_PASSWORD from this same Secret.
+    existingSecret: ""
+    ## @param clickhouse.lwqlAccessModel.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
+    passwordSecretKey: lwql_password
+    # lwql_postgres named collection — the ClickHouse -> PostgreSQL bridge that
+    # backs the api-key -> tenant map. It must reach the SAME PostgreSQL the app
+    # dials via DATABASE_URL, and it connects as a DEDICATED read-only role
+    # (`lwql_ro`), never the PostgreSQL superuser: the app converges that role
+    # from the reader password (LWQL_POSTGRES_READER_PASSWORD, the same
+    # `lwql_pg_password` key the subchart mounts here) at deploy time, granting it
+    # SELECT on the approved views only. A superuser bridge would both fail to
+    # authenticate (its password lives under `postgres-password`, not this key)
+    # and discard that reader isolation.
+    #
+    # CHART-MANAGED PostgreSQL (postgresql.chartManaged: true, the default):
+    # `host` below defaults to the chart's own PostgreSQL Service. THIS parent
+    # chart composes '<release>-postgresql' as its own default (a tpl string the
+    # subchart only evaluates — the subchart never guesses a host), so the
+    # collection renders and works out of the box. `database` must equal
+    # postgresql.auth.database, and `user` must stay `lwql_ro` — the render fails
+    # if either drifts while the bridge dials this Service, since Helm cannot
+    # derive one subchart value from a parent one and the app converges exactly
+    # that reader.
+    #
+    # EXTERNAL PostgreSQL (postgresql.chartManaged: false): leaving `host` at ""
+    # DISABLES the bridge — a supported, deliberate posture, not a fallback (no
+    # shipped LangWatchQL view reads through it yet, langwatch-saas#7387). NOTES.txt
+    # and a langwatch.io/lwql-postgres-bridge: disabled annotation on the app
+    # Deployment say so loudly. A PARTIAL override (host left "" but
+    # .database/.user/.passwordSecretKey changed) still fails the render as a likely
+    # forgotten host. Setting an explicit non-empty `host` turns the bridge live
+    # against your PostgreSQL and now REQUIRES clickhouse.lwqlAccessModel.existingSecret
+    # to point at a Secret you own carrying BOTH `lwql_pg_password` (the lwql_ro
+    # reader password ClickHouse dials your PostgreSQL with) AND `lwql_password`
+    # (the langwatch_lwql ClickHouse identity password) — the chart never
+    # provisions a reader on a PostgreSQL it does not own and will not autogenerate
+    # a password nobody set there, so the render fails otherwise. Set `database` to
+    # your instance's, and keep `user: lwql_ro` unless you provision a different
+    # reader yourself.
+    postgres:
+      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: "{{ .Release.Name }}-postgresql"] PostgreSQL host the lwql_postgres bridge dials, tpl'd by the clickhouse-serverless subchart. Defaults to the chart-managed PostgreSQL Service so a default install works out of the box. Every external-PostgreSQL example/profile resets this to "" to disable the bridge (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) instead of failing the render — but a PARTIAL override (only .database/.user/.passwordSecretKey changed while this stays empty) still fails the render as a likely mistake.
+      host: '{{ .Release.Name }}-postgresql'
+      ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads. Must equal postgresql.auth.database for chart-managed PostgreSQL; set to your instance's database for an external PostgreSQL.
+      database: langwatch
+      ## @param clickhouse.lwqlAccessModel.postgres.user [default: lwql_ro] PostgreSQL role the bridge connects as — a dedicated read-only reader the app converges (never the superuser). Keep the default unless you provision your own reader on an external PostgreSQL.
+      user: lwql_ro
+      ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_ro reader password. Matches the subchart's default projection and the key the app reads as LWQL_POSTGRES_READER_PASSWORD; mounted whenever the bridge renders.
+      passwordSecretKey: lwql_pg_password
+
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
   # ---------------------------------------------------------------------------
@@ -1766,7 +2039,10 @@ clickhouse:
     ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
     password: ""
     ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password. Supports tpl expressions.
-    existingSecret: '{{ printf "%s-clickhouse" .Release.Name }}'
+    ## Defaults to the chart-managed ClickHouse Service name (release name truncated
+    ## to 36 chars, matching clickhouse-serverless.fullname), so the parent-rendered
+    ## Secret and the subchart mount agree on a release name of any length.
+    existingSecret: '{{ include "langwatch.clickhouse.serviceName" . }}'
     ## @extra clickhouse.auth.secretKeys Key mappings for existing secret.
     secretKeys:
       ## @param clickhouse.auth.secretKeys.passwordKey [string, default: password] Key name in the existing secret.
@@ -1785,6 +2061,43 @@ clickhouse:
     affinity: {}
     ## @param clickhouse.scheduling.tolerations [array] Tolerations for ClickHouse pods.
     tolerations: []
+
+# =============================================================================
+# LangWatchQL (LWQL) Configuration
+# =============================================================================
+# The governed analytics SQL API. Its backend is the restricted ClickHouse
+# identity (langwatch_lwql), the lwql_restricted settings profile, the tenant
+# row policies, the lwql_postgres named collection and the caller-facing views.
+# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
+# backend objects exist regardless.
+#
+# Ownership follows one rule (Design C, langwatch-saas#1168): whoever owns the
+# ClickHouse server owns the access model, and exactly one provisioner writes
+# each entity name.
+#
+#   - Chart-managed ClickHouse (clickhouse.chartManaged=true, the default):
+#     the clickhouse-serverless subchart renders the whole access model as
+#     ClickHouse config at pod boot (clickhouse.lwqlAccessModel.enabled, default true). The
+#     app does NOT run provisioning DDL — a second SQL owner of the same names
+#     is startup-fatal (named-collection collision) or wedges access entities
+#     (error 495 on every repair statement). Works at any replica count.
+#   - External / BYO ClickHouse (clickhouse.chartManaged=false): the chart
+#     cannot render config into a server it does not run, so the app
+#     self-provisions the same objects via SQL DDL on every boot, and degrades
+#     to a logged, fail-closed refusal if the server rejects a statement. This
+#     requires a ClickHouse whose admin user may run access-management DDL.
+#
+# Either way the app authenticates as langwatch_lwql at query time, so the two
+# stable passwords (chart-generated) reach the app on both paths.
+## @section LangWatchQL (LWQL)
+# NOT the same as `clickhouse.lwqlAccessModel` (in the ClickHouse section above):
+# this root `lwql` key is the FEATURE switch (turns LangWatchQL on/off regardless
+# of who provisions it), while `clickhouse.lwqlAccessModel` is the chart-managed-
+# ClickHouse RENDER switch that tells the clickhouse-serverless subchart to render
+# the access model as config. Both default true so the two agree out of the box.
+lwql:
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Chart-managed ClickHouse renders it as config via the clickhouse-serverless subchart; external ClickHouse has the app self-provision it. The feature flag still gates the endpoint.
+  enabled: true
 
 # =============================================================================
 # Redis Configuration
@@ -1940,7 +2253,7 @@ gateway:
     authExistingSecretName: ""
     authSecretKey: token
 
-## The Langy agent is the OpenCode "manager" pod that backs the in-product
+## The Langy agent is the worker manager pod that backs the in-product
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
@@ -1955,9 +2268,9 @@ gateway:
 ## ISOLATION. The agent runs shell written by a language model, and the workers
 ## hold the requesting user's credentials, so the controls that bound that are
 ## on by DEFAULT and cost nothing: each conversation's worker runs under its own
-## UID with its own credentials, workers cannot read each other's, the per-worker
-## opencode password separates them, and the NetworkPolicy denies egress to the
-## internet unless you turn it on.
+## UID with its own credentials, workers cannot read each other's, a worker
+## binds no listener a sibling could dial, and the NetworkPolicy denies egress
+## to the internet unless you turn it on.
 ##
 ## Those are the controls that stop the attack that actually happens: a worker
 ## reached by prompt injection through ingested data, using its own legitimate

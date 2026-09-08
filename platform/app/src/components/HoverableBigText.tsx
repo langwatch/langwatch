@@ -1,5 +1,5 @@
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
 import { Markdown } from "./Markdown";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
@@ -81,14 +81,14 @@ export function HoverableBigText({
   );
   const expandedVersion_ = expandedVersion ?? children;
 
-  const checkOverflow = () => {
+  const checkOverflow = useCallback(() => {
     setIsOverflown(
       ref.current
         ? Math.abs(ref.current.offsetWidth - ref.current.scrollWidth) > 2 ||
             Math.abs(ref.current.offsetHeight - ref.current.scrollHeight) > 2
         : false,
     );
-  };
+  }, []);
 
   // Re-measure after every render, once the browser has laid the box out.
   // The handle is cleared on unmount and before the next render's probe, so a
@@ -97,6 +97,19 @@ export function HoverableBigText({
     const timeout = setTimeout(checkOverflow, 100);
     return () => clearTimeout(timeout);
   });
+
+  // A render is not the only way this box changes size: a window resize, a
+  // column drag or a sidebar opening all reflow it while the component sits
+  // still. Without this the last render's answer stands, so text that has
+  // since started clamping offers no tooltip and the hidden half is
+  // unreachable — and text that has stopped clamping still offers one.
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [checkOverflow]);
 
   return (
     <>

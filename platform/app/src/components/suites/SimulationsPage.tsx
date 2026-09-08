@@ -12,7 +12,6 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
 import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +22,7 @@ import {
   usePeriodSelector,
 } from "~/components/PeriodSelector";
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
+import { ReturnToNewSimulationsBanner } from "~/components/suites/ReturnToNewSimulationsBanner";
 import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
@@ -42,8 +42,10 @@ import {
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
 import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/scenario-tab-events";
@@ -55,7 +57,11 @@ import { NowProvider } from "./NowProvider";
 export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
-  const utils = api.useContext();
+  // The rows open a run's detail and the sidebar opens the run plan editor,
+  // both separate downloads. Fetch them while the person reads the runs, so
+  // the click opens the drawer rather than a spinner.
+  usePreloadDrawer("scenarioRunDetail", "suiteEditor");
+  const utils = api.useUtils();
   const { selectedSuiteSlug, navigateToSuite, highlightBatchId } =
     useSuiteRouting();
 
@@ -241,7 +247,6 @@ export default function SimulationsPage() {
       toaster.create({
         title: "Run plan archived",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (err) =>
@@ -258,7 +263,6 @@ export default function SimulationsPage() {
       toaster.create({
         title: "Run plan duplicated",
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (err) =>
@@ -367,6 +371,7 @@ export default function SimulationsPage() {
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulations</PageLayout.Heading>
               <HStack>
+                <ReturnToNewSimulationsBanner target="runs" />
                 <PeriodSelector
                   period={period}
                   mode={mode}

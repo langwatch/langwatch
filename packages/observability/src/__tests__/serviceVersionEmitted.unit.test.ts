@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createLogger } from "../logger";
+import { createLogger, resetLoggerCache } from "../logger";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -47,6 +47,11 @@ describe("service.version on a record createLogger wrote", () => {
     // The node logger defaults to `error` under NODE_ENV=test; these assertions
     // are about an ordinary info line.
     process.env.PINO_LOG_LEVEL = "info";
+    // Every case here writes through the same logger name while changing the
+    // environment that name was built from. createLogger memoises by name for
+    // the life of the process, so without this each case would assert against
+    // whichever environment the first case happened to set.
+    resetLoggerCache();
   });
 
   afterEach(() => {

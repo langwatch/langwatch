@@ -94,6 +94,113 @@ helm upgrade lw . -f examples/overlays/size-dev.yaml -f examples/overlays/access
 helm uninstall lw
 ```
 
+#### ClickHouse credentials Secret rename (release names longer than 36 characters)
+
+The chart-managed ClickHouse credentials Secret is now named
+`langwatch.clickhouse.serviceName` — the release name **truncated to 36
+characters** — so it agrees with the subchart's own `-clickhouse` fullname on a
+release name of any length. Earlier chart versions used the **untruncated**
+`<release>-clickhouse`. For a release name of 36 characters or fewer the two are
+identical and upgrades are unaffected.
+
+For a release name **longer than 36 characters**, this is a rename. The old
+Secret is retained (`helm.sh/resource-policy: keep`) and still holds the live
+password and Keeper `clusterSecret` the running pods authenticate with. On
+`autogen.enabled=true` the chart detects this on upgrade: when the new
+(truncated) name has no Secret yet but the old untruncated one does, it **adopts
+the old values into the new Secret** so the password and `clusterSecret` are not
+regenerated underneath the pods. The old Secret is then orphaned but harmless;
+delete it once the upgrade is confirmed healthy. Operators who set an explicit
+`clickhouse.auth.existingSecret` are unaffected — the chart honours that name
+verbatim.
+
+Adoption depends on Helm's `lookup` function reading the live cluster, and
+`lookup` returns nil in any render path with no cluster access — an ArgoCD
+repo-server render and a plain `helm template` both fall in this bucket. In those
+paths the chart cannot see the existing Secret, so it does **not** adopt and
+instead regenerates the credentials from the random branch. Reconcile a
+truncating rename through a path that has cluster access (a `helm upgrade`, or an
+ArgoCD sync that renders server-side), or set `clickhouse.auth.existingSecret`
+explicitly so the value never depends on `lookup` at all.
+
+#### Upgrades with local-filesystem stored objects
+
+This is the default mode, where the app and the workers mount one
+`ReadWriteOnce` PVC. A `ReadWriteOnce` volume attaches to one node, so every
+pod that mounts it has to run on that node. Both Deployments already use a
+kill-then-start rollout for this reason, but a `helm upgrade` rolls both at the
+same time. On a cluster with more than one node, the new pod of one Deployment
+can be scheduled on a fresh node while the old pod of the other still holds the
+attachment on the old node, and both then wedge in `ContainerCreating` with a
+multi-attach error.
+
+The chart orders them for you, with two hook Jobs:
+
+1. A **drain** Job (`pre-upgrade`, `pre-rollback`) scales the workers to 0 and
+   waits for their pods to go away, so the old workers pod cannot hold the
+   volume on the old node while Helm rolls the app.
+2. A **restore** Job (`post-upgrade`, `post-rollback`) scales the workers to 0
+   again, waits for the app rollout to finish, and then scales them back to
+   `workers.replicaCount`.
+
+The second step is not redundant. Helm's apply restores the replica count from
+the manifest, so a new workers pod is created at the same instant as the new app
+pod. Its required `podAffinity` matches the old app pod, which is still
+terminating on the old node, so the scheduler puts the workers back on the node
+the app is leaving, where they take over the attachment and wedge the new app
+pod for good. Holding the workers at 0 until the app rollout finishes is what
+makes them follow the new app pod.
+
+Expect a worker outage that covers the app rollout, on top of the brief app
+outage the kill-then-start rollout already carries.
+
+The hooks need a ServiceAccount token and a namespaced Role: `get` on the app
+and the workers Deployments, `patch` on the workers' scale subresource, and read
+access to the pods of the release namespace. They render only in this mode. With
+`app.dataplane` (S3 / Azure) there is no shared volume, so they never render.
+
+If the drain Job fails, the upgrade stops and the workers stay at 0. That is
+deliberate: it is safer than a wedged rollout. Read the Job logs, fix the cause,
+then run the upgrade again, which scales the workers back up. The restore Job
+never fails the release over a slow or broken app: if the rollout does not
+finish in time it says so and brings the workers back anyway.
+
+**Rollbacks.** `helm rollback` moves both Deployments the same way an upgrade
+does, so both Jobs are registered for the rollback events too and a rollback is
+ordered the same way. One case the chart cannot cover: on a rollback Helm runs
+the hooks stored in the **target** revision, so a rollback to a chart version
+from before these Jobs existed runs no Jobs at all. Before such a downgrade,
+scale the workers down by hand and bring them back after it:
+
+```bash
+kubectl -n <namespace> scale deployment <release>-workers --replicas=0
+kubectl -n <namespace> rollout status deployment <release>-workers --timeout=2m
+helm rollback <release> <old-revision>
+kubectl -n <namespace> scale deployment <release>-workers --replicas=1
+```
+
+To order the rollout yourself, or on a cluster that forbids that RBAC:
+
+```yaml
+app:
+  storedObjects:
+    localFilesystem:
+      serializeUpgrades: false
+```
+
+For an air-gapped install, mirror the hook image and point
+`app.storedObjects.localFilesystem.serializeUpgradesImage` at your copy. It
+needs `sh` and `kubectl`, and it accepts a digest reference. If your registry
+needs credentials, name the pull secrets in
+`app.storedObjects.localFilesystem.serializeUpgradesPullSecrets`: the hook
+Jobs run under their own ServiceAccount, so secrets you attached to the
+namespace's `default` ServiceAccount do not reach them.
+
+The image tag names the kubectl version. `kubectl` supports one minor version of
+skew either way, so change it if your cluster is far from 1.34. The hooks only
+call `get deployment`, `patch deployment --subresource=scale` and `wait
+--for=delete pod`, which have been stable for many releases.
+
 ### Secrets
 
 Use `secretKeyRef` to reference existing Kubernetes Secrets instead of inlining values:
@@ -126,6 +233,136 @@ For development, set `autogen.enabled: true` to auto-generate all secrets.
 
 For a complete installation guide, visit the [documentation](https://docs.langwatch.ai/self-hosting/kubernetes-helm).
 
+### LangWatchQL (LWQL) — BYO ClickHouse prerequisites
+
+`lwql.enabled` (default `true`) provisions the LangWatchQL backend: a
+restricted `langwatch_lwql` user, an `lwql_restricted` settings profile, row
+policies, and a `lwql_postgres` PostgreSQL-bridge named collection. **Who
+provisions these depends on who owns the ClickHouse server** — see
+[ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md)
+for the full contract. One rule either way: **one owner per entity name.**
+Two systems defining the same user, profile, or named collection is fatal,
+not redundant — a duplicate named collection blocks server boot with
+`NAMED_COLLECTION_ALREADY_EXISTS`, and a duplicate access entity fails every
+repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
+
+- **`clickhouse.chartManaged: true` (default):** the `clickhouse-serverless`
+  subchart owns the **access model** — it renders `langwatch_lwql`,
+  `lwql_restricted`, the row policies, and the `lwql_postgres` named collection
+  as config at pod boot, and the app touches none of it. The app still
+  provisions its own **catalog views** and the api-key→tenant map, and QUERIES
+  as the restricted identity: the chart wires the full restricted connection
+  onto the app and workers — `LWQL_CLICKHOUSE_URL` (the in-cluster ClickHouse
+  Service), `LWQL_CLICKHOUSE_USER` (`langwatch_lwql`), `LWQL_DATABASE`,
+  `LWQL_TENANT_SETTING` (`custom_api_key_hash`) and the two passwords —
+  *without* `LWQL_SELF_PROVISION`. All five are required together;
+  `LWQL_SELF_PROVISION` is off so the subchart stays the only owner of the
+  access-model entity names. The `lwql_postgres` bridge works out of the box on
+  chart-managed PostgreSQL: `clickhouse.lwqlAccessModel.postgres.host`
+  defaults to `<release>-postgresql` (this chart's own default value — the
+  subchart never guesses a host), `database` must equal
+  `postgresql.auth.database` (the render fails if they diverge), and the bridge
+  connects as a dedicated read-only role `lwql_ro` — never the superuser — that
+  the app converges from the reader password at deploy time. An **external
+  PostgreSQL** (`postgresql.chartManaged: false`) needs
+  `clickhouse.lwqlAccessModel.postgres.host` set to reach it; every external
+  PostgreSQL example/profile cancels the auto-derived default back to `""`
+  instead, which renders successfully with the bridge disabled — a loud
+  NOTES.txt warning and a `langwatch.io/lwql-postgres-bridge: disabled`
+  annotation on the app Deployment (no shipped LangWatchQL view reads through
+  this bridge yet, langwatch-saas#7387). A **partial** override — only
+  `.database`, `.user` or `.passwordSecretKey` changed while `host` stays empty
+  — still fails the render as a likely mistake. To run the bridge live against an
+  external PostgreSQL, set an explicit `host` and supply the reader password
+  yourself — see [External PostgreSQL with an explicit bridge
+  host](#external-postgresql-with-an-explicit-bridge-host-bring-your-own-reader-role).
+- **`clickhouse.chartManaged: false` (BYO / external ClickHouse):** the chart
+  cannot render config into a server it does not run, so the application
+  self-provisions the same objects via SQL DDL at startup, and fails closed
+  (a logged refusal, not a crash) if the server rejects a statement. Your
+  external ClickHouse must satisfy three prerequisites before enabling
+  `lwql.enabled`, none of which this chart can set on the external path:
+
+  | Prerequisite | Why | Where it lives on the chart-managed path |
+  | --- | --- | --- |
+  | `custom_settings_prefixes` includes `custom_` | The `lwql_restricted` profile carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
+  | The administrative user (the one whose credentials the app connects with) has `access_management: 1` | The app needs DDL rights to create/repair `langwatch_lwql`, `lwql_restricted`, and the row policies. | Rendered via a `zz`-prefixed users config — see `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts` (`clickHouseAccessManagementConfigXml`). The `zz-` prefix is load-bearing: `users.d` files merge lexicographically and the later file wins, so a name that sorts before the official image's own `default-user` config would be silently overridden. |
+  | `named_collection_control: 1` on that same administrative user | Required specifically to create/drop the `lwql_postgres` named collection via SQL (`CREATE NAMED COLLECTION`), distinct from the general `access_management` grant. | Same file as above. |
+
+  Grant these on your ClickHouse server before pointing this chart at it with
+  `lwql.enabled: true`; see `examples/overlays/clickhouse-external.yaml`.
+
+**Plaintext-password caveat (chart-managed path only).** When ClickHouse
+renders `lwql_postgres` as config, the PostgreSQL reader password is written
+in plaintext into `config.d/lwql-server.yaml` on the pod's disk
+(`infra/clickhouse-serverless/internal/render/lwql.go:140-153`). This is not
+an oversight: ClickHouse must dial PostgreSQL with the real credential to use
+the named collection, so unlike every other credential this chart renders,
+this one cannot be stored as a hash. Mitigations in place: the file lives
+under `config.d/`, mounted read-only to the `clickhouse` container user only
+(standard container file permissions, no world/group read); the password
+itself reaches the pod as a Kubernetes Secret
+(`clickhouse.auth.*` / `LWQL_POSTGRES_READER_PASSWORD`), never committed to a
+values file or version control. Treat any node or volume snapshot that can
+read `config.d/` as able to read this password, and scope filesystem access
+to the ClickHouse pod accordingly.
+
+#### External PostgreSQL with an explicit bridge host (bring-your-own reader role)
+
+On chart-managed ClickHouse with an **external PostgreSQL**
+(`postgresql.chartManaged: false`), leaving
+`clickhouse.lwqlAccessModel.postgres.host` at `""` disables the bridge (above).
+Setting it to a non-empty host instead turns the `lwql_postgres` bridge **live**
+against your PostgreSQL, dialing as the read-only role `lwql_ro`. The chart never
+provisions that role on a PostgreSQL it does not own — `LWQL_MANAGE_POSTGRES_READER`
+is emitted only for chart-managed PostgreSQL — and it will not autogenerate a
+password nobody set on your server. So this posture **requires** you to create
+the reader yourself and hand the chart a Secret via
+`clickhouse.lwqlAccessModel.existingSecret` that carries **both** the reader
+password (`lwql_pg_password`) **and** the `langwatch_lwql` ClickHouse identity
+password (`lwql_password`); the render fails otherwise. That one Secret backs
+both credentials: `existingSecret` redirects both the subchart's mount (from
+which the owning ClickHouse pod creates the `langwatch_lwql` identity) and this
+chart's `lwqlSecretName` (from which the app/workers read
+`LWQL_CLICKHOUSE_PASSWORD`), so a Secret carrying only `lwql_pg_password` would
+leave `langwatch_lwql` with a password nobody set.
+
+Create the reader with the same shape the app converges on a chart-managed
+PostgreSQL (`postgresReaderRoleStatements` in
+`platform/app/src/server/analytics/lwql/provisioning/postgresMapping.ts`) —
+read-only, with `SELECT` granted on the approved `lwql_*` views only, never the
+superuser:
+
+```sql
+CREATE ROLE "lwql_ro" LOGIN;
+ALTER ROLE "lwql_ro" WITH LOGIN PASSWORD '<reader-password>' CONNECTION LIMIT <n>;
+ALTER ROLE "lwql_ro" SET default_transaction_read_only = on;
+ALTER ROLE "lwql_ro" SET statement_timeout = '<timeout>';
+REVOKE ALL ON SCHEMA "public" FROM "lwql_ro";
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" FROM "lwql_ro";
+GRANT USAGE ON SCHEMA "public" TO "lwql_ro";
+GRANT SELECT ON "public"."lwql_traces" TO "lwql_ro";
+-- ...one GRANT SELECT per approved lwql_* view
+```
+
+Then create a Secret you own carrying **two** keys and point
+`clickhouse.lwqlAccessModel.existingSecret` at it:
+
+- `lwql_pg_password` (or whatever
+  `clickhouse.lwqlAccessModel.postgres.passwordSecretKey` names) — the `lwql_ro`
+  reader password. ClickHouse mounts this Secret for the named collection, so the
+  bridge dials `lwql_ro` with the exact password you set on it.
+- `lwql_password` (or whatever `clickhouse.lwqlAccessModel.passwordSecretKey`
+  names) — the `langwatch_lwql` ClickHouse identity password. `existingSecret`
+  redirects this chart's `lwqlSecretName` at the same Secret, so the owning
+  ClickHouse pod creates `langwatch_lwql` from it and the app/workers read
+  `LWQL_CLICKHOUSE_PASSWORD` from it.
+
+Both mounts are `optional: true`, so a Secret missing either key installs without
+error and silently leaves that identity with a password nobody set — omit
+`lwql_pg_password` and the bridge is dead; omit `lwql_password` and every
+LangWatchQL query is refused. Include both.
+
 ### Pod security
 
 Every LangWatch pod (including the cron pods) and every bundled datastore
@@ -134,12 +371,13 @@ dropped capabilities, `RuntimeDefault` seccomp, no mounted SA token, and
 resource requests/limits on every container.
 
 A default install does **not** clear Pod Security Admission `restricted` on its
-own: three bundled components can't comply. On clusters that enforce it, add
+own: four bundled components can't comply. On clusters that enforce it, add
 `examples/overlays/strict-admission.yaml`, which turns off the upstream
 Prometheus subchart, the Langy assistant (whose manager must run as root to
-give each worker its own UID — never force it non-root), and the ClickHouse
-preflight Job (it runs kubectl, so it needs a token and a writable root), plus
-the custom-metrics gateway HPA. Full details in
+give each worker its own UID, never force it non-root), the ClickHouse
+preflight Job and the stored-objects upgrade hooks (both run kubectl, so they
+need a token and a writable root), plus the custom-metrics gateway HPA. Full
+details in
 [Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table
@@ -204,6 +442,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.otel`                                                   | OpenTelemetry identity for the app.                                                                                                                                                                                                                                                 |                              |
 | `app.otel.serviceName`                                       | Service name reported in traces and logs.                                                                                                                                                                                                                                           | `langwatch-app`              |
 | `app.replicaCount`                                           | Number of application replicas.                                                                                                                                                                                                                                                     | `1`                          |
+| `app.shutdownDrainSeconds`                | Seconds the queue may spend draining in-flight jobs on shutdown.                                                                                                                                                        | `25`                |
+| `app.terminationGracePeriodSeconds`       | Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.                                                                                                                                                     | `55`                |
 | `app.service`                                                | Service configuration for the app.                                                                                                                                                                                                                                                  |                              |
 | `app.service.type`                                           | Service type.                                                                                                                                                                                                                                                                       | `ClusterIP`                  |
 | `app.service.port`                                           | Service port.                                                                                                                                                                                                                                                                       | `5560`                       |
@@ -277,6 +517,9 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.storedObjects.localFilesystem.path`                     | Mount point that the LocalFilesystemDriver writes under.                                                                                                                                                                                                                            | `/var/lib/langwatch/objects` |
 | `app.storedObjects.localFilesystem.size`                     | PVC size for the stored-objects volume.                                                                                                                                                                                                                                             | `10Gi`                       |
 | `app.storedObjects.localFilesystem.storageClassName`         | PVC storageClassName (cluster default if empty).                                                                                                                                                                                                                                    | `""`                         |
+| `app.storedObjects.localFilesystem.serializeUpgrades`        | Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.                                                                                                                                                                                    | `true`                       |
+| `app.storedObjects.localFilesystem.serializeUpgradesImage`   | Image the upgrade hooks run. Needs sh and kubectl. A digest reference works too.                                                                                                                                                                                                    | `alpine/k8s:1.34.9`          |
+| `app.storedObjects.localFilesystem.serializeUpgradesPullSecrets` | Pull secrets for that image. The hook Jobs use their own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach them.                                                                                                                                      | `[]`                         |
 | `app.email`                                                  | Email provider configuration.                                                                                                                                                                                                                                                       |                              |
 | `app.email.defaultFrom`                                      | Default "from" address.                                                                                                                                                                                                                                                             | `""`                         |
 | `app.email.provider`                                         | Email provider. Empty sends no email.                                                                                                                                                                                                                                               | `""`                         |
@@ -420,6 +663,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `workers.otel.serviceName`                | Service name reported in traces and logs.                                                                                                                                                                               | `langwatch-workers` |
 | `workers.enabled`                         | Deploy the workers Deployment + PDB.                                                                                                                                                                                    | `true`              |
 | `workers.replicaCount`                    | Number of worker replicas.                                                                                                                                                                                              | `1`                 |
+| `workers.shutdownDrainSeconds`            | Seconds the queue may spend draining in-flight jobs on shutdown.                                                                                                                                                        | `25`                |
+| `workers.terminationGracePeriodSeconds`   | Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.                                                                                                                                                     | `55`                |
 | `workers.resources`                       | Resource requests and limits for workers.                                                                                                                                                                               |                     |
 | `workers.resources.requests.cpu`          | Requested CPU.                                                                                                                                                                                                          | `250m`              |
 | `workers.resources.requests.memory`       | Requested memory.                                                                                                                                                                                                       | `2Gi`               |
@@ -462,6 +707,10 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langwatch_nlp.service`                         | Service configuration for NLP.                                                                                                                                                                                          |                 |
 | `langwatch_nlp.service.type`                    | Service type.                                                                                                                                                                                                           | `ClusterIP`     |
 | `langwatch_nlp.service.port`                    | Service port.                                                                                                                                                                                                           | `5561`          |
+| `langwatch_nlp.security`                        | Outbound request policy for workflow HTTP nodes.                                                                                                                                                                        |                 |
+| `langwatch_nlp.security.blockLocalHTTPCalls`    | Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.                                      | `false`         |
+| `langwatch_nlp.security.allowedProxyHosts`      | Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.                                                                        | `[]`            |
+| `langwatch_nlp.codeBlockTimeoutSeconds`         | Seconds a code block may run before nlpgo kills it. Keep at or below 710 — the engine's stream idle timeout (720s default) minus a 10s safety margin. When langwatch_nlp.enabled is false the engine is external: set the real ceiling there and match it here.                                                  | `600`           |
 | `langwatch_nlp.resources`                       | Resource requests and limits.                                                                                                                                                                                           |                 |
 | `langwatch_nlp.resources.requests.cpu`          | Requested CPU.                                                                                                                                                                                                          | `250m`          |
 | `langwatch_nlp.resources.requests.memory`       | Requested memory.                                                                                                                                                                                                       | `256Mi`         |
@@ -715,6 +964,12 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `clickhouse.scheduling.nodeSelector`                                | Node selector for ClickHouse pods.                                                                                                                                                                                                                              | `{}`             |
 | `clickhouse.scheduling.affinity`                                    | Affinity rules for ClickHouse pods.                                                                                                                                                                                                                             | `{}`             |
 | `clickhouse.scheduling.tolerations`                                 | Tolerations for ClickHouse pods.                                                                                                                                                                                                                                | `[]`             |
+
+### LangWatchQL (LWQL)
+
+| Name           | Description                                                                                                        | Value  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
+| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, views). Who provisions it depends on who owns the server: with `clickhouse.chartManaged: true` (default), the `clickhouse-serverless` subchart renders these objects as config at pod boot; with an external ClickHouse, the application self-provisions the same objects via SQL DDL at startup (see [BYO ClickHouse prerequisites](#langwatchql-lwql--byo-clickhouse-prerequisites) and [ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md)). The feature flag still gates the endpoint. | `true` |
 
 ### Redis
 

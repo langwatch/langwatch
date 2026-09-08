@@ -93,6 +93,17 @@ const STATS_NUMERIC: LangyDerivedCard = {
   ],
 };
 
+const STATS_COMPARISON: LangyDerivedCard = {
+  kind: "stats",
+  blockId: "gallery-stats-comparison",
+  title: "Baseline vs candidate",
+  items: [
+    { label: "Baseline pass rate", value: 35, unit: "percent" },
+    { label: "Candidate pass rate", value: 45, unit: "percent" },
+    { label: "Best attempt pass rate", value: 83, unit: "percent" },
+  ],
+};
+
 const STATS_MIXED: LangyDerivedCard = {
   kind: "stats",
   blockId: "gallery-stats-mixed",
@@ -320,6 +331,10 @@ export function LangyDerivedCardsTestingGround() {
 
       <Labeled label="Derived stats — numeric figures roll up">
         <LangyDerivedCardView card={STATS_NUMERIC} />
+      </Labeled>
+
+      <Labeled label="Derived stats — readings on one scale draw as a comparison">
+        <LangyDerivedCardView card={STATS_COMPARISON} />
       </Labeled>
 
       <Labeled label="Derived stats — mixed values fall back to the grid">

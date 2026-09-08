@@ -7,9 +7,21 @@ const mockQueryBillableEventsByProjectApprox = vi.fn();
 const mockGetBillingMonth = vi.fn().mockReturnValue("2026-03");
 const mockIsClickHouseEnabled = vi.fn();
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  isClickHouseEnabled: () => mockIsClickHouseEnabled(),
-}));
+vi.mock("~/server/app-layer/app", () => {
+  const app = () => ({
+    clickhouse: {
+      enabled: mockIsClickHouseEnabled(),
+      resolveClient: async () => {
+        throw new Error("no client in this suite");
+      },
+      resolveOrganizationClient: async () => {
+        throw new Error("no organization client in this suite");
+      },
+      allInstances: async () => [],
+    },
+  });
+  return { getApp: app, tryGetApp: app };
+});
 
 vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
   queryBillableEventsTotalUniq: (...args: unknown[]) =>

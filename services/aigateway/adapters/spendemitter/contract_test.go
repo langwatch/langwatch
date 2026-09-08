@@ -110,7 +110,9 @@ func TestContractConfirmedPayload(t *testing.T) {
 	require.NoError(t, json.Unmarshal(records[0].Payload, &payload))
 	usage, ok := payload["usage"].(map[string]any)
 	require.True(t, ok)
-	assert.EqualValues(t, 869, usage["input_tokens"])
+	// 869 - 11 - 5: the input count is what the plain input rate applies to,
+	// and the cache buckets price beside it rather than inside it.
+	assert.EqualValues(t, 853, usage["input_tokens"])
 	assert.EqualValues(t, 207, usage["output_tokens"])
 	assert.EqualValues(t, 11, usage["cache_read_input_tokens"])
 	assert.EqualValues(t, 5, usage["cache_creation_input_tokens"])

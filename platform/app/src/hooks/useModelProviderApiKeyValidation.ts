@@ -43,7 +43,7 @@ export function useModelProviderApiKeyValidation(
 ) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   // A mutation, so the key travels in a request body rather than encoded into
   // a URL. See the procedure for why that matters.
   const { mutateAsync: validateApiKey } =

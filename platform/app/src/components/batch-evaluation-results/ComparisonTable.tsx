@@ -205,7 +205,7 @@ const buildComparisonColumns = ({
         id: `target_${targetId}`,
         header: () => (
           <Text fontSize="13px" fontWeight="medium">
-            {targetCol.name}
+            {targetCol.displayName ?? targetCol.name}
           </Text>
         ),
         size: 300,

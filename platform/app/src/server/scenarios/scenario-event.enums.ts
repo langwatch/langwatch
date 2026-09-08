@@ -33,11 +33,30 @@ export enum ScenarioRunStatus {
   IN_PROGRESS = "IN_PROGRESS",
   PENDING = "PENDING",
   FAILED = "FAILED",
+  /**
+   * Kept for external API/UI compatibility and any legacy stored rows.
+   * No longer produced anywhere: a stalled run now reaches terminal ERROR
+   * (reason "stalled") via the simulationRunExecution process manager's
+   * stall watchdog — nothing derives STALLED at read time anymore.
+   */
   STALLED = "STALLED",
   /** Queue waiting state - job is queued but not yet picked up by a worker */
   QUEUED = "QUEUED",
   /** Queue active state - job is being executed by a worker */
   RUNNING = "RUNNING",
+  /**
+   * The conversation is over and the judge has decided, but the evaluators the
+   * run's suite and plan attach have not been recorded yet, so the run may
+   * still be failed by a required one.
+   *
+   * Stored by the fold when the run finishes, the way QUEUED is, and
+   * replaced by the gated terminal status when the evaluated event records
+   * the results. A grading job that is lost is recorded as errored evaluators
+   * once its deadline passes, so a run never stays here for good.
+   *
+   * @see specs/scenarios/scenario-evaluation-pending.feature
+   */
+  PENDING_EVALUATION = "PENDING_EVALUATION",
 }
 
 /** Statuses that are eligible for cancellation (still in-flight). */
@@ -58,4 +77,24 @@ export const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
  */
 export function isCancellableStatus(status: ScenarioRunStatus): boolean {
   return CANCELLABLE_STATUSES.has(status);
+}
+
+/** Statuses a run cannot move out of. */
+export const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+  ScenarioRunStatus.ERROR,
+  ScenarioRunStatus.CANCELLED,
+  ScenarioRunStatus.STALLED,
+]);
+
+/**
+ * Whether a run has reached a state it will never leave.
+ *
+ * Not the negation of `isCancellableStatus`: RUNNING is neither cancellable
+ * (it has no queued job to drop) nor terminal, so the two sets do not
+ * partition the enum between them.
+ */
+export function isTerminalStatus(status: ScenarioRunStatus): boolean {
+  return TERMINAL_STATUSES.has(status);
 }

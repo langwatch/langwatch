@@ -1,12 +1,12 @@
 Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   As an organization admin (Persona 3 from gateway.md), I author the
-  anomaly rules that the detection reactor evaluates against the
+  anomaly rules that the detection subscriber evaluates against the
   activity-monitor event stream. What counts as "weird" varies per
   organization — admins encode their own thresholds + scopes +
   destinations rather than living with hardcoded one-size-fits-all rules.
 
   This page is the authoring surface for AnomalyRule rows; their
-  firings (`AnomalyAlert` rows) are produced by the detection reactor
+  firings (`AnomalyAlert` rows) are produced by the detection subscriber
   and surface on `/governance` (admin oversight dashboard's "Active
   anomaly alerts" section). One rule = one named threshold + scope +
   destination tuple.
@@ -15,18 +15,18 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     THIS spec covers rule CRUD (the config entity authoring UI +
     `api.anomalyRules.*` mutations). Evaluation, firing semantics, and
     dispatch contracts live in `anomaly-detection.feature` — that is
-    Sergey's event-sourcing reactor pattern (PR #3351 alignment per
+    Sergey's event-sourcing subscriber pattern (PR #3351 alignment per
     rchaves's "event sourcing is the one true way" directive). When
     these specs disagree on field shapes, the detection feature is
-    canonical because it owns the reactor's input contract.
+    canonical because it owns the subscriber's input contract.
 
   Current ship state (as of iter 18):
     - api.anomalyRules.{list, create, update, archive} are LIVE — rule
       rows persist to the AnomalyRule table.
-    - C1 (activity-monitor pipeline) + C2 (anomaly detection reactor +
+    - C1 (activity-monitor pipeline) + C2 (anomaly detection subscriber +
       AnomalyAlert producer for spend_spike) ARE LIVE. End-to-end
       dogfood proven on 2026-04-27: rule planted → events fired →
-      reactor evaluated → AnomalyAlert persisted → /governance
+      subscriber evaluated → AnomalyAlert persisted → /governance
       "Recent anomalies" section renders the alert.
     - C3 (Slack / SIEM / webhook / PagerDuty / email dispatch) ships in
       a follow-up — current alerts dispatch log-only.
@@ -36,29 +36,34 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   Background:
     Given the feature flag "release_ui_ai_governance_enabled" is enabled
       for the organization
-    And the user has the "organization:manage" permission
+    And the user has the "governance:view" permission
+    And the user has the "anomalyRules:manage" permission
 
   # ---------------------------------------------------------------------------
   # Page scaffold + permission gate
   # ---------------------------------------------------------------------------
 
   @bdd @ui @anomaly-rules @permission
-  Scenario: A non-admin user is redirected away from the rules page
-    Given a user without "organization:manage" is signed in
-    When they navigate to "/settings/governance/anomaly-rules"
-    Then they are redirected (or shown the existing settings-permission
-      "Not allowed" page)
+  Scenario: A user without the governance read grant is refused the rules page
+    # The page gate is `governance:view`. A holder of it who lacks
+    # `anomalyRules:view` reaches the page and is told which grant the rule
+    # list needs, per
+    # specs/ai-governance/rbac/delegated-governance-viewer.feature.
+    Given a user without "governance:view" is signed in
+    When they navigate to "/governance/anomaly-rules"
+    Then they are shown the existing settings-permission "Access Restricted"
+      page
 
   @bdd @ui @anomaly-rules @permission
   Scenario: An org admin reaches the rules page
-    When the admin navigates to "/settings/governance/anomaly-rules"
+    When the admin navigates to "/governance/anomaly-rules"
     Then the page renders with the heading "Anomaly Rules"
-    And the URL stays at "/settings/governance/anomaly-rules"
+    And the URL stays at "/governance/anomaly-rules"
 
   @bdd @ui @anomaly-rules @feature-flag
   Scenario: Without the governance preview flag the page is hidden
     Given the feature flag "release_ui_ai_governance_enabled" is disabled
-    When the admin navigates to "/settings/governance/anomaly-rules"
+    When the admin navigates to "/governance/anomaly-rules"
     Then the page renders the standard NotFoundScene
     And no telemetry is emitted that reveals the page exists
 
@@ -68,10 +73,10 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
 
   @bdd @ui @anomaly-rules @no-honest-state-banner
   Scenario: Page no longer shows the "evaluation pending" banner
-    When the page renders post-iter-18 (C2 reactor is live)
+    When the page renders post-iter-18 (C2 subscriber is live)
     Then no "Heads up: rules persist now…" banner is shown
     And no "Preview · mocked data" badge is shown
-    And the page reads as fully-live: rules persist, the reactor
+    And the page reads as fully-live: rules persist, the subscriber
       evaluates, AnomalyAlert rows are produced, and dispatched at
       least to log-only (C3 will add Slack / SIEM / webhook / PagerDuty
       / email)
@@ -110,7 +115,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     When the admin clicks "+ New rule" in any severity section
     Then an inline composer expands inline below the section header with
       these fields (shape aligned to anomaly-detection.feature, which
-      owns the reactor's input contract):
+      owns the subscriber's input contract):
       | field             | type                 | description                          |
       | name              | text                 | display name                         |
       | severity          | enum                 | critical / warning / info            |
@@ -124,7 +129,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
       severity section
     And on validation error the field-level message is surfaced inline
     And ruleType is open-enum (text + datalist) so admins aren't blocked
-      when the reactor adds new rule types between releases
+      when the subscriber adds new rule types between releases
 
   @bdd @ui @anomaly-rules @composer @threshold-shape
   Scenario: thresholdConfig examples are documented inline per rule type
@@ -149,7 +154,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
       }
       """
     # Authoritative shapes live in anomaly-detection.feature — that's
-    # the reactor's input contract. The UI mirrors them as guidance only.
+    # the subscriber's input contract. The UI mirrors them as guidance only.
 
   # ---------------------------------------------------------------------------
   # Per-rule actions — wired to api.anomalyRules.update / archive
@@ -161,10 +166,10 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     When the admin toggles its enabled-switch off
     Then `api.anomalyRules.update({id, status: "disabled"})` is called
     And on success the row dims and shows a "Disabled" badge
-    And the disabled rule is skipped by the detection reactor
+    And the disabled rule is skipped by the detection subscriber
       (see anomaly-detection.feature: "disabled rules are not evaluated")
     And re-enabling it does NOT replay missed events (forward-only
-      semantics — confirmed in the detection reactor spec)
+      semantics — confirmed in the detection subscriber spec)
 
   @bdd @ui @anomaly-rules @actions @real-update
   Scenario: Admin edits an existing rule
@@ -183,7 +188,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     And on confirm `api.anomalyRules.archive({id})` is called
     And the rule disappears from the active list (still queryable
       via list filter status="archived" for audit)
-    And the detection reactor stops considering this rule on the next
+    And the detection subscriber stops considering this rule on the next
       event append
 
   # ---------------------------------------------------------------------------
@@ -193,7 +198,7 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   @bdd @ui @anomaly-rules @tenant-isolation
   Scenario: Rules from other orgs are never visible
     Given two orgs each have authored rules
-    When admin of org A loads "/settings/governance/anomaly-rules"
+    When admin of org A loads "/governance/anomaly-rules"
     Then `api.anomalyRules.list` returns ONLY org A's rules
     And no rule belonging to org B is queryable from the org A session
       (enforced by the existing org-scoped procedure pattern; the
@@ -207,10 +212,10 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   @bdd @ui @anomaly-rules @cross-page
   Scenario: Each anomaly on /governance links to its source rule
     Given the admin oversight dashboard shows AnomalyAlert rows produced
-      by the detection reactor
+      by the detection subscriber
     When the admin clicks an alert row's rule name
     Then the browser navigates to
-      "/settings/governance/anomaly-rules?ruleId=<id>" and that rule's
+      "/governance/anomaly-rules?ruleId=<id>" and that rule's
       row is auto-scrolled into view + briefly highlighted
 
   # ---------------------------------------------------------------------------
@@ -218,17 +223,17 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @anomaly-rules @evaluate-now
-  Scenario: "Test rule" button uses the production reactor (no parallel poller)
+  Scenario: "Test rule" button uses the production subscriber (no parallel poller)
     Given the admin has authored a new rule
     When they click "Test rule" on its row
     Then the UI calls `api.anomalyRules.evaluateNow({id})`
     And per anomaly-detection.feature, that endpoint appends a synthetic
       ActivityEventReceived to the event_log against the rule's scope —
-      the production reactor evaluates it identically to a real ingest
+      the production subscriber evaluates it identically to a real ingest
     And the result toasts "Test fired (alert <id>)" or "No threshold
       breach with current data"
     # NOTE: this is explicitly NOT a parallel evaluation pathway — it
-    # exercises the same reactor that real events go through. Owned by
+    # exercises the same subscriber that real events go through. Owned by
     # anomaly-detection.feature; mirrored here for UI completeness.
 
   # ---------------------------------------------------------------------------

@@ -463,9 +463,6 @@ export function absorbContextTarget(target: LangyContextTarget): void {
   // composer the reader may not even be looking at.
   useLangyContextTargetStore.getState().flashAbsorb(target.id);
   useLangyStore.getState().chooseChip(target.id);
-  // Doing the thing retires the hint that teaches it. Nobody needs to be told
-  // how to do what they have just done.
-  useLangyStore.getState().dismissContextHint();
 }
 
 /**

@@ -6,7 +6,7 @@ keywords: RAG, technical documentation, evaluation, LangWatch, embeddings, chunk
 
 This guide shows you how to evaluate a RAG (Retrieval-Augmented Generation) chatbot designed to answer technical questions from complex product manuals. In this example, the chatbot is for technicians servicing advanced milking machines.
 
-The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation, making it easy to integrate into a CI/CD workflow.
+The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation so it can run in a CI/CD workflow.
 
 ### **1. The Scenario**
 Our RAG chatbot must answer precise technical questions from operators and technicians. The quality of its answers is critical for safety and proper machine maintenance.
@@ -141,9 +141,9 @@ print("Evaluation complete! Check your results in the LangWatch dashboard.")
 ### **5. Analyzing the Results**
 Once the script finishes, you can go to the LangWatch dashboard to analyze the performance of your RAG pipeline. The dashboard allows you to:
 
-* **Compare Experiments**: Easily compare the performance of `model-a-rag-evaluation-v1` against `v2` to see if your changes had a positive impact on metrics like faithfulness and accuracy.
+* **Compare Experiments**: Compare the performance of `model-a-rag-evaluation-v1` against `v2` to see if your changes had a positive impact on metrics like faithfulness and accuracy.
 * **Drill into Failures**: Filter for all samples where `expected_answer_accuracy` failed. For each failure, you can inspect the question, the contexts that were retrieved, the generated answer, and the expected answer to quickly diagnose the root cause (e.g. a retrieval issue or a generation problem).
-* **Collaborate with Experts**: Share direct links to evaluation results with the domain experts who created the dataset, making it easy to close the feedback loop.
+* **Collaborate with Experts**: Share direct links to evaluation results with the domain experts who created the dataset, so they can close the feedback loop.
 
 ### **6. Conclusion**
 

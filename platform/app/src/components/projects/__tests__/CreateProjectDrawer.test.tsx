@@ -71,7 +71,7 @@ vi.mock("../../../hooks/usePlanManagementUrl", () => ({
 
 vi.mock("../../../utils/api", () => ({
   api: {
-    useContext: vi.fn(() => ({
+    useUtils: vi.fn(() => ({
       organization: { getAll: { invalidate: vi.fn() } },
       limits: { getUsage: { invalidate: vi.fn() } },
       team: { getTeamsWithMembers: { invalidate: vi.fn() } },

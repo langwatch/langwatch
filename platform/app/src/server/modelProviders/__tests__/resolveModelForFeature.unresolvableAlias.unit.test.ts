@@ -15,8 +15,12 @@
  * (the catalog changes independently of this behavior) and could pass or
  * fail for the wrong reason as models are added/retired.
  */
-import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type {
+  ModelDefaultScopeType,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 const UNRESOLVABLE_ALIAS = "openai/latest";
 

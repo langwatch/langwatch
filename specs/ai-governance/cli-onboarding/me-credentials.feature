@@ -40,7 +40,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   #
   # The cached key is a long-lived Project.apiKey, not a session-bound token,
   # so trusting it forever would let a stolen ~/.langwatch/config.json keep
-  # working after the device was revoked from /me/devices. The resolver trusts
+  # working after the device was revoked from the devices inventory. The resolver trusts
   # the cache only within a short window; past it, it re-confirms the session
   # is live before using the key, and drops the key when the session is gone.
   # ─────────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @revocation @integration
   Scenario: device-session revocation severs CLI access and wipes the cached key
     Given a device login whose cached key's validation is past the window
-    When the device is revoked from /me/devices (its Redis tokens are dropped)
+    When the device is revoked from the devices inventory (its Redis tokens are dropped)
     And the next data command resolves credentials
     Then the session-authenticated revalidation fails with 401
     And the command reports the not-logged-in error
@@ -147,6 +147,23 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And no personal team, project, or role binding is created in the former tenant
     And the presented access token is revoked from Redis
     And a follow-up call with the same token is 401
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's pre-disable token cannot mint or return a personal key
+    Given a device-session token issued while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI calls GET /api/auth/cli/personal-project with that token
+    Then the response is 403
+    And no personal team, project, or role binding is created
+    And the presented access token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's session cannot be renewed
+    Given a device session started while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI presents the refresh token to POST /api/auth/cli/refresh
+    Then the response is 401 and no new token pair is issued
+    And the presented refresh token is revoked
 
   @bdd @cli-onboarding @credentials @tenancy @integration
   Scenario: a deactivated user's token cannot mint or return a personal key

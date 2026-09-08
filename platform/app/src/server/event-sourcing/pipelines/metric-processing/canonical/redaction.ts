@@ -7,36 +7,75 @@ export type RedactionService = {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      /**
+       * The real OTLP attribute name behind each key of `attributes`, for the
+       * keys where the two differ. `attributes` is keyed by a JSON path so two
+       * attributes sharing a name still address separate values; the
+       * sensitive-NAME rules have to see the name instead.
+       */
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PiiRedactionLevel,
     tenantId?: string,
   ): Promise<void>;
 };
 
-type StringRef = { owner: UnknownRecord; key: string; syntheticKey: string };
+type StringRef = {
+  owner: UnknownRecord;
+  key: string;
+  syntheticKey: string;
+  /** The OTLP attribute this string belongs to, when it sits under one. */
+  attributeName?: string;
+};
 
+/** The attribute an OTLP KeyValue node names, when this node is one. */
+function otlpAttributeName(value: UnknownRecord): string | undefined {
+  return typeof value.key === "string" && "value" in value
+    ? value.key
+    : undefined;
+}
+
+/**
+ * `syntheticKey` addresses the leaf and is built from array indices, so it can
+ * never satisfy a sensitive-NAME rule: a point attribute list yields
+ * `point.0.value.stringValue`. The owning attribute's real name travels with it
+ * so those rules can run on this pipeline at all.
+ */
 function collectStringRefs({
   value,
   prefix,
   out,
+  attributeName,
 }: {
   value: unknown;
   prefix: string;
   out: StringRef[];
+  attributeName?: string;
 }): void {
   if (Array.isArray(value)) {
     value.forEach((item, index) =>
-      collectStringRefs({ value: item, prefix: `${prefix}.${index}`, out }),
+      collectStringRefs({
+        value: item,
+        prefix: `${prefix}.${index}`,
+        out,
+        attributeName,
+      }),
     );
     return;
   }
   if (!isRecord(value)) return;
+  const ownName = otlpAttributeName(value) ?? attributeName;
   for (const [key, child] of Object.entries(value)) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (key === "stringValue" && typeof child === "string") {
-      out.push({ owner: value, key, syntheticKey: path });
+      out.push({ owner: value, key, syntheticKey: path, attributeName });
     } else {
-      collectStringRefs({ value: child, prefix: path, out });
+      collectStringRefs({
+        value: child,
+        prefix: path,
+        out,
+        attributeName: ownName,
+      });
     }
   }
 }
@@ -75,8 +114,13 @@ export async function redactTypedAttributes(args: {
   const attributes = Object.fromEntries(
     refs.map((ref) => [ref.syntheticKey, ref.owner[ref.key] as string]),
   );
+  const attributeNames = Object.fromEntries(
+    refs
+      .filter((ref) => ref.attributeName !== undefined)
+      .map((ref) => [ref.syntheticKey, ref.attributeName as string]),
+  );
   await args.redactionService.redactMetricAttributes(
-    { attributes, resourceAttributes: {} },
+    { attributes, resourceAttributes: {}, attributeNames },
     args.piiRedactionLevel,
     args.tenantId,
   );

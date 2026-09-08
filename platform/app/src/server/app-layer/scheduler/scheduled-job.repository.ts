@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { toPgTimestampUtc } from "~/server/utils/pgTimestamp";
 import type {
   ScheduledJobRecord,
@@ -272,6 +272,151 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
       -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
     `;
   }
+
+  async listPausedForOps({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<{ rows: ScheduledJobRecord[]; total: number }> {
+    // Its own query rather than a filter over `listForOps`: that one orders
+    // `active DESC`, and in Postgres `true > false`, so the inactive rows sort
+    // to the very end — precisely what its LIMIT drops. A caller filtering
+    // that page finds nothing the moment the fleet outgrows the page.
+    const [rows, totals] = await Promise.all([
+      this.prisma.$queryRaw<ScheduledJobRecord[]>`
+        SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
+               "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
+               "active", "createdAt", "updatedAt"
+        FROM "ScheduledJob"
+        WHERE "active" = false
+        ORDER BY "nextRunAt" ASC
+        LIMIT ${limit}
+        -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+      `,
+      this.prisma.$queryRaw<Array<{ total: number }>>`
+        SELECT COUNT(*)::int AS "total"
+        FROM "ScheduledJob"
+        WHERE "active" = false
+        -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+      `,
+    ]);
+    return { rows, total: totals[0]?.total ?? 0 };
+  }
+
+  // ── Operator control (ADR-091) ────────────────────────────────────────
+
+  async findByIdForOps({
+    id,
+  }: {
+    id: string;
+  }): Promise<ScheduledJobRecord | null> {
+    const rows = await this.prisma.$queryRaw<ScheduledJobRecord[]>`
+      SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
+             "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
+             "active", "createdAt", "updatedAt"
+      FROM "ScheduledJob"
+      WHERE "id" = ${id}
+      LIMIT 1
+      -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
+    `;
+    return rows[0] ?? null;
+  }
+
+  async setActiveForOps({
+    id,
+    projectId,
+    active,
+  }: {
+    id: string;
+    projectId: string;
+    active: boolean;
+  }): Promise<boolean> {
+    // Unconditional on `nextRunAt` on purpose: pausing is about whether the
+    // due-scan may pick the row up in future, and it must work regardless of
+    // what the row is doing right now. An in-flight slot is left alone — the
+    // confirmation copy says so, because a pause that silently killed a live
+    // run would be a different and much larger promise.
+    //
+    // `updatedAt` is deliberately NOT bumped. While a slot is held it is the
+    // only evidence the scheduler has that the worker is still alive, and the
+    // stale-slot guard reads it as exactly that. Pausing is the first thing an
+    // operator does to a wedged schedule, so bumping it here would make the
+    // pause itself withdraw the repair for another full staleness window.
+    const affected = await this.prisma.$executeRaw`
+      UPDATE "ScheduledJob"
+      SET "active" = ${active}
+      WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
+      -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
+    `;
+    return affected === 1;
+  }
+
+  async releaseSlotForOps({
+    id,
+    projectId,
+    expectedNextRunAt,
+    now,
+  }: {
+    id: string;
+    projectId: string;
+    expectedNextRunAt: Date;
+    now: Date;
+  }): Promise<boolean> {
+    const affected = await this.prisma.$executeRaw`
+      UPDATE "ScheduledJob"
+      SET "currentSlot" = NULL,
+          "attempts" = 0,
+          "lastError" = NULL,
+          "nextRunAt" = ${toPgTimestampUtc(now)}::timestamp,
+          "updatedAt" = now()
+      WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
+        AND "nextRunAt" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
+      -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
+    `;
+    return affected === 1;
+  }
+
+  async requestImmediateRunForOps({
+    id,
+    projectId,
+    expectedNextRunAt,
+    now,
+  }: {
+    id: string;
+    projectId: string;
+    expectedNextRunAt: Date;
+    now: Date;
+  }): Promise<boolean> {
+    // Only `nextRunAt` moves. Everything that makes a fire correct — claiming
+    // the slot, running the handler, retrying, settling the calendar — stays
+    // with the loop, so a manual run is the same event as a scheduled one with
+    // a different reason for being due.
+    //
+    // `currentSlot IS NULL` is the guard that stops a DOUBLE DELIVERY, and it
+    // has to live here rather than only in the service. Once `claim()` leases a
+    // slot, `nextRunAt` holds the lease instant — a perfectly ordinary-looking
+    // future timestamp. An operator reading the row sees it, run-now's
+    // `nextRunAt = expected` guard matches, and the row becomes due again while
+    // its worker is still executing. `claim()` guards only on `nextRunAt` too,
+    // and its `COALESCE("currentSlot", …)` preserves the pinned slot rather
+    // than refusing, so a second worker takes the same slot and the target
+    // fires twice. That COALESCE is right for a retry wake or a crash-refire,
+    // where the first worker is gone; it is not a defence against this.
+    const affected = await this.prisma.$executeRaw`
+      UPDATE "ScheduledJob"
+      SET "nextRunAt" = ${toPgTimestampUtc(now)}::timestamp,
+          "updatedAt" = now()
+      WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
+        AND "active" = true
+        AND "currentSlot" IS NULL
+        AND "nextRunAt" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
+      -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
+    `;
+    return affected === 1;
+  }
 }
 
 /**
@@ -300,5 +445,23 @@ export class NullScheduledJobRepository implements ScheduledJobRepository {
   }
   async listForOps(): Promise<ScheduledJobRecord[]> {
     return [];
+  }
+  async listPausedForOps(): Promise<{
+    rows: ScheduledJobRecord[];
+    total: number;
+  }> {
+    return { rows: [], total: 0 };
+  }
+  async findByIdForOps(): Promise<ScheduledJobRecord | null> {
+    return null;
+  }
+  async setActiveForOps(): Promise<boolean> {
+    return false;
+  }
+  async releaseSlotForOps(): Promise<boolean> {
+    return false;
+  }
+  async requestImmediateRunForOps(): Promise<boolean> {
+    return false;
   }
 }

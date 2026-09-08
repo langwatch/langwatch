@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { promptLoadKey } from "../dataLoader";
 import { buildTargetMetadata } from "../orchestrator";
 
 /**
@@ -88,6 +90,52 @@ describe("buildTargetMetadata — the judge model recorded on a run", () => {
       });
 
       expect(meta.model).toBeNull();
+    });
+  });
+
+  describe("given two columns pinned to different versions of one prompt", () => {
+    /** @scenario "Two columns pinned to different versions of one prompt each run their own version" */
+    it("records each column's own version, not whichever loaded last", () => {
+      const loadedPrompts = new Map([
+        [
+          promptLoadKey({ promptId: "prompt-1", promptVersionNumber: 1 }),
+          {
+            name: "greeter",
+            model: "openai/gpt-5-mini",
+          } as unknown as VersionedPrompt,
+        ],
+        [
+          promptLoadKey({ promptId: "prompt-1", promptVersionNumber: 2 }),
+          {
+            name: "greeter",
+            model: "anthropic/claude-sonnet-5",
+          } as unknown as VersionedPrompt,
+        ],
+      ]);
+
+      const metadata = buildTargetMetadata({
+        targets: [
+          {
+            id: "t1",
+            type: "prompt",
+            promptId: "prompt-1",
+            promptVersionNumber: 1,
+          },
+          {
+            id: "t2",
+            type: "prompt",
+            promptId: "prompt-1",
+            promptVersionNumber: 2,
+          },
+        ] as any,
+        loadedPrompts,
+        loadedAgents: new Map(),
+      });
+
+      expect(metadata[0]?.model).toBe("openai/gpt-5-mini");
+      expect(metadata[0]?.prompt_version).toBe(1);
+      expect(metadata[1]?.model).toBe("anthropic/claude-sonnet-5");
+      expect(metadata[1]?.prompt_version).toBe(2);
     });
   });
 });

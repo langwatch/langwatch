@@ -102,32 +102,75 @@ function isStoredObjectRefUrl(url: string): boolean {
  */
 export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
+  const seen = new Set<string>();
   for (const { media, role } of collectAnnotatedMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
     const withRole = role ? { role } : {};
+    let ref: TraceMediaRef | null = null;
     if (media.type === "binary") {
       if (!media.url || !isStoredObjectRefUrl(media.url)) continue;
       const kind = kindFromMime(media.mimeType);
-      refs.push({
+      ref = {
         kind,
         url: media.url,
         ...(media.filename ? { filename: media.filename } : {}),
         ...(kind === "file" ? { mimeType: media.mimeType } : {}),
         ...withRole,
-      });
+      };
     } else if (
       media.source.type === "url" &&
       isStoredObjectRefUrl(media.source.value)
     ) {
-      refs.push({ kind: media.type, url: media.source.value, ...withRole });
+      ref = { kind: media.type, url: media.source.value, ...withRole };
     }
+    if (!ref || seen.has(ref.url)) continue;
+    seen.add(ref.url);
+    refs.push(ref);
   }
   return refs;
 }
 
-/** JSON for the reserved attribute, or null when there is nothing to store. */
-export function serializeMediaRefs(value: unknown): string | null {
-  const refs = collectMediaRefs(value);
+/**
+ * Fold two ref lists into one, keeping the first occurrence of each url and
+ * stopping at the cap.
+ *
+ * The url IS the identity: storage is content-addressed, so two refs with the
+ * same url are the same bytes reached by two paths through one payload: a
+ * message content part and a mirrored field, the same recording quoted by two
+ * spans of the trace. Rendering both draws the identical player twice. When one
+ * url does arrive under two different chat roles, the first role recorded wins,
+ * which puts an echoed recording on the side that actually sent it.
+ *
+ * `precedence` says where the incoming list goes: the span that wins the
+ * trace's headline input/output prepends, so its media stays the trace's
+ * thumbnail, and every other span appends behind it.
+ */
+export function mergeMediaRefs({
+  existing,
+  incoming,
+  precedence,
+}: {
+  existing: TraceMediaRef[];
+  incoming: TraceMediaRef[];
+  precedence: "prepend" | "append";
+}): TraceMediaRef[] {
+  const ordered =
+    precedence === "prepend"
+      ? [...incoming, ...existing]
+      : [...existing, ...incoming];
+  const merged: TraceMediaRef[] = [];
+  const seen = new Set<string>();
+  for (const ref of ordered) {
+    if (merged.length >= MAX_TRACE_MEDIA_REFS) break;
+    if (seen.has(ref.url)) continue;
+    seen.add(ref.url);
+    merged.push(ref);
+  }
+  return merged;
+}
+
+/** JSON for the reserved attribute, or null when the list is empty. */
+export function serializeMediaRefList(refs: TraceMediaRef[]): string | null {
   return refs.length > 0 ? JSON.stringify(refs) : null;
 }
 

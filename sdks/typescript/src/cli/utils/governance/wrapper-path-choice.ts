@@ -112,6 +112,58 @@ export function parseToolModeFlag(
   return { args: out, override };
 }
 
+export interface ParsedProjectScope {
+  /** Args with the scope flags removed, order otherwise preserved. */
+  args: string[];
+  /** Project id or slug from `--project <value>` / `--project=<value>`. */
+  project?: string;
+  /** True when `--personal` was passed (clear the project pin). */
+  personal?: boolean;
+}
+
+/**
+ * Strip the wrapper-only telemetry-scope flags from the forwarded args:
+ * `--project <id-or-slug>` pins the tool's telemetry to a team project
+ * (minting a project ingest key), `--personal` clears the pin. Same
+ * contract as `parseToolModeFlag`: only these flags are consumed, every
+ * other arg is forwarded untouched and in order.
+ */
+export function parseProjectScopeFlags(args: string[]): ParsedProjectScope {
+  const out: string[] = [];
+  let project: string | undefined;
+  let personal = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--project") {
+      const value = args[i + 1];
+      // A following option is a missing value, not the project name. Reading
+      // `--project --personal` as a project called "--personal" swallows the
+      // second flag, so the scope conflict never surfaces and the pin is
+      // attempted against a name no project can have.
+      if (value !== undefined && !value.startsWith("-")) {
+        project = value;
+        i++;
+      }
+      continue;
+    }
+    if (arg.startsWith("--project=")) {
+      project = arg.slice("--project=".length);
+      continue;
+    }
+    if (arg === "--personal") {
+      personal = true;
+      continue;
+    }
+    out.push(arg);
+  }
+  const normalizedProject = project?.trim();
+  return {
+    args: out,
+    project: normalizedProject === "" ? undefined : normalizedProject,
+    personal,
+  };
+}
+
 /**
  * Whether an explicit forced-auto-login signal is set. The path prompt
  * is skipped in that case (CI / agent contexts that opted into the
@@ -185,7 +237,7 @@ export function gatewayChoiceTitle(): string {
 }
 
 export function gatewayChoiceDescription(): string {
-  return "route calls through LangWatch with a virtual key, billed per token";
+  return "route calls through LangWatch with a virtual key";
 }
 
 /**

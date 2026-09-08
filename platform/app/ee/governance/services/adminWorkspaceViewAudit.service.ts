@@ -22,7 +22,7 @@ import { createLogger } from "@langwatch/observability";
  *       specs/ai-gateway/governance/ingestion-attribution.feature
  *         §"Admins read user-scoped traces ONLY via audit-logged drill-in"
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import {
   type GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,

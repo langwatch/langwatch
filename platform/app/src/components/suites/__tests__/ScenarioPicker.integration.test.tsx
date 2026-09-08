@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioPicker, type ScenarioPickerProps } from "../ScenarioPicker";
 
-vi.mock("../ui/checkbox", () => ({
+vi.mock("../../ui/checkbox", () => ({
   Checkbox: ({
     checked,
     onCheckedChange,

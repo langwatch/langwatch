@@ -18,7 +18,7 @@
  *   - opencode → the session context plugin file in the plugins directory
  *   - gemini / opencode → a scoped shell function under the tool's marker
  *                pair in the shell rc
- *   - the global gateway export block in the shell rc (init-shell / legacy)
+ *   - the global gateway export block in the shell rc (legacy installs)
  *
  * Shell rc files are scanned for ALL supported shells (zsh/bash/fish), not
  * just $SHELL, so a block written to ~/.zshrc is still found from a bash
@@ -40,6 +40,11 @@ import {
 	removeCodexNotifyBlock,
 	removeCodexOtelBlock,
 } from "../codex-config-toml";
+import {
+	defaultCodexAgentsMdPath,
+	hasCodexAgentGuidance,
+	removeCodexAgentGuidance,
+} from "./codex-agents-md";
 import {
 	appEnvHasAnyVar,
 	appEnvValues,
@@ -248,6 +253,16 @@ export function scanTelemetryTargets({
 		label: `codex langwatch profile file (${tildify(codexProfile)})`,
 		present: codexProfileFileIsLangwatchOwned(codexProfile),
 		remove: () => removeCodexGatewayProfileFile(codexProfile),
+	});
+
+	// codex, the declare-your-context guidance block in its global AGENTS.md.
+	// Its own target because the file is the user's: removal deletes exactly
+	// the marker-managed block and keeps their content byte for byte.
+	const codexAgentsMd = defaultCodexAgentsMdPath();
+	targets.push({
+		label: `codex agent guidance (${tildify(codexAgentsMd)})`,
+		present: hasCodexAgentGuidance(codexAgentsMd),
+		remove: () => removeCodexAgentGuidance(codexAgentsMd),
 	});
 
 	// codex, the session context hook entries in its own hooks file. Same

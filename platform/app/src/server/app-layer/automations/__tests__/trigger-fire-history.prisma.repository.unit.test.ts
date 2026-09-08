@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaTriggerFireHistoryRepository } from "../repositories/trigger-fire-history.prisma.repository";
 
 function makeRepo() {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { expandDeletedSpanIds } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
-import { overlayTouchesSpan } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
+import { changedSpanFields } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useTraceEditStore } from "../../../stores/traceEditStore";
@@ -14,10 +14,17 @@ const NO_MARKS = {
 /**
  * Which rows a stored correction changed, and which ones it removed.
  *
- * The removed set is only populated while the reader is on the captured trace:
- * on the corrected one those rows are already gone, and while the correction is
- * being written the editing marks already say what is going away, so there is
- * nothing left to mark.
+ * The removed set belongs to the corrected trace, which is where a reader goes
+ * to see what the correction did: those rows are kept on screen and struck
+ * through rather than dropped, because a row that simply vanished reads as one
+ * that was never captured. The captured trace is the trace as it arrived and
+ * carries no marks about removal at all. While the correction is being written
+ * the editing marks already say what is going away, so there is nothing left
+ * to mark.
+ *
+ * The changed set is the rows whose values the correction replaces, and only
+ * those: it promises a captured value the reader can go and compare, which a
+ * removal has none of.
  */
 export function useCorrectionMarks(spans: SpanTreeNode[]): {
   correctedSpanIds: Set<string>;
@@ -40,10 +47,10 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
     const correctedSpanIds = new Set(
       spans
         .map((span) => span.spanId)
-        .filter((spanId) => overlayTouchesSpan({ patch, spanId })),
+        .filter((spanId) => changedSpanFields({ patch, spanId }).length > 0),
     );
     const deletedByCorrectionSpanIds =
-      !isEditing && overlayView === "original"
+      !isEditing && overlayView === "edited"
         ? expandDeletedSpanIds({
             links: spans.map((span) => ({
               id: span.spanId,

@@ -111,7 +111,7 @@ vi.mock("~/components/ui/toaster", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getOptimizedAnnotationQueues: { invalidate: vi.fn() },
         getPendingItemsCount: { invalidate: vi.fn() },
@@ -132,10 +132,10 @@ vi.mock("~/utils/api", () => ({
     },
     annotation: {
       markQueueItemDone: {
-        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       deleteQueueItems: {
-        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
   },

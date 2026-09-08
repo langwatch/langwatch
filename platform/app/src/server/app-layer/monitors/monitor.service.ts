@@ -1,4 +1,4 @@
-import type { Monitor, PrismaClient } from "@prisma/client";
+import type { Monitor, PrismaClient } from "~/generated/prisma/client";
 import { PrismaMonitorRepository } from "./repositories/monitor.prisma.repository";
 import type {
   MonitorRepository,

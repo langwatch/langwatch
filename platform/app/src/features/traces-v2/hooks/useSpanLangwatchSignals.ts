@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
@@ -28,8 +29,8 @@ export function useSpanLangwatchSignals() {
   const query = api.tracesV2.spanLangwatchSignals.useQuery(queryArgs, {
     enabled: isReady && !shared,
     staleTime: 300_000,
-    cacheTime: 1_800_000,
-    keepPreviousData: true,
+    gcTime: 1_800_000,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
     refetchInterval: isLive && !sseConnected ? LIVE_REFETCH_MS : false,
   });

@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
@@ -51,15 +52,16 @@ export function useTraceHeaderCanonical() {
     {
       enabled: isReady && !shared,
       staleTime: 300_000,
-      cacheTime: 1_800_000,
-      keepPreviousData: true,
+      gcTime: 1_800_000,
+      placeholderData: keepPreviousData,
       refetchOnWindowFocus: true,
-      refetchInterval: (data) => {
+      refetchInterval: (query) => {
         if (isLive && !sseConnected) return LIVE_REFETCH_MS;
         // The trace knows it used a prompt but the rollup hasn't
         // populated the IDs yet — keep polling on a slower cadence so
         // the chips fill in without the user clicking around. Once an
         // ID is present we go quiet again.
+        const data = query.state.data;
         if (data?.containsPrompt && !data.lastUsedPromptId) {
           return PROMPTS_PENDING_REFETCH_MS;
         }
@@ -75,7 +77,7 @@ export function useTraceHeaderCanonical() {
   // (span tree, events, signals) and any header refetch prune partitions
   // instead of cold-scanning `stored_spans` on S3. No-op when a hint was
   // already present, so a correct opener-supplied value is never lost.
-  // Guard against `keepPreviousData`: on a trace switch the previous
+  // Guard against `placeholderData: keepPreviousData`: on a trace switch the previous
   // trace's header lingers in `query.data` until the new fetch lands, so
   // only trust the timestamp when it belongs to the trace we're asking
   // about — otherwise we'd backfill trace A's time onto trace B.

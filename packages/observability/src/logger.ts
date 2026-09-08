@@ -136,13 +136,62 @@ function getSharedTransport(): DestinationStream | null {
  * async request context. Browser loggers use Pino's browser mode and never load
  * the package's OpenTelemetry or Node-only context modules.
  */
+// One logger per (name, disableContext) pair, kept for the life of the process.
+//
+// `createLogger` has 400+ call sites, many of them per-instance class fields
+// and a few inline in catch blocks, so a fresh `pino()` per call was measured
+// at 2.3% of the app's wall time in production — nearly a quarter of that
+// inside `pino/lib/caller.js:getCallers`, which captures a stack trace on
+// every construction to work out who called it. None of that work varies
+// between calls that pass the same name.
+//
+// Sharing an instance is safe because nothing request-scoped is baked in at
+// construction. `name`, `service` and `service.version` are process-wide, and
+// the per-request fields — traceId, spanId, organizationId, projectId, userId
+// — arrive through the `mixin` in createNodeLogger, which pino invokes on
+// every log call and which reads the async-local context at that moment. Two
+// requests sharing a logger still get their own context on their own lines.
+// The transport above is shared for the same reason.
+//
+// The cache is bounded by the number of distinct logger names in the source.
+// The handful of call sites that build a name rather than writing a literal
+// derive it from module or route identity, never from tenant or request data;
+// a name derived per project would make this grow without limit.
+//
+// `disableContext` is part of the key because it is the one option that
+// changes the logger that gets constructed.
+const loggerCache = new Map<string, PinoLogger>();
+
+/**
+ * Drops the memoised loggers.
+ *
+ * Only tests need this. They mutate the environment a logger reads at
+ * construction — SERVICE_VERSION, OTEL_RESOURCE_ATTRIBUTES, the log levels —
+ * between cases, and a process-lifetime cache would otherwise pin every case
+ * to whichever one ran first. Production reads that environment once at boot
+ * and never changes it.
+ */
+export function resetLoggerCache(): void {
+  loggerCache.clear();
+}
+
 export function createLogger(
   name: string,
   options?: CreateLoggerOptions,
 ): PinoLogger {
-  return isNodeRuntime
+  // The prefix keeps a context-disabled logger from being handed out for a
+  // name that also has a context-enabled one, which would silently drop the
+  // request fields from every line written through it.
+  const key = options?.disableContext ? `-${name}` : `+${name}`;
+
+  const cached = loggerCache.get(key);
+  if (cached) return cached;
+
+  const logger = isNodeRuntime
     ? createNodeLogger(name, options)
     : createBrowserLogger(name);
+  loggerCache.set(key, logger);
+  return logger;
 }
 
 function createBrowserLogger(name: string): PinoLogger {
