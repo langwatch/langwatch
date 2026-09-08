@@ -29,7 +29,7 @@ Three parts, run as three lanes in this order, one at a time, since they share `
    ZodVoid | ZodUndefined`; widen it to a discriminated union whose members are objects, and publish `oneOf` with the
    discriminator.
 
-## Part B: doors and addressing (this lane)
+## Part B: doors and addressing (LANDED `3f7db75a6b`)
 
 Notes from Part A for item 8: `mountMethodGuards` registers `app.all(<address>)` per family, which is safe while every family
 owns `/api/<namespace>` but would answer 405 ahead of a sibling's route for a literal-path family sharing a prefix, so a
@@ -69,7 +69,7 @@ parallel mechanism.
     `packages/features/dataset/server/src/rules/dataset-generate-tools.rules.ts`. Item 2's raw response covers the body;
     what is missing is the session door (14).
 
-## Part C: tRPC (third lane)
+## Part C: tRPC (next lane, after the D-o split)
 
 13. An anonymous procedure kind (`register`), the browser session's row id on the Actor or as a fact
     (`otherSessionsToRevoke`), the caller's address as a fact (register throttle), and an AND-composed permission

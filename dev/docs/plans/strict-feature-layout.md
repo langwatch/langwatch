@@ -237,11 +237,22 @@ where the fold promised nine: **DECISION D-o.**
 
 | Round three A: `withRawBody`, `withRawResponse({ produces })`, `.methods([...])` with a HEAD twin, `.anyMethod()` + `declined()`, the 405 guard with `Allow`, discriminated-union outputs | `6789a94a1d` |
 
-`runtime.ts` is 3,105 lines after round three A; D-o is now blocking.
-Running: **round three, part B** (`api-rest-runtime-gaps-3.md`): item 8 (a
-literal-path family) gates the trace OTLP alias, experiment v3's alias and
-evaluation's legacy family, which have every other capability they need. Part C (tRPC: anonymous procedure, session row id, caller address,
-AND-composed permission) follows. `anyAuthenticated` exists twice
+| Round three B: `withAddressing("literal")`, `{ generation }`, `session` and `instanceAdminKey` doors, `optionalCredential`, `deferredScope`, `withMultipart`, two 2xx in `responds`, `withRateLimit`/`withCache` with mount-supplied stores, method guards recognised by `assertEveryRouteDeclared` | `3f7db75a6b` |
+
+`runtime.ts` is 3,733 lines after round three B. **D-o is overdue**: the cut is
+`declaration.ts` (builder and declaration-time asserts, ~1,600 lines, where every
+capability lands), `addressing.ts` (~600), `runtime.ts` (mount and execution,
+~1,200), the registry into `security.ts`, idempotency out of `request.ts`. Ten
+files. Recommendation: approve and run the split before Part C.
+
+QUEUED: **round three, part C** (tRPC: anonymous procedure, session row id,
+caller address, AND-composed permission) plus one REST decision, **D-q**: agent's
+`agent-connect.rest.ts` needs an access kind for a route that requires a
+credential the handler validates and answers with a protocol frame
+(`registerJsonProtocol`'s one caller); `optionalCredential` misstates it and
+`publicRoute` records the wrong class.
+
+`anyAuthenticated` exists twice
 until coding-agent and project convert: the old no-argument `AccessPolicy` from
 `@langwatch/api` and the new door from `@langwatch/api/access`.
 `packages/api/README.md` still documents the deleted builders.
@@ -297,7 +308,6 @@ guarding things outside the package, 29 failing, 17 policies untested).
 
 | Lane | Brief | Started |
 | --- | --- | --- |
-| REST runtime round three B | `api-rest-runtime-gaps-3.md` | 09-09 01:3x |
 | lint L5 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 02:0x |
 
 Live briefs kept as work orders: `wave4-process-wiring.md` (landed `9697edd1f5`; its Wave 5 section is the open work order),
@@ -333,6 +343,7 @@ Ordered by what they unblock.
 - **D-m. Role behaviour changes to confirm.** Custom-role create/update/assign answered 503 on every deployment (no plan gate was ever composed) and now work under the Enterprise gate; `removeExclusiveApiKeyRoles` deleted as uncalled (Kimi's api-key retirement may want it).
 - **D-n. `AuditLogApi` widening, OSS audit log, ClickHouse persistence, the feature-catalogue split, org-door and agent-server brief pastes** (the five from 09-08 morning, still open).
 - **D-o. `packages/api/src/rest` at ten files, not nine.** Round two's cut splits `runtime.ts` (2,520 lines) into declaration, runtime and addressing and moves the registry into `security.ts` and idempotency out of `request.ts`. Either the nine-file promise moves to ten, or `request.ts` and `response.ts` merge to pay for it. Round three grows the file further until this is decided.
+- **D-q. An access kind for a handler-validated credential** (agent-connect's protocol frames): `handlerAuthenticated({ reason })` recording the family's credential class, or fold into `deferredScope`.
 - **Lint D1 to D7** (section 7's review): parity tool Go or TS; `expires` enforced or shrink-only; the 26 web-package cycles; comment-block ratchet beside the oxlint rule; the 17 untested policies; where the oxlint baseline check lives; refuse `screens/*` spellings now or after the drive.
 
 ## 10. Open items carried from 2026-09-06
