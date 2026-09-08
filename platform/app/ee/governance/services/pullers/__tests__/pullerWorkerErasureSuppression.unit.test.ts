@@ -27,7 +27,8 @@ const {
   findUnique,
   projectFindFirst,
   suppressionFindMany,
-  personCreate,
+  personCreateMany,
+  personUpdateMany,
   insertEvent,
   handleOtlpTraceRequest,
   runOnce,
@@ -36,7 +37,8 @@ const {
   findUnique: vi.fn(),
   projectFindFirst: vi.fn(),
   suppressionFindMany: vi.fn(),
-  personCreate: vi.fn(),
+  personCreateMany: vi.fn(),
+  personUpdateMany: vi.fn(),
   insertEvent: vi.fn(),
   handleOtlpTraceRequest: vi.fn(),
   runOnce: vi.fn(),
@@ -53,7 +55,10 @@ vi.mock("~/server/db", () => ({
     erasedIdentifierSuppression: {
       findMany: (...a: unknown[]) => suppressionFindMany(...a),
     },
-    discoveredPerson: { create: (...a: unknown[]) => personCreate(...a) },
+    discoveredPerson: {
+      createMany: (...a: unknown[]) => personCreateMany(...a),
+      updateMany: (...a: unknown[]) => personUpdateMany(...a),
+    },
   },
 }));
 vi.mock("~/server/app-layer/app", () => ({
@@ -138,7 +143,8 @@ beforeEach(() => {
   vi.stubEnv(ERASURE_SECRET_ENV, SECRET);
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
   projectFindFirst.mockReset().mockResolvedValue({ id: "proj_dest" });
-  personCreate.mockReset().mockResolvedValue({ id: "person_1" });
+  personCreateMany.mockReset().mockResolvedValue({ count: 1 });
+  personUpdateMany.mockReset().mockResolvedValue({ count: 0 });
   insertEvent.mockReset().mockResolvedValue(undefined);
   handleOtlpTraceRequest.mockReset().mockResolvedValue({});
   runOnce.mockReset();
@@ -210,9 +216,9 @@ describe("given a pull carrying an event that names an erased person", () => {
 
       await runIngestionPull({ sourceId: "src_1", cursor: null });
 
-      expect(personCreate).toHaveBeenCalledTimes(1);
-      expect(JSON.stringify(personCreate.mock.calls)).toContain(STAYS);
-      expect(JSON.stringify(personCreate.mock.calls)).not.toContain(ERASED);
+      expect(personCreateMany).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(personCreateMany.mock.calls)).toContain(STAYS);
+      expect(JSON.stringify(personCreateMany.mock.calls)).not.toContain(ERASED);
     });
   });
 
@@ -243,7 +249,7 @@ describe("given a pull carrying an event that names an erased person", () => {
       // Suppression empties the batch before discovery and the department
       // sync run; the sync's own empty-batch early return means neither pass
       // touches a table this harness would have had to mock.
-      expect(personCreate).not.toHaveBeenCalled();
+      expect(personCreateMany).not.toHaveBeenCalled();
     });
   });
 });
@@ -252,7 +258,7 @@ describe("given a pull where person discovery itself breaks", () => {
   /** @scenario "Discovery failing does not cost the run its events" */
   it("still writes the audit row and exports the conversation", async () => {
     suppressionFindMany.mockResolvedValue([]);
-    personCreate.mockRejectedValue(new Error("relation does not exist"));
+    personCreateMany.mockRejectedValue(new Error("relation does not exist"));
     runOnce.mockResolvedValue({
       events: [genieEvent(STAYS, "msg-stays")],
       cursor: null,
