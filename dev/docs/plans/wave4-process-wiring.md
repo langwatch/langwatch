@@ -148,3 +148,23 @@ five feature webs plus tsconfig/vitest aliases (gateway, governance) — same la
   from that test. authz's `authzRoleBindingRest` mounts the same way once its declaration gains `.withCredential("organizationKey")`
   and its API-key-ceiling check is answered by the door port (`hasApiKeyPermission`).
 
+## user (repositories, twins and flat screens landed; transports and adapter open)
+
+- `apps/api/src/app/api-production.composition.ts`: `composePersonFeatures` becomes `async … Promise<void>` (line ~3202),
+  awaited at ~1055; `this.composedUser = await composeUserFeature({...})` (~3241); drop the dead `peers.users: session.users`.
+- `apps/api/src/app-trpc/app-trpc.context.ts:211`: `users: UserApp` → `UserApi` (`@langwatch/user-contract`), drop the
+  `UserApp` import.
+- `apps/api/src/features/organization/__tests__/person-features.composition.integration.test.ts:156`: await the compose.
+- `apps/worker/src/app/worker-user-app.composition.ts:132`: `.withFeature(userServer, { infrastructure: { credentialIssuer,
+  avatarStorage, passwords } })` (`database` gone; `passwords: UserPasswordHasherPort` new — lift `BcryptPasswordHasher` from
+  `apps/api/src/features/user/user.composition.ts` into a module both processes import).
+- oxlint baseline keys for `web/src/screens/personal-workspace/*.screen.tsx` re-key to `web/src/ui/sections/personal-workspace/`
+  (root session, after lint L2).
+
+tRPC runtime gaps user's `user.*` family needs (round-three runtime brief): an anonymous procedure access kind (`register`),
+the browser session's row id on the Actor or as a fact (`otherSessionsToRevoke`), the caller's address as a fact (register
+throttle). The session's email and name are NOT gaps for user: the app reads its own row by `actor.id`. Also open: Better
+Auth's directory is typed `UserService` and calls `tryFindByEmail`/`create`/`createPasskeyUser` (`api-auth.composition.ts:204`)
+— decide whether it becomes `UserApi` operations or an auth-owned port; `GdprUserDataEraseRepository` walks other features'
+tables (tasks catalogue) and is not a user repository.
+
