@@ -150,6 +150,7 @@ describe("the starting chart specification", () => {
         });
       });
 
+      /** @scenario "A chart saved without a specification draws from a starter over its result columns" */
       it("names only columns the result actually has", () => {
         for (const { columns } of COLUMN_SHAPES) {
           const spec = starterVegaLiteSpec({ columns, datasetName: DATASET });

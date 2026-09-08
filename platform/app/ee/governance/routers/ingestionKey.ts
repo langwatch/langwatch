@@ -46,16 +46,20 @@ export const ingestionKeyRouter = createTRPCRouter({
     }),
 
   /**
-   * Mint (rotating in place) an ingestion key for the caller's personal
-   * project + sourceType. Returns the plaintext token ONCE; subsequent
-   * reads only see the source list.
+   * Connect a source: mint an ingestion key for the caller's personal project
+   * + sourceType. Returns the plaintext token ONCE; subsequent reads only see
+   * the source list.
+   *
+   * Create-only. Connecting a source says nothing about the machines already
+   * exporting for it, so their keys stay live; `rotate` is the verb that
+   * kills them.
    */
   install: protectedProcedure
     .input(mintInput)
     .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       const service = IngestionKeyService.create(ctx.prisma);
-      return await service.ensureForPersonalProject({
+      return await service.createForPersonalProject({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         sourceType: input.sourceType,

@@ -4,9 +4,9 @@ description: Inspect IngestionSources, tail recent OCSF events, and read the org
 sidebarTitle: CLI debug
 ---
 
-<Info>**Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is shared between Gateway and Governance, `login` and `logout` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
+<Info>**Pairs with:** [AI Gateway → CLI Integrations](/coding-agents/overview). The `langwatch` CLI is shared between Gateway and Governance, `login` and `logout` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
 
-A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render, so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
+A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-governance/ingestion-sources/index) already render, so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
 
 ## When to use
 
@@ -15,7 +15,7 @@ A small set of read-only commands for SREs, governance admins, and on-call engin
 - **"Has anyone in this org started using governance yet?"**: `langwatch governance status` mirrors the OR-of-flags that drives the MainMenu Govern entry promotion in the web app.
 - **"I need machine output for a runbook step, SIEM script"**: every command accepts `--json` and is contract-stable against the equivalent tRPC procedure.
 
-These commands are **not** for end-user developers, they don't proxy completions, debit budgets, or mutate state. For coding-CLI integration, see [Coding CLI Integrations](/ai-gateway/cli/overview).
+These commands are **not** for end-user developers, they don't proxy completions, debit budgets, or mutate state. For coding-CLI integration, see [Coding CLI Integrations](/coding-agents/overview).
 
 ## Prerequisites
 
@@ -221,7 +221,7 @@ Error: HTTP 409, no_default_routing_policy
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
-The CLI does not fall back to a non-default policy; selection is explicit. See the [admin prerequisites callout in the AI Governance overview](/ai-governance/overview#admin-prerequisites) for the rest of the org-bootstrap checklist.
+The CLI does not fall back to a non-default policy; selection is explicit. See [Getting started as an admin](/ai-governance/getting-started-admin) for the rest of the org-bootstrap checklist.
 
 The 409 contract is asserted in `specs/ai-gateway/governance/personal-keys.feature` (sign-in scenarios).
 

@@ -43,8 +43,8 @@ export interface LangWatchQLSnapshot {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
-   * The window the surface supplies for the reserved `period_start` /
-   * `period_end` parameters. Part of the snapshot because it is part of the
+   * The window the surface supplies for the reserved `dashboard_context_period_start` /
+   * `dashboard_context_period_end` parameters. Part of the snapshot because it is part of the
    * request: a result produced for last week's period is not current for this
    * week's, and only a snapshot that carries it can say so.
    *
@@ -53,7 +53,7 @@ export interface LangWatchQLSnapshot {
    */
   readonly timeWindow?: LangWatchQLTimeWindowValues;
   /**
-   * The step the surface supplies for the reserved `period_granularity_seconds`
+   * The step the surface supplies for the reserved `dashboard_context_granularity_seconds`
    * parameter, when it offers one.
    *
    * Part of the snapshot for the same reason the window is: it is part of the

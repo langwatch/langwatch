@@ -126,7 +126,7 @@ genuinely don't trust.
 ## Tier 1: Gateway proxy (where the CLI lives)
 
 Tier 1 is everything documented under
-[Coding CLI Integrations](/ai-gateway/cli/overview). The CLI's job
+[Coding CLI Integrations](/coding-agents/overview). The CLI's job
 is to acquire a virtual key, then `exec` the underlying tool with
 the gateway's base URL injected:
 
@@ -157,7 +157,7 @@ Why Tier 1 wins:
   exceeded). Tier 3 only sees the call after it happened.
 - **One credential covers every tool the dev uses.** Same VK for
   Claude Code, Codex, Cursor, Gemini CLI, see the matrix on the
-  [CLI overview](/ai-gateway/cli/overview).
+  [CLI overview](/coding-agents/overview).
 
 The CLI itself is documented end-to-end at
 [Personal IDE keys](/ai-gateway/governance/personal-keys) and
@@ -249,7 +249,7 @@ Two important Tier 4 sub-cases:
   bearer token in the workspace settings, every Cowork install in
   the org streams to LangWatch. **No per-desktop config required.**
 - **In-house agents using the LangWatch SDKs**: the existing
-  `langwatch` SDK setup; nothing governance-specific needed.
+  `langwatch` SDK setup, with no governance-specific step on top.
 
 ## Tier 5: Sandboxed runtime (Open Managed Agents)
 
@@ -365,7 +365,7 @@ Governance sits behind a single fence on each surface:
 - For the routing-policy DSL that lets one VK serve multiple tools:
   [Routing policies](/ai-gateway/governance/routing-policies).
 - For per-tool CLI config (env vars, dialect notes):
-  [Coding CLI Integrations](/ai-gateway/cli/overview).
+  [Coding CLI Integrations](/coding-agents/overview).
 - For the read-only CLI checks on ingestion sources
   (`langwatch governance status`, `langwatch ingest list | health |
   tail`): [CLI ingest debug](/ai-governance/cli-debug).

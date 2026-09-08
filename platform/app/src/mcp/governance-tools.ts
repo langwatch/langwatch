@@ -328,7 +328,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_ingestion_keys_mint",
-    "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
+    "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working; the only exception is the per-source cap, which retires the least recently used key once the workspace holds 32 of them. source_type must be a tool the LangWatch CLI wraps, or match a published ingestion template named by template_id. Requires OAuth-authenticated session + organization:view.",
     {
       source_type: z.string(),
       template_id: z.string().optional(),
@@ -337,7 +337,10 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "organization:view");
       if (denied) return text(denied);
-      const result = await ingestionKeyService.ensureForPersonalProject({
+      // Create-only: an agent asking for a key for the machine it runs on
+      // must not revoke the key every other machine under this login is
+      // exporting with. The explicit rotate lives on the /me tile.
+      const result = await ingestionKeyService.createForPersonalProject({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         sourceType: source_type,

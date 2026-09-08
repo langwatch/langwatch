@@ -14,7 +14,11 @@
  * session broke, so every failure is a null and a debug line.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
-import { describeIngestionKey, extractLookupIdFromToken } from "./cli-api";
+import {
+  describeIngestionKey,
+  extractLookupIdFromToken,
+  isExpiredSession,
+} from "./cli-api";
 import {
   type GovernanceConfig,
   isLoggedIn,
@@ -39,17 +43,27 @@ export interface HealedTarget {
  * the platform. A `failed` heal may already have spent a mint, so it is the
  * one that must not be retried in a loop. A `withheld` heal found that a
  * person revoked the key on purpose: the device must not replace it, and the
- * person must be told to set the device up again. Throttling a decline would
- * spend a repair window on a rejection that never cost anything, and delay
- * the real repair.
+ * person must be told to set the device up again. An `expired` heal found
+ * that the device itself is signed out, which no mint can repair either.
+ * Throttling a decline would spend a repair window on a rejection that never
+ * cost anything, and delay the real repair.
  */
 export type HealOutcome =
   | { status: "declined" }
   | { status: "failed" }
   | { status: "withheld" }
+  | { status: "expired" }
   | { status: "healed"; target: HealedTarget };
 
 const DECLINED: HealOutcome = { status: "declined" };
+
+/**
+ * Stands in for a key status the platform never gave, because it refused the
+ * device's session instead of answering. Distinct from the `null` any other
+ * describe failure produces, so the heal can end on the repair the person can
+ * actually make rather than on a silent failure.
+ */
+const EXPIRED_SESSION = Symbol("expired-session");
 
 /** The seams the healer composes, injectable so a test needs no real config. */
 export interface HealDeps {
@@ -161,6 +175,11 @@ export async function healRevokedIngestKey({
  * one revocation the device must not mint past is a person's, so a status
  * call that times out or errors ends the heal rather than falling through to
  * the mint; the next session asks again once the window is up.
+ *
+ * A platform that refused the session is the same wall for a different
+ * reason: the mint after this check would be refused too, so the heal ends
+ * on `expired`, which is the one outcome that names a repair the person can
+ * make.
  */
 async function revocationBlocksHeal({
   cfg,
@@ -176,8 +195,11 @@ async function revocationBlocksHeal({
 
   const described = await deps
     .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
-    .catch(() => null);
+    .catch((error: unknown) =>
+      isExpiredSession(error) ? EXPIRED_SESSION : null,
+    );
   if (!described) return { status: "failed" };
+  if (described === EXPIRED_SESSION) return { status: "expired" };
   if (
     described.status === "revoked" &&
     !PLATFORM_REVOCATION_CAUSES.has(described.revocationCause)

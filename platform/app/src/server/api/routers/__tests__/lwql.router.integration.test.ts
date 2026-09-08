@@ -3,32 +3,28 @@
  *
  * Router-level tests for the LangWatchQL feature switch: one flag, checked
  * server-side, that darkens the whole surface. `availability` answers false —
- * which is what hides the navigation and the page — and `schema`/`query`
- * refuse outright with the named code, so a caller who skips the availability
- * question gets the same answer.
+ * which is what a caller gates on — and `query` refuses outright with the
+ * named code, so a caller who skips the availability question gets the same
+ * answer.
  *
  * Spec: specs/analytics/lwql-workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  mockFeatureFlagIsEnabled,
-  mockDescribeSchema,
-  mockExecute,
-  deployment,
-} = vi.hoisted(() => ({
-  mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
-  mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
-  mockExecute: vi.fn().mockResolvedValue({
-    columns: [],
-    rows: [],
-    statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-    truncated: false,
-    diagnostics: [],
+const { mockFeatureFlagIsEnabled, mockExecute, deployment } = vi.hoisted(
+  () => ({
+    mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
+    mockExecute: vi.fn().mockResolvedValue({
+      columns: [],
+      rows: [],
+      statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+      truncated: false,
+      diagnostics: [],
+    }),
+    /** Whether this deployment has a LangWatchQL identity to run queries as. */
+    deployment: { provisioned: true },
   }),
-  /** Whether this deployment has a LangWatchQL identity to run queries as. */
-  deployment: { provisioned: true },
-}));
+);
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
@@ -49,7 +45,6 @@ vi.mock("~/server/analytics/lwql", async (importOriginal) => {
     ...actual,
     getLangWatchQLService: () => ({
       available: deployment.provisioned,
-      describeSchema: mockDescribeSchema,
       execute: mockExecute,
     }),
   };
@@ -133,13 +128,10 @@ describe("the LangWatchQL router's feature switch", () => {
       mockFeatureFlagIsEnabled.mockResolvedValue(true);
     });
 
-    it("answers available and serves the schema and the query", async () => {
+    it("answers available and serves the query", async () => {
       await expect(
         caller.availability({ projectId: "proj_test_123" }),
       ).resolves.toEqual({ available: true });
-
-      await caller.schema({ projectId: "proj_test_123" });
-      expect(mockDescribeSchema).toHaveBeenCalled();
 
       await runQuery(caller, { projectId: "proj_test_123", sql: "SELECT 1" });
       expect(mockExecute).toHaveBeenCalled();
@@ -151,25 +143,14 @@ describe("the LangWatchQL router's feature switch", () => {
       mockFeatureFlagIsEnabled.mockResolvedValue(false);
     });
 
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    /** @scenario "Every chart surface stays dark until the experimental feature switch is on" */
     it("answers unavailable, naming the switch as the gate that closed", async () => {
       await expect(
         caller.availability({ projectId: "proj_test_123" }),
       ).resolves.toEqual({ available: false, reason: "disabled" });
     });
 
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
-    it("refuses the schema with the named code and describes nothing", async () => {
-      await expect(
-        caller.schema({ projectId: "proj_test_123" }),
-      ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        cause: { code: "lwql_not_enabled" },
-      });
-      expect(mockDescribeSchema).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    /** @scenario "Every chart surface stays dark until the experimental feature switch is on" */
     it("refuses the query with the named code and runs nothing", async () => {
       await expect(
         runQuery(caller, { projectId: "proj_test_123", sql: "SELECT 1" }),
@@ -200,8 +181,8 @@ describe("the LangWatchQL router's feature switch", () => {
       );
     });
 
-    /** @scenario "An organization-scoped rule can switch the workbench on" */
-    it("switches the workbench on for that organization's project and no other", async () => {
+    /** @scenario "An organization-scoped rule can switch the chart surfaces on" */
+    it("switches the surfaces on for that organization's project and no other", async () => {
       await expect(
         caller.availability({ projectId: "proj_test_123" }),
       ).resolves.toEqual({ available: true });
@@ -223,7 +204,7 @@ describe("the LangWatchQL router's feature switch", () => {
       deployment.provisioned = false;
     });
 
-    /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
+    /** @scenario "The chart surfaces are unreachable while LangWatchQL is not provisioned" */
     it("answers unavailable, naming provisioning rather than the switch", async () => {
       await expect(
         caller.availability({ projectId: "proj_test_123" }),
