@@ -345,16 +345,25 @@ regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
 # still reported, identically to the same string in a file this block does not
 # cover.
 #
-# Anchored at the END only, and the asymmetry is deliberate. gitleaks matches
-# this pattern against an ABSOLUTE path, so a leading `^` matches nothing and
-# would silently disable the block rather than fail loudly — verified by scanning
-# with `^...$` and watching the intended file start reporting again. Without the
-# trailing `$` the pattern is a substring match, which also swallows
-# `toolCards.tsx`, `toolCards.ts.bak` and `toolCards.ts.orig`; with it, those
-# three are scanned again and only the named file is exempt.
+# Anchored at BOTH ends, because an unanchored pattern here is a substring match
+# and exempts more than it names. Without `$` it also swallows `toolCards.tsx`,
+# `toolCards.ts.bak` and `toolCards.ts.orig`; without `^` it also swallows any
+# prefixed path, so a vendored or submoduled copy at
+# `vendor/platform/app/.../toolCards.ts` is silently exempt too. Both were
+# confirmed by scanning a repo containing those files, not by reading the docs.
+#
+# gitleaks reports a path relative to the scan root it was given. CI passes `.`
+# from the repository root (`gitleaks git ... .`, see
+# .github/scripts/secrets-scan.sh), so the path this pattern is matched against
+# is repository-relative and `^` anchors it correctly. Passing an ABSOLUTE
+# directory instead — `gitleaks dir /abs/path`, which no CI job does — makes the
+# reported path absolute and the `^` stop matching. That direction is safe: the
+# block simply does not apply, the file is scanned, and the result is a false
+# positive rather than a hidden secret. The missing-`^` failure runs the other
+# way, which is why it is anchored.
 [[allowlists]]
 description = "Governance tool-card row identifiers are UI keys, not credentials"
 targetRules = ["generic-api-key"]
 paths = [
-  '''platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''',
+  '''^platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''',
 ]
