@@ -92,16 +92,23 @@ type FirstTraceWatchState = "hidden" | "waiting" | "redirecting";
  * "waiting" is the confirmed never-synced poll, "redirecting" the brief
  * announcement before navigation; "hidden" covers every case that keeps the
  * current close-this-tab behavior.
+ *
+ * The personal project is resolved within the organization now selected: the
+ * approval this page follows was granted against one organization and the
+ * CLI's personal workspace was ensured in that same one, so the watcher must
+ * not poll whichever personal project the payload happens to list first.
  */
 function useFirstTraceWatch(): FirstTraceWatchState {
   const router = useRouter();
   const { data: session } = useSession();
-  const { organizations } = useOrganizationTeamProject({
+  const { organizations, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
+  const userId = session?.user?.id;
+  const organizationId = organization?.id;
   const personalProject = useMemo(
-    () => findPersonalProject({ organizations, userId: session?.user?.id }),
-    [organizations, session?.user?.id],
+    () => findPersonalProject({ organizations, userId, organizationId }),
+    [organizations, userId, organizationId],
   );
 
   const [hasResult, setHasResult] = useState(false);
