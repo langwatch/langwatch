@@ -2437,9 +2437,19 @@ secured
  * what retires it later: logout, the devices tab, a re-login from this
  * device, or the session running out.
  *
- * A session that minted no login key (an approval from before key
- * selection) has nothing to parent to and is refused as signed out, the
- * same answer a revoked login key gets: the repair is `langwatch login`.
+ * A session whose record names no login key mints an unparented key: the row
+ * this route wrote before login keys existed, in the "Other keys" group, with
+ * no cascade behind it. Those are sessions approved before 2026-08-22, when
+ * `cli_api_key_id` began to be written; the refresh window is 90 days, so
+ * some are still alive and still minting. Refusing them would tell a person
+ * whose CLI works to sign in again for a reason they cannot see. The window
+ * closes as those sessions age out, so this branch is temporary by
+ * construction: every session opened since carries a login key and is
+ * parented.
+ *
+ * A session that names a login key which is revoked is still refused as
+ * signed out. That one is a real sign-out, and the repair is `langwatch
+ * login`.
  */
 async function mintPersonalIngestionKey(
   c: Context,
@@ -2453,15 +2463,13 @@ async function mintPersonalIngestionKey(
     sourceType: string;
   },
 ): Promise<Response> {
-  if (!tokenRecord.cli_api_key_id) {
-    return signedOut(c);
-  }
   try {
     const result = await service.mint({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       sourceType,
-      parentApiKeyId: tokenRecord.cli_api_key_id,
+      fromCliSession: true,
+      parentApiKeyId: tokenRecord.cli_api_key_id ?? null,
       // The same label the session's login key carries, so the devices tab
       // can put the key beside its session.
       createdByDeviceLabel: deviceLabelForSession(tokenRecord.client_info),
@@ -2592,7 +2600,9 @@ secured
 // `langwatch instrument` again.
 //
 // Response: { lookup_id, status: "live" | "revoked" | "unknown",
-//             source_type?, revocation_cause?: "user" | "rotation" | "cap" | null }
+//             source_type?,
+//             revocation_cause?: "user" | "rotation" | "session" | "expired"
+//                                | "offboarded" | "cap" | null }
 //
 // `unknown` is a 200, not a 404, so a CLI can tell "no such key of yours"
 // from "a server too old to have this route".

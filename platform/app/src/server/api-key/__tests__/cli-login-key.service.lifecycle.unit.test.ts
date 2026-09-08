@@ -172,7 +172,7 @@ describe("CliLoginKeyService.revokeSessionKey", () => {
 describe("CliLoginKeyService.revokeLoginKeysForDevice", () => {
   describe("given a device that signs in again under the same label", () => {
     /** @scenario "A re-login names rotation as the cause of the login key it replaces" */
-    it("revokes the previous login key as a rotation and its children as session", async () => {
+    it("revokes the previous login key as a rotation and its children as rotation too", async () => {
       const revoke = vi.fn().mockResolvedValue({});
       const revokeForSession = vi.fn().mockResolvedValue({ revokedCount: 1 });
       const findMany = vi.fn().mockResolvedValue([{ id: "ak_previous" }]);
@@ -203,10 +203,12 @@ describe("CliLoginKeyService.revokeLoginKeysForDevice", () => {
       expect(revoke).toHaveBeenCalledWith(
         expect.objectContaining({ id: "ak_previous", cause: "rotation" }),
       );
+      // The new session is live, so the children have to say re-mintable.
+      // "session" would read to an older CLI as a person's decision.
       expect(revokeForSession).toHaveBeenCalledWith(
         expect.objectContaining({
           parentApiKeyId: "ak_previous",
-          cause: "session",
+          cause: "rotation",
         }),
       );
     });

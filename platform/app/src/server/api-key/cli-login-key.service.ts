@@ -42,9 +42,15 @@ export interface CliKeyScopeSummary {
 }
 
 /**
- * Why a login key dies. The ingest keys under it die with it: a session that
- * ran out passes `expired` on to them and one whose person was offboarded
- * passes `offboarded`, every other cause reaches them as `session`.
+ * Why a login key dies. The ingest keys under it die with it, carrying the
+ * same cause, except a person's revoke (`user`), which reaches them as
+ * `session`: the person retired the login, and the keys went with it.
+ *
+ * `rotation` passing through matters. A re-login from the same device leaves
+ * a live session behind it, so a CLI that reads `rotation` on its dead key
+ * re-mints under the new session and repairs itself. Reading `session` there
+ * would make an older CLI treat a repairable key as a person's decision and
+ * go quiet.
  */
 export type CliLoginKeyRevocationCause = Extract<
   ApiKeyRevocationCause,
@@ -68,7 +74,7 @@ export interface SessionIngestKeyRevoker {
     parentApiKeyId: string;
     userId: string;
     organizationId: string;
-    cause: "session" | "expired" | "offboarded";
+    cause: "session" | "rotation" | "expired" | "offboarded";
   }): Promise<{ revokedCount: number }>;
 }
 
@@ -556,8 +562,9 @@ export class CliLoginKeyService {
           parentApiKeyId: apiKeyId,
           userId,
           organizationId,
-          cause:
-            cause === "expired" || cause === "offboarded" ? cause : "session",
+          // Only a person's revoke changes name on the way down: the
+          // children did not make that decision, the session did.
+          cause: cause === "user" ? "session" : cause,
         }));
     } catch (err) {
       logger.warn(

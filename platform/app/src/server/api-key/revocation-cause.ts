@@ -4,9 +4,11 @@
  * - `user`: a person revoked it, from the API-keys page, the REST API or the
  *   devices tab.
  * - `rotation`: a mint replaced it: a re-login from the same device replacing
- *   the previous CLI login key, or a rotate from the personal tile.
- * - `session`: the CLI login key it was parented to was revoked, so the key
- *   went with its session.
+ *   the previous CLI login key, or a rotate from the personal tile. The
+ *   ingest keys under a re-logged-in session carry it too, because the
+ *   session that replaced theirs is live and a device may re-mint under it.
+ * - `session`: a person revoked the CLI login key it was parented to (a
+ *   logout, or the devices tab), so the key went with its session.
  * - `expired`: its session ran out, at a refused refresh or in the hourly
  *   sweep over elapsed login keys.
  * - `offboarded`: the person's membership of the organization ended, so the

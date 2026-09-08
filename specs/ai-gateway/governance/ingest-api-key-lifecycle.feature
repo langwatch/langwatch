@@ -161,6 +161,17 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And no ingestion key is created
     # The CLI reads a 401 here as "sign in again", which is the repair.
 
+  @integration @ingest-api-key @issue @personal @session @compatibility
+  Scenario: A session from before login keys existed still mints
+    Given jane holds a device session whose record names no login key
+    When the CLI mints a personal key for "opencode"
+    Then the key is created with no parent
+    And retiring that session's login key leaves it live
+    # Sessions approved before the login key was written are still inside the
+    # 90-day refresh window. Refusing them would tell a person whose CLI works
+    # to sign in again for a reason they cannot see, so they mint the
+    # unparented key they always did. The window closes as they age out.
+
   @unit @ingest-api-key @issue @personal @session
   Scenario: A key minted as its session is being retired does not outlive it
     Given a login key that is live when the mint checks it
@@ -177,10 +188,9 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # Four things retire a login key: `langwatch logout`, the revoke on the
   # devices tab, a re-login from the same device, and the session running out
   # (the refresh window, or the organization's max session duration). The login
-  # key carries the cause of its own death; the ingest keys under it carry
-  # "session", except when the session ran out ("expired") or its person was
-  # offboarded ("offboarded"), which they inherit. Keys under another session
-  # are never touched.
+  # key carries the cause of its own death, and the ingest keys under it carry
+  # the same one, except a person's revoke ("user"), which reaches them as
+  # "session". Keys under another session are never touched.
 
   @integration @ingest-api-key @session @logout
   Scenario: Logging out retires the session's ingest keys and leaves another session's live
@@ -208,7 +218,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   Scenario: A re-login from the same device retires the keys of the session it replaces
     Given a device that signs in again under the same label
     When the previous login key is replaced
-    Then the ingest keys parented to it are revoked with cause "session"
+    Then the ingest keys parented to it are revoked with cause "rotation"
     And the new session starts with none
 
   @integration @ingest-api-key @session @expiry
@@ -339,13 +349,12 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # Revocation records its cause
   # ---------------------------------------------------------------------------
   # A device whose key died asks the platform why before it re-mints. The
-  # platform's own revocations name themselves: "session" when the login key
-  # the ingest key was parented to was revoked, "expired" when that session
+  # platform's own revocations name themselves: "session" when a person retired
+  # the login key the ingest key was parented to, "expired" when that session
   # ran out, "offboarded" when the person's membership ended, "rotation" when a
-  # rotate from the personal tile replaced it. Everything a person does through
-  # the API-keys page or the REST API is recorded as that person's decision,
-  # and the CLI leaves such a key dead until the person sets the device up
-  # again.
+  # re-login or a tile rotate replaced it. Everything a person does through the
+  # API-keys page or the REST API is recorded as that person's decision, and
+  # the CLI leaves such a key dead until the person sets the device up again.
 
   @unit @ingest-api-key
   Scenario: A revoke from the API keys page records a person as its cause
@@ -358,7 +367,10 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Given a device that signs in again under the same label
     When the previous login key is revoked
     Then its revocation cause is "rotation"
-    And the ingest keys under it name "session"
+    And the ingest keys under it name "rotation" too
+    # A re-login leaves a live session behind it, so the cause has to say the
+    # keys may be re-minted. "session" would read as a person's decision to an
+    # older CLI and leave the device quiet.
 
   @integration @ingest-api-key @issue @personal
   Scenario: The CLI can ask what became of its own key

@@ -173,15 +173,21 @@ export class IngestionKeyService {
   /**
    * Mints a key into the caller's personal workspace.
    *
-   * With `parentApiKeyId`, this is the CLI session mint (`langwatch
+   * With `fromCliSession`, this is the CLI session mint (`langwatch
    * instrument <tool>`, `langwatch <tool>`): the source type must be a tool
-   * the CLI wraps, and the login key must still be live, or the device is
-   * signed out and answers so. Without a parent, this is the tile or the MCP
-   * mint: the source type must be one a published template names, and a tool
-   * the CLI wraps is refused, because a key for it belongs to the machine
-   * that runs it.
+   * the CLI wraps, and the login key named by `parentApiKeyId` must still be
+   * live, or the device is signed out and answers so. Otherwise this is the
+   * tile or the MCP mint: the source type must be one a published template
+   * names, and a tool the CLI wraps is refused, because a key for it belongs
+   * to the machine that runs it.
    *
-   * Create-only in both shapes: the keys other machines hold stay live.
+   * A CLI session may name no parent at all. Those are the sessions opened
+   * before the login key existed; they mint the unparented key they always
+   * did rather than being told to sign in again. See
+   * `mintPersonalIngestionKey` in `auth-cli.ts` for the window that produces
+   * them.
+   *
+   * Create-only in every shape: the keys other machines hold stay live.
    */
   async mint({
     userId,
@@ -190,6 +196,7 @@ export class IngestionKeyService {
     ingestionTemplateId = null,
     parentApiKeyId = null,
     createdByDeviceLabel = null,
+    fromCliSession = parentApiKeyId !== null,
   }: {
     userId: string;
     organizationId: string;
@@ -197,12 +204,23 @@ export class IngestionKeyService {
     ingestionTemplateId?: string | null;
     parentApiKeyId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Whether a CLI device session is asking. Defaults to "yes if it named a
+     * login key", which is every caller but the one legacy window.
+     */
+    fromCliSession?: boolean;
   }): Promise<IssuedIngestionKey> {
-    if (parentApiKeyId) {
+    if (fromCliSession) {
       if (!isWrappedTool(sourceType)) {
         throw new IngestionKeySourceNotAllowedError(sourceType);
       }
-      await this.assertSessionLive({ parentApiKeyId, userId, organizationId });
+      if (parentApiKeyId) {
+        await this.assertSessionLive({
+          parentApiKeyId,
+          userId,
+          organizationId,
+        });
+      }
     } else {
       await this.assertMintableWithoutSession({
         organizationId,
@@ -344,7 +362,12 @@ export class IngestionKeyService {
     parentApiKeyId: string;
     userId: string;
     organizationId: string;
-    cause: "session" | "expired" | "offboarded";
+    /**
+     * What the children record. The CLI reads this off a dead key to decide
+     * whether it may re-mint, so `rotation` (a re-login, whose new session is
+     * live) has to reach them as `rotation` rather than as `session`.
+     */
+    cause: "session" | "rotation" | "expired" | "offboarded";
   }): Promise<{ revokedCount: number }> {
     const children = (
       await this.apiKeyRepo.findIngestKeysForUser({ organizationId, userId })

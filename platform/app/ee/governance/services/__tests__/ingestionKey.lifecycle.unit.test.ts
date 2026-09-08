@@ -224,6 +224,41 @@ describe("IngestionKeyService", () => {
       });
     });
 
+    describe("given a CLI session that names no login key", () => {
+      /** @scenario "A session from before login keys existed still mints" */
+      it("mints the wrapped tool unparented instead of refusing it", async () => {
+        const issued = await service.mint({
+          userId: USER,
+          organizationId: ORG,
+          sourceType: "claude_code",
+          fromCliSession: true,
+          parentApiKeyId: null,
+        });
+
+        expect(issued.apiKeyId).toBe("ak_new");
+        expect(apiKeys.create).toHaveBeenCalledWith(
+          expect.objectContaining({ parentApiKeyId: null }),
+        );
+        // Nothing to check the session against, and nothing to retire it with.
+        expect(apiKeyRepo.findByIdInOrg).not.toHaveBeenCalled();
+        expect(apiKeys.revoke).not.toHaveBeenCalled();
+      });
+
+      it("still refuses a source type no wrapped tool stamps", async () => {
+        await expect(
+          service.mint({
+            userId: USER,
+            organizationId: ORG,
+            sourceType: "made_up",
+            fromCliSession: true,
+            parentApiKeyId: null,
+          }),
+        ).rejects.toBeInstanceOf(IngestionKeySourceNotAllowedError);
+
+        expect(apiKeys.create).not.toHaveBeenCalled();
+      });
+    });
+
     describe("given a mint with no session behind it", () => {
       /** @scenario "A mint outside a CLI session accepts only a template-named source" */
       it("mints a source a published template names, with no parent", async () => {

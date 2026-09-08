@@ -305,6 +305,51 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
     });
   });
 
+  describe("given a session opened before login keys were written", () => {
+    /** @scenario "A session from before login keys existed still mints" */
+    it("mints an unparented key rather than telling a working device to sign in again", async () => {
+      const legacy = await signIn({ hostname: "vintage" });
+      // The shape those records have: no `cli_api_key_id`, because the
+      // /exchange that wrote them predates the field.
+      const raw = await redisConnection!.get(`lwcli:access:${legacy.token}`);
+      const record = JSON.parse(raw!) as Record<string, unknown>;
+      delete record.cli_api_key_id;
+      await redisConnection!.set(
+        `lwcli:access:${legacy.token}`,
+        JSON.stringify(record),
+        "EX",
+        60 * 60,
+      );
+
+      const minted = await mintPersonal(legacy, "opencode");
+
+      expect(minted.status).toBe(201);
+      expect(minted.token).toEqual(expect.stringMatching(/^ik-lw-/));
+
+      // The row main writes today: no parent, so no cascade reaches it and
+      // the devices tab files it under "Other keys".
+      const key = await keyOf(minted.token);
+      expect(key.parentApiKeyId).toBeNull();
+      expect(key.revokedAt).toBeNull();
+
+      // And it stays live when that session's login key is retired, because
+      // nothing joins the two.
+      await CliLoginKeyService.create(prisma).revokeSessionKey({
+        apiKeyId: legacy.loginKeyId,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        cause: "user",
+      });
+      const after = await prisma.apiKey.findUniqueOrThrow({
+        where: { id: key.id },
+        select: { revokedAt: true },
+      });
+      expect(after.revokedAt).toBeNull();
+
+      await redisConnection!.del(`lwcli:access:${legacy.token}`);
+    });
+  });
+
   describe("given a live key alongside keys revoked by a person and by a session cascade", () => {
     describe("when the CLI asks what became of a lookup id", () => {
       /** @scenario "The CLI can ask what became of its own key" */
