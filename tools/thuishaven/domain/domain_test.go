@@ -370,12 +370,7 @@ func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
 	st := Stack{
 		Slug: "portless", APIPort: 1, RedisDB: 3, WorkerMetricsPort: 2,
 		LocalAPIKey: DefaultLocalAPIKey,
-		Services: []Service{
-			{Name: "app", Port: 40000, URL: "https://app.portless.langwatch.localhost"},
-			{Name: "gateway", Port: 40001, URL: "https://gateway.portless.langwatch.localhost"},
-			{Name: "nlp", Port: 40002, URL: "https://nlp.portless.langwatch.localhost"},
-			{Name: "langyagent", Port: 40003},
-		},
+		Services:    []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}, {Name: "langyagent"}},
 	}
 	if hasKey(st.OverlayEnv(), "LANGWATCH_API_KEY") {
 		t.Fatalf("overlay emitted LANGWATCH_API_KEY — a platform must never receive the " +
