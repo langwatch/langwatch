@@ -164,6 +164,67 @@ export function UnifiedPeopleTable({
   );
 }
 
+/**
+ * Where a person's own page lives, for the rows that have one.
+ *
+ * A row that only the pull sources named has no actor to address, so there is
+ * nothing to link to and the row is not clickable.
+ */
+function personHref(row: PeopleRow): string | null {
+  return row.actor
+    ? `/governance/users/${encodeURIComponent(row.actor)}`
+    : null;
+}
+
+/**
+ * The two names a row is shown under: the one printed on the line, and the one
+ * the avatar takes its initials from.
+ *
+ * A spend row is named by its actor, so the address reads better split into a
+ * local part and the address under it. A discovered person already has a
+ * display name the provider or the directory gave them.
+ */
+function personNames(row: PeopleRow): { primary: string; avatarName: string } {
+  const described =
+    row.provider === null ? describePerson(row.displayName) : null;
+  return {
+    primary: described?.primary ?? row.displayName,
+    avatarName: described?.avatarName ?? row.displayName,
+  };
+}
+
+/**
+ * Who we decided the account is, and what proved it, as one phrase, because
+ * the status cell holds one line. The name is dropped when it is the name
+ * already on the row: repeating it costs the width the evidence needs, and
+ * "Priya Raman · confirmed address" next to a row headed Priya Raman told
+ * the reader one thing twice and then ran out of room to say the other.
+ */
+function matchSummary({
+  row,
+  primary,
+}: {
+  row: PeopleRow;
+  /** The name already on the row, so the phrase does not repeat it. */
+  primary: string;
+}): string | null {
+  const memberName =
+    row.matchDetail && row.matchDetail !== primary ? row.matchDetail : null;
+  const evidence = row.evidenceKind
+    ? (EVIDENCE_LABEL[row.evidenceKind] ?? row.evidenceKind)
+    : null;
+  return [memberName, evidence].filter(Boolean).join(" · ") || null;
+}
+
+/**
+ * One person, one row.
+ *
+ * The cells are components of their own rather than one long body. Each of
+ * them answers a different question about the person — who they are, which
+ * department they sit in, what they spent, whether we know who they are — and
+ * reading the row as that short list of questions is what keeps it legible
+ * once a column's rules for giving way get long.
+ */
 function PersonRow({
   row,
   source,
@@ -174,28 +235,9 @@ function PersonRow({
   onAssignDepartment?: (row: PeopleRow) => void;
 }) {
   const router = useRouter();
-  const href = row.actor
-    ? `/governance/users/${encodeURIComponent(row.actor)}`
-    : null;
-  // A spend row is named by its actor, so the address reads better split into a
-  // local part and the address under it. A discovered person already has a
-  // display name the provider or the directory gave them.
-  const described =
-    row.provider === null ? describePerson(row.displayName) : null;
-  const primary = described?.primary ?? row.displayName;
-  const avatarName = described?.avatarName ?? row.displayName;
-  // Who we decided the account is, and what proved it, as one phrase, because
-  // the status cell holds one line. The name is dropped when it is the name
-  // already on the row: repeating it costs the width the evidence needs, and
-  // "Priya Raman · confirmed address" next to a row headed Priya Raman told
-  // the reader one thing twice and then ran out of room to say the other.
-  const memberName =
-    row.matchDetail && row.matchDetail !== primary ? row.matchDetail : null;
-  const evidence = row.evidenceKind
-    ? (EVIDENCE_LABEL[row.evidenceKind] ?? row.evidenceKind)
-    : null;
-  const matchDetail =
-    [memberName, evidence].filter(Boolean).join(" · ") || null;
+  const href = personHref(row);
+  const { primary, avatarName } = personNames(row);
+  const matchDetail = matchSummary({ row, primary });
 
   return (
     <Table.Row
@@ -203,67 +245,15 @@ function PersonRow({
       onClick={href ? () => void router.push(href) : undefined}
       _hover={href ? { backgroundColor: "bg.subtle" } : undefined}
     >
-      <Table.Cell overflow="hidden">
-        <HStack gap={3} align="start" minWidth={0}>
-          <UserAvatar name={avatarName} size="xs" flexShrink={0} />
-          {/* Two lines' worth of box whether or not there is a second line. An
-              erased person has no identifier to show, and without this their
-              row sits shorter than its neighbours and reads as a break in the
-              table. */}
-          <VStack
-            align="start"
-            gap={0.5}
-            minWidth={0}
-            maxWidth="full"
-            minHeight="2.625rem"
-            justify="center"
-          >
-            <HStack gap={2} flexWrap="nowrap" maxWidth="full" overflow="hidden">
-              {href ? (
-                <Link
-                  href={href}
-                  fontWeight="semibold"
-                  color="fg"
-                  truncate
-                  minWidth="5rem"
-                  title={primary}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {primary}
-                </Link>
-              ) : (
-                <Text
-                  fontWeight="semibold"
-                  truncate
-                  minWidth="5rem"
-                  title={primary}
-                >
-                  {primary}
-                </Text>
-              )}
-              {row.isMachine && (
-                <ShrinkingBadge label="machine login" colorPalette="gray" />
-              )}
-              {row.needsReview && (
-                <ShrinkingBadge
-                  label="needs review"
-                  colorPalette="yellow"
-                  title={row.suspendedReason ?? undefined}
-                />
-              )}
-            </HStack>
-            <PersonIdentityLine row={row} primary={primary} source={source} />
-          </VStack>
-        </HStack>
-      </Table.Cell>
+      <PersonNameCell
+        row={row}
+        href={href}
+        primary={primary}
+        avatarName={avatarName}
+        source={source}
+      />
 
-      <Table.Cell
-        color={row.department ? "fg" : "fg.muted"}
-        truncate
-        title={row.department ?? undefined}
-      >
-        {row.department ?? "—"}
-      </Table.Cell>
+      <PersonDepartmentCell row={row} />
 
       <Table.Cell textAlign="end" fontWeight="semibold" whiteSpace="nowrap">
         {row.spendUsd === null ? notMeasured : formatUsd(row.spendUsd)}
@@ -281,54 +271,194 @@ function PersonRow({
           : formatRelativeTime(row.lastActiveIso)}
       </Table.Cell>
 
-      <Table.Cell>
-        <VStack align="start" gap={0}>
-          <Badge size="sm" colorPalette={STATUS_PALETTE[row.status]}>
-            {STATUS_LABEL[row.status]}
-          </Badge>
-          {matchDetail && (
-            <Text
-              fontSize="xs"
-              color="fg.muted"
-              lineClamp={1}
-              title={matchDetail}
-            >
-              {matchDetail}
-            </Text>
-          )}
-        </VStack>
-      </Table.Cell>
+      <PersonStatusCell row={row} matchDetail={matchDetail} />
 
       {onAssignDepartment && (
-        <Table.Cell textAlign="end">
-          {row.linkedUserId && (
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  aria-label={`Actions for ${primary}`}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <MoreVertical size={14} />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                <Menu.Item
-                  value="assign-department"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAssignDepartment(row);
-                  }}
-                >
-                  Assign department
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Root>
-          )}
-        </Table.Cell>
+        <PersonActionsCell
+          row={row}
+          primary={primary}
+          onAssignDepartment={onAssignDepartment}
+        />
       )}
     </Table.Row>
+  );
+}
+
+/**
+ * The Person column: the avatar, the name, the badges that qualify it, and the
+ * identity line underneath.
+ *
+ * It stands on its own because it is the only cell that has to hold four
+ * things at once inside a fixed width, so nearly everything in it is a
+ * decision about what gives way first when there is not enough room.
+ */
+function PersonNameCell({
+  row,
+  href,
+  primary,
+  avatarName,
+  source,
+}: {
+  row: PeopleRow;
+  /** Null for a person with no page of their own; the name renders unlinked. */
+  href: string | null;
+  primary: string;
+  avatarName: string;
+  source: IngestionSource | null;
+}) {
+  return (
+    <Table.Cell overflow="hidden">
+      <HStack gap={3} align="start" minWidth={0}>
+        <UserAvatar name={avatarName} size="xs" flexShrink={0} />
+        {/* Two lines' worth of box whether or not there is a second line. An
+            erased person has no identifier to show, and without this their
+            row sits shorter than its neighbours and reads as a break in the
+            table. */}
+        <VStack
+          align="start"
+          gap={0.5}
+          minWidth={0}
+          maxWidth="full"
+          minHeight="2.625rem"
+          justify="center"
+        >
+          <HStack gap={2} flexWrap="nowrap" maxWidth="full" overflow="hidden">
+            {href ? (
+              <Link
+                href={href}
+                fontWeight="semibold"
+                color="fg"
+                truncate
+                minWidth="5rem"
+                title={primary}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {primary}
+              </Link>
+            ) : (
+              <Text
+                fontWeight="semibold"
+                truncate
+                minWidth="5rem"
+                title={primary}
+              >
+                {primary}
+              </Text>
+            )}
+            {row.isMachine && (
+              <ShrinkingBadge label="machine login" colorPalette="gray" />
+            )}
+            {row.needsReview && (
+              <ShrinkingBadge
+                label="needs review"
+                colorPalette="yellow"
+                title={row.suspendedReason ?? undefined}
+              />
+            )}
+          </HStack>
+          <PersonIdentityLine row={row} primary={primary} source={source} />
+        </VStack>
+      </HStack>
+    </Table.Cell>
+  );
+}
+
+/**
+ * The department the person belongs to, or a dash while nobody has said.
+ *
+ * The dash is muted and a real department is not, so a reader sweeping the
+ * column sees the gaps without having to read every row.
+ */
+function PersonDepartmentCell({ row }: { row: PeopleRow }) {
+  return (
+    <Table.Cell
+      color={row.department ? "fg" : "fg.muted"}
+      truncate
+      title={row.department ?? undefined}
+    >
+      {row.department ?? "—"}
+    </Table.Cell>
+  );
+}
+
+/**
+ * Whether we know whose account this is, and under it the short phrase saying
+ * what settled the question.
+ */
+function PersonStatusCell({
+  row,
+  matchDetail,
+}: {
+  row: PeopleRow;
+  /** Null when there is nothing to add beyond the status word itself. */
+  matchDetail: string | null;
+}) {
+  return (
+    <Table.Cell>
+      <VStack align="start" gap={0}>
+        <Badge size="sm" colorPalette={STATUS_PALETTE[row.status]}>
+          {STATUS_LABEL[row.status]}
+        </Badge>
+        {matchDetail && (
+          <Text
+            fontSize="xs"
+            color="fg.muted"
+            lineClamp={1}
+            title={matchDetail}
+          >
+            {matchDetail}
+          </Text>
+        )}
+      </VStack>
+    </Table.Cell>
+  );
+}
+
+/**
+ * The row's overflow menu.
+ *
+ * The cell is rendered even for a person who has no menu to offer, because a
+ * missing cell would pull every column after it one place to the left on that
+ * row while its neighbours stayed put.
+ */
+function PersonActionsCell({
+  row,
+  primary,
+  onAssignDepartment,
+}: {
+  row: PeopleRow;
+  /** Named in the trigger's label, so a screen reader says whose menu it is. */
+  primary: string;
+  onAssignDepartment: (row: PeopleRow) => void;
+}) {
+  return (
+    <Table.Cell textAlign="end">
+      {row.linkedUserId && (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Actions for ${primary}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <MoreVertical size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="assign-department"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAssignDepartment(row);
+              }}
+            >
+              Assign department
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      )}
+    </Table.Cell>
   );
 }
 

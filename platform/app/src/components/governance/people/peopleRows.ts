@@ -157,6 +157,107 @@ function statusOf({
 }
 
 /**
+ * The row a metered actor gets, and the discovered person it was allowed to be
+ * shown as, when it was allowed one at all.
+ *
+ * Split from the merge below because the two answer different questions. The
+ * merge decides WHICH discovered person a spend row may claim, which is the
+ * timid decision this module exists to make. This decides what the reader then
+ * sees in each column, which is a long list of "the person's version if we have
+ * a person, the raw actor otherwise". Kept in one place they read as a single
+ * thing, and neither of them is legible.
+ */
+function spendRowFor({
+  spend,
+  person,
+  memberName,
+  departmentForActor,
+}: {
+  spend: SpendFacts;
+  /** The single discovered person this actor may be shown as, if there is one. */
+  person: DiscoveredFacts | null;
+  memberName: string | null;
+  departmentForActor: (actor: string) => string | null;
+}): PeopleRow {
+  const { status, matchDetail, evidenceKind } = statusOf({
+    person,
+    memberName,
+  });
+  return {
+    key: person?.id ?? `spend:${spend.actor}`,
+    displayName: person?.displayText ?? spend.actor,
+    identifier: person ? person.rawActorId : spend.actor,
+    provider: person?.provider ?? null,
+    status,
+    matchDetail,
+    evidenceKind,
+    department:
+      (person ? departmentLabelFor(person) : null) ??
+      departmentForActor(spend.actor),
+    spendUsd: asNumber(spend.spendUsd),
+    requests: spend.requests,
+    lastActiveIso: spend.lastActivityIso,
+    mostUsedTarget: spend.mostUsedTarget,
+    actor: spend.actor,
+    linkedUserId: person?.link?.userId ?? null,
+    isMachine: person ? person.kind !== "person" : false,
+    needsReview: person?.suspendedAt != null,
+    suspendedReason: person?.suspendedReason ?? null,
+  } satisfies PeopleRow;
+}
+
+/**
+ * The row a person gets when a provider named them and nothing ever metered
+ * them.
+ *
+ * Its own function for the same reason as the spend row above: what an erased
+ * person is allowed to show is a rule in its own right, and it deserves to be
+ * read on its own rather than as the second half of something longer.
+ */
+function discoveredRowFor(person: DiscoveredFacts): PeopleRow {
+  const erased = isErased(person);
+  const { status, matchDetail, evidenceKind } = statusOf({
+    person,
+    memberName: null,
+  });
+  return {
+    key: person.id,
+    displayName: person.displayText,
+    // An erased row is described by its stand-in and nothing else, even if
+    // a value survived upstream that erasure was supposed to blank.
+    identifier: erased ? null : person.rawActorId,
+    provider: erased ? null : person.provider,
+    status,
+    matchDetail,
+    evidenceKind,
+    department: departmentLabelFor(person),
+    // Nothing metered them, so there is no spend and no request count. When
+    // a provider last named them is a real measurement though, and it is
+    // the same question "last active" asks.
+    spendUsd: null,
+    requests: null,
+    lastActiveIso: new Date(asTime(person.lastSeenAt)).toISOString(),
+    mostUsedTarget: null,
+    actor: null,
+    linkedUserId: person.link?.userId ?? null,
+    isMachine: person.kind !== "person",
+    needsReview: person.suspendedAt != null,
+    suspendedReason: person.suspendedReason,
+  } satisfies PeopleRow;
+}
+
+/**
+ * Most recently seen first, and by name when two were seen at the same moment.
+ *
+ * Named rather than written inline so the reason for the tie-break sits with
+ * it: without one, two people a provider reported in the same pull could swap
+ * places between reads, and the table would look unstable for no reason.
+ */
+const byMostRecentlySeen = (a: DiscoveredFacts, b: DiscoveredFacts) =>
+  asTime(b.lastSeenAt) - asTime(a.lastSeenAt) ||
+  a.displayText.localeCompare(b.displayText);
+
+/**
  * The one table, ordered the way the reader asked for it.
  *
  * Rows carrying money keep the order the spend read returned, because that read
@@ -187,72 +288,18 @@ export function mergePeopleRows({
     // engine's question, so the money stays on its own row and says so.
     const person = claims.length === 1 ? (claims[0] ?? null) : null;
     if (person) joined.add(person.id);
-    const memberName = memberNameForActor(row.actor);
-    const { status, matchDetail, evidenceKind } = statusOf({
+    return spendRowFor({
+      spend: row,
       person,
-      memberName,
+      memberName: memberNameForActor(row.actor),
+      departmentForActor,
     });
-    return {
-      key: person?.id ?? `spend:${row.actor}`,
-      displayName: person?.displayText ?? row.actor,
-      identifier: person ? person.rawActorId : row.actor,
-      provider: person?.provider ?? null,
-      status,
-      matchDetail,
-      evidenceKind,
-      department:
-        (person ? departmentLabelFor(person) : null) ??
-        departmentForActor(row.actor),
-      spendUsd: asNumber(row.spendUsd),
-      requests: row.requests,
-      lastActiveIso: row.lastActivityIso,
-      mostUsedTarget: row.mostUsedTarget,
-      actor: row.actor,
-      linkedUserId: person?.link?.userId ?? null,
-      isMachine: person ? person.kind !== "person" : false,
-      needsReview: person?.suspendedAt != null,
-      suspendedReason: person?.suspendedReason ?? null,
-    } satisfies PeopleRow;
   });
 
   const discoveredRows = discovered
     .filter((person) => !joined.has(person.id))
-    .sort(
-      (a, b) =>
-        asTime(b.lastSeenAt) - asTime(a.lastSeenAt) ||
-        a.displayText.localeCompare(b.displayText),
-    )
-    .map((person) => {
-      const erased = isErased(person);
-      const { status, matchDetail, evidenceKind } = statusOf({
-        person,
-        memberName: null,
-      });
-      return {
-        key: person.id,
-        displayName: person.displayText,
-        // An erased row is described by its stand-in and nothing else, even if
-        // a value survived upstream that erasure was supposed to blank.
-        identifier: erased ? null : person.rawActorId,
-        provider: erased ? null : person.provider,
-        status,
-        matchDetail,
-        evidenceKind,
-        department: departmentLabelFor(person),
-        // Nothing metered them, so there is no spend and no request count. When
-        // a provider last named them is a real measurement though, and it is
-        // the same question "last active" asks.
-        spendUsd: null,
-        requests: null,
-        lastActiveIso: new Date(asTime(person.lastSeenAt)).toISOString(),
-        mostUsedTarget: null,
-        actor: null,
-        linkedUserId: person.link?.userId ?? null,
-        isMachine: person.kind !== "person",
-        needsReview: person.suspendedAt != null,
-        suspendedReason: person.suspendedReason,
-      } satisfies PeopleRow;
-    });
+    .sort(byMostRecentlySeen)
+    .map((person) => discoveredRowFor(person));
 
   return [...spendRows, ...discoveredRows];
 }
