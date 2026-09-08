@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { collectFeatureShapeFindings } from "../src/feature-shape.ts";
-import { discoverClassifiedPackages } from "../src/workspace.ts";
+import { discoverClassifiedPackages } from "../src/workspace/snapshot.ts";
 
 const root = resolve(import.meta.dirname, "../../..");
 const REFERENCE_FEATURE = "annotation";

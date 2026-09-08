@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { lintStrictPortModules, type ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -33,7 +34,7 @@ function writePort(source: string): string {
 }
 
 function lint(): ReturnType<typeof lintStrictPortModules> {
-  return lintStrictPortModules([packageForFixture()]);
+  return lintStrictPortModules(snapshotOf({ root, packages: [packageForFixture()] }));
 }
 
 describe("strict feature ports", () => {

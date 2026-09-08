@@ -2,9 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createWorkspaceModuleResolver } from "../src/module-graph.ts";
+import { createWorkspaceModuleResolver } from "../src/workspace/module-graph.ts";
 import { lintFeatureSetupInfrastructure } from "../src/feature-setup-infrastructure.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root: string;
 let packages: ClassifiedPackage[];
@@ -39,12 +40,7 @@ function findings(body: string, extras = ""): ReturnType<typeof lintFeatureSetup
 ${extras}
 ${body}`,
   );
-  return lintFeatureSetupInfrastructure(
-    root,
-    packages,
-    catalogue,
-    createWorkspaceModuleResolver({ root }),
-  );
+  return lintFeatureSetupInfrastructure(snapshotOf({ root, catalogue, packages }));
 }
 
 beforeEach(() => {

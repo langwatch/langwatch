@@ -25,7 +25,7 @@ import { lintServiceCeilings } from "./service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
 import { lintTestQuality } from "./test-quality.ts";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
-import { discoverClassifiedPackages } from "./workspace.ts";
+import { buildWorkspaceSnapshot } from "./workspace/snapshot.ts";
 
 export type {
   ApplicationPackageRole,
@@ -98,7 +98,10 @@ export {
   collectLegacyFeatureFragments,
   formatLegacyFeatureFragmentBaseline,
 } from "./legacy-feature-fragments.ts";
-export { discoverClassifiedPackages } from "./workspace.ts";
+export { buildWorkspaceSnapshot, discoverClassifiedPackages } from "./workspace/snapshot.ts";
+export type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
+export { walkFiles } from "./workspace/layout.ts";
 export { lintFeatureLayouts } from "./feature-layout.ts";
 export { lintFeatureSetupInfrastructure } from "./feature-setup-infrastructure.ts";
 export { lintManifests } from "./manifests.ts";
@@ -112,7 +115,7 @@ export type {
   PackageManifestRecord,
   ValueImportGraph,
   WorkspaceModuleResolver,
-} from "./module-graph.ts";
+} from "./workspace/module-graph.ts";
 export {
   chainsToSeeds,
   createWorkspaceModuleResolver,
@@ -120,9 +123,11 @@ export {
   rendersJsx,
   resolveRelativeModule,
   resolveSourceCandidate,
+  sourceFile,
+  sourceText,
   valueImports,
   walkValueImportGraph,
-} from "./module-graph.ts";
+} from "./workspace/module-graph.ts";
 export { lintTestQuality } from "./test-quality.ts";
 export type { TestQualityLintOptions } from "./test-quality.ts";
 export {
@@ -175,39 +180,51 @@ export type { FilenameMigrationPlan, FilenameRename } from "./filename-migration
 
 export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
   const root = resolve(options.root);
-  const changedFiles = options.changedFiles ?? changedSourceFiles(root);
-  const discovery = discoverClassifiedPackages(root);
+
+  return lintSnapshot(
+    buildWorkspaceSnapshot({
+      root,
+      changedFiles: options.changedFiles ?? changedSourceFiles(root),
+    }),
+    options,
+  );
+}
+
+/** The same run against a snapshot the caller already built, so a run reads the tree once. */
+export function lintSnapshot(
+  snapshot: WorkspaceSnapshot,
+  options: Omit<LintWorkspaceOptions, "root" | "changedFiles"> = {},
+): ArchitectureViolation[] {
+  const root = snapshot.root;
 
   const violations = [
-    ...discovery.violations,
-    ...lintBoundarySignatureMirrors(root),
-    ...lintEnterpriseSourceLicense(root),
-    ...lintFeatureLayouts(root, discovery.packages),
-    ...lintFeatureShape(root, discovery.catalogue, discovery.packages),
-    ...lintSourceFolderShape(root),
-    ...lintFeatureConfiguration(root, discovery.catalogue),
-    ...lintPrismaTableOwnership(root, discovery.catalogue),
-    ...lintFrontendUiBoundaries(root, discovery.packages),
-    ...lintGlobalAppAccess(root),
-    ...(options.legacyFeatureFragments === false
-      ? []
-      : lintLegacyFeatureFragments(root, discovery.catalogue, discovery.packages)),
-    ...lintEventingRoles(root, discovery.packages),
-    ...lintArchitectureRecords(discovery.packages),
-    ...lintStrictContractBuildConfigs(root, discovery.packages),
-    ...lintDeclarationProjectReferences(root, discovery.packages),
-    ...lintStrictPortModules(discovery.packages),
-    ...lintManifests(discovery.packages, declaredWebDependencyPairs(root, discovery.packages)),
-    ...lintApplicationBoundaries(root, discovery.packages, {
+    ...snapshot.discoveryViolations,
+    ...lintBoundarySignatureMirrors(snapshot),
+    ...lintEnterpriseSourceLicense(snapshot),
+    ...lintFeatureLayouts(snapshot),
+    ...lintFeatureShape(snapshot),
+    ...lintSourceFolderShape(snapshot),
+    ...lintFeatureConfiguration(snapshot),
+    ...lintPrismaTableOwnership(snapshot),
+    ...lintFrontendUiBoundaries(snapshot),
+    ...lintGlobalAppAccess(snapshot),
+    ...(options.legacyFeatureFragments === false ? [] : lintLegacyFeatureFragments(snapshot)),
+    ...lintEventingRoles(snapshot),
+    ...lintArchitectureRecords(snapshot),
+    ...lintStrictContractBuildConfigs(snapshot),
+    ...lintDeclarationProjectReferences(snapshot),
+    ...lintStrictPortModules(snapshot),
+    ...lintManifests(snapshot, declaredWebDependencyPairs(snapshot)),
+    ...lintApplicationBoundaries(snapshot, {
       legacyMigration: options.legacyApplicationMigration !== false,
     }),
-    ...lintApiTransportBoundaries(discovery.packages),
-    ...lintApiTransportFramework(root, discovery.packages),
-    ...lintServiceProjectionBoundaries(discovery.packages),
-    ...lintServiceCeilings(discovery.packages),
-    ...lintCycles(discovery.packages),
-    ...lintTestQuality(root, { files: changedFiles }),
-    ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),
+    ...lintApiTransportBoundaries(snapshot),
+    ...lintApiTransportFramework(snapshot),
+    ...lintServiceProjectionBoundaries(snapshot),
+    ...lintServiceCeilings(snapshot),
+    ...lintCycles(snapshot),
+    ...lintTestQuality(snapshot),
+    ...(options.declarations === false ? [] : lintDeclarations(snapshot)),
   ];
 
   return violations

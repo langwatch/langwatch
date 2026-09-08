@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { lintTestQuality } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 function writeFixture(root: string, file: string, source: string): string {
   const path = join(root, file);
@@ -12,7 +13,7 @@ function writeFixture(root: string, file: string, source: string): string {
 }
 
 function policies(root: string, file: string): string[] {
-  return lintTestQuality(root, { files: [file] }).map((violation) => violation.policy);
+  return lintTestQuality(snapshotOf({ root }), { files: [file] }).map((violation) => violation.policy);
 }
 
 describe("test quality", () => {
@@ -258,7 +259,7 @@ describe("test quality", () => {
       ].join("\n"),
     );
 
-    const violations = lintTestQuality(root, { files: [file] });
+    const violations = lintTestQuality(snapshotOf({ root }), { files: [file] });
     expect(violations).toMatchObject([
       {
         policy: "test-quality",
@@ -310,7 +311,7 @@ describe("test quality", () => {
       ].join("\n"),
     );
 
-    const violations = lintTestQuality(root, { files: [file] });
+    const violations = lintTestQuality(snapshotOf({ root }), { files: [file] });
     expect(violations).toHaveLength(1);
     expect(violations[0]).toMatchObject({
       policy: "test-quality",

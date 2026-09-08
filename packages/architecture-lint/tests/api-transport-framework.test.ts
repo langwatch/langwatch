@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { snapshotOf } from "./workspace.ts";
 import {
   apiTransportFrameworkFindings,
   featureServerTransportFindings,
@@ -130,7 +131,7 @@ export const guard = () => checkUserPermissionForProject(TeamRoleGroup.PROJECT_V
       const root = mkdtempSync(join(tmpdir(), "api-transport-framework-"));
       mkdirSync(join(root, "packages/architecture-lint/src"), { recursive: true });
 
-      expect(lintApiTransportFramework(root, [])).toEqual([]);
+      expect(lintApiTransportFramework(snapshotOf({ root, packages: [] }))).toEqual([]);
     });
   });
 
@@ -142,20 +143,25 @@ export const guard = () => checkUserPermissionForProject(TeamRoleGroup.PROJECT_V
       mkdirSync(join(packageRoot, "src/transport"), { recursive: true });
       writeFileSync(transport, 'import { Hono } from "hono";\nexport const app = new Hono();\n');
 
-      const violations = lintApiTransportFramework(root, [
-        {
-          name: "@langwatch/agent-server",
-          root: packageRoot,
-          manifestPath: join(packageRoot, "package.json"),
-          manifest: { name: "@langwatch/agent-server" },
-          kind: "server",
-          feature: "agent",
-          featureRoot: join(root, "packages/features/agent"),
-          layoutVersion: 0,
-          subjects: ["agent"],
-          enterprise: false,
-        },
-      ]);
+      const violations = lintApiTransportFramework(
+        snapshotOf({
+          root,
+          packages: [
+            {
+              name: "@langwatch/agent-server",
+              root: packageRoot,
+              manifestPath: join(packageRoot, "package.json"),
+              manifest: { name: "@langwatch/agent-server" },
+              kind: "server",
+              feature: "agent",
+              featureRoot: join(root, "packages/features/agent"),
+              layoutVersion: 0,
+              subjects: ["agent"],
+              enterprise: false,
+            },
+          ],
+        }),
+      );
 
       expect(violations.map((violation) => violation.message)).toContain(
         "REST transport constructs Hono of its own.",
@@ -228,6 +234,7 @@ export function process(queue: { handle: Function }, key: ApiKey) {
   it("finds named handlers and aliases outside the transport directory", () => {
     const source = `
 import { createRestService } from "@langwatch/api/rest";
+import { snapshotOf } from "./workspace.ts";
 const handler = async (args) => {
   const raw = args;
   return raw.request;

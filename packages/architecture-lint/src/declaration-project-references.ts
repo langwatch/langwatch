@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const configSchema = z.object({
@@ -121,9 +122,10 @@ function producerDirectories(projects: ReadonlyMap<string, Project>): Map<string
 
 /** Producer references determine preparation; no-emit consumer references cannot replace them. */
 export function lintDeclarationProjectReferences(
-  root: string,
-  packages: ClassifiedPackage[],
+  snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
+  const { root, packages } = snapshot;
+
   const violations: ArchitectureViolation[] = [];
   const projects = projectGraph(root, violations);
   const producerByDirectory = producerDirectories(projects);

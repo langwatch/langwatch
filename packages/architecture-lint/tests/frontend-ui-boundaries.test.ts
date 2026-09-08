@@ -8,6 +8,7 @@ import {
   lintManifests,
 } from "../src/index.ts";
 import type { ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -104,7 +105,7 @@ function writeWebFeature(feature: string, name: string, dependencies: string[] =
 }
 
 function lint(packages: ClassifiedPackage[]): ReturnType<typeof lintFrontendUiBoundaries> {
-  return lintFrontendUiBoundaries(root, packages);
+  return lintFrontendUiBoundaries(snapshotOf({ root, packages }));
 }
 
 function policies(packages: ClassifiedPackage[]): string[] {
@@ -247,15 +248,17 @@ describe("frontend UI architecture boundaries", () => {
     write("packages/features/trace/web/src/trace-card.ts", "export const TraceCard = true;");
     promptWeb.manifest.dependencies = { "@langwatch/trace-web": "workspace:*" };
 
-    const pairs = declaredWebDependencyPairs(root, [promptWeb, traceWeb]);
+    const pairs = declaredWebDependencyPairs(snapshotOf({ root, packages: [promptWeb, traceWeb] }));
     expect(pairs.has("@langwatch/prompt-web->@langwatch/trace-web")).toBe(true);
-    expect(lintManifests([promptWeb, traceWeb], pairs)).toEqual([]);
+    expect(lintManifests(snapshotOf({ root, packages: [promptWeb, traceWeb] }), pairs)).toEqual([]);
 
     writeCatalogue([
       { id: "prompt-studio", root: "prompt", screens: ["@langwatch/trace-web/trace-card"] },
     ]);
-    expect(declaredWebDependencyPairs(root, [promptWeb, traceWeb])).toEqual(new Set());
-    expect(lintManifests([promptWeb, traceWeb])).toEqual(
+    expect(declaredWebDependencyPairs(snapshotOf({ root, packages: [promptWeb, traceWeb] }))).toEqual(
+      new Set(),
+    );
+    expect(lintManifests(snapshotOf({ root, packages: [promptWeb, traceWeb] }))).toEqual(
       expect.arrayContaining([expect.objectContaining({ policy: "cross-feature" })]),
     );
   });

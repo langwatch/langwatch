@@ -2,9 +2,9 @@
 import { relative, resolve } from "node:path";
 import {
   boundaryEdgesFromViolations,
+  buildWorkspaceSnapshot,
   changedSourceFiles,
   declaredWebDependencyPairs,
-  discoverClassifiedPackages,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
   lintCommentBlocks,
@@ -15,10 +15,11 @@ import {
   lintManifests,
   lintOxlintBaseline,
   lintServiceCeilings,
+  lintSnapshot,
   lintStrictPortModules,
   lintTestQuality,
-  lintWorkspace,
   type ArchitectureViolation,
+  type WorkspaceSnapshot,
 } from "./index.ts";
 import { buildReport, formatReport } from "./report.ts";
 
@@ -171,16 +172,15 @@ function commentBlockRootsFindings(options: CliOptions): ArchitectureViolation[]
 
 type ShrinkResult = { findings: ArchitectureViolation[]; bootstrapped: string[] };
 
-function shrinkFindings(options: CliOptions): ShrinkResult {
+function shrinkFindings(options: CliOptions, snapshot: WorkspaceSnapshot): ShrinkResult {
   const { root } = options;
-  const discovery = discoverClassifiedPackages(root);
 
   // `lintManifests`/`lintFeatureLayouts` run outside `lintWorkspace` here, so
   // their violations still carry absolute file paths — relativize before
   // deriving edges, which are keyed by the workspace-relative `from`.
   const inventory = [
-    ...lintManifests(discovery.packages, declaredWebDependencyPairs(root, discovery.packages)),
-    ...lintFeatureLayouts(root, discovery.packages),
+    ...lintManifests(snapshot, declaredWebDependencyPairs(snapshot)),
+    ...lintFeatureLayouts(snapshot),
   ];
 
   const edges = boundaryEdgesFromViolations(
@@ -206,8 +206,8 @@ function shrinkFindings(options: CliOptions): ShrinkResult {
     ...oxlint.violations,
     ...composedExports.violations,
     ...commentBlockRootsFindings(options),
-    ...lintServiceCeilings(discovery.packages),
-    ...lintStrictPortModules(discovery.packages),
+    ...lintServiceCeilings(snapshot),
+    ...lintStrictPortModules(snapshot),
   ];
 
   return { findings, bootstrapped };
@@ -215,13 +215,11 @@ function shrinkFindings(options: CliOptions): ShrinkResult {
 
 function checkFindings(
   options: CliOptions,
-  changedFiles: readonly string[],
+  snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
   const { root } = options;
 
-  const workspace = lintWorkspace({
-    root,
-    changedFiles,
+  const workspace = lintSnapshot(snapshot, {
     declarations: options.declarations,
     legacyApplicationMigration: options.legacyApplicationMigration,
     legacyFeatureFragments: options.legacyFeatureFragments,
@@ -240,7 +238,7 @@ function checkFindings(
     ...commentBlockRootsFindings(options),
     ...boundaryEdges.violations,
     ...lintOxlintBaseline(root).violations,
-    ...(options.composedExports ? lintComposedExports(root) : []),
+    ...(options.composedExports ? lintComposedExports(snapshot) : []),
   ];
 }
 
@@ -266,9 +264,9 @@ function printCommentBlockReview(options: CliOptions, changedFiles: readonly str
 
 function testQualityFindings(
   options: CliOptions,
-  changedFiles: readonly string[],
+  snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
-  return lintTestQuality(options.root, { files: changedFiles }).map((violation) => ({
+  return lintTestQuality(snapshot, { files: snapshot.changedFiles }).map((violation) => ({
     ...violation,
     file: relative(options.root, violation.file) || violation.file,
   }));
@@ -297,11 +295,12 @@ function run(options: CliOptions): 0 | 1 {
     return 0;
   }
 
-  const shrink = options.mode === "shrink" ? shrinkFindings(options) : void 0;
+  const snapshot = buildWorkspaceSnapshot({ root: options.root, changedFiles });
+  const shrink = options.mode === "shrink" ? shrinkFindings(options, snapshot) : void 0;
 
   const findings = options.reviewTestQuality
-    ? testQualityFindings(options, changedFiles)
-    : (shrink?.findings ?? checkFindings(options, changedFiles));
+    ? testQualityFindings(options, snapshot)
+    : (shrink?.findings ?? checkFindings(options, snapshot));
 
   const report = buildReport(findings);
 

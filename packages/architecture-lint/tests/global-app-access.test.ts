@@ -7,6 +7,7 @@ import {
   formatGlobalAppAccessBaseline,
   lintGlobalAppAccess,
 } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -64,7 +65,7 @@ describe("global app access lint", () => {
       { symbol: "getApp", kind: "import" },
       { symbol: "getApp", kind: "reference" },
     ]);
-    expect(lintGlobalAppAccess(root)).toHaveLength(10);
+    expect(lintGlobalAppAccess(snapshotOf({ root }))).toHaveLength(10);
   });
 
   it("allows the legacy accessor definition but blocks growth beyond the checked baseline", () => {
@@ -75,13 +76,13 @@ describe("global app access lint", () => {
     write(usageFile, 'import { getApp } from "~/server/app-layer/app"; getApp();');
     baseline();
 
-    expect(lintGlobalAppAccess(root)).toEqual([]);
+    expect(lintGlobalAppAccess(snapshotOf({ root }))).toEqual([]);
 
     write(
       usageFile,
       'import { getApp } from "~/server/app-layer/app"; getApp();\nconst second = getApp();',
     );
-    expect(lintGlobalAppAccess(root)).toEqual([
+    expect(lintGlobalAppAccess(snapshotOf({ root }))).toEqual([
       expect.objectContaining({
         policy: "global-app-access",
         file: join(root, usageFile),
@@ -95,7 +96,7 @@ describe("global app access lint", () => {
     baseline();
     write(usageFile, "export const value = true;");
 
-    expect(lintGlobalAppAccess(root)).toContainEqual(
+    expect(lintGlobalAppAccess(snapshotOf({ root }))).toContainEqual(
       expect.objectContaining({
         policy: "global-app-access-baseline",
         message: expect.stringContaining("removed tryGetApp"),
@@ -129,7 +130,7 @@ describe("global app access lint", () => {
       'import { getApp } from "~/server/app-layer/app";\nconst newUse = getApp().new;',
     );
 
-    expect(lintGlobalAppAccess(root)).toEqual(
+    expect(lintGlobalAppAccess(snapshotOf({ root }))).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ policy: "global-app-access" }),
         expect.objectContaining({ policy: "global-app-access-baseline" }),

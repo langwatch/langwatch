@@ -10,6 +10,7 @@ import {
   lintSourceFolderShape,
   SOURCE_FOLDER_SHAPE_BASELINE,
 } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -176,7 +177,7 @@ describe("source folder shape", () => {
         ]),
       );
 
-      const violations = lintSourceFolderShape(root);
+      const violations = lintSourceFolderShape(snapshotOf({ root }));
 
       expect(violations.map((violation) => violation.policy)).toEqual([
         "source-folder-shape-baseline",
@@ -190,7 +191,7 @@ describe("source folder shape", () => {
       fill("packages/widget/src/rules", FOLDER_BUDGET + 1);
       write(BASELINE, baselineText([]));
 
-      const policies = lintSourceFolderShape(root).map((violation) => violation.policy);
+      const policies = lintSourceFolderShape(snapshotOf({ root })).map((violation) => violation.policy);
 
       expect(policies).toContain("source-folder-shape");
       expect(policies).toContain("source-folder-shape-baseline");

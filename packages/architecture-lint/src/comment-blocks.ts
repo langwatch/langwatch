@@ -12,7 +12,7 @@ import {
   staleRows,
 } from "./baseline.ts";
 import type { ArchitectureViolation } from "./types.ts";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 import {
   MAX_COMMENT_BLOCK_LINES,
   REVIEW_LINE_COUNT,

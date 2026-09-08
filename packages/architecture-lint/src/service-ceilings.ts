@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 
 const MAX_MODULE_LINES = 500;
 const MAX_METHOD_LINES = 80;
@@ -120,7 +122,7 @@ function exceeds(measurement: ServiceMeasurement, ceiling: ServiceMeasurement): 
 }
 
 function ceilingViolation(file: string): ArchitectureViolation | undefined {
-  const measurement = measureService(file, readFileSync(file, "utf8"));
+  const measurement = measureService(file, sourceText({ file }));
 
   if (!exceeds(measurement, defaults)) return void 0;
 
@@ -143,10 +145,12 @@ export function lintServiceCeilingsFile(root: string, path: string): Architectur
  * A service module stays inside the default ceiling. The per-file inventory
  * that once raised it reached zero and is gone.
  */
-export function lintServiceCeilings(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+export function lintServiceCeilings(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   return packages
     .filter((pkg) => pkg.kind === "server" && pkg.featureRoot)
-    .flatMap((pkg) => walkFiles(pkg.root, isStrictService))
+    .flatMap((pkg) => snapshot.files({ directory: pkg.root, accept: isStrictService }))
     .map(ceilingViolation)
     .filter((violation): violation is ArchitectureViolation => violation !== void 0);
 }

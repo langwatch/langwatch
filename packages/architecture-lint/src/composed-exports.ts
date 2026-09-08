@@ -13,9 +13,12 @@ import {
 } from "./baseline.ts";
 import {
   createWorkspaceModuleResolver,
+  sourceFile,
+  sourceText,
   walkValueImportGraph,
   type WorkspaceModuleResolver,
-} from "./module-graph.ts";
+} from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
 /**
@@ -104,13 +107,7 @@ function isSubjectName(name: string): boolean {
 }
 
 function parseFile(file: string): ts.SourceFile {
-  return ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
+  return sourceFile({ file, kind: file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS });
 }
 
 function subdirectories(path: string): string[] {
@@ -233,7 +230,7 @@ function isExcludedDeclaration({ name, file }: { name: string; file: string }): 
   if (excluded === void 0) {
     excluded = new Set<string>();
     excludedDeclarations.set(file, excluded);
-    const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+    const text = existsSync(file) ? sourceText({ file }) : "";
     for (const match of text.matchAll(ABSTRACT_CLASS)) excluded.add(match[1]!);
 
     for (const match of text.matchAll(CLASS_HERITAGE)) {
@@ -318,7 +315,7 @@ const IDENTIFIER = /[A-Za-z_$][A-Za-z0-9_$]*/g;
  * the name cannot construct it, and the rest are the ones worth parsing.
  */
 function mentionedWords({ file }: { file: string }): Set<string> {
-  return new Set(readFileSync(file, "utf8").match(IDENTIFIER) ?? []);
+  return new Set(sourceText({ file }).match(IDENTIFIER) ?? []);
 }
 
 function isDeclarationName(node: ts.Identifier): boolean {
@@ -460,9 +457,10 @@ export function collectComposedExportsBaseline({
 }
 
 export function lintComposedExports(
-  root: string,
+  snapshot: WorkspaceSnapshot,
   options?: { baselineFile?: string },
 ): ArchitectureViolation[] {
+  const { root } = snapshot;
   const file = options?.baselineFile ?? baselineFile(root);
   const baseline = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file });
   const baselined = liveKeys({ entries: baseline.entries });

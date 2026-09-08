@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lintServiceProjectionBoundaries, type ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -38,7 +39,7 @@ function strictServer(): ClassifiedPackage {
 }
 
 function lint(): ReturnType<typeof lintServiceProjectionBoundaries> {
-  return lintServiceProjectionBoundaries([strictServer()]);
+  return lintServiceProjectionBoundaries(snapshotOf({ root, packages: [strictServer()] }));
 }
 
 describe("service projection boundaries", () => {

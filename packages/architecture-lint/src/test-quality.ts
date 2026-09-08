@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import ts from "typescript";
+import { sourceFile } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
 const TEST_FILE = /(?:^|\/)\S+\.(?:test|spec)\.[cm]?[jt]sx?$/;
@@ -482,12 +484,7 @@ function canonicalCaseTable(source: ts.SourceFile, call: ts.CallExpression): str
 }
 
 function lintTestFile(file: string): ArchitectureViolation[] {
-  const source = ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-  );
+  const source = sourceFile({ file });
   const violations: ArchitectureViolation[] = [];
   const imports = collectImportBindings(source);
   const mockedModules = collectMockedModules(source);
@@ -589,9 +586,11 @@ function lintTestFile(file: string): ArchitectureViolation[] {
 }
 
 export function lintTestQuality(
-  root: string,
-  options: TestQualityLintOptions = {},
+  snapshot: WorkspaceSnapshot,
+  options: TestQualityLintOptions = { files: snapshot.changedFiles },
 ): ArchitectureViolation[] {
+  const root = snapshot.root;
+
   const files = options.files ?? [];
 
   return files

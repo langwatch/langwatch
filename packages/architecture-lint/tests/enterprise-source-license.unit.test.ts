@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { lintEnterpriseSourceLicense } from "../src/enterprise-source-license.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -13,7 +14,7 @@ function write(path: string, contents: string): void {
 }
 
 function violations(): ReturnType<typeof lintEnterpriseSourceLicense> {
-  return lintEnterpriseSourceLicense(root);
+  return lintEnterpriseSourceLicense(snapshotOf({ root }));
 }
 
 describe("Enterprise source license placement", () => {

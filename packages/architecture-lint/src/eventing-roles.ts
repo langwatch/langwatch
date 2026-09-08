@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const PROJECTION_FILE = /\.(?:projection|foldProjection|mapProjection)\.ts$/;
@@ -200,7 +202,7 @@ const ROLE_FILE_CHECKS = [
 ];
 
 function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[] {
-  const source = readFileSync(file, "utf8");
+  const source = sourceText({ file });
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -298,16 +300,16 @@ function violationsForRoleFile(
   return [...violations, ...lintStrictSubscriberTest(file, pkg)];
 }
 
-export function lintEventingRoles(
-  root: string,
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintEventingRoles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, packages } = snapshot;
+
   const packageByFile = packages
     .filter((pkg) => pkg.kind === "server")
     .sort((left, right) => right.root.length - left.root.length);
 
   return eventingScanRoots(root, packages).flatMap((scanRoot) =>
-    walkFiles(scanRoot, (candidate) => candidate.endsWith(".ts"))
+    snapshot
+      .files({ directory: scanRoot, accept: (candidate) => candidate.endsWith(".ts") })
       .filter((file) => !/(?:^|\/)(?:__tests__|tests|fixtures)(?:\/|$)/.test(file))
       .flatMap((file) => {
         const role = roleOf(file);

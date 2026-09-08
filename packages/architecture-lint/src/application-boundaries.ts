@@ -2,8 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 import { exportedSubpaths } from "./manifests.ts";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
@@ -103,7 +105,7 @@ function sourceLine(starts: readonly number[], offset: number): number {
 }
 
 function importsIn(file: string): SourceImport[] {
-  const source = readFileSync(file, "utf8");
+  const source = sourceText({ file });
   const lineStarts = sourceLineStarts(source);
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
@@ -185,7 +187,7 @@ function sourceImports(root: string): SourceImport[] {
 }
 
 function packageForSpecifier(
-  packages: ClassifiedPackage[],
+  packages: readonly ClassifiedPackage[],
   specifier: string,
 ): ClassifiedPackage | undefined {
   return packages
@@ -194,7 +196,7 @@ function packageForSpecifier(
 }
 
 function packageForRelativeImport(
-  packages: ClassifiedPackage[],
+  packages: readonly ClassifiedPackage[],
   sourceImport: SourceImport,
 ): ClassifiedPackage | undefined {
   if (!sourceImport.specifier.startsWith(".")) return void 0;
@@ -205,7 +207,7 @@ function packageForRelativeImport(
 }
 
 function packageForPhysicalApplicationSpecifier(
-  packages: ClassifiedPackage[],
+  packages: readonly ClassifiedPackage[],
   specifier: string,
 ): ClassifiedPackage | undefined {
   const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server)(?:\/|$)/);
@@ -215,7 +217,7 @@ function packageForPhysicalApplicationSpecifier(
 }
 
 function targetPackage(
-  packages: ClassifiedPackage[],
+  packages: readonly ClassifiedPackage[],
   sourceImport: SourceImport,
 ): ClassifiedPackage | undefined {
   return (
@@ -242,7 +244,7 @@ function matchingEnterpriseComposition(
   return importer.applicationRole === target.enterpriseCompositionRole;
 }
 
-function lintClassifiedSourceImports(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+function lintClassifiedSourceImports(packages: readonly ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const sourcePackages = packages.filter((pkg) =>
     ["application", "dev-runtime", "enterprise-root", "enterprise-composition"].includes(pkg.kind),
@@ -327,7 +329,7 @@ function lintClassifiedSourceImports(packages: ClassifiedPackage[]): Architectur
   return violations;
 }
 
-function lintCompositionSourceShape(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+function lintCompositionSourceShape(packages: readonly ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     if (
@@ -356,7 +358,7 @@ function lintCompositionSourceShape(packages: ClassifiedPackage[]): Architecture
 
     if (pkg.kind !== "enterprise-composition") continue;
 
-    const source = files.map((file) => readFileSync(file, "utf8")).join("\n");
+    const source = files.map((file) => sourceText({ file })).join("\n");
     if (
       !/export\s+(?:default\s+)?class\s+[A-Za-z_$][\w$]*/.test(source) ||
       !/static\s+create\s*\(/.test(source)
@@ -375,7 +377,7 @@ function lintCompositionSourceShape(packages: ClassifiedPackage[]): Architecture
 
 function lintRuntimeConstructionImports(
   root: string,
-  packages: ClassifiedPackage[],
+  packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const importers = [...sourceImports(join(root, "apps")), ...sourceImports(join(root, "tools"))];
@@ -779,10 +781,11 @@ function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
 }
 
 export function lintApplicationBoundaries(
-  root: string,
-  packages: ClassifiedPackage[],
+  snapshot: WorkspaceSnapshot,
   options?: { legacyMigration?: boolean },
 ): ArchitectureViolation[] {
+  const { root, packages } = snapshot;
+
   return [
     ...lintClassifiedSourceImports(packages),
     ...lintCompositionSourceShape(packages),

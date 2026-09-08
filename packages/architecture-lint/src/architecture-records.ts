@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const REQUIRED_SECTIONS = [
@@ -141,7 +142,9 @@ function violationsForRoot(root: string): ArchitectureViolation[] {
   ];
 }
 
-export function lintArchitectureRecords(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+export function lintArchitectureRecords(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   // Applications are composition and deployment roots documented by the
   // repository-level application ADR/spec. Package-local records belong to
   // reusable ownership boundaries, not each executable wrapper.

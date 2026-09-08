@@ -1,3 +1,4 @@
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "./types.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
@@ -329,9 +330,11 @@ function violationsForManifest(
 }
 
 export function lintManifests(
-  packages: ClassifiedPackage[],
+  snapshot: WorkspaceSnapshot,
   allowedWebDependencies: ReadonlySet<string> = new Set(),
 ): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
 
   return packages.flatMap((pkg) => violationsForManifest(pkg, byName, allowedWebDependencies));

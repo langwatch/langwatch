@@ -14,8 +14,8 @@
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { walkFiles } from "../src/files.ts";
-import { createWorkspaceModuleResolver, moduleImports } from "../src/module-graph.ts";
+import { walkFiles } from "../src/workspace/layout.ts";
+import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/module-graph.ts";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 

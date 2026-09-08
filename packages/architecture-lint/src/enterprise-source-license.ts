@@ -1,7 +1,7 @@
 import ts from "typescript";
-import { readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
-import { walkFiles } from "./files.ts";
+import { sourceFile, sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
 const POLICY = "enterprise-source-license";
@@ -33,7 +33,7 @@ function isEnterpriseSource(file: string, root: string): boolean {
 function enterpriseDirectiveLine(source: string, file: string): number | undefined {
   if (!source.includes("LicenseRef-LangWatch-Enterprise")) return void 0;
 
-  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const parsed = sourceFile({ file });
   const comments = new Map<number, ts.CommentRange>();
   const visit = (node: ts.Node): void => {
     const ranges = [
@@ -73,16 +73,20 @@ function isEnterprisePackageFile(root: string, file: string): boolean {
  * source that was marked proprietary before being moved into the Enterprise
  * aggregate; historical provenance without the marker remains unknowable.
  */
-export function lintEnterpriseSourceLicense(root: string): ArchitectureViolation[] {
+export function lintEnterpriseSourceLicense(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root } = snapshot;
   const violations: ArchitectureViolation[] = [];
-  const sourceFiles = ["apps", "packages"].flatMap((directory) =>
-    walkFiles(`${root}/${directory}`, (file) => isEnterpriseSource(file, root)),
+  const licensedFiles = ["apps", "packages"].flatMap((directory) =>
+    snapshot.files({
+      directory: `${root}/${directory}`,
+      accept: (file) => isEnterpriseSource(file, root),
+    }),
   );
 
-  for (const file of sourceFiles) {
+  for (const file of licensedFiles) {
     if (isEnterprisePackageFile(root, file)) continue;
 
-    const line = enterpriseDirectiveLine(readFileSync(file, "utf8"), file);
+    const line = enterpriseDirectiveLine(sourceText({ file }), file);
     if (line === undefined) continue;
 
     violations.push({

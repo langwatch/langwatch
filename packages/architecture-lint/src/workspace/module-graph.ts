@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import ts from "typescript";
+import { WORKSPACE_ROOTS, isIgnoredDirectory } from "./layout.ts";
 
 /**
  * Rules share source resolution so package barrels and safe leaf exports retain
@@ -9,9 +10,6 @@ import ts from "typescript";
  */
 
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
-
-/** Where a workspace package may be declared. Mirrors `pnpm-workspace.yaml`. */
-const WORKSPACE_ROOTS = ["apps", "packages", "sdks", "mcp", "plugins", "services", "skills"];
 
 /**
  * How deep below a workspace root a `package.json` may sit.
@@ -22,8 +20,6 @@ const WORKSPACE_ROOTS = ["apps", "packages", "sdks", "mcp", "plugins", "services
  * cannot contain a workspace manifest — on every lint run.
  */
 const WORKSPACE_MANIFEST_DEPTH = 4;
-
-const IGNORED_DIRECTORIES = new Set(["node_modules", "dist", "coverage", ".git"]);
 
 /**
  * Conditions read in the order a Node runtime would pick them, so a package
@@ -45,6 +41,8 @@ export type ModuleImport = {
    * `verbatimModuleSyntax` even `{ type A }` alone still emits the import.
    */
   typeOnly: boolean;
+  /** `import(...)` or `require(...)`: a real runtime edge, but not a static neighbour. */
+  dynamic: boolean;
 };
 
 export type PackageManifestRecord = {
@@ -70,20 +68,86 @@ type ParsedSource = {
   rendersJsx: boolean;
 };
 
-type ParsedSourceCacheEntry = ParsedSource & {
-  mtimeMs: number;
-  ctimeMs: number;
-  size: number;
-};
+type Cached<T> = { value: T; mtimeMs: number; ctimeMs: number; size: number };
 
 /**
- * Keyed by path with filesystem freshness metadata. The AST is deliberately
- * not retained: the derived import facts are all callers need, and retaining
- * every SourceFile keeps the whole workspace tree alive for the process.
+ * Derived import facts, keyed by path and validated against the filesystem, so
+ * a rewritten fixture reparses and a policy never reads another policy's stale
+ * view of the tree.
  */
-const parsedSources = new Map<string, ParsedSourceCacheEntry>();
+const parsedSources = new Map<string, Cached<ParsedSource>>();
 
-function scriptKind(file: string): ts.ScriptKind {
+/**
+ * Syntax trees, shared between the policies that read one file more than once,
+ * and held weakly: 14,000 retained trees cost three gigabytes, and a tree
+ * nobody is still reading is a tree the run can afford to parse again.
+ */
+const syntaxTrees = new Map<string, Cached<{ tree: WeakRef<ts.SourceFile>; parents: boolean }>>();
+
+function fresh(entry: Cached<unknown> | undefined, file: string): boolean {
+  const stats = statSync(file);
+
+  return (
+    entry?.mtimeMs === stats.mtimeMs && entry?.ctimeMs === stats.ctimeMs && entry?.size === stats.size
+  );
+}
+
+function stamp<T>(file: string, value: T): Cached<T> {
+  const stats = statSync(file);
+
+  return { value, mtimeMs: stats.mtimeMs, ctimeMs: stats.ctimeMs, size: stats.size };
+}
+
+/** This file's text, read once per run. Text is cheap to hold; a syntax tree is not. */
+const sourceTexts = new Map<string, Cached<string>>();
+
+export function sourceText({ file }: { file: string }): string {
+  const entry = sourceTexts.get(file);
+  if (entry && fresh(entry, file)) return entry.value;
+
+  const text = readFileSync(file, "utf8");
+  sourceTexts.set(file, stamp(file, text));
+
+  return text;
+}
+
+/**
+ * This file's syntax tree. ADR-099: the compiler API is asked for a source
+ * file here and nowhere else, so every policy reads the same tree rather than
+ * its own copy of it.
+ */
+export function sourceFile({
+  file,
+  kind,
+  parents = true,
+}: {
+  file: string;
+  kind?: ts.ScriptKind;
+  parents?: boolean;
+}): ts.SourceFile {
+  const resolvedKind = kind ?? scriptKind(file);
+  const key = `${file}\0${resolvedKind}`;
+  const entry = syntaxTrees.get(key);
+  // A tree with parents answers a request that does not need them; the
+  // reverse does not, so a first parents-free parse is replaced rather than
+  // reused when a policy that walks upward asks for the same file.
+  const usable = fresh(entry, file) && entry !== void 0 && (entry.value.parents || !parents);
+  const known = usable ? entry.value.tree.deref() : void 0;
+  if (known) return known;
+
+  const parsed = ts.createSourceFile(
+    file,
+    sourceText({ file }),
+    ts.ScriptTarget.Latest,
+    parents,
+    resolvedKind,
+  );
+  syntaxTrees.set(key, stamp(file, { tree: new WeakRef(parsed), parents }));
+
+  return parsed;
+}
+
+export function scriptKind(file: string): ts.ScriptKind {
   const isTsxLike = file.endsWith(".tsx") || file.endsWith(".jsx");
   if (isTsxLike) return ts.ScriptKind.TSX;
 
@@ -102,7 +166,12 @@ function isJsxNode(node: ts.Node): boolean {
   return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
-type ImportRecordInput = { node: ts.Node; specifier: ts.Expression | undefined; typeOnly: boolean };
+type ImportRecordInput = {
+  node: ts.Node;
+  specifier: ts.Expression | undefined;
+  typeOnly: boolean;
+  dynamic?: boolean;
+};
 
 /**
  * A dynamic `import(...)` in value position parses as a call; the two type
@@ -117,7 +186,7 @@ function dynamicImportRecord(node: ts.CallExpression): ImportRecordInput | undef
   const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
   if (!dynamicImport && !requireCall) return undefined;
 
-  return { node, specifier: node.arguments[0], typeOnly: false };
+  return { node, specifier: node.arguments[0], typeOnly: false, dynamic: true };
 }
 
 /** The import-record input for one AST node, across every module-specifier-bearing form. */
@@ -153,23 +222,19 @@ function importRecordFor(node: ts.Node): ImportRecordInput | undefined {
 }
 
 function parseSource(file: string): ParsedSource {
-  const stats = statSync(file);
-  const cached = parsedSources.get(file);
-  const sameVersion =
-    cached?.mtimeMs === stats.mtimeMs &&
-    cached?.ctimeMs === stats.ctimeMs &&
-    cached?.size === stats.size;
-  if (cached && sameVersion) {
-    return cached;
-  }
+  const entry = parsedSources.get(file);
+  if (entry && fresh(entry, file)) return entry.value;
 
-  const sourceFile = ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind(file),
-  );
+  const parsed = collectParsedSource(file);
+  parsedSources.set(file, stamp(file, parsed));
+
+  return parsed;
+}
+
+function collectParsedSource(file: string): ParsedSource {
+  // Import extraction never walks upward, and binding a parent onto every node
+  // of 14,000 files is the single most expensive thing the run would do.
+  const source = sourceFile({ file, parents: false });
 
   const imports: ModuleImport[] = [];
   let rendersJsx = false;
@@ -181,10 +246,11 @@ function parseSource(file: string): ParsedSource {
         : void 0;
     imports.push({
       file,
-      line: sourceFile.getLineAndCharacterOfPosition(options.node.getStart(sourceFile)).line + 1,
+      line: source.getLineAndCharacterOfPosition(options.node.getStart(source)).line + 1,
       specifier: literal ? literal.text : "<non-literal module specifier>",
       nonLiteral: literal === void 0,
       typeOnly: options.typeOnly,
+      dynamic: options.dynamic === true,
     });
   };
 
@@ -197,17 +263,9 @@ function parseSource(file: string): ParsedSource {
     ts.forEachChild(node, visit);
   };
 
-  visit(sourceFile);
+  visit(source);
 
-  const parsed = { imports, rendersJsx };
-  parsedSources.set(file, {
-    ...parsed,
-    mtimeMs: stats.mtimeMs,
-    ctimeMs: stats.ctimeMs,
-    size: stats.size,
-  });
-
-  return parsed;
+  return { imports, rendersJsx };
 }
 
 /** Every module specifier this file names, type-only ones included and flagged. */
@@ -361,8 +419,7 @@ function collectManifests(options: {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const isIgnoredDirectory = entry.name.startsWith(".") || IGNORED_DIRECTORIES.has(entry.name);
-    if (isIgnoredDirectory) continue;
+    if (isIgnoredDirectory({ name: entry.name })) continue;
 
     collectManifests({
       directory: join(options.directory, entry.name),

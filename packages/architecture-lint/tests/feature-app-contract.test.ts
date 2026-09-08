@@ -3,8 +3,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lintFeatureAppContracts } from "../src/feature-app-contract.ts";
-import { createWorkspaceModuleResolver } from "../src/module-graph.ts";
+import { createWorkspaceModuleResolver } from "../src/workspace/module-graph.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root: string;
 let packages: ClassifiedPackage[];
@@ -18,12 +19,7 @@ function write(file: string, text: string): void {
   writeFileSync(target, text);
 }
 function findings() {
-  return lintFeatureAppContracts(
-    root,
-    catalogue,
-    packages,
-    createWorkspaceModuleResolver({ root }),
-  );
+  return lintFeatureAppContracts(snapshotOf({ root, catalogue, packages }));
 }
 function install(kind: "legacy" | "defined" = "legacy", extra = ""): void {
   if (kind === "legacy") {

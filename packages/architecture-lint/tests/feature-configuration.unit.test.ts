@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lintFeatureConfiguration } from "../src/feature-configuration.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root: string;
 
@@ -29,7 +30,7 @@ function write(file: string, text: string): void {
 }
 
 function findings(): ReturnType<typeof lintFeatureConfiguration> {
-  return lintFeatureConfiguration(root, catalogue);
+  return lintFeatureConfiguration(snapshotOf({ root, catalogue }));
 }
 
 beforeEach(() => {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { lintStrictContractBuildConfigs, type ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -45,7 +46,7 @@ describe("strict contract declaration build configs", () => {
       exclude: ["tests"],
     });
 
-    expect(lintStrictContractBuildConfigs(root, [contractPackage("future-feature")])).toEqual([]);
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("future-feature")] }))).toEqual([]);
   });
 
   it("accepts recursive test-root exclusions used by canonical contracts", () => {
@@ -56,7 +57,7 @@ describe("strict contract declaration build configs", () => {
       exclude: ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
     });
 
-    expect(lintStrictContractBuildConfigs(root, [contractPackage("recursive-feature")])).toEqual(
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("recursive-feature")] }))).toEqual(
       [],
     );
   });
@@ -69,7 +70,7 @@ describe("strict contract declaration build configs", () => {
       exclude: ["src/tests/**"],
     });
 
-    expect(lintStrictContractBuildConfigs(root, [contractPackage("nested-feature")])).toMatchObject(
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("nested-feature")] }))).toMatchObject(
       [{ policy: "contract-build-config" }],
     );
   });
@@ -83,7 +84,7 @@ describe("strict contract declaration build configs", () => {
       exclude: [],
     });
 
-    expect(lintStrictContractBuildConfigs(root, [contractPackage("api-key")])).toMatchObject([
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("api-key")] }))).toMatchObject([
       { policy: "contract-build-config" },
     ]);
   });
@@ -91,7 +92,7 @@ describe("strict contract declaration build configs", () => {
   it("requires the build config when a discovered strict contract has a build script", () => {
     root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
 
-    expect(lintStrictContractBuildConfigs(root, [contractPackage("new-contract")])).toMatchObject([
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("new-contract")] }))).toMatchObject([
       { policy: "contract-build-config" },
     ]);
   });

@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { readFeatureCatalogue } from "./feature-catalogue.ts";
+import { join, resolve } from "node:path";
+import { readFeatureCatalogue } from "../feature-catalogue.ts";
+import { walkFiles } from "./layout.ts";
+import { createWorkspaceModuleResolver, type WorkspaceModuleResolver } from "./module-graph.ts";
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
@@ -10,7 +12,7 @@ import type {
   FeatureLayoutVersion,
   FeaturePackageRole,
   PackageManifest,
-} from "./types.ts";
+} from "../types.ts";
 
 const FEATURE_ROLES = new Set<FeaturePackageRole>(["contract", "server", "web"]);
 
@@ -498,4 +500,67 @@ export function discoverClassifiedPackages(root: string): {
   }
 
   return { packages, catalogue, violations };
+}
+
+/**
+ * One reading of the workspace, built once per run and handed to every policy.
+ * Before it, nine policies walked the tree for themselves with five different
+ * ignore lists, and a file every policy read was parsed once per policy.
+ */
+export type WorkspaceSnapshot = {
+  /** The absolute workspace root every path in the snapshot is relative to. */
+  readonly root: string;
+  readonly packages: readonly ClassifiedPackage[];
+  readonly catalogue: readonly FeatureCatalogueEntry[];
+  /** What discovery itself refused: a mis-named package, an unregistered feature root. */
+  readonly discoveryViolations: readonly ArchitectureViolation[];
+  /** Source files changed against the merge base, for the policies scoped to new code. */
+  readonly changedFiles: readonly string[];
+  readonly resolver: WorkspaceModuleResolver;
+  /** Every file under `directory` the filter accepts, from one walk per directory. */
+  files: (options: {
+    directory: string;
+    accept: (path: string) => boolean;
+    ignoredDirectories?: ReadonlySet<string>;
+  }) => readonly string[];
+};
+
+type SnapshotOptions = {
+  root: string;
+  changedFiles: readonly string[];
+};
+
+function directoryListings(): (options: {
+  directory: string;
+  ignoredDirectories?: ReadonlySet<string>;
+}) => readonly string[] {
+  const listings = new Map<string, readonly string[]>();
+
+  return ({ directory, ignoredDirectories }) => {
+    const key = `${directory}\0${[...(ignoredDirectories ?? [])].sort().join(",")}`;
+    const known = listings.get(key);
+    if (known) return known;
+
+    const found = walkFiles(directory, () => true, { ignoredDirectories });
+    listings.set(key, found);
+
+    return found;
+  };
+}
+
+export function buildWorkspaceSnapshot({ root, changedFiles }: SnapshotOptions): WorkspaceSnapshot {
+  const resolvedRoot = resolve(root);
+  const discovery = discoverClassifiedPackages(resolvedRoot);
+  const listing = directoryListings();
+
+  return {
+    root: resolvedRoot,
+    packages: discovery.packages,
+    catalogue: discovery.catalogue,
+    discoveryViolations: discovery.violations,
+    changedFiles,
+    resolver: createWorkspaceModuleResolver({ root: resolvedRoot }),
+    files: ({ directory, accept, ignoredDirectories }) =>
+      listing({ directory, ignoredDirectories }).filter(accept),
+  };
 }

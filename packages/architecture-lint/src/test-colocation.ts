@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
-import { discoverClassifiedPackages } from "./workspace.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { discoverClassifiedPackages } from "./workspace/snapshot.ts";
 
 /**
  * Moving a feature package's `tests/` tree into `__tests__` directories beside

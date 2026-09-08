@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { sourceFile } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
 const POLICY = "boundary-signature-mirrors";
@@ -61,8 +61,8 @@ function isApplicationCompositionPath(parts: readonly string[], file: string): b
   return isComposition;
 }
 
-function sourceFile(file: string): ts.SourceFile {
-  return ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+function parsed(file: string): ts.SourceFile {
+  return sourceFile({ file });
 }
 
 type Scope = Set<string>;
@@ -182,7 +182,7 @@ function utilityTypeName(node: ts.TypeReferenceNode): string | undefined {
 }
 
 function boundaryViolations(file: string): ArchitectureViolation[] {
-  const source = sourceFile(file);
+  const source = parsed(file);
   const scopes = scopeDeclarations(source);
   const violations: ArchitectureViolation[] = [];
   const report = (node: ts.Node, message: string): void => {
@@ -238,9 +238,14 @@ function boundaryViolations(file: string): ArchitectureViolation[] {
   return violations;
 }
 
-export function lintBoundarySignatureMirrors(root: string): ArchitectureViolation[] {
+export function lintBoundarySignatureMirrors(
+  snapshot: WorkspaceSnapshot,
+): ArchitectureViolation[] {
+  const { root } = snapshot;
   const files = [join(root, "packages"), join(root, "apps")]
-    .flatMap((directory) => walkFiles(directory, (file) => isBoundarySource(file, root)))
+    .flatMap((directory) =>
+      snapshot.files({ directory, accept: (file) => isBoundarySource(file, root) }),
+    )
     .sort();
 
   return files

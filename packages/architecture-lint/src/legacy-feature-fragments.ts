@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 import { z } from "zod";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
 
 const BASELINE_PATH = join(
@@ -250,11 +251,9 @@ function readBaseline(root: string): {
   return { baseline, violations };
 }
 
-export function lintLegacyFeatureFragments(
-  root: string,
-  catalogue: readonly FeatureCatalogueEntry[],
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintLegacyFeatureFragments(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, catalogue, packages } = snapshot;
+
   const path = join(root, BASELINE_PATH);
   const { baseline, violations } = readBaseline(root);
   const actual = collectLegacyFeatureFragments(root, catalogue, packages);

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
-import type { WorkspaceModuleResolver } from "./module-graph.ts";
+import type { WorkspaceModuleResolver } from "./workspace/module-graph.ts";
 
 function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return ts.canHaveModifiers(node) && Boolean(ts.getModifiers(node)?.some((m) => m.kind === kind));

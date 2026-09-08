@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { lintPrismaTableOwnership } from "../src/prisma-table-ownership.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
+import { snapshotOf } from "./workspace.ts";
 
 const roots: string[] = [];
 function fixture() {
@@ -50,7 +51,7 @@ model AuditLog {
 ${options.declaration ?? `export class Repository { static readonly tables = ${expression}; }`}`,
     );
   }
-  return { repository, lint: () => lintPrismaTableOwnership(root, catalogue) };
+  return { repository, lint: () => lintPrismaTableOwnership(snapshotOf({ root, catalogue })) };
 }
 
 afterEach(() => {

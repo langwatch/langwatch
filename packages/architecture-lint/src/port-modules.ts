@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 
 function isStrictPort(path: string): boolean {
   return /\/server\/src\/ports\/.+\.port\.ts$/.test(path);
@@ -50,13 +51,15 @@ function hasOnlyExportedAbstractPortClasses(path: string): boolean {
  * excused the type-bag ports reached zero and is gone: the rule is a plain
  * refusal now.
  */
-export function lintStrictPortModules(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+export function lintStrictPortModules(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of packages) {
     if (pkg.kind !== "server" || pkg.layoutVersion !== 0) continue;
 
-    for (const file of walkFiles(pkg.root, isStrictPort)) {
+    for (const file of snapshot.files({ directory: pkg.root, accept: isStrictPort })) {
       if (hasOnlyExportedAbstractPortClasses(file)) continue;
 
       violations.push({

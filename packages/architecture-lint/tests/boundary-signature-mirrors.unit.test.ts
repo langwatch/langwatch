@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { lintBoundarySignatureMirrors } from "../src/boundary-signature-mirrors.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -13,7 +14,7 @@ function write(path: string, source: string): void {
 }
 
 function findings() {
-  return lintBoundarySignatureMirrors(root);
+  return lintBoundarySignatureMirrors(snapshotOf({ root }));
 }
 
 describe("boundary signature mirrors", () => {

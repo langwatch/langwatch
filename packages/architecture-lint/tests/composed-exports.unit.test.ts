@@ -12,6 +12,7 @@ import {
   lintComposedExportsBaseline,
   readBaseline,
 } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -39,7 +40,7 @@ function baseline(keys: readonly string[], path = "packages/architecture-lint/sr
 }
 
 function reported(): string[] {
-  return lintComposedExports(root).map((violation) => violation.message);
+  return lintComposedExports(snapshotOf({ root })).map((violation) => violation.message);
 }
 
 /** One application reaching one composition, and one feature server package

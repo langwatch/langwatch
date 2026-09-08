@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 import { browserOnlyPackage } from "./browser-packages.ts";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 import {
   createWorkspaceModuleResolver,
   moduleImports,
@@ -14,7 +14,9 @@ import {
   walkValueImportGraph,
   type ModuleImport,
   type WorkspaceModuleResolver,
-} from "./module-graph.ts";
+  sourceText,
+} from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const UI_FEATURE_CATALOGUE_PATH = join("apps", "ui", "src", "features", "catalogue.json");
@@ -139,8 +141,17 @@ function isWithin(root: string, path: string): boolean {
   );
 }
 
+/**
+ * The seven scans this policy makes cover overlapping roots. One walk per root
+ * per run keeps them from re-reading `apps/ui/src` seven times over.
+ */
+const scans = new Map<string, string[]>();
+
 function sourceFiles(root: string): string[] {
-  return walkFiles(
+  const known = scans.get(root);
+  if (known) return known;
+
+  const found = walkFiles(
     root,
     (file) =>
       SOURCE_FILE.test(file) &&
@@ -148,6 +159,9 @@ function sourceFiles(root: string): string[] {
       !file.includes(`${sep}__tests__${sep}`) &&
       !file.includes(`${sep}__mocks__${sep}`),
   );
+  scans.set(root, found);
+
+  return found;
 }
 
 function resolveUiSourceImport(sourceImport: SourceImport, sourceRoot: string): string | undefined {
@@ -444,6 +458,9 @@ const commentFreeSources = new Map<string, string>();
  * The source with comments blanked to spaces (not removed, so offsets stay lined up). Capability checks are regex over raw text, so a docblock that only NAMES a capability read as a use of it; the PARSER, not a bare scanner, avoids the same trap with template literals.
  */
 function withoutComments(source: string): string {
+  // No comment marker, nothing to blank, and no reason to parse the file.
+  if (!source.includes("//") && !source.includes("/*")) return source;
+
   const known = commentFreeSources.get(source);
   if (known !== void 0) return known;
 
@@ -483,6 +500,11 @@ function withoutComments(source: string): string {
 }
 
 function browserCapabilitySourceViolations(source: string): string[] {
+  // Blanking a comment can only remove a match, never add one, so a source
+  // that names no capability at all needs neither parse.
+  const named = BROWSER_CAPABILITY_SOURCE.some(([pattern]) => pattern.test(source));
+  if (!named && !source.includes("process")) return [];
+
   const code = withoutComments(source);
 
   const capabilities = BROWSER_CAPABILITY_SOURCE.filter(([pattern]) => pattern.test(code)).map(
@@ -495,6 +517,8 @@ function browserCapabilitySourceViolations(source: string): string[] {
 }
 
 function readsProcessEnvironment(source: string): boolean {
+  if (!source.includes("process")) return false;
+
   const sourceFile = ts.createSourceFile(
     "source.tsx",
     source,
@@ -585,7 +609,7 @@ function createPortableModuleOracle({ root }: { root: string }): PortableModuleO
         emitted: ({ file }) =>
           rendersJsx({ file })
             ? "react/jsx-runtime"
-            : browserCapabilitySourceViolations(readFileSync(file, "utf8"))[0],
+            : browserCapabilitySourceViolations(sourceText({ file }))[0],
       }).seeds.size === 0;
 
     answers.set(specifier, portable);
@@ -999,7 +1023,7 @@ function lintUiSourceBoundaries(
   for (const file of sourceFiles(sourceRoot)) {
     const importerFeatureRoot = featureForFile(featuresRoot, file);
     const importerFeature = importerFeatureRoot ? featureByRoot.get(importerFeatureRoot) : void 0;
-    const source = readFileSync(file, "utf8");
+    const source = sourceText({ file });
 
     if (importerFeature) {
       for (const capability of browserCapabilitySourceViolations(source)) {
@@ -1306,7 +1330,7 @@ function screenClosureStep({
   const violations: ArchitectureViolation[] = [];
   const next: string[] = [];
   for (const browserCapability of browserCapabilitySourceViolations(
-    readFileSync(current, "utf8"),
+    sourceText({ file: current }),
   )) {
     violations.push({
       policy: "ui-screen-closure",
@@ -1457,7 +1481,7 @@ function surfaceClosureStep({
 }): { violations: ArchitectureViolation[]; next: { file: string; chain: string[] }[] } {
   const violations: ArchitectureViolation[] = [];
   const next: { file: string; chain: string[] }[] = [];
-  for (const used of browserCapabilitySourceViolations(readFileSync(current, "utf8"))) {
+  for (const used of browserCapabilitySourceViolations(sourceText({ file: current }))) {
     violations.push({
       policy: "ui-surface-closure",
       file: current,
@@ -2125,10 +2149,9 @@ function lintWebPrivateStructure(
   return violations;
 }
 
-export function lintFrontendUiBoundaries(
-  root: string,
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintFrontendUiBoundaries(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, packages } = snapshot;
+  scans.clear();
   const { catalogue, violations } = readUiFeatureCatalogue(root);
   if (!catalogue) return violations;
 
@@ -2159,10 +2182,9 @@ export function lintFrontendUiBoundaries(
  * Web package dependencies justified by an explicit, governed UI surface use.
  * Manifest validation still rejects every other cross-feature package edge.
  */
-export function declaredWebDependencyPairs(
-  root: string,
-  packages: ClassifiedPackage[],
-): ReadonlySet<string> {
+export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): ReadonlySet<string> {
+  const { root, packages } = snapshot;
+  scans.clear();
   const { catalogue } = readUiFeatureCatalogue(root);
   if (!catalogue) return new Set();
 

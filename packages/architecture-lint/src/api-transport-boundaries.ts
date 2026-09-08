@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceFile } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
@@ -1071,13 +1073,7 @@ function credentialContextViolations(file: string, source: ts.SourceFile): Archi
 }
 
 function lintSource(transport: TransportSource): ArchitectureViolation[] {
-  const source = ts.createSourceFile(
-    transport.file,
-    readFileSync(transport.file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind(transport.file),
-  );
+  const source = sourceFile({ file: transport.file });
   const violations: ArchitectureViolation[] = [];
 
   for (const reference of importReferences(source)) {
@@ -1114,9 +1110,9 @@ function lintSource(transport: TransportSource): ArchitectureViolation[] {
 }
 
 /** Fast structural checks for strict feature APIs and the API process transport surface. */
-export function lintApiTransportBoundaries(
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintApiTransportBoundaries(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   return transportSources(packages)
     .flatMap((source) => lintSource(source))
     .sort((left, right) =>

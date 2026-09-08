@@ -23,7 +23,9 @@ import { readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const POLICY = "api-transport-through-framework";
@@ -667,16 +669,15 @@ export function apiTransportFrameworkFindings(
 }
 
 /** Every transport declares its endpoints through the framework; nothing is excused. */
-export function lintApiTransportFramework(
-  root: string,
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintApiTransportFramework(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, packages } = snapshot;
+
   const violations: ArchitectureViolation[] = [];
 
   for (const { file, surface } of transportFiles(packages)) {
     for (const finding of apiTransportFrameworkFindings(
       file,
-      readFileSync(file, "utf8"),
+      sourceText({ file }),
       surface,
     )) {
       violations.push({
@@ -690,7 +691,7 @@ export function lintApiTransportFramework(
   }
 
   for (const file of featureServerFiles(packages)) {
-    for (const finding of featureServerTransportFindings(file, readFileSync(file, "utf8"))) {
+    for (const finding of featureServerTransportFindings(file, sourceText({ file }))) {
       violations.push({
         policy: POLICY,
         file: finding.file,

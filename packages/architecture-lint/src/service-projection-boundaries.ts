@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceFile } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const PROJECTION_WRITE_TYPES = new Set(["FoldProjectionStore", "ProjectionStore"]);
@@ -61,17 +63,11 @@ function packageTypes(files: readonly string[]): PackageTypes {
   const sourceByPath = new Map<string, ts.SourceFile>();
 
   for (const file of files) {
-    const sourceFile = ts.createSourceFile(
-      file,
-      readFileSync(file, "utf8"),
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
-    );
-    sourceByPath.set(file, sourceFile);
-    importsByFile.set(sourceFile, importedTypeNames(sourceFile));
+    const parsed = sourceFile({ file, kind: ts.ScriptKind.TS });
+    sourceByPath.set(file, parsed);
+    importsByFile.set(parsed, importedTypeNames(parsed));
 
-    for (const statement of sourceFile.statements) {
+    for (const statement of parsed.statements) {
       const isTypeDeclaration =
         ts.isClassDeclaration(statement) ||
         ts.isInterfaceDeclaration(statement) ||
@@ -273,14 +269,19 @@ function lintServiceFile(
 
 /** Services may read projections but cannot receive their write capabilities. */
 export function lintServiceProjectionBoundaries(
-  packages: readonly ClassifiedPackage[],
+  snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of packages) {
     if (pkg.kind !== "server" || pkg.layoutVersion !== 0) continue;
 
-    const sourceFiles = walkFiles(join(pkg.root, "src"), (file) => file.endsWith(".ts"));
+    const sourceFiles = snapshot.files({
+      directory: join(pkg.root, "src"),
+      accept: (file) => file.endsWith(".ts"),
+    });
     const types = packageTypes(sourceFiles);
 
     for (const file of sourceFiles.filter(isDomainServiceFile)) {

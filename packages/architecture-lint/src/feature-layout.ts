@@ -1,8 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
-import { readFeatureCatalogue } from "./feature-catalogue.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import { lintFeatureAppContracts } from "./feature-app-contract.ts";
 import { lintFeatureSetupInfrastructure } from "./feature-setup-infrastructure.ts";
 import {
@@ -14,12 +13,12 @@ import {
   TEST_DIRECTORY,
 } from "@langwatch/lint-core/grammar/feature-layout-policy.mjs";
 import {
-  createWorkspaceModuleResolver,
   resolveRelativeModule,
+  sourceFile,
   valueImports,
   walkValueImportGraph,
   type WorkspaceModuleResolver,
-} from "./module-graph.ts";
+} from "./workspace/module-graph.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const RULES_IMPLEMENTATION_PATH =
@@ -72,8 +71,14 @@ function compositionBindingsBeyondFeatureApi(statement: ts.ImportDeclaration): s
     .filter((name) => !FEATURE_API_VOCABULARY.has(name));
 }
 
-function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
-  const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
+function lintContract(
+  snapshot: WorkspaceSnapshot,
+  pkg: ClassifiedPackage,
+): ArchitectureViolation[] {
+  const files = snapshot.files({
+    directory: `${pkg.root}/src`,
+    accept: (path) => /\.[cm]?[jt]sx?$/.test(path),
+  });
   const services = files.filter((file) => {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (TEST_DIRECTORY.test(path)) return false;
@@ -86,13 +91,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
   if (services.length > 0) {
     const api = `${pkg.root}/src/${pkg.feature}.api.ts`;
     if (existsSync(api)) {
-      const parsed = ts.createSourceFile(
-        api,
-        readFileSync(api, "utf8"),
-        ts.ScriptTarget.Latest,
-        true,
-      );
-      for (const statement of parsed.statements) {
+      for (const statement of sourceFile({ file: api }).statements) {
         if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
           continue;
 
@@ -230,11 +229,14 @@ function lintRulesImports(
 }
 
 function lintServer(
+  snapshot: WorkspaceSnapshot,
   pkg: ClassifiedPackage,
-  getResolver: () => WorkspaceModuleResolver,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
+  const files = snapshot.files({
+    directory: `${pkg.root}/src`,
+    accept: (path) => /\.[cm]?[jt]sx?$/.test(path),
+  });
   let serviceCount = 0;
 
   for (const file of files) {
@@ -244,7 +246,7 @@ function lintServer(
     if (PROCESS_MANAGER_SERVICE_PATTERN.test(path)) continue;
 
     if (RULES_PATTERN.test(path)) {
-      violations.push(...lintRulesImports(pkg, file, getResolver()));
+      violations.push(...lintRulesImports(pkg, file, snapshot.resolver));
       continue;
     }
 
@@ -439,13 +441,7 @@ function isExportedValueDeclaration(statement: ts.Statement): boolean {
 }
 
 function parseModule(file: string): ts.SourceFile {
-  return ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
+  return sourceFile({ file, kind: ts.ScriptKind.TS });
 }
 
 /**
@@ -705,30 +701,18 @@ function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation
   return violations;
 }
 
-export function lintFeatureLayouts(
-  root: string,
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintFeatureLayouts(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  // Built at most once, and only when a rules/ file is actually found — most
-  // lint runs never need the workspace-wide resolver this walk requires.
-  let resolver: WorkspaceModuleResolver | undefined;
-  const getResolver = (): WorkspaceModuleResolver => {
-    resolver ??= createWorkspaceModuleResolver({ root });
+  violations.push(...lintFeatureAppContracts(snapshot));
+  violations.push(...lintFeatureSetupInfrastructure(snapshot));
 
-    return resolver;
-  };
-  const catalogue = readFeatureCatalogue(root, []);
-  violations.push(...lintFeatureAppContracts(root, catalogue, packages, getResolver()));
-  violations.push(...lintFeatureSetupInfrastructure(root, packages, catalogue, getResolver()));
-
-  for (const pkg of packages) {
+  for (const pkg of snapshot.packages) {
     if (pkg.layoutVersion !== 0) continue;
 
-    if (pkg.kind === "contract") violations.push(...lintContract(pkg));
+    if (pkg.kind === "contract") violations.push(...lintContract(snapshot, pkg));
 
     if (pkg.kind === "server") {
-      violations.push(...lintServer(pkg, getResolver));
+      violations.push(...lintServer(snapshot, pkg));
       violations.push(...lintPrivateServerExports(pkg));
     }
   }

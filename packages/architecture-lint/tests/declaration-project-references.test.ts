@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { lintDeclarationProjectReferences, type ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -95,12 +96,12 @@ describe("declaration project references", () => {
     consumerReference(consumer.root, "../dependency/tsconfig.build.json");
     writeSolution([consumer, dependency]);
 
-    expect(lintDeclarationProjectReferences(root, [consumer, dependency])).toMatchObject([
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [consumer, dependency] }))).toMatchObject([
       { policy: "declaration-project-references", specifier: "@scope/dependency" },
     ]);
 
     reference(consumer.root, "../dependency/tsconfig.build.json");
-    expect(lintDeclarationProjectReferences(root, [consumer, dependency])).toEqual([]);
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [consumer, dependency] }))).toEqual([]);
   });
 
   it("accepts transitive producer coverage and ignores dev-only dependencies", () => {
@@ -120,7 +121,7 @@ describe("declaration project references", () => {
     reference(middle.root, "../leaf/tsconfig.build.json");
     writeSolution([consumer, middle, leaf, ignored]);
 
-    expect(lintDeclarationProjectReferences(root, [consumer, middle, leaf, ignored])).toEqual([]);
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [consumer, middle, leaf, ignored] }))).toEqual([]);
   });
 
   it("reports dangling references without requiring declaration output files", () => {
@@ -136,7 +137,7 @@ describe("declaration project references", () => {
     );
     writeSolution([consumer]);
 
-    expect(lintDeclarationProjectReferences(root, [consumer])).toMatchObject([
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [consumer] }))).toMatchObject([
       {
         policy: "declaration-project-references",
         file: join(consumer.root, "tsconfig.build.json"),
@@ -156,12 +157,12 @@ describe("declaration project references", () => {
     });
     writeSolutionPaths([producer.root, join(consumer.root, "tsconfig.build.json")]);
 
-    expect(lintDeclarationProjectReferences(root, [producer, consumer])).toMatchObject([
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [producer, consumer] }))).toMatchObject([
       { specifier: "@scope/producer" },
     ]);
     reference(consumer.root, "../producer");
 
-    expect(lintDeclarationProjectReferences(root, [producer, consumer])).toEqual([]);
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [producer, consumer] }))).toEqual([]);
   });
 
   it("supports an alternate producer filename", () => {
@@ -180,12 +181,12 @@ describe("declaration project references", () => {
       join(consumer.root, "tsconfig.build.json"),
     ]);
 
-    expect(lintDeclarationProjectReferences(root, [producer, consumer])).toMatchObject([
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [producer, consumer] }))).toMatchObject([
       { specifier: "@scope/mail" },
     ]);
     reference(consumer.root, "../mail/tsconfig.declarations.json");
 
-    expect(lintDeclarationProjectReferences(root, [producer, consumer])).toEqual([]);
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [producer, consumer] }))).toEqual([]);
   });
 
   it("accepts dependencies in the same declaration group and detects external omissions", () => {
@@ -211,7 +212,7 @@ describe("declaration project references", () => {
     );
     writeSolutionPaths([group, external.root + "/tsconfig.build.json"]);
 
-    expect(lintDeclarationProjectReferences(root, [member, sameGroup, external])).toMatchObject([
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [member, sameGroup, external] }))).toMatchObject([
       { specifier: "@scope/external" },
     ]);
   });
@@ -226,7 +227,7 @@ describe("declaration project references", () => {
     reference(second.root, "../first/tsconfig.build.json");
     writeSolution([malformed, first, second]);
 
-    expect(lintDeclarationProjectReferences(root, [malformed, first, second])).toEqual(
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [malformed, first, second] }))).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ message: expect.stringContaining("valid JSONC") }),
         expect.objectContaining({ message: expect.stringContaining("cycle") }),
@@ -255,7 +256,7 @@ describe("declaration project references", () => {
         }),
       );
     }
-    expect(lintDeclarationProjectReferences(root, [])).toMatchObject([
+    expect(lintDeclarationProjectReferences(snapshotOf({ root, packages: [] }))).toMatchObject([
       { file: referringFile, message: expect.stringContaining("does not exist") },
     ]);
   });

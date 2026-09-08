@@ -10,7 +10,9 @@ import {
   readBaseline,
   staleRows,
 } from "./baseline.ts";
-import { walkFiles } from "./files.ts";
+import { PACKAGE_SOURCE_ROOTS, walkFiles } from "./workspace/layout.ts";
+import { sourceText, valueImports } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
 /**
@@ -46,8 +48,6 @@ export type SourceFolderShapeFinding = {
   allowed: string;
 };
 
-const SCANNED_ROOTS = ["apps", "packages", "tools/dev-runtime"];
-
 const SKIPPED_DIRECTORIES = new Set(["__tests__", "__mocks__", "generated", "test-utils"]);
 
 function isSourceFile(path: string): boolean {
@@ -69,13 +69,10 @@ function isUnderSrc(path: string): boolean {
 }
 
 function sourceFiles(root: string): string[] {
-  return SCANNED_ROOTS.flatMap((scanned) =>
+  return PACKAGE_SOURCE_ROOTS.flatMap((scanned) =>
     walkFiles(join(root, scanned), (path) => isSourceFile(path) && isUnderSrc(path)),
   );
 }
-
-/** A value import of a neighbour. `import type` is erased at build and reads nothing at runtime. */
-const RELATIVE_IMPORT = /(?<!import\s+type\s[^;]*)from\s+["'](\.{1,2}\/[^"']+)["']/g;
 
 function resolveImport(from: string, specifier: string, known: ReadonlySet<string>): string | null {
   const base = resolve(dirname(from), specifier);
@@ -93,16 +90,21 @@ function resolveImport(from: string, specifier: string, known: ReadonlySet<strin
   return candidates.find((candidate) => known.has(candidate)) ?? null;
 }
 
-/** Who imports each source file, by relative import only; package-name imports are entries. */
+/**
+ * Who reads each source file, by relative value import only; package-name
+ * imports are entries. `import type` is erased at build, so a types file read
+ * only by types is nobody's paragraph and the graph, not a regex, says so.
+ */
 function importersOf(files: readonly string[]): Map<string, Set<string>> {
   const known = new Set(files);
   const importers = new Map<string, Set<string>>();
 
   for (const file of files) {
-    const source = readFileSync(file, "utf8");
+    for (const { specifier, dynamic } of valueImports({ file })) {
+      // A lazily loaded screen is a route split, not a paragraph of its index.
+      if (dynamic || !specifier.startsWith(".")) continue;
 
-    for (const match of source.matchAll(RELATIVE_IMPORT)) {
-      const target = resolveImport(file, match[1]!, known);
+      const target = resolveImport(file, specifier, known);
       if (!target || target === file) continue;
 
       const set = importers.get(target) ?? new Set<string>();
@@ -115,7 +117,7 @@ function importersOf(files: readonly string[]): Map<string, Set<string>> {
 }
 
 function lineCount(file: string): number {
-  return readFileSync(file, "utf8")
+  return sourceText({ file })
     .split("\n")
     .filter((line) => line.trim() !== "").length;
 }
@@ -246,7 +248,8 @@ function baselineFile(root: string): string {
   return baselinePath({ root, policy: SOURCE_FOLDER_SHAPE_BASELINE });
 }
 
-export function lintSourceFolderShape(root: string): ArchitectureViolation[] {
+export function lintSourceFolderShape(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root } = snapshot;
   const file = baselineFile(root);
   const baseline = readBaseline({ policy: SOURCE_FOLDER_SHAPE_BASELINE, file });
   const violations = [

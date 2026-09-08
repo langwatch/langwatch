@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "./types.ts";
 
 /**
@@ -47,10 +48,8 @@ function featureConfigModules(root: string, feature: FeatureCatalogueEntry): str
     .map((name) => join(directory, name));
 }
 
-export function lintFeatureConfiguration(
-  root: string,
-  catalogue: readonly FeatureCatalogueEntry[],
-): ArchitectureViolation[] {
+export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, catalogue } = snapshot;
   const violations: ArchitectureViolation[] = [];
   const owners = new Map<string, string>();
 

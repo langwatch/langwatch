@@ -11,6 +11,7 @@ import {
   type ClassifiedPackage,
   type FeatureCatalogueEntry,
 } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 const catalogue: FeatureCatalogueEntry[] = [
@@ -81,7 +82,7 @@ function findings() {
 }
 
 function violations() {
-  return lintFeatureShape(root, catalogue, everyPackage());
+  return lintFeatureShape(snapshotOf({ root, catalogue, packages: everyPackage() }));
 }
 
 /** Rows keyed `<feature>|<kind>`, sorted the way the reader validates them. */

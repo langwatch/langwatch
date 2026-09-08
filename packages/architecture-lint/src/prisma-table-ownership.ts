@@ -1,7 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "./types.ts";
 import { lintPrismaMigrationAccess } from "./prisma-migration-access.ts";
 
@@ -283,7 +285,7 @@ function featureClaims(
   );
 
   return files.flatMap((file) => {
-    const text = readFileSync(file, "utf8");
+    const text = sourceText({ file });
     if (!text.includes(OWNERSHIP_MODULE) && !text.includes(REPOSITORY_MODULE)) return [];
 
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
@@ -326,10 +328,8 @@ function checkOwners(
 }
 
 /** Checks explicit adoption across the catalogue, including features never installed together. */
-export function lintPrismaTableOwnership(
-  root: string,
-  catalogue: readonly FeatureCatalogueEntry[],
-): ArchitectureViolation[] {
+export function lintPrismaTableOwnership(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, catalogue } = snapshot;
   const schemaFile = join(root, "packages/prisma-client/prisma/schema.prisma");
   if (!existsSync(schemaFile)) return [];
 

@@ -1,11 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 import ts from "typescript";
-import type { WorkspaceModuleResolver } from "./module-graph.ts";
-import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
-import { walkFiles } from "./files.ts";
-
-const sourceCache = new Map<string, ts.SourceFile>();
+import { sourceFile, type WorkspaceModuleResolver } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 function isImportWithLiteral(node: ts.Statement): node is ts.ImportDeclaration {
   return ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier);
@@ -75,18 +73,7 @@ function namedTypeDeclaration(item: ts.Statement, name: string): boolean {
 }
 
 function source(file: string): ts.SourceFile {
-  const cached = sourceCache.get(file);
-  if (cached) return cached;
-
-  const parsed = ts.createSourceFile(
-    file,
-    readFileSync(file, "utf8"),
-    ts.ScriptTarget.Latest,
-    true,
-  );
-  sourceCache.set(file, parsed);
-
-  return parsed;
+  return sourceFile({ file });
 }
 
 function typeName(node: ts.EntityName): string {
@@ -692,28 +679,21 @@ function capabilityOwner(
 }
 
 export function lintFeatureSetupInfrastructure(
-  root: string,
-  packages: readonly ClassifiedPackage[],
-  catalogue: readonly FeatureCatalogueEntry[],
-  resolver: WorkspaceModuleResolver,
+  snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
-  void root;
-  void catalogue;
+  const { packages, resolver } = snapshot;
 
-  sourceCache.clear();
+  return packages
+    .filter((pkg) => pkg.kind === "server" && pkg.layoutVersion === 0)
+    .flatMap((pkg) => {
+      const appRoot = join(pkg.root, "src", "app");
+      if (!existsSync(appRoot)) return [];
 
-  try {
-    return packages
-      .filter((pkg) => pkg.kind === "server" && pkg.layoutVersion === 0)
-      .flatMap((pkg) => {
-        const appRoot = join(pkg.root, "src", "app");
-        if (!existsSync(appRoot)) return [];
-
-        const files = walkFiles(appRoot, (file) => /\.[cm]?[jt]sx?$/.test(file));
-
-        return files.flatMap((file) => inspectAppFile(file, pkg, packages, resolver));
+      const files = snapshot.files({
+        directory: appRoot,
+        accept: (file) => /\.[cm]?[jt]sx?$/.test(file),
       });
-  } finally {
-    sourceCache.clear();
-  }
+
+      return files.flatMap((file) => inspectAppFile(file, pkg, packages, resolver));
+    });
 }

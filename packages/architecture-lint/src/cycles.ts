@@ -1,7 +1,10 @@
 import { manifestDependencies } from "./manifests.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
-export function lintCycles(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
   const graph = new Map<string, string[]>();
   for (const pkg of packages) {

@@ -10,9 +10,15 @@ import {
   readBaseline,
   staleRows,
 } from "./baseline.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
 
 const BASELINE_FILE = "feature-shape-baseline.json";
+
+/** Colocated tests are not the shape they test. */
+const TEST_DIRECTORIES = new Set(["__tests__"]);
 
 /**
  * Pieces of the pre-ADR-133 shape the annotation reference no longer has, and the
@@ -126,17 +132,7 @@ function files(path: string): string[] {
 }
 
 function sourceFiles(path: string): string[] {
-  if (!isDirectory(path)) return [];
-
-  return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
-    const skipped = entry.name === "__tests__" || entry.name === "node_modules";
-    if (skipped) return [];
-
-    const child = join(path, entry.name);
-    if (entry.isDirectory()) return sourceFiles(child);
-
-    return entry.name.endsWith(".ts") ? [child] : [];
-  });
+  return walkFiles(path, (file) => file.endsWith(".ts"), { ignoredDirectories: TEST_DIRECTORIES });
 }
 
 function pascalCase(feature: string): string {
@@ -152,7 +148,7 @@ function bootedInstallers(root: string): Set<string> {
 
   for (const scanRoot of BOOT_SCAN_ROOTS) {
     for (const file of sourceFiles(join(root, scanRoot))) {
-      for (const match of readFileSync(file, "utf8").matchAll(BOOTED_INSTALLER)) {
+      for (const match of sourceText({ file }).matchAll(BOOTED_INSTALLER)) {
         booted.add(match[1]!);
       }
     }
@@ -220,7 +216,7 @@ function serverFindings(
   if (nested) add("nested-transport", join(src, "transport", nested));
 
   const legacyRuntime = sourceFiles(src).find((file) =>
-    LEGACY_TRANSPORT_BUILDER.test(readFileSync(file, "utf8")),
+    LEGACY_TRANSPORT_BUILDER.test(sourceText({ file })),
   );
 
   if (legacyRuntime) add("legacy-transport-runtime", legacyRuntime);
@@ -261,7 +257,7 @@ function webFindings(root: string, feature: string, pkg: ClassifiedPackage): Fea
 function compositionFindings(root: string, feature: string): FeatureShapeFinding[] {
   return COMPOSITION_ROOTS.flatMap((compositionRoot) =>
     sourceFiles(join(root, compositionRoot, feature))
-      .filter((file) => REFUSING_EXPORT.test(readFileSync(file, "utf8")))
+      .filter((file) => REFUSING_EXPORT.test(sourceText({ file })))
       .map((file) => ({
         feature,
         kind: "refusing-composition" as const,
@@ -344,11 +340,8 @@ function baselineFile(root: string): string {
  * The ratchet: an unlisted legacy piece is a violation, a listed piece that is
  * gone is stale, so the inventory only shrinks.
  */
-export function lintFeatureShape(
-  root: string,
-  catalogue: readonly FeatureCatalogueEntry[],
-  packages: readonly ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintFeatureShape(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, catalogue, packages } = snapshot;
   const file = baselineFile(root);
   const baseline = readBaseline({ policy: FEATURE_SHAPE_BASELINE, file });
   const violations = [

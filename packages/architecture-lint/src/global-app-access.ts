@@ -4,7 +4,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
+import { sourceText } from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation } from "./types.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
@@ -310,7 +312,7 @@ function sourceFiles(root: string): string[] {
   } catch {
     return SOURCE_ROOTS.flatMap((sourceRoot) =>
       walkFiles(join(root, sourceRoot), isProductionSource).filter((file) => {
-        const text = readFileSync(file, "utf8");
+        const text = sourceText({ file });
 
         return SYMBOLS.some((symbol) => text.includes(symbol));
       }),
@@ -542,7 +544,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
 
 export function collectGlobalAppAccesses(root: string): GlobalAppAccess[] {
   return sourceFiles(root).flatMap((file) =>
-    collectFileAccesses(root, file, readFileSync(file, "utf8")),
+    collectFileAccesses(root, file, sourceText({ file })),
   );
 }
 
@@ -628,7 +630,9 @@ function readBaseline(root: string): {
   return { entries, violations };
 }
 
-export function lintGlobalAppAccess(root: string): ArchitectureViolation[] {
+export function lintGlobalAppAccess(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root } = snapshot;
+
   const current = collectGlobalAppAccesses(root);
   const { entries, violations } = readBaseline(root);
   const baseline = new Set(entries.map(key));

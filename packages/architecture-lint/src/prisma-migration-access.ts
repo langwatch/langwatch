@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
+import { walkFiles } from "./workspace/layout.ts";
 import {
   createWorkspaceModuleResolver,
   moduleImports,
   type WorkspaceModuleResolver,
-} from "./module-graph.ts";
+} from "./workspace/module-graph.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "./types.ts";
 
 const OWNERSHIP = "@langwatch/prisma-client/ownership";

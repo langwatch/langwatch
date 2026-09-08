@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import ts from "typescript";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const FORBIDDEN_DECLARATION = [
@@ -108,6 +109,8 @@ function violationsForPackage(pkg: ClassifiedPackage): ArchitectureViolation[] |
   return violations;
 }
 
-export function lintDeclarations(packages: ClassifiedPackage[]): ArchitectureViolation[] {
+export function lintDeclarations(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   return packages.flatMap((pkg) => violationsForPackage(pkg) ?? []);
 }

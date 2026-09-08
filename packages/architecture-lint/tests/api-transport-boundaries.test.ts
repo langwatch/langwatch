@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lintApiTransportBoundaries } from "../src/index.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 
@@ -51,7 +52,7 @@ function apiApplication(): ClassifiedPackage {
 }
 
 function violations(packages: readonly ClassifiedPackage[]): ArchitectureViolation[] {
-  return lintApiTransportBoundaries(packages);
+  return lintApiTransportBoundaries(snapshotOf({ root, packages }));
 }
 
 function policy(

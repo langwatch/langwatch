@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types.ts";
 
 const buildConfigSchema = z
@@ -92,9 +93,10 @@ function violationForPackage(pkg: ClassifiedPackage): ArchitectureViolation | un
  * A test file entering one reintroduces TS5011 when a package has tests outside src.
  */
 export function lintStrictContractBuildConfigs(
-  _root: string,
-  packages: ClassifiedPackage[],
+  snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
+  const packages = snapshot.packages;
+
   return packages.flatMap((pkg) => {
     const violation = violationForPackage(pkg);
 

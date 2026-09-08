@@ -1,13 +1,24 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "./files.ts";
 import { hasCanonicalAppFactory, hasPrivateAppConstructor } from "./feature-app-factory.ts";
-import type { WorkspaceModuleResolver } from "./module-graph.ts";
+import {
+  sourceFile,
+  sourceText,
+  type WorkspaceModuleResolver,
+} from "./workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types.ts";
 
 function source(file: string): ts.SourceFile {
-  return ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+  return sourceFile({ file });
+}
+
+/** A file with no `class` token declares no class, and is never parsed to find that out. */
+function classDeclarations(file: string): ts.ClassDeclaration[] {
+  if (!/\bclass\b/.test(sourceText({ file }))) return [];
+
+  return source(file).statements.filter((item) => ts.isClassDeclaration(item));
 }
 
 function modifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
@@ -534,6 +545,7 @@ function validContractToken(
   return canonicalApiTokenDeclaration(token, resolver);
 }
 function contractViolations(
+  snapshot: WorkspaceSnapshot,
   contractRoot: string,
   feature: string,
   resolver: WorkspaceModuleResolver,
@@ -549,10 +561,10 @@ function contractViolations(
       ),
     ];
 
-  const modules = walkFiles(
-    join(contractRoot, "src"),
-    (path) => path.endsWith(".api.ts") && !path.includes("/__tests__/"),
-  );
+  const modules = snapshot.files({
+    directory: join(contractRoot, "src"),
+    accept: (path) => path.endsWith(".api.ts") && !path.includes("/__tests__/"),
+  });
   const violations: ArchitectureViolation[] = [];
   if (modules.length !== 1)
     violations.push(
@@ -891,6 +903,7 @@ function factoryViolations(
 }
 
 function concreteAppViolations(
+  snapshot: WorkspaceSnapshot,
   serverRoot: string,
   contractRoot: string,
   feature: string,
@@ -906,8 +919,8 @@ function concreteAppViolations(
 
   const operations = apiOperations(api.node, resolver);
   const violations: ArchitectureViolation[] = [];
-  for (const file of productionFiles(serverRoot))
-    for (const statement of source(file).statements.filter(ts.isClassDeclaration)) {
+  for (const file of productionFiles(snapshot, serverRoot))
+    for (const statement of classDeclarations(file)) {
       const inheritedApp = hasInheritedApp(statement);
       if (inheritedApp) {
         violations.push(
@@ -999,14 +1012,17 @@ function hasContractProperty(statement: ts.ClassDeclaration): boolean {
   });
 }
 
-function productionFiles(root: string): string[] {
-  return walkFiles(join(root, "src"), (path) => {
-    const isTypeScript = path.endsWith(".ts") || path.endsWith(".tsx");
-    if (!isTypeScript) return false;
+function productionFiles(snapshot: WorkspaceSnapshot, root: string): readonly string[] {
+  return snapshot.files({
+    directory: join(root, "src"),
+    accept: (path) => {
+      const isTypeScript = path.endsWith(".ts") || path.endsWith(".tsx");
+      if (!isTypeScript) return false;
 
-    if (path.includes("/__tests__/")) return false;
+      if (path.includes("/__tests__/")) return false;
 
-    return !/(?:test|spec)\.tsx?$/.test(path);
+      return !/(?:test|spec)\.tsx?$/.test(path);
+    },
   });
 }
 
@@ -1132,11 +1148,10 @@ function installerChain(file: string, node: ts.CallExpression, kind: Installer["
   return { file, call: node, providers, complete, kind, stages, ...(app ? { app } : {}) };
 }
 
-function installers(serverRoot: string): Installer[] {
+function installers(snapshot: WorkspaceSnapshot, serverRoot: string): Installer[] {
   const result: Installer[] = [];
-  for (const file of productionFiles(serverRoot)) {
-    const contents = readFileSync(file, "utf8");
-    if (!contents.includes("@langwatch/runtime-composition")) continue;
+  for (const file of productionFiles(snapshot, serverRoot)) {
+    if (!sourceText({ file }).includes("@langwatch/runtime-composition")) continue;
 
     const parsed = source(file);
     const imports = installerImports(parsed);
@@ -1314,12 +1329,8 @@ function validDefinedStages(stages: string[]): boolean {
   return hasApp && hasBuild && hasOptionalTransports;
 }
 
-export function lintFeatureAppContracts(
-  root: string,
-  catalogue: readonly FeatureCatalogueEntry[],
-  packages: ClassifiedPackage[],
-  resolver: WorkspaceModuleResolver,
-): ArchitectureViolation[] {
+export function lintFeatureAppContracts(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  const { root, catalogue } = snapshot;
   const violations: ArchitectureViolation[] = [];
   const canonicalFeatureFiles = new Map(
     catalogue.map((item) => [
@@ -1330,10 +1341,10 @@ export function lintFeatureAppContracts(
   for (const owner of catalogue) {
     violations.push(
       ...lintFeatureOwner(
-        root,
+        snapshot,
         owner,
-        packages,
-        resolver,
+        snapshot.packages,
+        snapshot.resolver,
         new Set(catalogue.map((item) => item.id)),
         canonicalFeatureFiles,
       ),
@@ -1344,14 +1355,14 @@ export function lintFeatureAppContracts(
 }
 
 function lintFeatureOwner(
-  root: string,
+  snapshot: WorkspaceSnapshot,
   owner: FeatureCatalogueEntry,
-  packages: ClassifiedPackage[],
+  packages: readonly ClassifiedPackage[],
   resolver: WorkspaceModuleResolver,
   catalogueFeatures: ReadonlySet<string>,
   canonicalFeatureFiles: ReadonlyMap<string, string>,
 ): ArchitectureViolation[] {
-  const ownerRoot = join(root, owner.root);
+  const ownerRoot = join(snapshot.root, owner.root);
   const isEnterprise = owner.classification === "enterprise";
   const surfaces = packages.filter(
     (pkg) => pkg.feature === owner.id && pkg.enterprise === isEnterprise,
@@ -1370,11 +1381,12 @@ function lintFeatureOwner(
           "Give the feature its real portable app and service contracts, including browser-owned behaviour; do not create an empty app or invent a server package.",
         ),
       ];
-  violations.push(...contractViolations(contractRoot, owner.id, resolver));
+  violations.push(...contractViolations(snapshot, contractRoot, owner.id, resolver));
   for (const surface of surfaces) {
     if (surface.kind === "server" || surface.kind === "web")
       violations.push(
         ...concreteAppViolations(
+          snapshot,
           surface.root,
           contractRoot,
           owner.id,
@@ -1385,7 +1397,7 @@ function lintFeatureOwner(
       );
   }
 
-  const declarations = installers(server.root);
+  const declarations = installers(snapshot, server.root);
   if (declarations.length === 0) {
     const installerFile = join(server.root, "src", `${owner.id}.server.ts`);
     const hidden = existsSync(installerFile);
