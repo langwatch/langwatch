@@ -121,6 +121,7 @@ func TestTraces(t *testing.T) {
 
 func TestAnnotations(t *testing.T) {
 	t.Run("given the API wraps annotations in a data envelope", func(t *testing.T) {
+		// @scenario "Listing every annotation returns the annotations"
 		t.Run("when listing every annotation", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/annotations", r.URL.Path)
@@ -132,6 +133,7 @@ func TestAnnotations(t *testing.T) {
 			assert.Equal(t, "ann_1", list[0].Id)
 		})
 
+		// @scenario "Fetching one annotation returns the annotation"
 		t.Run("when fetching one annotation by id", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/annotations/ann_1", r.URL.Path)
@@ -142,6 +144,7 @@ func TestAnnotations(t *testing.T) {
 			assert.Equal(t, "ann_1", a.Id)
 		})
 
+		// @scenario "Listing a trace's annotations returns the annotations"
 		t.Run("when listing the annotations on a trace", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/annotations/trace/trace_1", r.URL.Path)
@@ -153,6 +156,7 @@ func TestAnnotations(t *testing.T) {
 			assert.Equal(t, "ann_1", list[0].Id)
 		})
 
+		// @scenario "Creating an annotation returns the created annotation"
 		t.Run("when attaching an annotation to a trace", func(t *testing.T) {
 			var mu sync.Mutex
 			var gotBody map[string]any
@@ -179,6 +183,7 @@ func TestAnnotations(t *testing.T) {
 			assert.Equal(t, "ann_1", a.Id)
 		})
 
+		// @scenario "Updating an annotation returns the updated annotation"
 		t.Run("when updating an annotation", func(t *testing.T) {
 			var mu sync.Mutex
 			var gotBody map[string]any
@@ -209,6 +214,7 @@ func TestAnnotations(t *testing.T) {
 	})
 
 	t.Run("given a project with no annotations", func(t *testing.T) {
+		// @scenario "A project with no annotations yields an empty list"
 		t.Run("when listing annotations", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodGet, r.Method)
@@ -226,6 +232,7 @@ func TestAnnotations(t *testing.T) {
 		// was not asked for. Without the nil check in decodeAnnotationEnvelope
 		// every one of these would hand back a zero-valued Annotation and no
 		// error, which is the failure the envelope handling exists to prevent.
+		// @scenario "A read that carries no annotation fails"
 		t.Run("when a read returns the bare value", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte(`{"id":"ann_1","comment":"Great"}`))
@@ -236,6 +243,7 @@ func TestAnnotations(t *testing.T) {
 			assert.Contains(t, err.Error(), "data")
 		})
 
+		// @scenario "A list that carries no annotations fails"
 		t.Run("when a list returns an unrelated object", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte(`{"annotations":[{"id":"ann_1"}]}`))
@@ -245,6 +253,7 @@ func TestAnnotations(t *testing.T) {
 			assert.Nil(t, list)
 		})
 
+		// @scenario "A write answered with an empty body fails"
 		t.Run("when a write returns an empty body", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -260,6 +269,7 @@ func TestAnnotations(t *testing.T) {
 	})
 
 	t.Run("given the API rejects the request", func(t *testing.T) {
+		// @scenario "A rejected read is reported as not found"
 		t.Run("when the annotation does not exist", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
