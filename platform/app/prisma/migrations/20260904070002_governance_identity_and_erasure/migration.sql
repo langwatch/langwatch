@@ -136,6 +136,20 @@ CREATE UNIQUE INDEX "GovernanceTenantHistory_organizationId_tenantId_key" ON "Go
 
 CREATE INDEX "GovernanceTenantHistory_organizationId_idx" ON "GovernanceTenantHistory"("organizationId");
 
+-- Bounds the backfill scan below to governance rows instead of the full
+-- Project table. Plain (non-CONCURRENTLY) build inside this transaction,
+-- same convention as 20260831120000_grant_role_key_live_index: ops can
+-- prebuild with CREATE INDEX CONCURRENTLY ahead of release, and IF NOT
+-- EXISTS becomes a no-op if that prebuild already succeeded. If a prior
+-- CONCURRENTLY attempt failed, it leaves an invalid index under this same
+-- name, which IF NOT EXISTS will then silently match - check
+-- pg_index.indisvalid and DROP INDEX before retrying in that case.
+-- Measured against prod (langwatch_db, 2026-09): 8,461 rows in Project,
+-- 112 match kind = 'internal_governance' (1.3%), table is 6 MB total.
+CREATE INDEX IF NOT EXISTS "Project_kind_internal_governance_idx"
+    ON "Project" ("kind")
+    WHERE "kind" = 'internal_governance';
+
 -- Backfill, and it is load-bearing rather than a convenience. Without it the
 -- history is empty for every organization that already ingested, so the first
 -- erasure after this migration would resolve zero tenants, delete nothing from
