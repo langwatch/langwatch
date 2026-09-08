@@ -2,7 +2,7 @@ import { HStack, Text, VStack } from "@chakra-ui/react";
 import { SourceTypeIconGlyph } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import type { SourceType } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import type React from "react";
-import { LuBot, LuTriangleAlert, LuUsers } from "react-icons/lu";
+import { LuBot, LuPackageOpen, LuUsers } from "react-icons/lu";
 import { AskChip } from "~/components/home/AskChip";
 import { HeroAskField } from "~/components/home/HeroAskField";
 import { HeroLeadPill } from "~/components/home/HeroLeadPill";
@@ -16,7 +16,7 @@ import { useRouter } from "~/utils/compat/next-router";
  * with: a greeting, one field, and the short ways in. The field is the
  * command palette mounted inline, the pill is the one action a governance
  * admin takes first (connect a vendor), and the chips under it are the three
- * things they add next — people, an agent, a rule.
+ * things they add next — people, an agent, a tool.
  *
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
@@ -32,8 +32,15 @@ export const HOME_MEASURE = "900px";
 export const INVENTORY_SOURCES_HREF = "/governance/inventory?tab=sources";
 export const PEOPLE_HREF = "/governance/people?tab=people";
 export const ADD_AGENT_HREF = "/governance/agents?tab=agents&add=1";
-export const INVENTORY_ANOMALY_RULES_HREF =
-  "/governance/inventory?tab=anomaly-rules";
+/**
+ * The inventory's bare address, which opens on the Catalog pane. Bare rather
+ * than `?tab=catalog` because that page keeps its default tab out of the
+ * address, and bare rather than the `?tab=anomaly-rules` this shortcut used to
+ * carry: anomaly rules stopped being an inventory tab, so that address
+ * degraded to this same pane and the shortcut delivered the tool catalog under
+ * a rule's name.
+ */
+export const INVENTORY_CATALOG_HREF = "/governance/inventory";
 
 /**
  * The vendors the pill leads with, in the order the menu offers them. Each
@@ -54,9 +61,14 @@ export const addSourceHref = (sourceType: SourceType) =>
 
 /**
  * The three ways in under the pill, in the order they are offered: add
- * someone, then give them an agent, then say what counts as odd. That is the
+ * someone, give them an agent, then register the tools they run. That is the
  * order a surface is set up in, rather than the order the pages sit in the
  * rail.
+ *
+ * Every href here that carries a `?tab=` must name a tab its page actually
+ * has. A page degrades an unknown tab to its default pane rather than
+ * refusing it, so a stale tab name is a silent wrong destination — which is
+ * what the third chip was until it stopped naming a retired tab.
  */
 const LEAD_CHIPS: ReadonlyArray<{
   key: string;
@@ -77,10 +89,10 @@ const LEAD_CHIPS: ReadonlyArray<{
     icon: <LuBot size={12} />,
   },
   {
-    key: "anomaly-rule",
-    label: "Add anomaly rule",
-    href: INVENTORY_ANOMALY_RULES_HREF,
-    icon: <LuTriangleAlert size={12} />,
+    key: "tool",
+    label: "Add tool",
+    href: INVENTORY_CATALOG_HREF,
+    icon: <LuPackageOpen size={12} />,
   },
 ];
 
