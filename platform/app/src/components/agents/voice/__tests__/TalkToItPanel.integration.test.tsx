@@ -278,6 +278,56 @@ describe("TalkToItPanel", () => {
     });
   });
 
+  describe("when the panel unmounts while a call is still connecting", () => {
+    // Cleanup only hangs up a "live" session (#18) — mid-mint there is no
+    // session yet, so runStart itself must notice the unmount once its own
+    // await (openCall) settles and hang up rather than leaving the mic open.
+    it("hangs up the session that arrives after unmount and never dispatches", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [] })) },
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                transport: "elevenlabs_convai",
+                sessionToken: "signed.token",
+                maxDurationSeconds: 300,
+                connect: { signedUrl: "wss://x" },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            ),
+        ),
+      );
+      const hangUp = vi.fn(async () => {});
+      let resolveOpenCall!: (session: {
+        hangUp: () => Promise<void>;
+        getInputVolume: () => number;
+      }) => void;
+      openCall.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOpenCall = resolve;
+          }),
+      );
+
+      const { unmount } = renderPanel();
+      await waitFor(() => expect(openCall).toHaveBeenCalled());
+
+      // Unmount before openCall resolves — mint already completed, so the
+      // panel is mid-"connecting", never "live".
+      unmount();
+      resolveOpenCall({ hangUp, getInputVolume: () => 0 });
+
+      await waitFor(() => {
+        expect(hangUp).toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("when the microphone is denied", () => {
     /** @scenario "Microphone access denied shows a retry notice and starts no run" */
     it("shows the retry notice and never stays on connecting", async () => {

@@ -248,7 +248,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
   describe("when ElevenLabs returns a signed URL on a non-wss scheme", () => {
     it("rejects it", async () => {
       mockFetchOnce({
-        json: () => ({ signed_url: "ws://api.elevenlabs.io/abc" }),
+        json: async () => ({ signed_url: "ws://api.elevenlabs.io/abc" }),
       });
 
       await expect(
@@ -264,7 +264,9 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
 
   describe("when ElevenLabs returns a signed URL on an unrelated host", () => {
     it("rejects it", async () => {
-      mockFetchOnce({ json: () => ({ signed_url: "wss://evil.example/abc" }) });
+      mockFetchOnce({
+        json: async () => ({ signed_url: "wss://evil.example/abc" }),
+      });
 
       await expect(
         elevenLabsConvaiTransport.mintSession({
@@ -280,7 +282,9 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
   describe("when the signed URL is on api.elevenlabs.io", () => {
     it("accepts it", async () => {
       mockFetchOnce({
-        json: () => ({ signed_url: "wss://api.elevenlabs.io/v1/convai/abc" }),
+        json: async () => ({
+          signed_url: "wss://api.elevenlabs.io/v1/convai/abc",
+        }),
       });
 
       const result = await elevenLabsConvaiTransport.mintSession({
@@ -297,7 +301,7 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
   describe("when the signed URL matches the credential's configured base host", () => {
     it("accepts it", async () => {
       mockFetchOnce({
-        json: () => ({ signed_url: "wss://regional.example.com/abc" }),
+        json: async () => ({ signed_url: "wss://regional.example.com/abc" }),
       });
 
       const result = await elevenLabsConvaiTransport.mintSession({

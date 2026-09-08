@@ -337,13 +337,17 @@ describe("Feature: Voice session HTTP door", () => {
       }));
       vi.stubGlobal("fetch", upstreamFetch);
 
-      const res = await app.request(
-        `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
-      );
+      // finally so a failing assertion cannot leak the stub onto later tests (isolate: false)
+      try {
+        const res = await app.request(
+          `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+        );
 
-      expect(res.status).toBe(200);
-      expect(res.headers.get("cache-control")).toBe("no-store");
-      vi.unstubAllGlobals();
+        expect(res.status).toBe(200);
+        expect(res.headers.get("cache-control")).toBe("no-store");
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
 
     it("fetches with redirect: error so the api key cannot be forwarded", async () => {
@@ -355,15 +359,63 @@ describe("Feature: Voice session HTTP door", () => {
       }));
       vi.stubGlobal("fetch", upstreamFetch);
 
-      await app.request(
-        `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
-      );
+      // finally so a failing assertion cannot leak the stub onto later tests (isolate: false)
+      try {
+        await app.request(
+          `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+        );
 
-      expect(upstreamFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ redirect: "error" }),
-      );
-      vi.unstubAllGlobals();
+        expect(upstreamFetch).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ redirect: "error" }),
+        );
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    describe("when the provider fetch rejects", () => {
+      it("answers Recording unavailable on a refused redirect", async () => {
+        getScenarioRunData.mockResolvedValue({ id: "run_1" });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => {
+            throw new TypeError("fetch failed: unexpected redirect");
+          }),
+        );
+
+        try {
+          const res = await app.request(
+            `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+          );
+
+          expect(res.status).toBe(404);
+          expect((await res.json()).error).toBe("Recording unavailable");
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
+
+      it("answers Recording unavailable on a connect timeout", async () => {
+        getScenarioRunData.mockResolvedValue({ id: "run_1" });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => {
+            throw new DOMException("The operation was aborted", "AbortError");
+          }),
+        );
+
+        try {
+          const res = await app.request(
+            `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+          );
+
+          expect(res.status).toBe(404);
+          expect((await res.json()).error).toBe("Recording unavailable");
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
     });
   });
 

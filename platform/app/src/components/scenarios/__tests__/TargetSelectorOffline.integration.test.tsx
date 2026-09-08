@@ -92,18 +92,20 @@ describe("given an offline connected agent", () => {
 describe("given a voice target is selected", () => {
   afterEach(cleanup);
 
-  it("shows the mic icon instead of the http globe", () => {
-    const { container } = render(
-      <ChakraProvider value={defaultSystem}>
-        <TargetSelector
-          value={{ type: "voice", id: "agent-voice" }}
-          onChange={vi.fn()}
-        />
-      </ChakraProvider>,
-    );
+  describe("when the selector renders", () => {
+    it("shows the mic icon instead of the http globe", () => {
+      const { container } = render(
+        <ChakraProvider value={defaultSystem}>
+          <TargetSelector
+            value={{ type: "voice", id: "agent-voice" }}
+            onChange={vi.fn()}
+          />
+        </ChakraProvider>,
+      );
 
-    const trigger = screen.getByTestId("target-selector-trigger");
-    expect(trigger.querySelector(".lucide-mic")).not.toBeNull();
-    expect(container.querySelector(".lucide-globe")).toBeNull();
+      const trigger = screen.getByTestId("target-selector-trigger");
+      expect(trigger.querySelector(".lucide-mic")).not.toBeNull();
+      expect(container.querySelector(".lucide-globe")).toBeNull();
+    });
   });
 });

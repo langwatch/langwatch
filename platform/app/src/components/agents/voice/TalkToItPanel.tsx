@@ -348,27 +348,34 @@ async function runStart({
   dispatch,
   setMicLevel,
   endCall,
+  isDisposedRef,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
   setMicLevel: (level: number) => void;
   endCall: (cutAtLimit: boolean) => void;
+  isDisposedRef: { current: boolean };
 }): Promise<void> {
   dispatch({ type: "START" });
   if (!(await requestMic(dispatch))) return;
+  // requestMic already released its own track; an unmount during the
+  // permission prompt leaves nothing else to tear down.
+  if (isDisposedRef.current) return;
 
   const mint = await mintSession({ props, refs, dispatch });
   if (!mint) return;
+  // Unmounted while minting: no session or timer exists yet, so returning is
+  // the whole fix.
+  if (isDisposedRef.current) return;
 
   refs.maxSeconds.current = mint.maxDurationSeconds;
   refs.sessionToken.current = mint.sessionToken;
   refs.startedAt.current = Date.now();
 
+  let session: VoiceCallSession;
   try {
-    refs.session.current = await voiceTransportClientRegistry[
-      props.transport
-    ].openCall({
+    session = await voiceTransportClientRegistry[props.transport].openCall({
       signedUrl: mint.connect.signedUrl,
       handlers: {
         onConnected: ({ conversationId }) => {
@@ -398,6 +405,18 @@ async function runStart({
     return;
   }
 
+  if (isDisposedRef.current) {
+    // The panel unmounted while the call was opening: the cleanup effect
+    // already ran (state was never "live", so it skipped its own hang-up) —
+    // hang up this just-arrived session ourselves instead of leaving the
+    // transport connected and the mic open with nobody listening.
+    void session.hangUp().catch(() => {
+      // Best-effort: the panel is already gone, nothing left to report to.
+    });
+    return;
+  }
+  refs.session.current = session;
+
   refs.tick.current = setInterval(() => {
     const elapsedMs = Date.now() - refs.startedAt.current;
     dispatch({ type: "TICK", elapsedMs });
@@ -414,6 +433,10 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   const refsRef = useRef<TalkRefs | null>(null);
   if (!refsRef.current) refsRef.current = createTalkRefs(props.agentRowId);
   const refs = refsRef.current;
+  // Lets an in-flight runStart notice the panel unmounted mid-await (mic
+  // prompt, mint, or openCall) so it never assigns a session or starts the
+  // timer after the fact (#thread 3956091334).
+  const isDisposedRef = useRef(false);
   // Mirrored during render so it is current before any effect (including the
   // provider's onDisconnect, fired outside React) runs finish (#21).
   refs.stateRef.current = state;
@@ -428,7 +451,8 @@ function useTalkToItCall(props: TalkToItPanelProps) {
     [refs, finish],
   );
   const start = useCallback(
-    () => runStart({ props, refs, dispatch, setMicLevel, endCall }),
+    () =>
+      runStart({ props, refs, dispatch, setMicLevel, endCall, isDisposedRef }),
     [props, refs, endCall],
   );
   const saveWithName = useCallback(
@@ -444,11 +468,13 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   useEffect(() => {
     void start();
     return () => {
+      isDisposedRef.current = true;
       stopTick(refs);
       // Unmounting mid-call (Back, or the dialog closing) must not leave the
       // provider session connected with the mic open and the call never
       // ingested — run the same end-of-call path an explicit "End call"
-      // uses (#18).
+      // uses (#18). A "connecting" unmount has no live session yet — runStart
+      // itself notices isDisposedRef and hangs up once its awaits settle.
       if (refs.stateRef.current.kind === "live") void endCall(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

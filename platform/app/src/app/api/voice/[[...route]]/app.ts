@@ -400,6 +400,11 @@ export const route = secured
             redirect: "error",
           },
         );
+      } catch {
+        // A refused redirect, a connect timeout, or a network failure all
+        // mean the same thing to the player: no recording to play. Answer
+        // 404 rather than letting the rejection surface as a 500.
+        return c.json({ error: "Recording unavailable" }, 404);
       } finally {
         clearTimeout(timeout);
         c.req.raw.signal.removeEventListener("abort", onCallerAbort);

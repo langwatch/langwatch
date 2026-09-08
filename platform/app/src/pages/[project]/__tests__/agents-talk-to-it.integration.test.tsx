@@ -12,6 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import AgentsPage from "../agents";
 
 const mockOpenDrawer = vi.fn();
 
@@ -101,7 +102,6 @@ describe("the agents page", () => {
   describe("given a voice agent's card menu action Talk to it", () => {
     /** @scenario "Talk to it appears on a voice agent's card menu while the flag is on" */
     it("opens the voice editor drawer with the call panel already open", async () => {
-      const { default: AgentsPage } = await import("../agents");
       render(<AgentsPage />, { wrapper: Wrapper });
 
       const user = userEvent.setup();

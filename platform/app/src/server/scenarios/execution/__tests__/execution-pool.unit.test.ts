@@ -171,16 +171,26 @@ describe("ScenarioExecutionPool", () => {
     // `_running` map and starts past `_concurrency`.
     it("does not admit a second job at concurrency 1 until the first deregisters", async () => {
       let releaseFirstPrefetch: (() => void) | undefined;
+      let resolveRun1Registered: (() => void) | undefined;
+      const run1Registered = new Promise<void>((resolve) => {
+        resolveRun1Registered = resolve;
+      });
+      let resolveRun2Started: (() => void) | undefined;
+      const run2Started = new Promise<void>((resolve) => {
+        resolveRun2Started = resolve;
+      });
       const slowPool = new ScenarioExecutionPool({ concurrency: 1 });
       const slowSpawned: ExecutionJobData[] = [];
       slowPool.setSpawnFunction(async (jobData) => {
         slowSpawned.push(jobData);
+        if (jobData.scenarioRunId === "run-2") resolveRun2Started?.();
         if (jobData.scenarioRunId === "run-1") {
           await new Promise<void>((resolve) => {
             releaseFirstPrefetch = resolve;
           });
         }
         slowPool.registerChild(jobData.scenarioRunId, makeFakeChild());
+        if (jobData.scenarioRunId === "run-1") resolveRun1Registered?.();
       });
 
       slowPool.submit(makeJob("run-1"));
@@ -191,9 +201,9 @@ describe("ScenarioExecutionPool", () => {
 
       // run-1's prefetch finishes and its child registers.
       releaseFirstPrefetch?.();
-      await new Promise((r) => setTimeout(r, 10));
+      await run1Registered;
       slowPool.deregisterChild("run-1");
-      await new Promise((r) => setTimeout(r, 10));
+      await run2Started;
 
       expect(slowSpawned.map((j) => j.scenarioRunId)).toEqual([
         "run-1",

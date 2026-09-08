@@ -11,8 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockFindById = vi.fn();
 vi.mock("~/server/agents/agent.repository", () => ({
   AgentRepository: class {
-    findById(...args: unknown[]) {
-      return mockFindById(...args);
+    findById({ projectId, id }: { projectId: string; id: string }) {
+      return mockFindById({ projectId, id });
     }
   },
 }));
