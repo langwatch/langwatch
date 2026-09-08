@@ -41,6 +41,12 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
   }),
 }));
 
+// The upload the cell editor offers reaches a tRPC mutation, and this test
+// renders the editor table without a tRPC client.
+vi.mock("@langwatch/dataset-web/surfaces/dataset-attachment-upload", () => ({
+  useDatasetAttachmentUpload: () => undefined,
+}));
+
 vi.mock("@xyflow/react", async (importOriginal) => {
   const original = await importOriginal<typeof import("@xyflow/react")>();
   return {

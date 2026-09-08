@@ -310,7 +310,12 @@ export class ExperimentWorkflowCellService {
 
     try {
       const traceId = cell.traceId ?? generateOtelTraceId();
-      const inputs = ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell });
+      const inputs = await this.cells.inlineAttachments({
+        projectId,
+        cell,
+        datasetColumns,
+        inputs: ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell }),
+      });
 
       // The workflow's own evaluator nodes carry the scores we surface per row.
       // Keep each node's display name so results show it (e.g. "Exact Match")

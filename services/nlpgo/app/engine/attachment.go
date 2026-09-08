@@ -20,8 +20,8 @@ import (
 )
 
 // Attachment fetching turns a remote URL referenced in a prompt message into
-// content the model can actually see/hear/read. The data-URL image splitter in
-// multimodal.go only handles inline data:image/...;base64 values; a plain
+// content the model can actually see/hear/read. The data-URL splitter in
+// multimodal.go only handles inline data:...;base64 values; a plain
 // http(s) URL is interpolated as text and the model never opens it. This pass
 // fetches such URLs, detects the type from the response (not the file
 // extension, so extension-less S3/CDN URLs work), and re-homes them into
@@ -120,7 +120,7 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 }
 
 // rewrite fetches remote attachment URLs in every message and re-homes them
-// into content parts. It runs after splitMessagesWithImages, so inline data:
+// into content parts. It runs after splitMessagesWithAttachments, so inline data:
 // URLs are already parts; this pass handles http(s) URLs in string content, in
 // text parts, and carried by existing image_url parts.
 func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMessage) ([]app.ChatMessage, *NodeError) {
@@ -141,7 +141,7 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 		}
 		// A system message that gained an attachment part must be re-homed:
 		// providers reject non-text parts in system role. Mirrors the same
-		// re-homing splitMessagesWithImages does for inline data-URL images.
+		// re-homing splitMessagesWithAttachments does for inline data-URL attachments.
 		if m.Role == "system" {
 			if parts, ok := newContent.([]any); ok && hasNonTextPart(parts) {
 				systemText, rest := splitLeadingText(parts)
@@ -160,48 +160,99 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 	return out, nil
 }
 
-// inlineImageInputs resolves image-typed inputs that carry a remote http(s)
-// URL into inline base64 data URLs before message templating, so the existing
-// data-URL image splitter delivers them as image parts. An image-typed input
-// is an explicit attachment: the author declared the field an image, so a URL
-// it carries that cannot be fetched as an image fails the run with a clear,
-// user-facing error rather than being left as text for the model to guess from
-// (e.g. from a filename). Inputs that are not image-typed, not http(s) URLs, or
-// already inline data URLs are left untouched. The returned map is a copy only
-// when a value was replaced, so the caller's original inputs (surfaced verbatim
-// in execution events) keep the readable URL rather than a base64 blob.
-func (f *attachmentFetcher) inlineImageInputs(ctx context.Context, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+// inlineAttachmentInputs resolves image-typed and file-typed inputs that carry
+// a remote http(s) URL into inline base64 data URLs before message templating,
+// so the data-URL splitter delivers them as content parts. Such a field is an
+// explicit attachment: the author declared it an image or a file, so a URL it
+// carries that cannot be delivered fails the run with a clear, user-facing
+// error rather than being left as text for the model to guess from (e.g. from
+// a filename). An image field accepts image media types only; a file field
+// accepts every media type the engine can deliver. Inputs that are neither
+// typed, not http(s) URLs, or already inline data URLs are left untouched. The
+// returned map is a copy only when a value was replaced, so the caller's
+// original inputs (surfaced verbatim in execution events) keep the readable URL
+// rather than a base64 blob.
+func (f *attachmentFetcher) inlineAttachmentInputs(ctx context.Context, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
 	out := inputs
 	copied := false
 	for _, field := range node.Data.Inputs {
-		if field.Type != dsl.FieldTypeImage {
-			continue
-		}
-		raw, ok := inputs[field.Identifier].(string)
+		rawURL, ok := remoteAttachmentFieldURL(field, inputs)
 		if !ok {
 			continue
-		}
-		rawURL := strings.TrimSpace(raw)
-		if !isHTTPURL(rawURL) {
-			continue // already a data URL or not a remote reference
 		}
 		att, ne := f.fetch(ctx, rawURL)
 		if ne != nil {
 			return nil, ne
 		}
-		if !strings.HasPrefix(att.mediaType, "image/") {
-			return nil, attachmentError(rawURL, "could not be loaded as an image (its content type is "+att.mediaType+")", 0)
+		if ne := refuseUndeliverableAttachment(field.Type, rawURL, att.mediaType); ne != nil {
+			return nil, ne
 		}
 		if !copied {
-			out = make(map[string]any, len(inputs))
-			for k, v := range inputs {
-				out[k] = v
-			}
+			out = copyInputs(inputs)
 			copied = true
 		}
 		out[field.Identifier] = dataURL(att)
 	}
 	return out, nil
+}
+
+// remoteAttachmentFieldURL returns the remote URL an attachment-typed field
+// carries, or false for a field that is not an attachment, holds no string,
+// or already holds an inline data URL.
+func remoteAttachmentFieldURL(field dsl.Field, inputs map[string]any) (string, bool) {
+	if field.Type != dsl.FieldTypeImage && field.Type != dsl.FieldTypeFile {
+		return "", false
+	}
+	raw, ok := inputs[field.Identifier].(string)
+	if !ok {
+		return "", false
+	}
+	rawURL := strings.TrimSpace(raw)
+	if !isHTTPURL(rawURL) {
+		return "", false
+	}
+	return rawURL, true
+}
+
+// refuseUndeliverableAttachment names why a fetched response is not what the
+// field declared, or nil when it is deliverable.
+func refuseUndeliverableAttachment(fieldType dsl.FieldType, rawURL, mediaType string) *NodeError {
+	if fieldType == dsl.FieldTypeImage && !strings.HasPrefix(mediaType, "image/") {
+		return attachmentError(rawURL, "could not be loaded as an image (its content type is "+mediaType+")", 0)
+	}
+	if fieldType == dsl.FieldTypeFile && !isDeliverableMediaType(mediaType) {
+		return attachmentError(rawURL, "could not be loaded as a file (its content type is "+mediaType+")", 0)
+	}
+	return nil
+}
+
+// copyInputs shallow-copies the caller's inputs so the originals, surfaced
+// verbatim in execution events, keep the readable URL rather than a base64 blob.
+func copyInputs(inputs map[string]any) map[string]any {
+	out := make(map[string]any, len(inputs))
+	for k, v := range inputs {
+		out[k] = v
+	}
+	return out
+}
+
+// isDeliverableMediaType reports whether the engine can turn a media type into
+// a content part the model reads. Everything outside this list (an executable,
+// an archive, an unrecognized binary) is refused on a file-typed field rather
+// than shipped to the provider as an opaque blob.
+func isDeliverableMediaType(mediaType string) bool {
+	switch {
+	case strings.HasPrefix(mediaType, "image/"),
+		strings.HasPrefix(mediaType, "audio/"),
+		strings.HasPrefix(mediaType, "video/"),
+		strings.HasPrefix(mediaType, "text/"):
+		return true
+	}
+	switch mediaType {
+	case "application/pdf", "application/json", "application/xml", "application/csv":
+		return true
+	}
+	return false
 }
 
 // hasNonTextPart reports whether a content-part list contains any part that is
@@ -332,13 +383,71 @@ func contentPartForAttachment(att *fetchedAttachment) (map[string]any, bool) {
 		return map[string]any{
 			"type": "file",
 			"file": map[string]any{
-				"filename":  fileNameFromURL(att.sourceURL, "attachment.pdf"),
+				"filename":  fileNameFromURL(att.sourceURL, "document.pdf"),
 				"file_data": dataURL(att),
 			},
 		}, true
 	default:
 		return nil, false
 	}
+}
+
+// inlineAttachmentPart turns an attachment the author explicitly declared into
+// the content part its media type calls for. It differs from
+// contentPartForAttachment in what it does with the types that one refuses: a
+// declared attachment is never left as a link, so text-like content is decoded
+// into a text part the model reads and anything else travels as a file part.
+//
+// contentPartForAttachment keeps its own narrower answer because it also serves
+// the best-effort prose scan, where a reachable web page is a link the author
+// mentioned rather than a document they attached.
+func inlineAttachmentPart(att *fetchedAttachment) map[string]any {
+	if part, ok := contentPartForAttachment(att); ok {
+		return part
+	}
+	if isTextMediaType(att.mediaType) {
+		return map[string]any{"type": "text", "text": string(att.data)}
+	}
+	return map[string]any{
+		"type": "file",
+		"file": map[string]any{
+			"filename":  fileNameFromURL(att.sourceURL, "file"+extensionForMediaType(att.mediaType)),
+			"file_data": dataURL(att),
+		},
+	}
+}
+
+// isTextMediaType reports whether the bytes read as characters rather than as a
+// binary payload, in which case the model reads them best as plain text.
+func isTextMediaType(mediaType string) bool {
+	if strings.HasPrefix(mediaType, "text/") {
+		return true
+	}
+	switch mediaType {
+	case "application/json", "application/xml", "application/csv":
+		return true
+	}
+	return false
+}
+
+// extensionForMediaType names a file for a media type the standard table knows,
+// falling back to the subtype so an unknown type still gets a readable suffix.
+func extensionForMediaType(mediaType string) string {
+	if exts, err := mime.ExtensionsByType(mediaType); err == nil && len(exts) > 0 {
+		return exts[0]
+	}
+	subtype := mediaType
+	if slash := strings.IndexByte(subtype, '/'); slash >= 0 {
+		subtype = subtype[slash+1:]
+	}
+	if plus := strings.IndexByte(subtype, '+'); plus >= 0 {
+		subtype = subtype[plus+1:]
+	}
+	subtype = strings.TrimPrefix(subtype, "x-")
+	if subtype == "" {
+		return ".bin"
+	}
+	return "." + subtype
 }
 
 func dataURL(att *fetchedAttachment) string {

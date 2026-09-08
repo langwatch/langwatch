@@ -7,6 +7,8 @@ const typesMap: Record<Field["type"], string> = {
   float: "float",
   bool: "bool",
   image: "dspy.Image",
+  // A file reaches the code block as a base64 data URL string.
+  file: "str",
   list: "list",
   "list[str]": "list[str]",
   "list[float]": "list[float]",

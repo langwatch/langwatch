@@ -1,5 +1,14 @@
 import { Box } from "@chakra-ui/react";
-import { Braces, Hash, Image, List, MessageSquare, ToggleLeft, Type } from "lucide-react";
+import {
+  Braces,
+  Hash,
+  Image,
+  List,
+  MessageSquare,
+  Paperclip,
+  ToggleLeft,
+  Type,
+} from "lucide-react";
 
 export const VariableTypeIcon = ({ type, size = 16 }: { type: string; size?: number }) => {
   const iconProps = { size, strokeWidth: 2.5, color: "var(--chakra-colors-gray-500)" };
@@ -28,6 +37,8 @@ export const VariableTypeIcon = ({ type, size = 16 }: { type: string; size?: num
       return <MessageSquare {...iconProps} />;
     case "image":
       return <Image {...iconProps} />;
+    case "file":
+      return <Paperclip {...iconProps} />;
     default:
       return <Type {...iconProps} />;
   }
@@ -42,6 +53,7 @@ export const TYPE_LABELS: Record<string, string> = {
   bool: "Boolean",
   boolean: "Boolean",
   image: "Image",
+  file: "File",
   list: "List",
   "list[str]": "List",
   "list[float]": "List",

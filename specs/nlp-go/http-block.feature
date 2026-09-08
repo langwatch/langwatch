@@ -62,6 +62,15 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       When the engine renders the body
       Then the rendered body equals "{\"ids\": [1,2,3]}"
 
+    @unit
+    Scenario: A data URL substituted into a JSON body template stays valid JSON
+      Given an HTTP node whose JSON body template holds a variable in a string position
+      And the value of that variable is an attachment as a base64 data URL
+      When the engine renders the body
+      Then the body parses as JSON and the agent receives the data URL byte for byte
+      # A workbench row sends an uploaded file to an HTTP agent this way, so a
+      # data URL that broke the body would break every such run.
+
   Rule: JSONPath extracts the configured field from the response
 
     @integration @unimplemented

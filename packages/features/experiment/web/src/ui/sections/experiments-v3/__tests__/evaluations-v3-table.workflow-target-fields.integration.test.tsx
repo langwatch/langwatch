@@ -102,6 +102,12 @@ vi.mock("@langwatch/dataset-web/surfaces/dataset-drawer", () => ({
   AddOrEditDatasetDrawer: () => null,
 }));
 
+// The upload the cell editor offers reaches a tRPC mutation, and this test
+// renders the table without a tRPC client.
+vi.mock("@langwatch/dataset-web/surfaces/dataset-attachment-upload", () => ({
+  useDatasetAttachmentUpload: () => undefined,
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

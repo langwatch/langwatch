@@ -16,6 +16,13 @@ Feature: Mapping source column types
     Then that column's option shows the Image type badge
     And it is not badged as Text
 
+  @integration
+  Scenario: A file dataset column is badged as File in the mapping dropdown
+    Given the active dataset has a column of type file
+    When I open the mapping dropdown for an input variable
+    Then that column's option shows the File type badge
+    And it is not badged as Text
+
   @unit
   Scenario: An image variable derives an image column in the demonstrations editor
     Given a prompt node with an input variable of type image
