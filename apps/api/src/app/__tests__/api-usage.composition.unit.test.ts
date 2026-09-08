@@ -12,8 +12,18 @@ import {
   composeApiPlanProvider,
   composeApiUsageEnforcement,
   composeApiUsageStats,
+  type ApiUsageStatsOptions,
 } from "../api-usage.composition.ts";
+import { installApiNotification } from "../../features/notification/notification.composition.ts";
 import { Temporal } from "@langwatch/time";
+
+/**
+ * The installed notification record, over the SAME rows the test records: a
+ * warning that went is written here and read back from here.
+ */
+async function notificationsOver(prisma: ApiUsageStatsOptions["prisma"]) {
+  return (await installApiNotification({ infrastructure: { prisma } })).app;
+}
 
 /**
  * What this file pins is this root's WIRING, not the plan policy.
@@ -306,8 +316,10 @@ describe("composeApiUsageStats", () => {
       const organizationsAsked: string[] = [];
       const tenantsAsked: string[] = [];
 
+      const prisma = usagePrisma(null);
       const usage = composeApiUsageStats({
-        prisma: usagePrisma(null),
+        prisma,
+        notifications: await notificationsOver(prisma),
         // Free tier, which is the branch that meters in EVENTS.
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: {
@@ -338,8 +350,10 @@ describe("composeApiUsageStats", () => {
       const organizationsAsked: string[] = [];
       const tenantsAsked: string[] = [];
 
+      const prisma = usagePrisma(null);
       const usage = composeApiUsageStats({
-        prisma: usagePrisma(null),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: {
           resolveClient: async (tenantId) => {
@@ -368,8 +382,10 @@ describe("composeApiUsageStats", () => {
     it("reads `billable_events` by OrganizationId, not the trace rollup", async () => {
       const asked: string[] = [];
 
+      const prisma = usagePrisma(null);
       const usage = composeApiUsageStats({
-        prisma: usagePrisma(null),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: {
           resolveClient: async () => countingClient(0, asked) as never,
@@ -391,8 +407,10 @@ describe("composeApiUsageStats", () => {
   describe("given a process that opened no ClickHouse", () => {
     /** @scenario "A deployment with no ClickHouse reads the volume as unknown, not as zero" */
     it("reads the events volume as unknown rather than as zero", async () => {
+      const prisma = usagePrisma(null);
       const usage = composeApiUsageStats({
-        prisma: usagePrisma(null),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         // The two accessors travel together — a process either opened the
         // connection or did not — so there is no half-composed state to test.

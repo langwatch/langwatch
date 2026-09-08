@@ -1,4 +1,3 @@
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   createNotificationCommandSchema,
   notificationRecentQuerySchema,
@@ -7,27 +6,20 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
-import { NotificationRepository } from "../notification.repository.ts";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { NotificationRepository } from "../notification.repository.ts";
 
-/** Prisma implementation of the private Notification repository port. */
-/**
- * Only the delegates this repository touches, so composition can name the
- * slice it needs instead of the whole generated client.
- */
-export type NotificationDatabase = Pick<PrismaClient, "notification">;
-
-export class PrismaNotificationRepository extends NotificationRepository {
-  private constructor(private readonly database: NotificationDatabase) {
-    super();
-  }
-
-  static create(database: NotificationDatabase): PrismaNotificationRepository {
-    return new PrismaNotificationRepository(database);
-  }
+export class PrismaNotificationRepository
+  extends PrismaRepository.for("Notification")
+  implements NotificationRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaNotificationRepository(prisma));
 
   async listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
     const query = notificationRecentQuerySchema.parse(input);
-    const rows = await this.database.notification.findMany({
+
+    const rows = await this.prisma.notification.findMany({
       where: {
         organizationId: query.organizationId,
         sentAt: { gte: query.since },
@@ -40,7 +32,8 @@ export class PrismaNotificationRepository extends NotificationRepository {
 
   async create(input: CreateNotificationCommand): Promise<Notification> {
     const command = createNotificationCommandSchema.parse(input);
-    const row = await this.database.notification.create({
+
+    const row = await this.prisma.notification.create({
       data: {
         organizationId: command.organizationId,
         projectId: command.projectId,

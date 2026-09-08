@@ -7,7 +7,7 @@
 import {
   NotificationHostProvider,
   type NotificationHostPort,
-} from "@langwatch/notification-web/screens/email-suppressions";
+} from "@langwatch/notification-web/email-suppressions";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

@@ -5,8 +5,18 @@ import {
   ApiEntitlementAbsenceReport,
   composeApiPlanProvider,
   composeApiUsageStats,
+  type ApiUsageStatsOptions,
 } from "../api-usage.composition.ts";
 import type { ApiMailComposition } from "../api-mail.composition.ts";
+import { installApiNotification } from "../../features/notification/notification.composition.ts";
+
+/**
+ * The installed notification record, over the SAME rows the test records: a
+ * warning that went is written here and read back from here.
+ */
+async function notificationsOver(prisma: ApiUsageStatsOptions["prisma"]) {
+  return (await installApiNotification({ infrastructure: { prisma } })).app;
+}
 
 /**
  * The approaching-limit mail, driven through the REAL warning service.
@@ -134,8 +144,10 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       const gateway = new RecordingGateway();
       const written: NotificationRow[] = [];
 
+      const prisma = usagePrisma({ written });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({ written }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         // Free tier, which is the branch metered in EVENTS: one
         // organization-keyed read answers the whole breakdown.
         plans: composeApiPlanProvider({ isSaas: true }),
@@ -161,8 +173,10 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
     it("renders the organization, the projects and the counts a person reads", async () => {
       const gateway = new RecordingGateway();
 
+      const prisma = usagePrisma({ written: [] });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({ written: [] }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: clickHouse([
           { projectId: "project-1", total: "6000" },
@@ -192,8 +206,10 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
     it("records that it went, so the same threshold is not warned about twice this month", async () => {
       const written: NotificationRow[] = [];
 
+      const prisma = usagePrisma({ written });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({ written }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: clickHouse([{ projectId: "project-1", total: "9500" }]),
         mail: composedMail(new RecordingGateway()),
@@ -216,11 +232,13 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
     it("sends nothing when this month's warning for the threshold already went", async () => {
       const gateway = new RecordingGateway();
 
+      const prisma = usagePrisma({
+        written: [],
+        alreadySent: [{ metadata: { type: "USAGE_LIMIT_WARNING", threshold: 95 } }],
+      });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({
-          written: [],
-          alreadySent: [{ metadata: { type: "USAGE_LIMIT_WARNING", threshold: 95 } }],
-        }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: clickHouse([{ projectId: "project-1", total: "9500" }]),
         mail: composedMail(gateway),
@@ -236,11 +254,13 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       expect(gateway.sent).toEqual([]);
     });
 
-    it("names no absent mail, because it composed one", () => {
+    it("names no absent mail, because it composed one", async () => {
       const report = new RecordingEntitlementAbsence();
 
+      const prisma = usagePrisma({ written: [] });
       composeApiUsageStats({
-        prisma: usagePrisma({ written: [] }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: null,
         mail: composedMail(new RecordingGateway()),
@@ -257,8 +277,10 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       const gateway = new RecordingGateway();
       const tenantsAsked: string[] = [];
 
+      const prisma = usagePrisma({ written: [] });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({ written: [] }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: paidPlan,
         clickhouse: {
           resolveClient: async (tenantId: string) => {
@@ -296,8 +318,10 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       const gateway = new RecordingGateway();
       const written: NotificationRow[] = [];
 
+      const prisma = usagePrisma({ written });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({ written }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         // An unread rollup and a quiet month are different facts, and the
         // events rollup is a GROUP BY: both come back empty. Composing over no
@@ -324,8 +348,10 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
     it("refuses the warning by name rather than reporting a message it never sent", async () => {
       const report = new RecordingEntitlementAbsence();
 
+      const prisma = usagePrisma({ written: [] });
       const usage = composeApiUsageStats({
-        prisma: usagePrisma({ written: [] }),
+        prisma,
+        notifications: await notificationsOver(prisma),
         plans: composeApiPlanProvider({ isSaas: true }),
         clickhouse: null,
         processName: "langwatch-api-test",

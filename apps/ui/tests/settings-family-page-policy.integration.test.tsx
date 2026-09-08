@@ -46,7 +46,7 @@ vi.mock("@langwatch/topic-web/screens/topic-clustering", () => ({
   TopicHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/notification-web/screens/email-suppressions", () => ({
+vi.mock("@langwatch/notification-web/email-suppressions", () => ({
   notificationApi: apiNode(),
   notificationScreens: { emailSuppressions: screenFor("the email suppressions page") },
   NotificationHostPort: class {},
@@ -78,7 +78,7 @@ vi.mock("@langwatch/enterprise-scim-web/screens/scim", () => ({
   ScimHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/annotation-web/screens/annotation-scores", () => ({
+vi.mock("@langwatch/annotation-web/annotation-scores", () => ({
   annotationScoresApi: apiNode(),
   annotationScoresScreens: { annotationScores: screenFor("the annotation scores page") },
   AnnotationScoreDrawer: () => null,

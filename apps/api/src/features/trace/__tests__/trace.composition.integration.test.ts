@@ -2,18 +2,19 @@
  * The observability half of the packaged record, served by the API process.
  */
 import { EventEmitter } from "node:events";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwatch/trace-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   ApiApplication,
   type ApiTrpcFeatureMount,
-  MissingAgentService,
   MissingSecretService,
 } from "../../../api.application.ts";
 import { ApiRestSecurity } from "../../../api-rest.security.ts";
@@ -32,8 +33,13 @@ import {
 import { ApiRateLimitInfrastructure } from "../../../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition.ts";
-import { composeApiPlanProvider, composeApiUsageStats } from "../../../app/api-usage.composition.ts";
+import { TestDataPrivacyService } from "./support/test-data-privacy.service.ts";
+import {
+  composeApiPlanProvider,
+  composeApiUsageStats,
+} from "../../../app/api-usage.composition.ts";
 import { composeSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
+import { installApiNotification } from "../../notification/notification.composition.ts";
 import {
   createSpansTrpcRouter,
   createTraceEditOverlayTrpcRouter,
@@ -293,7 +299,7 @@ function composeApplication() {
 
   const session = { user: { id: "user-1", email: "person@example.com" } };
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     secrets: new MissingSecretService(),
     features,
     http: {
@@ -646,19 +652,18 @@ describe("given an API process that composed the real observability collaborator
           // The PLATFORM's own default policy, resolved by the real resolver
           // against an empty rule set: a hand-written policy shape here would
           // be a second declaration of Data Privacy's own contract.
-          dataPrivacy: {
-            getResolvedForProject: async () =>
-              resolveDataPrivacy({
-                rows: [],
-                facts: {
-                  organizationId: "org-1",
-                  teamId: "team-1",
-                  projectId: "project-1",
-                  departmentId: null,
-                  isPersonal: false,
-                },
-              }),
-          },
+          dataPrivacy: new TestDataPrivacyService(
+            resolveDataPrivacy({
+              rows: [],
+              facts: {
+                organizationId: "org-1",
+                teamId: "team-1",
+                projectId: "project-1",
+                departmentId: null,
+                isPersonal: false,
+              },
+            }),
+          ),
           plans,
           dataRetention: stub("dataRetention"),
           topics: stub("topics"),
@@ -675,9 +680,12 @@ describe("given an API process that composed the real observability collaborator
    * ClickHouse the group reads: what the panel reports is a real count taken
    * against a real plan rather than a fake.
    */
-  function composeRealUsage(clickHouse: ReturnType<typeof testClickHouse>) {
+  async function composeRealUsage(clickHouse: ReturnType<typeof testClickHouse>) {
+    const prisma = testPrisma();
+
     return composeApiUsageStats({
-      prisma: testPrisma(),
+      prisma,
+      notifications: (await installApiNotification({ infrastructure: { prisma } })).app,
       plans,
       // Both routings, as the process publishes them: the trace rollup is
       // keyed by project and the billable-events rollup by organization.
@@ -690,7 +698,7 @@ describe("given an API process that composed the real observability collaborator
   }
 
   /** The record, with the observability half composed for real. */
-  function composeRealApplication(clickHouse: ReturnType<typeof testClickHouse>) {
+  async function composeRealApplication(clickHouse: ReturnType<typeof testClickHouse>) {
     const { broadcast } = testBroadcast();
     const group = composeRealGroup(clickHouse);
     const collaborators = stubCollaborators({
@@ -709,7 +717,10 @@ describe("given an API process that composed the real observability collaborator
       composed: {
         ...stubComposedFeatures(),
         trace: group,
-        spend: composeSpendFeature({ infrastructure, usage: composeRealUsage(clickHouse) }),
+        spend: composeSpendFeature({
+          infrastructure,
+          usage: await composeRealUsage(clickHouse),
+        }),
       },
       infrastructure,
       collaborators,
@@ -719,7 +730,7 @@ describe("given an API process that composed the real observability collaborator
     return {
       group,
       application: ApiApplication.create({
-        agents: new MissingAgentService(),
+        agents: createApiFixture<AgentApi>(),
         secrets: new MissingSecretService(),
         features,
         http: {
@@ -737,7 +748,7 @@ describe("given an API process that composed the real observability collaborator
   describe("when the live-count read is called through the real handler", () => {
     it("answers the count its own ClickHouse returned rather than refusing", async () => {
       const clickHouse = testClickHouse([["SELECT count() AS cnt", [{ cnt: 12 }]]]);
-      const { application } = composeRealApplication(clickHouse);
+      const { application } = await composeRealApplication(clickHouse);
 
       const { status, body } = await callTrpc(application, "tracesV2.newCount", {
         projectId: "project-1",
@@ -835,7 +846,7 @@ describe("given an API process that composed the real observability collaborator
   describe("when the usage panel and the plan banner are read through the real handler", () => {
     it("answers a real reading taken against a real plan", async () => {
       const clickHouse = testClickHouse([]);
-      const { application } = composeRealApplication(clickHouse);
+      const { application } = await composeRealApplication(clickHouse);
 
       const usage = await callTrpc(application, "limits.getUsage", { organizationId: "org-1" });
       const plan = await callTrpc(application, "plan.getActivePlan", { organizationId: "org-1" });
@@ -989,7 +1000,7 @@ describe("given the anonymous share read composed on this process", () => {
     return {
       metered,
       application: ApiApplication.create({
-        agents: new MissingAgentService(),
+        agents: createApiFixture<AgentApi>(),
         secrets: new MissingSecretService(),
         features,
         http: {
@@ -1141,19 +1152,18 @@ function realTraceReadMappers() {
       tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
       tryGetById: async () => ({ id: "project-1" }),
     } as unknown as ProjectService,
-    dataPrivacy: {
-      getResolvedForProject: async () =>
-        resolveDataPrivacy({
-          rows: [],
-          facts: {
-            organizationId: "org-1",
-            teamId: "team-1",
-            projectId: "project-1",
-            departmentId: null,
-            isPersonal: false,
-          },
-        }),
-    },
+    dataPrivacy: new TestDataPrivacyService(
+      resolveDataPrivacy({
+        rows: [],
+        facts: {
+          organizationId: "org-1",
+          teamId: "team-1",
+          projectId: "project-1",
+          departmentId: null,
+          isPersonal: false,
+        },
+      }),
+    ),
     plans: composeApiPlanProvider({ isSaas: false }),
     dataRetention: stub("dataRetention"),
     topics: stub("topics"),
@@ -1272,7 +1282,11 @@ describe("given the anonymous share read assembles its payload", () => {
 
   /** Composes the share read with every store answering, and no cache hit. */
   function composeAssemblingShare({ spanCount }: { spanCount: number }) {
-    const summaryReads: Array<{ visibilityCutoffMs: number | null }> = [];
+    const summaryReads: Array<{
+      projectId: string;
+      traceId: string;
+      visibilityCutoffMs: number | null;
+    }> = [];
     const resolveCalls: Array<{ token: string; viewerKey?: string }> = [];
     const { broadcast } = testBroadcast();
     const group = composeTraceFeature({
@@ -1295,7 +1309,11 @@ describe("given the anonymous share read assembles its payload", () => {
       },
       readCachedSharePayload: async () => null,
       writeCachedSharePayload: async () => undefined,
-      readTraceSummary: async (input: { visibilityCutoffMs: number | null }) => {
+      readTraceSummary: async (input: {
+        projectId: string;
+        traceId: string;
+        visibilityCutoffMs: number | null;
+      }) => {
         summaryReads.push(input);
         return summaryFixture(spanCount);
       },
@@ -1334,7 +1352,7 @@ describe("given the anonymous share read assembles its payload", () => {
       summaryReads,
       resolveCalls,
       application: ApiApplication.create({
-        agents: new MissingAgentService(),
+        agents: createApiFixture<AgentApi>(),
         secrets: new MissingSecretService(),
         features,
         http: {
@@ -1374,6 +1392,17 @@ describe("given the anonymous share read assembles its payload", () => {
   }
 
   const viewer = { address: CLIENT_IP, userAgent: "Reader/1.0" };
+
+  it("reads the trace and project named by the resolved share resource", async () => {
+    const { application, summaryReads } = composeAssemblingShare({ spanCount: 2 });
+
+    const response = await readShare(application, "share-token-1", viewer);
+
+    expect(response.status).toBe(200);
+    expect(summaryReads).toEqual([
+      expect.objectContaining({ projectId: PROJECT_ID, traceId: TRACE_ID }),
+    ]);
+  });
 
   describe("when one reader opens the link twice from the same session", () => {
     /** @scenario One viewing session counts as a single view */

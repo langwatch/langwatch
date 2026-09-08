@@ -1,18 +1,6 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings → Email Suppressions: who is on the list, and who may take them off.
- *
- * TWO GRANTS, ONE PAGE, and that is the decision worth pinning. Opening the
- * page reads `triggers:view`; removing a row RESUMES DELIVERY to an address
- * that asked to stop hearing from us, so the button behind it reads the
- * narrower `triggers:manage`. A reader with only the first sees the list and no
- * way to act on it.
- *
- * The badge is the other one. A row with no trigger id is a recipient who opted
- * out of EVERYTHING this project sends, and saying so plainly is what stops an
- * operator removing it thinking they are unblocking one notification.
- *
  * Spec: specs/settings/settings-page-chrome.feature
  */
 
@@ -25,7 +13,10 @@ const { state, calls } = vi.hoisted(() => ({
     isLoading: false,
     isError: false,
   },
-  calls: { remove: vi.fn(), invalidate: vi.fn().mockResolvedValue(void 0) },
+  calls: {
+    remove: vi.fn<(input: unknown) => void>(),
+    invalidate: vi.fn<() => Promise<void>>().mockResolvedValue(void 0),
+  },
 }));
 
 vi.mock("../../../behavior/notification-api.ts", () => ({
@@ -40,7 +31,7 @@ vi.mock("../../../behavior/notification-api.ts", () => ({
           isLoading: state.isLoading,
           isError: state.isError,
           isRefetching: false,
-          refetch: vi.fn(),
+          refetch: vi.fn<() => void>(),
         }),
       },
       remove: {
@@ -58,7 +49,7 @@ vi.mock("../../../behavior/notification-api.ts", () => ({
 }));
 
 import { FakeNotificationHost, renderWithNotificationHost } from "../../../testing.tsx";
-import EmailSuppressionsScreen from "../email-suppressions.screen.tsx";
+import EmailSuppressionsScreen from "../email-suppressions-screen.tsx";
 
 const row = (overrides: Record<string, unknown> = {}) => ({
   id: "sup-1",
@@ -90,6 +81,7 @@ describe("given no project is in scope", () => {
   });
 });
 
+/** No trigger id means EVERY notification this project sends, said plainly. */
 describe("given a recipient who opted out of everything", () => {
   it("says so rather than naming a notification they did not pick", () => {
     renderWithNotificationHost(<EmailSuppressionsScreen />);
@@ -108,6 +100,7 @@ describe("given a recipient who opted out of one notification", () => {
   });
 });
 
+/** `triggers:view` opens the page; removing a row reads `triggers:manage`. */
 describe("when the reader may only view the triggers of this project", () => {
   it("shows the list and offers no way to resume delivery", () => {
     renderWithNotificationHost(

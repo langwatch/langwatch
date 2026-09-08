@@ -1,6 +1,5 @@
 export { EmailDeliveryAdapter } from "./adapters/email-delivery.adapter.ts";
-export { PostgresNotificationAdapter } from "./adapters/postgres.notification.adapter.ts";
-export { notificationServer, type NotificationInfrastructure } from "./notification.server.ts";
+export { notificationServer } from "./notification.server.ts";
 export { ResendEmailGatewayAdapter } from "./adapters/resend.email-gateway.adapter.ts";
 export { SendgridEmailGatewayAdapter } from "./adapters/sendgrid.email-gateway.adapter.ts";
 export {

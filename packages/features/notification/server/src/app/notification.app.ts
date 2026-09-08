@@ -1,33 +1,39 @@
 import {
   NotificationApi,
-  type NotificationApi as NotificationApiContract,
+  type CreateNotificationCommand,
+  type Notification,
+  type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { PostgresNotificationAdapter } from "../adapters/postgres.notification.adapter.ts";
-import type { NotificationDatabase } from "../repositories/prisma/prisma.notification.repository.ts";
-import { DefaultNotificationService } from "../services/notification.service.ts";
+import type { NotificationRepositories } from "../repositories/notification.repositories.ts";
+import { NotificationService } from "../services/notification.service.ts";
 
-export type NotificationInfrastructure = Readonly<{ prisma: NotificationDatabase }>;
+type NotificationSetup = FeatureSetup<
+  typeof NotificationApp.dependencies,
+  never,
+  undefined,
+  NotificationRepositories
+>;
 
-export class NotificationApp implements NotificationApiContract {
+export class NotificationApp implements NotificationApi {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
 
-  #service: DefaultNotificationService;
+  #notifications: NotificationService;
 
-  private constructor(service: DefaultNotificationService) {
-    this.#service = service;
+  private constructor(repositories: NotificationRepositories) {
+    this.#notifications = NotificationService.create({ repository: repositories.notifications });
   }
 
-  static create({
-    infrastructure,
-  }: FeatureSetup<typeof NotificationApp.dependencies, NotificationInfrastructure, undefined>) {
-    const service = PostgresNotificationAdapter.create({ database: infrastructure.prisma }).build();
-    return new NotificationApp(service);
+  static create({ repositories }: NotificationSetup): NotificationApp {
+    return new NotificationApp(repositories);
   }
 
-  listRecentByOrganization: NotificationApiContract["listRecentByOrganization"] = (input) =>
-    this.#service.listRecentByOrganization(input);
+  listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
+    return this.#notifications.listRecentByOrganization(input);
+  }
 
-  create: NotificationApiContract["create"] = (input) => this.#service.create(input);
+  create(input: CreateNotificationCommand): Promise<Notification> {
+    return this.#notifications.create(input);
+  }
 }

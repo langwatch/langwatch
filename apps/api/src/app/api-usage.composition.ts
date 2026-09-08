@@ -51,7 +51,7 @@ import {
 } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import { sendUsageLimitEmail } from "@langwatch/mail";
-import { PostgresNotificationAdapter } from "@langwatch/notification-server";
+import type { NotificationApi } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PricingModel, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ApiMailComposition } from "./api-mail.composition.ts";
@@ -227,6 +227,12 @@ export type ApiUsageStatsOptions = Readonly<{
    */
   clickhouse: ApiUsageClickHouse | null;
   /**
+   * Where a sent warning is written down, so the next reading knows this
+   * organization was already told. The SAME installed feature every other
+   * caller records through, rather than a second graph over the same table.
+   */
+  notifications: NotificationApi;
+  /**
    * The gateway the approaching-limit mail leaves through, and the host it
    * links back to. Absent on a deployment that named no `BASE_HOST`, which is
    * the one case the warning still refuses in.
@@ -272,7 +278,7 @@ function composeApiUsageWarnings(
   if (!mail) return undefined;
 
   return UsageWarningService.create({
-    records: PostgresNotificationAdapter.create({ database: options.prisma }).build(),
+    records: options.notifications,
     organizations: ApiUsageWarningDirectory.create(options.prisma),
     usageCounts: ApiUsageBreakdownAdapter.create(counter, options.clickhouse !== null),
     emails: BillingNotificationService.create({

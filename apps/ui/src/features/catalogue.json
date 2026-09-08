@@ -42,8 +42,8 @@
       "id": "agent-management",
       "root": "agent",
       "uses": {
-        "screens": ["@langwatch/agent-web/screens/agent-management"],
-        "surfaces": ["@langwatch/agent-web/surfaces/browser-port"]
+        "screens": ["@langwatch/agent-web/agent-management"],
+        "surfaces": ["@langwatch/agent-web/agent-client", "@langwatch/organization-web/organization-client"]
       }
     },
     {
@@ -58,7 +58,7 @@
       "id": "annotation-scores",
       "root": "annotation-scores",
       "uses": {
-        "screens": ["@langwatch/annotation-web/screens/annotation-scores"],
+        "screens": ["@langwatch/annotation-web/annotation-scores"],
         "surfaces": []
       }
     },
@@ -66,8 +66,17 @@
       "id": "annotations",
       "root": "annotation",
       "uses": {
-        "screens": ["@langwatch/annotation-web/screens/annotations"],
-        "surfaces": []
+        "screens": ["@langwatch/annotation-web/annotations"],
+        "surfaces": [
+          "@langwatch/organization-web/personal-workspace-features",
+          "@langwatch/trace-web/surfaces/annotation-queue-session",
+          "@langwatch/trace-web/surfaces/conversation-turns",
+          "@langwatch/trace-web/surfaces/conversation-view",
+          "@langwatch/trace-web/surfaces/isolated-error-boundary",
+          "@langwatch/trace-web/surfaces/legacy-trace-to-turn",
+          "@langwatch/trace-web/surfaces/trace-edit-mode",
+          "@langwatch/trace-web/surfaces/trace-host"
+        ]
       }
     },
     {
@@ -157,7 +166,7 @@
       "id": "email-suppressions",
       "root": "notification",
       "uses": {
-        "screens": ["@langwatch/notification-web/screens/email-suppressions"],
+        "screens": ["@langwatch/notification-web/email-suppressions"],
         "surfaces": []
       }
     },
@@ -340,7 +349,26 @@
       "root": "simulations",
       "uses": {
         "screens": ["@langwatch/scenario-web/screens/simulations"],
-        "surfaces": ["@langwatch/scenario-web/drawers"]
+        "surfaces": [
+          "@langwatch/scenario-web/drawers",
+          "@langwatch/scenario-web/scenario-mappings",
+          "@langwatch/agent-web/agent-editors",
+          "@langwatch/agent-web/agent-client",
+          "@langwatch/agent-web/agent-http-editor",
+          "@langwatch/agent-web/connected-agents",
+          "@langwatch/prompt-web/surfaces/variables",
+          "@langwatch/prompt-web/surfaces/outputs-section",
+          "@langwatch/workflow-web/surfaces/workflow-card",
+          "@langwatch/workflow-web/surfaces/workflow-api",
+          "@langwatch/workflow-web/surfaces/execution-state-error",
+          "@langwatch/workflow-web/surfaces/emoji-picker-modal",
+          "@langwatch/workflow-web/surfaces/workflow-icons",
+          "@langwatch/workflow-web/surfaces/workflow-templates",
+          "@langwatch/workflow-web/surfaces/code-block-editor",
+          "@langwatch/workflow-web/surfaces/code-editor-transport",
+          "@langwatch/workflow-web/surfaces/copy-button",
+          "@langwatch/trace-web/surfaces/setup-with-agent-button"
+        ]
       }
     },
     {
@@ -356,7 +384,11 @@
       "root": "traces",
       "uses": {
         "screens": ["@langwatch/trace-web/screens/traces"],
-        "surfaces": []
+        "surfaces": [
+          "@langwatch/annotation-web/annotation-card",
+          "@langwatch/annotation-web/annotation-chips",
+          "@langwatch/annotation-web/annotation-form"
+        ]
       }
     },
     {

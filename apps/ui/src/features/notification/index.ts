@@ -1,6 +1,6 @@
 /** Email Suppressions: single screen in `@langwatch/notification-web`. */
 
-import { notificationApi } from "@langwatch/notification-web/screens/email-suppressions";
+import { notificationApi } from "@langwatch/notification-web/email-suppressions";
 import { uiFeature } from "../../behavior/ui-feature";
 import { notificationPageLoaders } from "./ui/sections/notification-routes";
 

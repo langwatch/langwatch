@@ -1,6 +1,10 @@
-/** Which page key the Email Suppressions address answers: `uiPage`'s settings layout frames both the page and a refusal, unlike the old `layoutComponent` guard. */
+/**
+ * Which page key the Email Suppressions address answers. `uiPage`'s settings
+ * layout frames both the page and a refusal, unlike the old
+ * `layoutComponent` guard.
+ */
 
-import { notificationScreens } from "@langwatch/notification-web/screens/email-suppressions";
+import { notificationScreens } from "@langwatch/notification-web/email-suppressions";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

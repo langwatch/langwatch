@@ -8,9 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/email-suppressions": {
-      "types": "./dist/screens/email-suppressions/index.d.ts",
-      "default": "./src/screens/email-suppressions/index.ts"
+    "./email-suppressions": {
+      "langwatch-declaration-source": "./src/email-suppressions.ts",
+      "types": "./dist/email-suppressions.d.ts",
+      "default": "./src/email-suppressions.ts"
     }
   },
   "scripts": {
@@ -19,9 +20,9 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/time": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "lucide-react": "^1.22.0"
   },
   "devDependencies": {
