@@ -4,7 +4,7 @@
  * deep link into one dataset works, matching the platform pages.
  */
 
-import { datasetScreens } from "@langwatch/dataset-web/screens/datasets";
+import { datasetScreens } from "@langwatch/dataset-web/datasets";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

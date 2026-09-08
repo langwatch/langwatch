@@ -1,29 +1,16 @@
-/**
- * `evaluators.copy`/`monitors.copy` share one replication implementation so
- * a copy is self-contained, not a dangling cross-project reference.
- */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
-import {
-  EvaluatorTrpcApi,
-  type EvaluatorTrpcContext,
-  type EvaluatorTrpcPorts,
-} from "@langwatch/evaluator-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+/** Binds the feature's declared procedures to this process's execution path. */
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { evaluatorTrpcTransport } from "@langwatch/evaluator-server";
 
-/** Mounts `evaluators.*` on the app process's tRPC root. */
-export function createEvaluatorTrpcRouter<
-  TContext extends EvaluatorTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<EvaluatorTrpcPorts>) {
-  const service = createTrpcApiService(mount);
-  return EvaluatorTrpcApi.create(
-    mount.root,
-    {
-      protected: service.protected,
-      policy: (permission) => service.policy(permission),
-      validateOutput: service.validateOutput,
-    },
-    mount.ports,
-  );
+/** The one slice of the process context the `evaluators` namespace reads. */
+export interface EvaluatorHostContext {
+  app: Readonly<{ evaluatorApp: EvaluatorApi }>;
+}
+
+/** Mounts `evaluators.*`. */
+export function createEvaluatorTrpcRouter<TContext extends EvaluatorHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(evaluatorTrpcTransport, (ctx) => ctx.app.evaluatorApp);
 }

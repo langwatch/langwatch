@@ -3,7 +3,7 @@
  * stores, for the mixed trace + thread case.
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/trace-contract";
+import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 import { deserializeMappingStateToUI } from "../deserialize-mapping-state-to-ui.ts";
 import { serializeMappingsToMappingState } from "../serialize-mappings-to-mapping-state.ts";

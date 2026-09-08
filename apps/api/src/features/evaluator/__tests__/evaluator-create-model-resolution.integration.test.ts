@@ -1,22 +1,8 @@
 /**
  * The REST evaluator create resolves default models per role (#7556), over a
- * real Postgres and this process's own model gateway.
- *
- * It used to ask the cascade for BOTH the chat default and the embeddings
- * default on every create, so an organization whose default config carried
- * DEFAULT and FAST but no EMBEDDINGS could not create a `ragas/faithfulness`
- * evaluator, whose settings schema has no `embeddings_model` field at all.
- *
- * Nothing about the resolution is stubbed: the `ModelDefaultConfig` row is
- * real, the cascade that reads it is the packaged one, and the project and
- * organization it walks are Postgres rows. A stand-in gateway would answer
- * from the double instead of from the org's own configuration, which is the
- * exact thing this scenario is about. The org shape is the production one: an
- * Anthropic-first organization that seeded DEFAULT and FAST and never got an
- * EMBEDDINGS key.
- *
+ * real Postgres and this process's own model gateway: DEFAULT and FAST seeded,
+ * no EMBEDDINGS key ever issued.
  * @see specs/evaluators/evaluator-create-model-resolution.feature
- *
  * @integration
  * @vitest-environment node
  */
@@ -25,7 +11,10 @@ import {
   KsuidAuthzBindingIdAdapter,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
-import { EvaluatorApp, createEvaluatorsRestApp } from "@langwatch/evaluator-server";
+import { bindRestMiddleware, createRestRuntime, projectRestFacts } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { EvaluatorApp, EvaluatorGraphPort, createEvaluatorRest } from "@langwatch/evaluator-server";
+import { HandledError } from "@langwatch/handled-error";
 import { expandLatestAlias } from "@langwatch/model-provider-contract";
 import {
   GroupIdentityAdapter,
@@ -99,11 +88,6 @@ const project: RestAuthProject = {
   ownerUserId: null,
 };
 
-const world = RestAuthWorld.create({
-  projects: [project],
-  keys: [{ token: API_KEY, projectId: PROJECT_ID }],
-});
-
 /**
  * A marker cipher. No provider credential is read on the default-resolution
  * path, and the real algorithm has its own suite.
@@ -130,6 +114,26 @@ function unreachedNlpRuntime(): WorkflowNlpRuntimePort {
   return new Proxy({} as WorkflowNlpRuntimePort, {
     get: (_target, property) => () => {
       throw new Error(`the NLP engine was dialled at ${String(property)}`);
+    },
+    has: () => true,
+  });
+}
+
+/** A create in the caller's own project asks no cross-project permission. */
+function unreachedPermissions(): AuthzApi {
+  return new Proxy({} as AuthzApi, {
+    get: (_target, property) => () => {
+      throw new Error(`authz.${String(property)} is not reachable from an evaluator create`);
+    },
+    has: () => true,
+  });
+}
+
+/** A catalogue evaluator has no workflow and no monitors to reach for. */
+function unreachedGraph(): EvaluatorGraphPort {
+  return new Proxy({} as EvaluatorGraphPort, {
+    get: (_target, property) => () => {
+      throw new Error(`graph.${String(property)} is not reachable from an evaluator create`);
     },
     has: () => true,
   });
@@ -181,17 +185,41 @@ function mountEvaluatorsFamily() {
     peers: { workflows: unreachedWorkflows(), nlpRuntime: unreachedNlpRuntime() },
   });
 
-  const app = EvaluatorApp.create({ evaluators, modelProviders });
+  const app = EvaluatorApp.create({
+    evaluators,
+    modelProviders,
+    // A create asks nobody's permission in another project and reads no
+    // workflow: this scenario is the model cascade and nothing else.
+    permissions: unreachedPermissions(),
+    graph: unreachedGraph(),
+  });
 
-  return createEvaluatorsRestApp({
-    security: world.security(),
-    app: () => app,
-    platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-    organizationMiddleware: async (c, next) => {
-      c.set("organization", { id: ORGANIZATION_ID });
-      await next();
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: PROJECT_ID } as const }),
     },
   });
+
+  return runtime.mount(
+    createEvaluatorRest(
+      ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
+    ).router(),
+    {
+      app: () => app,
+      credential: "projectKey",
+      onError: (error, c) =>
+        HandledError.isHandled(error)
+          ? c.json({ error: error.code, message: error.message }, error.httpStatus as 400)
+          : c.json({ error: "internal_server_error", message: String(error) }, 500),
+      facts: [
+        bindRestMiddleware(projectRestFacts, () => ({
+          projectSlug: project.slug,
+          viewerUserId: null,
+          actorId: API_KEY,
+        })),
+      ],
+    },
+  );
 }
 
 const describeWithDatabase = describe.skipIf(connection === null);

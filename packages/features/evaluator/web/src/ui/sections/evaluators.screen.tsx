@@ -1,29 +1,9 @@
 /**
- * `/:project/evaluators` — every reusable scoring function in the project.
- *
- * WHAT THIS SCREEN CAN DO ON ITS OWN: list, delete (with the cascade the delete
- * would cause named first), replicate into another project, push a change onto
- * the replicas, pull a replica back in line with its source, read the audit
- * history, and print the snippets that call an evaluator from a customer's own
- * code.
- *
- * WHAT IT ASKS THE APPLICATION FOR, and does not have today: CREATING and
- * EDITING an evaluator. Both are `platform/app` drawers — `evaluatorEditor`
- * (fifteen openers, fourteen of them outside this family), `codeEvaluatorEditor`
- * (four, three outside) and `evaluatorCategorySelector` (five, four outside) —
- * and a drawer with a caller outside the family does not move. So the screen
- * writes the ADDRESS through `host.openOverlay`, and under `apps/ui` today
- * nothing opens, because the registry is mounted by `DashboardPageBody`, which
- * is chrome a packaged screen has nothing above it to supply. The me,
- * automations, annotations and analytics families recorded the same gap for the
- * same registry.
- *
- * `setFlowCallbacks("evaluatorEditor", …)` DID NOT TRAVEL AND COULD NOT.
- * `platform/app` registered a callback so that saving a NEW evaluator closed the
- * drawer instead of walking back up the category → type → editor stack. That is
- * a registry-wide side channel that exists only because an address carries
- * strings and not functions — the analytics family found the same shape behind
- * `seriesFilters` — and it belongs to whoever owns the drawer.
+ * `/:project/evaluators` — every reusable scoring function in the project: list,
+ * delete (naming the cascade first), replicate, push, sync, history, snippets.
+ * Creating and editing are drawers this family does not own, so the screen
+ * writes their ADDRESS through `host.openOverlay` and the owning frontend
+ * feature mounts the registry that answers it.
  */
 
 import { Center, EmptyState, Grid, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
@@ -33,11 +13,11 @@ import { useCallback, useState } from "react";
 
 import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
-import { EvaluatorDeleteDialog } from "../../ui/blocks/evaluator-delete-dialog.tsx";
-import { EvaluatorGridCard } from "../../ui/blocks/evaluator-grid-card.tsx";
-import { EvaluatorHistoryPanel } from "../../ui/sections/evaluator-history-panel.tsx";
-import { EvaluatorPushToCopiesDialog } from "../../ui/sections/evaluator-push-to-copies-dialog.tsx";
-import { EvaluatorReplicateDialog } from "../../ui/sections/evaluator-replicate-dialog.tsx";
+import { EvaluatorDeleteDialog } from "../blocks/evaluator-delete-dialog.tsx";
+import { EvaluatorGridCard } from "../blocks/evaluator-grid-card.tsx";
+import { EvaluatorHistoryPanel } from "./evaluator-history-panel.tsx";
+import { EvaluatorPushToCopiesDialog } from "./evaluator-push-to-copies-dialog.tsx";
+import { EvaluatorReplicateDialog } from "./evaluator-replicate-dialog.tsx";
 
 /** The grant the platform page carried, unchanged. */
 export const EVALUATORS_PAGE_PERMISSION = "evaluations:view";

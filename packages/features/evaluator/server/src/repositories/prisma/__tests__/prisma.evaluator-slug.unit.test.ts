@@ -1,12 +1,20 @@
 /**
  * @vitest-environment node
  */
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
-import type { EvaluatorDatabase } from "../../evaluator.repository.ts";
 import { PrismaEvaluatorRepository } from "../prisma.evaluator.repository.ts";
 
-function fakeDatabase(overrides: Partial<EvaluatorDatabase["evaluator"]> = {}): {
-  database: EvaluatorDatabase;
+/** Only the `evaluator` delegate this repository declares is stood in for. */
+type EvaluatorDelegate = Partial<{
+  findFirst(args: unknown): Promise<unknown>;
+  findMany(args: unknown): Promise<unknown[]>;
+  create(args: { data: Record<string, unknown> }): Promise<unknown>;
+  update(args: unknown): Promise<unknown>;
+}>;
+
+function fakeDatabase(overrides: EvaluatorDelegate = {}): {
+  database: PrismaClient;
   created: Record<string, unknown>[];
 } {
   const created: Record<string, unknown>[] = [];
@@ -29,7 +37,7 @@ function fakeDatabase(overrides: Partial<EvaluatorDatabase["evaluator"]> = {}): 
     },
     ...overrides,
   };
-  return { database: { evaluator } as unknown as EvaluatorDatabase, created };
+  return { database: { evaluator } as unknown as PrismaClient, created };
 }
 
 const persistInput = (overrides: { id?: string; projectId?: string; name: string }) => ({
@@ -45,7 +53,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
     /** @scenario "Generate slug from evaluator name on creation" */
     it("generates a kebab-case slug from the evaluator name", async () => {
       const { database, created } = fakeDatabase();
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(persistInput({ name: "My Custom Evaluator" }));
 
@@ -55,7 +63,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
     /** @scenario "Handle special characters in name" */
     it("strips special characters down to lowercase letters, numbers and hyphens", async () => {
       const { database, created } = fakeDatabase();
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(persistInput({ name: "LLM Judge (v2.0) - Beta!" }));
 
@@ -66,7 +74,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
     /** @scenario "Handle unicode characters in name" */
     it("collapses non-alphanumeric unicode characters to hyphens rather than crashing", async () => {
       const { database, created } = fakeDatabase();
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(persistInput({ name: "Säfety Check" }));
 
@@ -76,7 +84,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
     /** @scenario "Handle very long names" */
     it("does not reject a very long name — the slug carries its full length", async () => {
       const { database, created } = fakeDatabase();
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
       const longName = "A".repeat(200);
 
       await repository.create(persistInput({ name: longName }));
@@ -87,7 +95,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
     /** @scenario "Handle empty or whitespace-only names" */
     it("falls back to the literal 'evaluator' slug for a whitespace-only name", async () => {
       const { database, created } = fakeDatabase();
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(persistInput({ name: "   " }));
 
@@ -116,7 +124,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
           };
         },
       });
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       const result = await repository.create(persistInput({ name: "Exact Match" }));
 
@@ -129,7 +137,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
     /** @scenario "Same name allowed in different projects" */
     it("generates the same slug for each project without either create failing", async () => {
       const { database, created } = fakeDatabase();
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await repository.create(
         persistInput({ id: "eval_1", projectId: "proj1", name: "Exact Match" }),
@@ -151,7 +159,7 @@ describe("PrismaEvaluatorRepository slug generation", () => {
           throw new Error("Unique constraint failed on the fields: (`id`)");
         },
       });
-      const repository = PrismaEvaluatorRepository.create(database);
+      const repository = PrismaEvaluatorRepository.create({ prisma: database });
 
       await expect(repository.create(persistInput({ name: "Conflict" }))).rejects.toThrow(
         /\(`id`\)/,

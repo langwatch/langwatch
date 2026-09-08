@@ -93,3 +93,77 @@ export class EvaluatorInvalidConfigError extends HandledError {
     this.name = "EvaluatorInvalidConfigError";
   }
 }
+
+/**
+ * A workflow evaluator was asked to replicate before its workflow was ever
+ * saved. The copy would be a structurally broken replica, so the refusal is
+ * the caller's to act on: save a version first.
+ */
+export class EvaluatorWorkflowVersionRequiredError extends HandledError {
+  declare readonly code: "evaluator_workflow_version_required";
+
+  constructor(evaluatorId: string) {
+    super("evaluator_workflow_version_required", "This evaluator's workflow has no saved version", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { evaluatorId },
+    });
+    this.name = "EvaluatorWorkflowVersionRequiredError";
+  }
+}
+
+/**
+ * The wizard asked to attach a second evaluator to a workflow that already has
+ * one. 400 rather than the 409 `EvaluatorWorkflowAlreadyAssignedError` answers,
+ * because this is the status the `evaluators.create` door has answered since it
+ * shipped and a client branches on it.
+ */
+export class EvaluatorWorkflowEvaluatorExistsError extends HandledError {
+  declare readonly code: "evaluator_workflow_evaluator_exists";
+
+  constructor(input: { workflowId: string; evaluatorName: string }) {
+    super(
+      "evaluator_workflow_evaluator_exists",
+      `An evaluator already exists for this workflow: "${input.evaluatorName}"`,
+      { httpStatus: 400, fault: "customer", meta: { workflowId: input.workflowId } },
+    );
+    this.name = "EvaluatorWorkflowEvaluatorExistsError";
+  }
+}
+
+/**
+ * An update tried to change what the evaluator IS. The type is fixed at
+ * creation: changing it would make every result already stored under it mean
+ * something else.
+ */
+export class EvaluatorTypeImmutableError extends HandledError {
+  declare readonly code: "evaluator_type_immutable";
+
+  constructor(currentType: string) {
+    super(
+      "evaluator_type_immutable",
+      `evaluatorType cannot be changed after creation. Current type: "${currentType}"`,
+      { httpStatus: 400, fault: "customer", meta: { currentType } },
+    );
+    this.name = "EvaluatorTypeImmutableError";
+  }
+}
+
+/**
+ * Replicating reads the source project, and the caller may not manage it. 401
+ * rather than 403, which is the status this refusal has answered since it
+ * shipped; `AgentSourcePermissionDeniedError` keeps the same one for the same
+ * reason.
+ */
+export class EvaluatorSourcePermissionDeniedError extends HandledError {
+  declare readonly code: "evaluator_source_permission_denied";
+
+  constructor(sourceProjectId: string) {
+    super(
+      "evaluator_source_permission_denied",
+      "You do not have permission to manage evaluations in the source project",
+      { httpStatus: 401, fault: "customer", meta: { sourceProjectId } },
+    );
+    this.name = "EvaluatorSourcePermissionDeniedError";
+  }
+}

@@ -24,7 +24,8 @@
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project packages/features/evaluator/server/tsconfig.json && tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
@@ -36,6 +37,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
@@ -45,6 +47,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }

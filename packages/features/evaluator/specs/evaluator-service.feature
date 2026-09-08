@@ -14,6 +14,15 @@ Feature: Evaluator service boundary
     When a caller uses the ordinary lookup
     Then the service throws the evaluator not found domain error
 
+  @integration
+  Scenario: The memory and Postgres evaluator repositories answer alike
+    Given the same cases run against the memory twin and against Postgres
+    When an evaluator is written, read by id, by slug and by its workflow,
+      updated, archived, and listed as a copy of another project's evaluator
+    Then both backends answer the same rows in the same order
+    And both answer an absence with undefined rather than a refusal
+    And neither answers with a row belonging to another project
+
   Scenario: Evaluator persistence stays behind the server boundary
     Given an evaluator is loaded from Postgres
     When the repository maps the row

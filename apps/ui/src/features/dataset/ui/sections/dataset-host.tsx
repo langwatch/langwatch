@@ -8,7 +8,7 @@ import {
   datasetApi,
   DatasetHostProvider,
   type DatasetHostPort,
-} from "@langwatch/dataset-web/screens/datasets";
+} from "@langwatch/dataset-web/datasets";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

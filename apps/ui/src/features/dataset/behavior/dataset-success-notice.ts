@@ -4,7 +4,7 @@
  * on the toaster's own action trigger instead.
  */
 
-import type { DatasetSuccessNotice } from "@langwatch/dataset-web/screens/datasets";
+import type { DatasetSuccessNotice } from "@langwatch/dataset-web/datasets";
 
 export function notifyDatasetSuccess({
   notice,

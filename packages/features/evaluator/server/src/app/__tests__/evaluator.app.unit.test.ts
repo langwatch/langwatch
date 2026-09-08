@@ -1,11 +1,14 @@
 /**
  * @vitest-environment node
  */
-import type {
-  Evaluator,
-  EvaluatorService,
-  EvaluatorWithFields,
+import type { AuthzApi } from "@langwatch/authz-contract";
+import {
+  newEvaluatorId,
+  type Evaluator,
+  type EvaluatorService,
+  type EvaluatorWithFields,
 } from "@langwatch/evaluator-contract";
+import type { EvaluatorGraphPort } from "../../ports/evaluator.port.ts";
 import {
   ModelNotConfiguredError,
   type ModelProviderService,
@@ -70,6 +73,10 @@ function harness({
     app: EvaluatorApp.create({
       evaluators: evaluatorService,
       modelProviders: modelProviderService,
+      // Neither reached by the cases below: they exercise the model resolution
+      // and the id-or-slug lookup, which ask no permission and touch no graph.
+      permissions: {} as AuthzApi,
+      graph: {} as EvaluatorGraphPort,
     }),
   };
 }
@@ -83,10 +90,8 @@ function firstCall(method: unknown): Record<string, unknown> {
 describe("EvaluatorApp", () => {
   describe("when a new evaluator needs an id", () => {
     it("mints it under the one scheme every call site now shares", () => {
-      const { app } = harness();
-
-      expect(app.newEvaluatorId()).toMatch(/^evaluator_.+/);
-      expect(app.newEvaluatorId()).not.toBe(app.newEvaluatorId());
+      expect(newEvaluatorId()).toMatch(/^evaluator_.+/);
+      expect(newEvaluatorId()).not.toBe(newEvaluatorId());
     });
   });
 
@@ -95,7 +100,7 @@ describe("EvaluatorApp", () => {
       const { app, evaluators } = harness();
 
       await expect(
-        app.tryGetByIdOrSlugWithFields({ idOrSlug: "evaluator_1", projectId: "project-1" }),
+        app.findByIdOrSlugWithFields({ idOrSlug: "evaluator_1", projectId: "project-1" }),
       ).resolves.toEqual(withFields);
       expect(evaluators.tryGetBySlug).not.toHaveBeenCalled();
     });
@@ -106,7 +111,7 @@ describe("EvaluatorApp", () => {
       });
 
       await expect(
-        app.tryGetByIdOrSlugWithFields({ idOrSlug: "exact-match", projectId: "project-1" }),
+        app.findByIdOrSlugWithFields({ idOrSlug: "exact-match", projectId: "project-1" }),
       ).resolves.toEqual(withFields);
       expect(evaluators.tryGetBySlug).toHaveBeenCalledWith({
         slug: "exact-match",
@@ -118,7 +123,7 @@ describe("EvaluatorApp", () => {
       });
     });
 
-    it("answers null when neither the id nor the slug names one", async () => {
+    it("answers undefined when neither the id nor the slug names one", async () => {
       const { app } = harness({
         evaluators: {
           tryGetByIdWithFields: vi.fn(async () => null),
@@ -127,8 +132,8 @@ describe("EvaluatorApp", () => {
       });
 
       await expect(
-        app.tryGetByIdOrSlugWithFields({ idOrSlug: "ghost", projectId: "project-1" }),
-      ).resolves.toBeNull();
+        app.findByIdOrSlugWithFields({ idOrSlug: "ghost", projectId: "project-1" }),
+      ).resolves.toBeUndefined();
     });
   });
 

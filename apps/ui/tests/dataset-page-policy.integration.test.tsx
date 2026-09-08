@@ -8,9 +8,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/dataset-web/screens/datasets", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/dataset-web/screens/datasets")>(
-    "@langwatch/dataset-web/screens/datasets",
+vi.mock("@langwatch/dataset-web/datasets", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/dataset-web/datasets")>(
+    "@langwatch/dataset-web/datasets",
   );
   const ListScreen = () => <div>the datasets page</div>;
   const EditorScreen = () => <div>the dataset editor page</div>;

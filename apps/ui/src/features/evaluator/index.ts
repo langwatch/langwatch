@@ -1,6 +1,6 @@
 /** Evaluators: screen, dialogs, history panel and API usage snippets, all in `@langwatch/evaluator-web`. */
 
-import { evaluatorApi } from "@langwatch/evaluator-web/screens/evaluators";
+import { evaluatorApi } from "@langwatch/evaluator-web/evaluators";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { evaluatorPageLoaders } from "./ui/sections/evaluator-routes";

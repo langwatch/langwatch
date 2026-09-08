@@ -10,7 +10,7 @@ import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/s
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useProjectSpanNames } from "@langwatch/trace-web/surfaces/project-span-names";
-import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/trace-contract";
+import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/dataset-contract";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

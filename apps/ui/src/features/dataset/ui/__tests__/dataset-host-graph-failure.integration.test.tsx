@@ -11,9 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/dataset-web/screens/datasets", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/dataset-web/screens/datasets")>(
-    "@langwatch/dataset-web/screens/datasets",
+vi.mock("@langwatch/dataset-web/datasets", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/dataset-web/datasets")>(
+    "@langwatch/dataset-web/datasets",
   );
   return {
     ...actual,

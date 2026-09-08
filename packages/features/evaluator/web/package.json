@@ -50,15 +50,15 @@
       "types": "./dist/behavior/use-available-evaluators.d.ts",
       "default": "./src/behavior/use-available-evaluators.ts"
     },
-    "./screens/evaluation-edit": {
-      "langwatch-declaration-source": "./src/screens/evaluation-edit/index.ts",
-      "types": "./dist/screens/evaluation-edit/index.d.ts",
-      "default": "./src/screens/evaluation-edit/index.ts"
+    "./evaluation-edit": {
+      "langwatch-declaration-source": "./src/evaluation-edit.ts",
+      "types": "./dist/evaluation-edit.d.ts",
+      "default": "./src/evaluation-edit.ts"
     },
-    "./screens/evaluators": {
-      "langwatch-declaration-source": "./src/screens/evaluators/index.ts",
-      "types": "./dist/screens/evaluators/index.d.ts",
-      "default": "./src/screens/evaluators/index.ts"
+    "./evaluators": {
+      "langwatch-declaration-source": "./src/evaluators.ts",
+      "types": "./dist/evaluators.d.ts",
+      "default": "./src/evaluators.ts"
     },
     "./surfaces/evaluation-types": {
       "langwatch-declaration-source": "./src/model/evaluations/types.ts",
@@ -71,9 +71,9 @@
       "default": "./src/model/evaluation-results.ts"
     },
     "./surfaces/evaluation-status": {
-      "langwatch-declaration-source": "./src/surfaces/evaluation-status/index.ts",
-      "types": "./dist/surfaces/evaluation-status/index.d.ts",
-      "default": "./src/surfaces/evaluation-status/index.ts"
+      "langwatch-declaration-source": "./src/model/evaluation-status.ts",
+      "types": "./dist/model/evaluation-status.d.ts",
+      "default": "./src/model/evaluation-status.ts"
     }
   },
   "scripts": {
@@ -85,15 +85,15 @@
     "@hookform/resolvers": "^5.4.0",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

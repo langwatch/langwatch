@@ -1,4 +1,4 @@
-import type { EvaluatorOverlayRequest } from "@langwatch/evaluator-web/screens/evaluators";
+import type { EvaluatorOverlayRequest } from "@langwatch/evaluator-web/evaluators";
 
 /**
  * How an overlay this family does not own is addressed: `drawer.open` plus

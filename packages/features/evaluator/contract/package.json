@@ -22,11 +22,14 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/runtime-composition": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/trace-contract": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }

@@ -1,18 +1,25 @@
 /**
  * @vitest-environment node
+ *
+ * The `/api/evaluators` family over the runtime a process mounts it on: the
+ * addresses, the statuses and the bodies the public API has answered since it
+ * shipped, against a stubbed application.
  */
 import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
+  bindRestMiddleware,
+  createRestRuntime,
+  projectRestFacts,
+  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { AVAILABLE_EVALUATORS, type Evaluator } from "@langwatch/evaluator-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  type Evaluator,
+  type EvaluatorApi,
+} from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluatorApp } from "../evaluator.app.ts";
-import { createEvaluatorsRestApp } from "../../transport/api-rest/evaluator.api.ts";
+
+import { createEvaluatorRest } from "../evaluator.rest.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -33,13 +40,14 @@ const evaluator = {
 const enriched = { ...evaluator, fields: [], outputFields: [] };
 
 /**
- * The process's own boundary renderer, reduced to what these tests read back. A handled error
- * keeps its own status and code, and its `meta` is spread onto the body — which is what puts
- * `fields` beside `error` on a rejected request.
+ * The process's own boundary renderer, reduced to what these tests read back. A
+ * handled error keeps its own status and code, and its `meta` is spread onto
+ * the body — which is what puts `fields` beside `error` on a rejected request.
  */
-const boundaryErrorHandler: ErrorHandler = (error, c) => {
+const renderHandled: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const serialized = error.serialize();
+
     return c.json(
       {
         error: serialized.code,
@@ -50,156 +58,95 @@ const boundaryErrorHandler: ErrorHandler = (error, c) => {
       serialized.httpStatus as 400,
     );
   }
-  if (error instanceof HTTPException) {
-    return c.json({ error: error.message }, error.status as 400);
-  }
+
   return c.json({ error: "internal_server_error" }, 500);
 };
 
-/** Every enforcement step the builder chose for the route under test. */
-function testSecurity(): { security: AppRestSecurity; chain: string[] } {
-  const chain: string[] = [];
-  const record =
-    (label: string): MiddlewareHandler =>
-    async (_c, next) => {
-      chain.push(label);
-      await next();
-    };
-  const authenticateProject: MiddlewareHandler = async (c, next) => {
-    chain.push("authenticateProject");
-    c.set("project", {
-      id: "project-1",
-      name: "Project One",
-      slug: "project-one",
-      teamId: "team-1",
-      organizationId: "organization-1",
-      isPersonal: false,
-      ownerUserId: null,
-    });
-    await next();
-  };
-
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => authenticateProject,
-    authorizeProjectPermission: ({ permission }) => record(`authorize:${permission}`),
-    authorizeApiKeyCeiling: ({ permission }) => record(`ceiling:${permission}`),
-    authenticateOrganization: () => record("authenticateOrganization"),
-    authorizeOrganizationPermission: ({ permission }) => record(`authorizeOrg:${permission}`),
-    authorizeRouteTeamPermission: () => async (_c, next) => next(),
-    authorizeRouteProjectPermission: ({ permission }) =>
-      record(`authorizeRouteProject:${permission}`),
-    authenticateOrganizationThrowing: record("authenticateOrganizationThrowing"),
-    authorizeOrganizationPermissionThrowing: (permission) =>
-      record(`authorizeOrgThrowing:${permission}`),
-  };
-
-  return { security: createAppRestSecurity(ports), chain };
-}
+const platformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
+  `https://app.langwatch.test/${projectSlug}${path}`;
 
 function buildApi(overrides: Record<string, unknown> = {}) {
-  const { security, chain } = testSecurity();
   const stub = {
     getAllWithFields: vi.fn(async () => [enriched]),
-    tryGetByIdOrSlugWithFields: vi.fn(async () => enriched),
+    findByIdOrSlugWithFields: vi.fn(async () => enriched),
     getByIdWithFields: vi.fn(async () => enriched),
-    tryGetById: vi.fn(async () => evaluator),
+    findById: vi.fn(async () => evaluator),
     createWithResolvedDefaults: vi.fn(async () => evaluator),
     update: vi.fn(async () => evaluator),
     archive: vi.fn(async () => evaluator),
     ...overrides,
-  } as unknown as EvaluatorApp;
+  } as unknown as EvaluatorApi;
 
-  const family = createEvaluatorsRestApp({
-    security,
-    app: () => stub,
-    platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-    // Resolving the organization reads the process's team graph, so the
-    // middleware that sets it is supplied rather than imported.
-    organizationMiddleware: async (c, next) => {
-      chain.push("organization");
-      c.set("organization", { id: "organization-1" });
-      await next();
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
     },
   });
+  const hono = runtime.mount(createEvaluatorRest(platformUrl).router(), {
+    app: () => stub,
+    credential: "projectKey",
+    onError: renderHandled,
+    facts: [
+      bindRestMiddleware(projectRestFacts, () => ({
+        projectSlug: "project-one",
+        viewerUserId: null,
+        actorId: "project-key-1",
+      })),
+    ],
+  });
 
-  return { hono: family, stub, chain };
+  return { hono, stub };
 }
 
 const jsonHeaders = { "content-type": "application/json" };
 
 type MountedFamily = ReturnType<typeof buildApi>["hono"];
 
+const request = (hono: MountedFamily, path: string, init?: RequestInit) =>
+  hono.fetch(new Request(`http://api.test${path}`, init));
+
 const post = (hono: MountedFamily, body: unknown) =>
-  hono.request("/api/evaluators", {
+  request(hono, "/api/evaluators", {
     method: "POST",
     headers: jsonHeaders,
     body: JSON.stringify(body),
   });
 
-describe("createEvaluatorsRestApp", () => {
-  describe("given the mounted family", () => {
-    it("declares the read permission on both reads", async () => {
-      const list = buildApi();
-      await list.hono.request("/api/evaluators");
-      expect(list.chain).toEqual([
-        "authenticateProject",
-        "authorize:evaluations:view",
-        "organization",
-      ]);
+describe("the evaluators REST family", () => {
+  describe("given the dated addressing every route inherits", () => {
+    it("answers at the bare path, the dated path and latest alike", async () => {
+      const { hono } = buildApi();
 
-      const read = buildApi();
-      await read.hono.request("/api/evaluators/evaluator_1");
-      expect(read.chain).toEqual([
-        "authenticateProject",
-        "authorize:evaluations:view",
-        "organization",
-      ]);
+      const answered = await Promise.all(
+        [
+          "/api/evaluators",
+          "/api/v1/evaluators",
+          "/api/evaluators/2026-08-07",
+          "/api/v1/evaluators/2026-08-07",
+          "/api/evaluators/latest",
+          "/api/v1/evaluators/latest",
+        ].map(async (path) => [path, (await request(hono, path)).status] as const),
+      );
+
+      expect(answered.filter(([, status]) => status !== 200)).toEqual([]);
     });
+  });
 
-    it("declares create on the create, update on the edit, and manage on the archive", async () => {
-      const create = buildApi();
-      await post(create.hono, {
-        name: "New",
-        config: { evaluatorType: "langevals/exact_match" },
-      });
-      expect(create.chain).toEqual([
-        "authenticateProject",
-        "authorize:evaluations:create",
-        "organization",
+  describe("when the project's evaluators are listed", () => {
+    it("publishes each one with the address its editor opens at", async () => {
+      const { hono, stub } = buildApi();
+
+      const response = await request(hono, "/api/evaluators");
+
+      expect(response.status).toBe(200);
+      expect(stub.getAllWithFields).toHaveBeenCalledWith({ projectId: "project-1" });
+      await expect(response.json()).resolves.toMatchObject([
+        {
+          id: "evaluator_1",
+          platformUrl:
+            "https://app.langwatch.test/project-one/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=evaluator_1",
+        },
       ]);
-
-      const update = buildApi();
-      await update.hono.request("/api/evaluators/evaluator_1", {
-        method: "PUT",
-        headers: jsonHeaders,
-        body: JSON.stringify({ name: "Updated Name" }),
-      });
-      expect(update.chain).toEqual([
-        "authenticateProject",
-        "authorize:evaluations:update",
-        "organization",
-      ]);
-
-      const archive = buildApi();
-      await archive.hono.request("/api/evaluators/evaluator_1", { method: "DELETE" });
-      expect(archive.chain).toEqual([
-        "authenticateProject",
-        "authorize:evaluations:manage",
-        "organization",
-      ]);
-    });
-
-    it("resolves the organization only after the caller is authenticated", async () => {
-      const { hono, chain } = buildApi();
-
-      await hono.request("/api/evaluators");
-
-      expect(chain.indexOf("organization")).toBeGreaterThan(chain.indexOf("authenticateProject"));
     });
   });
 
@@ -207,10 +154,10 @@ describe("createEvaluatorsRestApp", () => {
     it("asks for it by whichever identifier the caller sent", async () => {
       const { hono, stub } = buildApi();
 
-      const response = await hono.request("/api/evaluators/original-name");
+      const response = await request(hono, "/api/evaluators/original-name");
 
       expect(response.status).toBe(200);
-      expect(stub.tryGetByIdOrSlugWithFields).toHaveBeenCalledWith({
+      expect(stub.findByIdOrSlugWithFields).toHaveBeenCalledWith({
         idOrSlug: "original-name",
         projectId: "project-1",
       });
@@ -223,11 +170,12 @@ describe("createEvaluatorsRestApp", () => {
 
     /** @scenario "DELETE /api/evaluators/:id archives an evaluator" */
     it("answers 404 when the project has no evaluator by that name", async () => {
-      const { hono } = buildApi({ tryGetByIdOrSlugWithFields: vi.fn(async () => null) });
+      const { hono } = buildApi({ findByIdOrSlugWithFields: vi.fn(async () => void 0) });
 
-      const response = await hono.request("/api/evaluators/ghost");
+      const response = await request(hono, "/api/evaluators/ghost");
 
       expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ error: "evaluator_not_found" });
     });
   });
 
@@ -236,7 +184,7 @@ describe("createEvaluatorsRestApp", () => {
     it("sends only the fields the caller named", async () => {
       const { hono, stub } = buildApi();
 
-      const response = await hono.request("/api/evaluators/evaluator_1", {
+      const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
         headers: jsonHeaders,
         body: JSON.stringify({ name: "Updated Name" }),
@@ -254,7 +202,7 @@ describe("createEvaluatorsRestApp", () => {
     it("keeps the canonical config shape on a settings-only update", async () => {
       const { hono, stub } = buildApi();
 
-      const response = await hono.request("/api/evaluators/evaluator_1", {
+      const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
         headers: jsonHeaders,
         body: JSON.stringify({
@@ -280,7 +228,7 @@ describe("createEvaluatorsRestApp", () => {
     it("refuses a body that changes the evaluator's type", async () => {
       const { hono, stub } = buildApi();
 
-      const response = await hono.request("/api/evaluators/evaluator_1", {
+      const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
         headers: jsonHeaders,
         body: JSON.stringify({ config: { evaluatorType: "openai/moderation" } }),
@@ -288,7 +236,8 @@ describe("createEvaluatorsRestApp", () => {
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toMatchObject({
-        error: expect.stringContaining("evaluatorType cannot be changed"),
+        error: "evaluator_type_immutable",
+        message: expect.stringContaining("evaluatorType cannot be changed"),
       });
       expect(stub.update).not.toHaveBeenCalled();
     });
@@ -296,7 +245,7 @@ describe("createEvaluatorsRestApp", () => {
     it("accepts a body that repeats the type it already has", async () => {
       const { hono } = buildApi();
 
-      const response = await hono.request("/api/evaluators/evaluator_1", {
+      const response = await request(hono, "/api/evaluators/evaluator_1", {
         method: "PUT",
         headers: jsonHeaders,
         body: JSON.stringify({
@@ -308,9 +257,9 @@ describe("createEvaluatorsRestApp", () => {
     });
 
     it("answers 404 without writing when the project has no such evaluator", async () => {
-      const { hono, stub } = buildApi({ tryGetById: vi.fn(async () => null) });
+      const { hono, stub } = buildApi({ findById: vi.fn(async () => void 0) });
 
-      const response = await hono.request("/api/evaluators/nonexistent-id", {
+      const response = await request(hono, "/api/evaluators/nonexistent-id", {
         method: "PUT",
         headers: jsonHeaders,
         body: JSON.stringify({ name: "Updated Name" }),
@@ -326,7 +275,7 @@ describe("createEvaluatorsRestApp", () => {
     it("archives it and answers success", async () => {
       const { hono, stub } = buildApi();
 
-      const response = await hono.request("/api/evaluators/evaluator_1", { method: "DELETE" });
+      const response = await request(hono, "/api/evaluators/evaluator_1", { method: "DELETE" });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ success: true });
@@ -334,9 +283,9 @@ describe("createEvaluatorsRestApp", () => {
     });
 
     it("answers 404 without archiving when the project has no such evaluator", async () => {
-      const { hono, stub } = buildApi({ tryGetById: vi.fn(async () => null) });
+      const { hono, stub } = buildApi({ findById: vi.fn(async () => void 0) });
 
-      const response = await hono.request("/api/evaluators/nonexistent-id", { method: "DELETE" });
+      const response = await request(hono, "/api/evaluators/nonexistent-id", { method: "DELETE" });
 
       expect(response.status).toBe(404);
       expect(stub.archive).not.toHaveBeenCalled();

@@ -3,6 +3,7 @@ import {
   codeEvaluatorConfigSchema,
   evaluatorExecutionConfigSchema,
   EvaluatorInvalidConfigError,
+  EvaluatorNotFoundError,
   EvaluatorWorkflowNotFoundError,
   resolvedEvaluatorExecutionSchema,
   type EvaluatorIdOrSlugInput,
@@ -33,6 +34,8 @@ export class EvaluatorExecutionService {
 
   async resolve(input: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution> {
     const evaluator = await this.options.repository.findByIdOrSlug(input);
+    if (!evaluator) throw new EvaluatorNotFoundError(input.idOrSlug);
+
     const config = evaluatorExecutionConfigSchema.safeParse(evaluator.config);
     const settings = config.success ? config.data.settings : void 0;
 

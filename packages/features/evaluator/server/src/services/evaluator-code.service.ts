@@ -1,6 +1,7 @@
 import {
   codeEvaluatorConfigSchema,
   codeEvaluatorOutputFields,
+  EvaluatorNotFoundError,
   type CodeEvaluatorConfig,
   type CodeEvaluatorExecutionInput,
   type SingleEvaluationResult,
@@ -54,6 +55,8 @@ export class EvaluatorCodeService {
         id: input.evaluatorId,
         projectId: input.projectId,
       });
+      if (!evaluator) throw new EvaluatorNotFoundError(input.evaluatorId);
+
       if (evaluator.type !== "code") {
         throw new Error(`Code evaluator not found: ${input.evaluatorId}`);
       }

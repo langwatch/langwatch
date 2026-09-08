@@ -1,21 +1,16 @@
 /**
- * Copying an evaluator from one project into another.
- *
- * Shared by `evaluators.copy` and `monitors.copy` so replicating from either
- * surface produces an identical, independently-editable evaluator in the target
- * project. The caller owns the permission checks; this assumes the source is
- * readable.
- *
+ * Copying an evaluator from one project into another. Shared by
+ * `evaluators.copy` and `monitors.copy`, so either produces an identical,
+ * independently-editable evaluator. The caller owns the permission checks.
  * Spec: specs/monitors/replicate-monitor-to-project.feature.
  */
 import {
   EvaluatorNotFoundError,
+  EvaluatorWorkflowVersionRequiredError,
   evaluatorTypeSchema,
+  newEvaluatorId,
   type Evaluator,
-  type EvaluatorService,
 } from "@langwatch/evaluator-contract";
-import { nanoid } from "nanoid";
-import { EvaluatorWorkflowVersionRequiredError } from "#app/evaluator.app";
 
 /**
  * Workflow replication, which the process owns: a workflow evaluator's backing
@@ -39,7 +34,18 @@ export type EvaluatorReplicationPorts = Readonly<{
 
 /** One replication, from the source project into the target. */
 export type EvaluatorCopyCommand = Readonly<{
-  evaluators: EvaluatorService;
+  evaluators: {
+    findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined>;
+    create(input: {
+      id: string;
+      projectId: string;
+      name: string;
+      type: "evaluator" | "code" | "workflow";
+      config: Record<string, unknown>;
+      workflowId?: string;
+      copiedFromEvaluatorId?: string;
+    }): Promise<Evaluator>;
+  };
   evaluatorId: string;
   sourceProjectId: string;
   targetProjectId: string;
@@ -51,11 +57,11 @@ export type EvaluatorCopyCommand = Readonly<{
  * Constructed per request, because the workflow ports it delegates to resolve
  * their work from that request's context.
  */
-export class EvaluatorReplicationApi {
+export class EvaluatorReplicationService {
   private constructor(private readonly ports: EvaluatorReplicationPorts) {}
 
-  static create(ports: EvaluatorReplicationPorts): EvaluatorReplicationApi {
-    return new EvaluatorReplicationApi(ports);
+  static create(ports: EvaluatorReplicationPorts): EvaluatorReplicationService {
+    return new EvaluatorReplicationService(ports);
   }
 
   /**
@@ -67,9 +73,9 @@ export class EvaluatorReplicationApi {
     evaluatorId,
     sourceProjectId,
     targetProjectId,
-    newEvaluatorId = `evaluator_${nanoid()}`,
+    newEvaluatorId: copyId = newEvaluatorId(),
   }: EvaluatorCopyCommand): Promise<Evaluator> {
-    const source = await evaluators.tryGetById({ id: evaluatorId, projectId: sourceProjectId });
+    const source = await evaluators.findById({ id: evaluatorId, projectId: sourceProjectId });
 
     if (!source) throw new EvaluatorNotFoundError(evaluatorId);
 
@@ -81,7 +87,7 @@ export class EvaluatorReplicationApi {
 
     try {
       return await evaluators.create({
-        id: newEvaluatorId,
+        id: copyId,
         projectId: targetProjectId,
         name: source.name,
         type: evaluatorTypeSchema.parse(source.type),

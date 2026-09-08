@@ -4,7 +4,7 @@
  * already reads `@langwatch/workflow-web/studio-host/*`.
  */
 
-import { evaluationEditScreens } from "@langwatch/evaluator-web/screens/evaluation-edit";
+import { evaluationEditScreens } from "@langwatch/evaluator-web/evaluation-edit";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

@@ -8,7 +8,7 @@ import {
   evaluatorApi,
   EvaluatorHostProvider,
   type EvaluatorHostPort,
-} from "@langwatch/evaluator-web/screens/evaluators";
+} from "@langwatch/evaluator-web/evaluators";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

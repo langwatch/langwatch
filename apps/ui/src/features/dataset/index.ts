@@ -1,6 +1,6 @@
 /** Datasets: two screens, four overlays and the spreadsheet editor, all in `@langwatch/dataset-web`. */
 
-import { datasetApi } from "@langwatch/dataset-web/screens/datasets";
+import { datasetApi } from "@langwatch/dataset-web/datasets";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { datasetPageLoaders } from "./ui/sections/dataset-routes";

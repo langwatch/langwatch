@@ -1,6 +1,6 @@
 /** Which page key the evaluators screen answers: `evaluations:view`, unchanged from the platform page. */
 
-import { evaluatorScreens } from "@langwatch/evaluator-web/screens/evaluators";
+import { evaluatorScreens } from "@langwatch/evaluator-web/evaluators";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

@@ -72,11 +72,16 @@ export class EvaluatorService extends EvaluatorServiceContract {
   }
 
   async tryGetById(input: { id: string; projectId: string }): Promise<Evaluator | null> {
-    return this.options.repository.tryFindById(input);
+    return (await this.options.repository.findById(input)) ?? null;
   }
 
   async getById(input: { id: string; projectId: string }): Promise<Evaluator> {
-    return this.options.repository.findById(input);
+    const evaluator = await this.options.repository.findById(input);
+    if (!evaluator) {
+      throw new EvaluatorNotFoundError(input.id);
+    }
+
+    return evaluator;
   }
 
   async tryGetByIdWithFields(input: {
@@ -98,12 +103,12 @@ export class EvaluatorService extends EvaluatorServiceContract {
     return this.execution.resolve(parsed);
   }
 
-  tryGetBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null> {
-    return this.options.repository.tryFindBySlug(input);
+  async tryGetBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null> {
+    return (await this.options.repository.findBySlug(input)) ?? null;
   }
 
   async getBySlug(input: { slug: string; projectId: string }): Promise<Evaluator> {
-    const evaluator = await this.options.repository.tryFindBySlug(input);
+    const evaluator = await this.options.repository.findBySlug(input);
     if (!evaluator) {
       throw new EvaluatorNotFoundError(input.slug);
     }
@@ -111,8 +116,11 @@ export class EvaluatorService extends EvaluatorServiceContract {
     return evaluator;
   }
 
-  tryGetByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator | null> {
-    return this.options.repository.tryFindByWorkflow(input);
+  async tryGetByWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<Evaluator | null> {
+    return (await this.options.repository.findByWorkflow(input)) ?? null;
   }
 
   getAll(input: { projectId: string }): Promise<Evaluator[]> {
@@ -382,7 +390,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
       throw new EvaluatorIsNotCopyError(copy.id);
     }
 
-    const source = await this.options.repository.tryFindByIdOnly(copy.copiedFromEvaluatorId);
+    const source = await this.options.repository.findByIdAcrossProjects(copy.copiedFromEvaluatorId);
 
     if (!source) {
       throw new EvaluatorSourceNotFoundError(copy.copiedFromEvaluatorId);

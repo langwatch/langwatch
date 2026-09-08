@@ -1,6 +1,12 @@
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
 export const EVALUATOR_FEATURE_ID = "evaluator" as const;
+
+const EVALUATOR_KSUID_RESOURCE = "evaluator";
+
+/** The id a new evaluator gets: one scheme, where three used to be written. */
+export const newEvaluatorId = (): string => generate(EVALUATOR_KSUID_RESOURCE).toString();
 export const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
 export type EvaluatorType = z.infer<typeof evaluatorTypeSchema>;
 

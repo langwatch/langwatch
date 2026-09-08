@@ -175,7 +175,7 @@
       "id": "evaluation-edit",
       "root": "evaluations",
       "uses": {
-        "screens": ["@langwatch/evaluator-web/screens/evaluation-edit"],
+        "screens": ["@langwatch/evaluator-web/evaluation-edit"],
         "surfaces": []
       }
     },
@@ -183,7 +183,7 @@
       "id": "evaluators",
       "root": "evaluator",
       "uses": {
-        "screens": ["@langwatch/evaluator-web/screens/evaluators"],
+        "screens": ["@langwatch/evaluator-web/evaluators"],
         "surfaces": ["@langwatch/evaluator-web/drawers"]
       }
     },
@@ -406,6 +406,7 @@
         "surfaces": [
           "@langwatch/dataset-web/surfaces/dataset-drawer",
           "@langwatch/dataset-web/surfaces/upload-csv-drawer",
+          "@langwatch/evaluator-web/editor-drawers",
           "@langwatch/prompt-web/surfaces/prompt-editor-drawer"
         ]
       }
