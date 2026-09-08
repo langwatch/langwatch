@@ -4,19 +4,19 @@
     {
       "id": 1,
       "prompt": "The dataset package has a REST app but hitting /api/v1/datasets returns 404 on the api process.",
-      "expected_output": "Finds the missing entry in app-rest.packaged-families.ts, gates the family on its service being built, names the absence otherwise, adds or extends the composition test, and does not regenerate the OpenAPI document.",
+      "expected_output": "Finds that the dataset REST declaration is never mounted, adds the <f>-rest.mount.ts over the composed app and registers the family from the API root only when the feature is installed, adds or extends the composition test, and does not regenerate the OpenAPI document.",
       "files": []
     },
     {
       "id": 2,
       "prompt": "Install the annotation-queue screen from @langwatch/annotation-web into apps/ui at /:project/annotations/queue.",
-      "expected_output": "Adds the catalogue.json use, the private apps/ui feature folder with a routes file wrapping host, chrome and guard in that order, the installed-ui-features registration, the route-table key, feature-map.json, and runs the two install guard tests.",
+      "expected_output": "Adds the catalogue.json use, the private apps/ui feature folder with a host implementing the HostPort and a routes file built with uiPage, the WebInstallation in installed-ui-features, the pinned page key, feature-map.json, and runs the install guard tests.",
       "files": []
     },
     {
       "id": 3,
       "prompt": "Make the worker run the new dataset-normalization command.",
-      "expected_output": "Adds an installer or extends the area's installer, the catalogue entry, and calls out the job-registry.json change as deliberate; proves routability with the capability-mount test.",
+      "expected_output": "Installs the dataset server in the capability root that owns the job with .withFeature, adds the catalogue entry, and calls out the job-registry.json change as deliberate; proves routability with the capability-mount test.",
       "files": []
     }
   ]

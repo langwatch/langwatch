@@ -10,13 +10,13 @@
     {
       "id": 2,
       "prompt": "feature-source-layout is failing on packages/features/trace/server/src/utils/spanTree.ts. Why, and where does it go?",
-      "expected_output": "Explains the closed server grammar, that utils/ is not a layer, and places the code in a service (or the contract if pure), with the canonical kebab filename.",
+      "expected_output": "Explains the closed server grammar, that utils/ is not a layer, and places the code in a service, a rules module, or the contract if pure, with the canonical kebab filename.",
       "files": []
     },
     {
       "id": 3,
       "prompt": "Explain how a screen in a feature web package ends up as a page a user can open.",
-      "expected_output": "Walks the six install steps: screen export, catalogue.json, private apps/ui feature adapter with the loader wrapping order, installed-ui-features, installed-ui-drawers, the route table key, feature-map.json.",
+      "expected_output": "Walks the install steps: the flat web entry export, catalogue.json, the private apps/ui feature folder whose host implements the HostPort and whose routes use uiPage (host, guard, screen), the WebInstallation in installed-ui-features, the pinned page keys, feature-map.json.",
       "files": []
     }
   ]

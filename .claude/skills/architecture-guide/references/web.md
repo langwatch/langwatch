@@ -1,19 +1,20 @@
 # Web packages
 
 `packages/features/<name>/web` is `@langwatch/<name>-web`. It is optional, browser-safe,
-and depends on the feature's contract, `@langwatch/platform-api-client` and
-`@langwatch/design-system`. It never imports the server package or `apps/*`.
+and depends on the feature's contract, `@langwatch/platform-api-client`,
+`@langwatch/design-system`, `@langwatch/ui-host` and `@langwatch/ui-drawer`. It never
+imports the server package or `apps/*`. The reference is
+`packages/features/annotation/web`.
 
 ## Layers and direction
 
 ```
-model/          pure values, types, view-model transforms, *HostPort contracts
-behavior/       hooks, the api binding (createFeatureApi), stores, form logic
-ui/elements/    leaf presentation: props in, JSX out
-ui/blocks/      small compositions of elements
-ui/sections/    composed presentation fed by behavior
-screens/<owner>/index.ts    a whole page, owner-only, public
-surfaces/<id>/index.ts      an embeddable piece other features may mount, public
+src/<entry>.ts(x)   flat public entries: annotations.ts, annotation-card.ts, annotation-form.ts, testing.tsx
+model/              pure values, types, view-model transforms, the *HostPort contract and its React context
+behavior/           hooks, the api binding (createFeatureApi), stores, form logic
+ui/elements/        leaf presentation: props in, JSX out
+ui/blocks/          small compositions of elements
+ui/sections/        composed presentation fed by behavior; screens and layouts live here
 ```
 
 Allowed imports (`UI_LAYER_DEPENDENCIES` in
@@ -21,6 +22,7 @@ Allowed imports (`UI_LAYER_DEPENDENCIES` in
 
 | from        | may import                                  |
 | ----------- | ------------------------------------------- |
+| entry file  | any implementation module                   |
 | model       | model                                       |
 | behavior    | model, behavior                             |
 | ui/elements | model, elements                             |
@@ -28,79 +30,105 @@ Allowed imports (`UI_LAYER_DEPENDENCIES` in
 | ui/sections | model, behavior, elements, blocks, sections |
 
 Elements and blocks can never fetch: they cannot import behavior. Sections are where
-data meets layout. Screens and surfaces compose sections.
+data meets layout. Nothing imports an entry file from inside the package.
 
-## The public entry is closed
+## The public entries are flat, closed and catalogue-declared
 
-`package.json` `exports` may name only `./screens/<id>` and `./surfaces/<id>`
-(`ui-web-public-entry`). A few packages still publish a `./drawers` entry; it is not a
-declarable capability, because `capabilityForSpecifier` matches only `./screens/<id>` and
-`./surfaces/<id>`. Publish new shared pieces as a surface. A surface export may point
-at any module in the package; the export path is the contract, not the file path.
-`ui-screen-closure` walks the whole import graph of each exported screen and rejects
-direct browser capabilities, non-literal module specifiers, forbidden presentation
-imports and anything reaching outside the package. `@langwatch/design-system` and any
-`*-contract` package are always allowed (`PORTABLE_BY_ROLE`).
+`package.json` `exports` lists each entry once:
 
-A screen export looks like:
-
-```ts
-// screens/secret/index.ts
-export const secretScreens = { secrets: () => import("./secrets.screen") }; // the one
-export { secretApi } from "../../behavior/secret-api"; // allowed
-export { SecretHostPort } from "../../model/secret-host"; // lazy form
+```json
+"./annotations": {
+  "langwatch-declaration-source": "./src/annotations.ts",
+  "types": "./dist/annotations.d.ts",
+  "default": "./src/annotations.ts"
+}
 ```
 
-(The lazy `import()` of a screen module inside `screens/*/index.ts` is how page loaders
-code-split; everywhere else inline `import()` is banned.)
+and the entry file says what a consumer may reach:
+
+```ts
+// src/annotations.ts
+export const annotationScreens = {
+  annotations: () => import("./ui/sections/annotations-screen.tsx"),
+} as const satisfies Record<string, AnnotationScreenLoader>;
+
+export { annotationApi } from "./behavior/annotation-api.ts";
+export { AnnotationHostPort, AnnotationHostProvider, useAnnotationHost } from "./model/annotation-host.ts";
+export { useAnnotationQueues } from "./behavior/use-annotation-queues.ts";
+export { default as AnnotationQueueLayout } from "./ui/sections/annotation-queue-layout.tsx";
+```
+
+- The export path is the contract. `ui-web-public-entry` accepts a flat `./<id>` when
+  `apps/ui/src/features/catalogue.json` declares it: listed under one feature's
+  `uses.screens` it is that feature's **screen**; listed under any feature's
+  `uses.surfaces` it is a **surface** another feature may mount. `./screens/<id>` and
+  `./surfaces/<id>` are the older spelling and still accepted; new packages use the flat
+  form. An undeclared flat entry is a violation.
+- `ui-screen-closure` walks the whole import graph behind each entry and rejects direct
+  browser capabilities, non-literal module specifiers, forbidden presentation imports and
+  anything reaching outside the package. `@langwatch/design-system`, `@langwatch/ui-host`
+  and any `*-contract` package are always allowed.
+- The lazy `import()` of a screen module inside an entry file is how page loaders
+  code-split; everywhere else inline `import()` is banned.
+- `./testing` exports the stub host and a render harness (`src/testing.tsx`) for the
+  package's consumers' tests; production code never imports it.
 
 ## Screen versus surface versus page
 
-A **screen** is a whole page the owning feature publishes; its export id must equal the
-consuming feature's id (`ui-screen-owner`). A **surface** is an embeddable piece any
-declared feature may mount — a store, a picker, a panel, a chart. A **page** is the
-application's addressable key (`"pages/settings/secrets"`) in
-`apps/ui/src/model/ui-route-table.ts`, answered by a loader in
-`apps/ui/src/features/<f>/ui/sections/<f>-routes.tsx` that wraps the screen: host provider
-outermost, then chrome (`withUiSettingsLayout`), then the permission guard
-(`withUiPageGuard`) innermost. That order is load-bearing. See `install.md` and the
-`web-surface` skill.
+A **screen** is a whole page the owning feature publishes; several page keys may share
+one screen with the view as a prop (`annotations-screen.tsx` takes `{ view }` and serves
+inbox, mine, all and one queue). A **surface** is an embeddable piece another feature
+mounts: a card, a form body, chips, a picker, a store. A **page** is an address in
+`apps/ui`, answered by a route the private feature folder installs (`install.md`).
 
 ## Host ports
 
 A screen never reads the session, the project or the router directly. It declares what
-it needs as an abstract `*HostPort` class in `model/`, and the application's private
-feature folder provides an implementation in the loader. This is what keeps a screen
-portable and its closure clean.
+it needs as an abstract `*HostPort` class in `model/<f>-host.ts`, published with a
+`<F>HostProvider` context and a `use<F>Host()` hook, and the application's private
+feature folder implements it in its host component from `useUiCapabilities()`. The port
+carries facts the screen needs (`project`, `currentUser`, `hasPermission`,
+`isOwnPersonalWorkspace`, `route.params`) and the actions it takes (`navigate`,
+`notifySuccess`, `notifyFailure`), never a `pathname`: the view arrives as a prop.
+`src/testing.tsx` ships `Stub<F>Host extends <F>HostPort` for consumers' tests.
 
-## Data access
+## Data access: the api-map
 
 ```ts
-// behavior/use-secrets.ts
-export function useSecrets({ projectId }: { projectId: string }) {
-  return secretApi.secrets.list.useQuery({ projectId });
-}
+// behavior/annotation-api.ts
+export type AnnotationApiMap = {
+  annotation: {
+    getAll: { query: { input: ProjectScope & { traceIds?: string[] }; output: WireOf<AnnotationWithUser>[] } };
+    create: { mutation: { input: AnnotationApiCreateInput; output: WireOf<Annotation> } };
+  };
+  annotationScore: { getAllActive: { query: { input: ProjectScope; output: WireOf<AnnotationScore>[] } } };
+};
+export const annotationApi = createFeatureApi<AnnotationApiMap>();
+export type RouterOutputs = OutputsFromMap<AnnotationApiMap>;
 ```
 
-- The api binding is one `createFeatureApi<XApiMap>()` at module scope in `behavior/`,
-  typed from contract types and never from `AppRouter` (ADR-130).
-- Mutation errors: read with `readHandledError` and render copy from the code-keyed
-  registry; `error.message` on the wire is the code slug, never toast it. Map
-  `meta.fieldErrors` onto form fields instead of a toast.
+- `createFeatureApi`, `WireOf` and `OutputsFromMap` live in
+  `@langwatch/platform-api-client/feature-api`. Types come from the contract, never from
+  `AppRouter` (ADR-130) and never `any`.
+- The segment names are the tRPC cache key and must equal the namespaces the process
+  mounts (`annotation`, `annotationScore` in `apps/api/src/app-trpc/app-trpc.features.ts`).
+  A different spelling silently stops sharing a cache with every other call site.
+- Hooks in `behavior/use-<thing>.ts` return state and callbacks, never JSX. Mutation
+  errors are read with `readHandledError` and rendered from the code-keyed registry;
+  `error.message` on the wire is the code slug, never toast it. Map `meta.fieldErrors`
+  onto form fields instead of a toast.
 - Subscriptions ride the SSE link the shell configures; a feature never opens its own
   EventSource.
 
 ## Components and hooks
 
-- Hooks return state and callbacks, never JSX. `.ts` for hooks, `.tsx` for components.
+- `.ts` for hooks, `.tsx` for components. A screen module default-exports its component.
 - Children that receive `form` use `useWatch({ control, name })`, never `form.watch()`;
   the React Compiler breaks `register` in children, so use `Controller`.
 - Chakra v3 through `@langwatch/design-system`; read `dev/docs/best_practices/react.md`,
-  `dev/docs/best_practices/drawers.md`,
-  `dev/docs/best_practices/row-actions-overflow-menu.md`,
-  `dev/docs/best_practices/selection-action-bar.md`,
-  `dev/docs/best_practices/scope-selector-and-badges.md` before building a settings or
-  list surface. Scope selection always uses `ScopeChipPicker`.
+  `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md` and
+  `scope-selector-and-badges.md` before building a settings or list surface. Scope
+  selection always uses `ScopeChipPicker`.
 - Copy: no abbreviations, no internals ("uses the analysis service"), spell out tokens,
   requests, context. Read `dev/docs/best_practices/copywriting.md`.
 
@@ -108,31 +136,16 @@ export function useSecrets({ projectId }: { projectId: string }) {
 
 Drawers are URL-routed singletons from `@langwatch/ui-drawer`: `?drawer.open=<name>`
 names the open one, `drawer.<key>` carries serialisable props, a module-scope store
-carries the rest, and a stack makes the back button work. The application registers them
-per feature in `apps/ui/src/features/<f>/index.ts`:
-
-```ts
-export const datasetFeature = uiFeature({
-  name: "@langwatch/dataset-web",
-  api: datasetApi,
-  loaders: datasetPageLoaders,
-  drawers: {
-    selectDataset: lazyDrawer({
-      factory: () => import("./ui/sections/dataset-drawers"),
-      key: "SelectDatasetDrawer",
-    }),
-  },
-});
-```
-
-`installedUiFeatures.drawers` is the composed map, re-exported as `installedUiDrawers`
-from `apps/ui/src/features/installed-ui-features.ts`. A sub-flow navigates
-(`openDrawer("target", { onSuccess, onClose: goBack })`); it never mounts another drawer
+carries the rest, and a stack makes the back button work. A feature that owns drawers
+registers them from its private `apps/ui/src/features/<f>/index.ts`
+(`uiFeature({ drawers })` or the installation's drawer contribution); a sub-flow navigates
+(`openDrawer("target", { onSuccess, onClose: goBack })`), never mounts another drawer
 with `useState`, and the target never calls `closeDrawer`, which clears the whole stack.
 
 ## Tests
 
 Rendering a component with mocked boundaries is an integration test:
 `<name>.integration.test.tsx` under `__tests__/`, with `// @vitest-environment jsdom` in
-the docblock. Browser-lane tests are `.browser.test.tsx`. Pure model functions get
-`.unit.test.ts`. Every `it` binds a scenario.
+the docblock and the package's `vitest.setup.ts`. Pure model functions get
+`.unit.test.ts` under `model/__tests__/`. Hooks that need a host render inside
+`Stub<F>Host`. Every `it` binds a scenario.

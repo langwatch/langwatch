@@ -2,52 +2,102 @@
 
 `packages/features/<name>/contract` is `@langwatch/<name>-contract`. It is the only
 part of a feature that other features, the server half and the web half may all import,
-so it carries what exists and what can go wrong, never how anything is done.
+so it carries what exists, what can be asked, and what can go wrong, never how anything
+is done. The reference is `packages/features/annotation/contract`.
 
 ## What may live in `contract/src`
 
 ```
 index.ts
-<subject>.service.ts     abstract capability, at least one is required
-<subject>.commands.ts    write inputs (zod)
-<subject>.queries.ts     read inputs and outputs (zod), and the public REST declaration
-<subject>.events.ts      domain events
-<subject>.errors.ts      HandledError subclasses with stable codes
-<domain files or domain directories>   e.g. secret.ts, simulation.ts, visualization/
+<name>.api.ts                  interface <Name>Api + export const <Name>Api = featureApi<<Name>Api>("<name>")   REQUIRED
+<name>.schemas.ts              the domain value's zod schema(s) and inferred types
+<name>-<part>.schemas.ts       one file per public shape family (queue, response, review, …)
+<name>-rest.schemas.ts         params, query, body and response schemas of the REST door
+<name>-trpc.schemas.ts         input schemas of the tRPC door
+<name>.errors.ts · <name>-<part>.errors.ts     HandledError subclasses with stable codes
+<name>-<part>.types.ts         portable types that are not schemas (inputs the app takes from peers)
+<name>.ts                      constants and small portable values (ANNOTATION_KSUID_RESOURCE, anchor helpers)
 ```
 
-Allowed artifact suffixes (`CONTRACT_ARTIFACT_SUFFIX`):
-`commands | errors | events | queries | service`. A server artifact suffix in contract
-source (`adapter, api, mapper, migration, port, projection, repository, store`) fails
-`feature-source-layout`. A bare `service.ts` with no subject fails too: the file is
-`<subject>.service.ts`.
+Allowed artifact suffixes (`CONTRACT_ARTIFACT_SUFFIX`): `commands | errors | events |
+queries | service` plus `api`; `schemas` and `types` are ordinary qualifiers the filename
+grammar accepts. A server artifact suffix in contract source (`adapter, mapper, migration,
+port, projection, repository, store`) fails `feature-source-layout`. A `<name>.service.ts`
+(the old abstract service) is inventoried by `feature-shape` and is deleted when the
+feature converts; do not add one.
 
 Contract must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,
-Eventing, application aliases, or its own server and web packages. It may import
-`zod`, `@langwatch/handled-error`, and other features' contracts.
+Eventing, application aliases, or its own server and web packages. It may import `zod`,
+`@langwatch/handled-error`, `@langwatch/time`, `@langwatch/runtime-composition/contract`
+(only that subpath, for `featureApi`) and other features' contracts.
+
+## The callable API and its token
+
+```ts
+// contract/src/annotation.api.ts
+import { featureApi } from "@langwatch/runtime-composition/contract";
+
+export interface AnnotationApi {
+  create(input: CreateAnnotationInput): Promise<Annotation>;
+  getById(input: AnnotationByIdInput): Promise<Annotation>;
+  list(input: ListAnnotationsInput): Promise<Annotation[]>;
+  upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore>;
+  queueTraces(input: QueueAnnotationTracesInput): Promise<Readonly<{ created: number; skipped: number }>>;
+}
+
+export const AnnotationApi = featureApi<AnnotationApi>("annotation");
+```
+
+- One interface of callable operations. No service-valued properties, getters,
+  repositories, transport objects or lookup methods (`feature-app-contract`).
+- The same-named `const` is the runtime token. It is the only thing another feature may
+  depend on: the peer names it in its app's `static dependencies`, the process provides an
+  implementation with `.withProvided(AnnotationApi, app)` or by installing the feature,
+  and boot rejects a missing, duplicate or cyclic provider by name.
+- `featureApi` takes a `FeatureName`, the literal union generated from
+  `packages/features/catalogue.json` (`packages/runtime-composition/src/feature-names.generated.ts`,
+  regenerate with `node packages/runtime-composition/scripts/check-feature-names.mjs --write`).
+  `featureApi("annotations")` does not compile.
+- Operation names use RPC verbs: `get` for one known record, `getMany` for known ids,
+  `list` for queries, `create`, `update`, `delete` for mutations; `<verb><Entity>` for
+  a second entity (`listScores`, `upsertScore`, `markQueueItemDone`). A method returns a
+  value or throws; absence is a `find*` method returning `undefined`, never `try*`.
+- Parameters are one named object, typed from the contract's own schemas.
 
 ## Schemas once, types inferred
 
 ```ts
-export const createSecretInputSchema = z.object({
-  projectId: secretProjectIdSchema,
-  name: z.string().min(1),
-  value: secretValueSchema,
+export const annotationScoreSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  dataType: z.enum(["OPTION", "CHECKBOX", "BOOLEAN", "LIKERT", "CATEGORICAL"]),
+  createdAt: z.date(),
 });
-export type CreateSecretInput = z.infer<typeof createSecretInputSchema>;
+export type AnnotationScore = z.infer<typeof annotationScoreSchema>;
 ```
 
-When both validation and a type are needed, the schema is the source. Internal constants
-with no external input use `as const`. Do not `.strict()` a schema that a producer you do
-not control fills. Use `z.input<typeof schema>` for wire inputs whose fields carry
-defaults.
+When both validation and a type are needed, the schema is the source; compose schemas
+with `z.object({ ...base.shape, extra })`. Internal constants with no external input use
+`as const`. Do not `.strict()` a schema that a producer you do not control fills; a REST
+response that must keep passing through stored columns uses `z.looseObject(schema.shape)`
+(see `annotation-rest.schemas.ts`). Use `z.output<typeof schema>` for inputs whose fields
+carry defaults or transforms. Dates stay `z.date()` in contracts; services convert with
+`@langwatch/time`.
 
 ## Errors
 
 ```ts
-export class SecretNotFoundError extends HandledError {
-  constructor() {
-    super("secret_not_found", "Secret not found.", { status: 404 });
+export class AnnotationNotFoundError extends HandledError {
+  declare readonly code: "annotation_not_found";
+
+  constructor(id: string) {
+    super("annotation_not_found", `Annotation ${id} was not found.`, {
+      httpStatus: 404,
+      fault: "customer",
+      meta: { annotationId: id },
+    });
+    this.name = "AnnotationNotFoundError";
   }
 }
 ```
@@ -60,77 +110,22 @@ export class SecretNotFoundError extends HandledError {
   A listed code with no presentation fails typecheck; a brand-new unlisted code is caught
   by `apps/ui/src/model/errors/__tests__/codes.unit.test.ts`.
 - `message` is customer-safe: no env var names, hostnames or internal service names.
-- A 5xx subclass sets `fault: "platform"` or `"provider"` explicitly.
+- `fault` is explicit on every error; a 5xx sets `"platform"` or `"provider"`.
+- `meta` is a client contract: only fields a UI or agent reads.
 - Tests assert on `code`, never on message prose.
-
-## The abstract service
-
-```ts
-export abstract class SecretService {
-  abstract getAll(input: ListSecretsInput): Promise<Secret[]>;
-  abstract getById(input: { projectId: string; secretId: string }): Promise<Secret>;
-  abstract create(input: CreateSecretInput & { actorId: string }): Promise<Secret>;
-}
-```
-
-The server package implements it; a composition root constructs the concrete class and
-injects it wherever another feature declares a dependency on the abstract one. Methods
-return a value or throw the domain error. Only `try*` methods return `null`; `require*`
-is forbidden. Parameters are named objects.
-
-## The public REST declaration
-
-A public REST surface states its operations here, so the shape of the wire is portable
-and the transport is only a builder over it
-(`packages/features/secret/contract/src/secret.queries.ts`):
-
-```ts
-export const secretPublicRest = {
-  list: {
-    input: secretPublicListInputSchema,
-    output: z.array(secretPublicSchema),
-    permission: "secrets:view",
-  },
-  create: {
-    input: secretPublicCreateInputSchema,
-    output: secretPublicSchema,
-    permission: "secrets:manage",
-  },
-} as const satisfies Record<string, SecretRestOperation<ZodType, ZodType>>;
-```
-
-`permission` is an `AuthzPermission` from `@langwatch/authz-contract`. Output schemas are
-`.strict()` so a field the projection should never carry cannot join an answer by
-accident. See the `api-rest-route` skill.
-
-## The api-map: router types for the browser without importing the server
-
-The web half never imports `apps/api` and never names `AppRouter` (ADR-130: that one type
-import loads the whole API application into the browser typecheck). It declares the
-procedures it calls as a map typed from contract inputs and outputs, and
-`createFeatureApi` turns that into a tRPC React client whose cache keys are the same as
-the application's:
-
-```ts
-// web/src/behavior/secret-api.ts
-export type SecretApiMap = {
-  secrets: {
-    list: { query: { input: ListSecretsInput; output: Secret[] } };
-    create: { mutation: { input: CreateSecretInput; output: Secret } };
-  };
-};
-export const secretApi = createFeatureApi<SecretApiMap>();
-```
-
-`createFeatureApi`, `FeatureApiMap`, `RouterFromMap` and the one named cast
-`asFeatureApiClient` live in `packages/platform-api-client/src/feature-api.ts`. The
-nesting is the cache key and must match the mounted namespace exactly, so a hook in the
-package and the shell's proxy share one entry. Never type a map slot as `any`; name the
-contract type.
+- A peer's error propagates as itself: the app does not wrap `ProjectNotFoundError`.
 
 ## Sharing across features
 
-Feature B needs feature A's capability: B's server declares a port or takes A's abstract
-service from `@langwatch/a-contract` in its `create({ ... })`, and the composition root
-passes A's concrete service. B never imports `@langwatch/a-server`. If the shared thing
-is a pure function or a value, it moves into A's contract, not into a shared `utils`.
+Feature B needs feature A's capability: B's app names `A`'s token in `static dependencies`
+(`projects: ProjectApi`), the container hands B's `create(setup)` a `setup.dependencies.projects`
+typed as `ProjectApi`, and B calls it. B never imports `@langwatch/a-server`, never
+declares a port for A, and never takes A's service or repository. If the shared thing is
+a pure function or a value, it moves into A's contract, not into a shared `utils`.
+
+## The browser's api-map
+
+The web half never names `AppRouter` (ADR-130). It declares the procedures it calls as a
+map typed from contract inputs and outputs in `web/src/behavior/<name>-api.ts`; see
+`references/web.md`. The contract's job is to export the input and output types that map
+needs.

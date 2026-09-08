@@ -13,6 +13,7 @@ import { lintEventingRoles } from "./eventing-roles.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
+import { lintFeatureShape } from "./feature-shape.ts";
 import { lintPrismaTableOwnership } from "./prisma-table-ownership.ts";
 import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
@@ -129,6 +130,15 @@ export {
   formatOverengineeringBaseline,
   lintOverengineeringBaseline,
 } from "./overengineering.ts";
+export {
+  collectFeatureShapeBaseline,
+  collectFeatureShapeFindings,
+  FEATURE_SHAPE_LEGACY_KINDS,
+  formatFeatureShapeBaseline,
+  lintFeatureShape,
+  readFeatureShapeBaselineFile,
+} from "./feature-shape.ts";
+export type { FeatureShapeFinding, FeatureShapeLegacyKind } from "./feature-shape.ts";
 export { lintStrictPortModules } from "./port-modules.ts";
 export { lintStrictPortBaseline } from "./port-modules.ts";
 export { readStrictPortBaselineFile } from "./port-modules.ts";
@@ -164,6 +174,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintBoundarySignatureMirrors(root),
     ...lintEnterpriseSourceLicense(root),
     ...lintFeatureLayouts(root, discovery.packages),
+    ...lintFeatureShape(root, discovery.catalogue, discovery.packages),
     ...lintFeatureConfiguration(root, discovery.catalogue),
     ...lintPrismaTableOwnership(root, discovery.catalogue),
     ...lintFrontendUiBoundaries(root, discovery.packages),

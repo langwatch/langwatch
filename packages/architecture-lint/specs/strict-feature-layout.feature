@@ -48,6 +48,15 @@ Feature: Strict versioned feature source layout
     Then architecture lint accepts it as a rules module
 
   @unit @architecture
+  Scenario: A pre-reference feature shape is inventoried, never admitted
+    Given a catalogue feature whose contract or server still carries a piece the annotation reference has no place for
+    And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, unselected repositories, or Prisma repositories without memory twins
+    When architecture lint checks the workspace
+    Then a piece the feature-shape baseline does not list is reported with the reference shape it should take
+    And a baseline entry whose piece is gone is reported as stale
+    And the baseline only shrinks
+
+  @unit @architecture
   Scenario: Strict services, ports, and contract builds remain mechanically bounded
     Given a layout-version-0 feature service, port, or declaration build
     When architecture lint and scoped Oxlint check it

@@ -92,8 +92,8 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
   return [
     violation(
       `${pkg.root}/src`,
-      "A strict contract package must declare its service capability in a subject-named module.",
-      "Add src/<subject>.service.ts and export it from src/index.ts.",
+      "A strict contract package must declare its callable feature API.",
+      "Add src/<feature>.api.ts exporting the <Feature>Api interface and its featureApi token, and export it from src/index.ts.",
     ),
   ];
 }
@@ -609,7 +609,7 @@ function lintPrivateServerExportsForEntry(
       message:
         "A feature server root cannot expose a repository, store, or projection implementation.",
       allowed:
-        "Export the composition adapter and service; keep persistence and projection modules private to the feature server.",
+        "Export the feature installer (<feature>Server) and its transport declarations; keep persistence and projection modules private to the feature server.",
     });
   };
 

@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "In the secret feature, add the ability to rotate a secret's value and record who rotated it.",
-      "expected_output": "Adds a tagged scenario first, a command schema in contract, a service method with the actor, a repository method carrying projectId, a tRPC procedure, the api-map entry and a hook in web, an error code if a failure is named, and binds tests at each layer; does not touch other features' packages.",
+      "expected_output": "Adds a tagged scenario first, an input schema and the operation on the SecretApi in contract, the operation on the app and its service, a repository method carrying projectId on the interface and on both the Prisma and memory backends, an inline tRPC handler on the flat declaration, the api-map entry and a hook in web, an error code if a failure is named, and binds tests at each layer; does not touch other features' packages.",
       "files": []
     },
     {

@@ -10,8 +10,11 @@ decisions remain the source of truth:
 - [Feature package boundaries](../architecture-lint/adrs/001-feature-package-boundaries.md)
 - [Strict versioned source layout](../architecture-lint/adrs/002-versioned-strict-feature-layout.md)
 - [Singular feature ownership](../../dev/docs/adr/112-singular-feature-ownership.md)
-- `agent` is the target strict-layout reference feature; existing plural roots
-  are migration paths, not naming precedents.
+- [One feature installer, one construction path](../../dev/docs/adr/133-composition-spec.md)
+- `annotation` is the reference feature (its [ADR-001](./annotation/adrs/001-annotation-service-boundary.md)
+  records the shape); `packages/architecture-lint/src/feature-shape-baseline.json`
+  lists what every other feature still carries from the older shape, and it only
+  shrinks. Existing plural roots are migration paths, not naming precedents.
 
 ## Start a feature
 
@@ -56,8 +59,8 @@ Each code directory is a separate workspace package:
 
 | Directory  | Package name                    | Responsibility                                                              |
 | ---------- | ------------------------------- | --------------------------------------------------------------------------- |
-| `contract` | `@langwatch/<feature>-contract` | Portable values, schemas, commands, queries, errors, and service capability |
-| `server`   | `@langwatch/<feature>-server`   | Services, private persistence, adapters, APIs, projections, and migrations  |
+| `contract` | `@langwatch/<feature>-contract` | Portable values, schemas, errors, and the callable `<Feature>Api` with its token |
+| `server`   | `@langwatch/<feature>-server`   | The installer, the app, private services and repositories, transport declarations |
 | `web`      | `@langwatch/<feature>-web`      | Optional browser-safe components and feature UI                             |
 
 The feature root is an ownership directory, not a package. Do not put a
@@ -119,32 +122,34 @@ alias with its last caller.
 ```text
 contract/src/
 ├── index.ts
-├── <subject>.service.ts
-├── <subject>.commands.ts
-├── <subject>.queries.ts
-├── <subject>.events.ts
-├── <subject>.errors.ts
-└── <domain files or domain directories>
+├── <feature>.api.ts                      interface <Feature>Api + featureApi token
+├── <subject>.schemas.ts · <subject>-<part>.schemas.ts
+├── <subject>-rest.schemas.ts · <subject>-trpc.schemas.ts
+├── <subject>.errors.ts · <subject>-<part>.errors.ts
+└── <subject>-<part>.types.ts
 
 server/src/
-├── index.ts
-├── testing.ts
-├── fixtures/<subject>.fixture.ts
+├── index.ts                              exports <feature>Server and the transport declarations only
+├── <feature>.server.ts                   defineFeature(...).withRepositories(...).withApp(...).withTransports(...).build()
+├── app/<feature>.app.ts                  class <Feature>App implements <Feature>Api
+├── app/__tests__/<feature>.fixture.ts
 ├── services/<subject>.service.ts
-├── repositories/<subject>.repository.ts
-├── repositories/<adapter>/<adapter>.<subject>.repository.ts
-├── repositories/<adapter>/<adapter>.<subject>.mapper.ts
-├── stores/<subject>.store.ts
-├── stores/<adapter>/<adapter>.<subject>.store.ts
-├── projections/<subject>.projection.ts
-├── subscribers/<subject>.subscriber.ts
-├── processes/<subject>.process.ts
-├── intents/<subject>.intent.ts
-├── ports/<subject>.port.ts
-├── adapters/<adapter>.<subject>.adapter.ts
-├── api/<surface>/<subject>.api.ts
+├── rules/<subject>.rules.ts
+├── repositories/<subject>.repository.ts  the interface
+├── repositories/<feature>.repositories.ts
+├── repositories/<feature>-repositories.registry.ts
+├── repositories/prisma/prisma.<subject>.repository.ts · prisma.<feature>.repositories.ts
+├── repositories/memory/memory.<subject>.repository.ts · memory.<feature>.repositories.ts
+├── transport/<feature>.rest.ts · transport/<feature>[-<part>].trpc.ts
+├── ports/<subject>.port.ts               technical infrastructure only
+├── stores/ · projections/ · subscribers/ · processes/ · intents/
+├── tasks/<subject>.task.ts
 └── migrations/<source>-import.<subject>.migration.ts
 ```
+
+Still parsed but inventoried by `feature-shape` until the feature converts:
+`testing.ts`, `fixtures/`, `adapters/<backend>.<subject>.adapter.ts`, a contract
+`<subject>.service.ts`, and `transport/<surface>/<subject>.api.ts`.
 
 `<subject>`, `<adapter>`, `<surface>`, and `<source>` use lower-case kebab case.
 Dots separate architectural qualifiers; hyphens remain part of a name.
@@ -179,7 +184,8 @@ The contract is portable. It owns:
 - domain values and identifiers;
 - Zod 4 schemas and inferred transport-safe types;
 - commands, queries, events, and concrete domain errors; and
-- an abstract `<Subject>Service` capability.
+- one callable `<Feature>Api` interface and its `featureApi` token, the only
+  cross-feature dependency surface (ADR-133).
 
 It must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,
 Eventing, application aliases, or its server and web implementations. It must
@@ -187,8 +193,9 @@ not contain repositories, stores, adapters, projections, migrations, or API
 implementations.
 
 The contract root export is the supported vocabulary other packages consume.
-Cross-feature collaboration always uses the owning feature's abstract service
-from its contract. Consumers do not create caller-specific versions of that
+Cross-feature collaboration always names the owning feature's `*Api` token in the
+dependent app's `static dependencies`; the container provides the implementation at
+boot. Consumers do not create caller-specific versions of that
 service or import its repository, store, projection, or concrete server
 implementation.
 

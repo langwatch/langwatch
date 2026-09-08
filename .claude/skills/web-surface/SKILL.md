@@ -1,6 +1,6 @@
 ---
 name: web-surface
-description: "Publish a piece of one feature's web package for another feature to mount: a surfaces/<id> export, its catalogue declaration in apps/ui/src/features/catalogue.json uses.surfaces, and the closure and layer rules that decide what may sit behind it. Covers surface versus screen, why the export path is the contract, governedWebPackages, and the ui-web-public-entry / ui-screen-closure / ui-web-capability-declaration rules. Use when someone says 'reuse this component in another feature', 'share this store', 'mount X inside Y's page', 'export it from the web package', or a lint finding says a web package may only be imported through an explicit screens/* or surfaces/* entry."
+description: "Publish a piece of one feature's web package for another feature to mount: a flat src/<id>.ts entry exported as ./<id> (the annotation shape; ./surfaces/<id> is the older spelling), its catalogue declaration in apps/ui/src/features/catalogue.json uses.surfaces, and the closure and layer rules that decide what may sit behind it. Covers surface versus screen, why the export path is the contract, governedWebPackages, and the ui-web-public-entry / ui-screen-closure / ui-web-capability-declaration rules. Use when someone says 'reuse this component in another feature', 'share this store', 'mount X inside Y's page', 'export it from the web package', or a lint finding says a web package may only be imported through an explicit screens/* or surfaces/* entry."
 user-invocable: true
 argument-hint: "<owning feature> <surface id> [consuming feature]"
 ---
@@ -18,29 +18,33 @@ in a web package is private.
 
 The id is lower-kebab and names what the consumer mounts, not where the file sits:
 `trace-filters`, `annotation-form`, `department-picker`, `dataset-table`. The export path
-is the contract; the module behind it can be a `surfaces/<id>/index.ts` barrel or an
-existing `ui/sections/*.tsx` or `behavior/*.ts` module.
+is the contract; the module behind it is a flat entry file `src/<id>.ts` that names what
+the consumer may reach (the older `surfaces/<id>/index.ts` barrel is still accepted).
 
-`packages/features/trace/web/src/surfaces/trace-filters/index.ts` is the barrel idiom:
+`packages/features/annotation/web/src/annotation-card.ts` is the entry idiom:
 
 ```ts
-export * from "../../behavior/filter.store";
-export * from "../../model/url-state";
+export * from "./ui/blocks/annotation-card.tsx";
 ```
+
+and `annotations.ts` in the same package shows an entry that publishes a screen loader,
+the api binding, the host port and a few hooks together.
 
 ## 2. Export it
 
 `packages/features/<owner>/web/package.json`:
 
 ```json
-"./surfaces/trace-view-state": {
-  "types": "./src/surfaces/trace-view-state/index.ts",
-  "default": "./src/surfaces/trace-view-state/index.ts"
+"./annotation-card": {
+  "langwatch-declaration-source": "./src/annotation-card.ts",
+  "types": "./dist/annotation-card.d.ts",
+  "default": "./src/annotation-card.ts"
 }
 ```
 
-`ui-web-public-entry` allows only `./screens/<id>` and `./surfaces/<id>` here — the id
-must match `[a-z][a-z0-9]*(-[a-z0-9]+)*`. `ui-screen-closure` then walks the whole import
+`ui-web-public-entry` allows a flat `./<id>` only when the catalogue declares it (step 3),
+plus the older `./screens/<id>` and `./surfaces/<id>`; the id must match
+`[a-z][a-z0-9]*(-[a-z0-9]+)*`. `ui-screen-closure` then walks the whole import
 graph behind each export and rejects direct browser capabilities, non-literal module
 specifiers, forbidden presentation imports and anything reaching outside the package.
 `@langwatch/design-system` and any `*-contract` package are always allowed.
@@ -58,7 +62,7 @@ section may. A surface that needs data composes a section.
   "root": "trace",
   "uses": {
     "screens": ["@langwatch/trace-web/screens/trace"],
-    "surfaces": ["@langwatch/annotation-web/surfaces/annotation-form"]
+    "surfaces": ["@langwatch/annotation-web/annotation-form"]
   }
 }
 ```

@@ -42,6 +42,7 @@ function featurePackage({
   enterprise = false,
   layoutVersion = 0,
   subjects,
+  capability = "service",
 }: {
   feature: string;
   role: "contract" | "server" | "web";
@@ -52,6 +53,8 @@ function featurePackage({
   enterprise?: boolean;
   layoutVersion?: 0;
   subjects?: string[];
+  /** The contract capability: the legacy abstract service, or the reference featureApi token. */
+  capability?: "service" | "api";
 }): void {
   const prefix = enterprise
     ? `packages/enterprise/features/${feature}/${role}`
@@ -164,8 +167,14 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   );
   write(`${prefix}/src/index.ts`, source);
   const serviceName = `${className(feature)}Service`;
-  if (layoutVersion === 0 && role === "contract") {
+  if (layoutVersion === 0 && role === "contract" && capability === "service") {
     write(`${prefix}/src/${feature}.service.ts`, `export abstract class ${serviceName} {}`);
+  }
+  if (layoutVersion === 0 && role === "contract" && capability === "api") {
+    write(
+      `${prefix}/src/${feature}.api.ts`,
+      `import { featureApi } from "@langwatch/runtime-composition/contract"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = featureApi<${className(feature)}Api>("${feature}");`,
+    );
   }
   if (layoutVersion === 0 && role === "server") {
     write(
@@ -185,10 +194,11 @@ function policies(options?: { declarations?: boolean }): string[] {
 describe("feature package boundary lint", () => {
   /** @scenario A valid feature graph passes */
   it("accepts portable contracts and role-correct dependencies", () => {
-    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "workflow", role: "contract", capability: "api" });
     featurePackage({
       feature: "agent",
       role: "contract",
+      capability: "api",
       dependencies: { "@langwatch/workflow-contract": "workspace:*" },
       source:
         'import type { value } from "@langwatch/workflow-contract"; export type Agent = typeof value;',
@@ -939,7 +949,7 @@ describe("Prisma client containment", () => {
   });
 
   it("reports nothing about a source file whose only defect is its formatting", () => {
-    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "contract", capability: "api" });
     write(
       "packages/features/agent/contract/src/agent.command.ts",
       "export    const   createAgent=(name:string)=>({name})\n\n\n",

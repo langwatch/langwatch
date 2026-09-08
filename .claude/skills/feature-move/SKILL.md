@@ -35,7 +35,10 @@ checklist.
 
 Pure, framework-free code shared by both halves goes to the contract. A hook or
 component goes to the web package. A Prisma read goes into `repositories/prisma/` behind
-the abstract repository, never into a service.
+the repository interface (with its memory twin under `repositories/memory/`), never into a
+service. Nothing moves INTO a legacy piece: not into `adapters/`, `fixtures/`, `testing.ts`,
+a `transport/<surface>/` folder or a contract `.service.ts` (`feature-shape`); if the
+destination feature has only those, create the annotation-shaped home.
 
 ## 2. Move
 
@@ -55,10 +58,11 @@ grep -rn "<old path or old module name>" --include=*.ts --include=*.tsx --includ
 ```
 
 Fix each importer. Cross-package consumers import from the destination package's public
-entry: for a server package that means the service or adapter from `index.ts` (never a
-repository); for a web package `./screens/*` or `./surfaces/*`. If a consumer would need
-something the entry does not export, that is the redesign seam: expose a service method
-or a surface, not the internal module.
+entry: for a server package that means nothing but the installer and transport
+declarations — a peer calls the feature through its `*Api` token, never an import; for a
+web package a declared flat entry (or `./screens/*` / `./surfaces/*`). If a consumer would
+need something the entry does not export, that is the redesign seam: add an operation to
+the `<F>Api`, or publish a surface, not the internal module.
 
 ## 4. The second-pass sweep (this is where moves break)
 

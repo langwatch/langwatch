@@ -1,5 +1,15 @@
 # Service, repository, adapter, port
 
+> **Status (2026-09-08).** The persistence half of this shape is superseded by the
+> annotation reference (`packages/features/annotation`, ADR-133): repositories are
+> interfaces with a Prisma and a memory implementation selected once at boot by
+> `defineRepositories`, services take repository interfaces, and the app builds its
+> services from the bundle it is handed. `adapters/postgres.*.adapter.ts` and
+> persistence ports are inventoried by `feature-shape` and go away as features convert.
+> Ports remain for technical infrastructure only (encryption, object storage, a clock).
+> Read `.claude/skills/architecture-guide/references/server.md` for the current shape;
+> the text below describes the older layout that many features still carry.
+
 The four words this repo uses for the layers of a feature package. Each one
 has a specific job, and the shape of every feature-cleanup lands here. Read
 this before extracting a feature or adding a new persistence-backed one.
