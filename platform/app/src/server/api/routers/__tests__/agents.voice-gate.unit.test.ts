@@ -47,6 +47,12 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: vi.fn(async () => "org_1"),
 }));
 
+// The FORBIDDEN path records an audit row through Prisma; without this mock
+// the write needs a live database and turns the refusal into a 500 on CI.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 describe("agentsRouter voice-agent gate", () => {
   let caller: ReturnType<typeof agentsRouter.createCaller>;
 

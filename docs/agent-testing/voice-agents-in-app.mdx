@@ -88,10 +88,10 @@ Set these as app environment variables.
 
 ## Traps
 
-- The ElevenLabs key needs `convai_read`, `convai_write` and conversation read — a key missing any of these fails at a different step, so check all three when a call breaks.
+- The ElevenLabs key needs `convai_read`, `convai_write` and conversation read. A key missing any of these fails at a different step, so check all three when a call breaks.
 - The agent must be in the same ElevenLabs workspace as the key.
 - An agent marked public in ElevenLabs still needs a token here; public access does not skip the credential check.
-- LangWatch never sends prompt overrides. Enabling overrides on the agent changes nothing here — the agent's own ElevenLabs prompt is what gets tested.
+- LangWatch never sends prompt overrides. Enabling overrides on the agent has no effect on these calls: the agent's own ElevenLabs prompt is what gets tested.
 - The recording can be unavailable for a short while after hang-up while ElevenLabs processes it. The run shows "Recording unavailable"; reload later.
 - The browser needs HTTPS or localhost and microphone permission. Autoplay policy can keep the agent silent until the page has been clicked.
 - Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes and OpenAI audio tokens on your accounts.
