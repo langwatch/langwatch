@@ -11,15 +11,23 @@ it("rejects raw context access in governed feature handlers", () => {
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import type { TrpcDeclaredAbsent, TrpcProcedureChain } from ${JSON.stringify(source)};
+import type { TrpcDeclaredAbsent, TrpcProcedureChain, TrpcUndeclared } from ${JSON.stringify(source)};
 
 const input = z.object({ id: z.string() });
 const output = z.object({ id: z.string() });
 declare const chain: TrpcProcedureChain<object, "query", typeof input, typeof output, true, { app: true }, { id: string }, { id: string }>;
 chain.handle(({ ctx }) => ({ id: ctx }));
+chain.handle(({ actor }) => ({ id: actor === null ? "absent" : actor.id }));
+chain.handle(({ actor }) => { const absent: null = actor; return { id: "invalid" }; });
 declare const noInput: TrpcProcedureChain<object, "query", TrpcDeclaredAbsent, typeof output, true, { app: true }, never, never>;
 noInput.handle(({ input }) => ({ id: String(input) }));
+declare const voidOutput: TrpcProcedureChain<object, "mutation", typeof input, TrpcUndeclared, true, { app: true }, never, never>;
+voidOutput.handle(() => ({ id: "accidental-return" }));
 chain.handle(() => ({ id: 7 }));
+chain.withOutput(z.string());
+chain.withOutput(z.date());
+chain.withOutput(z.unknown());
+chain.withOutput(z.any());
 `,
   );
 
@@ -54,8 +62,14 @@ chain.handle(() => ({ id: 7 }));
     }
 
     expect(diagnostics).toMatch(/Property 'ctx' does not exist/);
+    expect(diagnostics).toMatch(/not assignable to type 'null'/);
     expect(diagnostics).toMatch(/not assignable to method's 'this' of type 'never'/);
+    expect(diagnostics).toMatch(/not assignable to type 'void \| Promise<void>'/);
     expect(diagnostics).toMatch(/Type 'number' is not assignable to type 'string'/);
+    expect(diagnostics).toMatch(/ZodString/);
+    expect(diagnostics).toMatch(/ZodDate/);
+    expect(diagnostics).toMatch(/ZodUnknown/);
+    expect(diagnostics).toMatch(/ZodAny/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

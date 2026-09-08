@@ -29,7 +29,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Inbox, MoreVertical, Pencil, Plus, SquarePen, Users } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { useState } from "react";
-import type { AnnotationQueueBadge } from "../../behavior/annotation-api.ts";
+import type { AnnotationQueuePendingCount } from "@langwatch/annotation-contract";
 import type { AnnotationView } from "../../model/annotation-view.ts";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 import { SidebarMenuLink } from "../elements/sidebar-menu-link.tsx";
@@ -57,7 +57,7 @@ function QueueSidebarEntry({
   canEdit,
   onEdit,
 }: {
-  queue: AnnotationQueueBadge;
+  queue: AnnotationQueuePendingCount;
   href: string;
   isSelected: boolean;
   icon: ReactNode;
@@ -143,7 +143,7 @@ export function AnnotationSidebar({
   pendingCount: number | undefined;
   /** Items queued directly for the reviewer. */
   assignedCount: number | undefined;
-  queues: readonly AnnotationQueueBadge[];
+  queues: readonly AnnotationQueuePendingCount[];
   /** Which queue the `queue` view is on, from the route parameter. */
   activeQueueSlug: string | undefined;
   /** A lite member reads queues and does not define them. */

@@ -1,22 +1,151 @@
 # @langwatch/api
 
-LangWatch's API framework, in three entry points.
+LangWatch's API framework, in five entry points.
 
 | Import                | What it is                                                                                                                                                                                                                                                                    |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@langwatch/api/contract` | `defineTrpcContract`: what a feature declares, in a module a browser can read. Value-imports nothing — no tRPC, no Hono, no Node API — so a feature contract and a feature web package may both name it. |
+| `@langwatch/api/access` | `decide`: the one access check both transports run after the parser — the three declarations, the scope-lineage guard, the blank-scope-id refusal and the project-id mismatch refusal. Names no transport. |
 | `@langwatch/api`      | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework. |
 | `@langwatch/api/rest` | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                        |
 | `@langwatch/api/trpc` | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                         |
 
-The three do not re-export one another. A consumer that wants the error
-vocabulary imports `@langwatch/api`; one that wants the REST builder imports
-`@langwatch/api/rest`; one wiring tRPC imports `@langwatch/api/trpc`. Most REST
-call sites need two of the three, and that is the point — the import says which
-half of the framework a file depends on.
+None re-exports another. A consumer that wants the error vocabulary imports
+`@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
+one wiring tRPC imports `@langwatch/api/trpc`; one *declaring* procedures for
+both a server and a browser imports `@langwatch/api/contract`. Most REST call
+sites need two of the five, and that is the point — the import says which half
+of the framework a file depends on.
 
 REST is built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Existing services accept Standard Schema; the public REST surface requires Zod 4 so it can derive HTTP documentation from one input object. tRPC is built on [@trpc/server](https://trpc.io) and chooses none of its concretes.
 
 The lasting decisions live in [adrs/](./adrs), including [the fluent handler contract](./adrs/001-rpc-first-fluent-registration.md), [public REST versioning](./adrs/004-public-rest-v1-and-date-negotiation.md) and [the tRPC framework boundary](./adrs/20260828-trpc-framework-boundary.md). Behaviour lives in [specs/](./specs); this README is usage.
+
+## Declaring a feature's transports
+
+A tRPC procedure is declared **once**, in the feature's contract, and bound
+**once**, in the feature's server. Design:
+[the transport declaration split](./adrs/20260908-transport-declaration-split.md).
+Behaviour: [specs/transport-declaration-split.feature](./specs/transport-declaration-split.feature).
+
+```ts
+// contract/src/annotation.trpc.ts — imports zod and its own schemas, nothing else.
+import { defineTrpcContract } from "@langwatch/api/contract";
+
+export const annotationTrpc = defineTrpcContract("annotation")
+  .query("getById").withInput(annotationScopeSchema).withOutput(annotationSchema)
+  .mutation("deleteById").withInput(annotationScopeSchema)
+  .build();
+```
+
+```ts
+// server/src/transport/annotation.trpc.ts — the permission and the handler, and nothing else.
+import { defineTrpcRouter } from "@langwatch/api/trpc";
+
+export const annotationTrpcTransport = defineTrpcRouter(AnnotationApi, annotationTrpc)
+  .procedure("getById")
+  .withPermission("annotations:view")
+  .handle(async ({ app, input }) => app.getById({ id: input.annotationId }))
+  .procedure("deleteById")
+  .withPermission("annotations:delete")
+  .handle(async ({ app, input }) => app.deleteReview(input))
+  .build();
+```
+
+`.procedure(name)` selects a member the contract declared and inherits its kind,
+its parser and its answer. The compiler refuses an undeclared name, a second
+implementation of one name, a `build()` that left one unimplemented, a `handle`
+before `withPermission` / `noPermission` / `serviceAuthorized`, and a handler
+whose answer the declared output refuses. The declaration carries no process
+generic and no runtime import: `router(runtime, app)` is where the host's root,
+ports and application slice arrive.
+
+The browser derives its client from the same declaration, so no map restates it:
+
+```ts
+// web/src/behavior/annotation-api.ts
+export const annotationApi = createFeatureApi<ContractApiMap<typeof annotationTrpc>>();
+```
+
+REST is declared whole in the server, because it has no browser half to share a
+declaration with:
+
+```ts
+export const annotationRest = defineRestRouter(AnnotationApi)
+  .withNamespace("annotations")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .get("/:id", "getAnnotation")
+  .withParams(annotationRestParamsSchema)
+  .withPermission("annotations:view")
+  .withOutput(annotationRestResponseSchema)
+  .withDocs({ summary: "Get an annotation in the caller’s project" })
+  .handle(async ({ app, input, scope }) => ({ data: await app.getById({ id: input.id, projectId: scope.id }) }))
+  .build();
+```
+
+`withNamespace` is the family's own path segment, so the routes answer under
+`/api/<namespace>` and the process mount reads the name off the declaration
+rather than restating it. A route declared without `withOutput` is served as 204
+with an empty body.
+
+### Mounting a declaration
+
+A declaration is inert. The process builds one runtime per transport, from the
+collaborators it already holds, and mounts each declaration on it.
+
+```ts
+// The tRPC path, built once per root beside the process's own policy chain.
+const runtime = createTrpcRuntime({ root, procedure: authenticatedProcedure, ports });
+const annotation = runtime.mount(annotationTrpcTransport, (ctx) => ctx.app.annotation);
+```
+
+```ts
+// The REST path. `identity.authenticate` is the family's own door; the runtime
+// answers a Hono app the process mounts.
+const rest = createRestRuntime({ identity: { authenticate } });
+const annotations = rest.mount(annotationRest.router(), {
+  app: () => annotationApi,
+  credential: "projectKey",
+  onError: annotationErrorHandler,
+});
+```
+
+`ApiRuntimePorts` are the process's, not the feature's: `identity` says who is
+calling, `authorization` answers the permission decisions, `denials` supplies
+the two refusals whose copy is the product's, `audit` records and redacts, and
+`errors` reports and translates. A feature declaration names none of them.
+
+### The one execution path
+
+Both runtimes run the same boxes, and each is the same body it was:
+
+```
+tRPC   authenticate ─▶ parse ─▶ trace ─▶ log ─▶ decide ─▶ handle ─▶ check output ─▶ audit ─▶ respond
+REST   parse ─▶ authenticate ─▶ decide ─▶ handle ─▶ check output ─▶ respond
+```
+
+The two orders differ, deliberately, and each is the order its families already
+answer in. On tRPC, everything that reads the request reads the **validated**
+input, so trace, log, the handled-error boundary, the check and the audit row
+are installed **after** the contract's own `.input()` parser — a check ahead of
+it is handed `undefined` and authorizes nothing. On REST the request is parsed
+**before** the credential is resolved, so a malformed body is refused without
+ever touching the caller's key.
+
+What a handler is handed never changes: `{ app, input, actor, scope, signal }`.
+No `ctx`, no request, no response, no framework type. The access step writes
+those facts onto the request context through tRPC's own `next({ ctx })`, and a
+procedure that somehow reached its handler without them refuses by name.
+
+A declared REST route answers at three addresses — its dated namespace,
+`latest`, and the family's bare path — plus the `/api/v1` twin of each, and any
+real date the caller pins is served by the latest registration on or before it.
+
+### Deprecated, and what replaces it
+
+`createRestService`, `ServiceBuilder`, raw-`{ ctx, input }` tRPC handlers,
+`handlerManagedAuth` and `withCustomPermission` are the shapes features used
+before the split. They are removed when the last feature converts.
 
 ## Public REST (opt-in)
 
@@ -348,9 +477,20 @@ src/
   ports.ts                # RateLimiter + ResponseCache capability ports (the app supplies the substrate)
   schema.ts               # The Standard Schema boundary (parse, issue shape, flatten)
 
+  contract/
+    index.ts              # "./contract" -- what a feature declares, browser-safe
+    trpc-contract.ts      # defineTrpcContract: namespace, procedure names, kinds, input and output schemas
+
+  access/
+    index.ts              # "./access" -- the one access check both transports run
+    access.ts             # decide(): the three declarations, lineage, blank scope, project-id mismatch
+
   rest/
     index.ts              # "./rest" -- the Hono service framework, plus routeHandlers() for legacy Next-style hosts
     builder.ts            # createService(), createRestService(), ServiceBuilder, GroupRegistrar
+    rest-router.ts        # defineRestRouter: one complete declaration per route, under a namespace and version
+    rest-runtime.ts       # createRestRuntime: parse, authenticate, decide, handle, check the answer, respond
+    rest-openapi.ts       # The operation block one mounted route publishes
     definition.ts         # The definition chain (withInput/withOutput/withStatus/withAuth/...), precedence merge, status invariant
     capabilities.ts       # Rate-limit and cache middleware (keys, 429, validated-bytes caching, failure degradation)
     versioning.ts         # Version catalogue from registrations; forward-copy + withdrawal resolution
@@ -366,6 +506,8 @@ src/
   trpc/
     index.ts              # "./trpc" -- the tRPC root and policy spine
     trpc-root.ts          # TrpcRootDefinition: a typed root that keeps context and input concrete
+    trpc-router.ts        # defineTrpcRouter: a permission and a handler per procedure the contract declared
+    trpc-runtime.ts       # createTrpcRuntime: trace, log, decide, handle, check the answer, audit, envelope
     trpc-permission-builder.ts   # After .input(), no .query/.mutation until authorization is declared
     trpc-declared-authz.ts       # permission / permissionAny / noPermission / authorizeInService
     trpc-runtime-policy.ts, trpc-policy-ports.ts, trpc-policy-context.ts

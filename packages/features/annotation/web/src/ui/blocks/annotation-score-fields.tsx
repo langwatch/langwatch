@@ -29,6 +29,7 @@ export function ScoreFields({ state }: { state: AnnotationFormState }) {
   const scores = state.scores.data;
   const hasNoScores = !scores || scores.length === 0;
   if (hasNoScores) return null;
+
   return (
     <VStack align="stretch" gap={1.5}>
       <Text
@@ -44,6 +45,7 @@ export function ScoreFields({ state }: { state: AnnotationFormState }) {
         {scores.map((s) => {
           const parsedOptions = scoreOptionsSchema.safeParse(s.options);
           const options: AnnotationScoreOption[] = parsedOptions.success ? parsedOptions.data : [];
+
           return (
             <ScoreChip
               key={s.id}
@@ -70,9 +72,12 @@ export function ScoreFields({ state }: { state: AnnotationFormState }) {
 /** How a rating reads on the chip itself, or nothing when there is none. */
 function describeScoreValue(value: string | string[] | undefined): string | null {
   if (value == null || value === "") return null;
+
   if (!Array.isArray(value)) return String(value);
+
   const [first] = value;
   if (first === void 0) return null;
+
   return value.length === 1 ? first : `${value.length} selected`;
 }
 
@@ -83,7 +88,9 @@ function describeScoreValue(value: string | string[] | undefined): string | null
  */
 function toSelection(value: string | string[] | undefined): string[] {
   if (value == null || value === "") return [];
+
   const list = Array.isArray(value) ? value : [String(value)];
+
   return list.filter((v) => v !== "");
 }
 
@@ -113,6 +120,7 @@ export function ScoreChip({
   // the reviewer walked away from leaves nothing behind for the next one.
   useEffect(() => {
     if (!open) return;
+
     setDraftSelection(toSelection(value));
     setDraftReason(reason);
   }, [open, value, reason]);
@@ -254,6 +262,7 @@ function ScoreOptionList({
       </CheckboxGroup>
     );
   }
+
   return (
     <RadioGroup
       size="sm"

@@ -212,6 +212,7 @@ function OptionEditor({
                     if (defaultRadioOption === option) {
                       onDefaultRadioOptionChange("");
                     }
+
                     onOptionChange(index, event.target.value);
                   }}
                 />
@@ -267,8 +268,10 @@ function CheckboxOptionEditor({
                       defaultCheckboxOptions.filter((value) => value !== option),
                     );
                   }, 100);
+
                   return;
                 }
+
                 if (option.trim() !== "") {
                   onDefaultCheckboxOptionsChange([...defaultCheckboxOptions, option]);
                 }

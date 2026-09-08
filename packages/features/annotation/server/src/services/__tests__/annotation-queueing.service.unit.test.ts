@@ -1,41 +1,99 @@
-/**
- * See specs/traces-v2/bulk-actions.feature.
- */
+/** Queue behaviour exercised through the composed annotation application. */
+import {
+  AnnotationQueueNameReservedError,
+  AnnotationQueueNameTakenError,
+} from "@langwatch/annotation-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { AnnotationService } from "@langwatch/annotation-contract";
-import { AnnotationQueueingService } from "../annotation-queueing.service.ts";
+import {
+  createAnnotationTestApp,
+  createAnnotationTestAuthz,
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+  createAnnotationTestTraces,
+  createAnnotationTestUsers,
+} from "../../app/__tests__/annotation.fixture.ts";
+import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
 
-function fakeAnnotations(): AnnotationService & {
-  createQueueItems: ReturnType<typeof vi.fn>;
-} {
-  return {
-    createQueueItems: vi.fn(async () => {}),
-    getProjectOrganizationId: vi.fn(async () => "org-1"),
-    assertQueueConfigurationReferences: vi.fn(async () => {}),
-    assertAnnotatorReferences: vi.fn(async () => {}),
-  } as unknown as AnnotationService & { createQueueItems: ReturnType<typeof vi.fn> };
+function appWithExistingTraces(traceIds: readonly string[] = []) {
+  const traces = createAnnotationTestTraces();
+  traces.findExistingTraceIds = vi.fn(async () => [...traceIds]);
+  const repositories = MemoryAnnotationRepositories.create();
+
+  const app = createAnnotationTestApp({
+    repositories,
+    dependencies: {
+      projects: createAnnotationTestProjects(),
+      organizations: createAnnotationTestOrganizations(["user-1", "abc"]),
+      traces,
+      users: createAnnotationTestUsers(),
+      permissions: createAnnotationTestAuthz(),
+    },
+  });
+
+  return { app, traces };
 }
 
-describe("AnnotationQueueingService.createOrUpdateQueueItems", () => {
-  describe("given the same trace id sent twice in one call", () => {
-    /** @scenario The same trace sent twice in one send is queued once */
-    it("queues the trace once and counts it once", async () => {
-      const annotations = fakeAnnotations();
-      const findExistingTraceIds = vi.fn(async (input: { traceIds: string[] }) => input.traceIds);
+describe("AnnotationApp queue workflow", () => {
+  it("queues each existing trace once when it is sent twice", async () => {
+    const { app, traces } = appWithExistingTraces(["trace-1"]);
 
-      const result = await AnnotationQueueingService.createOrUpdateQueueItems({
+    await expect(
+      app.queueTraces({
         traceIds: ["trace-1", "trace-1"],
         projectId: "project-1",
         annotators: ["user-abc"],
         userId: "user-abc",
-        annotations,
-        findExistingTraceIds,
-      });
+      }),
+    ).resolves.toEqual({ created: 1, skipped: 1 });
 
-      expect(result).toEqual({ created: 1, skipped: 1 });
-      expect(annotations.createQueueItems).toHaveBeenCalledWith(
-        expect.objectContaining({ traceIds: ["trace-1"] }),
-      );
+    expect(traces.findExistingTraceIds).toHaveBeenCalledWith({
+      projectId: "project-1",
+      traceIds: ["trace-1"],
     });
+
+    await expect(app.countAssignedItems({ projectId: "project-1", userId: "abc" })).resolves.toBe(
+      1,
+    );
+  });
+
+  it("rejects reserved and duplicate queue names", async () => {
+    const { app } = appWithExistingTraces();
+
+    const queue = {
+      projectId: "project-1",
+      name: "Team Reviews",
+      description: "d",
+      userIds: [],
+      scoreTypeIds: [],
+    };
+
+    await expect(app.configure(queue)).resolves.toMatchObject({ slug: "team-reviews" });
+    await expect(app.configure(queue)).rejects.toBeInstanceOf(AnnotationQueueNameTakenError);
+
+    await expect(app.configure({ ...queue, name: "All" })).rejects.toBeInstanceOf(
+      AnnotationQueueNameReservedError,
+    );
+  });
+
+  it("only completes an item reachable by its requested project and user", async () => {
+    const { app } = appWithExistingTraces(["trace-1"]);
+
+    await app.queueTraces({
+      projectId: "project-1",
+      traceIds: ["trace-1"],
+      annotators: ["user-user-1"],
+      userId: "user-1",
+    });
+
+    const [item] = await app.listQueueItems({ projectId: "project-1" });
+    if (!item) throw new Error("queue item was not created");
+
+    await expect(
+      app.markQueueItemDone({
+        projectId: "project-1",
+        userId: "user-1",
+        queueItemId: item.id,
+      }),
+    ).resolves.toMatchObject({ id: item.id, doneAt: expect.any(Date) });
   });
 });

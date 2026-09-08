@@ -6,7 +6,7 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { z } from "zod";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { AnnotationUser } from "../../model/annotation-row.ts";
-import { readableDate } from "../../model/readable-date.ts";
+import { toDate, toZonedDateTime } from "@langwatch/time";
 
 interface ScoreEntry {
   name: string;
@@ -75,6 +75,7 @@ export function AnnotationCard({
       // The card carries a button's role, so it owes a button's keyboard.
       onKeyDown={(e: KeyboardEvent) => {
         if (!isOwn || (e.key !== "Enter" && e.key !== " ")) return;
+
         e.preventDefault();
         e.stopPropagation();
         onEdit();
@@ -113,16 +114,6 @@ export function AnnotationCard({
   );
 }
 
-/**
- * The part of the trace the comment is about, when it is about one. A comment
- * about the trace as a whole names nothing: the card is already beside the turn
- * it belongs to, so a chip saying so would be noise on every card.
- *
- * Naming the part is only half of it: the chip takes the reader there, which
- * means the trace view with that span selected and its row brought into
- * view. That only works for the turn the drawer has open, so a comment on
- * another turn's span names its part and leaves the reader to open that turn.
- */
 function AnchorBreadcrumb({
   annotation,
   contextTraceId,
@@ -145,6 +136,7 @@ function AnchorBreadcrumb({
     annotation.anchorKind === "span"
       ? annotation.anchorKind
       : null;
+
   const label = describeAnnotationAnchor({
     anchor: {
       anchorKind,
@@ -156,13 +148,16 @@ function AnchorBreadcrumb({
     // the reader cannot already see.
     selfLabel: contextTraceId === annotation.traceId ? null : "Trace",
   });
+
   if (!label) return null;
 
   const jump = onJumpToAnchor;
+
   const canJump =
     annotation.traceId === openTraceId &&
     (annotation.anchorKind === "span" || annotation.anchorKind === "field") &&
     jump !== void 0;
+
   if (!canJump || !jump) {
     return (
       <HStack gap={1} maxWidth="full" data-testid="annotation-anchor">
@@ -189,6 +184,7 @@ function AnchorBreadcrumb({
       title={label}
       onClick={(e) => {
         e.stopPropagation();
+
         jump({
           traceId: annotation.traceId,
           anchorKind: annotation.anchorKind,
@@ -252,7 +248,9 @@ function Author({
           <ApiAuthor email={annotation.email ?? null} />
         )}
         <Text textStyle="2xs" color="fg.subtle">
-          {annotation.createdAt ? readableDate(annotation.createdAt).toLocaleString() : ""}
+          {annotation.createdAt
+            ? toDate(toZonedDateTime(annotation.createdAt)).toLocaleString()
+            : ""}
         </Text>
       </VStack>
     </>
@@ -264,9 +262,11 @@ function ThumbVerdict({ isThumbsUp }: { isThumbsUp: AnnotationWithUser["isThumbs
   if (isThumbsUp === true) {
     return <Icon as={ThumbsUp} boxSize={3.5} color="green.fg" aria-label="Thumbs up" />;
   }
+
   if (isThumbsUp === false) {
     return <Icon as={ThumbsDown} boxSize={3.5} color="red.fg" aria-label="Thumbs down" />;
   }
+
   return null;
 }
 
@@ -299,6 +299,7 @@ function ApiAuthor({ email }: { email: string | null }) {
 /** Each score the annotation carries, with its reason a hover away. */
 function ScoreBadges({ scores }: { scores: ScoreEntry[] }) {
   if (scores.length === 0) return null;
+
   return (
     <HStack gap={2} wrap="wrap">
       {scores.map((score) => (
@@ -335,6 +336,7 @@ function ScoreBadges({ scores }: { scores: ScoreEntry[] }) {
 /** The output the reviewer said the turn should have produced. */
 function SuggestedCorrection({ expectedOutput }: { expectedOutput: string | null }) {
   if (!expectedOutput) return null;
+
   return (
     <VStack align="stretch" gap={1}>
       <HStack gap={1}>
@@ -372,6 +374,7 @@ function resolveScores(
 ): ScoreEntry[] {
   const parsed = scoreOptionsSchema.safeParse(scoreOptions);
   if (!parsed.success) return [];
+
   return Object.entries(parsed.data)
     .map(([id, raw]) => readScoreEntry({ name: scoreNamesById.get(id), raw }))
     .filter((entry): entry is ScoreEntry => entry !== null);
@@ -386,16 +389,21 @@ function readScoreEntry({
   raw: unknown;
 }): ScoreEntry | null {
   if (!name) return null;
+
   const parsed = scoreEntrySchema.safeParse(raw);
   if (!parsed.success) return null;
+
   const score = parsed.data;
   const value = Array.isArray(score.value) ? score.value.join(", ") : String(score.value ?? "");
   if (!value) return null;
+
   return { name, value, reason: readReason(score.reason) };
 }
 
 function readReason(reason: unknown): string | null {
   if (reason == null || reason === "") return null;
+
   if (typeof reason === "object") return JSON.stringify(reason);
+
   return String(reason);
 }

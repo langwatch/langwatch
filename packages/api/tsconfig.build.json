@@ -11,7 +11,13 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/rest/index.ts", "./src/trpc/index.ts", "./src/composition.ts"],
+  "files": [
+    "./src/index.ts",
+    "./src/contract/index.ts",
+    "./src/rest/index.ts",
+    "./src/trpc/index.ts",
+    "./src/composition.ts"
+  ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

@@ -30,6 +30,7 @@ function Probe({
   seen: AnnotationPeriodReading[];
 }) {
   seen.push(useAnnotationPeriod(query));
+
   return null;
 }
 

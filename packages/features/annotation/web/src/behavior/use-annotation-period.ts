@@ -1,22 +1,4 @@
-/**
- * The date range a list is reading, held still between renders.
- *
- * `readAnnotationPeriod` is pure and takes `now`, which is what makes it
- * testable — and what makes calling it straight out of a render body a bug.
- * A relative range is anchored to the moment it is resolved, so a fresh `now`
- * per render is a fresh `endDate` per render, to the millisecond. Anything
- * downstream that is keyed on the window then changes on every render: the
- * list's "the picks belong to these rows" effect re-fires and sets state, which
- * renders, which moves the window again. That is an infinite loop, and in a
- * browser it is also an infinite round trip — the queue read's input carries
- * the two dates, so every render would be a new tRPC cache key.
- *
- * `platform/app`'s `usePeriodSelector` held the same line with the same
- * `useMemo`, and its comment said why: the window has to stay referentially
- * stable unless the ADDRESS changes. A page re-mount — a refresh, a route
- * change — gets a fresh `now` for free, which is the only time a relative
- * window should move.
- */
+/** Holds a relative date window stable for the current route address. */
 
 import { nowInstant, toDate } from "@langwatch/time";
 import { useMemo } from "react";

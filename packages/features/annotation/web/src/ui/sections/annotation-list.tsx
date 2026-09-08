@@ -1,26 +1,4 @@
-/**
- * The list every annotation view renders: the header controls, the table, the
- * pager and what the reviewer can do with the rows they picked.
- *
- * MOVED from `platform/app/src/components/annotations/AnnotationsTable.tsx`,
- * which was exclusive to the four page files this screen replaces and so is
- * deleted rather than copied. Its shape is unchanged — the status filter, the
- * date range, the export, the paging, the selection bar and the three bulk
- * actions — and what it used to read from the application it now takes as
- * props, resolved once by the screen from `AnnotationHostPort`.
- *
- * TWO THINGS THAT USED TO BE CLOSURES ARE MODULES NOW, because both are rules
- * rather than rendering and neither had a test that did not first mount a
- * table: the paging (`model/annotation-list-paging.ts`) and the export
- * (`model/annotation-export.ts`).
- *
- * THE ROW ACTIONS THAT OPEN AN APPLICATION OVERLAY WRITE AN ADDRESS. Viewing a
- * trace and handing rows to a dataset were `openDrawer` calls; they are query
- * writes now (`model/annotation-overlay-address.ts`), which is the same intent
- * and carries the chrome gap recorded there.
- *
- * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
- */
+/** One table renders every annotations view. */
 
 import { Box, Button, Flex, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -69,7 +47,7 @@ import { RedactedField } from "../elements/redacted-field.tsx";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 import { SelectionActionBar } from "../elements/selection-action-bar.tsx";
 import { SendToQueueDialog } from "./send-to-queue-dialog.tsx";
-import { downloadCsv } from "../../behavior/download-csv.ts";
+import { downloadCsv } from "@langwatch/csv/download";
 
 /**
  * The list this page IS, named the way the queue reads name participants
@@ -126,6 +104,7 @@ export function AnnotationList({
   // time".
   const rangeIsPicked = !periodIsDefault;
   const queuedRange = rangeIsPicked ? period : {};
+
   // The range as a value rather than two Date objects, so effects keyed on it
   // fire when the window changes and not merely when it is re-derived.
   const queuedRangeKey = rangeIsPicked
@@ -172,6 +151,7 @@ export function AnnotationList({
     () => providedRows ?? queueItemsToRows(assignedQueueItems),
     [providedRows, assignedQueueItems],
   );
+
   const pageRows = useMemo(
     () =>
       isPageProvidedRows
@@ -179,6 +159,7 @@ export function AnnotationList({
         : allRows,
     [allRows, isPageProvidedRows, paging.pageOffset, paging.pageSize],
   );
+
   const rowCount = isPageProvidedRows ? allRows.length : totalCount;
   const isLoading = isPageProvidedRows ? !!rowsLoading : queuesLoading;
 
@@ -194,6 +175,7 @@ export function AnnotationList({
   });
 
   const utils = annotationApi.useUtils();
+
   const refreshQueues = useCallback(async () => {
     await Promise.all([
       utils.annotation.getOptimizedAnnotationQueues.invalidate(),
@@ -207,6 +189,7 @@ export function AnnotationList({
     onSuccess: (result) => {
       setRowSelection({});
       void refreshQueues();
+
       host.succeeded({
         title: "Removed from queue",
         description: `${result.deleted} ${result.deleted === 1 ? "item" : "items"} removed`,
@@ -231,6 +214,7 @@ export function AnnotationList({
   const openRow = useCallback(
     (row: AnnotationRow) => {
       const stillWaiting = copy.rowTarget === "queueItem" && !!row.queueItemId && !row.doneAt;
+
       if (stillWaiting) {
         host.navigate(
           queueItemHref({
@@ -239,8 +223,10 @@ export function AnnotationList({
             traceId: row.traceId,
           }),
         );
+
         return;
       }
+
       openTraceDrawer(row);
     },
     [copy.rowTarget, host, openTraceDrawer, project?.slug],
@@ -250,6 +236,7 @@ export function AnnotationList({
     async (traceIds: string[]) => {
       const allowed = await datasetGate.requestEnable();
       if (!allowed) return;
+
       setQuery(addDatasetRecordAddress({ current: query, traceIds }));
     },
     [datasetGate, query, setQuery],
@@ -258,6 +245,7 @@ export function AnnotationList({
   const removeFromQueue = useCallback(
     (queueItemIds: string[]) => {
       if (!project || queueItemIds.length === 0) return;
+
       deleteQueueItems.mutate({ projectId: project.id, queueItemIds });
     },
     [deleteQueueItems, project],
@@ -267,12 +255,14 @@ export function AnnotationList({
     () => pageRows.filter((row) => rowSelection[row.id]),
     [pageRows, rowSelection],
   );
+
   // One trace can be queued in several queues, and a dataset record is per
   // trace, so what the dataset gets is the traces behind the picked rows.
   const selectedTraceIds = useMemo(
     () => Array.from(new Set(selectedRows.map((row) => row.traceId))),
     [selectedRows],
   );
+
   const selectedQueueItemIds = useMemo(
     () => selectedRows.map((row) => row.queueItemId).filter((id): id is string => id !== null),
     [selectedRows],
@@ -284,6 +274,7 @@ export function AnnotationList({
       activeScoreTypes,
       dateColumnLabel: copy.dateColumnLabel,
     });
+
     downloadCsv({ fields, rows, fileName: csvFileName("Annotations") });
   }, [activeScoreTypes, copy.dateColumnLabel, pageRows]);
 
@@ -495,6 +486,7 @@ function SelectionActions({
 
   const onQueued = (annotatorIds: string[]) => {
     if (!pageQueue || annotatorIds.includes(pageQueue.annotatorId)) return;
+
     onRemoveFromQueue(selectedQueueItemIds);
   };
 

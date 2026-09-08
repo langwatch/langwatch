@@ -1,25 +1,7 @@
 /**
- * The addresses this family's rows open, as query writes.
- *
- * `platform/app` wrote them through `useDrawer`, which is application
- * composition a feature-web package may not reach. What a drawer actually needs
- * is the address: `CurrentDrawer` hydrates itself from `drawer.open` plus the
- * `drawer.*` parameters, so writing the same keys is writing the same intent.
- *
- * KNOWN CHROME GAP, stated here rather than papered over. Both drawers named
- * below — `traceV2Details` and `addDatasetRecord` — are registered in
- * `platform/app` and mounted by `DashboardPageBody`, which is the application
- * chrome. A screen served from `apps/ui` has no chrome above it yet (the same
- * gap the coding-agent, me and automations families recorded), so on these
- * screens the address changes and nothing opens until the chrome layout route
- * lands. The address is still the right thing to write: it is what makes both
- * overlays come back for free when the chrome does, and it is what a shared
- * link already means.
- *
- * Every `drawer.` key already on the address is taken off first and everything
- * else is left alone, which is what the platform registry did — so opening a
- * trace from a queue page leaves the page's paging and date range standing
- * underneath it.
+ * The addresses this family's rows open, as query writes. A drawer hydrates
+ * from `drawer.open` plus its `drawer.*` parameters; every write clears the
+ * `drawer.` keys already present and leaves the rest of the address alone.
  */
 
 /** The whole-query write a route port takes: `undefined` removes a key. */
@@ -30,18 +12,17 @@ function withoutDrawerKeys(
   current: Readonly<Record<string, string | undefined>>,
 ): AnnotationQueryWrite {
   const next: AnnotationQueryWrite = {};
+
   for (const [key, value] of Object.entries(current)) {
     next[key] = key.startsWith("drawer.") ? void 0 : value;
   }
+
   return next;
 }
 
 /**
- * The trace explorer's own drawer, opened on one trace.
- *
- * `t` is the partition hint the drawer uses to find the trace without scanning
- * every partition; it travels only when the row actually knows it, which is
- * what `toOccurredAtMsHint` decides.
+ * The trace explorer's drawer on one trace. `drawer.t` is the partition hint,
+ * sent only when the row knows it (`toOccurredAtMsHint`).
  */
 export function traceDetailsAddress({
   current,
@@ -60,13 +41,7 @@ export function traceDetailsAddress({
   };
 }
 
-/**
- * The dataset hand-off, opened on the traces behind the picked rows.
- *
- * The platform registry took `selectedTraceIds` as an array; the address is
- * single-valued, so the ids travel comma-joined the way every other list-valued
- * drawer parameter does.
- */
+/** The dataset hand-off on the picked rows' traces; the ids travel comma-joined. */
 export function addDatasetRecordAddress({
   current,
   traceIds,
@@ -90,6 +65,7 @@ export function readQueueEditor(
 ): { queueId: string | undefined } | null {
   const value = query[QUEUE_EDITOR_PARAM];
   if (!value) return null;
+
   return { queueId: value === "new" ? void 0 : value };
 }
 

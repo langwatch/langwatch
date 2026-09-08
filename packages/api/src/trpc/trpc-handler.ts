@@ -1,6 +1,10 @@
 import type { z } from "zod";
-import { actorSchema, type Actor } from "@langwatch/actor";
+import { actorSchema, toLedgerActor, type Actor } from "@langwatch/actor";
 import { declaredScopeIdSchema, type AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import { TRPCError } from "@trpc/server";
+
+/** An authenticated tRPC actor, normalized with a stable identifier for every kind. */
+export type TrpcHandlerActor = Actor & Readonly<{ id: string }>;
 
 export type ApiHandlerAdapter<TContext, App> = <Input>(input: {
   readonly ctx: TContext;
@@ -41,9 +45,20 @@ export async function resolveTrustedHandlerArguments<TContext, App, Input>(
     readonly input: Input;
     readonly signal: AbortSignal | undefined;
   },
-): Promise<Readonly<{ app: App; actor: Actor | null; scope: AuthzDeclaredScopeId | null }>> {
+): Promise<Readonly<{ app: App; actor: TrpcHandlerActor; scope: AuthzDeclaredScopeId | null }>> {
   const resolved = await TrpcHandlerBinding.resolve(binding, request);
-  const actor = resolved.actor === null ? null : actorSchema.parse(resolved.actor);
+  if (resolved.actor === null) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+  }
+  const parsedActor = actorSchema.parse(resolved.actor);
+  const ledgerActor = toLedgerActor(parsedActor);
+  if (ledgerActor.id === null) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+  }
+  const actor: TrpcHandlerActor =
+    parsedActor.type === "user" || parsedActor.type === "api_key"
+      ? parsedActor
+      : { ...parsedActor, id: ledgerActor.id };
   const scope = resolved.scope === null ? null : declaredScopeIdSchema.parse(resolved.scope);
   return {
     app: resolved.app,

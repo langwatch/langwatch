@@ -1,19 +1,6 @@
 /**
  * Which of the four annotation lists a page key means, and the words that go
- * with it.
- *
- * FOUR KEYS, ONE SCREEN, AND THE VIEW ARRIVES AS A PROP. `platform/app` had
- * four page files whose bodies differed only in the props they handed one
- * table; the route table already gives each address its own page key, so
- * `apps/ui` maps a key to a view and the screen never reads the address to
- * learn what the router already knew. That is the automations family's
- * tab-as-prop shape, applied to a list rather than to tabs, and it is why the
- * host port has no `pathname`: the sidebar marks its own entry from the view it
- * was given.
- *
- * The one view that still reads the address is `queue`, and it reads a route
- * PARAMETER (`:slug`) rather than the path — the router captured it, so the
- * screen asks for the capture rather than parsing the URL back apart.
+ * with it. The view arrives as a prop; only `queue` reads a route parameter.
  */
 
 /** One of the four annotation lists. */
@@ -21,12 +8,7 @@ export type AnnotationView = "inbox" | "mine" | "all" | "queue";
 
 /**
  * What a view puts on screen when it has nothing to show, and what it calls its
- * date column.
- *
- * Every string here is the one `platform/app`'s four page files passed as a
- * prop, moved rather than rewritten. `heading` is absent for `queue` because
- * that page renders the queue's name and its members instead, which is a node
- * rather than a string.
+ * date column. `heading` is absent for `queue`, which renders the queue itself.
  */
 export type AnnotationViewCopy = {
   heading?: string;
@@ -80,13 +62,7 @@ export function annotationViewCopy(view: AnnotationView): AnnotationViewCopy {
   return VIEW_COPY[view];
 }
 
-/**
- * Whether this view reads the reviewer's own inbox as well as the queues they
- * are on.
- *
- * The Inbox is the one list that spans both, which is what
- * `showQueueAndUser` said on the platform page.
- */
+/** Whether this view reads the reviewer's own items and every queue they are on. */
 export function viewReadsMemberQueues(view: AnnotationView): boolean {
   return view === "inbox";
 }

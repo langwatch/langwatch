@@ -8,7 +8,7 @@ import type { LangyApp } from "@langwatch/langy-server";
 import type { OpsApp } from "@langwatch/ops-server";
 import type { ScenarioApp } from "@langwatch/scenario-server";
 import type { SuiteApp } from "@langwatch/suite-server";
-import type { AnnotationApp } from "@langwatch/annotation-server";
+import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApp } from "@langwatch/api-key-server";
 import type { AutomationApp } from "@langwatch/automation-server";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
@@ -21,9 +21,8 @@ import type {
 } from "@langwatch/enterprise-api";
 import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GithubService } from "@langwatch/github-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { AuthzApp } from "@langwatch/authz-server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { AuthzApi, AuthzService } from "@langwatch/authz-contract";
+import type { FeatureFlagApp } from "@langwatch/feature-flag-contract";
 import type { DashboardApp } from "@langwatch/dashboard-server";
 import type { DatasetApp } from "@langwatch/dataset-server";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
@@ -50,7 +49,7 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
  */
 export type ApiTrpcFeatureApplication = Readonly<{
   analytics: AnalyticsApp;
-  annotations: AnnotationApp;
+  annotation: AnnotationApi;
   apiKeys: ApiKeyApp;
   /**
    * A project's triggers, their channels and the addresses that asked those channels to
@@ -61,7 +60,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
   /** What the coding agents did inside a project, as the read surfaces ask it. */
   codingAgentApp: CodingAgentApp;
   /** What the caller may do at one scope, as `authz.*` reports it back to them. */
-  authzApp: AuthzApp;
+  authzApp: AuthzApi;
   broadcast: PresenceEmitterPort;
   dashboard: DashboardApp;
   /**
@@ -86,7 +85,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * This deployment's flag store. Read by `featureFlag.*` and, through it, by
    * every rollout gate the browser asks about.
    */
-  featureFlags: FeatureFlagService;
+  featureFlag: FeatureFlagApp;
   /**
    * The AI Gateway's one application, as all six core gateway surfaces reach it.
    */

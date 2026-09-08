@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { TimeInput } from "@langwatch/time";
 import { annotationAnchorLabel } from "../../model/annotation-row.ts";
-import { readableDate } from "../../model/readable-date.ts";
+import { toDate, toZonedDateTime } from "@langwatch/time";
 
 export function AnnotationHoverChip({
   annotations,
@@ -126,9 +126,12 @@ function formatAnnotationTime(createdAt: TimeInput | null): string {
   if (!createdAt) {
     return "";
   }
-  const date = readableDate(createdAt);
+
+  const date = toDate(toZonedDateTime(createdAt));
+
   if (Number.isNaN(date.getTime())) {
     return "";
   }
+
   return date.toLocaleString();
 }

@@ -43,6 +43,20 @@ import { declaredScopeIdSchema } from "@langwatch/authz-contract";
 
 const AUTHORIZED_SCOPE = "__langwatch_authorized_scope" as const;
 const PREPARED_SCOPE = "__langwatch_prepared_scope" as const;
+
+/**
+ * A trusted authentication middleware may publish the scope it authenticated
+ * so the governed handler receives it as `args.scope`. This is intentionally
+ * middleware-only: handlers cannot replace their authorization facts.
+ */
+export function setAuthorizedHandlerScope(context: Context, scope: AuthzDeclaredScopeId): void {
+  context.set(AUTHORIZED_SCOPE, declaredScopeIdSchema.parse(scope));
+}
+
+/** Reads the scope a trusted middleware established for a governed handler. */
+export function authorizedHandlerScope(context: Context): AuthzDeclaredScopeId | undefined {
+  return context.get(AUTHORIZED_SCOPE);
+}
 import type {
   BaseApp,
   EndpointDef,
@@ -894,7 +908,7 @@ function commitScopeReceiptMiddleware(): MiddlewareHandler {
   return async (context, next) => {
     const prepared = context.get(PREPARED_SCOPE);
     if (prepared !== void 0) {
-      context.set(AUTHORIZED_SCOPE, declaredScopeIdSchema.parse(prepared));
+      setAuthorizedHandlerScope(context, prepared);
     }
     await next();
   };

@@ -97,7 +97,7 @@ export type ComposedApiFeatures = Readonly<{
   /** One namespace: the setup checklist the onboarding screens render. */
   integrationsChecks: ComposedIntegrationsChecksFeature;
   /**
-   * Two namespaces and the `ctx.app.annotations` slice the annotation REST
+   * Two namespaces and the `ctx.app.annotation` slice the annotation REST
    * family reads. Here rather than in the record's literal for that reason.
    */
   annotation: ComposedAnnotationFeature;

@@ -1,24 +1,17 @@
-/**
- * @vitest-environment jsdom
- *
- * The sibling suite mocks papaparse, so it can only show what downloadCsv
- * hands the writer. That is one step short of the thing being promised: what
- * matters is the text that lands in the file somebody opens.
- *
- * This file runs the real writer and reads the bytes back, so the guarantee is
- * held by the artifact rather than by an argument.
- */
+/** @vitest-environment jsdom */
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { downloadCsv } from "../download-csv.ts";
+import { downloadCsv } from "@langwatch/csv/download";
 
 let lastBlob: Blob | undefined;
 
 beforeAll(() => {
   window.URL.createObjectURL = vi.fn((blob: Blob) => {
     lastBlob = blob;
+
     return "blob:test";
   });
+
   window.URL.revokeObjectURL = vi.fn();
 });
 
@@ -26,6 +19,7 @@ beforeAll(() => {
 const writtenFile = async (args: { fields: string[]; rows: (string | number)[][] }) => {
   lastBlob = undefined;
   downloadCsv({ ...args, fileName: "f.csv" });
+
   return await lastBlob!.text();
 };
 
@@ -42,5 +36,14 @@ describe("the file downloadCsv actually writes", () => {
         "ok,'=1+1,-5,plain",
       ]);
     });
+  });
+
+  it("keeps quoted, multiline, and Unicode annotation text intact", async () => {
+    const file = await writtenFile({
+      fields: ["Comment", "Reviewer"],
+      rows: [[`said "yes", then\nleft`, "🦊"]],
+    });
+
+    expect(file).toBe('Comment,Reviewer\r\n"said ""yes"", then\nleft",🦊');
   });
 });

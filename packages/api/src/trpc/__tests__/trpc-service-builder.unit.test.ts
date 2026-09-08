@@ -106,7 +106,7 @@ describe("createTrpcService", () => {
       ).resolves.toEqual({ id: "key-1:project-1:composed:project-1" });
     });
 
-    it("rejects malformed governed output", async () => {
+    it("preserves malformed governed output", async () => {
       const { policy } = recordingPolicy();
       const router = governedServiceUnder({
         policy,
@@ -125,7 +125,32 @@ describe("createTrpcService", () => {
         )
         .build();
 
-      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).rejects.toThrow();
+      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).resolves.toEqual({
+        id: "rejected",
+      });
+    });
+
+    it("preserves an unexpected value from a void governed procedure", async () => {
+      const { policy } = recordingPolicy();
+      const router = governedServiceUnder({
+        policy,
+        handlerBinding: createTrpcHandlerBinding(async () => ({
+          app: { projects: "unused" },
+          actor: { type: "user", id: "u1" },
+          scope: { tier: "project", id: "p1" },
+        })),
+      })
+        .mutation("void", (p) =>
+          p
+            .withInput(z.undefined())
+            .withPermission("project:view")
+            .handle(() => ({ diagnostic: "unexpected" }) as never),
+        )
+        .build();
+
+      await expect(router.createCaller({ actor: { id: "u1" } }).void()).resolves.toEqual({
+        diagnostic: "unexpected",
+      });
     });
 
     it("fails closed when the process binding returns malformed trust data", async () => {
@@ -188,6 +213,59 @@ describe("createTrpcService", () => {
       );
       expect(bindingCalled).toBe(false);
       expect(handlerCalled).toBe(false);
+    });
+
+    it("rejects an absent trusted actor before the handler", async () => {
+      const { policy } = recordingPolicy();
+      let handlerCalled = false;
+      const router = governedServiceUnder({
+        policy,
+        handlerBinding: createTrpcHandlerBinding(async () => ({
+          app: { projects: "unused" },
+          actor: null,
+          scope: null,
+        })),
+      })
+        .query("governed", (p) =>
+          p
+            .withInput(z.undefined())
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(() => {
+              handlerCalled = true;
+              return { id: "unexpected" };
+            }),
+        )
+        .build();
+
+      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).rejects.toMatchObject({
+        code: "UNAUTHORIZED",
+      });
+      expect(handlerCalled).toBe(false);
+    });
+
+    it("normalizes a system actor's stable identifier for the handler", async () => {
+      const { policy } = recordingPolicy();
+      const router = governedServiceUnder({
+        policy,
+        handlerBinding: createTrpcHandlerBinding(async () => ({
+          app: { projects: "unused" },
+          actor: { type: "system", name: "scim" },
+          scope: null,
+        })),
+      })
+        .query("governed", (p) =>
+          p
+            .withInput(z.undefined())
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(({ actor }) => ({ id: actor.id })),
+        )
+        .build();
+
+      await expect(router.createCaller({ actor: { id: "u1" } }).governed()).resolves.toEqual({
+        id: "system:scim",
+      });
     });
   });
 
@@ -280,8 +358,8 @@ describe("createTrpcService", () => {
   });
 
   describe("when the process asks for output validation", () => {
-    /** @scenario "Invalid output is rejected during validation" */
-    it("names the procedure and the offending field, and leaves the answer untouched when it fits", async () => {
+    /** @scenario "Invalid output is recorded during validation" */
+    it("preserves answers whether they match the declared output or not", async () => {
       const { policy } = recordingPolicy();
       const service = serviceUnder({ policy, validateOutput: true });
       const router = service
@@ -304,9 +382,7 @@ describe("createTrpcService", () => {
         .build();
 
       const caller = router.createCaller({ actor: { id: "actor-1" } });
-      await expect(caller.wrong()).rejects.toThrow(
-        /tRPC procedure "wrong" answered with a value its declared output schema refuses: id:/,
-      );
+      await expect(caller.wrong()).resolves.toEqual({ id: 7 });
       await expect(caller.right()).resolves.toEqual({ id: "project-1", extra: true });
     });
 
@@ -453,10 +529,8 @@ describe("createTrpcService.subscription", () => {
             seen.push(value);
           }
         })(),
-      ).rejects.toThrow(
-        /tRPC procedure "watch" answered with a value its declared output schema refuses: id:/,
-      );
-      expect(seen).toEqual([{ id: "first" }]);
+      ).resolves.toBeUndefined();
+      expect(seen).toEqual([{ id: "first" }, { id: 2 }]);
     });
   });
 });

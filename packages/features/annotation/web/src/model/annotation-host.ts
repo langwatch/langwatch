@@ -1,27 +1,7 @@
 /**
- * What the annotation screens ask of the application they are mounted in.
- *
- * ONE PORT FOR THE WHOLE FAMILY, declared here without importing anything of
- * the composing application's — the tenth port of the shape governance,
- * gateway, me, automations, ops, agents, datasets, model-config and RBAC each
- * wrote before it. Everything a page used to read off `useOrganizationTeamProject`,
- * `useRequiredSession`, `useRouter`, `useDrawer` and the toaster arrives through
- * these methods, which is what lets the screens move with their
- * `annotationApi.x.y.useQuery` call sites unchanged.
- *
- * WHAT THIS PORT DOES NOT HAVE, and deliberately: a `pathname`. The four page
- * keys are four views and the view arrives as a prop, so nothing on these
- * screens has to read the address to find out which list it is — see
- * `annotation-view.ts`. The one thing still read off the address is the queue
- * slug, which the router captured as a route PARAMETER.
- *
- * `isOwnPersonalWorkspace` is on the port for the same reason datasets put
- * `isLiteMember` on theirs: it is a column on the project rather than a grant,
- * so `hasPermission` cannot answer it, and the whole personal-workspace feature
- * gate turns on it. Answering it wrong in either direction is visible — `true`
- * gates a reader who is not on their own workspace out of the dataset hand-off,
- * and `false` sends a `personalWorkspaceFeatures.get` read that answers
- * NOT_FOUND for everyone else.
+ * What the annotation screens ask of the application they are mounted in: one
+ * port for the whole family, with no `pathname` (the view arrives as a prop, see
+ * `annotation-view.ts`; the queue slug is a route parameter).
  */
 
 import { createContext, useContext } from "react";
@@ -49,16 +29,8 @@ export type AnnotationRouteReading = {
 };
 
 /**
- * A short confirmation of something the reviewer just did.
- *
- * `action` is the datasets family's shape, taken for the same reason: the
- * shared feedback capability carries a title and a description and no action,
- * widening it is a change to a shared port that a page move does not own, and
- * this family has exactly one notice that needs a button — the send
- * confirmation, whose whole point is a way into wherever the traces landed. The
- * frontend feature renders it on the Design System toaster's own action
- * trigger. Everything without one still goes through the capability, so the
- * code-keyed copy still decides the words.
+ * A short confirmation of something the reviewer just did. `action` is the one
+ * button a notice may carry (the send confirmation's way into the traces).
  */
 export type AnnotationSuccessNotice = {
   title: string;
@@ -68,13 +40,8 @@ export type AnnotationSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry, and a screen that wrote its own would print the code
- * slug instead (#5984). `fallbackTitle` names the action that failed, so an
- * unrecognised code still says what the reviewer was doing.
+ * A failure, as the screen knows it. The raw `error` travels and the host
+ * resolves the words from its `code`; `fallbackTitle` names the action that failed.
  */
 export type AnnotationFailureNotice = {
   error: unknown;
@@ -94,20 +61,10 @@ export abstract class AnnotationHostPort {
 
   abstract hasPermission(permission: string): boolean;
 
-  /**
-   * Whether the reader holds the lite `EXTERNAL` membership role.
-   *
-   * The sidebar hides queue creation and queue editing from a lite member,
-   * which is what `useLiteMemberGuard` decided on the platform layout.
-   */
+  /** Whether the reader holds the lite `EXTERNAL` role; the sidebar hides queue editing from them. */
   abstract isLiteMember(): boolean;
 
-  /**
-   * Whether the project in scope is the reader's OWN personal workspace.
-   *
-   * The advanced-features bundle exists only there, so this is what decides
-   * whether the dataset hand-off has to ask before it opens.
-   */
+  /** Whether the project is the reader's own personal workspace; the dataset hand-off asks first there. */
   abstract isOwnPersonalWorkspace(): boolean;
 
   abstract route(): AnnotationRouteReading;
@@ -130,19 +87,15 @@ const AnnotationHostContext = createContext<AnnotationHostPort | undefined>(void
 /** Publishes the host to the screen and everything it renders. */
 export const AnnotationHostProvider = AnnotationHostContext.Provider;
 
-/**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
- */
+/** The host this screen is mounted in; missing is a composition fault, so it throws. */
 export function useAnnotationHost(): AnnotationHostPort {
   const host = useContext(AnnotationHostContext);
+
   if (!host) {
     throw new Error(
       "No annotations host is mounted above this screen; render it inside the annotation frontend feature.",
     );
   }
+
   return host;
 }

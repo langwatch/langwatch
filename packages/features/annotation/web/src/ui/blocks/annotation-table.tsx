@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { toDate } from "@langwatch/time";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Database, Eye, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
@@ -20,7 +21,7 @@ import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import type { AnnotationRow, AnnotationUser } from "../../model/annotation-row.ts";
-import type { DisplayMoment } from "../../model/readable-date.ts";
+import type { DisplayMoment } from "../../model/annotation-row.ts";
 
 const ChakraButton = chakra("button");
 
@@ -66,14 +67,18 @@ function headerCheckedState({
   someRowsSelected: boolean;
 }): boolean | "indeterminate" {
   if (allRowsSelected) return true;
+
   if (someRowsSelected) return "indeterminate";
+
   return false;
 }
 
 /** A checkbox's boolean-or-indeterminate state, as the string `aria-checked` wants. */
 function ariaCheckedValue(checked: boolean | "indeterminate"): "true" | "false" | "mixed" {
   if (checked === true) return "true";
+
   if (checked === false) return "false";
+
   return "mixed";
 }
 
@@ -331,7 +336,7 @@ function RowActions({
 }
 
 function formatRowDate(date: DisplayMoment | null): string {
-  return date ? date.toLocaleDateString() : "-";
+  return date ? toDate(date).toLocaleDateString() : "-";
 }
 
 const scoreOptionsSchema = z.record(z.string(), z.unknown());
@@ -349,14 +354,17 @@ function scoreValuesFor(
 ): { annotationId: string; value: string[]; reason?: string | null }[] {
   return annotations.flatMap((annotation) => {
     const options = scoreOptionsSchema.safeParse(annotation.scoreOptions);
+
     if (!options.success) {
       return [];
     }
 
     const score = scoreValueSchema.safeParse(options.data[scoreTypeId]);
     if (!score.success || !score.data.value) return [];
+
     const value = Array.isArray(score.data.value) ? score.data.value : [score.data.value];
     if (value.length === 0) return [];
+
     return [{ annotationId: annotation.id, value, reason: score.data.reason ?? null }];
   });
 }

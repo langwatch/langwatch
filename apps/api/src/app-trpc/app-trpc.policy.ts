@@ -18,11 +18,15 @@
  * here re-states the order; it hands the pieces over and the packaged
  * composition puts them in it.
  */
+import type { Actor } from "@langwatch/actor";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   createDeclaredAuthzMiddlewares,
   createScopeLineageGuard,
+  createTrpcRuntime,
   createTrpcRuntimePolicy,
+  isAuditLogExempt,
+  redactAuditArgs,
   type AppTrpcPolicyMiddlewares,
   type TrpcAuditPort,
   type TrpcAuthorizationDecisions,
@@ -34,6 +38,8 @@ import {
   type TrpcIdentityPort,
   type TrpcPolicyContext,
   type TrpcRoot,
+  type TrpcRuntimeContext,
+  type TrpcRuntimePorts,
 } from "@langwatch/api/trpc";
 import { declaredCheckFrom } from "./app-trpc.declared-check.ts";
 
@@ -66,7 +72,7 @@ export type ApiTrpcPolicyPorts<TContext, TAuthenticatedContext extends object> =
  * the caller from the arguments it is given, never from ambient state.
  */
 export function createApiTrpcPolicy<
-  TContext extends TrpcPolicyContext & TrpcDeclaredAuthzContext & object,
+  TContext extends TrpcPolicyContext & TrpcDeclaredAuthzContext & TrpcRuntimeContext & object,
   TAuthenticatedContext extends object,
 >(root: TrpcRoot<TContext>, ports: ApiTrpcPolicyPorts<TContext, TAuthenticatedContext>) {
   const runtime = createTrpcRuntimePolicy<TContext, TAuthenticatedContext>(root, {
@@ -111,6 +117,58 @@ export function createApiTrpcPolicy<
   return {
     protectedProcedure: runtime.authProtectedProcedure,
     middlewares,
+    // The declared path, on the same collaborators. Built here rather than
+    // beside the mounts so a second root can never hand out its middlewares.
+    declaredRuntime: createTrpcRuntime<TContext>({
+      root: root as Parameters<typeof createTrpcRuntime<TContext>>[0]["root"],
+      procedure: runtime.authProtectedProcedure,
+      ports: runtimePorts(ports),
+    }),
+  };
+}
+
+/** The same ports the policy chain runs on, as the declared path names them. */
+function runtimePorts<TContext extends TrpcRuntimeContext & object, TAuthenticated extends object>(
+  ports: ApiTrpcPolicyPorts<TContext, TAuthenticated>,
+): TrpcRuntimePorts<TContext> {
+  // tRPC hands a middleware the context with its index signatures stripped,
+  // which the compiler cannot prove assignable back to an unresolved
+  // `TContext`. The port reads exactly the fields `TContext` already had.
+  const actorOfContext = ports.identity.actor as (
+    ctx: TContext,
+  ) => { id: string; impersonatorId?: string } | undefined;
+
+  return {
+    identity: { caller: (ctx) => ({ actor: actorOf(actorOfContext(ctx)) }) },
+    authorization: { forRequest: () => ports.authz },
+    denials: ports.denials,
+    audit: {
+      record: (entry) => ports.audit.record(entry),
+      redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
+      exempt: (procedure) => isAuditLogExempt(procedure),
+    },
+    errors: {
+      report: (failure) => ports.errorReporting.capture(failure),
+      asError: (failure) => ports.errorReporting.asError(failure),
+      translate: (cause) => ports.causes.translate(cause),
+    },
+  };
+}
+
+/**
+ * The one identity the path attributes a call to. `id` stays the impersonated
+ * user, because that is who the authorization decision is about; the real
+ * administrator behind them travels beside it for the audit row.
+ */
+function actorOf(
+  actor: { id: string; impersonatorId?: string } | undefined,
+): (Actor & { id: string }) | null {
+  if (!actor) return null;
+
+  return {
+    type: "user",
+    id: actor.id,
+    ...(actor.impersonatorId ? { impersonatorId: actor.impersonatorId } : {}),
   };
 }
 

@@ -25,9 +25,11 @@ function explanationFor(visibleTo: string | null): string {
   if (!visibleTo) {
     return "This field is redacted based on your permissions and the project's privacy settings.";
   }
+
   if (visibleTo === "no one") {
     return "A privacy rule keeps this content hidden from everyone: it is stored, but no audience is allowed to read it.";
   }
+
   return `A privacy rule limits who can read this content. Visible to: ${visibleTo}.`;
 }
 
@@ -38,7 +40,9 @@ function explanationFor(visibleTo: string | null): string {
  */
 function audienceHint(visibleTo: string | null): string | null {
   if (!visibleTo) return null;
+
   if (visibleTo === "no one") return "hidden by privacy settings";
+
   return `visible to ${visibleTo}`;
 }
 
@@ -50,6 +54,7 @@ export function RedactedInline({
   canOpenSettings: boolean;
 }) {
   const hint = audienceHint(visibleTo);
+
   return (
     <Tooltip
       interactive
@@ -102,8 +107,10 @@ export function RedactedField({
   if (isLoading || isRedacted === void 0) {
     return <Skeleton height="20px" width="100%" />;
   }
+
   if (isRedacted) {
     return <RedactedInline visibleTo={visibleTo} canOpenSettings={canOpenSettings} />;
   }
+
   return <>{children}</>;
 }

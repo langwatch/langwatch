@@ -1,23 +1,4 @@
-/**
- * Sends traces to people or annotation queues for review.
- *
- * A FAMILY-LOCAL COPY of
- * `platform/app/src/features/traces-v2/components/AddToAnnotationQueueDialog`,
- * which keeps two callers on the trace surfaces — the trace table's bulk bar
- * and the trace drawer's overflow menu — and so did not travel.
- *
- * NARROWED IN ONE PLACE: the platform dialog mounts the queue-creation drawer
- * itself, through `useDisclosure`. Here "Add New Queue" writes this family's own
- * `?queue-editor=new` address and the screen above mounts the editor, so the
- * dialog does not have to know that a queue can be created at all.
- *
- * WHERE THE CONFIRMATION TAKES THE SENDER is not a detail: sending to one queue
- * lands on that queue, sending only to yourself lands on your own inbox, and
- * anything wider has no single destination and lands on the queue listing.
- *
- * Spec: specs/traces-v2/bulk-actions.feature ("Send selected traces to an
- * annotation queue"), packages/features/annotation/specs/annotations-list-selection.feature.
- */
+/** Sends selected traces to reviewers or queues. */
 
 import { VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -44,6 +25,7 @@ export function queuedDestination({
   const queueIds = annotators
     .filter((annotator) => annotator.id.startsWith(QUEUE_PREFIX))
     .map((annotator) => annotator.id.slice(QUEUE_PREFIX.length));
+
   const userIds = annotators
     .filter((annotator) => annotator.id.startsWith(USER_PREFIX))
     .map((annotator) => annotator.id.slice(USER_PREFIX.length));
@@ -58,6 +40,7 @@ export function queuedDestination({
     queueIds.length === 0 &&
     !!sessionUserId &&
     userIds[0] === sessionUserId;
+
   if (isOwnInbox) {
     return { label: "View inbox", href: `/${projectSlug}/annotations/me` };
   }
@@ -75,10 +58,12 @@ export function sentDescription({
 }): string {
   const sent = `${created} ${created === 1 ? "trace" : "traces"} sent for annotation`;
   if (skipped === 0) return sent;
+
   const reason =
     skipped === 1
       ? "1 skipped because its trace no longer exists"
       : `${skipped} skipped because their traces no longer exist`;
+
   return `${sent}. ${reason}`;
 }
 
@@ -132,12 +117,14 @@ export function SendToQueueDialog({
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
+
   const organization = annotationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId },
   );
 
   const utils = annotationApi.useUtils();
+
   const send = annotationApi.annotation.createQueueItem.useMutation({
     onSuccess: ({ created, skipped }) => {
       // The sidebar badges and the queue listing all count pending work, so
@@ -157,6 +144,7 @@ export function SendToQueueDialog({
       setAnnotators([]);
       onClose();
       onQueued?.(annotators.map((annotator) => annotator.id));
+
       onSucceeded({
         title: "Added to annotation queue",
         description: sentDescription({ created, skipped }),
@@ -195,6 +183,7 @@ export function SendToQueueDialog({
             isSending={send.isPending}
             onSend={() => {
               if (!projectId) return;
+
               send.mutate({
                 projectId,
                 traceIds,

@@ -6,11 +6,16 @@
  * once rather than shaped by hand twice.
  */
 
-import { createIsPublicProcedure, type AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+import {
+  createIsPublicProcedure,
+  createTrpcRuntime,
+  type AppTrpcPolicyMiddlewares,
+  type TrpcRuntimePorts,
+} from "@langwatch/api/trpc";
 
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
-import { createTrpcRoot } from "../../../api.application.ts";
+import { createTrpcRoot, type ApiTrpcContext } from "../../../api.application.ts";
 import { composeGatewayFeature } from "../../../features/gateway/gateway.composition.ts";
 import { refusingAuthFeature } from "../../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
@@ -31,7 +36,7 @@ import { refusingStoredObjectFeature } from "../../../features/stored-object/sto
 import { refusingBugReportFeature } from "../../../features/bug-report/bug-report.composition.ts";
 import { refusingDataPrivacyFeature } from "../../../features/data-privacy/data-privacy.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
-import { refusingAnnotationFeature } from "../../../features/annotation/annotation.composition.ts";
+import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
 import { refusingSavedViewFeature } from "../../../features/dashboard/saved-view.composition.ts";
 import { refusingSpendFeature } from "../../../features/entitlement/spend.composition.ts";
 import { refusingHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
@@ -84,6 +89,31 @@ const middlewares: AppTrpcPolicyMiddlewares = {
 };
 
 /**
+ * The declared path's ports, permissive for the same reason the middlewares
+ * above are: the record is being enumerated, not exercised.
+ */
+const runtimePorts: TrpcRuntimePorts<ApiTrpcContext> = {
+  identity: { caller: () => ({ actor: { type: "user", id: "builder" } }) },
+  authorization: {
+    forRequest: () => ({
+      getDecision: async () => ({ permitted: true, organizationRole: null }),
+      getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+      checkScopeLineage: async () => ({ kind: "consistent" }),
+    }),
+  },
+  denials: {
+    membershipDisabled: () => new Error("membership disabled"),
+    liteMemberRestricted: () => new Error("lite member"),
+  },
+  audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+  errors: {
+    report: () => {},
+    asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+    translate: () => undefined,
+  },
+};
+
+/**
  * The mount the record is built against. `authenticate` gives the authenticated
  * procedure a middleware, which is what makes one built on the public procedure
  * distinguishable — the only way to enumerate the anonymous surface.
@@ -102,6 +132,13 @@ export function buildAppTrpcMount(options: { authenticate?: boolean } = {}) {
       : trpc.procedure,
     publicProcedure: trpc.procedure,
     middlewares,
+    runtime: createTrpcRuntime<ApiTrpcContext>({
+      root: trpc,
+      procedure: options.authenticate
+        ? trpc.procedure.use(authentication as never)
+        : trpc.procedure,
+      ports: runtimePorts,
+    }),
     // Test processes check every declared output: a shape that drifted from
     // its schema is a defect, and this is where it is cheap to find.
     validateOutput: true,

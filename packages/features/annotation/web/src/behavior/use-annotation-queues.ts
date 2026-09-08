@@ -1,22 +1,9 @@
-/**
- * One page of the reviewer's queue work, however the list is scoped.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/hooks/useAnnotationQueues.tsx`,
- * which stays where it is: the annotation queue walker
- * (`/annotations/my-queue`) has not moved — it mounts four thousand lines of
- * `features/traces-v2`' conversation view, which belongs to the traces family —
- * and deletes-only forbids repointing it.
- *
- * NARROWED. The platform hook read the page and the page size off the router
- * itself; here they arrive as arguments, because the screen already reads them
- * through the host's route port and two independent readings of one address is
- * how a list and its pager come to disagree.
- */
+/** Queue paging and filters come from the screen's single route reading. */
 
 import { useMemo } from "react";
 import type { AnnotationPeriodMoment } from "../model/annotation-period.ts";
 import { annotationApi } from "./annotation-api.ts";
-import type { AnnotationQueueItemRead } from "./annotation-api.ts";
+import type { RouterOutputs } from "./annotation-api.ts";
 
 /** Either end of the range, when the caller narrowed the read to one. */
 type AnnotationPeriodRange = {
@@ -31,14 +18,18 @@ function dateRangeInput({ startDate, endDate }: AnnotationPeriodRange): {
 } {
   const range: AnnotationPeriodRange = {};
   if (startDate) range.startDate = startDate;
+
   if (endDate) range.endDate = endDate;
+
   return range;
 }
 
 export type AnnotationQueuesReading = {
-  assignedQueueItems: AnnotationQueueItemRead[];
+  assignedQueueItems: RouterOutputs["annotation"]["getOptimizedAnnotationQueues"]["assignedQueueItems"];
   totalCount: number;
   queuesLoading: boolean;
+  queuesReady: boolean;
+  queuesError: unknown | undefined;
 };
 
 export function useAnnotationQueues({
@@ -93,7 +84,9 @@ export function useAnnotationQueues({
       assignedQueueItems: reading.data?.assignedQueueItems ?? [],
       totalCount: reading.data?.totalCount ?? 0,
       queuesLoading: enabled && reading.isLoading,
+      queuesReady: enabled && reading.isSuccess,
+      queuesError: reading.error,
     }),
-    [reading.data, reading.isLoading, enabled],
+    [reading.data, reading.error, reading.isLoading, reading.isSuccess, enabled],
   );
 }

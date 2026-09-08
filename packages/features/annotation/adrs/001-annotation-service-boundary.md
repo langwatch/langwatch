@@ -1,119 +1,149 @@
-# ADR-001: Annotation has one service boundary
+# ADR-001: Annotation exposes one callable app
 
-**Status:** Accepted
+**Status:** Accepted; implementation in progress
 
 **Behavioural contract:** [Annotation service](../specs/annotation-service.feature)
 
+**Shared architecture:** [ADR-133](../../../../dev/docs/adr/133-composition-spec.md)
+
 ## Context
 
-Annotation writes and projection reads originated in application-owned Prisma
-access and request-created services. Anchor vocabulary was defined beside the
-transports, so trace and annotation surfaces could drift.
+Annotation comments, scores, queues and queue items belong to one product
+feature. Their persistence and workflows previously leaked into process
+composition and transports. Splitting those tables into separate features would
+preserve that fragmentation instead of fixing ownership.
 
 ## Decision
 
-The singular `annotation` feature owns the portable annotation vocabulary,
-anchor schemas, errors and one abstract `AnnotationService`. Its server package
-owns one private repository and a PostgreSQL adapter. The service owns writes,
-tenant-scoped reads, projection reads, score definitions, queue-item creation
-and queue-reference validation. Inputs and returned database rows are parsed by
-the contract schemas.
+The contract publishes portable schemas, handled errors and one callable
+`AnnotationApi` interface with its runtime token. `AnnotationApp` implements
+that interface and owns three private services:
 
-Existing tRPC and REST routes remain compatibility transports; this package
-does not register routes. Browser routing, transport hooks, draft stores and
-trace navigation stay in the application and are passed to annotation web
-components through narrow props and callbacks. The web package owns controlled
-cards, chips, avatars, form bodies, diffs and score fields. The generic delete
-confirmation remains shared application UI because dataset and prompt surfaces
-also use it.
+| Service                  | Responsibility                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `AnnotationService`      | Comment and anchor mapping, persistence and entity errors                       |
+| `AnnotationScoreService` | Score definitions                                                               |
+| `AnnotationQueueService` | Queue configuration and lookup, assignments, reach, completion and page queries |
 
-The queue router still owns trace enrichment, membership authorization and
-queue configuration and read workflows. Transport-specific user enrichment
-also remains there. These are deliberate residuals until that orchestration has
-its own complete migration slice.
-
-## Boundaries
-
-The contract contains transport-safe values and Zod 4 schemas. The server
-repository is private and is the only owner of Annotation persistence. A
-required lookup throws a concrete domain error from both the service and its
-repository. Neither boundary returns a nullable value for a required record.
-
-The concrete service receives its private repository, the complete
-`ProjectService` and the complete `OrganizationService`. Project ownership and
-organization membership stay behind their owning services; Annotation maps only
-the project absence and invalid-member outcomes required by its existing 404
-and 400 transports.
-
-The tRPC transport hydrates users in one `UserService` batch per result set.
-The repository does not query User. Full legacy user fields remain on project
-and queue results, trace results keep id, name and image, and ordinary
-annotation values remain user-free.
-
-## Persistence
-
-`PrismaAnnotationRepository` is private to the server package and owns only
-Annotation, score, queue and queue-item rows. It parses every returned row.
-Queue-item upserts share one transaction while retaining their existing unique
-keys and reset-on-requeue behaviour.
-
-The process composition root builds one annotation service for each process
-preset and injects it into handlers. Requests do not construct it. The feature
-reads no environment values, and generated Prisma records do not cross the
-server boundary.
-
-## Public surfaces and transports
-
-The contract publishes the annotation vocabulary, anchor schemas, errors and the
-abstract `AnnotationService`. The server package publishes one composition
-adapter and nothing else. The web package publishes browser-safe cards, chips,
-avatars, form bodies, diffs and score fields. The feature mounts no transport of
-its own: the `annotation` and `annotationScore` tRPC routers and the
-`/api/annotations` routes in the application are compatibility transports that
-call the composed service.
+The app coordinates services and peer APIs for user enrichment, reference
+validation, review pages, suggestions and trace effects. Services receive only
+their entity repositories; they do not fetch users or orchestrate peer features.
+Neither services nor repositories are
+public app fields. Other features receive `AnnotationApi`, never an annotation
+repository or an internal service. Complete peer APIs provide project ownership,
+organization membership, users, trace operations and authorization decisions.
 
 ## Dependencies
 
-The contract depends on the shared handled-error package and Zod. The server
-depends on that contract, on the Project and Organization contracts for project
-ownership and membership checks, and on the generated Prisma client. The web
-package depends on the contract, the design system, Chakra UI and React; it
-never depends on the server package.
+Only the app consumes complete Project, Organization, User, Trace and Authz APIs
+from their contracts. Entity services receive repository interfaces. The web
+surface reads shared session, active scope and permissions from the UI host;
+the application owns their query and navigation lifecycles.
 
-## Runtime and registration
+## Persistence
 
-Process composition builds one annotation adapter from the Prisma client and the
-canonical Project and Organization services, then exposes the built service on
-the application context. Importing the feature registers nothing. It owns no
-worker job, subscriber or event pipeline, so the same single instance serves the
-web and worker roles.
+Repository contracts are interfaces. The annotation and score services each
+receive one repository. The queue service receives both queue and queue-item
+repositories: repository count does not determine service count. Generated
+Prisma types remain in the Prisma
+implementations. `AnnotationApp.create` receives repository interfaces and has
+no knowledge of Prisma, Postgres connections or backend selection.
 
-## Environment and configuration
+The feature registers one Postgres repository factory and one memory repository
+factory with `defineRepositories`. Each constructs four separate repositories;
+the factories contain wiring only. Tests may replace one repository while using
+the other real memory implementations. Process startup selects one backend with
+`.withPersistence(...)`. Boot validates every required implementation and
+infrastructure dependency before construction, constructs each selected
+repository once and injects the resulting repositories into the app factory.
+Missing Postgres infrastructure never falls back to memory. Memory state belongs
+to the installed process, never to an import-time singleton.
 
-Annotation packages read no environment value. Every collaborator, including the
-database client and the Project and Organization services, arrives as a
-constructor argument at composition.
-
-## Errors
-
-A missing annotation or score definition throws a concrete error that the
-transports map to their existing not-found responses. A missing project, an
-invalid queue member, an invalid annotator and an invalid score throw handled
-errors carrying the codes `annotation_project_not_found`,
-`annotation_queue_member_invalid`, `annotation_annotator_invalid` and
-`annotation_score_invalid`.
+All annotation tables remain owned by this feature. Queue-item writes retain
+transactional upserts, existing unique keys and reset-on-requeue behavior.
+Prisma repositories declare their model tuples through the shared repository
+base. Those tuples supply both native delegate types and runtime table claims;
+the Postgres bundle derives its infrastructure requirement and claims from its
+repositories. Type narrowing does not provide runtime database isolation.
+Both persistence implementations preserve project isolation, ordering,
+pagination and ordinary lookup errors. In-memory persistence is a functioning
+implementation, not a collection of test stubs.
 
 ## Contracts and validation
 
-Zod 4 schemas in the contract define every annotation input and output. The
-repository parses each row it returns, so generated Prisma records never leave
-the server package.
+Contracts contain public app, REST and tRPC inputs, outputs, schemas and errors.
+Internal commands, persistence rows and intermediate models belong in the
+server package. Public schema files use role names such as
+`annotation.schemas.ts`, `annotation-rest.schemas.ts` and
+`annotation-trpc.schemas.ts`; a storage-oriented filename does not define a
+public boundary. Use `get`, `getMany`, `list`, `create`, `update` and `delete`
+for the corresponding app and service operations.
+
+Private commands are colocated with their owning service. They are not public
+contract exports merely because a repository also uses them.
+
+## Public surfaces and transports
+
+REST and tRPC declarations use the shared API package. Each endpoint places its
+name, verb, input sources, permissions, output, documentation and inline handler
+together. REST uses `/api/v1/annotations`; deliberate compatibility mounts retain
+existing URLs. The framework parses inputs, authorizes the exact target and
+serializes responses. Handler arguments contain no raw request or response.
+
+The web package owns controlled cards, editors, score fields and queue
+presentation. The UI application supplies routing, transport hooks and actions.
+Author enrichment remains behind the app and preserves full user fields for
+project and queue reads, with only id, name and image on trace reads.
+
+## Errors
+
+Omitting output declares `void`; REST then returns HTTP 204 with no body.
+Annotation deletion uses this form. Expected failures are thrown handled errors;
+ordinary annotation, score and queue lookups throw a handled 404 when absent.
+Peer errors such as `ProjectNotFoundError` propagate unchanged. An annotation
+wrapper is unnecessary when it adds no domain meaning.
+Runtime output mismatches are logged without response content and preserve the
+response, as specified in ADR-133.
+
+## Runtime and registration
+
+The obsolete ClickHouse annotation backfill and its migration registration are
+removed. Annotation declares no migration or background backfill task.
+
+Imports and declarations perform no work. API and worker install the same app
+factory, constructing services once per process. Requests never construct
+services or repositories. Environment parsing and resource startup belong to
+process composition.
+
+## Environment and configuration
+
+Annotation does not read environment variables. Process boot supplies the
+selected persistence backend and its typed infrastructure. Memory selection
+creates fresh process-owned state without requiring Postgres configuration.
+
+## Preserved behavior
+
+Reference checks precede queue name and slug checks. Queue operations retain
+project filters, organization membership, actor reach, ordering, pagination,
+counts and complete response fields. Queueing rejects malformed annotators,
+validates references, trims and deduplicates trace IDs, and writes only traces
+held by the requested project. Unresolved and repeated IDs count as skipped.
+
+Review writes preserve suggestion updates and trace annotation markers.
+Marker creation and removal are best effort after annotation persistence. A
+marker failure is logged and does not turn an already committed mutation into
+a failed request that callers might retry. This does not guarantee marker
+delivery; guaranteed delivery would require a durable retry boundary.
+
+Annotation IDs use KSUID with the shared `ANNOTATION_KSUID_RESOURCE` constant.
+Repositories return typed domain values and validate uncertain JSON fields.
+Known absence and invalid
+references retain their concrete handled errors; unexpected database failures
+propagate to the framework's error boundary.
 
 ## Consequences
 
-Annotation has one discoverable capability, one reusable browser surface and
-one persistence lifecycle while existing URLs and tRPC procedure names remain
-stable. Trace projections can consume a portable annotation projection without
-importing Prisma or application aliases. The remaining application query and
-mutation composition, queue configuration/read seam, stores and startup hook
-are explicit process responsibilities, not a second Annotation implementation.
+One public app keeps workflows coherent without exposing the services or
+repositories it coordinates. Separate repository interfaces allow replacing one
+dependency in a test. Supporting memory and Postgres requires observable parity
+checks for the same operations; type compatibility alone cannot establish it.

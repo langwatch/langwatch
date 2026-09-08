@@ -1,37 +1,4 @@
-/**
- * Creating an annotation queue, and editing the one that exists.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/AddAnnotationQueueDrawer`. The platform drawer
- * stays where it is: it is registered as `addAnnotationQueue` and the send
- * dialog on the trace surfaces still opens it, which deletes-only forbids
- * repointing.
- *
- * ADDRESSED BY THIS FAMILY'S OWN QUERY KEY (`?queue-editor=<id|new>`) rather
- * than through the application's drawer registry. That is the gateway family's
- * shape: the registry is composition, and a screen only ever needed the
- * address — so a link that opens a queue for editing keeps working without this
- * package carrying a copy of the registry, and without the chrome gap the
- * registry's own drawers sit behind.
- *
- * THREE THINGS THE NARROWING TOOK OUT, all recorded rather than slipped away:
- *
- * 1. **The nested "Add New" score type sub-drawer is gone.** It opened
- *    `AddOrEditAnnotationScore`, another 219 lines with its own mutations and
- *    its own callers, to define a score type from inside the queue form. Score
- *    types are defined on `/settings/annotation-scores`, which is a page this
- *    family does not own and which has not moved; the picker now says so. The
- *    same shape the automations family recorded when creating a dataset from
- *    inside its drawer went away.
- * 2. **The slug preview under the name field is gone.** The server mints the
- *    slug (`toQueueSlug`), and the preview restated a slugify vocabulary this
- *    package would have had to copy with nothing narrowing it. A preview that
- *    can disagree with what the server will do is worse than no preview.
- * 3. **`react-hook-form` did not travel.** Two text fields and two pickers are
- *    plain state, which is the trade the datasets family made for the same
- *    reason. The server's own field rejections still land on the field that was
- *    rejected — see `fieldProblems` below.
- */
+/** Edits a queue through the annotation feature API. */
 
 import {
   Button,
@@ -49,7 +16,7 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { annotationApi } from "../../behavior/annotation-api.ts";
-import { readHandledError } from "../../model/handled-error.ts";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 
 /** What the server said about individual fields, if it named any. */
@@ -57,11 +24,14 @@ function fieldProblems(error: unknown): Record<string, string> {
   const handled = readHandledError(error);
   const raw = handled?.meta.fieldErrors;
   if (typeof raw !== "object" || raw === null) return {};
+
   const problems: Record<string, string> = {};
+
   for (const [field, messages] of Object.entries(raw as Record<string, unknown>)) {
     const first = Array.isArray(messages) ? messages[0] : messages;
     if (typeof first === "string") problems[field] = first;
   }
+
   return problems;
 }
 
@@ -87,10 +57,12 @@ export function AnnotationQueueEditor({
     { projectId: projectId ?? "", queueId: queueId ?? "" },
     { enabled: !!projectId && !!queueId },
   );
+
   const scores = annotationApi.annotationScore.getAllActive.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
+
   const organization = annotationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId },
@@ -108,13 +80,17 @@ export function AnnotationQueueEditor({
   // Edit-mode hydration. Creating a queue never resolves a read, so nothing
   // here fires and the form stays the empty one it started as.
   const loaded = queue.data;
+
   useEffect(() => {
     if (!loaded) return;
+
     setName(loaded.name);
     setDescription(loaded.description ?? "");
+
     setParticipants(
       loaded.members.map((member) => ({ id: member.user.id, name: member.user.name })),
     );
+
     setScoreTypes(
       loaded.AnnotationQueueScores.map((score) => ({
         id: score.annotationScore.id,
@@ -124,6 +100,7 @@ export function AnnotationQueueEditor({
   }, [loaded]);
 
   const utils = annotationApi.useUtils();
+
   const save = annotationApi.annotation.createOrUpdateQueue.useMutation({
     onSuccess: (saved) => {
       // Everything that lists queues or counts their work: the listing, the
@@ -151,12 +128,16 @@ export function AnnotationQueueEditor({
 
   const submit = () => {
     if (!projectId) return;
+
     setProblem(null);
     setProblems({});
+
     if (participants.length === 0 || scoreTypes.length === 0) {
       setProblem("Pick at least one participant and one score type.");
+
       return;
     }
+
     save.mutate({
       projectId,
       name,
@@ -243,6 +224,7 @@ export function AnnotationQueueEditor({
                           const isPicked = participants.some(
                             (participant) => participant.id === member.user.id,
                           );
+
                           return (
                             <Button
                               key={member.user.id}
@@ -334,6 +316,7 @@ export function AnnotationQueueEditor({
                           const isPicked = scoreTypes.some(
                             (scoreType) => scoreType.id === score.id,
                           );
+
                           return (
                             <Button
                               key={score.id}

@@ -151,6 +151,11 @@ export type RestHandlerResult<TOutput extends z.ZodType | undefined> = TOutput e
   ? z.input<TOutput> | Promise<z.input<TOutput>>
   : void | Promise<void>;
 
+type RestHandler<TApp, TInput extends z.ZodObject | undefined, TResult = unknown> =
+  TInput extends z.ZodObject
+    ? (args: ApiHandlerArguments<z.output<TInput>, TApp>) => TResult
+    : (args: ApiHandlerArguments<undefined, TApp>) => TResult;
+
 /**
  * A handler gets input only when input was declared, so it can't read
  * something that was never validated.
@@ -159,9 +164,7 @@ export type RestEndpointHandler<
   TApp,
   TInput extends z.ZodObject | undefined,
   TOutput extends z.ZodType | undefined,
-> = TInput extends z.ZodObject
-  ? (args: ApiHandlerArguments<z.output<TInput>, TApp>) => RestHandlerResult<TOutput>
-  : (args: ApiHandlerArguments<undefined, TApp>) => RestHandlerResult<TOutput>;
+> = RestHandler<TApp, TInput, RestHandlerResult<TOutput>>;
 
 /**
  * A REQUEST-named scope, not necessarily the CREDENTIAL's scope. Unchecked,
@@ -266,7 +269,7 @@ export interface RestEndpoint<
   withoutResourceLimit(
     reason: string,
   ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled, TScopeBound>;
-  handle(
+  handle<TResult extends RestHandlerResult<TOutput>>(
     this: RestReady<TPermission, TRateLimit, TResourceLimit> extends true
       ? ScopeBound<TInput, TScopeBound> extends true
         ? THandled extends false
@@ -283,7 +286,7 @@ export interface RestEndpoint<
           : never
         : never
       : never,
-    handler: RestEndpointHandler<TApp, TInput, TOutput>,
+    handler: RestHandler<TApp, TInput, TResult>,
   ): RestEndpoint<
     TApp,
     TInput,

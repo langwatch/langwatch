@@ -1,23 +1,24 @@
 /**
  * A reviewer's annotations, served by the API process.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { TraceEditOverlayService } from "@langwatch/trace-server";
+import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import {
   applyOverlayToTrace,
-  mapTraceToDatasetEntry,
   type Trace,
   type TraceEditOverlayPatch,
 } from "@langwatch/trace-contract";
-import type { UserService } from "@langwatch/user-contract";
+import { mapTraceToDatasetEntry } from "@langwatch/dataset-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-  MissingSecretService,
-} from "../../../api.application.ts";
+import { ApiApplication, MissingSecretService } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stubCollaborators,
@@ -25,7 +26,8 @@ import {
   stubInfrastructureEntitlements,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { composeApiTraceProducerCommands } from "../../trace/trace-producer.composition.ts";
-import { composeAnnotationFeature } from "../annotation.composition.ts";
+import { installApiAnnotation } from "../annotation.composition.ts";
+import { ApiAnnotationUnavailableError } from "../annotation-absence.ts";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -42,6 +44,7 @@ function testPrisma() {
     annotationQueueItem: {
       createMany: vi.fn(async ({ data }: { data: Record<string, unknown>[] }) => {
         queueItemWrites.push(data);
+
         return { count: data.length };
       }),
       updateMany: vi.fn(async () => ({ count: 0 })),
@@ -58,6 +61,7 @@ function testPrisma() {
     string,
     { id: string; projectId: string; traceId: string; patch: unknown }
   >();
+
   const overlayKey = (projectId: string, traceId: string) => `${projectId}/${traceId}`;
 
   const client = {
@@ -98,14 +102,18 @@ function testPrisma() {
             where.projectId_traceId.projectId,
             where.projectId_traceId.traceId,
           );
+
           const existing = overlays.get(key);
+
           const row = { ...(existing ?? create), ...update } as {
             id: string;
             projectId: string;
             traceId: string;
             patch: unknown;
           };
+
           overlays.set(key, row);
+
           return row;
         },
       ),
@@ -125,13 +133,14 @@ function testPrisma() {
   return { client, queueItemWrites, transaction, overlays, overlayKey };
 }
 
-function testAuthz(): AuthzService {
+function testAuthz(): AuthzApi {
   return {
     hasPermission: async () => true,
+    hasProjectPermission: async () => true,
     getDecision: async () => ({ permitted: true, organizationRole: null }),
     getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
     checkScopeLineage: async () => ({ kind: "consistent" }),
-  } as unknown as AuthzService;
+  } as unknown as AuthzApi;
 }
 
 /** The one statement shape the trace-existence read issues. */
@@ -145,6 +154,7 @@ function testClickHouse(existing: readonly string[]) {
   const query = vi.fn(async (_statement: TraceExistenceQuery) => ({
     json: async () => existing.map((TraceId) => ({ TraceId })),
   }));
+
   return {
     query,
     resolveClient: async () => ({ query }) as never,
@@ -152,7 +162,81 @@ function testClickHouse(existing: readonly string[]) {
 }
 
 function composeAnnotation(prisma: PrismaClient, clickHouse: ReturnType<typeof testClickHouse>) {
-  return composeAnnotationFeature({
+  const traceCommands = composeApiTraceProducerCommands({
+    eventing: undefined,
+    processName: "langwatch-api",
+  });
+
+  const overlays = TraceEditOverlayService.create(PrismaTraceEditOverlayRepository.create(prisma));
+
+  const traces = {
+    async findExistingTraceIds(input: { projectId: string; traceIds: readonly string[] }) {
+      const client = await clickHouse.resolveClient(input.projectId);
+
+      const result = await client.query({
+        query: "",
+        query_params: { tenantId: input.projectId, traceIds: [...input.traceIds] },
+      });
+
+      const rows = await result.json();
+
+      return rows.map(({ TraceId }) => TraceId);
+    },
+    loadTraces: () =>
+      Promise.reject(
+        new ApiAnnotationUnavailableError(
+          "trace read pipeline, so it cannot resolve the traces behind an annotation queue",
+        ),
+      ),
+    async writeSuggestion(input: {
+      projectId: string;
+      traceId: string;
+      target:
+        | { kind: "span"; spanId: string; field: "input" | "output" }
+        | {
+            kind: "trace";
+            field: "input" | "output";
+          };
+      text: string;
+      userId: string;
+    }) {
+      if (input.target.kind === "span") {
+        const scope = {
+          projectId: input.projectId,
+          traceId: input.traceId,
+          spanId: input.target.spanId,
+          userId: input.userId,
+          field: input.target.field,
+        };
+
+        if (input.text.length === 0) {
+          await overlays.tryRemoveSpanFieldEdit(scope);
+        } else {
+          await overlays.mergeSpanFieldEdit({ ...scope, text: input.text });
+        }
+
+        return;
+      }
+
+      const scope = {
+        projectId: input.projectId,
+        traceId: input.traceId,
+        userId: input.userId,
+        field: input.target.field,
+      };
+
+      if (input.text.length === 0) {
+        await overlays.tryRemoveTraceIOEdit(scope);
+      } else {
+        await overlays.mergeTraceIOEdit({ ...scope, value: input.text });
+      }
+    },
+    recordAnnotation: (input: Parameters<typeof traceCommands.add>[0]) => traceCommands.add(input),
+    removeAnnotation: (input: Parameters<typeof traceCommands.remove>[0]) =>
+      traceCommands.remove(input),
+  } as unknown as TraceApi;
+
+  return installApiAnnotation({
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       prisma,
@@ -169,27 +253,22 @@ function composeAnnotation(prisma: PrismaClient, clickHouse: ReturnType<typeof t
           team: { organizationId: ORGANIZATION_ID },
         }),
         getOrganizationId: async () => ORGANIZATION_ID,
-      } as unknown as ProjectService,
-      organizations: {
+      } as unknown as ProjectApi,
+      organizations: createApiFixture<OrganizationApi>({
         getOrganizationMembers: async () => [],
-        getTeamById: async () => ({ organizationId: ORGANIZATION_ID }),
-      } as unknown as OrganizationService,
-      users: { getProfiles: async () => [] } as unknown as UserService,
-      // No queue: the two trace-side markers refuse by name, which is the
-      // composition's stated absence and not a path this file drives.
-      traceCommands: composeApiTraceProducerCommands({
-        eventing: undefined,
-        processName: "langwatch-api",
+        getAllMembers: async () => [],
       }),
+      users: { getProfiles: async () => [] } as unknown as UserApi,
+      traces,
+      permissions: testAuthz(),
     },
-    resolveClickHouseClient: clickHouse.resolveClient,
   });
 }
 
-function composeApplication() {
+async function composeApplication() {
   const prisma = testPrisma();
   const clickHouse = testClickHouse(["trace-a"]);
-  const annotation = composeAnnotation(prisma.client, clickHouse);
+  const annotation = await composeAnnotation(prisma.client, clickHouse);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), annotation },
@@ -200,13 +279,14 @@ function composeApplication() {
       audit: undefined,
     },
     collaborators: stubCollaborators({
-      annotations: annotation.app,
+      annotation: annotation.app,
     }),
   });
+
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     secrets: new MissingSecretService(),
     features,
     http: {
@@ -229,7 +309,9 @@ async function callTrpc(
   method: "query" | "mutation" = "mutation",
 ): Promise<{ status: number; body: unknown }> {
   if (!application.hono) throw new Error("HTTP composition was not created.");
+
   const url = `http://127.0.0.1/api/trpc/${path}`;
+
   const response =
     method === "mutation"
       ? await application.hono.request(url, {
@@ -238,6 +320,7 @@ async function callTrpc(
           body: JSON.stringify(input),
         })
       : await application.hono.request(`${url}?input=${encodeURIComponent(JSON.stringify(input))}`);
+
   return { status: response.status, body: await response.json() };
 }
 
@@ -245,7 +328,7 @@ describe("given an API process composed with the annotation feature", () => {
   describe("when traces are queued for annotation", () => {
     /** @scenario "An id no trace answers to is never queued for review" */
     it("queues only the ids trace storage answers to", async () => {
-      const { application, prisma, clickHouse } = composeApplication();
+      const { application, prisma, clickHouse } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "annotation.createQueueItem", {
         projectId: PROJECT_ID,
@@ -259,11 +342,13 @@ describe("given an API process composed with the annotation feature", () => {
       // The existence answer came from trace storage, scoped by tenant, and it
       // is what decided the write.
       expect(clickHouse.query).toHaveBeenCalledTimes(1);
+
       expect(clickHouse.query).toHaveBeenCalledWith(
         expect.objectContaining({
           query_params: { tenantId: PROJECT_ID, traceIds: ["trace-a", "trace-b"] },
         }),
       );
+
       expect(prisma.queueItemWrites).toEqual([
         [
           {
@@ -280,7 +365,7 @@ describe("given an API process composed with the annotation feature", () => {
   describe("when a reviewer suggests what a span should have answered", () => {
     /** @scenario "A field suggested through a comment reaches the dataset" */
     it("carries the suggested output into the dataset row for that span", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
       const traceId = "trace-span-suggestion-dataset";
 
       const { status } = await callTrpc(application, "annotation.create", {
@@ -293,6 +378,7 @@ describe("given an API process composed with the annotation feature", () => {
         anchorPath: "output",
         expectedOutput: "Amsterdam",
       });
+
       expect(status).toBe(200);
 
       const capturedTrace = {
@@ -317,6 +403,7 @@ describe("given an API process composed with the annotation feature", () => {
       } as unknown as Trace;
 
       const stored = prisma.overlays.get(prisma.overlayKey(PROJECT_ID, traceId));
+
       const corrected = applyOverlayToTrace({
         trace: capturedTrace,
         patch: stored?.patch as TraceEditOverlayPatch,
@@ -338,7 +425,7 @@ describe("given an API process composed with the annotation feature", () => {
   describe("when the deployment composed no trace read pipeline", () => {
     /** @scenario "A capability the deployment does not hold refuses by name" */
     it("refuses the reviewer's trace content by name rather than answering an empty queue", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(
         application,

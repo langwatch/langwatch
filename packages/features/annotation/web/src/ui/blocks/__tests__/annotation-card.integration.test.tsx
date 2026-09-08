@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { AnnotationCard } from "../../../index.ts";
+import { AnnotationCard } from "../annotation-card.tsx";
 
 const SCORE_NAMES = new Map([
   ["score-1", "Helpfulness"],
@@ -135,6 +135,7 @@ describe("annotation card presentation", () => {
 describe("annotation card anchors", () => {
   it("names a span field and jumps to it when the trace is open", () => {
     const onJumpToAnchor = vi.fn();
+
     renderCard({
       openTraceId: "trace-1",
       onJumpToAnchor,
@@ -183,6 +184,7 @@ describe("annotation card anchors", () => {
     expect(screen.queryByTestId("annotation-anchor")).not.toBeInTheDocument();
 
     cleanup();
+
     renderCard({
       item: annotation({
         anchorKind: "message",
@@ -190,6 +192,7 @@ describe("annotation card anchors", () => {
         anchorPath: "message-1",
       }),
     });
+
     expect(screen.getByTestId("annotation-anchor")).toHaveTextContent("Message");
     expect(screen.getByTestId("annotation-anchor")).not.toHaveTextContent("message-1");
   });

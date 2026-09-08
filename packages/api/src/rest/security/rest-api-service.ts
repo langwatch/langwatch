@@ -11,6 +11,7 @@ import {
   requires,
 } from "../../access-policy.ts";
 import { createService, type ServiceBuilder } from "../builder.ts";
+import type { RestService } from "../builder.ts";
 import type { IdempotentRunner } from "../idempotency.ts";
 import { RestVersionSelector } from "../rest-version-selector.ts";
 import type { DefaultsChain } from "../definition.ts";
@@ -502,6 +503,7 @@ export type VersionedFamilyScope = "project" | "organization" | "service";
 // grant would have reached every team in the organization.
 export interface RestApiVersionedFamily {
   service: ServiceBuilder<unknown, EndpointVariables, unknown>;
+  rest: RestService;
   policy: (
     access: AuthzPermission | AccessPolicy,
   ) => <TChain extends DefaultsChain>(b: TChain) => TChain;
@@ -880,7 +882,7 @@ function versionedFamily({
     };
   };
 
-  return { service, policy };
+  return { service, rest: service.asRestService(), policy };
 }
 
 /** The declarations a shared-secret door can actually stand behind. */

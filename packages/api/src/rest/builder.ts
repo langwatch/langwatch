@@ -245,6 +245,28 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
     return this;
   }
 
+  /** Mounts a descriptor already checked by the REST transport authoring surface. */
+  registerTransportRoute(
+    method: HttpMethod,
+    path: string,
+    version: VersionLabel,
+    handler: (context: ServiceContext<TVariables, TApp>, input: unknown) => unknown,
+    define: (endpoint: RouteChain) => RouteChain,
+  ): this {
+    this._registerRoute(method, path, version, undefined, handler, define);
+    return this;
+  }
+
+  /**
+   * The schema-first REST declaration surface over this service's existing
+   * versioning and middleware configuration. Service families use this when a
+   * fixed protocol generation or a custom error boundary prevents them from
+   * being created through {@link createRestService}.
+   */
+  asRestService(): RestService<TApp> {
+    return new RestServiceBuilder(this);
+  }
+
   /**
    * Register one path that answers EVERY method.
    *
@@ -431,9 +453,6 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
     handler: unknown,
     definition: RawEndpointDef,
   ): void {
-    if (!this._config.publicRest) {
-      throw new Error(`The fluent ${method.toUpperCase()} API belongs to createRestService()`);
-    }
     assertVersionLabel(version);
     if (version === VERSION_PREVIEW) {
       throw new Error("Public REST registrations use dated versions, not preview");
@@ -737,12 +756,13 @@ class RestEndpointBuilder extends ChainBuilder {
 
 class RestServiceBuilder<
   TProject,
+  TVariables extends Record<string, unknown>,
   TApp = unknown,
   TPermission extends boolean = false,
   TRateLimit extends boolean = false,
   TResourceLimit extends boolean = false,
 > implements RestService<TApp, TPermission, TRateLimit, TResourceLimit> {
-  constructor(private readonly service: ServiceBuilder<TProject, EndpointVariables, TApp>) {}
+  constructor(private readonly service: ServiceBuilder<TProject, TVariables, TApp>) {}
 
   withDocs(docs: RestEndpointDocs): this {
     this.service.withDocs(docs);
@@ -756,42 +776,63 @@ class RestServiceBuilder<
 
   withPermission(
     permission: Parameters<DefaultsChain["withPermission"]>[0],
-  ): RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit> {
+  ): RestServiceBuilder<TProject, TVariables, TApp, true, TRateLimit, TResourceLimit> {
     this.service.withPermission(permission);
-    return this as RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit>;
+    return this as RestServiceBuilder<TProject, TVariables, TApp, true, TRateLimit, TResourceLimit>;
   }
 
   withoutPermission(
     reason: string,
-  ): RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit> {
+  ): RestServiceBuilder<TProject, TVariables, TApp, true, TRateLimit, TResourceLimit> {
     this.service.withoutPermission(reason);
-    return this as RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit>;
+    return this as RestServiceBuilder<TProject, TVariables, TApp, true, TRateLimit, TResourceLimit>;
   }
 
   withResourceLimit(
     limitType: string,
-  ): RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true> {
+  ): RestServiceBuilder<TProject, TVariables, TApp, TPermission, TRateLimit, true> {
     this.service.withResourceLimit(limitType);
-    return this as RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true>;
+    return this as RestServiceBuilder<TProject, TVariables, TApp, TPermission, TRateLimit, true>;
   }
 
   withoutResourceLimit(
     reason: string,
-  ): RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true> {
+  ): RestServiceBuilder<TProject, TVariables, TApp, TPermission, TRateLimit, true> {
     this.service.withoutResourceLimit(reason);
-    return this as RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true>;
+    return this as RestServiceBuilder<TProject, TVariables, TApp, TPermission, TRateLimit, true>;
   }
 
-  withRateLimit(): RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit> {
+  withRateLimit(): RestServiceBuilder<
+    TProject,
+    TVariables,
+    TApp,
+    TPermission,
+    true,
+    TResourceLimit
+  > {
     this.service.withRateLimit();
-    return this as RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit>;
+    return this as RestServiceBuilder<
+      TProject,
+      TVariables,
+      TApp,
+      TPermission,
+      true,
+      TResourceLimit
+    >;
   }
 
   withoutRateLimit(
     reason: string,
-  ): RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit> {
+  ): RestServiceBuilder<TProject, TVariables, TApp, TPermission, true, TResourceLimit> {
     this.service.withoutRateLimit(reason);
-    return this as RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit>;
+    return this as RestServiceBuilder<
+      TProject,
+      TVariables,
+      TApp,
+      TPermission,
+      true,
+      TResourceLimit
+    >;
   }
 
   get<TPath extends string>(

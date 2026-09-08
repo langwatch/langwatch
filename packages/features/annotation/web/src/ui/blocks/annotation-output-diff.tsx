@@ -18,6 +18,7 @@ export function useOutputDiff({
   edited: string;
 }): Change[] {
   const deferredEdited = useDeferredValue(edited);
+
   return useMemo(() => diffWordsWithSpace(original, deferredEdited), [original, deferredEdited]);
 }
 
@@ -26,6 +27,7 @@ export function DiffCounts({ parts }: { parts: Change[] }) {
   const counts = useMemo(() => {
     const added = parts.filter((p) => p.added).reduce((acc, p) => acc + p.value.length, 0);
     const removed = parts.filter((p) => p.removed).reduce((acc, p) => acc + p.value.length, 0);
+
     return { added, removed };
   }, [parts]);
 
@@ -83,6 +85,7 @@ export function DiffPanel({ parts }: { parts: Change[] }) {
               </Box>
             );
           }
+
           if (part.removed) {
             return (
               <Box
@@ -97,6 +100,7 @@ export function DiffPanel({ parts }: { parts: Change[] }) {
               </Box>
             );
           }
+
           return (
             <Box key={i} as="span" color="fg.muted">
               {part.value}

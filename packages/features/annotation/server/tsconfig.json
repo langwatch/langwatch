@@ -6,7 +6,7 @@
     "outDir": "dist",
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2022"],
+    "lib": ["es2024"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "types": ["vitest/globals"],
@@ -44,9 +44,6 @@
     },
     {
       "path": "../../../runtime-composition/tsconfig.build.json"
-    },
-    {
-      "path": "../../../task/tsconfig.build.json"
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"

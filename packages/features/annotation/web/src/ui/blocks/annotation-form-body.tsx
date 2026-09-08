@@ -32,6 +32,7 @@ export function AnnotateBody({ state }: { state: AnnotationFormState }) {
  */
 function AnchorLine({ label }: { label: string | null }) {
   if (!label) return null;
+
   return (
     <HStack gap={1} maxWidth="full">
       <Icon as={Crosshair} boxSize={3} color="purple.fg" flexShrink={0} />
@@ -128,6 +129,7 @@ export function SuggestBody({
 /** Removing the annotation, offered only once there is one to remove. */
 function DeleteAnnotationButton({ state }: { state: AnnotationFormState }) {
   if (!state.isEdit || !state.hasExisting) return null;
+
   return (
     <Button
       size="2xs"

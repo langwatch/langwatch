@@ -1,22 +1,16 @@
 import { HandledError } from "@langwatch/handled-error";
 
-export class AnnotationNotFoundError extends Error {
+export class AnnotationNotFoundError extends HandledError {
+  declare readonly code: "annotation_not_found";
+
   constructor(id: string) {
-    super(`Annotation ${id} was not found.`);
-    this.name = "AnnotationNotFoundError";
-  }
-}
-
-export class AnnotationProjectNotFoundError extends HandledError {
-  declare readonly code: "annotation_project_not_found";
-
-  constructor(projectId: string) {
-    super("annotation_project_not_found", "Project not found", {
+    super("annotation_not_found", `Annotation ${id} was not found.`, {
       httpStatus: 404,
       fault: "customer",
-      meta: { projectId },
+      meta: { annotationId: id },
     });
-    this.name = "AnnotationProjectNotFoundError";
+
+    this.name = "AnnotationNotFoundError";
   }
 }
 
@@ -29,6 +23,7 @@ export class AnnotationQueueMemberInvalidError extends HandledError {
       "One or more queue members are not in this organization",
       { httpStatus: 400, fault: "customer" },
     );
+
     this.name = "AnnotationQueueMemberInvalidError";
   }
 }
@@ -41,13 +36,21 @@ export class AnnotationScoreInvalidError extends HandledError {
       httpStatus: 400,
       fault: "customer",
     });
+
     this.name = "AnnotationScoreInvalidError";
   }
 }
 
-export class AnnotationScoreNotFoundError extends Error {
+export class AnnotationScoreNotFoundError extends HandledError {
+  declare readonly code: "annotation_score_not_found";
+
   constructor(scoreId: string) {
-    super(`Annotation score ${scoreId} was not found.`);
+    super("annotation_score_not_found", `Annotation score ${scoreId} was not found.`, {
+      httpStatus: 404,
+      fault: "customer",
+      meta: { scoreId },
+    });
+
     this.name = "AnnotationScoreNotFoundError";
   }
 }
@@ -61,6 +64,7 @@ export class AnnotationAnnotatorInvalidError extends HandledError {
       "One or more annotators are not available in this project",
       { httpStatus: 400, fault: "customer" },
     );
+
     this.name = "AnnotationAnnotatorInvalidError";
   }
 }

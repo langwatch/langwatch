@@ -1,282 +1,358 @@
-/**
- * The annotation feature's application: what both of its doors call.
- *
- * It holds every service the feature's api files reach — the annotation
- * capability itself and the user directory a comment's author is resolved
- * through — and it is the one typed thing a transport is given. Before it, the
- * comment door declared `Readonly<{ annotations; users }>` and the score door
- * declared `Readonly<{ annotations }>`: two descriptions of the same
- * composition, agreeing by attention rather than by construction, and neither
- * reachable from the other.
- *
- * Most operations are `AnnotationService`'s own. What lives here as a rule of
- * its own is what a door would otherwise have to decide for itself:
- *
- *   - joining comments to the people who left them, which needs BOTH services
- *     at once and so was the one thing the score door could never do;
- *   - attributing a comment to its author, which the create path stamped
- *     itself;
- *   - which queue names the URL space has already spent, and that a name
- *     already in use is a refusal rather than a second queue.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
- */
 import {
+  ANNOTATION_KSUID_RESOURCE,
+  AnnotationApi,
   AnnotationNotFoundError,
+  AnnotationAnnotatorInvalidError,
+  AnnotationAnnotatorReferenceInvalidError,
+  AnnotationQueueMemberInvalidError,
+  AnnotationScoreInvalidError,
+  resolveAnnotationSuggestionTarget,
+  withReadableAnnotationAnchor,
   type Annotation,
-  type AnnotationByIdInput,
-  type AnnotationProjectInput,
-  type AnnotationScore,
-  type AnnotationScoreByIdInput,
-  type AnnotationService,
-  type AnnotationUser,
-  type AssertQueueConfigurationReferencesInput,
   type CreateAnnotationInput,
-  type DeleteAnnotationInput,
-  type ListAnnotationScoresInput,
-  type ListAnnotationsInput,
-  type ToggleAnnotationScoreInput,
+  type CreateUnattributedAnnotationInput,
+  type ListProjectionAnnotationsInput,
   type UpdateAnnotationInput,
+  type DeleteAnnotationInput,
+  type AnnotationByIdInput,
+  type ListAnnotationsInput,
+  type ListAnnotationScoreNamesInput,
   type UpsertAnnotationScoreInput,
+  type ListAnnotationScoresInput,
+  type AnnotationScoreByIdInput,
+  type ToggleAnnotationScoreInput,
+  type AnnotationQueueConfiguration,
+  type AnnotationQueueScope,
+  type AnnotationQueueCaller,
+  type QueueAnnotationTracesInput,
+  type AnnotationReviewUpdateInput,
+  type AnnotationReviewDeleteInput,
+  type AnnotationReviewOptimizedQueuesInput,
+  type AnnotationQueuePageItem,
+  type AnnotationReviewQueueItem,
+  type AnnotationReviewCreateInput,
+  type AnnotationSuggestionSource,
 } from "@langwatch/annotation-contract";
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { UserFullProfile, UserService } from "@langwatch/user-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import {
+  OrganizationApi,
+  UserNotInOrganizationError,
+  type User as OrganizationMember,
+} from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import { TraceApi } from "@langwatch/trace-contract";
+import { UserApi, type UserFullProfile } from "@langwatch/user-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { createLogger } from "@langwatch/observability";
+import { generate } from "@langwatch/ksuid";
+import { fromDate, nowInstant } from "@langwatch/time";
+import { z } from "zod";
+import type { AnnotationRepositories } from "#repositories/annotation.repositories";
+import { AnnotationService } from "#services/annotation.service";
+import { AnnotationQueueService } from "#services/annotation-queue.service";
+import { AnnotationScoreService } from "#services/annotation-score.service";
 
-/** Who a comment is attributed to. */
-export interface AnnotationCaller {
-  readonly id: string;
-}
+type AnnotationSetup = FeatureSetup<
+  typeof AnnotationApp.dependencies,
+  never,
+  undefined,
+  AnnotationRepositories
+>;
+const logger = createLogger("langwatch:annotation:app");
+const annotatorReferenceSchema = z.string().transform((reference, context) => {
+  if (reference.startsWith("queue-") && reference.length > 6) {
+    return { type: "queue" as const, id: reference.slice(6) };
+  }
 
-/** What the process composes this feature's application from. */
-export interface AnnotationAppDependencies {
-  annotations: AnnotationService;
-  users: Pick<UserService, "getProfiles">;
-}
+  if (reference.startsWith("user-") && reference.length > 5) {
+    return { type: "user" as const, id: reference.slice(5) };
+  }
 
-/** A comment with the reviewer's whole profile, for the annotations list. */
-export type AnnotationWithFullUser = Annotation & { user: UserFullProfile | null };
+  context.addIssue({ code: "custom", message: "Invalid annotator" });
 
-/** A comment with just enough of the reviewer to render an avatar. */
-export type AnnotationWithUserSummary = Annotation & { user: AnnotationUser | null };
+  return z.NEVER;
+});
 
-/** Slugs the queue URL space already spends on something else. */
-const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);
+export class AnnotationApp implements AnnotationApi {
+  static readonly contract = AnnotationApi;
+  static readonly dependencies = {
+    projects: ProjectApi,
+    organizations: OrganizationApi,
+    traces: TraceApi,
+    users: UserApi,
+    permissions: AuthzApi,
+  };
 
-/** The queue name resolves to a slug the annotation URLs already use. */
-export class AnnotationQueueNameReservedError extends HandledError {
-  declare readonly code: "annotation_queue_name_reserved";
+  #annotations: AnnotationService;
+  #scores: AnnotationScoreService;
+  #queues: AnnotationQueueService;
+  #projects: ProjectApi;
+  #organizations: OrganizationApi;
+  #users: UserApi;
+  #traces: TraceApi;
+  #permissions: AuthzApi;
 
-  constructor(slug: string) {
-    super("annotation_queue_name_reserved", "That annotation queue name is reserved", {
-      httpStatus: 409,
-      fault: "customer",
-      meta: { slug },
+  private constructor(
+    repositories: AnnotationRepositories,
+    dependencies: AnnotationSetup["dependencies"],
+  ) {
+    this.#annotations = AnnotationService.create({ repository: repositories.annotations });
+    this.#scores = AnnotationScoreService.create({ repository: repositories.scores });
+
+    this.#queues = AnnotationQueueService.create({
+      queues: repositories.queues,
+      items: repositories.queueItems,
     });
-    this.name = "AnnotationQueueNameReservedError";
-  }
-}
 
-/** The project already has a queue addressed by this name. */
-export class AnnotationQueueNameTakenError extends HandledError {
-  declare readonly code: "annotation_queue_name_taken";
-
-  constructor(slug: string) {
-    super("annotation_queue_name_taken", "An annotation queue with this name already exists", {
-      httpStatus: 409,
-      fault: "customer",
-      meta: { slug },
-    });
-    this.name = "AnnotationQueueNameTakenError";
-  }
-}
-
-/** No open queue item by that id that is this reviewer's to finish. */
-export class AnnotationQueueItemNotFoundError extends NotFoundError {
-  declare readonly code: "annotation_queue_item_not_found";
-
-  constructor(queueItemId: string) {
-    super("annotation_queue_item_not_found", "Queue item", queueItemId, {
-      meta: { queueItemId },
-    });
-    this.name = "AnnotationQueueItemNotFoundError";
-  }
-}
-
-export class AnnotationApp {
-  static create(dependencies: AnnotationAppDependencies): AnnotationApp {
-    return new AnnotationApp(dependencies);
+    this.#projects = dependencies.projects;
+    this.#organizations = dependencies.organizations;
+    this.#users = dependencies.users;
+    this.#traces = dependencies.traces;
+    this.#permissions = dependencies.permissions;
   }
 
-  private constructor(private readonly dependencies: AnnotationAppDependencies) {}
-
-  /**
-   * The service itself, for `createOrUpdateQueueItems`.
-   *
-   * That queueing function is this package's own, but it is not reachable from
-   * here: it takes the trace-storage read that decides which of the requested
-   * ids actually address a trace, which is another feature's persistence and
-   * therefore the process's to supply. So the process calls it, and this getter
-   * is what it hands over — the same seam `EvaluatorApp.evaluatorService` keeps.
-   */
-  get annotationService(): AnnotationService {
-    return this.dependencies.annotations;
+  static create({ repositories, dependencies }: AnnotationSetup): AnnotationApp {
+    return new AnnotationApp(repositories, dependencies);
   }
 
-  // -- comments --------------------------------------------------------------
-
-  /** The comments matching a query, in the order the query asked for. */
-  list(input: ListAnnotationsInput): Promise<Annotation[]> {
-    return this.dependencies.annotations.list(input);
+  create(input: CreateAnnotationInput) {
+    return this.#annotations.create(input);
   }
 
-  /**
-   * The comments matching a query, each carrying the reviewer's whole profile.
-   *
-   * The join is the reason this class exists rather than an argument for it:
-   * it reads the annotation service AND the user directory, so no door holding
-   * one of them could ever answer it, and the door that held both did the join
-   * itself in five places.
-   */
-  async listWithFullUsers(input: ListAnnotationsInput): Promise<AnnotationWithFullUser[]> {
-    const annotations = await this.dependencies.annotations.list(input);
-    const profiles = await this.profilesFor(annotations);
-    return annotations.map((annotation) => ({
-      ...annotation,
-      user: this.authorOf(annotation, profiles),
-    }));
+  createUnattributed(input: CreateUnattributedAnnotationInput) {
+    return this.#annotations.createUnattributed(input);
   }
 
-  /** The same query, carrying only what an avatar and a name need. */
-  async listWithUserSummaries(input: ListAnnotationsInput): Promise<AnnotationWithUserSummary[]> {
-    const annotations = await this.dependencies.annotations.list(input);
-    const profiles = await this.profilesFor(annotations);
-    return annotations.map((annotation) => {
-      const user = this.authorOf(annotation, profiles);
-      return {
-        ...annotation,
-        user: user ? { id: user.id, name: user.name, image: user.image } : null,
-      };
-    });
+  update(input: UpdateAnnotationInput) {
+    return this.#annotations.update(input);
   }
 
-  /** Saves one comment, attributed to the reviewer who left it. */
-  create(input: Omit<CreateAnnotationInput, "userId">, by: AnnotationCaller): Promise<Annotation> {
-    return this.dependencies.annotations.create({ ...input, userId: by.id });
+  delete(input: DeleteAnnotationInput) {
+    return this.#annotations.delete(input);
   }
 
-  /**
-   * Saves one comment left through the public API, where the annotator is a
-   * project credential rather than a member of the workspace.
-   *
-   * The reviewer is null on purpose and not by omission: there is no user to
-   * attribute it to, and stamping the key's owner would credit whoever minted
-   * the key with words they never wrote. What identity there is travels in
-   * `email` on the input, which is the only thing an external annotator hands
-   * us. Named apart from {@link create} so a door cannot reach the
-   * unattributed write by forgetting an argument.
-   */
-  createUnattributed(input: Omit<CreateAnnotationInput, "userId">): Promise<Annotation> {
-    return this.dependencies.annotations.create({ ...input, userId: null });
+  getById(input: AnnotationByIdInput) {
+    return this.#annotations.getById(input);
   }
 
-  /** Replaces what a comment says. Never what it is about — that is a new comment. */
-  update(input: UpdateAnnotationInput): Promise<Annotation> {
-    return this.dependencies.annotations.update(input);
+  list(input: ListAnnotationsInput) {
+    return this.#annotations.list(input);
   }
 
-  /** One comment, refusing when the project has none by that id. */
-  getById(input: AnnotationByIdInput): Promise<Annotation> {
-    return this.dependencies.annotations.getById(input);
+  listForProjection(input: ListProjectionAnnotationsInput) {
+    return this.#annotations.listForProjection(input);
   }
 
-  /**
-   * One comment, or null when there is none.
-   *
-   * Absence is a real answer for the reader that asks by id off a stale list,
-   * which is why this exists next to {@link getById} rather than instead of it.
-   */
-  async tryGetById(input: AnnotationByIdInput): Promise<Annotation | null> {
+  listScoreNames(input: ListAnnotationScoreNamesInput) {
+    return this.#scores.listScoreNames(input);
+  }
+
+  upsertScore(input: UpsertAnnotationScoreInput) {
+    return this.#scores.upsertScore(input);
+  }
+
+  listScores(input: ListAnnotationScoresInput) {
+    return this.#scores.listScores(input);
+  }
+
+  getScore(input: AnnotationScoreByIdInput) {
+    return this.#scores.getScore(input);
+  }
+
+  toggleScore(input: ToggleAnnotationScoreInput) {
+    return this.#scores.toggleScore(input);
+  }
+
+  deleteScore(input: AnnotationScoreByIdInput) {
+    return this.#scores.deleteScore(input);
+  }
+
+  async configure(input: AnnotationQueueConfiguration) {
+    const organizationId = await this.#projects.getOrganizationId(input.projectId);
+    const userIds = [...new Set(input.userIds)];
+    const scoreTypeIds = [...new Set(input.scoreTypeIds)];
+
+    const [, count] = await Promise.all([
+      this.#assertOrganizationMembers(organizationId, userIds, AnnotationQueueMemberInvalidError),
+      this.#scores.countAnnotationScores({ projectId: input.projectId, scoreTypeIds }),
+    ]);
+
+    if (count !== scoreTypeIds.length) throw new AnnotationScoreInvalidError();
+
+    return this.#queues.configure(input);
+  }
+  listQueues(input: AnnotationQueueScope & Readonly<{ reachableOnly?: boolean; userId?: string }>) {
+    return this.#queues.listQueues(input);
+  }
+
+  async getQueue(input: AnnotationQueueScope & Readonly<{ slug?: string; queueId?: string }>) {
+    const { members, ...scope } = await this.#getOrganizationScope(input);
+    const queue = await this.#queues.getQueue({ ...input, ...scope });
+
+    return this.#withMemberSummaries(queue, members);
+  }
+
+  async listQueueItems(input: AnnotationQueueScope) {
+    const { members, ...scope } = await this.#getOrganizationScope(input);
+    const items = await this.#queues.listQueueItems({ ...input, ...scope });
+
+    return items.map((item) => this.#withQueueItemMemberSummaries(item, members));
+  }
+
+  countPendingItems(input: AnnotationQueueCaller) {
+    return this.#queues.countPendingItems(input);
+  }
+
+  countAssignedItems(input: AnnotationQueueCaller) {
+    return this.#queues.countAssignedItems(input);
+  }
+
+  async listMemberQueuePendingCounts(input: AnnotationQueueCaller) {
+    return [...(await this.#queues.listMemberQueuePendingCounts(input))];
+  }
+
+  async deleteQueueItems(
+    input: AnnotationQueueCaller & Readonly<{ queueItemIds: readonly string[] }>,
+  ) {
+    const { members: _members, ...scope } = await this.#getOrganizationScope(input);
+
+    return this.#queues.deleteQueueItems({ ...input, ...scope });
+  }
+
+  async markQueueItemDone(input: AnnotationQueueCaller & Readonly<{ queueItemId: string }>) {
+    const { members: _members, ...scope } = await this.#getOrganizationScope(input);
+
+    return this.#queues.markQueueItemDone({ ...input, ...scope });
+  }
+
+  async #getOrganizationScope({ projectId }: { projectId: string }) {
+    const organizationId = await this.#projects.getOrganizationId(projectId);
+    const members = await this.#organizations.getAllMembers({ organizationId });
+
+    return {
+      organizationId,
+      organizationMemberIds: members.map((member) => member.id),
+      members: new Map(members.map((member) => [member.id, member])),
+    };
+  }
+
+  #memberSummary(
+    user: { id: string; name: string | null; image: string | null },
+    members: ReadonlyMap<string, OrganizationMember>,
+  ) {
+    const member = members.get(user.id);
+
+    return member === void 0 ? user : { id: member.id, name: member.name, image: member.image };
+  }
+
+  #withMemberSummaries<
+    T extends { members: { user: { id: string; name: string | null; image: string | null } }[] },
+  >(queue: T, members: ReadonlyMap<string, OrganizationMember>): T {
+    return {
+      ...queue,
+      members: queue.members.map(({ user }) => ({ user: this.#memberSummary(user, members) })),
+    };
+  }
+
+  #withQueueItemMemberSummaries<
+    T extends {
+      user: { id: string; name: string | null; image: string | null } | null;
+      createdByUser: { id: string; name: string | null; image: string | null } | null;
+    },
+  >(item: T, members: ReadonlyMap<string, OrganizationMember>): T {
+    return {
+      ...item,
+      user: item.user === null ? null : this.#memberSummary(item.user, members),
+      createdByUser:
+        item.createdByUser === null ? null : this.#memberSummary(item.createdByUser, members),
+    };
+  }
+
+  async #assertOrganizationMembers(
+    organizationId: string,
+    userIds: string[],
+    InvalidMemberError:
+      | typeof AnnotationQueueMemberInvalidError
+      | typeof AnnotationAnnotatorInvalidError,
+  ): Promise<void> {
     try {
-      return await this.dependencies.annotations.getById(input);
+      await this.#organizations.getOrganizationMembers({ organizationId, userIds });
     } catch (error) {
-      if (error instanceof AnnotationNotFoundError) return null;
+      if (error instanceof UserNotInOrganizationError) {
+        throw new InvalidMemberError();
+      }
+
       throw error;
     }
   }
 
-  /** Removes one comment. */
-  delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    return this.dependencies.annotations.delete(input);
+  async queueTraces(input: QueueAnnotationTracesInput) {
+    const annotators = input.annotators.map((reference) => {
+      const result = annotatorReferenceSchema.safeParse(reference);
+
+      if (!result.success) {
+        throw new AnnotationAnnotatorReferenceInvalidError(reference);
+      }
+
+      return result.data;
+    });
+
+    const queueIds = annotators.filter((item) => item.type === "queue").map((item) => item.id);
+    const userIds = annotators.filter((item) => item.type === "user").map((item) => item.id);
+    const organizationId = await this.#projects.getOrganizationId(input.projectId);
+
+    const [queueCount] = await Promise.all([
+      this.#queues.countQueues({ projectId: input.projectId, queueIds: [...new Set(queueIds)] }),
+      this.#assertOrganizationMembers(
+        organizationId,
+        [...new Set(userIds)],
+        AnnotationAnnotatorInvalidError,
+      ),
+    ]);
+
+    if (queueCount !== new Set(queueIds).size) throw new AnnotationAnnotatorInvalidError();
+
+    const candidates = [...new Set(input.traceIds.map((id) => id.trim()).filter(Boolean))];
+
+    const existing = new Set(
+      await this.#traces.findExistingTraceIds({ projectId: input.projectId, traceIds: candidates }),
+    );
+
+    const traceIds = candidates.filter((id) => existing.has(id));
+
+    await this.#queues.createQueueItems({
+      projectId: input.projectId,
+      traceIds,
+      queueIds,
+      userIds,
+      createdByUserId: input.userId,
+    });
+
+    return { created: traceIds.length, skipped: input.traceIds.length - traceIds.length };
   }
 
-  /** The organization the project belongs to. */
-  organizationOf(input: AnnotationProjectInput): Promise<string> {
-    return this.dependencies.annotations.getProjectOrganizationId(input);
+  async listWithFullUsers(input: ListAnnotationsInput) {
+    const annotations = await this.list(input);
+    const profiles = await this.#profilesFor(annotations);
+
+    return annotations.map((annotation) => ({
+      ...annotation,
+      user: annotation.userId ? (profiles.get(annotation.userId) ?? null) : null,
+    }));
   }
 
-  // -- queues ----------------------------------------------------------------
+  async listWithUserSummaries(input: ListAnnotationsInput) {
+    const annotations = await this.listWithFullUsers(input);
 
-  /** Refuses a queue configuration naming a member or a score it may not use. */
-  assertQueueConfigurationReferences(
-    input: AssertQueueConfigurationReferencesInput,
-  ): Promise<void> {
-    return this.dependencies.annotations.assertQueueConfigurationReferences(input);
+    return annotations.map(({ user, ...annotation }) =>
+      withReadableAnnotationAnchor({
+        ...annotation,
+        user: user ? { id: user.id, name: user.name, image: user.image } : null,
+      }),
+    );
   }
 
-  /**
-   * Refuses a queue slug the annotation URL space already spends on something
-   * else.
-   *
-   * `/annotations/all`, `/annotations/me` and `/annotations/my-queue` are
-   * views, not queues, so a queue that took one of those names would be
-   * unreachable at its own address.
-   */
-  requireUnreservedQueueSlug(slug: string): void {
-    if (RESERVED_QUEUE_SLUGS.has(slug)) throw new AnnotationQueueNameReservedError(slug);
-  }
-
-  /** The refusal for a name the project already has a queue for. */
-  queueNameTaken(slug: string): AnnotationQueueNameTakenError {
-    return new AnnotationQueueNameTakenError(slug);
-  }
-
-  /** The refusal for an item that is not this reviewer's to finish. */
-  queueItemNotFound(queueItemId: string): AnnotationQueueItemNotFoundError {
-    return new AnnotationQueueItemNotFoundError(queueItemId);
-  }
-
-  // -- score definitions -----------------------------------------------------
-
-  /** Creates a score definition, or replaces an existing one. */
-  upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
-    return this.dependencies.annotations.upsertScore(input);
-  }
-
-  /** The project's score definitions, all of them or only the pickable ones. */
-  listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
-    return this.dependencies.annotations.listScores(input);
-  }
-
-  /** One score definition. */
-  getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
-    return this.dependencies.annotations.getScore(input);
-  }
-
-  /** Retires a score definition, or brings it back, without losing its scores. */
-  toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore> {
-    return this.dependencies.annotations.toggleScore(input);
-  }
-
-  /** Removes a score definition for good. */
-  deleteScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
-    return this.dependencies.annotations.deleteScore(input);
-  }
-
-  private async profilesFor(
-    annotations: readonly Annotation[],
-  ): Promise<Map<string, UserFullProfile>> {
+  async #profilesFor(annotations: readonly Annotation[]): Promise<Map<string, UserFullProfile>> {
     const userIds = [
       ...new Set(
         annotations.flatMap((annotation) =>
@@ -284,14 +360,247 @@ export class AnnotationApp {
         ),
       ),
     ];
-    const profiles = await this.dependencies.users.getProfiles({ userIds });
+
+    const profiles = await this.#users.getProfiles({ userIds });
+
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }
 
-  private authorOf(
-    annotation: Annotation,
-    profiles: Map<string, UserFullProfile>,
-  ): UserFullProfile | null {
-    return annotation.userId ? (profiles.get(annotation.userId) ?? null) : null;
+  async createReview(input: AnnotationReviewCreateInput) {
+    await this.#syncTraceSuggestion(input);
+
+    const created = await this.create({
+      userId: input.actorId,
+      id: generate(ANNOTATION_KSUID_RESOURCE).toString(),
+      projectId: input.projectId,
+      traceId: input.traceId,
+      comment: input.comment ?? "",
+      isThumbsUp: input.isThumbsUp ?? null,
+      scoreOptions: input.scoreOptions,
+      expectedOutput: input.expectedOutput ?? null,
+      anchorKind: input.anchorKind,
+      anchorId: input.anchorId,
+      anchorPath: input.anchorPath,
+    });
+
+    await this.#recordMarkerBestEffort(created);
+
+    return created;
+  }
+
+  async updateReview(input: AnnotationReviewUpdateInput) {
+    const existing = await this.getById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+
+    if (existing.traceId !== input.traceId) {
+      throw new AnnotationNotFoundError(input.id);
+    }
+
+    await this.#syncTraceSuggestion(
+      {
+        ...input,
+        anchorKind: existing.anchorKind,
+        anchorId: existing.anchorId,
+        anchorPath: existing.anchorPath,
+      },
+      existing.expectedOutput,
+    );
+
+    return this.update({
+      id: input.id,
+      projectId: input.projectId,
+      traceId: input.traceId,
+      comment: input.comment ?? "",
+      isThumbsUp: input.isThumbsUp,
+      scoreOptions: input.scoreOptions,
+      expectedOutput: input.expectedOutput,
+    });
+  }
+
+  async deleteReview(input: AnnotationReviewDeleteInput) {
+    const deleted = await this.delete({
+      id: input.annotationId,
+      projectId: input.projectId,
+    });
+
+    try {
+      await this.#traces.removeAnnotation({
+        tenantId: input.projectId,
+        traceId: deleted.traceId,
+        annotationId: deleted.id,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      logger.error(
+        { error, traceId: deleted.traceId, projectId: input.projectId },
+        "Failed to sync annotation removal to ClickHouse",
+      );
+    }
+
+    return deleted;
+  }
+
+  async #syncTraceSuggestion(
+    input: AnnotationSuggestionSource & { actorId: string; projectId: string; traceId: string },
+    previousExpectedOutput?: string | null,
+  ): Promise<void> {
+    if (input.expectedOutput === void 0) return;
+
+    const next = input.expectedOutput ?? "";
+    const previous = previousExpectedOutput ?? "";
+    if (next === previous) return;
+
+    const target = resolveAnnotationSuggestionTarget(input);
+    if (target === null) return;
+
+    const mayUpdate = await this.#permissions.hasProjectPermission({
+      userId: input.actorId,
+      projectId: input.projectId,
+      permission: "annotations:update",
+    });
+
+    if (!mayUpdate) return;
+
+    await this.#traces.writeSuggestion({
+      projectId: input.projectId,
+      traceId: input.traceId,
+      target,
+      text: next,
+      userId: input.actorId,
+    });
+  }
+
+  async #recordMarkerBestEffort(annotation: Annotation): Promise<void> {
+    try {
+      await this.#traces.recordAnnotation({
+        tenantId: annotation.projectId,
+        traceId: annotation.traceId,
+        annotationId: annotation.id,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      logger.error(
+        { error, traceId: annotation.traceId, projectId: annotation.projectId },
+        "Failed to sync annotation to ClickHouse",
+      );
+    }
+  }
+  async listReviewQueueItems(input: AnnotationQueueCaller) {
+    const queueItems = await this.listQueueItems(input);
+    const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
+
+    const traces = await this.#traces.loadTraces({
+      projectId: input.projectId,
+      userId: input.userId,
+      traceIds,
+    });
+
+    const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+    return queueItems.map((item) => ({ ...item, trace: traceMap.get(item.traceId) ?? null }));
+  }
+
+  async listOptimizedQueues(input: AnnotationReviewOptimizedQueuesInput) {
+    const { members, ...scope } = await this.#getOrganizationScope(input);
+
+    const page = await this.#queues.listQueueItemsPage({
+      ...scope,
+      projectId: input.projectId,
+      userId: input.userId,
+      status: input.selectedAnnotations,
+      queueId: input.queueId,
+      ...(input.queueIds && input.queueIds.length > 0 ? { pickedQueueIds: input.queueIds } : {}),
+      includeMemberQueues: input.showQueueAndUser === true,
+      startDate: input.startDate ? fromDate(input.startDate) : void 0,
+      endDate: input.endDate ? fromDate(input.endDate) : void 0,
+      pageSize: input.pageSize,
+      pageOffset: input.pageOffset,
+      allQueueItems: input.allQueueItems === true,
+    });
+
+    const queueIds = [
+      ...new Set(
+        page.items.flatMap((item) =>
+          item.annotationQueueId === null ? [] : [item.annotationQueueId],
+        ),
+      ),
+    ];
+
+    const queues = await this.#queues.listQueuesWithItems({
+      projectId: input.projectId,
+      ...scope,
+      queueIds,
+    });
+
+    const itemsWithMembers = page.items.map((item) => {
+      const withUsers = this.#withQueueItemMemberSummaries(item, members);
+
+      return withUsers.annotationQueue === null
+        ? withUsers
+        : {
+            ...withUsers,
+            annotationQueue: this.#withMemberSummaries(withUsers.annotationQueue, members),
+          };
+    });
+
+    const enrichedQueueItems = await this.#enrichQueueItems(input, itemsWithMembers);
+    const enrichedById = new Map(enrichedQueueItems.map((item) => [item.id, item] as const));
+
+    const processedQueues = queues.map((queue) => {
+      const queueWithMembers = this.#withMemberSummaries(queue, members);
+
+      return {
+        ...queueWithMembers,
+        AnnotationQueueItems: queueWithMembers.AnnotationQueueItems.flatMap((item) => {
+          const enriched = enrichedById.get(item.id);
+
+          return enriched === void 0 ? [] : [enriched];
+        }),
+      };
+    });
+
+    return {
+      assignedQueueItems: enrichedQueueItems,
+      queues: processedQueues,
+      totalCount: page.totalCount,
+    };
+  }
+
+  async #enrichQueueItems(
+    input: AnnotationQueueCaller,
+    queueItems: readonly AnnotationQueuePageItem[],
+  ): Promise<AnnotationReviewQueueItem[]> {
+    const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
+
+    const annotationsWithUsers = await this.listWithFullUsers({
+      projectId: input.projectId,
+      traceIds,
+      anchor: "all",
+      order: "desc",
+    });
+
+    const traces = await this.#traces.loadTraces({
+      projectId: input.projectId,
+      userId: input.userId,
+      traceIds,
+    });
+
+    const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+    const annotationMap = Map.groupBy(annotationsWithUsers, (annotation) => annotation.traceId);
+
+    return queueItems.map((item) => {
+      const annotations = annotationMap.get(item.traceId) ?? [];
+
+      return {
+        ...item,
+        trace: traceMap.get(item.traceId) ?? null,
+        annotations,
+        scoreOptions: annotations.flatMap((annotation) =>
+          annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : [],
+        ),
+      };
+    });
   }
 }

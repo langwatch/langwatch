@@ -6,7 +6,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { AnnotationAvatarGroup, AnnotationScoresChip } from "../../../index.ts";
+import { AnnotationAvatarGroup } from "../../elements/annotation-avatar-group.tsx";
+import { AnnotationScoresChip } from "../../elements/annotation-scores-chip.tsx";
 
 afterEach(cleanup);
 

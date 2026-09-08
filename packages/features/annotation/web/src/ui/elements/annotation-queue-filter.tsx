@@ -15,21 +15,15 @@ function queueFilterLabel({
   selected: Set<string>;
 }): string {
   if (selected.size === 0) return "All";
+
   if (selected.size === 1) {
     return queues.find((queue) => selected.has(queue.id))?.name ?? "1 queue";
   }
+
   return `${selected.size} queues`;
 }
 
-/**
- * Which queues the inbox reads. The inbox pools every queue the reviewer
- * belongs to, so on a project with several of them the list is a mix nobody
- * asked for: this is how a reviewer gets down to the one they are working on
- * without leaving the page that counts all their pending work.
- *
- * Picking nothing reads them all, which is what the label says rather than
- * leaving the reviewer to infer it from an empty control.
- */
+/** The inbox can narrow pooled work to one queue. */
 export function AnnotationQueueFilter({
   queues,
   selectedQueueIds,
@@ -46,8 +40,10 @@ export function AnnotationQueueFilter({
 
   const toggle = (queueId: string) => {
     const next = new Set(selected);
+
     if (next.has(queueId)) next.delete(queueId);
     else next.add(queueId);
+
     onSelectedQueueIdsChange([...next]);
   };
 

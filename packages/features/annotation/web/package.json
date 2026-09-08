@@ -7,38 +7,38 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
+  "main": "./src/annotations.ts",
+  "types": "./dist/annotations.d.ts",
   "exports": {
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
+    "./annotations": {
+      "langwatch-declaration-source": "./src/annotations.ts",
+      "types": "./dist/annotations.d.ts",
+      "default": "./src/annotations.ts"
     },
-    "./screens/annotation-scores": {
-      "langwatch-declaration-source": "./src/screens/annotation-scores/index.ts",
-      "types": "./dist/screens/annotation-scores/index.d.ts",
-      "default": "./src/screens/annotation-scores/index.ts"
+    "./annotation-scores": {
+      "langwatch-declaration-source": "./src/annotation-scores.ts",
+      "types": "./dist/annotation-scores.d.ts",
+      "default": "./src/annotation-scores.ts"
     },
-    "./screens/annotations": {
-      "langwatch-declaration-source": "./src/screens/annotations/index.ts",
-      "types": "./dist/screens/annotations/index.d.ts",
-      "default": "./src/screens/annotations/index.ts"
+    "./annotation-form": {
+      "langwatch-declaration-source": "./src/annotation-form.ts",
+      "types": "./dist/annotation-form.d.ts",
+      "default": "./src/annotation-form.ts"
     },
-    "./surfaces/annotation-form": {
-      "langwatch-declaration-source": "./src/surfaces/annotation-form/index.ts",
-      "types": "./dist/surfaces/annotation-form/index.d.ts",
-      "default": "./src/surfaces/annotation-form/index.ts"
+    "./annotation-chips": {
+      "langwatch-declaration-source": "./src/annotation-chips.ts",
+      "types": "./dist/annotation-chips.d.ts",
+      "default": "./src/annotation-chips.ts"
     },
-    "./surfaces/annotation-chips": {
-      "langwatch-declaration-source": "./src/surfaces/annotation-chips/index.ts",
-      "types": "./dist/surfaces/annotation-chips/index.d.ts",
-      "default": "./src/surfaces/annotation-chips/index.ts"
+    "./annotation-card": {
+      "langwatch-declaration-source": "./src/annotation-card.ts",
+      "types": "./dist/annotation-card.d.ts",
+      "default": "./src/annotation-card.ts"
     },
-    "./surfaces/annotation-card": {
-      "langwatch-declaration-source": "./src/surfaces/annotation-card/index.ts",
-      "types": "./dist/surfaces/annotation-card/index.d.ts",
-      "default": "./src/surfaces/annotation-card/index.ts"
+    "./testing": {
+      "langwatch-declaration-source": "./src/testing.tsx",
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.tsx"
     }
   },
   "scripts": {
@@ -51,9 +51,11 @@
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/organization-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "diff": "^9.0.0",

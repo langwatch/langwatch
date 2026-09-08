@@ -684,7 +684,7 @@ describe("output validation", () => {
     expect(await jsonBody(res)).toEqual({ id: 1, name: "item" });
   });
 
-  it("answers an internal error when the handler breaks its own contract", async () => {
+  it("records a mismatch and preserves the handler response", async () => {
     const app = buildTestService()
       .registerRoute(
         "post",
@@ -698,16 +698,8 @@ describe("output validation", () => {
     const res = await app.request("/api/test/2025-03-15/things.get", {
       method: "POST",
     });
-    expect(res.status).toBe(500);
-    expect(await jsonBody(res)).toEqual({
-      code: "internal_error",
-      // Deprecated back-compat alias of `code` (see ErrorResponseBody.kind).
-      kind: "internal_error",
-      // The Go envelope's name for the same value (see ErrorResponseBody.type).
-      type: "internal_error",
-      message: "An unknown error occurred",
-      retryable: false,
-    });
+    expect(res.status).toBe(200);
+    expect(await jsonBody(res)).toEqual({ id: "not-a-number" });
   });
 });
 

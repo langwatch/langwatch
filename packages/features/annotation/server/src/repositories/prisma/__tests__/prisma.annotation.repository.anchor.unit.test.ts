@@ -38,7 +38,8 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
       const create = vi
         .fn()
         .mockResolvedValue(baseRow({ anchorKind: "span", anchorId: "span-search" }));
-      const repository = PrismaAnnotationRepository.create(fakeDatabase(create));
+
+      const repository = PrismaAnnotationRepository.create({ prisma: fakeDatabase(create) });
 
       const result = await repository.create({
         id: "annotation-1",
@@ -62,6 +63,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
           }),
         }),
       );
+
       expect(result.anchorKind).toBe("span");
       expect(result.anchorId).toBe("span-search");
       expect(result.anchorPath).toBeNull();
@@ -76,7 +78,8 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
           Promise.resolve(baseRow({ ...data, email: null })),
         );
-      const repository = PrismaAnnotationRepository.create(fakeDatabase(create));
+
+      const repository = PrismaAnnotationRepository.create({ prisma: fakeDatabase(create) });
 
       const onOutput = await repository.create({
         id: "annotation-output",
@@ -91,6 +94,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         anchorId: "span-search",
         anchorPath: "output",
       });
+
       const onInput = await repository.create({
         id: "annotation-input",
         projectId: "project-1",
@@ -118,7 +122,8 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
           Promise.resolve(baseRow({ ...data, email: null })),
         );
-      const repository = PrismaAnnotationRepository.create(fakeDatabase(create));
+
+      const repository = PrismaAnnotationRepository.create({ prisma: fakeDatabase(create) });
 
       const results = await Promise.all(
         ["input", "output", "metadata.environment"].map((path, i) =>
@@ -139,6 +144,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
       );
 
       expect(results.every((row) => row.anchorId === "trace-1")).toBe(true);
+
       expect(results.map((row) => row.anchorPath).sort()).toEqual([
         "input",
         "metadata.environment",
@@ -158,8 +164,9 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
           anchorPath: "output",
         }),
       );
+
       const database = { annotation: { update } } as unknown as AnnotationDatabase;
-      const repository = PrismaAnnotationRepository.create(database);
+      const repository = PrismaAnnotationRepository.create({ prisma: database });
 
       const updated = await repository.update({
         id: "annotation-1",
@@ -190,9 +197,10 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         baseRow({ id: "a-span-2", anchorKind: "span", anchorId: "span-2" }),
         baseRow({ id: "a-span-3", anchorKind: "span", anchorId: "span-3" }),
       ];
+
       const findMany = vi.fn().mockResolvedValue(rows);
       const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
-      const repository = PrismaAnnotationRepository.create(database);
+      const repository = PrismaAnnotationRepository.create({ prisma: database });
 
       const all = await repository.list({
         projectId: "project-1",
@@ -211,8 +219,9 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         .mockResolvedValue([
           baseRow({ id: "a-trace", anchorKind: null, anchorId: null, anchorPath: null }),
         ]);
+
       const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
-      const repository = PrismaAnnotationRepository.create(database);
+      const repository = PrismaAnnotationRepository.create({ prisma: database });
 
       const traceOnly = await repository.list({
         projectId: "project-1",

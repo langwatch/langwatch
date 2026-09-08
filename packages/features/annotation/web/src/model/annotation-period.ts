@@ -1,9 +1,6 @@
 /**
- * The date range these lists read, as data. A family-local copy of the
- * reading half of the old `PeriodSelector` (deletes-only migration forbids
- * repointing its thirty other callers). Kept pure and separate from
- * `ui/elements/period-picker.tsx` so "the queue narrows only once a range is
- * picked" is a unit test, not a rendered assertion. Narrowed: no `daysDifference`.
+ * The date range these lists read, as data: presets, the window a preset
+ * resolves to, and the address that carries a range. Pure, so the rules are unit tests.
  */
 
 import type { ListAnnotationsInput } from "@langwatch/annotation-contract";
@@ -15,9 +12,9 @@ import {
   subDays,
   toDate,
   toEpochMs,
+  toZonedDateTime,
   type TimeInput,
 } from "@langwatch/time";
-import { readableDate } from "./readable-date.ts";
 
 /** Date range used for time-based filtering, in the shape the list query sends. */
 export type AnnotationPeriod = Required<Pick<ListAnnotationsInput, "startDate" | "endDate">>;
@@ -59,24 +56,21 @@ const isValidDateString = (value: string) => !Number.isNaN(toEpochMs(value));
 const daysBetween = (startDate: TimeInput, endDate: TimeInput) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 
-/**
- * The window a preset resolves to, anchored to `now`.
- *
- * Day-based presets snap the start to start-of-day, which is what the day quick
- * selectors have always done.
- */
+/** The window a preset resolves to, anchored to `now`; day presets start at start-of-day. */
 export function computeRelativeWindow(
   presetKey: AnnotationPeriodPresetKey,
   now: AnnotationPeriodMoment,
 ): AnnotationPeriod {
   const preset = PRESETS_BY_KEY.get(presetKey);
   if (!preset) return { startDate: startOfDay(subDays(now, 29)), endDate: now };
+
   if (preset.minutes !== null) {
     return {
       startDate: toDate(fromDate(now).subtract({ milliseconds: preset.minutes * 60_000 })),
       endDate: now,
     };
   }
+
   return { startDate: startOfDay(subDays(now, preset.days - 1)), endDate: now };
 }
 
@@ -84,10 +78,8 @@ export type AnnotationPeriodReading = {
   period: AnnotationPeriod;
   mode: AnnotationPeriodMode;
   /**
-   * True while the address carries no range of its own, so `period` is this
-   * module's fallback rather than something the reviewer asked for. The
-   * queue lists depend on this: the sidebar badge counts all pending work,
-   * so they narrow the read only once a range is actually picked.
+   * True while the address carries no range, so `period` is the fallback and the
+   * queue lists do not narrow their read yet.
    */
   isDefault: boolean;
 };
@@ -102,9 +94,11 @@ export function readAnnotationPeriod({
 }): AnnotationPeriodReading {
   const start = query.startDate;
   const end = query.endDate;
+
   if (start && end && isValidDateString(start) && isValidDateString(end)) {
-    const startDate = readableDate(start);
-    const endDate = readableDate(end);
+    const startDate = toDate(toZonedDateTime(start));
+    const endDate = toDate(toZonedDateTime(end));
+
     return {
       period: { startDate: startDate > endDate ? endDate : startDate, endDate },
       mode: "absolute",
@@ -115,6 +109,7 @@ export function readAnnotationPeriod({
   const named = query.period;
   const picked = isPresetKey(named);
   const presetKey: AnnotationPeriodPresetKey = picked ? named : "30d";
+
   return {
     period: computeRelativeWindow(presetKey, now),
     mode: "relative",
@@ -135,6 +130,7 @@ export function absolutePeriodAddress({
   const safeEnd = Number.isNaN(endDate.getTime()) ? toDate(nowInstant()) : endDate;
   const candidate = Number.isNaN(startDate.getTime()) ? toDate(nowInstant()) : startDate;
   const safeStart = candidate > safeEnd ? safeEnd : candidate;
+
   return {
     ...current,
     period: void 0,
@@ -162,10 +158,8 @@ export function clearedPeriodAddress(
 }
 
 /**
- * The preset a window matches, for the trigger's label. Moved as-is, quirk
- * included: the day-span match runs first, so every sub-day preset also
- * matches `today` and a fifteen-minute window labels as "Today". Changing
- * which preset wins is a behaviour change this move does not own.
+ * The preset a window matches, for the trigger's label. The day-span match runs
+ * first, so a sub-day window ending now labels as "Today".
  */
 export function matchingPreset({
   period,
@@ -175,12 +169,15 @@ export function matchingPreset({
   now: AnnotationPeriodMoment;
 }): (typeof ANNOTATION_PERIOD_PRESETS)[number] | undefined {
   const span = daysBetween(period.startDate, period.endDate);
+
   const byDays =
     daysBetween(period.endDate, now) > 1
       ? void 0
       : ANNOTATION_PERIOD_PRESETS.find((preset) => preset.minutes === null && preset.days === span);
+
   if (byDays) return byDays;
 
   const minutes = Math.round((period.endDate.getTime() - period.startDate.getTime()) / 60_000);
+
   return ANNOTATION_PERIOD_PRESETS.find((preset) => preset.minutes === minutes);
 }

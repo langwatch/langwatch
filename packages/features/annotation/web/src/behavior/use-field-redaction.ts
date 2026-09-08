@@ -1,16 +1,6 @@
 /**
  * Whether captured input and output are readable in this project, and by whom.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/hooks/useFieldRedaction`, which
- * keeps its callers across the trace surfaces.
- *
- * NARROWED IN ONE WAY THAT MATTERS: the platform hook opens with a
- * `window.location.pathname.includes("/share/")` escape hatch that returns
- * "nothing is redacted" on a public share page. These screens are not reachable
- * from a share link — a share page renders one trace, never a queue — and a
- * governed screen closure may not read `location` in any case, so the escape
- * hatch did not travel. Both fields are asked for once and answered together,
- * which is what the one procedure returns.
+ * Both fields come from one read; there is no share-page escape hatch here.
  */
 
 import { annotationApi } from "./annotation-api.ts";

@@ -14,6 +14,7 @@ export function AnnotationAvatarGroup({
   renderAvatar: (user: AnnotationUser) => ReactNode;
 }) {
   const users = new Map<string, AnnotationUser>();
+
   if (createdByUser) {
     users.set(createdByUser.id, createdByUser);
   }

@@ -11,11 +11,14 @@ const storageKey = (projectId: string) => `annotations:columns:${projectId}`;
 
 const readChoices = (projectId: string): AnnotationColumnChoices => {
   if (typeof window === "undefined" || !projectId) return {};
+
   try {
     const stored = window.localStorage.getItem(storageKey(projectId));
     if (!stored) return {};
+
     const parsed: unknown = JSON.parse(stored);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
     // Anything that is not a plain on/off is not a choice this build wrote, so
     // it is dropped rather than trusted: a bad entry would otherwise hide a
     // column with no way to work out why.
@@ -42,6 +45,7 @@ export function useAnnotationColumnChoices({ projectId }: { projectId: string | 
     (next: AnnotationColumnChoices) => {
       setChoices(next);
       if (typeof window === "undefined" || !projectId) return;
+
       try {
         window.localStorage.setItem(storageKey(projectId), JSON.stringify(next));
       } catch {

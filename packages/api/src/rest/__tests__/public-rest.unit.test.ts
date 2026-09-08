@@ -326,7 +326,7 @@ describe("modern REST", () => {
   );
 
   /** @scenario "Output always crosses its schema boundary" */
-  it("rejects invalid output and raw Response bypasses", async () => {
+  it("preserves invalid output and raw Response bypasses", async () => {
     const app = service()
       .get("/wrong", "2026-08-07", (endpoint) =>
         endpoint
@@ -336,7 +336,9 @@ describe("modern REST", () => {
       )
       .build();
 
-    expect((await app.request("/api/v1/thing/wrong")).status).toBe(500);
+    const invalid = await app.request("/api/v1/thing/wrong");
+    expect(invalid.status).toBe(200);
+    await expect(invalid.json()).resolves.toEqual({ id: "wrong" });
 
     let responseError: unknown;
     const serializer = new Hono().get("/response", (context) => {

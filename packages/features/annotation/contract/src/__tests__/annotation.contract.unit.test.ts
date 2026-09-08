@@ -21,6 +21,7 @@ describe("annotation contract", () => {
       isThumbsUp: null,
       expectedOutput: null,
     });
+
     expect(value.scoreOptions).toEqual({});
   });
 
@@ -43,6 +44,7 @@ describe("annotation contract", () => {
         anchorPath: "output",
       }),
     ).toEqual({ kind: "span", spanId: "span-1", field: "output" });
+
     expect(
       resolveAnnotationSuggestionTarget({
         traceId: "trace-1",

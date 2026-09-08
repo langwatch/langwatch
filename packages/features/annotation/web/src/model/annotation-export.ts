@@ -1,22 +1,10 @@
 /**
- * What an annotation export says, as data.
- *
- * The two exports the family offers built their header row and their data rows
- * inside a component callback, which is why neither had a test that did not
- * first render a table. They are pure here: a header row and a matrix of
- * strings, which is exactly what a CSV is.
- *
- * THE TWO ARE DELIBERATELY NOT THE SAME EXPORT. The queue lists export ONE ROW
- * PER QUEUE ITEM with a column per active score type, because that is what the
- * list on screen shows. All Annotations exports ONE ROW PER ANNOTATION, scores
- * as one JSON cell, because that page's rows are traces and its subject is the
- * comments underneath them — a reviewer who marked six spans of one trace said
- * six things, and a per-trace row would report one.
+ * The list and all-annotations exports are pure CSV-ready data. The former
+ * has one row per queue item; the latter has one row per annotation.
  */
 
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { nowInstant, type TimeInput } from "@langwatch/time";
-import { readableDate } from "./readable-date.ts";
+import { nowInstant, toDate, toZonedDateTime, type TimeInput } from "@langwatch/time";
 import {
   annotationRatingExportLabel,
   annotationScores,
@@ -39,7 +27,7 @@ export function csvFileName(
   name: string,
   today: TimeInput = nowInstant().epochMilliseconds,
 ): string {
-  return `${name} - ${readableDate(today).toISOString().split("T")[0]}.csv`;
+  return `${name} - ${toZonedDateTime(today).toPlainDate().toString()}.csv`;
 }
 
 /** Every distinct annotator on a row, in the order they first appear. */
@@ -59,19 +47,15 @@ function scoreCell({ row, scoreTypeId }: { row: AnnotationRow; scoreTypeId: stri
     .flatMap((annotation) => {
       const score = annotationScores({ annotation }).find((answer) => answer.name === scoreTypeId);
       if (!score) return [];
+
       const value = score.values.join(", ");
+
       return [score.reason ? `${value} (${score.reason})` : value];
     })
     .join("\n");
 }
 
-/**
- * The rows on screen, as the reviewer sees them.
- *
- * `dateColumnLabel` is the list's own — "Date queued" on a queue, "Date
- * annotated" on All Annotations — so the export's first column is named the
- * same thing the column it came from is.
- */
+/** The rows on screen; `dateColumnLabel` names the first column as the list does. */
 export function annotationListExport({
   rows,
   activeScoreTypes,
@@ -95,7 +79,7 @@ export function annotationListExport({
       "Annotators",
     ],
     rows: rows.map((row) => [
-      row.date ? row.date.toISOString() : "",
+      row.date ? row.date.toString() : "",
       row.doneAt ? "Completed" : "Pending",
       row.createdByUser?.name ?? "",
       row.traceId,
@@ -115,12 +99,7 @@ export function annotationListExport({
   };
 }
 
-/**
- * Every annotation the All Annotations page holds, not the page on screen.
- *
- * The list pages through what it loaded; the export carries all of it, which is
- * the property the page's own test names.
- */
+/** Every annotation the All Annotations page holds, not only the page on screen. */
 export function allAnnotationsExport({
   annotations,
   traces,
@@ -129,6 +108,7 @@ export function allAnnotationsExport({
   traces: readonly AnnotationTrace[];
 }): AnnotationExport {
   const traceById = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
   return {
     fields: [
       "User",
@@ -143,7 +123,8 @@ export function allAnnotationsExport({
     ],
     rows: annotations.map((annotation) => {
       const trace = traceById.get(annotation.traceId);
-      const createdAt = annotation.createdAt ? readableDate(annotation.createdAt) : null;
+      const createdAt = annotation.createdAt ? toDate(toZonedDateTime(annotation.createdAt)) : null;
+
       return [
         annotation.user?.name ?? "",
         trace?.input?.value ?? "",

@@ -1,7 +1,7 @@
 /**
  * The subscription lane's wire, proved frame by frame.
  */
-import { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { OrganizationService } from "@langwatch/organization-contract";
@@ -44,7 +44,7 @@ function testSecurity(): AppRestSecurity {
     });
 
   return ApiRestSecurity.create({
-    apiKeys: unreachable(ApiKeyService.prototype),
+    apiKeys: unreachable({} as ApiKeyApi),
     authz: unreachable(AuthzService.prototype),
     organizations: unreachable(OrganizationService.prototype),
     observability: ApiRestObservabilityComposition.create(),

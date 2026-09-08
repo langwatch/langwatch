@@ -1,12 +1,6 @@
 /**
  * Which page of a list the address names, and how a page change is written.
- *
- * Lifted out of `AnnotationsTable`'s `useListPaging` closure so the two rules
- * that matter can be asserted without rendering a table: the default page size
- * and the default offset are ABSENT from the address rather than written as
- * their own defaults (a link to page one is the bare address), and a page size
- * change lands the reviewer back on the first page rather than at an offset
- * that no longer exists in the new pagination.
+ * Defaults are absent from the address, and a page size change returns to page one.
  */
 
 export const DEFAULT_ANNOTATION_PAGE_SIZE = 25;
@@ -20,6 +14,7 @@ export type AnnotationListPaging = {
 
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
+
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
@@ -29,15 +24,11 @@ export function readAnnotationListPaging(
 ): AnnotationListPaging {
   const pageSize = positiveInteger(query.pageSize, DEFAULT_ANNOTATION_PAGE_SIZE);
   const pageOffset = positiveInteger(query.pageOffset, 0);
+
   return { page: Math.floor(pageOffset / pageSize) + 1, pageOffset, pageSize };
 }
 
-/**
- * The address for a page and a size, with the defaults left out.
- *
- * `undefined` removes a key, which is what keeps page one at the default size
- * looking like the bare address it is.
- */
+/** The address for a page and a size; `undefined` removes a key, so defaults are left out. */
 function pagingAddress({
   current,
   pageOffset,
@@ -71,13 +62,7 @@ export function pageAddress({
   });
 }
 
-/**
- * Changes how many rows a page holds, and goes back to the first one.
- *
- * Keeping the offset would land the reviewer partway down a list that has been
- * repaginated under them, at a position the old page size described and the new
- * one does not.
- */
+/** Changes how many rows a page holds and returns to the first page. */
 export function pageSizeAddress({
   current,
   pageSize,

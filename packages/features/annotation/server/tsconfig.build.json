@@ -54,9 +54,6 @@
       "path": "../../../runtime-composition/tsconfig.build.json"
     },
     {
-      "path": "../../../task/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {

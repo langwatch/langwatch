@@ -39,9 +39,12 @@ import type {
   TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import type { z } from "zod";
+import { createLogger, validationMeta } from "@langwatch/observability";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
-import type { TrpcHandlerBinding } from "./trpc-handler.ts";
-import { parseGovernedOutput, resolveTrustedHandlerArguments } from "./trpc-handler.ts";
+import type { TrpcHandlerActor, TrpcHandlerBinding } from "./trpc-handler.ts";
+import { resolveTrustedHandlerArguments } from "./trpc-handler.ts";
+
+const outputLogger = createLogger("langwatch:api:output-validation");
 
 /** One procedure, wrapped in the process's policy chain. */
 export type TrpcPolicyDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -92,6 +95,8 @@ export type TrpcDeclaredAbsent = Readonly<{ readonly __absent: true }>;
 
 type ChainInput = z.ZodType | TrpcUndeclared | TrpcDeclaredAbsent;
 type ChainOutput = z.ZodType | TrpcUndeclared | TrpcDeclaredAbsent;
+type TrpcHandlerArguments<Input, App> = Omit<ApiHandlerArguments<Input, App>, "actor"> &
+  Readonly<{ actor: TrpcHandlerActor }>;
 
 /** What the handler is handed: the PARSED input, or nothing. */
 type HandlerInput<TInput extends ChainInput> = TInput extends z.ZodType
@@ -155,10 +160,40 @@ type GovernedHandlerResult<
   ? AsyncIterable<z.input<TSchema>> | Promise<AsyncIterable<z.input<TSchema>>>
   : z.input<TSchema> | Promise<z.input<TSchema>>;
 
+type GovernedJsonOutput = Readonly<Record<string, unknown>> | readonly unknown[] | void;
+
+type IsAny<Value> = 0 extends 1 & Value ? true : false;
+
+type IsUnknown<Value> =
+  IsAny<Value> extends true
+    ? false
+    : unknown extends Value
+      ? [Value] extends [unknown]
+        ? true
+        : false
+      : false;
+
+type IsGovernedJsonOutput<Value> =
+  IsAny<Value> extends true
+    ? false
+    : IsUnknown<Value> extends true
+      ? false
+      : Value extends GovernedJsonOutput
+        ? true
+        : false;
+
+type GovernedOutputSchema<TSchema extends z.ZodType> =
+  IsGovernedJsonOutput<z.output<TSchema>> extends true ? TSchema : never;
+
+/** An omitted output declaration is deliberately a void procedure. */
+type GovernedResult<
+  TKind extends ProcedureKind,
+  TOutput extends ChainOutput,
+> = TOutput extends z.ZodType ? GovernedHandlerResult<TKind, TOutput> : void | Promise<void>;
+
 /**
- * `handle` exists only on a chain that has declared its input, its output and
- * its access. Anything else resolves its `this` to `never` — TS2684 at the
- * call site, so the declaration is mandatory by construction.
+ * `handle` requires input and access. A governed handler with no output
+ * declaration is deliberately void.
  */
 type ReadyChain<
   TContext extends object,
@@ -172,9 +207,7 @@ type ReadyChain<
 > = TDeclared extends true
   ? TInput extends TrpcUndeclared
     ? never
-    : TOutput extends TrpcUndeclared
-      ? never
-      : TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
+    : TrpcProcedureChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
   : never;
 
 /** The definition chain of one procedure. */
@@ -210,7 +243,7 @@ export interface TrpcProcedureChain<
    * to tRPC's `.output()`, so the client's inferred type is the handler's own.
    */
   withOutput<TSchema extends z.ZodType>(
-    schema: TSchema,
+    schema: TSchema & ([TApp] extends [never] ? unknown : GovernedOutputSchema<TSchema>),
   ): TrpcProcedureChain<TContext, TKind, TInput, TSchema, TDeclared, TApp, TActor, TScope>;
   /** The answer is not this feature's to describe, with the reason. */
   withoutOutput(
@@ -246,13 +279,11 @@ export interface TrpcProcedureChain<
    * `signal` is tRPC's own request signal — `AbortSignal | undefined`, exactly
    * as tRPC types it — which is what a stream stops on when the client leaves.
    */
-  handle<TResult>(
+  handle<TResult extends ([TApp] extends [never] ? unknown : GovernedResult<TKind, TOutput>)>(
     this: [TApp] extends [never]
       ? ReadyChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
       : TInput extends z.ZodType
-        ? TOutput extends z.ZodType
-          ? ReadyChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
-          : never
+        ? ReadyChain<TContext, TKind, TInput, TOutput, TDeclared, TApp, TActor, TScope>
         : never,
     handler: [TApp] extends [never]
       ? (
@@ -262,12 +293,14 @@ export interface TrpcProcedureChain<
             signal: AbortSignal | undefined;
           }>,
         ) => TResult | Promise<TResult>
-      : (
-          opts: ApiHandlerArguments<HandlerInput<TInput>, TApp>,
-        ) => GovernedHandlerResult<TKind, Extract<TOutput, z.ZodType>>,
+      : (opts: TrpcHandlerArguments<HandlerInput<TInput>, TApp>) => TResult,
   ): [TApp] extends [never]
     ? BuiltProcedure<TKind, TInput, OutputOf<TKind, TResult>>
-    : BuiltProcedure<TKind, TInput, GovernedOutputOf<TKind, Extract<TOutput, z.ZodType>>>;
+    : BuiltProcedure<
+        TKind,
+        TInput,
+        TOutput extends z.ZodType ? GovernedOutputOf<TKind, TOutput> : void
+      >;
 }
 
 /**
@@ -415,22 +448,38 @@ type ChainState = {
 };
 
 /**
- * Refuses an answer its own declared schema refuses. Loud on purpose: a shape
- * that drifted from its declaration is a defect in the procedure, and finding
- * it in test or development is cheap.
+ * Reports an answer its own declared schema refuses without changing the
+ * transport answer. A response mismatch is a server defect, not a new 500.
  */
-function assertDeclaredOutput(name: string, schema: z.ZodType, value: unknown): void {
+function validateDeclaredOutput(name: string, schema: z.ZodType, value: unknown): unknown {
   const parsed = schema.safeParse(value);
-  if (parsed.success) return;
-  throw new Error(
-    `tRPC procedure "${name}" answered with a value its declared output schema refuses: ` +
-      parsed.error.issues
-        .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
-        .join("; "),
+  if (parsed.success) return parsed.data;
+  outputLogger.error(
+    {
+      endpoint: name,
+      protocol: "trpc",
+      validation: validationMeta(parsed.error, { privacy: "schema-only" }),
+    },
+    "tRPC handler response did not match its declared output schema",
   );
+  return value;
 }
 
-/** The guard around one answer. @see assertDeclaredOutput */
+/** Reports a value from a procedure that deliberately declared no JSON output. */
+function validateVoidOutput(name: string, value: unknown): unknown {
+  if (value === undefined) return value;
+  outputLogger.error(
+    {
+      endpoint: name,
+      protocol: "trpc",
+      validation: { expected: "void", received: typeof value },
+    },
+    "tRPC handler response did not match its declared output schema",
+  );
+  return value;
+}
+
+/** The guard around one answer. @see validateDeclaredOutput */
 function guardOutput(
   name: string,
   schema: z.ZodType,
@@ -439,10 +488,16 @@ function guardOutput(
 ): (opts: never) => Promise<unknown> {
   return async (opts: never) => {
     const result = await handler(opts);
-    if (parse) return parseGovernedOutput(schema, result);
-    assertDeclaredOutput(name, schema, result);
-    return result;
+    const validated = validateDeclaredOutput(name, schema, result);
+    return parse ? validated : result;
   };
+}
+
+function guardVoidOutput(
+  name: string,
+  handler: (opts: never) => unknown,
+): (opts: never) => Promise<unknown> {
+  return async (opts: never) => validateVoidOutput(name, await handler(opts));
 }
 
 /**
@@ -460,12 +515,8 @@ function guardStream(
     async *[Symbol.asyncIterator]() {
       const stream = (await handler(opts)) as AsyncIterable<unknown>;
       for await (const value of stream) {
-        if (parse) {
-          yield await parseGovernedOutput(schema, value);
-        } else {
-          assertDeclaredOutput(name, schema, value);
-          yield value;
-        }
+        const validated = validateDeclaredOutput(name, schema, value);
+        yield parse ? validated : value;
       }
     },
   });
@@ -488,9 +539,6 @@ function buildProcedure({
   handler: (opts: never) => unknown;
   parseOutput?: boolean;
 }): unknown {
-  if (parseOutput && !state.output) {
-    throw new Error(`tRPC procedure "${name}" requires an output schema at the governed boundary`);
-  }
   if (parseOutput && !state.input) {
     throw new Error(`tRPC procedure "${name}" requires an input schema at the governed boundary`);
   }
@@ -505,7 +553,9 @@ function buildProcedure({
       ? kind === "subscription"
         ? guardStream(name, state.output, handler, parseOutput ?? false)
         : guardOutput(name, state.output, handler, parseOutput ?? false)
-      : handler;
+      : validateOutput
+        ? guardVoidOutput(name, handler)
+        : handler;
   const decorated = state.policy(parsed);
   if (kind === "query") return decorated.query(guarded);
   if (kind === "mutation") return decorated.mutation(guarded);
@@ -564,7 +614,7 @@ function createChain<
         state: context.state,
         procedure: context.procedure,
         validateOutput: context.handlerBinding ? true : context.validateOutput,
-        parseOutput: Boolean(context.handlerBinding),
+        parseOutput: Boolean(context.handlerBinding && context.state.output),
         handler: async (opts: never) => {
           const request = opts as {
             ctx: TContext;
@@ -573,13 +623,15 @@ function createChain<
           };
           if (context.handlerBinding) {
             const trusted = await resolveTrustedHandlerArguments(context.handlerBinding, request);
-            return (handler as (args: ApiHandlerArguments<HandlerInput<TInput>, TApp>) => unknown)({
-              input: request.input,
-              app: trusted.app,
-              actor: trusted.actor,
-              scope: trusted.scope,
-              signal: request.signal,
-            });
+            return (handler as (args: TrpcHandlerArguments<HandlerInput<TInput>, TApp>) => unknown)(
+              {
+                input: request.input,
+                app: trusted.app,
+                actor: trusted.actor,
+                scope: trusted.scope,
+                signal: request.signal,
+              },
+            );
           }
           return (
             handler as (args: {

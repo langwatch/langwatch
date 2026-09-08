@@ -42,15 +42,19 @@ export function AnnotationColumnsMenu({
 
   const sections = useMemo(() => {
     const wanted = query.trim().toLowerCase();
+
     const matching = wanted
       ? columns.filter((column) => column.label.toLowerCase().includes(wanted))
       : columns;
+
     const bySection = new Map<string, AnnotationColumnOption[]>();
+
     for (const column of matching) {
       const bucket = bySection.get(column.section) ?? [];
       bucket.push(column);
       bySection.set(column.section, bucket);
     }
+
     return [...bySection.entries()].map(([title, sectionColumns]) => ({
       title,
       columns: sectionColumns,

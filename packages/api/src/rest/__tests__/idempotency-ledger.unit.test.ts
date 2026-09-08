@@ -26,6 +26,7 @@ import {
   RECEIPT_TTL_MS,
   TAKEOVER_AFTER_MS,
 } from "@langwatch/api/rest";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 const SCOPE = "project_acme";
 const KEY = "order-4711";
@@ -339,20 +340,25 @@ describe("the Idempotency-Key receipt ledger", () => {
   describe("given a claim made long ago", () => {
     /** @scenario "Takeover turns on the last beat, not on the claim's age" */
     it("is not abandoned while it is still reporting itself alive", () => {
-      const now = new Date();
-      const longAfterAnyFixedWindow = new Date(now.getTime() - RECEIPT_TTL_MS + 1_000);
+      const now = nowInstant();
+      const longAfterAnyFixedWindow = now.subtract({ milliseconds: RECEIPT_TTL_MS - 1_000 });
 
-      expect(isClaimAbandoned({ heartbeatAt: new Date(now.getTime() - 1_000), now })).toBe(false);
+      expect(isClaimAbandoned({ heartbeatAt: now.subtract({ milliseconds: 1_000 }), now })).toBe(
+        false,
+      );
       expect(isClaimAbandoned({ heartbeatAt: longAfterAnyFixedWindow, now })).toBe(true);
       expect(
-        isClaimAbandoned({ heartbeatAt: new Date(now.getTime() - TAKEOVER_AFTER_MS - 1), now }),
+        isClaimAbandoned({
+          heartbeatAt: now.subtract({ milliseconds: TAKEOVER_AFTER_MS + 1 }),
+          now,
+        }),
       ).toBe(true);
     });
   });
 
   describe("given a claim that stopped beating", () => {
-    const now = new Date("2026-08-05T12:00:00.000Z");
-    const lastBeat = (agoMs: number) => new Date(now.getTime() - agoMs);
+    const now = Temporal.Instant.from("2026-08-05T12:00:00.000Z");
+    const lastBeat = (agoMs: number) => now.subtract({ milliseconds: agoMs });
 
     /** @scenario "A claim that stopped reporting itself alive is taken over" */
     it("releases the claim once the tolerance is past", () => {

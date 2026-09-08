@@ -67,6 +67,7 @@ export function QueueParticipants({
   ];
 
   const collection = createListCollection({ items: options });
+
   const left = collection.items.filter(
     (item) => !annotators.some((annotator) => annotator.id === item.value),
   );
@@ -110,6 +111,7 @@ export function QueueParticipants({
                       aria-label={`Remove ${item.label}`}
                       onClick={(event) => {
                         event.stopPropagation();
+
                         setAnnotators(
                           annotators.filter((annotator) => annotator.id !== item.value),
                         );

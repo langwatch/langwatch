@@ -170,6 +170,7 @@ export function AnnotationCommentEditor({
           if (reasonScoreTypeId) {
             onScoreReasonChange(reasonScoreTypeId, reason);
           }
+
           setReasonScoreTypeId(null);
         }}
       />

@@ -188,7 +188,7 @@ describe("endpoint success status", () => {
      * Registration refuses the schema that would let the status move, so a
      * missing body is an error rather than a quietly different status.
      */
-    it("fails the request rather than downgrading a missing body to 204", async () => {
+    it("preserves a malformed missing body rather than changing its status", async () => {
       const app = buildTestService()
         .registerRoute(
           "post",
@@ -204,7 +204,7 @@ describe("endpoint success status", () => {
       const res = await app.request("/api/test/2025-03-15/things.create", {
         method: "POST",
       });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(200);
     });
   });
 

@@ -158,6 +158,7 @@ describe("given a window on screen", () => {
       expect(matchingPreset({ period: computeRelativeWindow("7d", NOW), now: NOW })?.key).toBe(
         "7d",
       );
+
       expect(matchingPreset({ period: computeRelativeWindow("30d", NOW), now: NOW })?.key).toBe(
         "30d",
       );

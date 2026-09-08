@@ -1,4 +1,5 @@
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import {
   annotationAnchorLabel,
@@ -11,7 +12,7 @@ import {
   suggestionExportLine,
   toOccurredAtMsHint,
 } from "../annotation-row.ts";
-import { readAnnotationScoreOptions } from "../../index.ts";
+import { readAnnotationScoreOptions } from "../annotation-score-options.ts";
 
 const score = (scoreOptions: unknown) => ({ scoreOptions });
 
@@ -119,6 +120,7 @@ describe("annotation row score presentation", () => {
         }),
       }),
     ).toEqual([{ name: "score-2", values: ["valid"], reason: null }]);
+
     expect(annotationScores({ annotation: score(null) })).toEqual([]);
   });
 });
@@ -135,6 +137,7 @@ describe("annotation row shaping", () => {
         traceId: "trace-1",
       }),
     ).toBe("Trace · Output · answer");
+
     expect(
       annotationAnchorLabel({
         annotation: {
@@ -145,6 +148,7 @@ describe("annotation row shaping", () => {
         traceId: "trace-1",
       }),
     ).toBe("Span span-1 · Input");
+
     expect(
       annotationAnchorLabel({
         annotation: {
@@ -189,7 +193,7 @@ describe("annotation row shaping", () => {
       queueItemId: "queue-1",
       traceId: "trace-1",
       occurredAtMs: Date.parse("2026-08-25T07:00:00.000Z"),
-      date: new Date("2026-08-25T08:00:00.000Z"),
+      date: Temporal.Instant.from("2026-08-25T08:00:00.000Z"),
     });
   });
 
@@ -205,7 +209,7 @@ describe("annotation row shaping", () => {
     ]);
 
     expect(rows[0]?.queueItemId).toBeNull();
-    expect(rows[0]?.date).toEqual(new Date("2026-08-25T08:00:00.000Z"));
+    expect(rows[0]?.date).toEqual(Temporal.Instant.from("2026-08-25T08:00:00.000Z"));
     expect(toOccurredAtMsHint("not-a-date")).toBe(void 0);
   });
 });

@@ -1,38 +1,89 @@
-/**
- * Click-to-enable gate for the personal workspace's advanced features.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/me/usePersonalFeatureGate.ts`,
- * which keeps its other callers in the trace explorer and so did not travel.
- *
- * WHAT IT GATES HERE is one action: handing picked rows to a dataset. Datasets
- * are part of the same bundle annotations are, so a reviewer on their own
- * personal workspace with the bundle off is offered the switch from the place
- * they tried to use it rather than being sent to `/me/configure` and back.
- *
- * NARROWED to the one feature this family asks about. The platform hook takes a
- * feature key because four surfaces share it; here the answer is always about
- * datasets, so the key is not a parameter and the dialog's copy is not a
- * lookup.
- *
- * WHETHER THE READER IS ON THEIR OWN PERSONAL WORKSPACE IS THE HOST'S ANSWER,
- * not a second read: `personalWorkspaceFeatures.get` refuses with NOT_FOUND for
- * anybody else's project, so asking it to find out would be asking a question
- * whose refusal is the answer.
- *
- * Spec: specs/ai-gateway/governance/personal-workspace-features.feature
- *       @modal scenarios — modal-flow (b), one-step continuation.
- */
+/** Enables the advanced-features bundle before an annotation hand-off to a dataset. */
 
-import { useCallback, useMemo, useState } from "react";
-import type { PersonalFeatureGateDialogState } from "../model/personal-feature-gate-state.ts";
-import { annotationApi } from "./annotation-api.ts";
+import { useCallback, useEffect, useState } from "react";
+import { personalWorkspaceFeaturesApi } from "@langwatch/organization-web/personal-workspace-features";
+
+type PendingEnable = {
+  projectId: string;
+  promise: Promise<boolean>;
+  resolve: (enabled: boolean) => void;
+};
+
+class PersonalFeatureGateRequest {
+  #pending: PendingEnable | undefined;
+  #confirming: PendingEnable | undefined;
+  readonly #onOpenChange: (open: boolean) => void;
+
+  constructor(onOpenChange: (open: boolean) => void) {
+    this.#onOpenChange = onOpenChange;
+  }
+
+  request(projectId: string): Promise<boolean> {
+    if (this.#pending?.projectId === projectId) return this.#pending.promise;
+
+    this.cancel();
+
+    let resolvePromise: (enabled: boolean) => void = () => {};
+
+    const promise = new Promise<boolean>((resolve) => {
+      resolvePromise = resolve;
+    });
+
+    this.#pending = { projectId, promise, resolve: resolvePromise };
+    this.#onOpenChange(true);
+
+    return promise;
+  }
+
+  async confirm(
+    projectId: string | undefined,
+    enable: (input: { projectId: string }) => Promise<unknown>,
+  ): Promise<void> {
+    const pending = this.#pending;
+    if (!pending || this.#confirming === pending) return;
+
+    if (pending.projectId !== projectId) {
+      this.#settle(pending, false);
+
+      return;
+    }
+
+    this.#confirming = pending;
+
+    try {
+      await enable({ projectId: pending.projectId });
+      this.#settle(pending, true);
+    } catch {
+      this.#settle(pending, false);
+    } finally {
+      if (this.#confirming === pending) this.#confirming = void 0;
+    }
+  }
+
+  cancel = (): void => {
+    if (this.#pending) this.#settle(this.#pending, false);
+  };
+
+  #settle(pending: PendingEnable, enabled: boolean): void {
+    if (this.#pending !== pending) return;
+
+    this.#pending = void 0;
+    pending.resolve(enabled);
+    this.#onOpenChange(false);
+  }
+}
 
 export type PersonalFeatureGate = {
   /** Whether an action has to ask before it goes ahead. */
   isGated: boolean;
   /** Resolves true once the action may proceed, false when the reader backed out. */
   requestEnable: () => Promise<boolean>;
-  dialogState: PersonalFeatureGateDialogState;
+  dialogState: {
+    open: boolean;
+    onConfirm: () => void;
+    onCancel: () => void;
+    isEnabling: boolean;
+  };
 };
 
 export function usePersonalDatasetGate({
@@ -42,56 +93,43 @@ export function usePersonalDatasetGate({
   projectId: string | undefined;
   isOwnPersonalWorkspace: boolean;
 }): PersonalFeatureGate {
-  const features = annotationApi.personalWorkspaceFeatures.get.useQuery(
+  const features = personalWorkspaceFeaturesApi.personalWorkspaceFeatures.get.useQuery(
     { projectId: projectId ?? "" },
     { enabled: isOwnPersonalWorkspace && !!projectId, refetchOnWindowFocus: false },
   );
-  const utils = annotationApi.useUtils();
-  const enableAll = annotationApi.personalWorkspaceFeatures.enableAll.useMutation({
+
+  const utils = personalWorkspaceFeaturesApi.useUtils();
+
+  const enableAll = personalWorkspaceFeaturesApi.personalWorkspaceFeatures.enableAll.useMutation({
     onSuccess: () => {
-      if (projectId) {
-        void utils.personalWorkspaceFeatures.get.invalidate({ projectId });
-      }
+      void utils.personalWorkspaceFeatures.get.invalidate();
     },
   });
 
-  const [pendingResolve, setPendingResolve] = useState<((value: boolean) => void) | null>(null);
+  const [open, setOpen] = useState(false);
+  const [request] = useState(() => new PersonalFeatureGateRequest(setOpen));
+  useEffect(() => request.cancel, [projectId, request]);
 
   const isGated = isOwnPersonalWorkspace && !features.data?.datasets;
 
   const requestEnable = useCallback((): Promise<boolean> => {
     if (!isGated) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => setPendingResolve(() => resolve));
-  }, [isGated]);
+
+    if (!projectId) return Promise.resolve(false);
+
+    return request.request(projectId);
+  }, [isGated, projectId, request]);
 
   const enable = enableAll.mutateAsync;
-  const onConfirm = useCallback(async () => {
-    if (!projectId || !pendingResolve) return;
-    try {
-      await enable({ projectId });
-      pendingResolve(true);
-    } catch {
-      pendingResolve(false);
-    } finally {
-      setPendingResolve(null);
-    }
-  }, [projectId, pendingResolve, enable]);
 
-  const onCancel = useCallback(() => {
-    if (!pendingResolve) return;
-    pendingResolve(false);
-    setPendingResolve(null);
-  }, [pendingResolve]);
-
-  const dialogState = useMemo(
-    () => ({
-      open: pendingResolve !== null,
-      onConfirm: () => void onConfirm(),
-      onCancel,
+  return {
+    isGated,
+    requestEnable,
+    dialogState: {
+      open,
+      onConfirm: () => void request.confirm(projectId, enable),
+      onCancel: request.cancel,
       isEnabling: enableAll.isPending,
-    }),
-    [pendingResolve, onConfirm, onCancel, enableAll.isPending],
-  );
-
-  return { isGated, requestEnable, dialogState };
+    },
+  };
 }

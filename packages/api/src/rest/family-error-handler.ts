@@ -28,10 +28,16 @@ export function createFamilyErrorHandler(options: {
   /** e.g. `API Keys Error`, the prefix on the logged sentence. */
   label: string;
   boundary: ErrorHandler;
+  mapError?: (error: Error) => Error;
+  headers?: (error: Error) => Readonly<Record<string, string>>;
 }): ErrorHandler {
   const logger = createLogger(options.loggerName);
 
   return async (error, c) => {
+    error = options.mapError?.(error) ?? error;
+    for (const [name, value] of Object.entries(options.headers?.(error) ?? {})) {
+      c.header(name, value);
+    }
     // Same order as the response dispatch below, so the logged status is
     // always the status the caller received.
     const status = resolveResponseStatus(error);

@@ -12,6 +12,23 @@ export { type AuthDiagnostics, collectAuthDiagnostics } from "./auth-diagnostics
 // second answer to "how big is too big" on the same process.
 export { bodyLimit, type BodyLimitOptions } from "./body-limit.ts";
 export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.ts";
+export { defineRestRouter } from "./rest-router.ts";
+export {
+  createRestRuntime,
+  type RestCaller,
+  type RestMountOptions,
+  type RestRuntime,
+  type RestRuntimePorts,
+} from "./rest-runtime.ts";
+export { documentRoute, operationIdOf, restRouteDocumentation } from "./rest-openapi.ts";
+export type {
+  FeatureApiWitness,
+  RestTransportDeclaration,
+  RestTransportDocs,
+  RestTransportRoute,
+} from "./rest-router.ts";
+export { mountProjectTransport, setProjectTransportAuthorization } from "./transport-mount.ts";
+export type { ProjectTransportAuthorization, ProjectTransportMount } from "./transport-mount.ts";
 export type { RestService } from "./builder.ts";
 export type {
   DefaultsChain,
@@ -26,6 +43,7 @@ export type {
   SseChain,
 } from "./definition.ts";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.ts";
+export { setAuthorizedHandlerScope } from "./pipeline.ts";
 export {
   restVersionSelectorMiddleware,
   RestVersionSelector,
@@ -45,6 +63,7 @@ import { handle } from "hono/vercel";
 
 export function routeHandlers(app: Hono) {
   const h = handle(app);
+
   return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
 }
 export { createSSEResponse, type SSEHandler, type TypedSSEStream } from "./sse.ts";
@@ -270,3 +289,15 @@ export { requestTraceIds } from "./trace-ids.ts";
 // The request validator that fails the way the rest of the boundary fails.
 export { type FieldViolation, RequestValidationError, validator } from "./validation.ts";
 export { createRestRouter, type RestTransportDescriptor } from "./create-rest-router.ts";
+export { registerJsonProtocol } from "./json-protocol.ts";
+export {
+  defineRestMiddleware,
+  bindRestMiddleware,
+  bindRestHeader,
+} from "./transport-middleware.ts";
+export { mountAuthenticatedProjectTransport } from "./transport-mount.ts";
+export { mountProjectRestRouter, projectRestFacts } from "./project-transport.ts";
+export type {
+  RestTransportMiddleware,
+  RestTransportMiddlewareBinding,
+} from "./transport-middleware.ts";

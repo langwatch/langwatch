@@ -82,6 +82,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
       deleteQueueItems: {
         useMutation: (options: { onSuccess?: (result: { deleted: number }) => void }) => {
           mocks.deleteOptions = options;
+
           return { mutate: mocks.deleteMutate, isPending: false };
         },
       },
@@ -98,6 +99,7 @@ vi.mock("../../../behavior/annotation-api.ts", () => ({
           onSuccess?: (result: { created: number; skipped: number }) => void;
         }) => {
           mocks.createQueueItemOptions = options;
+
           return { mutate: mocks.createQueueItemMutate, isPending: false };
         },
       },
@@ -167,22 +169,26 @@ const setItems = (items: QueueItem[]) => {
  */
 function renderList(props: ListProps, options: StubAnnotationHostOptions = {}) {
   const host = new StubAnnotationHost(options);
+
   const view = render(
     <AnnotationTestHarness host={host}>
       <AnnotationList {...props} host={host} />
     </AnnotationTestHarness>,
   );
+
   return {
     ...view,
     host,
     /** Re-renders on a NEW host, which is how the address changes under it. */
     onAddress: (next: StubAnnotationHostOptions) => {
       const moved = new StubAnnotationHost(next);
+
       view.rerender(
         <AnnotationTestHarness host={moved}>
           <AnnotationList {...props} host={moved} />
         </AnnotationTestHarness>,
       );
+
       return moved;
     },
   };
@@ -232,12 +238,15 @@ beforeEach(() => {
   mocks.pickedAnnotators = [];
   mocks.createQueueItemOptions = null;
   mocks.createQueueItemMutate.mockReset();
+
   mocks.createQueueItemMutate.mockImplementation(() => {
     mocks.createQueueItemOptions?.onSuccess?.({ created: 2, skipped: 0 });
   });
+
   mocks.invalidateQueues.mockClear();
   mocks.requestEnable.mockReset();
   mocks.requestEnable.mockResolvedValue(true);
+
   setItems([
     { id: "item-1", traceId: "trace-1", doneAt: null },
     { id: "item-2", traceId: "trace-2", doneAt: null },
@@ -314,6 +323,7 @@ describe("given the annotations list shows rows", () => {
         { id: "item-2", traceId: "trace-1", doneAt: null },
         { id: "item-3", traceId: "trace-2", doneAt: null },
       ]);
+
       renderInbox();
 
       fireEvent.click(headerCheckbox());
@@ -327,6 +337,7 @@ describe("given the annotations list shows rows", () => {
         { id: "item-1", traceId: "trace-1", doneAt: null },
         { id: "item-2", traceId: "trace-1", doneAt: null },
       ]);
+
       const { host } = renderInbox();
 
       fireEvent.click(headerCheckbox());
@@ -481,6 +492,7 @@ describe("given rows on the all annotations page are selected", () => {
         traceIds: ["trace-1", "trace-2"],
         annotators: ["queue-q2"],
       });
+
       expect(mocks.deleteMutate).not.toHaveBeenCalled();
     });
 
@@ -536,6 +548,7 @@ describe("given rows on a queue page are selected", () => {
         traceIds: ["trace-1", "trace-3"],
         annotators: ["queue-q2"],
       });
+
       expect(mocks.deleteMutate).toHaveBeenCalledWith({
         projectId: "proj-1",
         queueItemIds: ["item-1", "item-3"],
@@ -550,6 +563,7 @@ describe("given rows on a queue page are selected", () => {
 
       fireEvent.click(rowCheckbox("trace-1"));
       fireEvent.click(screen.getByRole("button", { name: /Move to queue/ }));
+
       pickAndSend([
         { id: "queue-q1", name: "Support reviews" },
         { id: "queue-q2", name: "Sales reviews" },
@@ -560,6 +574,7 @@ describe("given rows on a queue page are selected", () => {
         traceIds: ["trace-1"],
         annotators: ["queue-q1", "queue-q2"],
       });
+
       expect(mocks.deleteMutate).not.toHaveBeenCalled();
     });
   });

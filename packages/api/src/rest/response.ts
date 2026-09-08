@@ -1,7 +1,10 @@
 import type { Context } from "hono";
+import { createLogger, validationMeta } from "@langwatch/observability";
 
 import { parseApiSchemaSync } from "../schema.ts";
 import { ENDPOINT_ROUTE, type EndpointDef, type EndpointRegistration } from "./types.ts";
+
+const outputLogger = createLogger("langwatch:api:output-validation");
 
 /**
  * The answer a handler gives when the request is not its own after all: the
@@ -39,23 +42,20 @@ export function serializeEndpointResult({
   kind: EndpointRegistration["kind"];
   result: unknown;
 }): Response {
-  for (const [name, value] of Object.entries(config.headers ?? {})) {
-    c.header(name, value);
-  }
-
   // Declared to answer outside the JSON contract: the handler's own value is
-  // written through. A whole Response is passed on untouched, because a
-  // redirect, a 304 and a streamed body each carry headers of their own that
-  // this function has no business rewriting.
+  // written through.
   if (config.rawResponse) {
-    if (result instanceof Response) return result;
+    if (result instanceof Response) return withDeclaredHeaders(result, config);
     if (result === undefined || result === null) {
-      return c.body(null, config.status ?? 204);
+      return withDeclaredHeaders(c.body(null, config.status ?? 204), config);
     }
     if (config.rawResponse.contentType) {
       c.header("Content-Type", config.rawResponse.contentType);
     }
-    return c.body(result as string | ArrayBuffer | ReadableStream, config.status ?? 200);
+    return withDeclaredHeaders(
+      c.body(result as string | ArrayBuffer | ReadableStream, config.status ?? 200),
+      config,
+    );
   }
 
   if (result instanceof Response) {
@@ -64,7 +64,7 @@ export function serializeEndpointResult({
     if ((kind === "rest" || kind === "public-rest") && config.output) {
       throw new TypeError("A handler with an output schema must return a value, not a Response");
     }
-    return result;
+    return withDeclaredHeaders(result, config);
   }
 
   // The success status of a value-returning handler is fixed at registration
@@ -76,19 +76,22 @@ export function serializeEndpointResult({
   // Reached only by an untyped caller, or a return type that drifted behind an
   // `any`: no declared body means no body.
   if (!config.output) {
-    return c.body(null, config.status ?? 204);
+    return withDeclaredHeaders(c.body(null, config.status ?? 204), config);
   }
 
   const validation = parseApiSchemaSync(config.output, result);
   if (!validation.success) {
-    // Deliberately a plain `Error`, not a `HandledError`: the caller cannot
-    // act on our own bug, so it degrades to "unknown" plus a trace id
-    // (ADR-045). The endpoint is named so the log line says which endpoint
-    // breaks its own contract, not just the concrete URL.
     const route = c.get(ENDPOINT_ROUTE) as string | undefined;
-    throw new Error(`Response failed output validation${route ? ` for ${route}` : ""}`, {
-      cause: validation.error,
-    });
+    outputLogger.error(
+      {
+        endpoint: route ?? "<unregistered>",
+        method: c.req.method,
+        path: c.req.path,
+        validation: validationMeta(validation.error, { privacy: "schema-only" }),
+      },
+      "REST handler response did not match its declared output schema",
+    );
+    return withDeclaredHeaders(c.json(result, config.status ?? 200), config);
   }
 
   // Reachable only for a `z.void()` / `z.undefined()` output, because
@@ -97,7 +100,14 @@ export function serializeEndpointResult({
   // per-request coin flip: a no-body endpoint always takes this branch and
   // every other endpoint never does.
   if (validation.data === undefined) {
-    return c.body(null, config.status ?? 204);
+    return withDeclaredHeaders(c.body(null, config.status ?? 204), config);
   }
-  return c.json(validation.data, config.status ?? 200);
+  return withDeclaredHeaders(c.json(validation.data, config.status ?? 200), config);
+}
+
+function withDeclaredHeaders(response: Response, config: EndpointDef): Response {
+  for (const [name, value] of Object.entries(config.headers ?? {})) {
+    response.headers.set(name, value);
+  }
+  return response;
 }

@@ -3,6 +3,20 @@
 
 export { TrpcRootDefinition, type TrpcRoot } from "./trpc-root.ts";
 export {
+  defineTrpcRouter,
+  type TrpcContractHandlerArguments,
+  type TrpcContractProcedures,
+  type TrpcFeatureApiWitness,
+  type TrpcProceduresNotImplemented,
+  type TrpcRouterAccess,
+  type TrpcRouterBuilder,
+  type TrpcRouterDeclaration,
+  type TrpcRouterImplementation,
+  type TrpcRouterMount,
+  type TrpcProcedureFactory,
+  type TrpcProcedureRequest,
+} from "./trpc-router.ts";
+export {
   appTrpcCustomPolicy,
   appTrpcNoPermissionPolicy,
   appTrpcPolicy,
@@ -84,5 +98,13 @@ export {
 export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.ts";
 export { createScopeLineageGuard } from "./trpc-scope-lineage.ts";
 export { createTrpcRouter, type TrpcTransportDescriptor } from "./create-trpc-router.ts";
+export {
+  createTrpcRuntime,
+  type TrpcRuntime,
+  type TrpcRuntimeAuditEntry,
+  type TrpcRuntimeContext,
+  type TrpcRuntimePorts,
+  type TrpcRuntimeRequest,
+} from "./trpc-runtime.ts";
 export type { TrpcHandlerBinding } from "./trpc-handler.ts";
 export type { ApiHandlerArguments } from "../handler-arguments.ts";

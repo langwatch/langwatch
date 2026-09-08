@@ -1,0 +1,216 @@
+/**
+ * The three access decisions, and the four refusals behind them.
+ *
+ * Spec: packages/api/specs/transport-declaration-split.feature.
+ */
+
+import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz-contract";
+import { describe, expect, it } from "vitest";
+
+import {
+  AccessWiringError,
+  AuthenticationRequiredError,
+  decide,
+  securityRequirement,
+  type AccessDenialPort,
+  type AuthorizePort,
+  type Caller,
+} from "../access.ts";
+
+const reviewer: Caller = { actor: { type: "user", id: "reviewer-1" } };
+
+const denials: AccessDenialPort = {
+  membershipDisabled: () => new Error("membership disabled"),
+  liteMemberRestricted: (resource) => new Error(`lite member: ${resource}`),
+};
+
+function authorize(
+  overrides: Partial<AuthorizePort> = {},
+  seen: { decisions: unknown[] } = { decisions: [] },
+): AuthorizePort {
+  return {
+    getDecision: async (input) => {
+      seen.decisions.push(input);
+
+      return { permitted: true, organizationRole: null };
+    },
+    getProjectAnyDecision: async (input) => {
+      seen.decisions.push(input);
+
+      return { permitted: true, organizationRole: null };
+    },
+    checkScopeLineage: async () => ({ kind: "consistent" }),
+    ...overrides,
+  };
+}
+
+describe("deciding access for one call", () => {
+  describe("given the declaration names one permission", () => {
+    /** @scenario "A tRPC call runs one execution path" */
+    it("checks it at the scope the validated input names, and answers actor and scope", async () => {
+      const seen = { decisions: [] as unknown[] };
+
+      const decision = await decide({
+        declaration: { kind: "permission", permission: "annotations:view" },
+        caller: reviewer,
+        input: { projectId: "project-1" },
+        authorize: authorize({}, seen),
+        denials,
+      });
+
+      expect(seen.decisions).toEqual([
+        {
+          userId: "reviewer-1",
+          permission: "annotations:view",
+          scope: { tier: "project", id: "project-1" },
+        },
+      ]);
+
+      expect(decision).toEqual({
+        actor: { type: "user", id: "reviewer-1" },
+        scope: { tier: "project", id: "project-1" },
+      });
+    });
+
+    it("refuses an anonymous caller before reading any scope id", async () => {
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: { actor: null },
+          input: { projectId: "project-1" },
+          authorize: authorize(),
+          denials,
+        }),
+      ).rejects.toBeInstanceOf(AuthenticationRequiredError);
+    });
+
+    it("answers a refusal as a permission denial naming the scope", async () => {
+      const refusing = authorize({
+        getDecision: async () => ({ permitted: false, organizationRole: null }),
+      });
+
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: reviewer,
+          input: { projectId: "project-1" },
+          authorize: refusing,
+          denials,
+        }),
+      ).rejects.toBeInstanceOf(PermissionDeniedError);
+    });
+  });
+
+  describe("given the input names a scope field it left empty", () => {
+    it("answers a blank scope id, which the caller can fix, not a wiring bug", async () => {
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: reviewer,
+          input: { projectId: "" },
+          authorize: authorize(),
+          denials,
+        }),
+      ).rejects.toBeInstanceOf(BlankScopeIdError);
+    });
+  });
+
+  describe("given the input names no scope field at all", () => {
+    it("answers a wiring bug the caller cannot act on", async () => {
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: reviewer,
+          input: {},
+          authorize: authorize(),
+          denials,
+        }),
+      ).rejects.toBeInstanceOf(AccessWiringError);
+    });
+  });
+
+  describe("given the scope ids do not share one organization", () => {
+    it("refuses before any permission is checked", async () => {
+      const mismatched = authorize({
+        checkScopeLineage: async () => ({
+          kind: "mismatch",
+          widest: { tier: "organization", id: "organization-2" },
+          entries: [],
+        }),
+      });
+
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: reviewer,
+          input: { projectId: "project-1" },
+          authorize: mismatched,
+          denials,
+        }),
+      ).rejects.toBeInstanceOf(PermissionDeniedError);
+    });
+  });
+
+  describe("given the credential resolved a project of its own", () => {
+    it("refuses an input project id that disagrees with it", async () => {
+      await expect(
+        decide({
+          declaration: { kind: "service-authorized", reason: "the door", permissions: [] },
+          caller: { actor: null, scope: { tier: "project", id: "project-1" } },
+          input: { projectId: "project-2" },
+        }),
+      ).rejects.toThrow(/does not match the authorized project scope/);
+    });
+  });
+
+  describe("given the declaration is deliberately unchecked", () => {
+    it("refuses a scope field it did not individually allow with a reason", async () => {
+      await expect(
+        decide({
+          declaration: { kind: "no-permission", reason: "public read" },
+          caller: reviewer,
+          input: { projectId: "project-1" },
+        }),
+      ).rejects.toThrow(/projectId is not allowed to be used without permission check/);
+    });
+
+    it("passes one it did allow", async () => {
+      const decision = await decide({
+        declaration: {
+          kind: "no-permission",
+          reason: "public read",
+          allow: { projectId: "the row is the caller's own" },
+        },
+        caller: reviewer,
+        input: { projectId: "project-1" },
+      });
+
+      expect(decision).toEqual({ actor: { type: "user", id: "reviewer-1" }, scope: null });
+    });
+  });
+
+  describe("given the surface supplied no authorization port", () => {
+    it("refuses a declaration whose check it cannot run, by name", async () => {
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: reviewer,
+          input: { projectId: "project-1" },
+        }),
+      ).rejects.toThrow(/"permission" access declaration needs an authorization port/);
+    });
+  });
+});
+
+describe("the security requirement one credential publishes", () => {
+  it("names the scheme an API client presents", () => {
+    expect(securityRequirement("projectKey")).toEqual([{ project_api_key: [] }]);
+    expect(securityRequirement("organizationKey")).toEqual([{ admin_api_key: [] }]);
+    expect(securityRequirement("public")).toEqual([]);
+  });
+
+  it("refuses a credential no API client can present", () => {
+    expect(() => securityRequirement("session")).toThrow(/no security scheme/);
+    expect(() => securityRequirement("internalSecret")).toThrow(/no security scheme/);
+  });
+});

@@ -5,7 +5,9 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { AnnotationTable, type AnnotationRow } from "../../../index.ts";
+import { Temporal } from "@langwatch/time";
+import { type AnnotationRow } from "../../../model/annotation-row.ts";
+import { AnnotationTable } from "../annotation-table.tsx";
 
 afterEach(cleanup);
 
@@ -31,7 +33,7 @@ const row: AnnotationRow = {
   id: "queue-item-1",
   queueItemId: "queue-item-1",
   traceId: "trace-1",
-  date: new Date("2026-08-01T10:00:00Z"),
+  date: Temporal.Instant.from("2026-08-01T10:00:00Z"),
   doneAt: null,
   createdByUser: { id: "user-2", name: "Bo", image: null },
   trace: {

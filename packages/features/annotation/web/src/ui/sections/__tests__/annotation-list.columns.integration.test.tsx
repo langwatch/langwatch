@@ -1,30 +1,4 @@
-/**
- * @vitest-environment jsdom
- *
- * The one annotations list behind the inbox, my queue, a single queue and all
- * annotations: its columns, its row actions, and its header controls.
- *
- * MOVED from
- * `platform/app/src/components/annotations/__tests__/AnnotationsTable.columns.integration.test.tsx`.
- * Two things changed and both are recorded where they bite: an overlay is
- * observed as the address the host recorded rather than as a call on the
- * application's drawer registry, and the redaction marker is driven by the real
- * redaction read rather than mocked away, which is strictly more than the
- * platform test asserted.
- *
- * THIS FILE FOUND A LIVE DEFECT THE MOVE INTRODUCED, and the two range tests
- * below are the ones that found it. `readAnnotationPeriod` is pure and takes
- * `now`; calling it straight out of a render body gave a relative window a new
- * end timestamp every render, the list's "the picks belong to these rows"
- * effect is keyed on that window, and the two chased each other forever. In a
- * suite it looked like a worker that stalled inside an ordinary synchronous
- * render and walked to its heap ceiling with no failing assertion; in a browser
- * it would have been a render loop and a tRPC round trip per frame. The window
- * is memoised on the address now — `behavior/use-annotation-period.ts`, which
- * is what `platform/app`'s own `usePeriodSelector` did and said why.
- *
- * Spec: packages/features/annotation/specs/annotations-list-selection.feature.
- */
+/** @vitest-environment jsdom */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -66,6 +40,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../behavior/use-annotation-queues.ts", () => ({
   useAnnotationQueues: (args: Record<string, unknown>) => {
     mocks.queueReadArgs = args;
+
     return {
       assignedQueueItems: mocks.items,
       totalCount: mocks.items.length,
@@ -74,7 +49,7 @@ vi.mock("../../../behavior/use-annotation-queues.ts", () => ({
   },
 }));
 
-vi.mock("../../../behavior/download-csv.ts", () => ({ downloadCsv: mocks.downloadCsv }));
+vi.mock("@langwatch/csv/download", () => ({ downloadCsv: mocks.downloadCsv }));
 
 vi.mock("../../../behavior/annotation-api.ts", () => ({
   annotationApi: {
@@ -194,21 +169,25 @@ type ListProps = Omit<Parameters<typeof AnnotationList>[0], "host">;
 
 function renderList(props: ListProps, options: StubAnnotationHostOptions = {}) {
   const host = new StubAnnotationHost(options);
+
   const view = render(
     <AnnotationTestHarness host={host}>
       <AnnotationList {...props} host={host} />
     </AnnotationTestHarness>,
   );
+
   return {
     ...view,
     host,
     onAddress: (next: StubAnnotationHostOptions) => {
       const moved = new StubAnnotationHost(next);
+
       view.rerender(
         <AnnotationTestHarness host={moved}>
           <AnnotationList {...props} host={moved} />
         </AnnotationTestHarness>,
       );
+
       return moved;
     },
   };
@@ -234,6 +213,7 @@ const user = userEvent.setup({ pointerEventsCheck: 0 });
 
 const openRowMenu = async (traceId: string) => {
   await user.click(screen.getByRole("button", { name: `Actions for trace ${traceId}` }));
+
   return user;
 };
 
@@ -247,10 +227,12 @@ beforeEach(() => {
   mocks.downloadCsv.mockReset();
   mocks.utils.annotation.getOptimizedAnnotationQueues.invalidate.mockClear();
   mocks.scoreTypes = [];
+
   mocks.redaction = {
     isRedacted: { input: false, output: false },
     visibleTo: { input: null, output: null },
   };
+
   mocks.queueReadArgs = null;
   setItems([{ id: "item-1", traceId: "trace-1" }]);
 });
@@ -288,6 +270,7 @@ describe("given the annotations list shows rows", () => {
       { id: "item-1", traceId: "trace-1" },
       { id: "item-2", traceId: "trace-2" },
     ]);
+
     const { host } = renderQueuePage();
 
     const user = await openRowMenu("trace-2");
@@ -307,6 +290,7 @@ describe("given the annotations list shows rows", () => {
       { id: "item-1", traceId: "trace-1" },
       { id: "item-2", traceId: "trace-2" },
     ]);
+
     renderQueuePage();
 
     const user = await openRowMenu("trace-2");
@@ -337,6 +321,7 @@ describe("given the annotations list shows rows", () => {
     fireEvent.click(screen.getByText("the question"));
 
     expect(host.navigations).toEqual([]);
+
     expect(host.lastQuery).toMatchObject({
       "drawer.open": "traceV2Details",
       "drawer.traceId": "trace-1",
@@ -359,6 +344,7 @@ describe("given the annotations list shows rows", () => {
       isRedacted: { input: true, output: true },
       visibleTo: { input: "Admins", output: "no one" },
     };
+
     renderQueuePage();
 
     expect(screen.queryByText("the question")).not.toBeInTheDocument();
@@ -447,6 +433,7 @@ describe("given the annotations list shows rows", () => {
   /** @scenario "Export describes the visible list" */
   it("exports the rows on screen with the table's own columns", () => {
     mocks.scoreTypes = [{ id: "score-1", name: "Helpfulness", active: true }];
+
     setItems([
       {
         id: "item-1",
@@ -460,11 +447,13 @@ describe("given the annotations list shows rows", () => {
       },
       { id: "item-2", traceId: "trace-2" },
     ]);
+
     renderQueuePage();
 
     fireEvent.click(screen.getByRole("button", { name: /Export/ }));
 
     const call = mocks.downloadCsv.mock.calls[0]?.[0];
+
     expect(call.fields).toEqual([
       "Date queued",
       "Status",
@@ -477,6 +466,7 @@ describe("given the annotations list shows rows", () => {
       "Helpfulness",
       "Annotators",
     ]);
+
     expect(call.rows).toHaveLength(2);
     expect(call.rows[0]).toContain("trace-1");
     expect(call.rows[0]).toContain("Pending");
@@ -502,6 +492,7 @@ describe("given a row carries comments", () => {
         ],
       },
     ]);
+
     renderQueuePage();
 
     const chip = screen.getByTestId("annotation-comments-chip");
@@ -539,6 +530,7 @@ describe("given a row carries comments", () => {
         ],
       },
     ]);
+
     renderQueuePage();
 
     await user.hover(screen.getByTestId("annotation-comments-chip"));
@@ -567,6 +559,7 @@ describe("given the project collects scores", () => {
       { id: "score-2", name: "Tone", active: true },
       { id: "score-3", name: "Retired", active: false },
     ];
+
     renderQueuePage();
 
     const headers = columnHeaders();
@@ -582,6 +575,7 @@ describe("given the project collects scores", () => {
       { id: "score-1", name: "Retired", active: false },
       { id: "score-2", name: "Also retired", active: false },
     ];
+
     renderQueuePage();
 
     const headers = columnHeaders();
@@ -610,6 +604,7 @@ describe("given a row carries suggestions", () => {
         ],
       },
     ]);
+
     renderQueuePage();
 
     // The wall of text lives behind the count, so the table stays scannable.
@@ -636,6 +631,7 @@ describe("given a row carries suggestions", () => {
         annotations: [annotation({ comment: "reads well" })],
       },
     ]);
+
     renderQueuePage();
 
     expect(screen.queryByTestId("annotation-suggestions-chip")).not.toBeInTheDocument();
@@ -657,6 +653,7 @@ describe("given the all annotations page", () => {
     ]);
 
     expect(columnHeaders()).toContain("Date annotated");
+
     expect(
       screen.getByText(new Date("2026-07-20T10:00:00Z").toLocaleDateString()),
     ).toBeInTheDocument();
@@ -684,6 +681,7 @@ describe("given the all annotations page", () => {
     fireEvent.click(screen.getAllByText("<empty>")[0]!);
 
     expect(host.navigations).toEqual([]);
+
     expect(host.lastQuery).toEqual({
       "drawer.open": "traceV2Details",
       "drawer.traceId": "trace-1",
@@ -706,10 +704,12 @@ describe("given the all annotations page", () => {
       traceId: `trace-${index}`,
       annotations: [],
     }));
+
     const view = renderAllPage(groups);
 
     // 25 rows plus the header row.
     expect(screen.getAllByRole("row")).toHaveLength(26);
+
     expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
       "30 rows · showing 1–25 · per page",
     );

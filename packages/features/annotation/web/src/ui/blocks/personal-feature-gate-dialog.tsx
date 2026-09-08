@@ -1,23 +1,13 @@
-/**
- * The switch a reviewer is offered when they try to hand rows to a dataset on a
- * personal workspace whose advanced features are still off.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/me/PersonalFeatureGateDialog`, which keeps its
- * other callers in the trace explorer. Narrowed to the one feature this family
- * asks about, so the label is a word rather than a lookup over four.
- *
- * Confirm turns the whole bundle on and the original action proceeds inline —
- * the only follow-up surface is the one the action would have opened anyway
- * (the add-to-dataset drawer), never a second permission prompt.
- *
- * Spec: specs/ai-gateway/governance/personal-workspace-features.feature
- *       @modal scenarios.
- */
+/** The confirmation dialog shown before enabling personal-workspace advanced features. */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import type { PersonalFeatureGateDialogState } from "../../model/personal-feature-gate-state.ts";
+type PersonalFeatureGateDialogState = {
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isEnabling: boolean;
+};
 
 export function PersonalFeatureGateDialog({ state }: { state: PersonalFeatureGateDialogState }) {
   return (

@@ -42,6 +42,7 @@ if (typeof window !== "undefined") {
       }),
     });
   }
+
   // Ark's menus and selects scroll their highlighted row into view when the
   // list opens. jsdom implements neither `Element.scrollTo` nor
   // `scrollIntoView`, and the first surfaces as "scrollTo is not a function"
@@ -49,9 +50,11 @@ if (typeof window !== "undefined") {
   if (!Element.prototype.scrollTo) {
     Element.prototype.scrollTo = () => undefined;
   }
+
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => undefined;
   }
+
   if (!window.ResizeObserver) {
     Object.defineProperty(window, "ResizeObserver", {
       configurable: true,

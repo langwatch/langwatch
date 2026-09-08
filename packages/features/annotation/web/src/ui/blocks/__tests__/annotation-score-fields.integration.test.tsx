@@ -89,6 +89,7 @@ function ScoreFieldsHost({
 }) {
   const [scoreOptions, setScoreOptions] = useState<ScoreOptions>(initial);
   composed.scoreOptions = scoreOptions;
+
   return (
     <ScoreFields
       state={makeState({
@@ -154,6 +155,7 @@ describe("given a score key the reviewer opened", () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
       await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
+
       await userEvent.type(
         screen.getByPlaceholderText("Reason (optional)"),
         "answered the actual question",
@@ -164,6 +166,7 @@ describe("given a score key the reviewer opened", () => {
       await waitFor(() =>
         expect(screen.queryByRole("radio", { name: "Helpful" })).not.toBeInTheDocument(),
       );
+
       expect(composed.scoreOptions["score-1"]).toEqual({
         value: "helpful",
         reason: "answered the actual question",
@@ -175,10 +178,12 @@ describe("given a score key the reviewer opened", () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
       await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
+
       await userEvent.type(
         screen.getByPlaceholderText("Reason (optional)"),
         "answered the actual question",
       );
+
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
 
       expect(chip(/Helpfulness/)).toHaveTextContent("Helpfulness: helpful");
@@ -192,12 +197,14 @@ describe("given a score key the reviewer opened", () => {
       renderScores({
         initial: { "score-1": { value: "unhelpful", reason: "" } },
       });
+
       await userEvent.click(chip(/Helpfulness/));
       await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
 
       await userEvent.click(document.body);
 
       expect(chip(/Helpfulness/)).toHaveTextContent("Helpfulness: unhelpful");
+
       expect(composed.scoreOptions["score-1"]).toEqual({
         value: "unhelpful",
         reason: "",
@@ -221,6 +228,7 @@ describe("given a score key the reviewer opened", () => {
       renderScores({
         initial: { "score-1": { value: "unhelpful", reason: "" } },
       });
+
       await userEvent.click(chip(/Helpfulness/));
       await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
       await userEvent.keyboard("{Escape}");
@@ -242,12 +250,14 @@ describe("given a score the reviewer already rated", () => {
           "score-1": { value: "helpful", reason: "answered the question" },
         },
       });
+
       await userEvent.click(chip(/Helpfulness/));
 
       await userEvent.click(await screen.findByRole("button", { name: "Clear" }));
 
       expect(chip("Helpfulness")).toHaveTextContent(/^Helpfulness$/);
       expect(screen.queryByLabelText("Helpfulness has a reason")).not.toBeInTheDocument();
+
       expect(composed.scoreOptions["score-1"]).toEqual({
         value: "",
         reason: "",

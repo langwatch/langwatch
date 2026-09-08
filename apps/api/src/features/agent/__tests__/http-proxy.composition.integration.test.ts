@@ -1,73 +1,118 @@
-/**
- * The studio's outbound dispatch, composed as its own feature.
- */
+import type { DatasetService } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import {
+  studioWorkflowSchema,
+  type ExecuteWorkflowComponentInput,
+  type WorkflowApi,
+  type WorkflowService,
+} from "@langwatch/workflow-contract";
 import {
   HttpWorkflowStudioStreamAdapter,
+  WorkflowApp,
   WorkflowStudioDispatchService,
+  type WorkflowAgentMappingPort,
+  type WorkflowRowPort,
+  type WorkflowStudioDslPort,
 } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
-import { composeApiStudioHost } from "../../../app/api-studio-host.composition.ts";
-import { composeHttpProxyFeature } from "../http-proxy.composition.ts";
 
-const noop = () => undefined;
+const input: ExecuteWorkflowComponentInput = {
+  projectId: "project-1",
+  nodeId: "node-1",
+  traceId: "trace-1",
+  inputs: { question: "hello" },
+  origin: "agent_test",
+  workflow: studioWorkflowSchema.parse({
+    name: "Agent test",
+    description: "An HTTP agent request",
+    version: "1",
+    spec_version: "1.4",
+    icon: "test",
+    workflow_id: "workflow-1",
+    nodes: [],
+    edges: [],
+    state: {},
+    default_llm: { model: "openai/gpt-4o" },
+  }),
+};
 
-describe("given the studio dispatch composed on this process", () => {
-  describe("when it dispatches an event to an engine that answers", () => {
-    it("relays the engine's own server events back to the watcher", async () => {
-      const frames = [
-        'data: {"type":"component_state_change","payload":{"component_id":"node-1"}}\n\n',
-        'data: {"type":"done","payload":{}}\n\n',
-      ];
-      const encoder = new TextEncoder();
-      const engine = vi.fn(async () => ({
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            for (const frame of frames) controller.enqueue(encoder.encode(frame));
-            controller.close();
-          },
-        }),
-      })) as unknown as typeof fetch;
+function workflowApp(studioDispatch?: WorkflowStudioDispatchService): WorkflowApi {
+  return WorkflowApp.create({
+    infrastructure: {
+      studioDispatch,
+      workflows: createApiFixture<WorkflowService>(),
+      datasets: createApiFixture<DatasetService>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
+      studioDsl: createApiFixture<WorkflowStudioDslPort>(),
+      agentMappings: createApiFixture<WorkflowAgentMappingPort>(),
+      workflowRows: createApiFixture<WorkflowRowPort>(),
+    },
+    dependencies: {},
+    config: void 0,
+    resources: new ResourceScope(),
+  });
+}
 
-      const seen: Array<{ type: string }> = [];
-      const dispatch = WorkflowStudioDispatchService.create({
-        stream: HttpWorkflowStudioStreamAdapter.create({
-          serviceUrl: "http://127.0.0.1:5561",
-          fetch: engine,
-        }),
-        modelProviders: { getForProject: async () => ({}) } as never,
-      });
+function dispatching(events: object[]) {
+  const payload = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+  const engine = vi.fn<typeof fetch>().mockImplementation(async () => new Response(payload));
+  const dispatch = WorkflowStudioDispatchService.create({
+    stream: HttpWorkflowStudioStreamAdapter.create({
+      serviceUrl: "http://127.0.0.1:5561",
+      fetch: engine,
+    }),
+    modelProviders: createApiFixture<ModelProviderService>({ getForProject: async () => ({}) }),
+  });
+  return { app: workflowApp(dispatch), engine };
+}
 
-      await dispatch.postEvent({
-        projectId: "project-1",
-        event: { type: "execute_flow", payload: { node_id: "node-1" } } as never,
-        onEvent: (event) => seen.push(event as { type: string }),
-      });
-
-      expect(seen.map((event) => event.type)).toEqual(["component_state_change", "done"]);
+describe("Workflow component execution behind the Agent HTTP test", () => {
+  /** @scenario "HTTP agent execution reaches the composed Workflow API" */
+  it("returns the requested component's final state from the real engine stream", async () => {
+    const state = {
+      status: "success",
+      outputs: { answer: "hello" },
+      http: { status_code: 201 },
+      timestamps: { started_at: 1000, finished_at: 1250 },
+    };
+    const { app, engine } = dispatching([
+      {
+        type: "component_state_change",
+        payload: { component_id: "other", execution_state: { status: "error" } },
+      },
+      {
+        type: "component_state_change",
+        payload: { component_id: "node-1", execution_state: state },
+      },
+      { type: "done", payload: {} },
+    ]);
+    await expect(app.executeComponent(input)).resolves.toEqual(state);
+    expect(engine).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(engine.mock.calls[0]?.[1]?.body));
+    expect(body).toMatchObject({
+      type: "execute_component",
+      payload: {
+        trace_id: "trace-1",
+        node_id: "node-1",
+        inputs: input.inputs,
+        origin: "agent_test",
+      },
     });
   });
 
-  describe("when the process composed no provider gateway", () => {
-    it("refuses the dispatch by name rather than dispatching without one", async () => {
-      const studio = composeApiStudioHost({
-        nlpServiceUrl: undefined,
-        modelProviders: undefined,
-        processName: "langwatch-api",
-      });
-      // Composed the way the process composes it, so what refuses is the port
-      // the mounted namespace carries rather than a second one built here.
-      composeHttpProxyFeature({ studio });
+  it("refuses missing component results instead of manufacturing success", async () => {
+    const { app } = dispatching([{ type: "done", payload: {} }]);
+    await expect(app.executeComponent(input)).rejects.toMatchObject({
+      code: "workflow_execution_failed",
+    });
+  });
 
-      await expect(
-        studio.ports().postStudioEvent(undefined, {
-          projectId: "project-1",
-          event: { type: "is_alive", payload: {} } as never,
-          onEvent: noop,
-        }),
-      ).rejects.toMatchObject({
-        code: "service_unavailable",
-        meta: { capability: "the studio event dispatch" },
-      });
+  it("refuses execution when no studio dispatcher was composed", async () => {
+    await expect(workflowApp().executeComponent(input)).rejects.toMatchObject({
+      code: "workflow_execution_failed",
     });
   });
 });

@@ -141,7 +141,7 @@ describe("the endpoint a request matched", () => {
    */
   describe("given a handler that returns something its schema rejects", () => {
     describe("when the response is serialised", () => {
-      it("names the endpoint in the error", async () => {
+      it("preserves the successful response", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
           .registerRoute(
             "get",
@@ -155,13 +155,11 @@ describe("the endpoint a request matched", () => {
 
         const res = await app.request("/api/things/2026-08-07/broken");
 
-        expect(res.status).toBe(500);
-        const cause = requestRecords()[0]?.payload.error as { message?: string } | undefined;
-        expect(cause?.message).toContain("Response failed output validation");
-        expect(cause?.message).toContain("GET /broken");
+        expect(res.status).toBe(200);
+        await expect(res.json()).resolves.toEqual({ id: "not-a-number" });
       });
 
-      it("still answers the caller with an unknown error, not the detail", async () => {
+      it("does not turn a schema mismatch into an error envelope", async () => {
         const app = createService({ name: "things", basePath: "/api/things" })
           .registerRoute(
             "get",
@@ -178,7 +176,7 @@ describe("the endpoint a request matched", () => {
           unknown
         >;
 
-        expect(JSON.stringify(body)).not.toContain("not-a-number");
+        expect(body).toEqual({ id: "not-a-number" });
       });
     });
   });

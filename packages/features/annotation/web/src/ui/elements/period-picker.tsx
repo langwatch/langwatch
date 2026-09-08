@@ -8,7 +8,7 @@
 
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { format, nowInstant, toDate } from "@langwatch/time";
+import { format, nowInstant, toDate, toZonedDateTime } from "@langwatch/time";
 import { Calendar, ChevronDown } from "lucide-react";
 import {
   ANNOTATION_PERIOD_PRESETS,
@@ -18,7 +18,6 @@ import {
   type AnnotationPeriodMoment,
   type AnnotationPeriodPresetKey,
 } from "../../model/annotation-period.ts";
-import { readableDate } from "../../model/readable-date.ts";
 
 export function PeriodPicker({
   period,
@@ -53,6 +52,7 @@ export function PeriodPicker({
       const preset = matchingPreset({ period, now: toDate(nowInstant()) });
       if (preset) return preset.label;
     }
+
     return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
   };
 
@@ -86,7 +86,9 @@ export function PeriodPicker({
                 <Input
                   type="datetime-local"
                   value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(event) => setPeriod(readableDate(event.target.value), endDate)}
+                  onChange={(event) =>
+                    setPeriod(toDate(toZonedDateTime(event.target.value)), endDate)
+                  }
                 />
               </Field.Root>
               <Field.Root>
@@ -94,7 +96,9 @@ export function PeriodPicker({
                 <Input
                   type="datetime-local"
                   value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(event) => setPeriod(startDate, readableDate(event.target.value))}
+                  onChange={(event) =>
+                    setPeriod(startDate, toDate(toZonedDateTime(event.target.value)))
+                  }
                 />
               </Field.Root>
             </VStack>
