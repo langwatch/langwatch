@@ -147,6 +147,29 @@ describe("given an image column", () => {
     });
   });
 
+  describe("when the edit ends while an upload is in flight", () => {
+    /** @scenario "An upload that lands after the edit ends leaves the cell alone" */
+    it("writes nothing once the panel is gone", async () => {
+      let finishUpload = (_attachment: DatasetAttachment) => {};
+      const uploadAttachment = vi.fn(
+        () =>
+          new Promise<DatasetAttachment>((resolve) => {
+            finishUpload = resolve;
+          }),
+      );
+      const { setCellValue, unmount } = renderCell({ dataType: "image", uploadAttachment });
+
+      await pickFile(new File(["bytes"], "photo.png", { type: "image/png" }));
+      await waitFor(() => expect(uploadAttachment).toHaveBeenCalledTimes(1));
+
+      unmount();
+      finishUpload(storedPicture);
+      await Promise.resolve();
+
+      expect(setCellValue).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a cell holds a stored picture", () => {
     /** @scenario "A stored picture is drawn in an image cell" */
     it("draws the picture from the stored address", () => {

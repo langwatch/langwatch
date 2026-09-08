@@ -23,15 +23,17 @@ export abstract class ProjectApi {
 
   /** Provisions a project, attributed to the caller who asked for it. */
   abstract create(
-    input: Readonly<{
-      organizationId: string;
-      teamId?: string | undefined;
-      newTeamName?: string | undefined;
-      name: string;
-      language: string;
-      framework: string;
+    args: Readonly<{
+      input: Readonly<{
+        organizationId: string;
+        teamId?: string | undefined;
+        newTeamName?: string | undefined;
+        name: string;
+        language: string;
+        framework: string;
+      }>;
+      by: ProjectCaller;
     }>,
-    by: ProjectCaller,
   ): Promise<Project>;
 
   /** Writes the project settings form; secret fields arrive as ciphertext. */
@@ -47,7 +49,6 @@ export abstract class ProjectApi {
 
   /** Asks the scheduler for a manual topic-clustering run. */
   abstract requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: ProjectCaller,
+    args: Readonly<{ input: Readonly<{ projectId: string }>; by: ProjectCaller }>,
   ): Promise<TopicClusteringRequest>;
 }

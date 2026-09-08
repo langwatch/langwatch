@@ -9,7 +9,7 @@
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Upload } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import {
@@ -49,6 +49,18 @@ export function DatasetAttachmentPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
+  // The panel goes away when the reader cancels the edit or switches to the URL
+  // field, and an upload in flight outlives it. Writing the cell from a finished
+  // upload after that would undo what the reader did instead.
+  const isEditingRef = useRef(true);
+
+  useEffect(() => {
+    isEditingRef.current = true;
+
+    return () => {
+      isEditingRef.current = false;
+    };
+  }, []);
 
   const pickFile = useCallback(
     async (file: File | undefined) => {
@@ -61,6 +73,8 @@ export function DatasetAttachmentPanel({
       setIsUploading(true);
       try {
         const attachment = await uploadAttachment({ file });
+        if (!isEditingRef.current) return;
+
         onUploaded(datasetAttachmentCellValue({ dataType, attachment }));
       } catch (error) {
         setFailure(error);

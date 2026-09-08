@@ -40,7 +40,7 @@ describe("ColumnTypeSelect", () => {
     });
   });
 
-  describe("when the option list is open", () => {
+  describe("when the reader opens the option list", () => {
     /** @scenario "The column type picker offers Image and File" */
     it("offers a column of pictures and a column of files", async () => {
       const user = userEvent.setup();

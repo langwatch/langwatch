@@ -30,7 +30,7 @@ const attachment: DatasetAttachment = {
 };
 
 /** A file of the given size without holding the bytes for it. */
-function fileOfSize(sizeBytes: number, name: string): File {
+function fileOfSize({ sizeBytes, name }: { sizeBytes: number; name: string }): File {
   const file = new File(["x"], name, { type: "application/pdf" });
   Object.defineProperty(file, "size", { value: sizeBytes });
   return file;
@@ -54,7 +54,7 @@ describe("given a file the reader picked", () => {
       const readAsDataUrl = vi.spyOn(FileReader.prototype, "readAsDataURL");
 
       const failure = await readDatasetAttachmentFile(
-        fileOfSize(DATASET_ATTACHMENT_MAX_BYTES + 1, "huge.pdf"),
+        fileOfSize({ sizeBytes: DATASET_ATTACHMENT_MAX_BYTES + 1, name: "huge.pdf" }),
       ).catch((error: unknown) => error);
 
       expect(readHandledError(failure)?.code).toBe("dataset_attachment_too_large");

@@ -146,14 +146,14 @@ describe("given a workbench column whose prompt reads an image variable", () => 
   describe("when the row holds an uploaded picture", () => {
     /** @scenario "A prompt target receives the uploaded picture as bytes" */
     it("dispatches the engine with the picture's bytes in that input", async () => {
-      for await (const _event of ExperimentRunOrchestratorService.executeCell(
-        promptCell(),
-        PROJECT,
+      for await (const _event of ExperimentRunOrchestratorService.executeCell({
+        cell: promptCell(),
+        projectId: PROJECT,
         ports,
         datasetColumns,
-        {},
+        loadedData: {},
         workflows,
-      )) {
+      })) {
         // Draining the generator is what runs the cell.
       }
 

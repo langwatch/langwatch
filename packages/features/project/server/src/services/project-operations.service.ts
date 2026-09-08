@@ -81,7 +81,10 @@ export class ProjectOperationsService {
    * The attribution is here rather than in each door because "who created
    * this" is a property of the act, not of the transport it arrived over.
    */
-  create(
+  create({
+    input,
+    by,
+  }: Readonly<{
     input: Readonly<{
       organizationId: string;
       teamId?: string | undefined;
@@ -89,9 +92,9 @@ export class ProjectOperationsService {
       name: string;
       language: string;
       framework: string;
-    }>,
-    by: ProjectCaller,
-  ): Promise<Project> {
+    }>;
+    by: ProjectCaller;
+  }>): Promise<Project> {
     return this.projects.create({
       organizationId: input.organizationId,
       userId: by.id,
@@ -190,10 +193,13 @@ export class ProjectOperationsService {
    * nature: the scheduler, not this check, is what keeps two runs off one
    * project.
    */
-  async requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: ProjectCaller,
-  ): Promise<TopicClusteringRequest> {
+  async requestTopicClustering({
+    input,
+    by,
+  }: Readonly<{
+    input: Readonly<{ projectId: string }>;
+    by: ProjectCaller;
+  }>): Promise<TopicClusteringRequest> {
     if ((await this.topics.getClusteringStatus(input)).isRunInFlight) {
       return { started: false, reason: "already_running" };
     }

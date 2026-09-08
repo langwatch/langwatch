@@ -264,6 +264,14 @@ Feature: Dataset editor
     Then the editor tells me why the upload did not happen
     And the cell keeps the value it had
 
+  @integration
+  Scenario: An upload that lands after the edit ends leaves the cell alone
+    Given the dataset has a "photo" column of type image
+    And a picture is being uploaded into a cell
+    When the edit ends before the upload finishes
+    Then the cell keeps the value it had
+    And the finished upload writes nothing
+
   @unit
   Scenario: A stored picture is recognised as a picture wherever a cell is drawn
     Given a cell holds a stored picture
