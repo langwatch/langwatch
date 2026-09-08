@@ -34,6 +34,7 @@ export const evaluatorCatalogueEntrySchema = z.looseObject({
 
 /** Every evaluator LangWatch knows, keyed by its type. */
 export const evaluatorCatalogueSchema = z.record(z.string(), evaluatorCatalogueEntrySchema);
+export type EvaluatorCatalogue = z.infer<typeof evaluatorCatalogueSchema>;
 
 /**
  * One run's result, plus the two fields the trace-side runner adds to it.
@@ -45,6 +46,8 @@ export const evaluationRunOutcomeSchema = z.intersection(
     inputs: z.record(z.string(), z.unknown()).optional(),
   }),
 );
+export type EvaluationRunOutcome = z.infer<typeof evaluationRunOutcomeSchema>;
 
 /** What the evaluator-runtime warm-up answers with. */
 export const evaluationWarmupSchema = z.object({ success: z.boolean(), count: z.number() });
+export type EvaluationWarmup = z.infer<typeof evaluationWarmupSchema>;

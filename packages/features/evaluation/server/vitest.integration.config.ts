@@ -1,13 +1,15 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Integration lane: `*.integration.test.ts` under `src/`, excluded from the
- * unit lane. Needs Postgres, at `DATABASE_URL` — the evaluator settings
- * roundtrip suite asserts jsonb config against real rows.
+ * Integration lane: `*.integration.test.ts` and the repository contract suites
+ * under `src/`. Needs Postgres — the evaluator settings roundtrip asserts jsonb
+ * config against real rows at `DATABASE_URL`, and the cost ledger's contract
+ * suite runs its cases against the Prisma repository at
+ * `LANGWATCH_TEST_DATABASE_URL` rather than the memory twin alone.
  */
 export default defineConfig({
   test: {
-    include: ["src/**/*.integration.test.ts"],
+    include: ["src/**/*.integration.test.ts", "src/**/*.contract.test.ts"],
     pool: "forks",
     fileParallelism: false,
     testTimeout: 60_000,

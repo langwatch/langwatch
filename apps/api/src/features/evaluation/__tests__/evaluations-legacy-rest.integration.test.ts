@@ -76,6 +76,10 @@ function mount() {
         Promise.resolve({
           ok: true as const,
           project: { id: "project-1" },
+          resolved: {
+            type: "legacyProjectKey" as const,
+            project: { id: "project-1" } as never,
+          },
           markUsed: () => void 0,
         }),
       rateLimit: async () => ({ allowed: true }),

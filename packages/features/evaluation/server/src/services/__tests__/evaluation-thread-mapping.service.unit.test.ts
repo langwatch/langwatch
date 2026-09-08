@@ -2,7 +2,8 @@
  * Thread sources inside a TRACE-level evaluation. A trace-level evaluator fires once per
  * incoming trace, and may still map one of its inputs at the thread.
  */
-import type { MappingState, Trace } from "@langwatch/trace-contract";
+import type { MappingState } from "@langwatch/dataset-contract";
+import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationSpanDigestPort } from "../../ports/evaluation-execution.port.ts";
 import { EvaluationThreadMappingService } from "../evaluation-thread-mapping.service.ts";

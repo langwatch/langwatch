@@ -8,8 +8,8 @@ import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
-  type Trace,
-} from "@langwatch/trace-contract";
+} from "@langwatch/dataset-contract";
+import type { Trace } from "@langwatch/trace-contract";
 import type { EvaluationSpanDigestPort } from "../ports/evaluation-execution.port.ts";
 
 /**

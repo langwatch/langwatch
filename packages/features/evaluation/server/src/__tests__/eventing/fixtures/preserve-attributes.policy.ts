@@ -1,4 +1,4 @@
-import { EvaluationAnalyticsAttributePolicy } from "@langwatch/evaluation-server/internal";
+import { EvaluationAnalyticsAttributePolicy } from "../../../ports/evaluation.port.ts";
 
 export class PreserveEvaluationAnalyticsAttributes extends EvaluationAnalyticsAttributePolicy {
   trim(attributes: Record<string, string>): Record<string, string> {

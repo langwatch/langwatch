@@ -20,9 +20,31 @@ import type {
   EvaluationSummariesByTraceIdsQuery,
   TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
+import type {
+  CustomEvaluator,
+  EvaluationProjectScope,
+  RunTraceEvaluationInput,
+  WarmupEvaluatorsInput,
+} from "./evaluation-trpc.schemas.ts";
+import type {
+  EvaluationRunOutcome,
+  EvaluationWarmup,
+  EvaluatorCatalogue,
+} from "./evaluation.responses.ts";
 
 /** The complete callable Evaluation capability shared by process peers. */
 export interface EvaluationApi {
+  /** Every evaluator, with what this install and this project are missing for it. */
+  listEvaluators(input: EvaluationProjectScope): Promise<EvaluatorCatalogue>;
+  /** The project's own workflow-backed evaluators. */
+  listCustomEvaluators(input: EvaluationProjectScope): Promise<CustomEvaluator[]>;
+  /** Scores one stored trace now, and reports the verdict onto the pipeline. */
+  runTraceEvaluation(
+    input: RunTraceEvaluationInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<EvaluationRunOutcome>;
+  /** Nudges the evaluator runtime ahead of a run. */
+  warmupEvaluators(input: WarmupEvaluatorsInput): Promise<EvaluationWarmup>;
   executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult>;
   upsertRun(input: UpsertEvaluationRunCommand): Promise<void>;
   upsertRuns(input: UpsertEvaluationRunCommand[]): Promise<void>;

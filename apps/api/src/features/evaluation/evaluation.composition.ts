@@ -1,161 +1,205 @@
 /**
- * One trace re-scored, and the pipeline the result is reported on, composed as their own
- * feature. `evaluations.*` is the evaluator inventory a project can run and the re-score
- * of one trace against one of them.
+ * One trace re-scored, and the pipeline the result is reported on, installed over this
+ * process's own graph. `evaluations.*` is the evaluator inventory a project can run and the
+ * re-score of one trace against one of them.
  */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
-  EvaluationProcessingProducerAdapter,
-  EvaluatorAvailabilityService,
   type EvaluationRunOutcome,
-} from "@langwatch/evaluation-server";
-import {
-  AZURE_SAFETY_PROVIDER_KEY,
   type ReportEvaluationCommandData,
+  type RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
+import {
+  evaluationServer,
+  EvaluationCustomEvaluatorsPort,
+  EvaluationExecutionPort,
+  EvaluationInputsResolutionPort,
+  EvaluationInstallEnvironmentPort,
+  EvaluationProcessingProducerAdapter,
+  EvaluationReportPort,
+  EvaluationRescorePort,
+  EvaluationRunAnalyticsPort,
+  EvaluationWarmupPort,
+  type EvaluationClickHouseResolver,
+  type EvaluationInfrastructure,
+} from "@langwatch/evaluation-server";
 import type { EventSourcing } from "@langwatch/eventing";
-import { HandledError } from "@langwatch/handled-error";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { getProjectModelProviders } from "@langwatch/model-provider-server";
-import { createLogger } from "@langwatch/observability";
-import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
-import type { ZodTypeAny } from "zod";
+import {
+  ModelProviderApi,
+  type ModelProviderApi as ModelProviderApiContract,
+} from "@langwatch/model-provider-contract";
+import { createApp } from "@langwatch/runtime-composition";
+import { TraceApi, type TraceApi as TraceApiContract } from "@langwatch/trace-contract";
+import { TraceRetentionFloorService } from "@langwatch/trace-server";
+import { WorkflowApi, type WorkflowApi as WorkflowApiContract } from "@langwatch/workflow-contract";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import { permissiveMappingsSchema } from "../trace/trace-mappings.ts";
-import type { ApiWorkflowRuntime } from "../workflow/workflow.composition.ts";
-import { createEvaluationTrpcRouter, type EvaluationMountPorts } from "./evaluation-trpc.mount.ts";
-
-/** What the evaluation surface reaches that this feature does not own. */
-export type EvaluationPeers = Readonly<{
-  /** The gateway a project's Azure Safety credentials are read from. */
-  modelProviders: ModelProviderService;
-  /** Where a code evaluator and the keep-alive probe both go. */
-  workflowRuntime: ApiWorkflowRuntime;
-}>;
-
+import { listCustomEvaluators } from "../../platform/infrastructure/postgres.custom-evaluators.adapter.ts";
+import { createEvaluationTrpcRouter } from "./evaluation-trpc.mount.ts";
 import type { ComposedEvaluationFeature } from "./evaluation.composition.types.ts";
 
-/** Composes the evaluation surface over this process's own graph. */
-export function composeEvaluationFeature(options: {
-  infrastructure: ApiTrpcInfrastructure;
-  peers: EvaluationPeers;
-  /** Names this process in a refusal a stand-in raises. */
-  processName: string;
-  /** The producer-only eventing runtime the pipeline is registered on. */
-  eventing: EventSourcing | undefined;
-  /** Scores one trace with one evaluator. Absent refuses by name. */
-  runEvaluationForTrace?: NonNullable<
-    EvaluationMountPorts<unknown, unknown>
-  >["runEvaluationForTrace"];
-  /** The parser for a run's field mappings, when the deployment has the registry. */
-  mappingsSchema?: ZodTypeAny;
+/** The other features' capabilities the evaluation surface reads. */
+export type EvaluationPeers = Readonly<{
+  workflows: WorkflowApiContract;
+  traces: TraceApiContract;
+  /** The gateway a project's Azure Safety credentials are read from. */
+  modelProviders: ModelProviderApiContract;
+}>;
+
+/** What this process answers the door's questions with. */
+export type EvaluationCollaborators = Readonly<{
+  /** Scores one stored trace with one evaluator, over the process's ONE evaluator runtime. */
+  runTraceEvaluation: (input: RunTraceEvaluationInput) => Promise<EvaluationRunOutcome>;
+  /** One liveness probe at the evaluator backend. */
+  probeEvaluatorRuntime: (input: Readonly<{ projectId: string }>) => Promise<void>;
   /** Product signal for a completed evaluation run. */
-  trackEvaluationRan?: (input: { userId: string; projectId: string }) => void;
-  /** The process environment, for the evaluator-install questions. */
-  environment?: Readonly<Record<string, string | undefined>>;
-}): ComposedEvaluationFeature {
-  const logger = createLogger("langwatch:api:evaluation");
-  const environment = options.environment ?? process.env;
-  const { nlpRuntime } = options.peers.workflowRuntime;
+  trackEvaluationRan: (input: Readonly<{ userId: string; projectId: string }>) => void;
+  /** The environment this process was started with, for the evaluator-install questions. */
+  environment: Readonly<Record<string, string | undefined>>;
+}>;
 
-  const reportEvaluation = composeReportEvaluation({
-    eventing: options.eventing,
-    processName: options.processName,
-  });
+class ApiEvaluationInstallEnvironment extends EvaluationInstallEnvironmentPort {
+  constructor(private readonly environment: Readonly<Record<string, string | undefined>>) {
+    super();
+  }
 
-  const ports: EvaluationMountPorts<unknown, unknown> = {
-    mappingsSchema: (options.mappingsSchema ?? permissiveMappingsSchema) as EvaluationMountPorts<
-      unknown,
-      unknown
-    >["mappingsSchema"],
-
-    /**
-     * Azure Content Safety credentials come solely from the project's `azure_safety`
-     * model provider.
-     * Spec: specs/evaluators/azure-safety-byok-gating.feature.
-     */
-    tryResolveAzureSafetyEnv: async (_ctx, input) => {
-      const providers = await getProjectModelProviders(
-        options.peers.modelProviders,
-        input.projectId,
-      );
-      const provider = providers[AZURE_SAFETY_PROVIDER_KEY];
-      if (!provider?.enabled) return null;
-
-      const endpoint = provider.customKeys?.AZURE_CONTENT_SAFETY_ENDPOINT;
-      const key = provider.customKeys?.AZURE_CONTENT_SAFETY_KEY;
-      if (typeof endpoint !== "string" || endpoint.trim() === "") return null;
-      if (typeof key !== "string" || key.trim() === "") return null;
-
-      return {
-        AZURE_CONTENT_SAFETY_ENDPOINT: endpoint,
-        AZURE_CONTENT_SAFETY_KEY: key,
-      };
-    },
-
-    tryEvaluatorUnavailability: (input) =>
-      EvaluatorAvailabilityService.tryEvaluatorUnavailability({
-        evaluatorType: input.evaluatorType,
-        environment,
-      }),
-
-    missingEnvironmentVariables: (envVars) => [...envVars].filter((name) => !environment[name]),
-
-    runEvaluationForTrace: async (ctx, input) => {
-      if (!options.runEvaluationForTrace) {
-        throw new ApiEvaluationUnavailableError(
-          "trace read pipeline, so it cannot score a trace on demand",
-        );
-      }
-      return (await options.runEvaluationForTrace(ctx, input)) as EvaluationRunOutcome;
-    },
-
-    trackEvaluationRan: (input) => options.trackEvaluationRan?.(input),
-
-    /**
-     * One liveness probe at the evaluator backend. The platform app sent this down the
-     * engine's STREAMING route, which is the per-project Lambda path this process does
-     * not carry.
-     */
-    sendKeepAliveProbe: async (_ctx, input) => {
-      if (!(nlpRuntime instanceof HttpWorkflowNlpRuntimeAdapter)) return;
-      try {
-        await nlpRuntime.probe({ projectId: input.projectId });
-      } catch (error) {
-        logger.debug({ error, projectId: input.projectId }, "evaluator keep-alive probe failed");
-      }
-    },
-  };
-
-  return {
-    reportEvaluation,
-    app: { reportEvaluation: reportEvaluation as (data: never) => Promise<unknown> },
-    router: (mount) =>
-      createEvaluationTrpcRouter({ ...mount, prisma: options.infrastructure.prisma, ports }),
-  };
+  read(): Readonly<Record<string, string | undefined>> {
+    return this.environment;
+  }
 }
 
 /**
- * The evaluation surface on a process that composed no graph to run it over. The
- * namespace still mounts and every call refuses by name, so a person is told this
- * deployment scores nothing rather than shown an empty evaluator inventory.
+ * The project's published workflow-backed evaluators. The rows belong to the
+ * Workflow table, so this stays a process-level read until the Workflow
+ * capability owns the query.
  */
-export function refusingEvaluationFeature(): ComposedEvaluationFeature {
-  const refuse = (): never => {
-    throw new ApiEvaluationUnavailableError("evaluation pipeline");
+class ApiEvaluationCustomEvaluators extends EvaluationCustomEvaluatorsPort {
+  constructor(private readonly prisma: ApiTrpcInfrastructure["prisma"]) {
+    super();
+  }
+
+  async findAll(input: Readonly<{ projectId: string }>) {
+    return listCustomEvaluators({ prisma: this.prisma, projectId: input.projectId });
+  }
+}
+
+class ApiEvaluationRescore extends EvaluationRescorePort {
+  constructor(private readonly run: EvaluationCollaborators["runTraceEvaluation"]) {
+    super();
+  }
+
+  runForTrace(input: RunTraceEvaluationInput): Promise<EvaluationRunOutcome> {
+    return this.run(input);
+  }
+}
+
+class ApiEvaluationWarmup extends EvaluationWarmupPort {
+  constructor(private readonly send: EvaluationCollaborators["probeEvaluatorRuntime"]) {
+    super();
+  }
+
+  probe(input: Readonly<{ projectId: string }>): Promise<void> {
+    return this.send(input);
+  }
+}
+
+class ApiEvaluationRunAnalytics extends EvaluationRunAnalyticsPort {
+  constructor(private readonly track: EvaluationCollaborators["trackEvaluationRan"]) {
+    super();
+  }
+
+  evaluationRan(input: Readonly<{ userId: string; projectId: string }>): void {
+    this.track(input);
+  }
+}
+
+/**
+ * The api process runs evaluations through the door's own runtime, not through
+ * the durable execution path the worker owns: an execute reaching here is a
+ * wiring mistake, and says which process it reached.
+ */
+class UnavailableEvaluationExecution extends EvaluationExecutionPort {
+  constructor(private readonly processName: string) {
+    super();
+  }
+
+  execute(): Promise<never> {
+    return Promise.reject(
+      new Error(`${this.processName} composes no evaluator runtime for an evaluation read`),
+    );
+  }
+}
+
+/** Stored inputs reach this process already resolved. */
+class PassThroughEvaluationInputs extends EvaluationInputsResolutionPort {
+  async tryResolve(input: {
+    tenantId: string;
+    inputs: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown> | null> {
+    return input.inputs;
+  }
+}
+
+class ApiEvaluationReport extends EvaluationReportPort {
+  constructor(private readonly send: (data: ReportEvaluationCommandData) => Promise<unknown>) {
+    super();
+  }
+
+  reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown> {
+    return this.send(data);
+  }
+}
+
+/** Installs the evaluation surface over this process's own graph. */
+export async function installApiEvaluation(options: {
+  infrastructure: ApiTrpcInfrastructure;
+  peers: EvaluationPeers;
+  collaborators: EvaluationCollaborators;
+  /** Names this process on the pipeline it registers. */
+  processName: string;
+  /** The producer-only eventing runtime the pipeline is registered on. */
+  eventing: EventSourcing;
+  /**
+   * The SAME routed ClickHouse the charted reads and the run history use, as
+   * the two calls Evaluation makes of it. The driver's own client meets this
+   * structural one at the root, where the connection is opened.
+   */
+  resolveClickHouse: EvaluationClickHouseResolver;
+  /** The project cascade the evaluation retention floor is bounded by. */
+  dataRetention: DataRetentionApi;
+}): Promise<ComposedEvaluationFeature> {
+  const { prisma } = options.infrastructure;
+  const { workflows, traces, modelProviders } = options.peers;
+  const reportEvaluation = registerReportEvaluation(options);
+
+  const infrastructure: EvaluationInfrastructure = {
+    resolveClickHouse: options.resolveClickHouse,
+    retentionFloor: TraceRetentionFloorService.create(options.dataRetention),
+    execution: new UnavailableEvaluationExecution(options.processName),
+    inputResolution: new PassThroughEvaluationInputs(),
+    environment: new ApiEvaluationInstallEnvironment(options.collaborators.environment),
+    customEvaluators: new ApiEvaluationCustomEvaluators(prisma),
+    rescore: new ApiEvaluationRescore(options.collaborators.runTraceEvaluation),
+    warmup: new ApiEvaluationWarmup(options.collaborators.probeEvaluatorRuntime),
+    analytics: new ApiEvaluationRunAnalytics(options.collaborators.trackEvaluationRan),
+    report: new ApiEvaluationReport(reportEvaluation),
   };
-  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
-  const ports = refuseEvery<EvaluationMountPorts<unknown, unknown>>();
-  // The custom-evaluator read runs on the connection this process does not
-  // have, so it refuses where it is asked for rather than answering an empty
-  // inventory a project would read as "this deployment offers nothing".
-  const prisma = refuseEvery<ApiTrpcInfrastructure["prisma"]>();
-  const reportEvaluation = () => Promise.reject(new ApiEvaluationUnavailableError("command queue"));
+
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure(infrastructure)
+    .withProvided(WorkflowApi, workflows)
+    .withProvided(TraceApi, traces)
+    .withProvided(ModelProviderApi, modelProviders)
+    .withFeature(evaluationServer)
+    .boot({ role: "api" });
+
+  const app = runtime.feature(evaluationServer).provided;
 
   return {
+    routers: (mount) => ({ evaluations: createEvaluationTrpcRouter(mount.runtime) }),
+    app,
     reportEvaluation,
-    app: { reportEvaluation: reportEvaluation as (data: never) => Promise<unknown> },
-    router: (mount) => createEvaluationTrpcRouter({ ...mount, prisma, ports }),
   };
 }
 
@@ -163,28 +207,21 @@ export function refusingEvaluationFeature(): ComposedEvaluationFeature {
  * Registers the `evaluation_processing` pipeline as a PRODUCER and hands back its
  * `reportEvaluation` sender.
  */
-function composeReportEvaluation(input: {
-  eventing: EventSourcing | undefined;
+function registerReportEvaluation(input: {
+  eventing: EventSourcing;
   processName: string;
 }): (data: ReportEvaluationCommandData) => Promise<unknown> {
-  if (!input.eventing) {
-    return () =>
-      Promise.reject(
-        new ApiEvaluationUnavailableError(
-          "command queue, so it cannot report an evaluation to the processing pipeline",
-        ),
-      );
-  }
-
   const registered = input.eventing.register(
     EvaluationProcessingProducerAdapter.createPipeline({ processName: input.processName }),
   );
   const sender = (registered.commands as Record<string, unknown>).reportEvaluation;
+
   if (!isSender(sender)) {
     throw new Error(
       'The evaluation_processing registration produced no "reportEvaluation" command sender; the pipeline was registered incompletely.',
     );
   }
+
   return (data) => sender.send(data);
 }
 
@@ -194,18 +231,3 @@ const isSender = (value: unknown): value is CommandSender =>
   typeof value === "object" &&
   value !== null &&
   typeof (value as CommandSender).send === "function";
-
-/**
- * A capability this deployment did not compose, reported to the caller.
- */
-export class ApiEvaluationUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiEvaluationUnavailableError";
-  }
-}

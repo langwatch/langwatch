@@ -1,4 +1,4 @@
-import { mappingsReadEvaluationsSource } from "@langwatch/evaluator-contract";
+import { mappingsReadEvaluationsSource } from "@langwatch/dataset-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorService,
@@ -13,8 +13,9 @@ import {
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
-import { type MappingState, type Trace } from "@langwatch/trace-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { MappingState } from "@langwatch/dataset-contract";
+import type { Trace } from "@langwatch/trace-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import {
   type EvaluationExecutionTelemetryPort,
   type EvaluationLangevalsPort,
@@ -49,7 +50,7 @@ export interface EvaluationExecutionDeps {
   spanDigest: EvaluationSpanDigestPort;
   modelEnvResolver: EvaluationModelEnvPort;
   langevalsClient: EvaluationLangevalsPort;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   evaluators: EvaluatorService;
   workflowExecutor: EvaluationWorkflowExecutorPort;
   /**

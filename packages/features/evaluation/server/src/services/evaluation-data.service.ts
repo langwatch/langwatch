@@ -5,9 +5,7 @@
 
 import {
   AVAILABLE_EVALUATORS,
-  DEFAULT_MAPPINGS,
   isCodeEvaluatorCheckType,
-  migrateLegacyMappings,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import {
@@ -16,14 +14,16 @@ import {
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
 import {
-  type MappingState,
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
   mapTraceToDatasetEntry,
+  type MappingState,
   SERVER_ONLY_THREAD_SOURCES,
   SERVER_ONLY_TRACE_SOURCES,
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
-  type Trace,
-} from "@langwatch/trace-contract";
+} from "@langwatch/dataset-contract";
+import { type Trace } from "@langwatch/trace-contract";
 import type { EvaluationTraceProtections } from "../ports/evaluation-execution.port.ts";
 import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
@@ -131,7 +131,7 @@ export class EvaluationDataService {
     // An evaluator this install skipped is not a broken one. Say which it is,
     // and how to get it, rather than letting the request reach an evaluator
     // service with no route for it and come back as a bare 404.
-    const unavailable = EvaluatorAvailabilityService.tryEvaluatorUnavailability({
+    const unavailable = EvaluatorAvailabilityService.findUnavailability({
       evaluatorType,
       environment: this.deps.installEnvironment,
     });

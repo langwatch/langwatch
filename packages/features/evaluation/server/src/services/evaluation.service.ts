@@ -20,7 +20,7 @@ import {
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type {
   EvaluationExecutionPort,
   EvaluationInputsResolutionPort,
@@ -34,7 +34,7 @@ export type EvaluationServiceOptions = {
   monitorPerformance: MonitorPerformanceRepository;
   execution: EvaluationExecutionPort;
   inputResolution: EvaluationInputsResolutionPort;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
 };
 
 /** One canonical Evaluation capability for API, workers and projections. */

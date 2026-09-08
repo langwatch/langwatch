@@ -2,6 +2,8 @@ export {
   EvaluationAdapter,
   type EvaluationAdapterOptions,
 } from "./adapters/evaluation.clickhouse.adapter.ts";
+export { EvaluationApp, type EvaluationInfrastructure } from "./app/evaluation.app.ts";
+export { evaluationServer } from "./evaluation.server.ts";
 /**
  * The `evaluation_runs` repository, for a process that needs one read and not the service
  * around it.
@@ -68,21 +70,24 @@ export {
   type EvaluatorInstallEnvironment,
 } from "./services/evaluator-availability.service.ts";
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
+export { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 export {
-  EvaluationTrpcApi,
-  type EvaluationTrpcContext,
-  type EvaluationTrpcPorts,
-  type EvaluationRunOutcome,
-} from "./transport/api-trpc/evaluation.api.ts";
+  EvaluationCustomEvaluatorsPort,
+  EvaluationInstallEnvironmentPort,
+  EvaluationReportPort,
+  EvaluationRescorePort,
+  EvaluationRunAnalyticsPort,
+  EvaluationWarmupPort,
+} from "./ports/evaluation-rescore.port.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 export {
   EvaluationPreconditionService,
   PRECONDITION_FIELDS,
 } from "./services/evaluation-precondition.service.ts";
 
-/** The Postgres cost ledger an evaluation run writes into. Was
- * `platform/app/src/server/app-layer/evaluations/evaluation-cost.recorder.ts`. */
-export { PrismaEvaluationCostRecorderAdapter } from "./adapters/postgres.evaluation-cost-recorder.adapter.ts";
+/** The cost ledger an evaluation run writes into, over the repositories it is handed. */
+export { EvaluationCostService } from "./services/evaluation-cost.service.ts";
+export { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
 
 /**
  * The ONLINE execution path: rendering a stored trace through its evaluator

@@ -15,20 +15,8 @@ import {
   EvaluationService as EvaluationServiceContract,
   type ExecuteEvaluationCommand as ExecuteEvaluationInput,
 } from "@langwatch/evaluation-contract";
-import type {
-  EnabledGuardrailMonitor,
-  MonitorCreateInput,
-  MonitorEnabledGuardrailInput,
-  MonitorExperimentUpsertInput,
-  Monitor,
-  MonitorIdInput,
-  MonitorSummary,
-  MonitorReplicationInput,
-  MonitorToggleInput,
-  MonitorUpdateInput,
-  MonitorWithEvaluator,
-} from "@langwatch/monitor-contract";
-import { monitorWithEvaluatorSchema, MonitorService } from "@langwatch/monitor-contract";
+import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import { monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceSpan,
@@ -51,6 +39,7 @@ import {
   EvaluationExecutionReceiptPort,
   type ExecuteEvaluationCommandDeps,
 } from "../../evaluation.port.ts";
+import { EvaluationMonitorLookupPort } from "../../evaluation-execution.port.ts";
 
 export function buildExecuteCommand(
   overrides: Partial<ExecuteEvaluationCommandData> = {},
@@ -118,70 +107,18 @@ export function buildMonitor(overrides: Record<string, unknown> = {}): MonitorWi
   });
 }
 
-export class TestMonitorService extends MonitorService {
+/**
+ * The one monitor read an execution makes. Narrowed to
+ * {@link EvaluationMonitorLookupPort}: everything else a monitor can answer
+ * belongs to the monitor feature's own tests.
+ */
+export class TestMonitorLookup extends EvaluationMonitorLookupPort {
   readonly tryGetMonitorById = vi.fn(
     async (_input: MonitorIdInput): Promise<MonitorWithEvaluator | null> => this.monitor,
   );
 
   constructor(private readonly monitor: MonitorWithEvaluator | null) {
     super();
-  }
-
-  async getAllForProject(_input: { projectId: string }): Promise<MonitorWithEvaluator[]> {
-    return this.monitor ? [this.monitor] : [];
-  }
-
-  async getEnabledOnMessageMonitors(_projectId: string): Promise<MonitorSummary[]> {
-    return [];
-  }
-
-  async listEnabledGuardrailMonitors(
-    _input: MonitorEnabledGuardrailInput,
-  ): Promise<EnabledGuardrailMonitor[]> {
-    return [];
-  }
-
-  async getById(_input: MonitorIdInput): Promise<MonitorWithEvaluator> {
-    if (!this.monitor) throw new Error("monitor fixture is absent");
-    return this.monitor;
-  }
-
-  async getAllByIds(_input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
-    return this.monitor ? [this.monitor] : [];
-  }
-
-  async toggle(_input: MonitorToggleInput): Promise<{ success: true }> {
-    return { success: true };
-  }
-
-  async create(_input: MonitorCreateInput): Promise<Monitor> {
-    throw new Error("unused monitor capability");
-  }
-
-  async update(_input: MonitorUpdateInput): Promise<Monitor> {
-    throw new Error("unused monitor capability");
-  }
-
-  async delete(_input: MonitorIdInput): Promise<{ success: true }> {
-    return { success: true };
-  }
-
-  async deleteForExperiment(_input: { projectId: string; experimentId: string }): Promise<void> {}
-
-  async upsertForExperiment(_input: MonitorExperimentUpsertInput): Promise<Monitor> {
-    throw new Error("unused monitor capability");
-  }
-
-  async isNameAvailable(_input: {
-    projectId: string;
-    name: string;
-    checkId?: string;
-  }): Promise<{ available: boolean }> {
-    return { available: true };
-  }
-
-  async replicate(_input: MonitorReplicationInput): Promise<Monitor> {
-    throw new Error("unused monitor capability");
   }
 }
 
@@ -375,13 +312,13 @@ export interface EvaluationExecutionFixtureOptions {
 export function buildExecutionDeps(
   options: EvaluationExecutionFixtureOptions = {},
 ): ExecuteEvaluationCommandDeps & {
-  monitors: TestMonitorService;
+  monitors: TestMonitorLookup;
   traces: TestTraceService;
   evaluations: TestEvaluationService;
   costRecorder: TestCostRecorder;
   executionReceipt: TestEvaluationExecutionReceipt;
 } {
-  const monitors = new TestMonitorService(options.monitor ?? buildMonitor());
+  const monitors = new TestMonitorLookup(options.monitor ?? buildMonitor());
   const traces = new TestTraceService();
   const evaluations = new TestEvaluationService();
   if (options.executionResult)

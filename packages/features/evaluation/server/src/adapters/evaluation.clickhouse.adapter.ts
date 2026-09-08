@@ -1,4 +1,4 @@
-import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { EvaluationService as EvaluationServiceContract } from "@langwatch/evaluation-contract";
 import {
   EvaluationExecutionPort,
@@ -15,7 +15,7 @@ export type EvaluationAdapterOptions = {
   retentionFloor: EvaluationRetentionFloorPort;
   execution: EvaluationExecutionPort;
   inputResolution?: EvaluationInputsResolutionPort;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
 };
 
 class PassthroughEvaluationInputsResolution extends EvaluationInputsResolutionPort {

@@ -28,7 +28,7 @@ export class EvaluatorAvailabilityService {
   }
 
   /** Why an evaluator cannot run on this install, or undefined when it can. */
-  static tryEvaluatorUnavailability(input: {
+  static findUnavailability(input: {
     evaluatorType: string;
     environment: EvaluatorInstallEnvironment;
   }): EvaluatorUnavailability | undefined {

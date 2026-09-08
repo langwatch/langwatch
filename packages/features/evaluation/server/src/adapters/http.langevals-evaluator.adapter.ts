@@ -8,7 +8,7 @@ import {
   EvaluatorExecutionError,
   EvaluatorInputTooLargeError,
 } from "@langwatch/evaluation-contract";
-import { tryAndConvertTo } from "@langwatch/trace-contract";
+import { tryAndConvertTo } from "@langwatch/dataset-contract";
 import {
   EvaluationLangevalsPort,
   type EvaluationExecutionTelemetryPort,

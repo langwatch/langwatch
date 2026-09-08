@@ -54,3 +54,33 @@ Feature: Evaluation service boundary
     When an evaluation finishes
     Then its duration is recorded against the evaluator that produced it
     And its outcome is counted apart from the other outcomes
+
+  @unit
+  Scenario: The evaluator inventory names what this install and this project lack
+    Given an evaluator this install left out and a project with no Azure Safety provider
+    When a caller lists the evaluators
+    Then each Azure evaluator names both Azure credentials as missing
+    And the evaluator left out says so, apart from being unconfigured
+    And every other evaluator's missing variables come from this install's environment
+
+  @unit
+  Scenario: A re-scored trace is reported onto the pipeline every other verdict travels on
+    Given a caller re-scores one stored trace with one evaluator
+    When the evaluator answers
+    Then the result reaches the caller
+    And the run is attributed to the caller
+    And the verdict is reported against the project's tenant
+    And a pipeline that refuses the report still lets the caller have the result
+
+  @unit
+  Scenario: A warm-up is a nudge rather than a health check
+    Given a caller warms the evaluator runtime for a project
+    When every probe fails
+    Then the caller is still told how many were sent
+
+  @unit
+  Scenario: The memory and Postgres evaluation cost ledgers answer alike
+    Given one evaluation run's cost written under its own idempotency key
+    When the same run is recorded again
+    Then the second write is refused rather than billing the project twice
+    And a row belonging to another project is never read back for this one
