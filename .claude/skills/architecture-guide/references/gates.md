@@ -61,11 +61,17 @@ A comment block over five lines is flagged for review; keep comments short.
 
 `*-baseline.json` in `packages/architecture-lint/src` (`boundary-edge`,
 `composed-exports`, `feature-shape`, `overengineering`, `oxlint`, `port-module`,
-`service-ceilings`, `typed-prisma-seam`) record pre-existing violations and may only
-shrink. A new violation in a file you touched is yours to fix, not to add. Lanes never
+`service-ceilings`, `source-folder-shape`, `typed-prisma-seam`) record pre-existing violations
+and may only shrink. A new violation in a file you touched is yours to fix, not to add. Lanes never
 edit a baseline; the root session regenerates it once the violation is gone (a stale
 entry is itself reported). Diff the violation LIST before and after, not the total: a
 wrong placement trades one violation for another.
+
+`source-folder-shape` is the shape of the tree itself, everywhere under `apps/` and `packages/`:
+a source folder holds at most 12 source files (a folder is one concept; past that a reader
+stops seeing it), and a file under 20 lines read only by its own folder is a fragment of the
+file that reads it. Its messages say where the code belongs. When you hit one, fold the code
+into the file that owns the noun; when no file does, split the folder, never the file.
 
 `feature-shape-baseline.json` is the conversion inventory: one entry per feature and
 kind, measured against annotation. Pieces annotation has no place for:

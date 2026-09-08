@@ -14,6 +14,7 @@ import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
+import { lintSourceFolderShape } from "./source-folder-shape.ts";
 import { lintPrismaTableOwnership } from "./prisma-table-ownership.ts";
 import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
@@ -139,6 +140,17 @@ export {
   readFeatureShapeBaselineFile,
 } from "./feature-shape.ts";
 export type { FeatureShapeFinding, FeatureShapeLegacyKind } from "./feature-shape.ts";
+export {
+  collectSourceFolderShapeBaseline,
+  collectSourceFolderShapeFindings,
+  FOLDER_BUDGET,
+  formatSourceFolderShapeBaseline,
+  FRAGMENT_FLOOR,
+  lintSourceFolderShape,
+  readSourceFolderShapeBaselineFile,
+  SOURCE_FOLDER_SHAPE_KINDS,
+} from "./source-folder-shape.ts";
+export type { SourceFolderShapeFinding, SourceFolderShapeKind } from "./source-folder-shape.ts";
 export { lintStrictPortModules } from "./port-modules.ts";
 export { lintStrictPortBaseline } from "./port-modules.ts";
 export { readStrictPortBaselineFile } from "./port-modules.ts";
@@ -175,6 +187,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintEnterpriseSourceLicense(root),
     ...lintFeatureLayouts(root, discovery.packages),
     ...lintFeatureShape(root, discovery.catalogue, discovery.packages),
+    ...lintSourceFolderShape(root),
     ...lintFeatureConfiguration(root, discovery.catalogue),
     ...lintPrismaTableOwnership(root, discovery.catalogue),
     ...lintFrontendUiBoundaries(root, discovery.packages),

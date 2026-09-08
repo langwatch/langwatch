@@ -1,0 +1,1729 @@
+{
+  "version": 0,
+  "entries": [
+    {
+      "kind": "crowded-folder",
+      "path": "apps/api/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "apps/api/src/api-runtime.port.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "apps/api/src/app"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "apps/server/src/predeps"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "apps/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "apps/ui/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "apps/ui/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "apps/worker/src/app"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "apps/worker/src/app/worker-github-redis.composition.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/api/src/rest"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/api/src/rest/create-rest-router.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/api/src/rest/management-version.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/api/src/rest/platform-url.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/api/src/rest/response-types.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/api/src/trpc"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/api/src/trpc/create-trpc-router.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/api/src/trpc/trpc-failure-trace.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/architecture-lint/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/audit-log-null/src/audit-log-null.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/clickhouse-client/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/clickhouse-client/src/observability.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/clickhouse-client/src/shutdown.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/config/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/config/src/clickhouse.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/config/src/logger.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/config/src/postgres.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/config/src/redis.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/config/src/trusted-proxy.config.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/design-system/src"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/design-system/src/components"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/close-button.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/delayed.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/design-system/src/components/icons"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/anthropic-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/custom-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/databricks-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/equals-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/github-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/llm-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/microsoft-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/openai-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/opentelemetry-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/weaviate-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/icons/workato-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/messages/remove-message-button.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/components/small-label.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/system/create-system.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/design-system/src/type-utils.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/composition/api/src/governance"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/composition/api/src/governance/clickhouse-client.port.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/audit-log/server/src/audit-log.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/billing/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/billing/contract/src/billing.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/billing/contract/src/notification-types.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/billing/server/src/adapters"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/billing/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/billing/server/src/services"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/billing/web/src/model/display-formatters.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/governance/contract/src/governance-attributes.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/governance/contract/src/governance-audit.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/governance/contract/src/governance-signals.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/governance/contract/src/otlp-receiver-policy.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/governance/contract/src/session-policy.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/server/src/adapters"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/server/src/repositories/prisma"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/server/src/transport/api-trpc"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/governance/web/src/screens/governance"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/enterprise/features/licensing/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/licensing/contract/src/license-limit-labels.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/licensing/contract/src/license-member-type.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/licensing/contract/src/license-plan.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/licensing/contract/src/license.queries.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/licensing/web/src/surfaces/global-upgrade-modal/plan-management-url.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/managed-provider/server/src/managed-provider.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/saas/contract/src/saas-browser.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/enterprise/features/sso/contract/src/sso.service.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/eventing/src/projections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/eventing/src/replay"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/eventing/src/server/schedule/scheduler-wake.repository.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/agent/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/agent/contract/src/agent.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/agent/contract/src/config/base.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/agent/contract/src/config/workflow.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/agent/contract/src/http-proxy.trpc.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/agent/server/src/agent.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/agent/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/agent/web/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/contract/src"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/contract/src/visualization"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/analytics/contract/src/visualization/lwql-dataset-names.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/analytics/server/src/analytics.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/server/src/repositories/clickhouse"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/server/src/rules"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/web/src/model"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/analytics/web/src/model/format-milliseconds.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/analytics/web/src/model/format-money.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/analytics/web/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/annotation/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/annotation/contract/src/annotation-queue.types.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/annotation/contract/src/annotation-review.types.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/annotation/server/src/annotation.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/annotation/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/api-key/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/api-key/contract/src/api-key.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/api-key/contract/src/api-key.revocation-cause.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/api-key/contract/src/api-key.visibility.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/api-key/server/src/api-key.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/api-key/web/src/model"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/api-key/web/src/model/api-key-scope.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/audit-log/contract/src/audit-log.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/audit-log/contract/src/audit-log.commands.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/auth/contract/src/auth.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/auth/contract/src/auth.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/auth/contract/src/cli-session-keys.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/auth/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/auth/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/auth/web/src/ui/elements"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/auth/web/src/ui/elements/github-icon.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/auth/web/src/ui/elements/microsoft-icon.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/auth/web/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/authz/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/authz/contract/src/authz-scope-lineage.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/authz/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/authz/server/src/authz.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/automation/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/contract/src/automation.queries.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/contract/src/custom-graph.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/contract/src/email-suppression.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/contract/src/pause-reasons.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/automation/contract/src/templating"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/contract/src/templating.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/automation/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/server/src/automation.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/automation/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/automation/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/automation/web/src/features/authoring/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/automation/web/src/features/authoring/ui/sections/automation-store.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/coding-agent/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/coding-agent/contract/src/coding-agent-processing.commands.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/coding-agent/contract/src/telemetry/claude-code.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/coding-agent/contract/src/telemetry/copilot.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/coding-agent/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/coding-agent/server/src/coding-agent.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/coding-agent/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/coding-agent/web/src"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/coding-agent/web/src/trace"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/dashboard/server/src/dashboard.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/data-privacy/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/data-privacy/contract/src/data-privacy.app.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/data-privacy/server/src/data-privacy.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/data-retention/server/src/data-retention.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/dataset/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/dataset/contract/src/dataset-normalization.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/dataset/server/src/dataset.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/dataset/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/dataset/web/src/ui/elements"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/entitlement/contract/src/entitlement.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/entitlement/contract/src/entitlement.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/entitlement/server/src/entitlement.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/evaluation/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/evaluation/contract/src/azure-safety.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/evaluation/contract/src/evaluation.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/evaluation/contract/src/evaluation.errors.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/evaluation/server/src/evaluation.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/evaluation/server/src/services"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/evaluator/contract/src/evaluator.api.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/experiment/contract/src/experiment-legacy-workbench.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/experiment/contract/src/experiment-run-eventing.events.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/experiment/contract/src/experiment.api.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/contract/src/workbench/actions/transforms"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/experiment/server/src/adapters/noop-experiment-workbench-updates.adapter.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/experiment/server/src/experiment.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/server/src/processes"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/web/src/behavior/experiments-v3"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/web/src/model/experiments-v3"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/experiment/web/src/model/random.mulberry32.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/web/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/web/src/ui/sections/batch-results"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/experiment/web/src/ui/sections/experiments-v3"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/feature-flag/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/feature-flag/contract/src/feature-flag.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/feature-flag/contract/src/feature-flag.app.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/feature-flag/server/src/feature-flag.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/gateway/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/gateway/contract/src/gateway.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/gateway/contract/src/gateway.audit-serializer.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/gateway/contract/src/gateway.realtime-session.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/gateway/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/gateway/server/src/gateway.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/gateway/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/gateway/server/src/repositories"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/gateway/server/src/repositories/prisma"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/gateway/server/src/services"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/gateway/web/src/surfaces/budget-overview/spent-subline.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/github/server/src/github.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/hosted-mcp/contract/src/hosted-mcp.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/hosted-mcp/server/src/hosted-mcp.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/identity/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/identity/contract/src/identity-email.service.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/identity/server/src/adapters"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/identity/server/src/intents"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/identity/server/src/repositories/prisma"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/identity/server/src/rules"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/identity/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/langy/contract/src/langy-prompt.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/langy/server/src/langy.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/server/src/rules"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/web/src/features/langy/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/langy/web/src/features/langy/ui/sections/derived-cards/langy-choices-card.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/langy/web/src/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/log/contract/src/log-preparation.types.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/log/contract/src/log.commands.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/log/contract/src/log.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/log/contract/src/log.constants.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/log/server/src/log.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/metric/contract/src/metric.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/metric/contract/src/metric.config.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/metric/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/metric/server/src/metric.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/contract/src"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/contract/src/catalog"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/model-provider/contract/src/codex-account.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/web/src/ui/elements/icons"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/model-provider/web/src/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/monitor/contract/src/monitor.commands.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/monitor/contract/src/monitor.errors.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/monitor/server/src/monitor.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/navigation/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/navigation/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/navigation/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/navigation/web/src/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/notification/contract/src/notification.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/notification/server/src/notification.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/onboarding/web/src/behavior"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/onboarding/web/src/behavior/product-flow.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/onboarding/web/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/ops/contract/src/ops-feature-flag.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/ops/server/src/ops.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/server/src/repositories/prisma"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/web/src/features/event-store/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/web/src/features/event-store/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/ops/web/src/features/event-store/ui/sections/process-recent-actions-panel.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/web/src/features/foundry/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/ops/web/src/screens/ops"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/organization/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/organization/contract/src/organization-group.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/organization/contract/src/organization.errors.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/organization/server/src/organization.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/organization/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/organization/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/organization/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/organization/web/src/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/platform-health/contract/src/platform-health.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/platform-health/contract/src/platform-health.errors.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/platform-health/contract/src/platform-health.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/platform-health/server/src/platform-health.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/presence/contract/src/presence-stream.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/presence/contract/src/presence.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/presence/contract/src/presence.app.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/presence/contract/src/presence.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/presence/server/src/presence.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/presence/web/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/project/server/src/project.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/project/web/src/screens/home/components"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/prompt/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/contract/src/prompt.enums.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/contract/src/prompt.sort-keys.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/contract/src/prompt.tags.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/contract/src/prompt.token-limits.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/prompt/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/prompt/web/src/model"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/model/prompt-form/are-form-values-equal.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/model/prompt-form/save-blocker-message.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/prompt/web/src/screens/prompt-studio"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/screens/prompt-studio/browser/window/demonstrations-tab-content.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/screens/prompt-studio/fields/messages/remove-message-button.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/screens/prompt-studio/prompt-studio-sidebar-empty-state.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/surfaces/prompt-reference/organization-badge.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/prompt/web/src/surfaces/prompt-reference/prompt-handle.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/role/server/src/role.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/contract/src/field-mapping.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/contract/src/run-secret-ciphertext.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/contract/src/scenario.ids.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/contract/src/simulation-target.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/server/src/adapters"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/server/src/services"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/ui/elements/agent-testing/shared"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/web/src/ui/elements/scenario-section-header.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/ui/sections/agent-testing/cases"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/web/src/ui/sections/agent-testing/drawers/run-drawer-error-body.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/ui/sections/agent-testing/results"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/scenario/web/src/ui/sections/agent-testing/results/period-controls.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/scenario/web/src/ui/sections/agent-testing/run"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/secret/contract/src/secret.config.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/secret/contract/src/secret.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/secret/server/src/secret.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/share/contract/src/share.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/share/server/src/share.server.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/share/web/src/readable-date.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/stored-object/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/stored-object/contract/src/stored-object-owner-resolver.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/stored-object/contract/src/validation.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/stored-object/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/stored-object/server/src/stored-object.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/suite/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/suite/contract/src/suite-set-id.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/suite/contract/src/suite.kind.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/suite/server/src/suite.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/suite/web/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/topic/contract/src/topic.api.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/topic/contract/src/topic.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/topic/server/src/topic.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-captured-span.commands.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-content-part.async-dispatcher.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-content-part.record-schema.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-content-part.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-content-part.visitor.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-derived-event.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-ingress.commands.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-ingress.constants.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-ingress.event-envelope.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-list-window.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-otel-ids.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-topic-assignment.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/contract/src/trace-viewer.service.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/server/src/adapters"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/adapters/null-query-field-values.adapter.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/adapters/trace-facet-span-name.clickhouse.adapter.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/server/src/ports"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/server/src/repositories/clickhouse"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/server/src/rules"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/server/src/services"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/services/langwatch-canonicaliser.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/services/trace-number-coercion.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/services/trace-safe-json.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/services/vercel-canonicaliser.service.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/server/src/trace.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/elements/icons"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/conversation/trace-query.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/filter-sidebar"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/find-bar/find-bar.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/hooks"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/hooks/use-drawer-project-id.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/search-bar"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/toolbar"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-drawer"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/last-turn-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/started-cell.tsx"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/root-span-name-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/root-span-type-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/service-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/span-count-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-id-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-name-cell.tsx"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/user/server/src/user.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/user/web/src/ui/sections"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/webhook/contract/src/webhook.queries.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/webhook/server/src/webhook.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/contract/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/workflow/contract/src/studio-optimization.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/workflow/contract/src/workflow-component.commands.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/server/src/adapters"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/server/src/services"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/workflow/server/src/workflow.server.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/web/src/behavior"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/web/src/model"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/web/src/model/code"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/workflow/web/src/model/code/python-api.types.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/features/workflow/web/src/model/sse/errors.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/web/src/ui/elements"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/web/src/ui/sections"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/features/workflow/web/src/ui/sections/optimization_studio"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/group-queue/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/group-queue/src/latency.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/group-queue/src/redisHashTag.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/group-queue/src/retry.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/mail/src/templates"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/mail/src/templates/readable-date.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/prisma-client/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/prisma-client/src/guard-middleware.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/prisma-client/src/readiness.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/prisma-client/src/seed.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/prisma-client/src/shutdown.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/redis-client/src/types.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/runtime-composition/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/runtime-composition/src/dependency-token.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/secrets/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/secrets/src/secret-source.port.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/system-migrations/src/lease.repository.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/system-migrations/src/tenant-source.ts"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/task/src/task.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/test-harness/src"
+    },
+    {
+      "kind": "fragment-file",
+      "path": "packages/time/src/temporal.ts"
+    },
+    {
+      "kind": "crowded-folder",
+      "path": "packages/ui-host/src"
+    }
+  ]
+}
