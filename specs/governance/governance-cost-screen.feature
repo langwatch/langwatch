@@ -484,15 +484,19 @@ Feature: One cost screen, three honest lanes
     # holding one more period — five identical periods reported a 50% rise.
 
   @unit
-  Scenario: A flat year read by quarter reports level, not growth
-    Given a year of identical daily spend and an interval of Quarter
+  Scenario: A flat year reports level, and folding it to quarters would not
+    Given a year of identical daily spend
     When the card's change figure is read
     Then it reports level
-    # Measured on the series as read, never on the folded one. A calendar
+    And that same spend folded to quarters lands in buckets differing several-fold
+    # The second Then is why the first is measured where it is. A calendar
     # bucket is not a unit of time that may be compared: a January holding
     # fourteen days of a quarter sits beside a full ninety-one-day April, so
     # the buckets differ in length as well as in number. Averages fix halves
     # of unequal count; only measuring before the fold fixes unequal length.
+    # The interval is not named in the Given because the figure is read from
+    # the series as it arrives, before any interval is applied to it. What an
+    # interval does to the reading is the mounted scenario's job, below.
 
   @unit
   Scenario: A day whose figure is withheld is left out of the change, never counted as zero
@@ -726,12 +730,18 @@ Feature: One cost screen, three honest lanes
     Then only the amount from the current version is counted
 
   @integration
-  Scenario: A window whose spend never moved says level, not growth
+  Scenario: A window whose spend never moved says level on both money lanes
     Given a year in which every day cost exactly the same
     When the cost lanes are shown
-    Then each lane's change badge reads level
+    Then the billed lane's change badge reads level
+    And the metered lane's change badge reads level
+    # Both money lanes named rather than "every lane", because the seat lane
+    # carries counts and has no change badge to read — a Then that said every
+    # lane would promise a third assertion that cannot exist.
+    #
     # Mounted, not computed in isolation. The defect was never in the
-    # percentage alone — it was in which series the screen handed it.
+    # percentage alone — it was in which series the screen handed it, and only
+    # a rendered screen can tell those two apart.
 
   @integration
   Scenario: A refund-heavy billed day renders negative as reported

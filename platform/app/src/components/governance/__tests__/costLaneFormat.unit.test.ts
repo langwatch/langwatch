@@ -155,8 +155,8 @@ describe("laneTrendPct", () => {
     expect(laneTrendBadge(laneTrendPct(flat))).toBe("level");
   });
 
-  /** @scenario "A flat year read by quarter reports level, not growth" */
-  it("reports level for a year of identical daily spend folded to quarters", () => {
+  /** @scenario "A flat year reports level, and folding it to quarters would not" */
+  it("reports level for a year of identical daily spend, and shows why the fold cannot", () => {
     // The screen's own default: a year in view, bucketed by quarter. A year
     // straddles five calendar quarters, the first and last of them partial, so
     // the buckets differ in count AND in the number of days each covers. Both

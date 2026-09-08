@@ -426,8 +426,8 @@ describe("the governance cost screen", () => {
   });
 
   describe("given a year in which every day cost exactly the same", () => {
-    /** @scenario "A window whose spend never moved says level, not growth" */
-    it("shows level on both lanes rather than a rise off the calendar", () => {
+    /** @scenario "A window whose spend never moved says level on both money lanes" */
+    it("shows level on both money lanes rather than a rise off the calendar", () => {
       // A full year, every day identical. The interval in view buckets it by
       // the calendar, and the calendar hands back buckets of different sizes —
       // a part-month at each end, quarters of 90 to 92 days. Measured on those
