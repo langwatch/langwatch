@@ -6,6 +6,13 @@
 name: Scenario voice gateway cell
 
 on:
+  # TEMPORARY (#6180 proof run): GitHub only registers workflow_dispatch
+  # workflows once they exist on the default branch, so this push trigger is
+  # the only way to get a real run on the PR branch. It is removed before the
+  # PR leaves draft. Never widen it.
+  push:
+    branches:
+      - feat/6180-scenario-voice-gateway-cell
   workflow_dispatch:
     inputs:
       gateway_url:
@@ -39,5 +46,5 @@ jobs:
         env:
           LANGWATCH_DEBUG: "true"
           SCENARIO_VOICE_GATEWAY_VK: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
-          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url }}
+          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url || 'https://gateway.langwatch.ai/v1' }}
         run: uv run pytest -s -vv -m e2e tests/e2e/test_scenario_voice_gateway_e2e.py
