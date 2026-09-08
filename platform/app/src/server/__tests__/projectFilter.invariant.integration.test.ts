@@ -265,7 +265,20 @@ const NOT_A_LISTING: Record<string, string> = {
     "counts application projects that have ingested, to decide one onboarding flag; returns a number",
 };
 
-/** Every source file that hides the governance home from a project read. */
+/**
+ * Every source file that hides the governance home from a project read.
+ *
+ * Discovery is BY the predicate, and that bounds what this sweep can prove.
+ * It catches a reader that filters today and quietly stops, and a surface
+ * pointed at a reader that no longer filters. It cannot catch a new
+ * member-facing listing that never filtered at all — such a reader carries
+ * no predicate, so it is absent from `filtering` and therefore from both
+ * `unaccounted` and `stale`, and this gate stays green while that screen
+ * leaks the home. Closing that end needs one shared project-listing boundary
+ * every member-facing reader must go through; until then, registering a new
+ * listing as a surface below is a review obligation, not a thing this file
+ * can enforce.
+ */
 function modulesFilteringTheGovernanceHome(): string[] {
   const found: string[] = [];
   for (const root of SWEPT_ROOTS) {
@@ -498,6 +511,9 @@ describe("the hidden governance project as a member sees it", () => {
     describe("when a new project listing is added to the codebase", () => {
       /** @scenario "Every filtered project listing is a surface the leak gate drives" */
       it("fails unless the listing registers itself as a driven surface", () => {
+        // Bounded on purpose: this proves the readers that filter stay
+        // driven, not that every member-facing reader filters. See
+        // `modulesFilteringTheGovernanceHome` for the end it cannot reach.
         const filtering = modulesFilteringTheGovernanceHome();
 
         // The sweep's own guard: a walker that found nothing, or a regex that

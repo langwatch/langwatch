@@ -57,7 +57,12 @@ Feature: Pulled provider cost has a home and never leaks
     # The scenario above only proves the surfaces it names. A listing added
     # later would filter the home on the day it lands and could quietly stop
     # filtering it a year on with nothing failing, because no surface drives
-    # it. This closes that gap in both directions.
+    # it. This closes that gap in both directions, for the readers that do
+    # filter. It does NOT catch a new member-facing listing that never
+    # filtered at all: the sweep discovers readers BY the predicate, so a
+    # reader missing it is invisible to both directions. Registering a new
+    # listing as a surface stays a review obligation until the predicate
+    # lives behind one shared project-listing boundary every reader must use.
     Given the sweep finds the project repository among the modules that filter the home
     When every filtering module is matched against the surfaces this gate drives
     Then no filtering module is left without a surface that proves it keeps filtering
