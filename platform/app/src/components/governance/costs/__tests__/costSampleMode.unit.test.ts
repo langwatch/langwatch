@@ -12,9 +12,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   resolveRealDataState,
-  type SummaryForSampleDecision,
   sampleModeActive,
   settleRealDataState,
+} from "~/components/governance/sample";
+
+import {
+  type SummaryForSampleDecision,
   summaryAsRead,
 } from "../costSampleMode";
 

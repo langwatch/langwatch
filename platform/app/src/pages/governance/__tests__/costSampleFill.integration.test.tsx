@@ -1,0 +1,297 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * What sample mode fills in on the Costs page, and what it takes away.
+ *
+ * The sibling suite `costSampleMode` covers WHEN the invented panels appear —
+ * the section-wide rule about empty screens and explicit choices. This one is
+ * about what the screen looks like once they have, and the two claims it makes
+ * are stronger than "some extra panels rendered":
+ *
+ *   1. NO FAILURE IS DRAWN. A reader who asked to see what a filled-in Costs
+ *      page looks like is not answered by a red alert across the top of it,
+ *      and "could not be loaded" is only another way of saying the screen has
+ *      nothing on it. Every real alert returns the moment the toggle goes off.
+ *   2. NOTHING INVENTED IS UNLABELLED. Suppressing the failure is only safe
+ *      because the banner says nothing on the page is real and every invented
+ *      figure carries the badge — including the lanes, which are the largest
+ *      numbers on the screen and were never badged before.
+ *
+ * Spec: specs/governance/governance-cost-screen.feature
+ *       specs/ai-governance/dashboard/governance-ui-controls.feature
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import "@testing-library/jest-dom/vitest";
+import type React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const harness = vi.hoisted(() => ({
+  summaryFails: false,
+  spendersFail: false,
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    isLoading: false,
+    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
+    organizations: [],
+    project: undefined,
+    hasPermission: () => true,
+    hasOrgPermission: () => true,
+    hasAnyPermission: () => true,
+  }),
+}));
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+vi.mock("~/hooks/useActivePlan", () => ({
+  useActivePlan: () => ({ isEnterprise: true, activePlan: undefined }),
+}));
+vi.mock("~/components/governance/GovernanceLayout", () => ({
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("~/components/NotFoundScene", () => ({
+  NotFoundScene: () => <div>this page does not exist</div>,
+}));
+vi.mock("~/components/LoadingScreen", () => ({
+  LoadingScreen: () => <div>loading</div>,
+}));
+
+vi.mock("~/utils/api", () => {
+  // The activity reads never answer, which is the shape a viewer holding
+  // `governanceCost:view` and not `activityMonitor:view` actually sees: the
+  // page never runs those queries at all. That leaves the sample decision
+  // "unknown", so nothing turns itself on and every test below asks for
+  // sample data the way the reader does — by pressing the button.
+  const unanswered = () => ({
+    useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  });
+  return {
+    api: {
+      governanceCost: {
+        summary: {
+          useQuery: () => ({
+            data: harness.summaryFails
+              ? undefined
+              : {
+                  unavailableReason: null,
+                  billed: { amountUsd: null, cellsWithoutAmount: 0 },
+                  gateway: { amountUsd: null, cellsWithoutAmount: 0 },
+                  seats: { status: "awaiting_data" },
+                  series: [],
+                  staleSources: null,
+                  unpricedWindow: null,
+                  azureBilling: null,
+                  windowDays: 365,
+                },
+            isLoading: false,
+            isError: harness.summaryFails,
+          }),
+        },
+        spenders: {
+          useQuery: () => ({
+            data: undefined,
+            isError: harness.spendersFail,
+            refetch: () => undefined,
+          }),
+        },
+      },
+      activityMonitor: {
+        summary: unanswered(),
+        spendByDepartment: unanswered(),
+        spendByUser: unanswered(),
+        spendOverTime: unanswered(),
+      },
+    },
+  };
+});
+
+import CostsPage from "../costs";
+
+const renderScreen = () =>
+  render(
+    <ChakraProvider value={defaultSystem}>
+      <CostsPage />
+    </ChakraProvider>,
+  );
+
+/** The panel card a title belongs to. */
+const panelFor = (title: string) =>
+  screen.getByText(title).closest('[data-testid="cost-panel"]') as HTMLElement;
+
+/** Render, then ask for sample data the way the reader does. */
+const renderInSampleMode = async () => {
+  const rendered = renderScreen();
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "See sample data" }));
+  return rendered;
+};
+
+beforeEach(() => {
+  harness.summaryFails = false;
+  harness.spendersFail = false;
+  // The section keeps ONE sample choice for the whole sitting, in session
+  // storage, so the first test to press the toggle would otherwise hand its
+  // answer to every test after it and they would open with samples already on.
+  window.sessionStorage.clear();
+});
+afterEach(() => cleanup());
+
+describe("the cost screen in sample mode", () => {
+  describe("given the cost read failed", () => {
+    beforeEach(() => {
+      harness.summaryFails = true;
+    });
+
+    /** @scenario "No error alerts are rendered while sample mode is on" */
+    /** @scenario "No error alert is rendered while sample mode is on" */
+    it("draws no error alert and shows invented lanes instead", async () => {
+      await renderInSampleMode();
+
+      expect(screen.queryByTestId("cost-lanes-error")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Cost data could not be loaded"),
+      ).not.toBeInTheDocument();
+      // The lanes are on screen, carrying figures, under the sample badge.
+      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("cost-lane-billed")).getByText("sample"),
+      ).toBeInTheDocument();
+    });
+
+    it("brings the failure straight back when the reader turns sample off", async () => {
+      await renderInSampleMode();
+
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Hide sample data" }));
+
+      expect(screen.getByTestId("cost-lanes-error")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the spender read failed", () => {
+    beforeEach(() => {
+      harness.spendersFail = true;
+    });
+
+    it("shows an invented spender list rather than the failure", async () => {
+      await renderInSampleMode();
+
+      const panel = panelFor("Billed spend by person");
+
+      expect(within(panel).getByText("sample")).toBeInTheDocument();
+      expect(
+        screen.queryByText(/could not be loaded/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the activity reads never answered", () => {
+    /** @scenario "Every invented panel carries the sample badge" */
+    /** @scenario "Every invented figure on the screen carries the sample badge" */
+    it("badges every invented panel and lane", async () => {
+      await renderInSampleMode();
+
+      for (const title of [
+        "Adoption",
+        "Metered spend forecast · by agent",
+        "Seats · bought against assigned",
+        "Cost over time · by team",
+        "Cost by department",
+        "Cost by model",
+        "Metered spend by person",
+        "Conversations over time",
+        "Tokens over time",
+      ]) {
+        expect(within(panelFor(title)).getByText("sample")).toBeInTheDocument();
+      }
+      for (const laneId of [
+        "cost-lane-billed",
+        "cost-lane-gateway",
+        "cost-lane-seats",
+      ]) {
+        expect(
+          within(screen.getByTestId(laneId)).getByText("sample"),
+        ).toBeInTheDocument();
+      }
+    });
+
+    /** @scenario "A panel with nothing in it shows sample data instead of Not available" */
+    /** @scenario "The adoption panel shows sample figures rather than nothing" */
+    it("fills the adoption panel with figures instead of saying nothing", async () => {
+      await renderInSampleMode();
+
+      const panel = panelFor("Adoption");
+
+      expect(
+        within(panel).getByText("People using AI tools"),
+      ).toBeInTheDocument();
+      expect(within(panel).getByText("Active seats")).toBeInTheDocument();
+      expect(within(panel).getByText("Tools adopted")).toBeInTheDocument();
+      expect(screen.queryByText("Not available.")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The sample toggle sits top-right and the banner directly under the header" */
+    it("puts the toggle beside the heading and the banner under it", async () => {
+      await renderInSampleMode();
+
+      const heading = screen.getByRole("heading", { name: "Costs" });
+      const toggle = screen.getByRole("button", { name: "Hide sample data" });
+      const banner = screen.getByRole("status");
+
+      // Same row as the heading, and the banner is the row after it.
+      expect(heading.parentElement).toBe(toggle.parentElement);
+      expect(heading.parentElement?.nextElementSibling).toBe(banner);
+    });
+
+    /** @scenario "Seats are drawn as counts against a seat axis, never as money" */
+    it("draws the seat panel as counts with no currency on it", async () => {
+      await renderInSampleMode();
+
+      const panel = panelFor("Seats · bought against assigned");
+
+      // The title is the assertion the panel is about seats rather than
+      // subscriptions in dollars. The figures themselves live inside a
+      // recharts SVG that jsdom never lays out, so the reachable proof that
+      // no money is drawn is that the panel carries no currency anywhere.
+      expect(panel.textContent).not.toContain("$");
+      expect(screen.queryByText(/Subscriptions/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "No panel is named after a single provider's product" */
+    it("names panels for what they count, not for one provider's product", async () => {
+      await renderInSampleMode();
+
+      expect(screen.getByText("Conversations over time")).toBeInTheDocument();
+      expect(screen.queryByText(/Genie/)).not.toBeInTheDocument();
+      // "Metered" is the word the lane above uses for this money, and the
+      // ADR uses throughout. "Consumption" named it a second way.
+      expect(
+        screen.getByText("Metered spend forecast · by agent"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Consumption/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The department chip offers sample departments while sample mode is on" */
+    it("offers the sample departments and narrows the breakdown to one", async () => {
+      const user = userEvent.setup();
+      await renderInSampleMode();
+
+      await user.click(
+        screen.getByText("Department").closest("button") as HTMLButtonElement,
+      );
+      expect(
+        await screen.findByRole("menuitem", { name: "Data & AI" }),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("menuitem", { name: "Engineering" }));
+
+      const panel = panelFor("Cost by department");
+      expect(panel.textContent).toContain("Engineering");
+      expect(panel.textContent).not.toContain("Marketing");
+    });
+  });
+});

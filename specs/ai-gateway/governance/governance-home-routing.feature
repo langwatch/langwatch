@@ -35,15 +35,18 @@ Feature: Governance home — route, nav promotion, persona detection
   # ---------------------------------------------------------------------------
 
   # Bound to delegatedViewer.integration.test.tsx, which renders the
-  # overview page and asserts the heading and every panel. The bound test
+  # overview page and asserts the heading and the hero. The bound test
   # renders the page component; the address staying put on a cold load
   # rides on the route registration the alias scenarios below exercise.
+  #
+  # The overview's panels moved to the pages that own them, so what says the
+  # dashboard rendered is the hero and its ways in, not a metrics view.
   @bdd @ui @governance-home @route @integration
   Scenario: Top-level /governance renders the dashboard
     When the admin navigates to "/governance"
     Then the page renders with the heading "AI Governance"
     And the URL stays at "/governance"
-    And the setup-checklist OR live-metrics view is rendered
+    And the hero and its ways in are rendered
 
   # Declared gap: specs/navigation/gateway-url-move.feature asserts the
   # DEEP-LINK form (/settings/governance/tool-catalog?... keeps its path
@@ -113,10 +116,10 @@ Feature: Governance home — route, nav promotion, persona detection
     When the admin cold-loads "/governance/catalog"
     Then they land on "/governance/inventory?tab=sources"
     # Bare /governance/catalog always meant the sources list. The new
-    # default tab on /governance/inventory is Catalog (tool tiles), so
+    # default tab on /governance/inventory is Catalog, so
     # the redirect must pin ?tab=sources or every stored sources link —
     # quarantine alerts, source chips, post-archive returns — would
-    # silently land on the tool-tiles pane.
+    # silently land on the catalog pane.
 
   @bdd @ui @governance-home @route @alias @integration
   Scenario: A stale tab value on a retired sources address still lands on Sources
@@ -137,11 +140,14 @@ Feature: Governance home — route, nav promotion, persona detection
   Scenario: The retired tool-catalog address lands on the inventory page
     When the admin cold-loads "/governance/tool-catalog"
     Then they land on "/governance/inventory"
-    And as an aiTools:manage holder their default tab is Catalog —
-      the same editor the retired address served
-    # Bare, no ?tab=: the bare address means "your default pane". A
-    # viewer following the same stored link lands on Sources instead,
-    # which is the pane they can actually read.
+    And their default tab is Catalog
+    # Bare, no ?tab=, and the same landing for every recipient of the
+    # stored link. The tiles editor the retired address served is no
+    # longer on this page at all: the tiles are the CLI's gateway-versus-
+    # direct policy map and belong with the settings that own that
+    # policy, not on the inventory. Catalog now means the catalog of
+    # tools the organization has actually connected, which is the nearest
+    # honest answer for someone following an old tool-catalog link.
 
   @bdd @ui @governance-home @route @alias @integration
   Scenario: The retired departments address lands on People
@@ -157,22 +163,26 @@ Feature: Governance home — route, nav promotion, persona detection
 
   # ---------------------------------------------------------------------------
   # Inventory tab shell — the inventory page is a tabbed surface: Catalog
-  # (the tool-tiles editor, formerly /governance/tool-catalog, carrying its
-  # own inner Tool Tiles / Ingestion Templates tabs unchanged), Sources
+  # (the registered-tools catalog, one card per connected tool),
+  # Environments (the environments discovered from those sources), Sources
   # (the ingestion-sources table) and Anomaly rules (the rules editor,
   # formerly /governance/anomaly-rules). A selected non-default tab is part
-  # of the address (?tab=); the default stays out of it. The default is
-  # permission-sensitive: Catalog for admins holding aiTools:manage,
-  # Sources otherwise — so the BARE address means "your default pane" and
-  # can resolve differently for different recipients of the same link.
-  # That is accepted deliberately: the ?tab= form is the stable shareable
-  # address, and both resolutions are the same page.
+  # of the address (?tab=); the default stays out of it.
+  #
+  # The default is Catalog for every reader. It used to be
+  # permission-sensitive — Catalog for aiTools:manage holders, Sources for
+  # everyone else — because Catalog was then the tool-tiles editor, which
+  # only those holders could use. The tiles left this page, and the pane
+  # that replaced them is built from the same source list the Sources tab
+  # reads, so there is no longer a reason for one bare link to open two
+  # different panes for two recipients.
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @inventory-tabs @integration
   Scenario: The inventory default tab stays out of the address
     When the admin opens "/governance/inventory"
-    Then the Catalog tab is selected and the tool-tiles editor renders inside it
+    Then the Catalog tab is selected and the registered-tools catalog
+      renders inside it
     And the address carries no "tab" parameter
 
   @bdd @ui @governance-home @inventory-tabs @integration
@@ -181,19 +191,26 @@ Feature: Governance home — route, nav promotion, persona detection
     Then the Sources tab is selected and the sources table renders inside it
 
   @bdd @ui @governance-home @inventory-tabs @integration
-  Scenario: A delegated viewer without aiTools:manage defaults to Sources
+  Scenario: The bare address opens the same pane for every reader
     Given a delegated viewer holding governance:view and
       ingestionSources:view but NOT aiTools:manage
     When they open "/governance/inventory"
-    Then the Sources tab is selected and the sources table renders
-    And the Catalog tab is still listed — selecting it shows the
-      aiTools:manage permission notice inside the pane (the notice the
-      old tool-catalog page showed full-page, now scoped to the tab)
+    Then the Catalog tab is selected, the same pane the admin lands on
+    And the address carries no "tab" parameter
+    And the sources list is read, since the catalog is built from it
+
+  @bdd @ui @governance-home @inventory-tabs @integration
+  Scenario: A reader without ingestionSources:view meets the grant, not an empty catalog
+    Given a reader holding governance:view but NOT ingestionSources:view
+    When they open "/governance/inventory"
+    Then the Catalog tab is still selected and still listed
+    And the pane names ingestionSources:view rather than reporting that
+      no tools are registered
 
   @bdd @ui @governance-home @inventory-tabs @integration
   Scenario: An unknown tab value falls back to the default
     When the admin opens "/governance/inventory?tab=nonsense"
-    Then the Catalog tab is selected and the tool-tiles editor renders
+    Then the Catalog tab is selected and the registered-tools catalog renders
     # Never a blank pane: a stale or mistyped tab value degrades to the
     # default instead of selecting nothing.
 
@@ -257,12 +274,21 @@ Feature: Governance home — route, nav promotion, persona detection
   # Applications (the applications they belong to). Same address contract
   # as the inventory: a selected non-default tab is part of the address
   # (?tab=), the default (Agents) stays out of it. No organization-wide
-  # list exists yet, so each pane is an empty state and the page issues
-  # no query — the rail shape ships ahead of the data, as Costs did.
+  # list exists yet, so the page issues no query — the rail shape ships
+  # ahead of the data, as Costs did.
+  #
+  # Sample mode now fills the Agents pane on arrival, because the section
+  # rule fills any governance page with nothing measured on it
+  # (specs/ai-governance/dashboard/agents-page.feature). The two scenarios
+  # below that read a pane's own sentence therefore say in their Given that
+  # the reader has turned sample data off. The other three do not depend on
+  # it: no query is issued either way, the Applications pane has no sample
+  # cards to show, and the guard refuses before any of it renders.
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @agents-tabs @integration
   Scenario: The agents page default tab stays out of the address
+    Given the reader has turned sample data off
     When a governance viewer opens "/governance/agents"
     Then the heading "Agents" renders and the Agents tab is selected
     And the pane reads "Agents appear here as they are detected across
@@ -288,6 +314,7 @@ Feature: Governance home — route, nav promotion, persona detection
 
   @bdd @ui @governance-home @agents-tabs @integration
   Scenario: An unknown agents tab value falls back to the default
+    Given the reader has turned sample data off
     When a governance viewer opens "/governance/agents?tab=nonsense"
     Then the Agents tab is selected and its empty state renders
 
@@ -398,8 +425,10 @@ Feature: Governance home — route, nav promotion, persona detection
       | Inventory         | /governance/inventory                         |
       | Agents            | /governance/agents                            |
       | People            | /governance/people                            |
-    # Tool Tiles is gone from the rail — it lives inside Inventory as
-    # the Catalog tab, and so is Anomaly Rules, as its own Inventory tab.
+    # Tool Tiles is gone from the rail, and off the Inventory page too:
+    # the Inventory Catalog tab is the catalog of connected tools, not the
+    # tile editor. Anomaly Rules is gone from the rail as well, and does
+    # live inside Inventory, as its own tab.
     # Costs and Platform join the rail only when
     # release_ui_governance_billed_cost_enabled is on; Billed stays absent
     # (see the billed-cost flag section below).

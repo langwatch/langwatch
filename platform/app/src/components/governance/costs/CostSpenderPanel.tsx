@@ -15,7 +15,7 @@ import { fmtMoney } from "./CostCharts";
  *
  * This panel reads the PULLED lane's spender breakdown — what the provider's
  * own bill attributed to each person — which is different money from the
- * "Cost by user" panel beside it (the cost recorded on traces as they were
+ * "Metered spend by person" panel beside it (the cost recorded on traces as they were
  * served). The two disagree on purpose and are never reconciled here; each is
  * labeled for its lane, same discipline as the totals.
  *
@@ -83,10 +83,14 @@ export function spenderDisplayRows(rows: SpenderRow[]): SpenderDisplayRow[] {
 }
 
 function SpenderName({ row }: { row: SpenderDisplayRow }) {
+  // Wider than the other ranked lists because this column carries badges as
+  // well as a name, and an email truncated to `ada@acme....` cannot be told
+  // from the next person at the same domain.
   return (
-    <HStack flex="0 0 40%" gap={2} minWidth={0}>
+    <HStack flex="0 0 58%" gap={2} minWidth={0}>
       <Text
         truncate
+        minWidth={0}
         title={row.notNamed ? undefined : row.label}
         color={row.notNamed ? "fg.muted" : undefined}
       >
@@ -94,12 +98,24 @@ function SpenderName({ row }: { row: SpenderDisplayRow }) {
       </Text>
       {/* The bucket row spans providers and carries none — no empty pill. */}
       {row.provider !== "" && (
-        <Badge size="xs" variant="subtle" colorPalette="gray" title="provider">
+        <Badge
+          size="xs"
+          variant="subtle"
+          colorPalette="gray"
+          title="provider"
+          flexShrink={0}
+        >
           {row.provider}
         </Badge>
       )}
       {row.agentId !== "" && (
-        <Badge size="xs" variant="subtle" colorPalette="gray" title="agent">
+        <Badge
+          size="xs"
+          variant="subtle"
+          colorPalette="gray"
+          title="agent"
+          flexShrink={0}
+        >
           {row.agentId}
         </Badge>
       )}

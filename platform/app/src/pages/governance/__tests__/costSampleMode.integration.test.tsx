@@ -167,6 +167,10 @@ const withNothingMeasured = () => {
 };
 
 beforeEach(() => {
+  // The section keeps ONE sample choice for the whole sitting, in session
+  // storage, so the first test to press the toggle would otherwise hand its
+  // answer to every test after it.
+  window.sessionStorage.clear();
   harness.costSummary = undefined;
   harness.activity = {
     summary: undefined,

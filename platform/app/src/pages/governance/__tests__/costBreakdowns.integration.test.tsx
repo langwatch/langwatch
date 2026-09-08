@@ -202,7 +202,27 @@ describe("the cost breakdown panels", () => {
       expect(
         screen.queryByText("Nothing in this window yet."),
       ).not.toBeInTheDocument();
-      expect(screen.getAllByText("Not available.").length).toBeGreaterThan(0);
+    });
+
+    /** @scenario "An empty panel says what it holds and what would fill it" */
+    it("names what each empty panel holds and what would fill it", () => {
+      renderScreen();
+
+      // The sentence a panel used to show instead. It named neither the panel
+      // nor what would fill it, so a reader's next move on seeing it was to
+      // report a bug against a screen working exactly as designed.
+      expect(screen.queryByText("Not available.")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Spend per model, largest first."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Fills from gateway traffic and from usage rows that name a model.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("link", { name: /Add a source/ }).length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -313,7 +333,7 @@ describe("the cost breakdown panels", () => {
       // reasons and print the same sentence, so a page-wide search for it
       // passes whether or not this panel drew bare axes.
       const panel = screen
-        .getByText("Cost evolution by team")
+        .getByText("Cost over time · by team")
         .closest('[data-testid="cost-panel"]');
 
       expect(panel).not.toBeNull();

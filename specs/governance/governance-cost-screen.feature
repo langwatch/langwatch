@@ -22,13 +22,197 @@ Feature: One cost screen, three honest lanes
     Given an organization with billed and gateway cost available
 
   @integration
-  Scenario: The department filter explains that it changes only the department chart
+  Scenario: The department filter explains that it changes only the department breakdown
     Given cost activity in two departments
     And the viewer holds both governanceCost:view and activityMonitor:view
     When a permitted viewer selects one department on the cost screen
-    Then the filter says it applies only to the Cost by department chart
-    And that chart shows only the selected department
+    Then the filter says it applies only to the department breakdown
+    And that breakdown shows only the selected department
     And the billed total, gateway total and cost-by-user panel stay unchanged
+
+  # =========================================================================
+  # The time controls, and the one axis every chart on the screen shares.
+  #
+  # Governance is read at a governance cadence. Budgets are set by quarter
+  # and headcount by year, so the screen opens on the last twelve months
+  # bucketed by quarter, and the finest bucket it offers is a month. The
+  # options themselves are the section-wide pair in
+  # ~/components/governance/filters and their behaviour is specified in
+  # specs/ai-governance/dashboard/governance-ui-controls.feature; what
+  # follows is what THIS screen has to do with them.
+  #
+  # The reads underneath answer in days and take no bucket parameter at
+  # all, so the fold to months, quarters and years happens on the client.
+  # That is a deliberate choice not to widen a server contract for a
+  # display concern — and it is also why the frame is clamped: every
+  # governance cost input caps its window at 365 days, and the Time Frame
+  # chip offers two years because every governance page offers the same
+  # four spans. Serving twelve months under a two-year label without
+  # saying so is exactly the class of quiet wrongness this screen exists
+  # to refuse, so the shortfall is stated on the screen.
+  #
+  # Group By is gone. It named the series of one chart while sitting in a
+  # row that reads as filtering the page, and every panel beside it
+  # ignored it — so the one thing it reliably taught a reader was that a
+  # chip on this page may or may not do anything. That chart says "by
+  # team" in its own title now, where someone looking at it will see it.
+  #
+  # The bucket is stated once, in words, under the filter row. It used to
+  # live in the heading of a full-width billed-against-metered chart that
+  # sat between the lanes and the breakdowns. That chart is gone — it was
+  # the largest thing on a screen that already carried four time series,
+  # and the comparison it drew is the one the two lane figures above it
+  # make directly. Its heading was also the only place the interval was
+  # ever written down, which meant a rule about EVERY chart was being
+  # proved against ONE. A sentence under the chips speaks for all of them.
+  # =========================================================================
+
+  @integration
+  Scenario: The screen opens on the last twelve months bucketed by quarter
+    When a permitted viewer opens the cost screen
+    Then the Time Frame chip reads Last 12 months
+    And the Time Interval chip reads Quarter
+    And no Group By chip is on the screen
+
+  @integration
+  Scenario: Every chart on the screen is ticked by the interval in view
+    Given the Time Interval is Quarter
+    When a permitted viewer reads the cost charts
+    Then no chart draws a bucket narrower than a quarter
+    And the time axis reads the same way on every chart that has one
+    And the screen says once, in words, which bucket the charts are drawn in
+
+  @integration
+  Scenario: A frame longer than the reads answer says how far the figures reach
+    Given the reader picks a Time Frame of two years
+    And the cost reads answer at most a year
+    When the screen renders
+    Then it says the figures cover the last twelve months
+    And it does not label a year of figures as two
+
+  @unit
+  Scenario: Seat counts fold to the last period in the bucket, never the sum
+    Given seat counts for three months inside one quarter
+    When they are folded to that quarter
+    Then the quarter reports the last month's count
+    # A seat count is a level, not a flow. Three months at 420 seats is a
+    # quarter holding 420, never 1,260 — the fold that is right for money
+    # is wrong for a count, so seats get their own.
+
+  @unit
+  Scenario: A period containing a day with no figure holds no figure either
+    Given a month whose days include one the read could not price
+    When the lane series is folded to that month
+    Then the month holds no figure for that lane
+    # Summing only the days we do have draws a total lower than the period
+    # cost with nothing on the chart saying so — the same lie the per-day
+    # figure already refuses to tell (ADR-128 §21).
+
+  @unit
+  Scenario: A period containing a restated day is itself marked restated
+    Given a quarter holding one day the provider restated
+    When the lane series is folded to that quarter
+    Then the quarter carries the restatement marker
+    And it carries the most recent restatement date in the quarter
+
+  # =========================================================================
+  # Sample mode on this screen.
+  #
+  # The section-wide rule — samples fill an empty screen, step aside once
+  # something real arrives, and an explicit choice by the reader beats
+  # both — lives in the UI controls spec. Two things are specific here.
+  #
+  # First, sample mode suppresses FAILURE, not just emptiness. A reader
+  # who has asked to see what a filled-in Costs page looks like is not
+  # answered by a red alert across the top of it, and "could not be
+  # loaded" is just another way of saying the screen has nothing on it.
+  # Every real alert comes back the moment the toggle goes off, and the
+  # toggle is always on screen.
+  #
+  # Second, no panel on this screen may say only "Not available." That
+  # sentence names neither the panel nor what would fill it, so a reader's
+  # next move on seeing it is to report a bug against a screen working
+  # exactly as designed. Every empty panel says what appears in it and
+  # what has to happen for it to hold figures, and offers the move that
+  # would do it where one exists.
+  # =========================================================================
+
+  @integration
+  Scenario: No error alert is rendered while sample mode is on
+    Given the cost read failed
+    When sample mode is on
+    Then no error alert is on the screen
+    And the lanes show invented figures under the sample badge
+
+  @integration
+  Scenario: Every invented figure on the screen carries the sample badge
+    Given sample mode is on with nothing measured
+    When the screen renders
+    Then each lane whose figure is invented carries the sample badge
+    And each invented panel carries it too
+    And no panel holding measured figures carries it
+
+  @integration
+  Scenario: An empty panel says what it holds and what would fill it
+    Given the activity reads answered with nothing and sample mode is off
+    When the screen renders
+    Then each empty panel names what appears in it
+    And names what has to happen for it to hold figures
+    And no panel reads only Not available
+
+  @integration
+  Scenario: The adoption panel shows sample figures rather than nothing
+    Given no adoption has been measured
+    When sample mode is on
+    Then the adoption panel shows invented adoption figures under the sample badge
+
+  @integration
+  Scenario: The department chip offers sample departments while sample mode is on
+    Given sample mode is on
+    When the reader opens the department chip
+    Then it offers the sample departments
+    And picking one narrows the invented department breakdown to it
+
+  # =========================================================================
+  # What the invented charts are allowed to claim.
+  #
+  # A sample chart teaches a reader the shape of a screen they have not
+  # filled in yet, so a sample that could not occur teaches them a shape
+  # the product will never show. Two of them were doing exactly that.
+  #
+  # Subscriptions were drawn as daily dollars. Nobody is charged for a
+  # subscription daily, and ADR-128 §6 says seat money is not something
+  # this product holds at all — the counts are the durable fact and what
+  # they cost is already on the invoice the billed lane reads. So seats
+  # are drawn as counts, bought against assigned, which is §16's wave-1
+  # idle-seat aggregate: "you pay for N seats, M are assigned". Per
+  # licence pool, not per department: attributing a seat to a department
+  # needs the per-person assignment facts §16 names as wave 2.
+  #
+  # The forecast was labelled "consumption". The lane above it is
+  # labelled "Metered by gateway" and §2 calls that money metering
+  # throughout, so the forecast says metered too — a screen that names
+  # the same money two ways teaches a reader they are two things.
+  #
+  # A panel was named after one provider's product. It is one of eight
+  # ingestion sources and no metric in the ADR or the product docs is
+  # named for it, so the panel is named for what it counts.
+  # =========================================================================
+
+  @integration
+  Scenario: Seats are drawn as counts against a seat axis, never as money
+    Given sample mode is on
+    When the seat chart renders
+    Then it plots seats bought against seats assigned
+    And its figures are counts, with no currency anywhere on it
+    And the two series are drawn side by side rather than added together
+
+  @integration
+  Scenario: No panel is named after a single provider's product
+    Given sample mode is on
+    When the screen renders its panels
+    Then no panel title names one provider's product
+    And the forecast is named for metered spend, the words the lane above it uses
 
   @integration
   Scenario: Each lane renders its own labeled total
@@ -483,7 +667,7 @@ Feature: One cost screen, three honest lanes
       When a viewer holding both the cost and the identity permissions opens the cost screen
       Then a spender panel lists that spender with their window total
       And the panel is labeled as billed spend, apart from the trace-cost cost-by-user panel
-      # The screen already carries a "Cost by user" panel summing the cost
+      # The screen already carries a "Metered spend by person" panel summing the cost
       # recorded on traces; the two measure different money and stay side
       # by side, each labeled — same lane discipline as the totals.
       # Rendered from the same gates as the lanes: no panel on an
@@ -570,3 +754,79 @@ Feature: One cost screen, three honest lanes
       Given any provider day with a bill
       When the connected view is drawn
       Then the attributed part and the part not seen by the gateway add up to the total exactly
+
+  # A REFUSAL IS NOT A FAILURE.
+  #
+  # Reported from a first visit: an organization that had configured nothing
+  # opened Costs and was met by red alerts saying something had gone wrong.
+  # Nothing had. The plan gate and the permission check both answer before a
+  # single cost row is read, so there was no outage to report — the screen was
+  # working exactly as designed and blaming itself for it.
+  #
+  # Two things follow. The page names the real cause, using the live plan to
+  # tell "your plan does not cover this" from "your role does not open this",
+  # because the server's own wording is copy and cannot be relied on. And it
+  # treats the decline as a settled answer of nothing, which is what finally
+  # lets the invented panels fill the one screen they were built for. A genuine
+  # fault keeps its red alert and keeps the samples off: we know what a refusal
+  # means, and we do not know what a 500 means.
+
+  Rule: A read the server declined is reported as a decline, not as a fault
+
+    @integration
+    Scenario: A declined read is never reported as something going wrong
+      Given a reader whose cost read is declined by the plan gate
+      When the cost screen is drawn
+      Then no alert says the cost data could not be loaded
+      And nothing on the screen says something went wrong
+
+    @integration
+    Scenario: A declined read fills the screen with sample data by default
+      Given a reader whose cost read is declined by the plan gate
+      When the cost screen is drawn
+      Then the invented panels are shown without the reader asking for them
+      And the control to turn them off is on the screen
+
+    @integration
+    Scenario: A declined read names the plan when the plan is what declined
+      Given an organization below the Enterprise plan
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then the screen says the cost views come with the Enterprise plan
+      And it does not say something went wrong
+
+    @integration
+    Scenario: A declined read names the grant when the plan already covers it
+      Given an organization on the Enterprise plan
+      And a reader whose cost read is declined for want of a grant
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then the screen says the reader does not have access to cost data
+      And it does not name the plan
+
+    @integration
+    Scenario: The spender panel states what it holds when its read is declined
+      Given a reader whose spender read is declined
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then the billed-spend-by-person panel says what would fill it
+      And it does not offer to try the read again
+      # "Try again" is advice that cannot work against a decline.
+
+  Rule: A read that genuinely broke still reports the failure
+
+    @integration
+    Scenario: A failed read still reports the failure
+      Given a cost read that fails with a server fault
+      When the cost screen is drawn
+      Then the screen says the cost data could not be loaded
+      And it does not say the read was declined
+
+    @integration
+    Scenario: A failed read does not turn sample mode on by itself
+      Given a cost read that fails with a server fault
+      When the cost screen is drawn
+      Then the invented panels are not shown
+      And the control to turn them on is on the screen
+      # A fault is not evidence the screen is empty, so the page offers the
+      # samples and leaves the choice with the reader.

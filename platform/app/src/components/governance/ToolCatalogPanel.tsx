@@ -78,10 +78,19 @@ function CatalogTabs({
 }
 
 /**
- * The tool-catalog editor body — the Catalog pane of the inventory page,
- * formerly the whole /governance/tool-catalog page. The composition is
- * unchanged from that page: it gates on the catalog's own grant, owns the
- * tile drawer's state, and delegates the tab strip to `CatalogTabs`.
+ * The tool-catalog editor body — the tile editor and the ingestion-template
+ * catalog, gating on the catalog's own grant, owning the tile drawer's state,
+ * and delegating the tab strip to `CatalogTabs`.
+ *
+ * NOT MOUNTED ANYWHERE TODAY. It was the Inventory page's Catalog pane, which
+ * is now the registered-tools catalog instead: tiles say what a person may
+ * click, not what the organization runs and pays for, so they are not an
+ * inventory. Tiles themselves are untouched and still have two consumers — the
+ * personal AI-tools portal renders them as its launcher, and the command line
+ * reads the coding-assistant tiles for each tool's path policy — so this
+ * composition is kept, not deleted, until it is given a home of its own
+ * (Settings, or the AI Gateway, where the tile's gateway-versus-direct choice
+ * actually bites). See specs/ai-governance/dashboard/inventory-catalog.feature.
  *
  * Both tabs read through `aiTools:manage`, the catalog's own grant. The
  * hosting page opens on `governance:view`, so a delegated viewer reaches
