@@ -51,6 +51,18 @@ Three parts, run as three lanes in this order, one at a time, since they share `
     project inside the handler after a cross-tenant ClickHouse lookup, and the runtime demands a project scope before the
     handler runs. Decide the shape: `anyAuthenticated` plus an app-side check, or a door variant that defers the scope.
 
+13. **Multipart bodies.** dataset's `POST /api/dataset/upload`, `POST /api/dataset/:slugOrId/upload` and
+    `POST /api/dataset/direct-upload` take files. A declaration states a JSON body or none; add a multipart input kind with
+    field schemas and the file parts named, documented as `multipart/form-data`.
+14. **A browser-session door.** dataset's direct-upload routes (`direct-upload`, `staging/:uploadId`, `:datasetId/finalize`,
+    `retry`, `DELETE`) and the deleted dataset generator authenticate a session cookie inside the handler. Add
+    `withCredential("session")` resolving the person and their project scope through the identity port.
+15. **Two success statuses on one route.** `PATCH /api/dataset/:slugOrId/records/:recordId` answers 201 when it created and
+    200 when it replaced; `responds` allows exactly one 2xx. Allow two when both carry the same schema.
+16. **A streamed answer.** `POST /api/dataset/generate` streamed a UI-message response; its rules are kept in
+    `packages/features/dataset/server/src/rules/dataset-generate-tools.rules.ts`. Item 2's raw response covers the body;
+    what is missing is the session door (14).
+
 ## Part C: tRPC (third lane)
 
 13. An anonymous procedure kind (`register`), the browser session's row id on the Actor or as a fact

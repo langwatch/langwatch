@@ -278,3 +278,36 @@ tables (tasks catalogue) and is not a user repository.
   `serviceAuthorized` with the app checking `evaluations:view` and `analytics:view` both (round three C).
 - Peer gap closing: once evaluator lands `EvaluatorApi.getById`, `MonitorEvaluatorPort` and `ProcessMonitorEvaluators` delete
   and `MonitorApp.dependencies` gains `evaluators: EvaluatorApi`.
+
+## dataset (door landed `bce3912c7e`; nine routes wait on the runtime)
+
+- `apps/api/src/app/api-production.composition.ts:76-79`: import `installApiDataset` only; `:1229-1233` → `this.composedDataset =
+  await installApiDataset({ prisma, peers: { experiments, permissions }, infrastructure: datasetInfrastructure, rest: {
+  credential, platformUrl, errors } })`, no refusing twin; `:4333` `composeDatasetService({ infrastructure })` is gone — the
+  workflow runtime's `peers.datasets` wants the deleted `DatasetService` contract, so it takes `this.composedDataset.app`
+  (`DatasetApi`) and `PostgresWorkflowAdapter`'s parameter type follows (workflow lane, note it).
+- `apps/api/src/app-rest/app-rest.packaged-families.ts:430-443`: the family is no longer built here; `mount("dataset", () =>
+  composed.dataset.rest)` (`installApiDataset` returns `rest: MountableRestApp`).
+- `apps/api/src/app-rest/app-rest.process-features.ts:86,495-497`: delete the `mountDatasetGenerateRest` import and the
+  `authoring?.datasetGenerate` block; `api-authoring-rest.composition.ts` drops the `"dataset-generate"` door name.
+- tRPC root (`src/app-trpc/app-trpc.composed.ts` and supports): `routers(mount)` returns `dataset`, `datasetRecord`,
+  `batchRecord`; `ctx.app.dataset` is `composed.dataset.app`.
+- Doubles and tests naming `refusingDatasetFeature` / `composeDatasetFeature` / `composeDatasetService`:
+  `src/app/__tests__/api-trpc-record.test-doubles.ts:284`, `src/app/__tests__/api-packaged-rest.usage-guard.integration.test.ts:62`,
+  `src/app-trpc/__tests__/support/app-trpc-features.ts:181`, `src/features/gateway/__tests__/gateway.composition.integration.test.ts:215`,
+  `src/features/role/__tests__/role.composition.integration.test.ts:181,198`,
+  `src/features/workflow/__tests__/execution-features.composition.integration.test.ts:348`,
+  `src/app/__tests__/api-experiment-run.composition.integration.test.ts:303` → booted memory installation.
+- Worker: `worker-dataset-normalization.composition.ts:17,77`, `worker-evaluation-app.composition.ts:20,73`,
+  `worker-scenario-execution.composition.ts:10,270` build `PostgresDatasetAdapter`, deleted and its repositories private →
+  a worker-side boot in `apps/worker/src/features/dataset/` (`withPersistence("postgres", { prisma }).withFeature(datasetServer,
+  { infrastructure }).boot({ role: "worker" })`) yielding one `DatasetApi`; `worker-dataset-normalization.composition.ts:45`
+  `PrismaDatasetContentRepository.create(options.database)` → `.create({ prisma: options.database })`.
+- Surface key: `packages/features/dataset/web/package.json` export `./surfaces/dataset-table` → `./dataset-table`;
+  `apps/ui/src/features/catalogue.json` `experiments.uses.surfaces` gains `@langwatch/dataset-web/dataset-table`; five
+  imports in `packages/features/experiment/web/src/{behavior/experiments-v3/use-dataset-sync.ts,
+  ui/sections/experiments-v3/evaluations-v3-dataset-table-provider.tsx, ui/sections/experiments-v3/table-settings-menu.tsx,
+  ui/sections/experiments-v3/evaluations-v3-table.tsx, ui/elements/experiments-v3/autosave-status.tsx}` repoint. One commit.
+- `specs/errors/handled-error-surfaces.feature:22,29,35,42` describe the deleted per-feature tRPC translation middleware;
+  handled errors cross tRPC natively now. Rewrite or retire those four scenarios (spec owner).
+- Baseline rows removed by the root session: nine `dataset|*`.

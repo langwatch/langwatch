@@ -291,42 +291,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "dataset|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "dataset|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "evaluation|contract-service",
       "measured": "2026-09-08"
     },
