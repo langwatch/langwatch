@@ -611,6 +611,12 @@ In TypeScript the handler receives one object, `{ messages, newMessages, threadI
 
 The function returns a string, one message, a list of messages, or a reply with a session value: `langwatch.AgentReply(output, session=...)` in Python, `{ output, session }` in TypeScript.
 
+### Attachments
+
+A connected agent column in the experiments workbench has an optional **attachment** input beside **input**. Map a dataset `image` or `file` column to it. See [Images and files in datasets](/datasets/dataset-images).
+
+The last user message then carries content parts instead of plain text. It holds the text of the turn, plus an `image_url` part for a picture, an `input_audio` part for a recording, or a `file` part with the file name and the file data in base64.
+
 ## Run parameters
 
 A run parameter is a value a run supplies, so one scenario covers several conditions: a model, a plan, a tenant, a fixture. The agent declares the parameters it accepts, and the platform offers them in the run dialog, in `--param` and in the API.
