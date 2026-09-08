@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
 /**
@@ -35,7 +35,7 @@ export async function lwqlEnabled({
   projectId,
   projects,
 }: {
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   projectId: string;
   projects: ProjectService;
 }): Promise<boolean> {

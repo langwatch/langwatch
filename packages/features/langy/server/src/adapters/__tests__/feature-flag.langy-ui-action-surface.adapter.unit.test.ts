@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   FeatureFlagLangyUiActionSurfaceAdapter,
@@ -7,8 +7,8 @@ import {
 
 const INPUT = { userId: "user-1", projectId: "project-1", organizationId: "org-1" };
 
-function makeFlags(isEnabled: FeatureFlagService["isEnabled"]): FeatureFlagService {
-  return { isEnabled } as unknown as FeatureFlagService;
+function makeFlags(isEnabled: FeatureFlagApi["isEnabled"]): FeatureFlagApi {
+  return { isEnabled } as unknown as FeatureFlagApi;
 }
 
 describe("FeatureFlagLangyUiActionSurfaceAdapter", () => {

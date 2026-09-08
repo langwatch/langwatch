@@ -20,7 +20,6 @@ import { z } from "zod";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
   NoApiTrpcFeatures,
 } from "../../api.application.ts";
 import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
@@ -346,7 +345,6 @@ function composeApplication(
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({
@@ -474,11 +472,10 @@ describe("given an API process with no collaborators for the record", () => {
     );
   });
 
-  it("serves its own two routers unchanged", () => {
+  it("serves its own agent router unchanged", () => {
     const application = ApiApplication.create({
       features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
-      secrets: new MissingSecretService(),
       http: {
         createContext: async () => ({
           actor: () => ({ id: "user-1" }),
@@ -634,7 +631,6 @@ function composeSessionApplication(options: {
 
   return ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: policy.asHttpOptions(),
   });

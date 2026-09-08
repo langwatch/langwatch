@@ -19,7 +19,6 @@ import { ApiAuditPort } from "../../../api-request.policy.ts";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
@@ -407,7 +406,6 @@ function composeApplication(
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

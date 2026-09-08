@@ -20,8 +20,7 @@ import { createEnterprisePlanGate } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { monitorApiMappingsSchema } from "@langwatch/monitor-contract";
 import type { Logger } from "@langwatch/observability";
-import { SecretApp, type SecretEncryptionPort } from "@langwatch/secret-server";
-import type { SecretService } from "@langwatch/secret-contract";
+import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
 import { TraceMediaStorePort } from "@langwatch/trace-server";
 import type {
@@ -120,7 +119,6 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   /** The process's ONE fixed-window counter. */
   rateLimit: FilesRateLimiter;
   redis: RedisConnection | undefined;
-  secrets: SecretService | undefined;
   /** The browser session, where this deployment composed a transport. */
   session: ApiHandlerManagedSessionPort | undefined;
   /**
@@ -226,7 +224,6 @@ export function composeApiPackagedRest(
       scenarioTabs: () => options.scenario.scenarioTabs,
       simulations: () => options.scenario.simulations,
       suites: () => options.scenario.suites,
-      ...(options.secrets ? { secrets: secretAppFrom(options.secrets) } : {}),
       // Both tracked-event URLs, over the SAME span collection the OTLP
       // receiver and the SDK collector send on. Absent where this process
       // registered no command queue: with nowhere to send the span, the door
@@ -378,12 +375,6 @@ function agentsV1ConnectedFrom(connectedAgents: ApiConnectedAgentsComposition) {
         : {}),
     },
   });
-}
-
-/** The secret application over the service the process already resolved. */
-function secretAppFrom(secrets: SecretService): () => SecretApp {
-  const app = SecretApp.create({ secrets });
-  return () => app;
 }
 
 /**

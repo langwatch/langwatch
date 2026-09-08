@@ -1,6 +1,6 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import {
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -163,7 +163,7 @@ function subscriber(options: {
     }
   }
   const built = createEvaluationTriggerSubscriber({
-    featureFlags: { isEnabled } as unknown as FeatureFlagService,
+    featureFlags: { isEnabled } as unknown as FeatureFlagApi,
     monitors: new Monitors(),
     evaluation: dispatch,
     metrics,

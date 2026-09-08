@@ -4,7 +4,7 @@
  * (specs/ops/process-manager-visibility.feature, specs/ops/shared-ops-snapshot.feature).
  */
 import type { AuthService } from "@langwatch/auth-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -58,7 +58,7 @@ function compose(options: { prisma: PrismaClient; redis?: RedisConnection | null
       prisma: options.prisma,
       authz: {} as never,
       plans: {} as never,
-      featureFlags: {} as unknown as FeatureFlagService,
+      featureFlags: {} as unknown as FeatureFlagApi,
       saasBilling: false,
       audit: undefined,
     },

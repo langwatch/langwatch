@@ -5,7 +5,7 @@ import { TraceEventAttributeMappingService } from "../../services/trace-event-at
 import { TraceLlmSpanMessagesService } from "../../services/trace-llm-span-messages.service.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationService, annotationSuggestedOutput } from "@langwatch/annotation-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
@@ -322,7 +322,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
      * Widens the span read's retention floor to this tenant's own policy.
      * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
      */
-    retentionResolver?: DataRetentionService;
+    retentionResolver?: DataRetentionApi;
     annotations?: AnnotationService;
     traceCanonicalisation: TraceCanonicalisationService;
   }) {
@@ -385,7 +385,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     filterConditions?: TraceLegacyFilterConditions | undefined;
     resolveTraceSpans?: ResolveTraceSpansFn;
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
-    retentionResolver?: DataRetentionService;
+    retentionResolver?: DataRetentionApi;
     annotations?: AnnotationService;
     traceCanonicalisation: TraceCanonicalisationService;
   }): TraceLegacyReadClickHouseRepository {

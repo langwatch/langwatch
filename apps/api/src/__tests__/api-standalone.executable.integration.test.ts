@@ -6,7 +6,6 @@ import type { UserService } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { OrganizationService } from "@langwatch/organization-contract";
-import { SecretService } from "@langwatch/secret-contract";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import {
   ApiAuthSessionCompositionPort,
@@ -270,7 +269,6 @@ function logged(spy: MockInstance): string[] {
 function hostProducts(): ApiProductionCompositionOptions {
   return {
     agents: new Proxy(AgentService.prototype, {}),
-    secrets: new Proxy(SecretService.prototype, {}),
     apiKeys: new Proxy(ApiKeyService.prototype, {}),
     authz: new Proxy(AuthzService.prototype, {}),
     organizations: new Proxy(OrganizationService.prototype, {}),

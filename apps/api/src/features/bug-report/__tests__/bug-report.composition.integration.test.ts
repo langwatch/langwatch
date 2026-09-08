@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { ApiAuditPort } from "../../../api-request.policy.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
@@ -62,7 +61,6 @@ function composeApplication() {
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

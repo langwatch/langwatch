@@ -47,7 +47,7 @@ import {
   WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
 } from "@langwatch/dashboard-server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -144,11 +144,11 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
 /** Organizations the workbench switch is on for. The rest of the fleet is dark. */
 let enabledOrganizationIds = new Set<string>();
 
-function featureFlags(): FeatureFlagService {
+function featureFlags(): FeatureFlagApi {
   return {
     isEnabled: async (_flag: string, context: { organizationId?: string | undefined }) =>
       context.organizationId !== undefined && enabledOrganizationIds.has(context.organizationId),
-  } as unknown as FeatureFlagService;
+  } as unknown as FeatureFlagApi;
 }
 
 /** Content protections per project. The gated project withholds captured content. */

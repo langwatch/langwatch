@@ -10,7 +10,7 @@ import {
 import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
 import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import {
   type AgentSandboxKeyReapDatabase,
@@ -192,7 +192,7 @@ import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
 } from "./worker-evaluation-processing.composition.ts";
-import type { WorkerFeatureFlagDatabase } from "./worker-feature-flags.composition.ts";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition.ts";
 import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition.ts";
 import {
@@ -200,7 +200,7 @@ import {
   createWorkerDatasetWrites,
 } from "./worker-dataset-normalization.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
-import { createWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
+import { installWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
 import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition.ts";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
@@ -315,7 +315,6 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   LangySessionKeyReapDatabase &
   WorkerLangyConversationDatabase &
   ScimSyncPipelineDatabase &
-  WorkerFeatureFlagDatabase &
   WorkerProjectStorageDatabase &
   WorkerTraceCapabilityDatabase;
 
@@ -464,16 +463,15 @@ export class WorkerProductionComposition {
         })
       : undefined;
 
-    // Built before the Eventing runtime because the runtime reads it: every
-    // projection, command and subscriber the pipelines mount consults its own
-    // kill switch per tenant, and ONE service per process is what keeps the
-    // cache tier shared and two callers from disagreeing for a TTL about
-    // whether a switch is thrown.
-    const featureFlags = createWorkerFeatureFlags({
-      database: options.database,
-      config: options.config,
-      redis: eventingOptions.groupQueue.redis,
-    });
+    // The flag answer, handed out before the feature is installed. The Eventing
+    // runtime below reads it, the tenant directories are composed over that
+    // runtime, and a tenant-targeted flag read is authorized against those same
+    // directories — so the reference is what lets one order exist. ONE per
+    // process, which is what keeps the cache tier shared and two callers from
+    // disagreeing for a TTL about whether a switch is thrown.
+    const featureFlagApis = new LocalFeatureApis();
+    featureFlagApis.declare(FeatureFlagApi);
+    const featureFlags = featureFlagApis.reference(FeatureFlagApi);
 
     const eventing = WorkerEventingRuntime.createProduction({
       persistence: eventingOptions,
@@ -752,6 +750,27 @@ export class WorkerProductionComposition {
         : {}),
       ...(options.observability ? { logger: options.observability.logger } : {}),
     });
+    // The rollout flags, installed now that the three directories a
+    // tenant-targeted read is authorized against are open, and bound to the
+    // reference every half above already holds. Every flag read before this
+    // line refuses by name rather than answering a default.
+    if (options.connection && tenancy) {
+      featureFlagApis.bind(
+        FeatureFlagApi,
+        await installWorkerFeatureFlags({
+          prisma: options.connection.client,
+          config: options.config,
+          redis: eventingOptions.groupQueue.redis,
+          peers: {
+            permissions: tenancy.authorization,
+            projects: tenancy.projects,
+            organizations: tenancy.organizations,
+          },
+        }),
+      );
+      featureFlagApis.ready();
+      options.resources?.own("worker feature-flag clients", () => featureFlagApis.close());
+    }
     // The model gateway, composed once for every path in this process that resolves a customer's
     // model: topic clustering's four questions and an online evaluation's `X_LITELLM_*`
     // environment. Two gateways would be two decryptions of one stored credential and two answers

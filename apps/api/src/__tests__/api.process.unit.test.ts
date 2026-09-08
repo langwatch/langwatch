@@ -1,5 +1,4 @@
 import { AgentService } from "@langwatch/agent-contract";
-import { SecretService } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -114,34 +113,6 @@ class TestAgentService extends AgentService {
   getHistory() {
     return this.unavailable();
   }
-
-  private unavailable(): never {
-    throw new Error("Not used by this test.");
-  }
-}
-
-class TestSecretService extends SecretService {
-  async list() {
-    return [];
-  }
-
-  async getValues() {
-    return {};
-  }
-
-  get() {
-    return this.unavailable();
-  }
-
-  create() {
-    return this.unavailable();
-  }
-
-  update() {
-    return this.unavailable();
-  }
-
-  async delete() {}
 
   private unavailable(): never {
     throw new Error("Not used by this test.");
@@ -287,7 +258,6 @@ function createProcess(
 ): ApiProcess {
   return ApiProcess.create({
     agents: new TestAgentService(),
-    secrets: new TestSecretService(),
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),

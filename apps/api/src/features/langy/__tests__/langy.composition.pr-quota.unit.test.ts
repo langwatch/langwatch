@@ -2,7 +2,7 @@
  * The per-user daily pull-request cap, as the API process composes it
  * (specs/langy/langy-github-prs.feature).
  */
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
   PostgresLangyAdapter,
@@ -92,7 +92,7 @@ function composedTurns(redis: RedisConnection | null): LangyTurnTechnicalPorts {
       prisma: {} as unknown as PrismaClient,
       authz: {} as never,
       plans: {} as never,
-      featureFlags: {} as unknown as FeatureFlagService,
+      featureFlags: {} as unknown as FeatureFlagApi,
       saasBilling: false,
       audit: undefined,
     },

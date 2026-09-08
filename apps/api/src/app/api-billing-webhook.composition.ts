@@ -12,7 +12,7 @@
  * subscription surface act on the same customer and the same subscription, and
  * a second client would be a second idempotency scope over one account.
  */
-import type { DataRetentionService, RetentionCategory } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi, RetentionCategory } from "@langwatch/data-retention-contract";
 import {
   BillingPriceCatalogue,
   getStripeEnvironmentFromNodeEnv,
@@ -98,7 +98,7 @@ export type ApiBillingWebhookOptions = Readonly<{
     | Pick<OrganizationService, "getBillingProfile" | "claimBillingCustomerId">
     | undefined;
   /** The retention cascade a first paid seat subscription writes a default into. */
-  dataRetention?: DataRetentionService | undefined;
+  dataRetention?: DataRetentionApi | undefined;
   /** The gateway the licence mail is sent through; absent sends no licence mail. */
   mail?: ApiMailComposition | undefined;
   /**
@@ -258,7 +258,7 @@ function composeBillingWriteHalf(
  */
 function composeBillingWebhookHost(options: {
   notifications: NotificationService;
-  dataRetention: DataRetentionService | undefined;
+  dataRetention: DataRetentionApi | undefined;
 }): BillingWebhookHostPort {
   if (!options.dataRetention) {
     logger.warn(
@@ -276,14 +276,14 @@ function composeBillingWebhookHost(options: {
 class ApiBillingWebhookHost extends BillingWebhookHostPort {
   static create(options: {
     notifications: NotificationService;
-    dataRetention: DataRetentionService;
+    dataRetention: DataRetentionApi;
   }): ApiBillingWebhookHost {
     return new ApiBillingWebhookHost(options.notifications, options.dataRetention);
   }
 
   private constructor(
     private readonly notifications: NotificationService,
-    private readonly dataRetention: DataRetentionService,
+    private readonly dataRetention: DataRetentionApi,
   ) {
     super();
   }

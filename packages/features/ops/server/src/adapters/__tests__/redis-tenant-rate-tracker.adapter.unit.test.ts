@@ -1,5 +1,6 @@
 import Redis from "ioredis";
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedisTenantRateTrackerAdapter } from "../redis.tenant-rate-tracker.adapter.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
@@ -108,8 +109,8 @@ describe("RedisTenantRateTrackerAdapter", () => {
     /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
     it("writes nothing for that tenant and keeps recording the others", async () => {
       const { redis } = redisFake();
-      const flags = MemoryFeatureFlagService.create();
-      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
+      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
       const tracker = RedisTenantRateTrackerAdapter.create({
         redis,
         now: () => now,
@@ -132,8 +133,8 @@ describe("RedisTenantRateTrackerAdapter", () => {
 
     it("records the enqueue anyway when the flag service is down", async () => {
       const { redis } = redisFake();
-      const flags = MemoryFeatureFlagService.create();
-      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
+      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
       const tracker = RedisTenantRateTrackerAdapter.create({
         redis,
         now: () => now,

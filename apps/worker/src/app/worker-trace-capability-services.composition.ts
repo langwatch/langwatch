@@ -57,7 +57,7 @@ import {
  * Eight operations over four Prisma models. Nothing here opens a connection,
  * reads an environment or chooses a gateway.
  *
- * WHAT IS DELIBERATELY NOT HERE. `FeatureFlagService` and `AnalyticsService`
+ * WHAT IS DELIBERATELY NOT HERE. `FeatureFlagApi` and `AnalyticsService`
  * are the other two services the record path names, and neither was ever the
  * blocker — one is a database, a cache, a config and a clock, the other is
  * `AnalyticsAdapter` over the ClickHouse resolver this process already holds.

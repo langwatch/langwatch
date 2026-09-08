@@ -9,16 +9,22 @@ import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-serv
 import { EventingTopicClusteringScheduleAdapter } from "@langwatch/topic-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { EnterpriseWorkerAuditLog } from "@langwatch/enterprise-worker";
-import { dataRetentionServer } from "@langwatch/data-retention-server";
+import {
+  dataRetentionServer,
+  PrismaDataRetentionDirectoryRepository,
+} from "@langwatch/data-retention-server";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { AuthzGrantsCommandDispatcherPort } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ProjectInfrastructure } from "@langwatch/project-server";
-import { createWorkerTenancyInfrastructure } from "./worker-tenancy-infrastructure.composition.ts";
+import {
+  createWorkerTenancyInfrastructure,
+  WorkerDataRetentionPlans,
+} from "./worker-tenancy-infrastructure.composition.ts";
 import { installWorkerTenancy } from "./worker-tenancy.composition.ts";
 import { installWorkerUser, WorkerUserAvatarStorage } from "./worker-user-app.composition.ts";
 import { installWorkerOps } from "./worker-ops-app.composition.ts";
@@ -49,7 +55,7 @@ export async function createWorkerFoundationApps(options: {
     eventLogClient(): ClickHouseClient;
   };
   plans: PlanProvider;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   resources: ResourceScope;
   authzDispatcher: AuthzGrantsCommandDispatcherPort;
   topicClustering: ProjectInfrastructure["topicClustering"];
@@ -68,12 +74,21 @@ export async function createWorkerFoundationApps(options: {
     topicSchedule: EventingTopicClusteringScheduleAdapter.create({
       processStore: options.eventing.processStore,
     }),
-    dataRetention: { resolveClickHouseClient: options.clickhouse.resolveClient },
+    dataRetention: {
+      // The organization lineage a rule is placed and gated against, over this
+      // process's ONE connection, and the plan behind the gate reduced to the
+      // two facts retention tiers on.
+      directory: PrismaDataRetentionDirectoryRepository.create(options.connection.client),
+      plans: WorkerDataRetentionPlans.create(options.plans),
+      resolveClickHouseClient: options.clickhouse.resolveClient,
+    },
   });
   const auditLog = await EnterpriseWorkerAuditLog.create({ prisma: options.connection.client });
   options.resources.own("worker audit log", () => auditLog.stop());
 
-  const builder = createApp({ name: "langwatch-worker-foundation" }).withInfrastructure({});
+  const builder = createApp({ name: "langwatch-worker-foundation" })
+    .withPersistence("postgres", { prisma: options.connection.client })
+    .withInfrastructure({});
   builder.withProvided(AuditLogApi, auditLog.auditLog());
   installWorkerTenancy(builder, tenancy);
   installWorkerUser(builder, {

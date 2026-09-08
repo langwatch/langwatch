@@ -5,7 +5,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application.ts";
+import { ApiApplication, MissingAgentService } from "../../api.application.ts";
 import { ApiAuditPort } from "../../api-request.policy.ts";
 import { ApiRestSecurity } from "../../api-rest.security.ts";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse.ts";
@@ -163,7 +163,6 @@ function composeApplication() {
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

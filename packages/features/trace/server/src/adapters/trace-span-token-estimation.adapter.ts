@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { TraceSpanTokenEstimationPort } from "../ports/trace-span-preparation.port.ts";
 import type { TraceTokenCounterPort } from "../ports/trace-token-counter.port.ts";
@@ -14,7 +14,7 @@ import { OtlpSpanTokenEstimationService } from "../services/span-token-estimatio
 export class TraceSpanTokenEstimationAdapter extends TraceSpanTokenEstimationPort {
   static create(options: {
     tokenizer: TraceTokenCounterPort;
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
   }): TraceSpanTokenEstimationAdapter {
     return new TraceSpanTokenEstimationAdapter(OtlpSpanTokenEstimationService.create(options));
   }

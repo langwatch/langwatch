@@ -5,7 +5,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -61,7 +61,7 @@ const dataPrivacyFor = (resolved: ResolvedDataPrivacy | null): DataPrivacyServic
     },
   }) as unknown as DataPrivacyService;
 
-const flags: FeatureFlagService = { isEnabled: async () => false } as unknown as FeatureFlagService;
+const flags: FeatureFlagApi = { isEnabled: async () => false } as unknown as FeatureFlagApi;
 
 function span(attributes: { key: string; value: { stringValue: string } }[]): OtlpSpan {
   return {

@@ -24,7 +24,7 @@ import {
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestFeatureFlagService } from "./support/test-feature-flag-service.ts";
+import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
 import { TestOrganizationService } from "./support/test-organization-service.ts";
 import { TestProjectService } from "./support/test-project-service.ts";
 import {
@@ -132,13 +132,13 @@ class SuiteOrganizationService extends TestOrganizationService {
 
 let chRepo: GatewayBudgetClickHouseRepository;
 let budgetDecisions: GatewayService;
-const featureFlags = new TestFeatureFlagService();
+const featureFlags = new TestFeatureFlags();
 
 const overviewService = (): BudgetOverviewService =>
   BudgetOverviewService.create({
     repository: PrismaGatewayBudgetOverviewRepository.create({ database: prisma }),
     organizations: new SuiteOrganizationService(),
-    featureFlags,
+    featureFlags: featureFlags.api,
     personalVirtualKeys: {
       listActiveForPrincipal: async ({ userId, organizationId }) =>
         await prisma.virtualKey.findMany({

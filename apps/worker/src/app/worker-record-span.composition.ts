@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { RecordSpanCommand, type TraceSpanSpoolPort } from "@langwatch/trace-server";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { createWorkerTraceContentDrop } from "./worker-trace-content-drop.composition.ts";
@@ -45,7 +45,7 @@ import type { WorkerTraceCapabilityServices } from "./worker-trace-capability-se
 export function createWorkerRecordSpanCommand(options: {
   config: WorkerConfig;
   services: WorkerTraceCapabilityServices;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   spool?: TraceSpanSpoolPort;
 }): RecordSpanCommand {
   const { config, services } = options;

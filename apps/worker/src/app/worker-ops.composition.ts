@@ -4,7 +4,7 @@
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Anomaly } from "@langwatch/ops-contract";
 import {
   AnomalyHardTierAlertPort,
@@ -51,7 +51,7 @@ export type WorkerOpsCompositionInput = Readonly<{
   database: UsageStatsWorkerDatabase;
   /** The counters the enqueue-rate baseline is kept in; absent disables the tick. */
   redis: RedisConnection | null | undefined;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /** The organization's own ClickHouse endpoint, for its usage counts. */
   resolveOrganizationClient:
     | ((organizationId: string) => UsageStatsClickHouseClientPort)

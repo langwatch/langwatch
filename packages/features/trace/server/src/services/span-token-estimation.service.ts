@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import type { TraceTokenCounterPort } from "../ports/trace-token-counter.port.ts";
 import { SpanModelNameService } from "./span-model-name.service.ts";
@@ -29,7 +29,7 @@ const PROJECT_KILL_SWITCH_KEY = "token-estimation-project-killswitch";
  */
 export interface OtlpSpanTokenEstimationServiceDependencies {
   tokenizer: TraceTokenCounterPort;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
 }
 
 /**

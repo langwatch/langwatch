@@ -5,7 +5,7 @@
  */
 import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { FeatureFlagKey, FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagKey, FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyApiCredentialInvalidError,
   LangyApiCredentialMissingError,
@@ -45,7 +45,7 @@ export type LangyRestCredentialPorts = Readonly<{
   /** Enforces one permission as the key's ceiling. */
   enforceCeiling: LangyRestCeilingPort;
   /** This deployment's flag store, for the per-project rollout gate. */
-  featureFlags: () => FeatureFlagService;
+  featureFlags: () => FeatureFlagApi;
   /** The user directory a key's owner is read from. */
   actors: () => LangyActorUserReader;
 }>;

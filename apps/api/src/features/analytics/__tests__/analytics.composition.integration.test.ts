@@ -17,11 +17,11 @@ import { ApiAuditPort } from "../../../api-request.policy.ts";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { LWQL_FLAG } from "@langwatch/analytics-server";
 import { composeAnalyticsFeature } from "../analytics.composition.ts";
-import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition.ts";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stub,
@@ -124,14 +124,13 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
     prisma: prisma.client,
     authz: testAuthz(),
     projects: testProjects(),
-    // The process's ONE rollout store, as the root composes it and hands it in.
-    featureFlags: composeFeatureFlagFeature({
-      prisma: prisma.client,
-      config: {
-        overrides: new Map(),
-        forceEnabled: new Set(options.workbenchEnabled === true ? [LWQL_FLAG] : []),
-      },
-    }).service,
+    // The process's ONE rollout store, as the root installs it and hands it in.
+    // One flag decides this surface, so the world answers that one and refuses
+    // every other operation by name.
+    featureFlags: createApiFixture<FeatureFlagApi>(
+      { isEnabled: async (flag) => flag === LWQL_FLAG && options.workbenchEnabled === true },
+      "analytics flags",
+    ),
     resolveClickHouseClient: options.clickhouse === false ? null : clickhouse.resolveClient,
     langWatchQL: undefined,
     resources: testResources(),
@@ -156,7 +155,6 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

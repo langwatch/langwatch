@@ -6,12 +6,12 @@
 import { TraceEdgeMediaExtractionService } from "../trace-edge-media-extraction.service.ts";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
 import { type EdgeMediaExtractionDeps } from "../trace-edge-media-extraction.service.ts";
 
-function flags(enabled = true): FeatureFlagService {
+function flags(enabled = true): FeatureFlagApi {
   return { isEnabled: async () => enabled } as never;
 }
 

@@ -38,7 +38,7 @@ import {
 } from "@langwatch/auth-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApp } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -103,7 +103,7 @@ export type ApiAuthCliDeviceFlowOptions = Readonly<{
   /** The AuthZ graph the project write check runs on. */
   authz: AuthzService | undefined;
   /** This deployment's flag store, for the device journey's rollout gate. */
-  featureFlags: FeatureFlagService | undefined;
+  featureFlags: FeatureFlagApi | undefined;
   /** This deployment's public origin, where it declared one. */
   publicBaseUrl: string | undefined;
   /**

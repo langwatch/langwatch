@@ -43,7 +43,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { PrismaDataPrivacyResolutionAdapter } from "@langwatch/data-privacy-server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -76,7 +76,7 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   /**
    * The process's ONE rollout store, composed by the feature-flag feature.
    */
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /** The application's own ClickHouse, or `null` where the process composed none. */
   resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   /** The restricted identity a member's own SQL runs as. */
@@ -109,7 +109,7 @@ import type { ComposedAnalyticsFeature } from "./analytics.composition.types.ts"
 class LangWatchQLWorkbenchAccess extends WorkbenchAccessPort {
   private constructor(
     private readonly dependencies: {
-      featureFlags: FeatureFlagService;
+      featureFlags: FeatureFlagApi;
       projects: ProjectService;
     },
   ) {
@@ -117,7 +117,7 @@ class LangWatchQLWorkbenchAccess extends WorkbenchAccessPort {
   }
 
   static create(dependencies: {
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
     projects: ProjectService;
   }): LangWatchQLWorkbenchAccess {
     return new LangWatchQLWorkbenchAccess(dependencies);
@@ -357,7 +357,7 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
     analytics: refusingApplication<AnalyticsApp>(),
     dashboard: refusingApplication<DashboardApp>(),
     langWatchQL: refusingApplication<LangWatchQLService>(),
-    featureFlags: refusingApplication<FeatureFlagService>(),
+    featureFlags: refusingApplication<FeatureFlagApi>(),
     apiKeyProtections: refuseAsync,
   };
 }

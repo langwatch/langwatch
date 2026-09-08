@@ -1,13 +1,13 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { OtlpSpan, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { createWorkerFeatureFlags } from "../worker-feature-flags.composition.ts";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { createWorkerRecordSpanCommand } from "../worker-record-span.composition.ts";
 import {
   createWorkerTraceCapabilityServices,
   type WorkerTraceCapabilityDatabase,
 } from "../worker-trace-capability-services.composition.ts";
-import type { WorkerFeatureFlagDatabase } from "../worker-feature-flags.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
 /**
@@ -99,7 +99,7 @@ function database(options: { policies?: unknown[]; costs?: unknown[] } = {}) {
       findMany: vi.fn(async () => []),
       findUnique: vi.fn(async () => null),
     },
-  } as unknown as WorkerTraceCapabilityDatabase & WorkerFeatureFlagDatabase;
+  } as unknown as WorkerTraceCapabilityDatabase;
 }
 
 function customerRate() {
@@ -178,7 +178,12 @@ function composeCommand(options: { policies?: unknown[]; costs?: unknown[] } = {
     command: createWorkerRecordSpanCommand({
       config,
       services,
-      featureFlags: createWorkerFeatureFlags({ database: prisma, config, redis: null }),
+      // No switch is thrown in this world: the command's two kill switches are
+      // read, and both answer off.
+      featureFlags: createApiFixture<FeatureFlagApi>(
+        { isEnabled: async () => false },
+        "record span flags",
+      ),
     }),
   };
 }

@@ -4,11 +4,12 @@
  * instead.
  */
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
-import {
-  FeatureFlagService,
-  type FeatureFlagKey,
-  type FeatureFlagTarget,
+import type {
+  FeatureFlagApi,
+  FeatureFlagKey,
+  FeatureFlagTarget,
 } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import {
   StoredObjectProjectDestinationResolverPort,
@@ -89,7 +90,7 @@ describe("given a process that composed no object store", () => {
       const composed = composeApiTraceSpool({
         storage: undefined,
         azureRetentionConfirmed: false,
-        featureFlags: new TestFeatureFlags(true, []),
+        featureFlags: testFeatureFlags(true, []),
         logger: { warn } as never,
       });
 
@@ -144,7 +145,7 @@ function spoolWorld(input: { enabled: boolean | Error }) {
       aws: AwsClientProcessRuntime.create({ outboundProxy: new NoOutboundProxy() }),
     },
     azureRetentionConfirmed: false,
-    featureFlags: new TestFeatureFlags(input.enabled, flagTargets),
+    featureFlags: testFeatureFlags(input.enabled, flagTargets),
     logger: { warn } as never,
   });
   if (!composed) throw new Error("This world composed an object store, so it composes a spool.");
@@ -194,61 +195,21 @@ class InMemoryDriver implements StoredObjectStorageDriver {
 }
 
 /** The per-project switch, answering what the case says and recording who asked. */
-class TestFeatureFlags extends FeatureFlagService {
-  constructor(
-    private readonly answer: boolean | Error,
-    private readonly asked: { flagKey: string; projectId: string }[],
-  ) {
-    super();
-  }
-
-  isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean> {
-    this.asked.push({
-      flagKey,
-      projectId: "projectId" in target ? target.projectId : "",
-    });
-    return this.answer instanceof Error
-      ? Promise.reject(this.answer)
-      : Promise.resolve(this.answer);
-  }
-
-  private unread(): Promise<never> {
-    return Promise.reject(new Error("This world reads one flag."));
-  }
-
-  resolveFrontendFlags(): Promise<never> {
-    return this.unread();
-  }
-
-  resolvePublicAnonymousFlags(): Promise<never> {
-    return this.unread();
-  }
-
-  resolveExperimentCatalogue(): Promise<never> {
-    return this.unread();
-  }
-
-  setUserExperimentEnrolment(): Promise<never> {
-    return this.unread();
-  }
-
-  setExperimentTenantPolicy(): Promise<never> {
-    return this.unread();
-  }
-
-  listOperatorCatalogue(): Promise<never> {
-    return this.unread();
-  }
-
-  setEnabled(): Promise<never> {
-    return this.unread();
-  }
-
-  setRules(): Promise<never> {
-    return this.unread();
-  }
-
-  clearStoredFlag(): Promise<never> {
-    return this.unread();
-  }
+/**
+ * One flag, answered. Every other operation refuses by name, which is what a
+ * world that reads one flag should do to a second read.
+ */
+function testFeatureFlags(
+  answer: boolean | Error,
+  asked: { flagKey: string; projectId: string }[],
+): FeatureFlagApi {
+  return createApiFixture<FeatureFlagApi>(
+    {
+      isEnabled: (flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean> => {
+        asked.push({ flagKey, projectId: "projectId" in target ? target.projectId : "" });
+        return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+      },
+    },
+    "trace spool flags",
+  );
 }

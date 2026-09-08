@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   TraceSpanTokenEstimationAdapter,
   type TraceSpanTokenEstimationPort,
@@ -19,7 +19,7 @@ import type { WorkerTraceTokenizerConfig } from "../platform/config/worker.confi
  *
  *     TraceSpanTokenEstimationPort         (trace-server declares it)
  *       └─ OtlpSpanTokenEstimationService  (trace-server owns it)
- *            ├─ FeatureFlagService         the two kill switches
+ *            ├─ FeatureFlagApi         the two kill switches
  *            └─ TraceTokenCounterPort      the encoding tables
  *                 └─ WorkerTiktokenCounterAdapter   tiktoken, local BPE first
  *
@@ -31,7 +31,7 @@ import type { WorkerTraceTokenizerConfig } from "../platform/config/worker.confi
  */
 export function createWorkerTraceTokenEstimation(options: {
   config: WorkerTraceTokenizerConfig;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   tokenizer?: TraceTokenCounterPort;
 }): WorkerTraceTokenEstimation {
   const tokenizer = options.tokenizer ?? WorkerTiktokenCounterAdapter.create(options.config);

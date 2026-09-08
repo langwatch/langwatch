@@ -1,7 +1,8 @@
 /** @vitest-environment node */
 
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules.ts";
 
@@ -16,20 +17,30 @@ function projectsIn(organizationId: string): ProjectService {
   } as unknown as ProjectService;
 }
 
+/** One flag, answered; every other operation refuses by name. */
+function flagsSaying(on: { value: boolean }): {
+  featureFlags: FeatureFlagApi;
+  isEnabled: ReturnType<typeof vi.fn>;
+} {
+  const isEnabled = vi.fn(async () => on.value);
+  return { featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }, "lwql flags"), isEnabled };
+}
+
 describe("LangWatchQL feature access", () => {
-  const featureFlags = MemoryFeatureFlagService.create();
+  const on = { value: true };
+  let featureFlags: FeatureFlagApi;
+  let isEnabled: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    featureFlags.setFlag(LWQL_FLAG, true);
+    on.value = true;
+    ({ featureFlags, isEnabled } = flagsSaying(on));
   });
 
   describe("given a project belonging to an organization", () => {
     describe("when the gate is asked", () => {
       /** @scenario "The switch is decided for the project's organization, not for the project alone" */
       it("evaluates the flag for both the project and its organization", async () => {
-        const isEnabled = vi.spyOn(featureFlags, "isEnabled");
-
         await lwqlEnabled({
           featureFlags,
           projectId: "project_1",
@@ -48,7 +59,7 @@ describe("LangWatchQL feature access", () => {
   describe("given the flag is off", () => {
     describe("when the gate is asked", () => {
       it("returns the flag service's decision", async () => {
-        featureFlags.setFlag(LWQL_FLAG, false);
+        on.value = false;
 
         await expect(
           lwqlEnabled({

@@ -6,7 +6,6 @@ import type { UserService } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 import { ApiMetricsPort, ApiReadinessPort } from "../../api-process.lifecycle.ts";
 import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../../api.process.ts";
@@ -199,32 +198,6 @@ describe("ApiStandaloneComposition", () => {
     });
   });
 
-  describe("when a host supplied every product adapter except the secret service", () => {
-    it("serves the rest of the process without a secret door, rather than refusing to boot", async () => {
-      const { secrets: _injected, ...withoutSecrets } = testProducts();
-      const composed = await ApiStandaloneComposition.create(withoutSecrets).compose({
-        config: ephemeralConfig(),
-        graph: new TestGraph(),
-        observability: { serviceName: "langwatch-api-test" },
-        resources: new ResourceScope(),
-      });
-
-      const address = await composed.start();
-      if (!address) throw new Error("The API process did not report a listener address.");
-
-      expect(await fetch(`http://127.0.0.1:${address.port}/api/health`)).toHaveProperty(
-        "status",
-        204,
-      );
-      const secretDoor = await fetch(`http://127.0.0.1:${address.port}/api/secret`, {
-        method: "POST",
-      });
-      expect(secretDoor.status).toBe(404);
-
-      await composed.close();
-    });
-  });
-
   describe("when a host supplied product service adapters", () => {
     it("mounts the product transports the bare process surface does not serve", async () => {
       const bare = await ApiStandaloneComposition.create().compose({
@@ -271,7 +244,6 @@ describe("ApiStandaloneComposition", () => {
 function testProducts(): ApiProductionCompositionOptions {
   return {
     agents: new Proxy(AgentService.prototype, {}),
-    secrets: new Proxy(SecretService.prototype, {}),
     apiKeys: new Proxy(ApiKeyService.prototype, {}),
     authz: new Proxy(AuthzService.prototype, {}),
     organizations: new Proxy(OrganizationService.prototype, {}),

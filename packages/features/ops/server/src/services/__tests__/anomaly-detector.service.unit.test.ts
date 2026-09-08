@@ -1,6 +1,6 @@
 import type { Anomaly } from "@langwatch/ops-contract";
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { AnomalyHardTierAlertPort } from "../../ports/anomaly-hard-tier-alert.port.ts";
 import { AnomalyRateTrackerPort } from "../../ports/anomaly-rate-tracker.port.ts";
@@ -64,7 +64,7 @@ class HardTierAlertsFake extends AnomalyHardTierAlertPort {
 
 function createDetector(
   options: {
-    flags?: FeatureFlagService | undefined;
+    flags?: FeatureFlagApi | undefined;
     alerts?: HardTierAlertsFake | undefined;
   } = {},
 ) {
@@ -185,8 +185,8 @@ describe("AnomalyDetectorService", () => {
   describe("given the kill-switch flag is resolved per tenant", () => {
     /** @scenario "Kill-switch FF disables anomaly detection for one tenant without a redeploy" */
     it("skips only the tenant the flag names and still evaluates the others", async () => {
-      const flags = MemoryFeatureFlagService.create();
-      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => false);
+      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "anomaly kill switch");
       const { detector, rateTracker, anomalyState } = createDetector({ flags });
       rateTracker.listActiveTenants.mockResolvedValue(["proj_killed", "proj_normal"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
@@ -205,8 +205,8 @@ describe("AnomalyDetectorService", () => {
     });
 
     it("carries the evaluated tenant into the flag target", async () => {
-      const flags = MemoryFeatureFlagService.create();
-      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => false);
+      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "anomaly kill switch");
       const { detector, rateTracker } = createDetector({ flags });
       rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);
@@ -222,8 +222,8 @@ describe("AnomalyDetectorService", () => {
 
     /** @scenario "Kill-switch fails open when PostHog is unavailable" */
     it("evaluates the tenant when the flag service throws", async () => {
-      const flags = MemoryFeatureFlagService.create();
-      const isEnabled = vi.spyOn(flags, "isEnabled");
+      const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>(async () => false);
+      const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "anomaly kill switch");
       const { detector, rateTracker, anomalyState } = createDetector({ flags });
       rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
       rateTracker.perMinuteSeries.mockResolvedValue(stableBaseline);

@@ -21,7 +21,7 @@ import {
   PrismaScheduledJobStore,
   type EventingClickHouseReplayClientResolver,
 } from "@langwatch/eventing/server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   AdminAuditSink,
   EventExplorerClickHouseRepository,
@@ -70,7 +70,7 @@ export type WorkerOpsAppCompositionOptions = Readonly<{
   resolveReplayClient: EventingClickHouseReplayClientResolver;
   eventing: EventSourcing;
   processStore: ProcessStore;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   adminEmails: string;
 }>;
 

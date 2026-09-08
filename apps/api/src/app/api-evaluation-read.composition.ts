@@ -4,7 +4,7 @@
  * a page of them.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import {
   EvaluationAdapter,
@@ -47,7 +47,7 @@ function refusingWorkflows(processName: string): WorkflowService {
 export function composeApiEvaluationReads(options: {
   resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
   /** The project cascade the evaluation floor is bounded by. */
-  dataRetention: DataRetentionService;
+  dataRetention: DataRetentionApi;
   processName: string;
 }): EvaluationService {
   return EvaluationAdapter.create({

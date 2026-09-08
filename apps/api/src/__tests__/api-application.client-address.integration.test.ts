@@ -2,7 +2,6 @@
  * The caller's address on the tRPC surface.
  * @regression
  */
-import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { AgentService } from "@langwatch/agent-contract";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,25 +14,6 @@ import {
   NoApiTrpcFeatures,
 } from "../api.application.ts";
 import { ApiHttpListener } from "../api-http.listener.ts";
-
-const secret: Secret = {
-  id: "secret-1",
-  projectId: "project-1",
-  name: "MY_SECRET",
-  createdAt: new Date("2026-08-28T00:00:00.000Z"),
-  updatedAt: new Date("2026-08-28T00:00:00.000Z"),
-  createdBy: { name: "Alex" },
-  updatedBy: { name: "Alex" },
-};
-
-class TestSecretService extends SecretService {
-  readonly list = vi.fn(async () => [secret]);
-  readonly getValues = vi.fn(async () => ({}));
-  readonly get = vi.fn(async () => secret);
-  readonly create = vi.fn(async () => secret);
-  readonly update = vi.fn(async () => secret);
-  readonly delete = vi.fn(async () => undefined);
-}
 
 /** One public procedure that answers with the key the limits would use. */
 class AddressProbeFeatures extends ApiTrpcFeaturesPort<TRPCCreateRouterOptions> {
@@ -62,7 +42,6 @@ async function probeAddress(headers: Record<string, string>): Promise<string> {
   const application = ApiApplication.create({
     features: new AddressProbeFeatures(),
     agents: new MissingAgentService() as AgentService,
-    secrets: new TestSecretService(),
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),
@@ -98,7 +77,6 @@ describe("the tRPC surface's per-caller rate-limit key", () => {
       const application = ApiApplication.create({
         features: new AddressProbeFeatures(),
         agents: new MissingAgentService() as AgentService,
-        secrets: new TestSecretService(),
         http: {
           createContext: async () => ({
             actor: () => ({ id: "user-1" }),

@@ -17,10 +17,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
-import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition.ts";
 import { composeDatasetFeature } from "../../dataset/dataset.composition.ts";
 import { composeEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
 import { composePromptFeature } from "../../prompt/prompt.composition.ts";
@@ -215,10 +213,6 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   });
   const prompt = composePromptFeature({ infrastructure, peers: { projects } });
 
-  const featureFlag = composeFeatureFlagFeature({
-    prisma: prisma.client,
-    config: { overrides: new Map(), forceEnabled: new Set() },
-  });
   const role = composeRoleFeature({
     infrastructure,
     grants: {
@@ -230,7 +224,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   const home = composeHomeFeature({ infrastructure });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: { ...stubComposedFeatures(), dataset, evaluator, prompt, featureFlag, home, role },
+    composed: { ...stubComposedFeatures(), dataset, evaluator, prompt, home, role },
     infrastructure,
     collaborators: stubCollaborators(
       {
@@ -246,7 +240,6 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
         dataset: dataset.app,
         evaluatorApp: evaluator.app,
         prompts: prompt.app,
-        featureFlags: featureFlag.service,
         authzApp: role.authzApp,
         permissions: authz,
         roles: role.app,
@@ -258,7 +251,6 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

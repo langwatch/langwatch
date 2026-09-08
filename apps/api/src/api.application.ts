@@ -10,8 +10,6 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
-import { SecretService } from "@langwatch/secret-contract";
-import { SecretApp, SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
 import {
   TRPCError,
   type AnyTRPCRouter,
@@ -43,6 +41,7 @@ import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse.ts";
 import { apiClientAddress, apiSocketAddress } from "./app/api-client-address.ts";
 import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter.ts";
 import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy.ts";
+import type { SecretHostContext } from "./features/secret/secret-trpc.mount.ts";
 import type {
   ApiTrpcEnterpriseRequest,
   ApiTrpcFeatureApplication,
@@ -57,7 +56,7 @@ export type ApiActor = Readonly<{ id: string }>;
  * unplaceable client cannot spend the whole deployment's signed-out budget.
  */
 const UNRESOLVED_CLIENT_ADDRESS = "unresolved";
-export type ApiServices = Readonly<{ agents: AgentApp; secrets: SecretApp }>;
+export type ApiServices = Readonly<{ agents: AgentApp }>;
 
 /** The HTTP host authenticates a request then supplies these policy operations. */
 export type ApiRequestContext = Readonly<{
@@ -141,7 +140,7 @@ type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
    */
   opsScope: { kind: "platform" | "none" } | undefined;
 } & AgentTrpcContext &
-  SecretTrpcContext &
+  SecretHostContext &
   /**
    * `undefined` on every request here, deliberately: see {@link
    * ApiTrpcEnterpriseRequest}.
@@ -282,40 +281,6 @@ export class MissingAgentService extends AgentService {
   }
 }
 
-/**
- * What a process passes {@link ApiApplication.create} when it composed no secret service,
- * so `secrets.*` still mounts and answers by name instead of being absent from the wire.
- */
-export class MissingSecretService extends SecretService {
-  private unavailable(): never {
-    throw new Error("Secret service is not configured for this API application.");
-  }
-
-  list() {
-    return this.unavailable();
-  }
-
-  getValues() {
-    return this.unavailable();
-  }
-
-  get() {
-    return this.unavailable();
-  }
-
-  create() {
-    return this.unavailable();
-  }
-
-  update() {
-    return this.unavailable();
-  }
-
-  delete() {
-    return this.unavailable();
-  }
-}
-
 function handledErrorCode(error: HandledError): TRPCError["code"] {
   const codes: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
@@ -413,12 +378,6 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
      * Reads presence off the connected-agent runtime (ADR-128).
      */
     connectedAgents?: AgentAppDependencies["connected"];
-    /**
-     * Required — a process that composes no real secret service passes
-     * {@link MissingSecretService}, which mounts the router and refuses every
-     * call by name instead of leaving `secrets.*` off the wire.
-     */
-    secrets: SecretService;
     topic?: TopicApiFeature;
     http?: ApiHttpOptions;
     rest?: Hono;
@@ -439,7 +398,6 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
           testing: options.agentTesting,
           ...(options.connectedAgents ? { connected: options.connectedAgents } : {}),
         }),
-        secrets: SecretApp.create({ secrets: options.secrets }),
       },
       options.http,
       options.rest,
@@ -465,10 +423,8 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
     const protectedProcedure = this.createProtectedProcedure();
     const agents = AgentTrpcApi.create(this.root, { protected: protectedProcedure });
-    const secrets = SecretTrpcApi.create(this.root, { protected: protectedProcedure });
     this.trpc = this.root.router({
       agents,
-      secrets,
       // Spread rather than nested: every packaged surface is keyed by the wire
       // namespace it has always answered on, and nesting them under one key
       // would rename all twenty-two of them at once.

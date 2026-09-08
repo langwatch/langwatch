@@ -77,7 +77,7 @@ import type {
 } from "@langwatch/evaluation-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
 import type { QueueSendOptions } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { createWorkerRecordSpanCommand } from "./worker-record-span.composition.ts";
@@ -152,7 +152,7 @@ export type WorkerTraceProcessingCompositionOptions = Readonly<{
   config: WorkerConfig;
   /** The four read-side capability services, over the one Prisma client. */
   services: WorkerTraceCapabilityServices;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   traceCanonicalisation: TraceCanonicalisationService;
   stores: WorkerTraceProcessingStores;
   commands: WorkerTraceProcessingCommands;

@@ -79,7 +79,6 @@ import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server/a
 import { createScenarioEventsRestApp } from "@langwatch/scenario-server/api-rest/scenario-event";
 import { createScenariosRestApp } from "@langwatch/scenario-server/api-rest/scenario";
 import { createSimulationRunsRestApp } from "@langwatch/scenario-server/api-rest/simulation-run";
-import type { SecretApp } from "@langwatch/secret-server";
 import type {
   FilesProjectPermissionCheck,
   FilesRateLimiter,
@@ -114,7 +113,6 @@ import {
   type AgentCacheStore,
   createAgentCacheRestApp,
 } from "../features/agent-cache/agent-cache-rest.ts";
-import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest.ts";
 import { mountTrackedEventLegacyPathRest } from "../features/trace/tracked-event-rest.mount.ts";
 
 /**
@@ -169,7 +167,6 @@ export type ApiPackagedRestServices = Readonly<{
   scenarioTabs?: (() => ScenarioTabRegistry) | undefined;
   /** The SCIM provisioning tokens an identity provider authenticates with. */
   scim?: (() => ScimApp) | undefined;
-  secrets?: (() => SecretApp) | undefined;
   simulations?: (() => SimulationService) | undefined;
   storedObjects?: (() => StoredObjectApp) | undefined;
   suites?: (() => SuiteApp) | undefined;
@@ -318,7 +315,6 @@ export type ApiPackagedRestFamilyName =
   | "scenario-events"
   | "scenarios"
   | "scim-tokens"
-  | "secret"
   | "simulation-runs"
   | "suites"
   | "teams"
@@ -644,12 +640,6 @@ export function mountApiPackagedRestFamilies(options: {
             audit: ports.managementAudit,
           })
       : null,
-  );
-
-  const secrets = services.secrets;
-  mount(
-    "secret",
-    secrets ? () => createSecretLegacyRestApp({ security, secrets }).mountable : null,
   );
 
   mount(

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.port.ts";
@@ -39,7 +39,7 @@ const queueMetricsLogger = createLogger("langwatch:ops:queueMetricsWriter");
 export interface OpsWorkerAdapterOptions {
   anomaly: {
     redis: IORedis | Cluster | undefined;
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
     hardTierAlerts: AnomalyHardTierAlertPort;
   };
   /** The connection the queue counters live on; absent leaves the fleet with no writer. */

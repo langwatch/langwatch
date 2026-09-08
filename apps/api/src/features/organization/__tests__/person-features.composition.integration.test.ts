@@ -27,7 +27,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter.ts";
 import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition.ts";
@@ -233,7 +232,6 @@ function composeApplication(
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

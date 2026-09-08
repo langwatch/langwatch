@@ -4,6 +4,7 @@
  * surface.
  */
 import { EventEmitter } from "node:events";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { z } from "zod";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators.ts";
@@ -15,8 +16,10 @@ import { refusingAnalyticsFeature } from "../../features/analytics/analytics.com
 import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
 import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../features/prompt/prompt.composition.ts";
-import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition.ts";
-import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition.ts";
+import { createFeatureFlagTrpcRouter } from "../../features/feature-flag/feature-flag-trpc.mount.ts";
+import type { ComposedFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition.types.ts";
+import { createDataRetentionTrpcRouter } from "../../features/data-retention/data-retention-trpc.mount.ts";
+import type { ComposedDataRetentionFeature } from "../../features/data-retention/data-retention.composition.types.ts";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition.ts";
 import { refusingHomeFeature } from "../../features/project/home.composition.ts";
 import { refusingRoleFeature } from "../../features/role/role.composition.ts";
@@ -55,6 +58,8 @@ import { refusingUserFeature } from "../../features/user/user.composition.ts";
 import { createPresenceTrpcRouter } from "../../features/presence/presence-trpc.mount.ts";
 import type { ComposedPresenceFeature } from "../../features/presence/presence.composition.types.ts";
 import { refusingApiKeyFeature } from "../../features/api-key/api-key.composition.ts";
+import { createSecretTrpcRouter } from "../../features/secret/secret-trpc.mount.ts";
+import type { ComposedSecretFeature } from "../../features/secret/secret.composition.types.ts";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed.ts";
 
 const anySchema = z.any();
@@ -148,6 +153,11 @@ export function stubApplicationSlices(
     ops: stub("app.ops", { isAdmin: () => true }),
     prompts: stub("app.prompts"),
     governance: stub("app.governance"),
+    featureFlag: createApiFixture<ApiTrpcFeatureApplicationSlices["featureFlag"]>(
+      { isEnabled: async () => false },
+      "app.featureFlag",
+    ),
+    secrets: stub("app.secrets"),
     governanceApp: stub("app.governanceApp"),
     sessionPolicy: stub("app.sessionPolicy"),
     webhooks: stub("app.webhooks"),
@@ -190,6 +200,31 @@ export function stubPresenceFeature(): ComposedPresenceFeature {
   };
 }
 
+export function stubFeatureFlagFeature(): ComposedFeatureFlagFeature {
+  return {
+    app: createApiFixture<ComposedFeatureFlagFeature["app"]>(
+      { isEnabled: async () => false },
+      "featureFlag",
+    ),
+    router: (mount) => createFeatureFlagTrpcRouter(mount.runtime),
+  };
+}
+
+export function stubDataRetentionFeature(): ComposedDataRetentionFeature {
+  return {
+    service: createApiFixture<ComposedDataRetentionFeature["service"]>({}, "dataRetention"),
+    router: (mount) => createDataRetentionTrpcRouter(mount.runtime),
+  };
+}
+
+export function stubSecretFeature(): ComposedSecretFeature {
+  return {
+    app: createApiFixture<ComposedSecretFeature["app"]>({}, "secrets"),
+    rest: [],
+    routers: (mount) => ({ secrets: createSecretTrpcRouter(mount.runtime) }),
+  };
+}
+
 /**
  * The record's collaborators: the whole stubbed application, with the slices a suite
  * actually drives passed as overrides.
@@ -222,11 +257,11 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     ops: refusingOpsFeature(),
     scenario: refusingScenarioFeature(),
     analytics: refusingAnalyticsFeature(),
-    featureFlag: refusingFeatureFlagFeature(),
+    featureFlag: stubFeatureFlagFeature(),
     dataset: refusingDatasetFeature(),
     evaluator: refusingEvaluatorFeature(),
     prompt: refusingPromptFeature(),
-    dataRetention: refusingDataRetentionFeature(),
+    dataRetention: stubDataRetentionFeature(),
     workflow: refusingWorkflowFeature(),
     experiment: refusingExperimentFeature(),
     evaluation: refusingEvaluationFeature(),
@@ -254,6 +289,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     user: refusingUserFeature("langwatch-api"),
     presence: stubPresenceFeature(),
     apiKey: refusingApiKeyFeature(),
+    secret: stubSecretFeature(),
   };
 }
 

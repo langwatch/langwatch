@@ -28,13 +28,16 @@ class SecretCredentialRefusal extends Error {
   }
 }
 
-/** A scoped key acts as the person who minted it; a legacy project key as nobody. */
+/**
+ * A scoped key acts as the person who minted it; a legacy project key as
+ * nobody. Attributing a write to the key itself would put a credential id in
+ * `createdById` where every other row carries a user, so the write is refused
+ * at the handler instead.
+ */
 function actorOf(resolved: ResolvedApiKeyCredential): Actor | null {
-  if (resolved.type !== "apiKey") return null;
+  if (resolved.type !== "apiKey" || !resolved.userId) return null;
 
-  return resolved.userId
-    ? { type: "user", id: resolved.userId }
-    : { type: "api_key", id: resolved.apiKeyId };
+  return { type: "user", id: resolved.userId };
 }
 
 /** `/api/secret` and `/api/secrets`, each with its `/api/v1` twin. */

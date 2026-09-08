@@ -44,6 +44,7 @@ export function createAppTrpcFeatures(options: {
   const analyticsRouters = composed.analytics.routers(mount);
   const datasetRouters = composed.dataset.routers(mount);
   const roleRouters = composed.role.routers(mount);
+  const secretRouters = composed.secret.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = composed.enterprise.routers(mount);
   const automationRouters = composed.automation.routers(mount);
@@ -72,6 +73,10 @@ export function createAppTrpcFeatures(options: {
     // the whole point of a plan provider.
     plan: entitlementRouters.plan,
     savedViews: composed.savedView.router(mount),
+    // A project's stored credentials. In the record rather than beside it: the
+    // namespace used to be mounted on the root directly, which put it outside
+    // every audit that reads this list.
+    secrets: secretRouters.secrets,
     share: shareRouters.share,
     // ADR-057's single anonymous trace read. It takes the process's PUBLIC
     // procedure and a `noPermission` declaration rather than a permission: the

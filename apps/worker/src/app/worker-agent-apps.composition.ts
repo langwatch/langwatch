@@ -57,7 +57,7 @@ export async function createWorkerAgentApps(options: {
   const scenarioApi = peers.reference(ScenarioApi);
   resources.own("worker agent peer clients", () => peers.close());
 
-  const graph = createWorkerScenarioExecutionGraph({
+  const graph = await createWorkerScenarioExecutionGraph({
     prerequisites,
     simulations,
     agents,

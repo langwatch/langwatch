@@ -13,11 +13,11 @@ import type {
 } from "@langwatch/authz-contract";
 import { AgentNotFoundError, type AgentService } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { SecretService } from "@langwatch/secret-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { TraceService } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -26,7 +26,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse.ts";
 import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request.ts";
@@ -148,8 +147,8 @@ function testBroadcast() {
 }
 
 /** The rollout the Langy gate reads, answerable either way per test. */
-function testFeatureFlags(enabled: boolean): FeatureFlagService {
-  return { isEnabled: vi.fn(async () => enabled) } as unknown as FeatureFlagService;
+function testFeatureFlags(enabled: boolean): FeatureFlagApi {
+  return { isEnabled: vi.fn(async () => enabled) } as unknown as FeatureFlagApi;
 }
 
 /**
@@ -257,7 +256,7 @@ function composeApplication(
     scenarioExecution: {
       workflows: stub<WorkflowService>("workflows"),
       modelProviders: stub<ModelProviderService>("modelProviders"),
-      secrets: stub<SecretService>("secrets"),
+      secrets: stub<SecretApi>("secrets"),
       traces: stub<TraceService>("traces"),
       config: {
         langwatchEndpoint: "https://ingest.acme.test",
@@ -284,7 +283,6 @@ function composeApplication(
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

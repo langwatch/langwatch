@@ -1,6 +1,5 @@
 import { AgentService, type AgentWithFields } from "@langwatch/agent-contract";
 import { getCurrentContext } from "@langwatch/observability/context";
-import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
 
@@ -103,36 +102,6 @@ class TestAgentService extends AgentService {
   }
 }
 
-class TestSecretService extends SecretService {
-  private unavailable(): never {
-    throw new Error("Not used by this test.");
-  }
-
-  list() {
-    return Promise.resolve([]);
-  }
-
-  getValues() {
-    return Promise.resolve({});
-  }
-
-  async get() {
-    return this.unavailable();
-  }
-
-  async create() {
-    return this.unavailable();
-  }
-
-  async update() {
-    return this.unavailable();
-  }
-
-  delete() {
-    return Promise.resolve();
-  }
-}
-
 describe("ApiApplication Agent tRPC composition", () => {
   it("mounts every legacy agents.* procedure with its legacy presenter shape", async () => {
     const agents = new TestAgentService();
@@ -140,7 +109,6 @@ describe("ApiApplication Agent tRPC composition", () => {
     const application = ApiApplication.create({
       agents,
       features: new NoApiTrpcFeatures(),
-      secrets: new TestSecretService(),
     });
     const caller = application.createCaller({
       actor: () => ({ id: "user-1" }),
@@ -198,7 +166,6 @@ describe("ApiApplication Agent tRPC composition", () => {
     const application = ApiApplication.create({
       features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
-      secrets: new TestSecretService(),
     });
 
     const names = Object.keys(application.trpc._def.procedures).filter((path) =>
@@ -228,7 +195,6 @@ describe("ApiApplication Agent tRPC composition", () => {
     const application = ApiApplication.create({
       agents,
       features: new NoApiTrpcFeatures(),
-      secrets: new TestSecretService(),
     });
     const caller = application.createCaller({
       actor: () => ({ id: "user-1" }),

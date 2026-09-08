@@ -6,18 +6,23 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PostgresAgentAdapter } from "@langwatch/agent-server";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { ProjectService } from "@langwatch/project-contract";
-import { PostgresPromptAdapter } from "@langwatch/prompt-server";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { SimulationService } from "@langwatch/scenario-contract";
+import type { SimulationService, ScenarioService, ScenarioApi } from "@langwatch/scenario-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import {
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
@@ -35,28 +40,20 @@ import {
   ScenarioTestSuiteIdPort,
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
-import { AesGcmSecretEncryptionAdapter, PostgresSecretAdapter } from "@langwatch/secret-server";
-import { RESERVED_PROJECT_SECRET_NAMES } from "@langwatch/secret-contract";
-import { PostgresSuiteAdapter, SuiteExecutionPort } from "@langwatch/suite-server";
-import {
-  ClickHouseTraceAdapter,
-  TraceFullIoPort,
-  TracePayloadReaderPort,
-  TraceQueryClassificationAdapter,
-  TraceQueryFieldValuesPort,
-  type TraceQueryFieldValuesResult,
-} from "@langwatch/trace-server";
+import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
+import { SuiteApp, SuiteExecutionPort } from "@langwatch/suite-server";
+import type { TraceApi } from "@langwatch/trace-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
   NlpPayloadStagingPort,
   PostgresWorkflowAdapter,
   PrismaWorkflowProjectEnvironmentAdapter,
-  UnconfiguredWorkflowNlpRuntimeAdapter,
   WorkflowLlmParametersPort,
+  type WorkflowNlpRuntimePort,
   type WorkflowLlmParameterResolution,
 } from "@langwatch/workflow-server";
-import type { LLMConfig } from "@langwatch/workflow-contract";
+import type { LLMConfig, WorkflowService } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -88,7 +85,7 @@ export type WorkerScenarioExecutionCompositionInput = Readonly<{
   config: WorkerConfig;
   connection: PrismaConnection | undefined;
   modelProviders: ModelProviderService | undefined;
-  projects: ProjectService | undefined;
+  projects: ProjectApi | undefined;
   redis: RedisConnection | null | undefined;
   resolveClickHouseClient: EventingClickHouseClientResolver | undefined;
   defaultRetentionDays: number;
@@ -102,7 +99,7 @@ export type WorkerScenarioExecutionPrerequisites = Readonly<{
   config: WorkerConfig;
   connection: PrismaConnection;
   modelProviders: ModelProviderService;
-  projects: ProjectService;
+  projects: ProjectApi;
   redis: RedisConnection;
   resolveClickHouseClient: EventingClickHouseClientResolver;
   defaultRetentionDays: number;
@@ -162,24 +159,23 @@ export function createWorkerScenarioExecution(input: {
   prerequisites: WorkerScenarioExecutionPrerequisites;
   pool: ScenarioExecutionPoolService;
   simulations: SimulationService;
-}): ScenarioProcessorService {
+  graph: WorkerScenarioGraph;
+  agents: AgentApi;
+}) {
   const { prerequisites: deps, pool, simulations } = input;
 
   const execution = ScenarioExecutionService.create({
     pool,
     cancellations: RedisCancellationPublisherAdapter.create(deps.redis),
-    prefetcher: createWorkerScenarioExecutionPrefetcher({ prerequisites: deps, simulations }),
+    prefetcher: input.graph.prefetcher,
     failures: ScenarioFailureHandlerService.create({
-      agents: PostgresAgentAdapter.create({
-        database: deps.connection.client,
-        processName: deps.config.serviceName,
-      }).build(),
+      agents: input.agents,
       simulations,
     }),
     simulations,
   });
 
-  return ScenarioProcessorService.create({
+  const processor = ScenarioProcessorService.create({
     execution,
     pool,
     // A dedicated connection: a client in subscribe mode can issue nothing
@@ -192,17 +188,11 @@ export function createWorkerScenarioExecution(input: {
     }),
     metrics: OtelScenarioProcessorMetricsAdapter.create(),
   });
+
+  return { execution, processor };
 }
 
-/**
- * Everything the PREFETCHER reads, which is narrower than what the executor
- * needs: it resolves a run's target, models and credentials and touches no
- * queue and no cancellation channel.
- *
- * Named as its own type so a test can compose the real graph — the real
- * adapters, over a real database — without standing up a Redis the prefetch
- * never reaches.
- */
+/** Inputs for resolving a run, without starting its pool or cancellation channel. */
 export type WorkerScenarioPrefetcherPrerequisites = Pick<
   WorkerScenarioExecutionPrerequisites,
   | "config"
@@ -217,19 +207,26 @@ export type WorkerScenarioPrefetcherPrerequisites = Pick<
   | "payloadStaging"
 >;
 
-/**
- * The run prefetcher, over this process's own graph.
- *
- * Its own factory rather than an expression inside the executor because it is
- * the seam a run's model resolution is decided at: whether a project's coding
- * default reaches a workflow, code or http target is answered here, over the
- * real resolver and the real provider rows.
- * @see specs/scenarios/simulation-run-model-resolution.feature
- */
-export function createWorkerScenarioExecutionPrefetcher(input: {
+/** Shared services used by ScenarioApp and run execution. */
+export interface WorkerScenarioGraph {
+  scenarios: ScenarioService;
+  prompts: PromptService;
+  suites: SuiteApi;
+  workflows: WorkflowService;
+  datasets: DatasetService;
+  nlpRuntime: WorkflowNlpRuntimePort;
+  secrets: SecretApi;
+  prefetcher: ScenarioExecutionPrefetcherService;
+}
+
+export async function createWorkerScenarioExecutionGraph(input: {
   prerequisites: WorkerScenarioPrefetcherPrerequisites;
   simulations: SimulationService;
-}): ScenarioExecutionPrefetcherService {
+  scenarioApi: ScenarioApi;
+  traces: TraceApi;
+  agents: AgentApi;
+  resources: ResourceScope;
+}): Promise<WorkerScenarioGraph> {
   const { prerequisites: deps, simulations } = input;
   const prisma = deps.connection.client;
   const encryption = AesGcmSecretEncryptionAdapter.create({ key: deps.encryptionKey });
@@ -249,32 +246,37 @@ export function createWorkerScenarioExecutionPrefetcher(input: {
     modelProvider: deps.modelProviders,
   }).build();
 
-  const agents = PostgresAgentAdapter.create({
-    database: prisma,
-    processName: deps.config.serviceName,
-  }).build();
+  const agents = input.agents;
+  const promptApp = PromptApp.create({ prompts, projects: deps.projects });
 
-  const suites = PostgresSuiteAdapter.create({
-    database: prisma,
-    agents,
-    prompts,
-    scenarios,
-    resolveClickHouseClient: deps.resolveClickHouseClient as never,
-    defaultRetentionDays: deps.defaultRetentionDays,
-    execution: new WorkerSuiteStartRefusal(deps.config.serviceName),
-    generateId: () => `suite_${nanoid()}`,
-  }).build();
+  const suites = SuiteApp.create({
+    dependencies: {
+      agents,
+      prompts: promptApp,
+      scenarios: input.scenarioApi,
+      projects: deps.projects,
+    },
+    infrastructure: {
+      database: prisma,
+      resolveClickHouseClient: deps.resolveClickHouseClient,
+      defaultRetentionDays: deps.defaultRetentionDays,
+      execution: new WorkerSuiteStartRefusal(deps.config.serviceName),
+      generateId: () => `suite_${nanoid()}`,
+    },
+    config: void 0,
+    resources: input.resources,
+  });
 
+  const datasets = PostgresDatasetAdapter.create({ database: prisma }).build();
+  const nlpRuntime = HttpWorkflowNlpRuntimeAdapter.create({
+    serviceUrl: deps.nlpServiceUrl,
+    staging: deps.payloadStaging,
+  });
   const workflows = PostgresWorkflowAdapter.create({
     database: prisma,
-    datasets: PostgresDatasetAdapter.create({ database: prisma }).build(),
+    datasets,
     modelProviders: deps.modelProviders,
-    nlpRuntime: deps.nlpServiceUrl
-      ? HttpWorkflowNlpRuntimeAdapter.create({
-          serviceUrl: deps.nlpServiceUrl,
-          staging: deps.payloadStaging,
-        })
-      : UnconfiguredWorkflowNlpRuntimeAdapter.create(),
+    nlpRuntime,
     projectEnvironment: PrismaWorkflowProjectEnvironmentAdapter.create({
       database: prisma,
       encryption,
@@ -283,13 +285,17 @@ export function createWorkerScenarioExecutionPrefetcher(input: {
     dslMigration: ContractWorkflowDslMigrationAdapter.create(),
   });
 
-  const secrets = PostgresSecretAdapter.create({
-    database: prisma,
-    encryption,
-    reservedNames: RESERVED_PROJECT_SECRET_NAMES,
-  }).build();
+  // The SAME cipher the child processes decrypt a run's parameters with, over this
+  // pod's own connection: the secret feature owns the reserved-name list itself now.
+  const secretRuntime = await createApp({ name: "langwatch-worker-secret" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withFeature(secretServer, { infrastructure: { encryption } })
+    .boot({ role: "worker" });
+  input.resources.own("worker scenario secrets", () => secretRuntime.stop());
+  const secrets = secretRuntime.feature(secretServer).provided;
 
-  return ScenarioExecutionPrefetcherService.create({
+  const prefetcher = ScenarioExecutionPrefetcherService.create({
     secretCipher,
     config: {
       langwatchEndpoint: deps.langwatchEndpoint,
@@ -304,22 +310,10 @@ export function createWorkerScenarioExecutionPrefetcher(input: {
     projects: deps.projects,
     modelProviders: deps.modelProviders,
     secrets,
-    traces: composeTraceReads(deps),
+    traces: input.traces,
   });
-}
 
-/**
- * The trace reads an HTTP target's ingest wait is measured on.
- */
-function composeTraceReads(deps: WorkerScenarioPrefetcherPrerequisites) {
-  return ClickHouseTraceAdapter.create({
-    resolveClient: deps.resolveClickHouseClient as never,
-    modelProviders: deps.modelProviders,
-    queryFieldValues: new UnlistedWorkerTraceQueryFieldValues(),
-    queryClassification: TraceQueryClassificationAdapter.create(),
-    payloads: new UnresolvedWorkerTracePayloadReader(),
-    fullIo: new UnrecomputedWorkerTraceFullIo(),
-  }).build();
+  return { scenarios, prompts, suites, workflows, datasets, nlpRuntime, secrets, prefetcher };
 }
 
 /**
@@ -408,27 +402,6 @@ class WorkerSuiteStartRefusal extends SuiteExecutionPort {
         `${this.processName} composes no suite start; suiteId=${input.suiteId} must be started through the API.`,
       ),
     );
-  }
-}
-
-/** The facet read, which the ingest-lag read never asks for. */
-class UnlistedWorkerTraceQueryFieldValues extends TraceQueryFieldValuesPort {
-  list(): Promise<TraceQueryFieldValuesResult> {
-    return Promise.resolve({ values: [] });
-  }
-}
-
-/** An offloaded payload, on a process that resolves none for this read. */
-class UnresolvedWorkerTracePayloadReader extends TracePayloadReaderPort {
-  tryRead(): Promise<string | null> {
-    return Promise.resolve(null);
-  }
-}
-
-/** Full-IO recomputation, which the ingest-lag read never asks for. */
-class UnrecomputedWorkerTraceFullIo extends TraceFullIoPort {
-  recompute(): { input: null; output: null } {
-    return { input: null, output: null };
   }
 }
 

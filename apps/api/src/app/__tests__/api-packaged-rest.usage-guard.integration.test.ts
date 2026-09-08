@@ -66,7 +66,6 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     publicBaseUrl: undefined,
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     redis: undefined,
-    secrets: undefined,
     session: undefined,
     traceIngest: usageLimit ? ({ usageLimit } as ApiTraceIngestComposition) : undefined,
     apiKeys: {} as never,

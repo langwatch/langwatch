@@ -18,7 +18,7 @@ import { mapTraceToDatasetEntry } from "@langwatch/dataset-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingSecretService } from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stubCollaborators,
@@ -287,7 +287,6 @@ async function composeApplication() {
 
   const application = ApiApplication.create({
     agents: createApiFixture<AgentApi>(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

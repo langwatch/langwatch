@@ -15,7 +15,7 @@ import {
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
 import type { Context } from "hono";
@@ -93,7 +93,7 @@ export type AuthCliDeviceFlowRestPorts = Readonly<{
    */
   canWriteProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
   /** This deployment's flag store, for the device journey's rollout gate. */
-  featureFlags: () => Pick<FeatureFlagService, "isEnabled">;
+  featureFlags: () => Pick<FeatureFlagApi, "isEnabled">;
   /**
    * The deployment's public origin, or none. The CLI persists it as the
    * control-plane base URL; a self-hosted install with neither still

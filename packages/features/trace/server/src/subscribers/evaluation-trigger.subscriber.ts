@@ -1,6 +1,6 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { QueueSendOptions } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
@@ -35,7 +35,7 @@ const EVALUATION_KSUID_RESOURCE = "eval";
 const logger = createLogger("langwatch:trace-processing:evaluation-trigger");
 
 export interface EvaluationTriggerSubscriberDeps {
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /**
    * Narrowed from the whole `MonitorService` to the one listing this
    * subscriber calls. The application narrows the same capability inline with
@@ -190,7 +190,7 @@ async function causalityLoopGuardFired({
   event: TraceProcessingEvent;
   tenantId: string;
   traceId: string;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   metrics: TraceEvaluationLoopMetricsPort;
 }): Promise<boolean> {
   const guardDisabled = await featureFlags.isEnabled(CAUSALITY_LOOP_GUARD_DISABLED_FLAG, {

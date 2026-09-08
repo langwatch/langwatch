@@ -11,7 +11,7 @@ import {
 } from "@langwatch/automation-contract";
 import { AutomationProviderRegistryAdapter } from "@langwatch/automation-server";
 import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -138,7 +138,7 @@ function harness() {
     prisma,
     projects: refuse<ProjectService>("the project directory"),
     monitors: refuse<MonitorService>("the monitor directory"),
-    featureFlags: refuse<FeatureFlagService>("the rollout gate"),
+    featureFlags: refuse<FeatureFlagApi>("the rollout gate"),
     plans: refuse<AutomationPlanProvider>("the plan provider"),
     providers,
     unsubscribeSecret: "unsubscribe-secret",

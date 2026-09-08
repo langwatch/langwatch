@@ -12,11 +12,7 @@ import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwat
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import {
-  ApiApplication,
-  type ApiTrpcFeatureMount,
-  MissingSecretService,
-} from "../../../api.application.ts";
+import { ApiApplication, type ApiTrpcFeatureMount } from "../../../api.application.ts";
 import { ApiRestSecurity } from "../../../api-rest.security.ts";
 import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse.ts";
 import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request.ts";
@@ -321,7 +317,6 @@ async function composeApplication() {
   const session = { user: { id: "user-1", email: "person@example.com" } };
   const application = ApiApplication.create({
     agents: createApiFixture<AgentApi>(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({
@@ -754,7 +749,6 @@ describe("given an API process that composed the real observability collaborator
       group,
       application: ApiApplication.create({
         agents: createApiFixture<AgentApi>(),
-        secrets: new MissingSecretService(),
         features,
         http: {
           createContext: async () => ({
@@ -1024,7 +1018,6 @@ describe("given the anonymous share read composed on this process", () => {
       metered,
       application: ApiApplication.create({
         agents: createApiFixture<AgentApi>(),
-        secrets: new MissingSecretService(),
         features,
         http: {
           createContext: async () => ({
@@ -1376,7 +1369,6 @@ describe("given the anonymous share read assembles its payload", () => {
       resolveCalls,
       application: ApiApplication.create({
         agents: createApiFixture<AgentApi>(),
-        secrets: new MissingSecretService(),
         features,
         http: {
           createContext: async () => ({

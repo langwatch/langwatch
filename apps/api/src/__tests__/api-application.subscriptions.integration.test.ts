@@ -5,7 +5,8 @@
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
-import { SecretService, type Secret } from "@langwatch/secret-contract";
+import type { Secret, SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -18,6 +19,7 @@ import {
 import { ApiRestSecurity } from "../api-rest.security.ts";
 import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition.ts";
 import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse.ts";
+import { createSecretTrpcRouter } from "../features/secret/secret-trpc.mount.ts";
 import { sameOriginSseInit } from "../app-trpc/__tests__/support/sse-browser-request.ts";
 
 const secret: Secret = {
@@ -30,13 +32,21 @@ const secret: Secret = {
   updatedBy: { name: "Alex" },
 };
 
-class TestSecretService extends SecretService {
-  readonly list = vi.fn(async ({ projectId }: { projectId: string }) => [{ ...secret, projectId }]);
-  readonly getValues = vi.fn(async () => ({}));
-  readonly get = vi.fn(async () => secret);
-  readonly create = vi.fn(async () => secret);
-  readonly update = vi.fn(async () => secret);
-  readonly delete = vi.fn(async () => undefined);
+/**
+ * The application behind `secrets.*`. Every call is recorded and none is
+ * expected: what the scenarios below assert is that the lane refuses the
+ * query and the mutation BEFORE either reaches it.
+ */
+function testSecrets() {
+  const calls = {
+    list: vi.fn(async ({ projectId }: { projectId: string }) => [{ ...secret, projectId }]),
+    getValues: vi.fn(async () => ({})),
+    get: vi.fn(async () => secret),
+    create: vi.fn(async () => secret),
+    update: vi.fn(async () => secret),
+    delete: vi.fn(async () => undefined),
+  };
+  return { calls, app: createApiFixture<SecretApi>(calls, "secrets") };
 }
 
 /**
@@ -53,13 +63,17 @@ class LiveUpdateFeatures extends ApiTrpcFeaturesPort<TRPCCreateRouterOptions> {
   readonly errorReporting = this.none.errorReporting;
   readonly application = this.none.application;
 
-  build({ root, publicProcedure }: ApiTrpcFeatureMount): TRPCCreateRouterOptions {
+  build({ root, publicProcedure, runtime }: ApiTrpcFeatureMount): TRPCCreateRouterOptions {
     return {
       live: root.router({
         watch: publicProcedure.subscription(async function* () {
           yield { tick: 1 };
         }),
       }),
+      // A real query and a real mutation on the same root, so the two refusals
+      // below are asserted against procedures that exist rather than paths that
+      // do not.
+      secrets: createSecretTrpcRouter(runtime),
     };
   }
 }
@@ -85,11 +99,10 @@ function subscriptionSecurity() {
 }
 
 /** The process, composed with its subscription lane mounted. */
-function processWithLane(secrets: SecretService) {
+function processWithLane() {
   const application = ApiApplication.create({
     features: new LiveUpdateFeatures(),
     agents: new MissingAgentService(),
-    secrets,
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),
@@ -127,7 +140,7 @@ describe("ApiApplication's subscription lane", () => {
   describe("given a subscription on the process's own root", () => {
     /** @scenario A subscription path still streams */
     it("resolves it against the same root and context the tRPC endpoint serves", async () => {
-      const lane = processWithLane(new TestSecretService());
+      const lane = processWithLane();
 
       const response = await lane.request("/api/sse/live.watch");
 
@@ -144,8 +157,8 @@ describe("ApiApplication's subscription lane", () => {
   describe("given a mutation on that same root", () => {
     /** @scenario A mutation reached over the subscription lane never runs */
     it("refuses it and leaves the service behind it untouched", async () => {
-      const secrets = new TestSecretService();
-      const lane = processWithLane(secrets);
+      const { calls } = testSecrets();
+      const lane = processWithLane();
 
       const input = encodeURIComponent(
         JSON.stringify({ projectId: "project-1", name: "STOLEN", value: "x" }),
@@ -156,26 +169,26 @@ describe("ApiApplication's subscription lane", () => {
       await expect(response.json()).resolves.toMatchObject({
         error: "live_stream_unsupported_procedure",
       });
-      expect(secrets.create).not.toHaveBeenCalled();
+      expect(calls.create).not.toHaveBeenCalled();
     });
 
     /** @scenario A query reached over the subscription lane never runs */
     it("refuses a query on the same grounds", async () => {
-      const secrets = new TestSecretService();
-      const lane = processWithLane(secrets);
+      const { calls } = testSecrets();
+      const lane = processWithLane();
 
       const input = encodeURIComponent(JSON.stringify({ projectId: "project-1" }));
       const response = await lane.request(`/api/sse/secrets.list?input=${input}`);
 
       expect(response.status).toBe(405);
-      expect(secrets.list).not.toHaveBeenCalled();
+      expect(calls.list).not.toHaveBeenCalled();
     });
   });
 
   describe("given a path this root carries no procedure at", () => {
     /** @scenario An unknown subscription path is refused as not found */
     it("answers not found without building a caller", async () => {
-      const lane = processWithLane(new TestSecretService());
+      const lane = processWithLane();
 
       const response = await lane.request("/api/sse/secrets.somethingElse");
 
@@ -187,7 +200,7 @@ describe("ApiApplication's subscription lane", () => {
   describe("given a request from another site", () => {
     /** @scenario A cross-site request cannot open the subscription lane */
     it("refuses it even though the path names a real subscription", async () => {
-      const lane = processWithLane(new TestSecretService());
+      const lane = processWithLane();
 
       const response = await lane.request("/api/sse/live.watch", {
         "sec-fetch-site": "cross-site",
@@ -205,7 +218,6 @@ describe("ApiApplication's subscription lane", () => {
       const application = ApiApplication.create({
         features: new NoApiTrpcFeatures(),
         agents: new MissingAgentService(),
-        secrets: new TestSecretService(),
         http: {
           createContext: async () => ({
             actor: () => ({ id: "user-1" }),

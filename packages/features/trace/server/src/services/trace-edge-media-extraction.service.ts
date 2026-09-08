@@ -5,7 +5,7 @@
  */
 
 import { TraceValueMediaExtractionService } from "./trace-value-media-extraction.service.ts";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { containsMediaMarkers, type OtlpKeyValue, type OtlpSpan } from "@langwatch/trace-contract";
 import type { TraceEdgeMediaTelemetryPort } from "../ports/trace-media-store.port.ts";
@@ -24,7 +24,7 @@ export interface EdgeMediaExtractionLogger {
 
 /** Injectable policy and storage dependencies for the extraction hook. */
 export interface EdgeMediaExtractionDeps {
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /**
    * True when the project's resolved data-privacy policy drops any span content. Required rather
    * than defaulted: a default of `false` would store media at the edge for exactly the projects

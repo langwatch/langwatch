@@ -1,6 +1,6 @@
 import { type RetentionDaysProvider, RetentionFloorService } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionManagedTable,
@@ -15,7 +15,7 @@ const logger = createLogger("langwatch:clickhouse:retention-floor");
  * of the policy; this is the whole policy half — map the table to its category, ask the cascade.
  */
 class PlatformRetentionDaysProvider implements RetentionDaysProvider {
-  constructor(private readonly resolver: DataRetentionService) {}
+  constructor(private readonly resolver: DataRetentionApi) {}
 
   async tryGetRetentionDays({
     tenantId,
@@ -40,7 +40,7 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
  * gets a bound, at the platform default, so a caller can adopt this before its site is rewired.
  */
 export class TraceRetentionFloorService {
-  static create(resolver?: DataRetentionService): RetentionFloorService {
+  static create(resolver?: DataRetentionApi): RetentionFloorService {
     return new RetentionFloorService({
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
       provider: resolver ? new PlatformRetentionDaysProvider(resolver) : undefined,

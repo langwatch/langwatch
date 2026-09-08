@@ -2,7 +2,8 @@
  * @see specs/langy/langy-api-key-turns.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { LangyIdentityToken } from "../langy-key-identity.service.ts";
 import { LangyKeyIdentityService } from "../langy-key-identity.service.ts";
 
@@ -23,9 +24,8 @@ function apiKeyToken({ userId }: { userId: string | null }): LangyIdentityToken 
 }
 
 function featureFlags(enabled: boolean) {
-  const service = MemoryFeatureFlagService.create();
-  service.setFlag("release_langy_enabled", enabled);
-  const isEnabled = vi.spyOn(service, "isEnabled");
+  const isEnabled = vi.fn(async () => enabled);
+  const service = createApiFixture<FeatureFlagApi>({ isEnabled }, "langy identity flags");
 
   return { service, isEnabled };
 }
@@ -63,14 +63,17 @@ describe("LangyKeyIdentityService", () => {
   it("rechecks Langy access for each use of the same key", async () => {
     // One token value, used for both calls: nothing about the key is edited
     // between them. Only the cohort answer changes.
-    const featureFlagService = MemoryFeatureFlagService.create();
-    featureFlagService.setFlag("release_langy_enabled", true);
+    const cohort = { enabled: true };
+    const featureFlagService = createApiFixture<FeatureFlagApi>(
+      { isEnabled: async () => cohort.enabled },
+      "langy identity flags",
+    );
     const resolved = apiKeyToken({ userId: "customer-3" });
 
     const identities = LangyKeyIdentityService.create({ featureFlags: featureFlagService });
 
     const before = await identities.resolve({ resolved });
-    featureFlagService.setFlag("release_langy_enabled", false);
+    cohort.enabled = false;
     const after = await identities.resolve({ resolved });
 
     expect(before).toEqual({ ok: true, userId: "customer-3" });

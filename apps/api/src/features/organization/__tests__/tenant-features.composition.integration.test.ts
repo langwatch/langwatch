@@ -20,7 +20,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeAutomationFeature } from "../../automation/automation.composition.ts";
@@ -235,7 +234,6 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

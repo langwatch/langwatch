@@ -9,8 +9,8 @@
 // runtime's scope check compares it against the project the credential
 // resolved. Every handler reads the CREDENTIAL's project, never the claim.
 
-import { PayloadTooLargeError } from "@langwatch/api";
-import { defineRestRouter, UnauthorizedError } from "@langwatch/api/rest";
+import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
+import { defineRestRouter } from "@langwatch/api/rest";
 import type { Actor } from "@langwatch/actor";
 import {
   SecretApi,
@@ -35,11 +35,14 @@ const secretBodyLimit = {
   onExceeded: () => new PayloadTooLargeError(),
 } as const;
 
-/** Who a write is attributed to. A credential bound to nobody cannot write. */
+/**
+ * Who a write is attributed to. A credential bound to nobody cannot write: the
+ * row carries `createdById`/`updatedById`, and a key is not a person.
+ */
 function callerOf(actor: Actor | null): SecretCaller {
   if (actor && (actor.type === "user" || actor.type === "api_key")) return { id: actor.id };
 
-  throw new UnauthorizedError("An authenticated actor is required");
+  throw new AuthenticatedActorRequiredError();
 }
 
 function defineSecretRest(namespace: string, operationSuffix: string) {

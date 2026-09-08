@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationService } from "@langwatch/annotation-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
@@ -57,7 +57,7 @@ export interface ClickHouseTraceLegacyReadOptions {
   /** The analytics filter translator; absent, a FILTERED list refuses. */
   filterConditions?: TraceLegacyFilterConditions | undefined;
   blobResolutionDeps?: BlobResolutionDeps;
-  retentionResolver?: DataRetentionService;
+  retentionResolver?: DataRetentionApi;
   annotationService?: AnnotationService;
 }
 

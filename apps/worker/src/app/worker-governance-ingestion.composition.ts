@@ -22,7 +22,7 @@ import {
 import { GatewayBudgetLedgerAdapter } from "@langwatch/gateway-server";
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
@@ -39,7 +39,7 @@ export type WorkerGovernanceIngestionOptions = Readonly<{
   resolveClickHouseClient: EventingClickHouseClientResolver;
   /** The two project reads a pull makes; see GovernanceInternalProjectPort. */
   projects: GovernanceInternalProjectPort;
-  featureFlags: Pick<FeatureFlagService, "isEnabled">;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** The AWS client runtime this process already built for stored objects. */
   aws: AwsClientProcessRuntime;
   /** The cipher a source's stored credentials were written with. */

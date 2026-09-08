@@ -1,4 +1,3 @@
-import { SecretService } from "@langwatch/secret-contract";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
@@ -44,7 +43,6 @@ describe("ApiApplication HTTP failures", () => {
     const application = ApiApplication.create({
       features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
-      secrets: new TestSecretService(),
       rest,
       http: {
         createContext: async () => ({
@@ -76,7 +74,6 @@ describe("ApiApplication HTTP failures", () => {
     const application = ApiApplication.create({
       features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
-      secrets: new TestSecretService(),
       rest,
       http: {
         createContext: async () => ({
@@ -104,30 +101,3 @@ class TestFailureCapture extends ApiRequestFailureCapturePort {
   readonly capture = vi.fn(async () => undefined);
 }
 
-class TestSecretService extends SecretService {
-  async list() {
-    return [];
-  }
-
-  async getValues() {
-    return {};
-  }
-
-  get() {
-    return this.unavailable();
-  }
-
-  create() {
-    return this.unavailable();
-  }
-
-  update() {
-    return this.unavailable();
-  }
-
-  async delete() {}
-
-  private unavailable(): never {
-    throw new Error("Not used by this test.");
-  }
-}

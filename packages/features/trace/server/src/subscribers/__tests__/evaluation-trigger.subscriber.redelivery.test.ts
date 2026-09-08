@@ -1,6 +1,6 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -139,7 +139,7 @@ class Monitors extends TraceEvaluationMonitorPort {
 
 async function deliverTwice(dispatch: Dispatch): Promise<void> {
   const built = createEvaluationTriggerSubscriber({
-    featureFlags: { isEnabled: vi.fn(async () => false) } as unknown as FeatureFlagService,
+    featureFlags: { isEnabled: vi.fn(async () => false) } as unknown as FeatureFlagApi,
     monitors: new Monitors(),
     evaluation: dispatch,
     metrics: new LoopMetrics(),

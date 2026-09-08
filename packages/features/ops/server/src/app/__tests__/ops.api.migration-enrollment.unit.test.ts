@@ -13,7 +13,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -101,7 +101,7 @@ function buildApp(): OpsApp {
   return OpsApp.create({
     infrastructure: {
       createCapability: () => createApiFixture<OpsCapability>(),
-      featureFlags: createApiFixture<FeatureFlagService>(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
       eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
         projections() {
           return [];

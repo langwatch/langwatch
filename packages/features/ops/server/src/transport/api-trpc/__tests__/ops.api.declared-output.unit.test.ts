@@ -4,7 +4,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -73,7 +73,7 @@ function buildCaller(capability: Partial<OpsCapability> = {}) {
   const app = OpsApp.create({
     infrastructure: {
       createCapability: () => createApiFixture<OpsCapability>({ snapshots: null, ...capability }),
-      featureFlags: createApiFixture<FeatureFlagService>(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
       eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
         projections() {
           return [];

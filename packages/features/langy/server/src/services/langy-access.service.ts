@@ -1,4 +1,4 @@
-import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 
 /**
  * The rollout flag Langy access hangs off, and the only lever that opens it. Declared here rather
@@ -34,13 +34,13 @@ function targetForLangyAccess(input: {
 
 /** Decides whether one user may reach Langy in a given scope. */
 export class LangyAccessService {
-  static create(options: { featureFlags: FeatureFlagService }): LangyAccessService {
+  static create(options: { featureFlags: FeatureFlagApi }): LangyAccessService {
     return new LangyAccessService(options);
   }
 
-  private readonly featureFlags: FeatureFlagService;
+  private readonly featureFlags: FeatureFlagApi;
 
-  private constructor(options: { featureFlags: FeatureFlagService }) {
+  private constructor(options: { featureFlags: FeatureFlagApi }) {
     this.featureFlags = options.featureFlags;
   }
 

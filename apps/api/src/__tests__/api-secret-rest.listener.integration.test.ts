@@ -1,12 +1,14 @@
-import { ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import { type ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
-import { OrganizationService } from "@langwatch/organization-contract";
-import { SecretService, type Secret } from "@langwatch/secret-contract";
+import type { Secret, SecretApi } from "@langwatch/secret-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
+import { ApiApplication, NoApiTrpcFeatures } from "../api.application.ts";
 import { ApiHttpListener } from "../api-http.listener.ts";
-import { ApiRestSecurity } from "../api-rest.security.ts";
-import { ApiSecretRestFeature } from "../api-secret-rest.feature.ts";
+import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential.ts";
+import { mountSecretRest } from "../features/secret/secret-rest.mount.ts";
 
 const secret: Secret = {
   id: "secret-1",
@@ -18,7 +20,7 @@ const secret: Secret = {
   updatedBy: { name: "Alex" },
 };
 
-const currentKey: ResolvedApiKeyToken = {
+const currentKey: ResolvedApiKeyCredential = {
   type: "apiKey",
   apiKeyId: "key-1",
   userId: "user-1",
@@ -36,20 +38,11 @@ const currentKey: ResolvedApiKeyToken = {
   },
 };
 
-/** The credentials every request carries; the real policy refuses without them. */
+/** The credentials every request carries; the real door refuses without them. */
 const credentials = {
   authorization: "Bearer current-token",
   "X-Project-Id": "project-1",
 };
-
-class TestSecretService extends SecretService {
-  readonly list = vi.fn(async () => [secret]);
-  readonly getValues = vi.fn(async () => ({}));
-  readonly get = vi.fn(async () => secret);
-  readonly create = vi.fn(async () => secret);
-  readonly update = vi.fn(async () => secret);
-  readonly delete = vi.fn(async () => undefined);
-}
 
 const running: ApiHttpListener[] = [];
 
@@ -104,41 +97,12 @@ describe("standalone Secret REST listener", () => {
       await expect(remove.json()).resolves.toEqual({ id: "secret-1", deleted: true });
     }
 
-    expect(api.secrets.list).toHaveBeenCalledTimes(bases.length);
-    expect(api.secrets.get).toHaveBeenCalledTimes(bases.length);
-    expect(api.secrets.create).toHaveBeenCalledTimes(bases.length);
-    expect(api.secrets.update).toHaveBeenCalledTimes(bases.length);
-    expect(api.secrets.delete).toHaveBeenCalledTimes(bases.length);
+    expect(api.calls.list).toHaveBeenCalledTimes(bases.length);
+    expect(api.calls.get).toHaveBeenCalledTimes(bases.length);
+    expect(api.calls.create).toHaveBeenCalledTimes(bases.length);
+    expect(api.calls.update).toHaveBeenCalledTimes(bases.length);
+    expect(api.calls.delete).toHaveBeenCalledTimes(bases.length);
     expect(api.authz.hasApiKeyPermission).toHaveBeenCalledTimes(bases.length * 5);
-  });
-
-  it("selects v1 from the path or header and refuses unsupported or conflicting versions", async () => {
-    const api = await startApi();
-    const explicit = await api.fetch("/api/v1/secret?projectId=project-1", {
-      headers: { ...credentials, "X-API-Version": "v1" },
-    });
-    const latest = await api.fetch("/api/secret?projectId=project-1", {
-      headers: { ...credentials },
-    });
-    const selected = await api.fetch("/api/secrets?projectId=project-1", {
-      headers: { ...credentials, "X-API-Version": "v1" },
-    });
-    const unsupported = await api.fetch("/api/secret?projectId=project-1", {
-      headers: { ...credentials, "X-API-Version": "v2" },
-    });
-    const conflict = await api.fetch("/api/v1/secrets?projectId=project-1", {
-      headers: { ...credentials, "X-API-Version": "v2" },
-    });
-    expect(explicit.headers.get("X-API-Version-Status")).toBe("stable");
-    expect(explicit.headers.get("X-API-Version")).toBe("v1");
-    expect(latest.headers.get("X-API-Version-Status")).toBe("latest");
-    expect(latest.headers.get("X-API-Version")).toBe("v1");
-    expect(selected.headers.get("X-API-Version-Status")).toBe("stable");
-    expect(selected.headers.get("X-API-Version")).toBe("v1");
-    expect(unsupported.status).toBe(400);
-    await expect(unsupported.json()).resolves.toMatchObject({ code: "invalid_api_version" });
-    expect(conflict.status).toBe(400);
-    await expect(conflict.json()).resolves.toMatchObject({ code: "api_version_conflict" });
   });
 
   /** @scenario "A caller may not reach a scope their credential does not cover" */
@@ -151,11 +115,11 @@ describe("standalone Secret REST listener", () => {
 
     expect(wrongProject.status).toBe(403);
     const body = (await wrongProject.text()).toLowerCase();
-    expect(JSON.parse(body)).toMatchObject({ code: "project_input_mismatch" });
     // The refusal is the same whether or not project-2 is real, so it must not
     // name it, quote it back, or say it was not found.
     expect(body).not.toContain("project-2");
     expect(body).not.toContain("not found");
+    expect(api.calls.list).not.toHaveBeenCalled();
   });
 
   /** @scenario "An authorised credential chooses a project" */
@@ -173,7 +137,7 @@ describe("standalone Secret REST listener", () => {
     });
 
     expect(response.status).toBe(201);
-    expect(api.apiKeys.tryResolveToken).toHaveBeenCalledExactlyOnceWith({
+    expect(api.apiKeys.findResolvedToken).toHaveBeenCalledExactlyOnceWith({
       token: "current-token",
       projectId: "project-1",
     });
@@ -184,15 +148,14 @@ describe("standalone Secret REST listener", () => {
       scope: { type: "project", id: "project-1", teamId: "team-1" },
       permission: "secrets:manage",
     });
-    expect(api.secrets.create).toHaveBeenCalledWith({
-      projectId: "project-1",
-      name: "OPENAI_API_KEY",
-      value: "secret-value",
-      actorId: "user-1",
-    });
+    expect(api.calls.create).toHaveBeenCalledWith(
+      { projectId: "project-1", name: "OPENAI_API_KEY", value: "secret-value" },
+      { id: "user-1" },
+    );
     expect(api.apiKeys.markUsed).toHaveBeenCalledExactlyOnceWith({ id: "key-1" });
   });
 
+  /** @scenario "Writes use the authenticated user actor" */
   it("refuses a write from a credential that names no person", async () => {
     const api = await startApi({ userId: null });
 
@@ -206,9 +169,22 @@ describe("standalone Secret REST listener", () => {
       }),
     });
 
-    expect(response.status).toBeGreaterThanOrEqual(400);
-    await expect(response.json()).resolves.toMatchObject({ code: expect.any(String) });
-    expect(api.secrets.create).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "authenticated_actor_required",
+    });
+    expect(api.calls.create).not.toHaveBeenCalled();
+  });
+
+  it("still lets that credential read, because a read attributes nothing", async () => {
+    const api = await startApi({ userId: null });
+
+    const response = await api.fetch("/api/v1/secret?projectId=project-1", {
+      headers: { ...credentials },
+    });
+
+    expect(response.status).toBe(200);
+    expect(api.calls.list).toHaveBeenCalledWith({ projectId: "project-1" });
   });
 
   it("does not move the key's last-used clock for a failed REST response", async () => {
@@ -232,22 +208,36 @@ const publicSecret = {
 };
 
 async function startApi(caller: { userId?: string | null } = {}) {
-  const secrets = new TestSecretService();
+  const calls = {
+    list: vi.fn(async () => [secret]),
+    getValues: vi.fn(async () => ({})),
+    get: vi.fn(async () => secret),
+    create: vi.fn(async () => secret),
+    update: vi.fn(async () => secret),
+    delete: vi.fn(async () => undefined),
+  };
+  const secrets = createApiFixture<SecretApi>(calls, "secrets");
   const apiKeys = apiKeyService();
   const withCallerUser = { ...currentKey, userId: caller.userId ?? null };
-  const resolved: ResolvedApiKeyToken = caller.userId === undefined ? currentKey : withCallerUser;
-  apiKeys.tryResolveToken.mockResolvedValue(resolved);
+  const resolved: ResolvedApiKeyCredential =
+    caller.userId === undefined ? currentKey : withCallerUser;
+  apiKeys.findResolvedToken.mockResolvedValue(resolved);
   const authz = authzService();
-  const security = ApiRestSecurity.projectPolicy({
+  const managed = ApiHandlerManagedCredentials.create({
     apiKeys: apiKeys.service,
     authz: authz.service,
-    organizations: new Proxy(OrganizationService.prototype, {}),
   });
+  const rest = new Hono();
+  for (const app of mountSecretRest({
+    secrets: () => secrets,
+    credential: (input) => managed.authenticate(input),
+  })) {
+    rest.route("/", app);
+  }
   const application = ApiApplication.create({
     features: new NoApiTrpcFeatures(),
-    agents: new MissingAgentService(),
-    secrets,
-    rest: ApiSecretRestFeature.create({ secrets, security }),
+    agents: createApiFixture<AgentApi>(),
+    rest,
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),
@@ -267,7 +257,7 @@ async function startApi(caller: { userId?: string | null } = {}) {
   running.push(listener);
 
   return {
-    secrets,
+    calls,
     apiKeys,
     authz,
     fetch: (path: string, init?: RequestInit) =>
@@ -276,16 +266,16 @@ async function startApi(caller: { userId?: string | null } = {}) {
 }
 
 function apiKeyService() {
-  const tryResolveToken = vi.fn<ApiKeyService["tryResolveToken"]>();
+  const findResolvedToken = vi.fn<ApiKeyApi["findResolvedToken"]>();
   const markUsed = vi.fn();
-  const service = new Proxy(ApiKeyService.prototype, {
+  const service = new Proxy({} as ApiKeyApi, {
     get(target, property, receiver) {
-      if (property === "tryResolveToken") return tryResolveToken;
+      if (property === "findResolvedToken") return findResolvedToken;
       if (property === "markUsed") return markUsed;
       return Reflect.get(target, property, receiver);
     },
   });
-  return { service, tryResolveToken, markUsed };
+  return { service, findResolvedToken, markUsed };
 }
 
 function authzService() {

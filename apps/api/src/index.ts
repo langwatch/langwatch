@@ -1,5 +1,6 @@
 export { ApiApplication } from "./api.application.ts";
-export { ApiSecretRestFeature } from "./api-secret-rest.feature.ts";
+export { installApiSecret } from "./features/secret/secret.composition.ts";
+export type { ComposedSecretFeature } from "./features/secret/secret.composition.types.ts";
 export {
   ApiOrganizationAuthenticationUnavailableError,
   ApiOrganizationCredentialClassMismatchError,
@@ -247,7 +248,6 @@ export {
   createCodingAgentRestApp,
 } from "@langwatch/coding-agent-server";
 export { createMonitorRestApp } from "@langwatch/monitor-server";
-export { createSecretLegacyRestApp } from "./features/secret/secret-legacy-rest.ts";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 export {

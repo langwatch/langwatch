@@ -33,7 +33,7 @@ import {
 } from "@langwatch/data-privacy-server";
 import { EvaluationPreconditionService } from "@langwatch/evaluation-server";
 import { evaluatorTypesSchema, getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
@@ -119,7 +119,7 @@ export type ApiTraceReadStackOptions = Readonly<{
   /** The plan the visibility window comes from. */
   plans: PlanProvider;
   /** The retention cascade the span read's floor is widened to. */
-  dataRetention: DataRetentionService;
+  dataRetention: DataRetentionApi;
   /** The topic tree the grid labels its rows with. */
   topics: TopicService;
   /** The gateway the AI composer resolves its model through. */

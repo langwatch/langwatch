@@ -8,7 +8,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -42,7 +42,7 @@ class OneSwitchIntrospection extends OpsEventingIntrospectionPort {
 
 function buildApp(): { app: OpsApp; written: string[] } {
   const written: string[] = [];
-  const featureFlags = createApiFixture<FeatureFlagService>({
+  const featureFlags = createApiFixture<FeatureFlagApi>({
     setEnabled: async ({ key }: { key: string }) => {
       written.push(key);
     },
@@ -82,7 +82,7 @@ describe("given an operator writing a feature flag", () => {
       dependencies,
       infrastructure: {
         createCapability,
-        featureFlags: createApiFixture<FeatureFlagService>(),
+        featureFlags: createApiFixture<FeatureFlagApi>(),
         eventingIntrospection: new OneSwitchIntrospection(),
       },
       config: void 0,

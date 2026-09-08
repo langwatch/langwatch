@@ -14,8 +14,7 @@ import { monitorApiMappingsSchema } from "@langwatch/monitor-contract";
 
 import { REGISTRY_RBAC_VOCABULARY } from "../../app/api-packaged-rest.composition.ts";
 
-import { ApiSecretRestFeature } from "../../api-secret-rest.feature.ts";
-import { ApiRestSecurity } from "../../api-rest.security.ts";
+import { mountSecretRest } from "../../features/secret/secret-rest.mount.ts";
 import {
   createApiProcessRestFeatures,
   type ApiProcessRestPorts,
@@ -142,7 +141,6 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       scenarios: refuse("Scenarios"),
       scenarioTabs: refuse("Scenario tabs"),
       scim: refuse("SCIM provisioning"),
-      secrets: refuse("Secrets"),
       simulations: refuse("Simulations"),
       storedObjects: refuse("Stored objects"),
       suites: refuse("Suites"),
@@ -335,17 +333,12 @@ function mountProcessTailFamilies(options: {
 }): void {
   const { app, security } = options;
 
-  app.route(
-    "/",
-    ApiSecretRestFeature.create({
-      secrets: opaque(),
-      security: ApiRestSecurity.projectPolicy({
-        apiKeys: opaque(),
-        authz: opaque(),
-        organizations: opaque(),
-      }),
-    }),
-  );
+  for (const secretApp of mountSecretRest({
+    secrets: refuse("The secret store"),
+    credential: refuse("The project credential door"),
+  })) {
+    app.route("/", secretApp);
+  }
 
   app.route(
     "/",

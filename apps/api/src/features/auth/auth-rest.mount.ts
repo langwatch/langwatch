@@ -4,7 +4,7 @@
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import { PostgresAuthDirectoryAdapter, type AuthRestPorts } from "@langwatch/auth-server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { BetterAuthIdentityBirthAdapter } from "@langwatch/identity-server/adapters/better-auth-identity-birth";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -25,7 +25,7 @@ export type ApiAuthRestOptions = Readonly<{
   /** The process's one guarded connection, or none. */
   prisma: PrismaClient | undefined;
   /** This deployment's flag store, for the born-finalized entrance. */
-  featureFlags: FeatureFlagService | undefined;
+  featureFlags: FeatureFlagApi | undefined;
 }>;
 
 /** Composes the `/api/auth` family's ports, or none. */

@@ -1,24 +1,15 @@
-import { FeatureFlagService } from "@langwatch/feature-flag-contract";
-
-const unsupported = <Method>(): Method =>
-  (() => Promise.reject(new Error("not used by this test"))) as Method;
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 /**
  * Complete flag boundary backed by one switch. Tests that care about a gate
- * drive `enabled`; the rest of the contract stays refused.
+ * drive `enabled`; every other operation on {@link api} refuses by name.
  */
-export class TestFeatureFlagService extends FeatureFlagService {
+export class TestFeatureFlags {
   enabled = true;
 
-  isEnabled = async (): Promise<boolean> => this.enabled;
-
-  resolveFrontendFlags = unsupported<FeatureFlagService["resolveFrontendFlags"]>();
-  resolvePublicAnonymousFlags = unsupported<FeatureFlagService["resolvePublicAnonymousFlags"]>();
-  resolveExperimentCatalogue = unsupported<FeatureFlagService["resolveExperimentCatalogue"]>();
-  setUserExperimentEnrolment = unsupported<FeatureFlagService["setUserExperimentEnrolment"]>();
-  setExperimentTenantPolicy = unsupported<FeatureFlagService["setExperimentTenantPolicy"]>();
-  listOperatorCatalogue = unsupported<FeatureFlagService["listOperatorCatalogue"]>();
-  setEnabled = unsupported<FeatureFlagService["setEnabled"]>();
-  setRules = unsupported<FeatureFlagService["setRules"]>();
-  clearStoredFlag = unsupported<FeatureFlagService["clearStoredFlag"]>();
+  readonly api: FeatureFlagApi = createApiFixture<FeatureFlagApi>(
+    { isEnabled: async (): Promise<boolean> => this.enabled },
+    "gateway test flags",
+  );
 }

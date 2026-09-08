@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { LANGY_UI_ACTIONS_FLAG, LangyUiActionSurfacePort } from "../ports/langy-turn-runtime.port.ts";
 
@@ -12,11 +12,11 @@ const logger = createLogger("langwatch:langy:ui-action-surface");
  * so a failed read holds the channel closed rather than open.
  */
 export class FeatureFlagLangyUiActionSurfaceAdapter extends LangyUiActionSurfacePort {
-  static create(featureFlags: FeatureFlagService): FeatureFlagLangyUiActionSurfaceAdapter {
+  static create(featureFlags: FeatureFlagApi): FeatureFlagLangyUiActionSurfaceAdapter {
     return new FeatureFlagLangyUiActionSurfaceAdapter(featureFlags);
   }
 
-  private constructor(private readonly featureFlags: FeatureFlagService) {
+  private constructor(private readonly featureFlags: FeatureFlagApi) {
     super();
   }
 

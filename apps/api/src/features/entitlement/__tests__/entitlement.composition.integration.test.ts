@@ -9,7 +9,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
-import { ApiApplication, MissingSecretService } from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stubCollaborators,
@@ -105,7 +105,6 @@ async function composeApplication() {
 
   return ApiApplication.create({
     agents: createApiFixture<AgentApi>(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

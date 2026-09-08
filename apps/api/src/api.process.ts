@@ -5,12 +5,10 @@ import {
 } from "@langwatch/observability/node";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { AgentAppDependencies, AgentTestPort } from "@langwatch/agent-server";
-import type { SecretService } from "@langwatch/secret-contract";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
   NoApiTrpcFeatures,
   type ApiHttpOptions,
   type ApiSubscriptionMount,
@@ -51,8 +49,6 @@ export class ApiProcess {
     agentTesting?: AgentTestPort;
     /** Absent for a process that composed no connected-agent transport; see ApiApplication. */
     connectedAgents?: AgentAppDependencies["connected"];
-    /** Absent for a process that composed no secret service; ApiApplication gets the null object. */
-    secrets?: SecretService;
     http?: Omit<ApiHttpOptions, "logger">;
     requestPolicy?: ApiRequestPolicy;
     rest?: Hono;
@@ -95,7 +91,6 @@ export class ApiProcess {
       agents: options.agents ?? new MissingAgentService(),
       agentTesting: options.agentTesting,
       ...(options.connectedAgents ? { connectedAgents: options.connectedAgents } : {}),
-      secrets: options.secrets ?? new MissingSecretService(),
       features: options.features ?? new NoApiTrpcFeatures(),
       validateOutput: options.validateOutput ?? false,
       http: {

@@ -4,7 +4,7 @@
  * of it ran. The queue then carries a reference the worker reads back.
  */
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -24,7 +24,7 @@ export type ApiTraceSpoolOptions = Readonly<{
   /** Whether Azure Blob may host the spool on this deployment. */
   azureRetentionConfirmed: boolean;
   /** The per-project switch, read on every over-threshold span. */
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   logger: Logger;
 }>;
 
@@ -67,7 +67,7 @@ export function composeApiTraceSpool(
  */
 class ApiFlagGatedTraceEdgeSpool extends TraceIngressPayloadPort {
   static create(options: {
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
     spool: TraceIngressPayloadPort;
     logger: Logger;
   }): ApiFlagGatedTraceEdgeSpool {
@@ -76,7 +76,7 @@ class ApiFlagGatedTraceEdgeSpool extends TraceIngressPayloadPort {
 
   private constructor(
     private readonly options: {
-      featureFlags: FeatureFlagService;
+      featureFlags: FeatureFlagApi;
       spool: TraceIngressPayloadPort;
       logger: Logger;
     },

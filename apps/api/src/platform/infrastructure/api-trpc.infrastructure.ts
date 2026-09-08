@@ -5,7 +5,7 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ApiAuditPort } from "../../api-request.policy.ts";
@@ -29,7 +29,7 @@ export type ApiTrpcInfrastructure = Readonly<{
    * a rollout gate and the browser's own flag read never disagree about whether
    * an account is inside a rollout.
    */
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /**
    * Whether this installation bills through Stripe. One variable, one meaning:
    * `IS_SAAS` is what decides it, read from the one leaf that carries it.

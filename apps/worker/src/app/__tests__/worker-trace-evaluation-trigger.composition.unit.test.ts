@@ -1,7 +1,7 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import { ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
 import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorService, MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import {
@@ -113,7 +113,7 @@ function graph(options: { guardDisabled?: boolean } = {}) {
   const monitors = { getEnabledOnMessageMonitors } as unknown as MonitorService;
   const featureFlags = {
     isEnabled: vi.fn(async () => options.guardDisabled ?? false),
-  } as unknown as FeatureFlagService;
+  } as unknown as FeatureFlagApi;
   const metrics = new RecordingLoopMetrics();
   const built = createWorkerTraceEvaluationTrigger({
     monitors,

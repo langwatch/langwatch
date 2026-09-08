@@ -40,6 +40,7 @@ import type { ComposedAuthFeature } from "../features/auth/auth.composition.type
 import type { ComposedUserFeature } from "../features/user/user.composition.types.ts";
 import type { ComposedPresenceFeature } from "../features/presence/presence.composition.types.ts";
 import type { ComposedApiKeyFeature } from "../features/api-key/api-key.composition.types.ts";
+import type { ComposedSecretFeature } from "../features/secret/secret.composition.types.ts";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
@@ -187,4 +188,10 @@ export type ComposedApiFeatures = Readonly<{
   presence: ComposedPresenceFeature;
   /** One namespace and the `ctx.app.apiKeys` slice every credential door reads. */
   apiKey: ComposedApiKeyFeature;
+  /**
+   * One namespace, the `ctx.app.secrets` slice the gateway's virtual keys, the
+   * scenario runner's parameters and the workflow executor read, and the two
+   * REST families the process routes beside its packaged list.
+   */
+  secret: ComposedSecretFeature;
 }>;

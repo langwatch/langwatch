@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { TraceTokenCounterPort } from "../../ports/trace-token-counter.port.ts";
@@ -17,7 +17,7 @@ class CountingTokenizer extends TraceTokenCounterPort {
   }
 }
 
-function flags(enabled: Record<string, boolean> = {}): FeatureFlagService {
+function flags(enabled: Record<string, boolean> = {}): FeatureFlagApi {
   return { isEnabled: async (key: string) => enabled[key] ?? false } as never;
 }
 
@@ -37,7 +37,7 @@ describe("OtlpSpanTokenEstimationService", () => {
   const estimate = async (
     subject: OtlpSpan,
     tokenizer: CountingTokenizer,
-    featureFlags: FeatureFlagService = flags(),
+    featureFlags: FeatureFlagApi = flags(),
   ): Promise<void> => {
     await OtlpSpanTokenEstimationService.create({ tokenizer, featureFlags }).estimateSpanTokens({
       span: subject,

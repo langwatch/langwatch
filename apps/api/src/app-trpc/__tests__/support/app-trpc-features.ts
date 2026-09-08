@@ -20,18 +20,19 @@ import { composeGatewayFeature } from "../../../features/gateway/gateway.composi
 import { refusingAuthFeature } from "../../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
 import {
+  stubDataRetentionFeature,
   stubEntitlementFeature,
+  stubFeatureFlagFeature,
   stubPresenceFeature,
+  stubSecretFeature,
   stubShareFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../../features/api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../../features/langy/langy.composition.ts";
-import { refusingDataRetentionFeature } from "../../../features/data-retention/data-retention.composition.ts";
 import { refusingAnalyticsFeature } from "../../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../../features/dataset/dataset.composition.ts";
 import { refusingEvaluatorFeature } from "../../../features/evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../../features/prompt/prompt.composition.ts";
-import { refusingFeatureFlagFeature } from "../../../features/feature-flag/feature-flag.composition.ts";
 import { refusingMonitorFeature } from "../../../features/monitor/monitor.composition.ts";
 import { refusingHomeFeature } from "../../../features/project/home.composition.ts";
 import { refusingRoleFeature } from "../../../features/role/role.composition.ts";
@@ -176,11 +177,11 @@ export function buildAppTrpcFeatures(
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
-      featureFlag: refusingFeatureFlagFeature(),
+      featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
       evaluator: refusingEvaluatorFeature(),
       prompt: refusingPromptFeature(),
-      dataRetention: refusingDataRetentionFeature(),
+      dataRetention: stubDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
       home: refusingHomeFeature(),
       role: refusingRoleFeature(),
@@ -204,6 +205,7 @@ export function buildAppTrpcFeatures(
       codingAgent: refusingCodingAgentFeature(),
       automation: refusingAutomationFeature(),
       enterprise: refusingEnterpriseFeature(),
+      secret: stubSecretFeature(),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

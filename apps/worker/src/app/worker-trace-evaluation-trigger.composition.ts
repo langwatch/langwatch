@@ -1,7 +1,7 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import { ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
 import type { QueueSendOptions } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   OtelTraceEvaluationLoopMetricsAdapter,
   TraceEvaluationDispatchPort,
@@ -26,7 +26,7 @@ import {
  * hands it.
  *
  *     TraceSummarySubscriber "evaluationTrigger"   (trace-server owns it)
- *       ├─ FeatureFlagService                      the loop-guard kill switch
+ *       ├─ FeatureFlagApi                      the loop-guard kill switch
  *       ├─ TraceEvaluationMonitorPort              the enabled on-message monitors
  *       │    └─ TraceEvaluationMonitorReader      narrowed to one listing
  *       ├─ TraceEvaluationLoopMetricsPort          the guard's own counter
@@ -60,7 +60,7 @@ export function createWorkerTraceEvaluationTrigger(options: {
    * the catalogue-only service the feature publishes.
    */
   monitors: TraceEvaluationMonitorReader;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   sendEvaluation: (
     data: ExecuteEvaluationCommandData,
     sendOptions?: QueueSendOptions<ExecuteEvaluationCommandData>,

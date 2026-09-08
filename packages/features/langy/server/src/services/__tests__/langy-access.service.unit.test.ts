@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { LangyAccessService } from "../langy-access.service.ts";
 
 function featureFlags(enabled: boolean) {
-  const service = MemoryFeatureFlagService.create();
-  service.setFlag("release_langy_enabled", enabled);
-  const isEnabled = vi.spyOn(service, "isEnabled");
+  const isEnabled = vi.fn(async () => enabled);
+  const service = createApiFixture<FeatureFlagApi>({ isEnabled }, "langy access flags");
 
   return { service, isEnabled };
 }

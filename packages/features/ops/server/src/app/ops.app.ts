@@ -32,7 +32,7 @@ import {
 } from "@langwatch/audit-log-contract";
 import type {
   FeatureFlagRules,
-  FeatureFlagService,
+  FeatureFlagApi,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
 import { listFeatureFlags } from "@langwatch/feature-flag-contract";
@@ -238,7 +238,7 @@ export interface OpsAppDependencies {
 /** The process-owned adapters used to make one Ops capability at boot. */
 export interface OpsAppInfrastructure {
   createCapability(dependencies: OpsAppDependencies): OpsCapability;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /**
    * The live pipeline graph, read for the kill-switch keys an operator may
    * set. Without it every generated key is unsettable.
@@ -247,7 +247,7 @@ export interface OpsAppInfrastructure {
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   projects: ProjectApiContract;
   eventingIntrospection: OpsEventingIntrospectionPort;
 }>;

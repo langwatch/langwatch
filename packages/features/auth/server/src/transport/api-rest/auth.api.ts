@@ -9,7 +9,7 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
 } from "@langwatch/api/rest";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
@@ -61,7 +61,7 @@ export type AuthRestPorts = Readonly<{
    */
   tryFindProjectSlugByToken: (input: { token: string }) => Promise<string | null>;
   /** This deployment's flag store, for the born-finalized entrance. */
-  featureFlags: () => FeatureFlagService;
+  featureFlags: () => FeatureFlagApi;
   /**
    * The typed client the born-finalized entrance reads its allowlist through.
    */

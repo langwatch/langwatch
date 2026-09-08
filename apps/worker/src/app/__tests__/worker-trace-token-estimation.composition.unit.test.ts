@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { TraceTokenCounterPort } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
@@ -19,7 +19,7 @@ import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimati
  * will call, rather than through the service underneath it.
  */
 
-const flags = (enabled: Record<string, boolean> = {}): FeatureFlagService =>
+const flags = (enabled: Record<string, boolean> = {}): FeatureFlagApi =>
   ({ isEnabled: async (key: string) => enabled[key] ?? false }) as never;
 
 class FixedTokenizer extends TraceTokenCounterPort {

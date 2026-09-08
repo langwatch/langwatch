@@ -1,4 +1,4 @@
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { LangyAccessService } from "./langy-access.service.ts";
 
 /**
@@ -24,7 +24,7 @@ export type LangyKeyIdentity =
 
 /** Bridges a resolved credential to the user a Langy turn runs as. */
 export class LangyKeyIdentityService {
-  static create(options: { featureFlags: FeatureFlagService }): LangyKeyIdentityService {
+  static create(options: { featureFlags: FeatureFlagApi }): LangyKeyIdentityService {
     return new LangyKeyIdentityService({
       access: LangyAccessService.create({ featureFlags: options.featureFlags }),
     });

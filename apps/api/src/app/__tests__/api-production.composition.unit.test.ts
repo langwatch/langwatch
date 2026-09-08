@@ -8,7 +8,7 @@ import {
 import { AuthService } from "@langwatch/auth-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { LANGY_VK_SECRET_NAME, SecretService, type Secret } from "@langwatch/secret-contract";
+import { LANGY_VK_SECRET_NAME } from "@langwatch/secret-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { OrganizationService } from "@langwatch/organization-contract";
 import type { UserService } from "@langwatch/user-contract";
@@ -19,23 +19,18 @@ const processMocks = vi.hoisted(() => {
   const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
   let rest: Hono | undefined;
   let agents: unknown;
-  let secrets: unknown;
   let metrics: unknown;
-  const create = vi.fn(
-    (options: { rest?: Hono; agents?: unknown; secrets?: unknown; metrics?: unknown }) => {
-      rest = options.rest;
-      agents = options.agents;
-      secrets = options.secrets;
-      metrics = options.metrics;
-      return process;
-    },
-  );
+  const create = vi.fn((options: { rest?: Hono; agents?: unknown; metrics?: unknown }) => {
+    rest = options.rest;
+    agents = options.agents;
+    metrics = options.metrics;
+    return process;
+  });
   return {
     create,
     process,
     rest: () => rest,
     agents: () => agents,
-    secrets: () => secrets,
     metrics: () => metrics,
   };
 });
@@ -109,6 +104,15 @@ const databaseMocks = vi.hoisted(() => {
           updatedBy: { name: "Alex" },
         })),
   );
+  const create = vi.fn(async (query: { data: { name: string } }) => ({
+    id: "secret-1",
+    projectId: "project-1",
+    name: query.data.name,
+    createdAt: new Date("2026-08-28T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-28T00:00:00.000Z"),
+    createdBy: { name: "Alex" },
+    updatedBy: { name: "Alex" },
+  }));
   // Every model this file does not describe answers empty rather than being
   // absent. The secret rows below are what these scenarios are about; the AuthZ
   // reads a mounted route makes on its way past are not, and a client missing
@@ -125,7 +129,7 @@ const databaseMocks = vi.hoisted(() => {
   );
   const client = new Proxy(
     {
-      projectSecret: { findMany },
+      projectSecret: { findMany, create },
       // The raw-query surface, as FUNCTIONS rather than the empty delegate the
       // trap below answers every other key with: the webhook replay store
       // refuses a client without `$transaction` (can't commit a buffer and
@@ -150,6 +154,7 @@ const databaseMocks = vi.hoisted(() => {
   return {
     rows,
     findMany,
+    create,
     client,
     configured,
     tryCreate: vi.fn(() => (configured.value ? { connection: { client } } : undefined)),
@@ -200,16 +205,6 @@ const resolvedKey: ResolvedApiKeyToken = {
 
 const ENCRYPTION_KEY = "0f".repeat(32);
 
-const secret: Secret = {
-  id: "secret-1",
-  projectId: "project-1",
-  name: "OPENAI_API_KEY",
-  createdAt: new Date("2026-08-28T00:00:00.000Z"),
-  updatedAt: new Date("2026-08-28T00:00:00.000Z"),
-  createdBy: { name: "Alex" },
-  updatedBy: { name: "Alex" },
-};
-
 // The production composition serves the built browser bundle off
 // `globalThis.process.env` directly (`tryCreateApiStaticSurface`, called from
 // `ApiProductionComposition`), not through this file's `resolveApiConfig`
@@ -243,11 +238,11 @@ describe("ApiProductionComposition", () => {
   it("constructs one API-key REST adapter in process composition and propagates its actor and ceiling", async () => {
     const apiKeys = apiKeyService(resolvedKey);
     const authz = authzService(true);
-    const secrets = secretService();
     const audit = new TestAudit();
+    databaseMocks.configured.value = true;
+    databaseMocks.create.mockClear();
     const composition = ApiProductionComposition.create({
       agents: new Proxy(AgentService.prototype, {}),
-      secrets: secrets.service,
       apiKeys: apiKeys.service,
       authz: authz.service,
       organizations: organizationService(),
@@ -256,7 +251,12 @@ describe("ApiProductionComposition", () => {
     });
 
     await composition.compose({
-      config: resolveApiConfig({ NODE_ENV: "test", API_PORT: "5560" }),
+      config: resolveApiConfig({
+        NODE_ENV: "test",
+        API_PORT: "5560",
+        DATABASE_URL: "postgresql://localhost/langwatch",
+        CREDENTIALS_SECRET: ENCRYPTION_KEY,
+      }),
       graph: new TestGraph(),
       observability: { serviceName: "langwatch-api-test" },
       resources: new ResourceScope(),
@@ -292,12 +292,16 @@ describe("ApiProductionComposition", () => {
       scope: { type: "project", id: "project-1", teamId: "team-1" },
       permission: "secrets:manage",
     });
-    expect(secrets.create).toHaveBeenCalledWith({
-      projectId: "project-1",
-      name: "OPENAI_API_KEY",
-      value: "secret-value",
-      actorId: "user-1",
-    });
+    expect(databaseMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          projectId: "project-1",
+          name: "OPENAI_API_KEY",
+          createdById: "user-1",
+          updatedById: "user-1",
+        }),
+      }),
+    );
     expect(apiKeys.markUsed).toHaveBeenCalledWith({ id: "key-1" });
     expect(audit.record).toHaveBeenCalledWith({
       actorId: "user-1",
@@ -313,7 +317,6 @@ describe("ApiProductionComposition", () => {
     const audit = new TestAudit();
     const composition = ApiProductionComposition.create({
       agents: new Proxy(AgentService.prototype, {}),
-      secrets: secretService().service,
       apiKeys: apiKeys.service,
       authz: authz.service,
       organizations: organizationService(),
@@ -455,41 +458,17 @@ describe("ApiProductionComposition", () => {
       databaseMocks.findMany.mockClear();
     });
 
-    describe("when a host supplied one", () => {
-      /** @scenario "A process with no key composes no secret service" */
-      it("serves the host's service, whatever this deployment was configured with", async () => {
-        databaseMocks.configured.value = true;
-        const injected = secretService().service;
-        const composition = productionComposition({ secrets: injected });
-
-        await composition.compose({
-          config: resolveApiConfig({
-            NODE_ENV: "test",
-            API_PORT: "5560",
-            DATABASE_URL: "postgresql://localhost/langwatch",
-            CREDENTIALS_SECRET: ENCRYPTION_KEY,
-          }),
-          graph: new TestGraph(),
-          observability: { serviceName: "langwatch-api-test" },
-          resources: new ResourceScope(),
-        });
-
-        expect(processMocks.secrets()).toBe(injected);
-        expect(databaseMocks.findMany).not.toHaveBeenCalled();
-      });
-    });
-
     describe("when the deployment configured a database and a key", () => {
       it("composes its own service over the guarded client, with no host supplying one", async () => {
         databaseMocks.configured.value = true;
 
-        await composeWithout({
+        const composition = await composeWithout({
           DATABASE_URL: "postgresql://localhost/langwatch",
           CREDENTIALS_SECRET: ENCRYPTION_KEY,
         });
 
-        const composed = processMocks.secrets() as SecretService;
-        expect(composed).toBeInstanceOf(SecretService);
+        const composed = composition.secrets();
+        if (!composed) throw new Error("The production composition installed no secret feature.");
         await expect(composed.list({ projectId: "project-1" })).resolves.toEqual([]);
         expect(databaseMocks.findMany).toHaveBeenCalledWith(
           expect.objectContaining({ where: { projectId: "project-1" } }),
@@ -506,12 +485,13 @@ describe("ApiProductionComposition", () => {
           }).encrypt("sk-live-abc123"),
         });
 
-        await composeWithout({
+        const composition = await composeWithout({
           DATABASE_URL: "postgresql://localhost/langwatch",
           CREDENTIALS_SECRET: ENCRYPTION_KEY,
         });
 
-        const composed = processMocks.secrets() as SecretService;
+        const composed = composition.secrets();
+        if (!composed) throw new Error("The production composition installed no secret feature.");
         await expect(composed.getValues({ projectId: "project-1" })).resolves.toEqual({
           OPENAI_API_KEY: "sk-live-abc123",
         });
@@ -527,12 +507,13 @@ describe("ApiProductionComposition", () => {
           }).encrypt("sk-live-abc123"),
         });
 
-        await composeWithout({
+        const composition = await composeWithout({
           DATABASE_URL: "postgresql://localhost/langwatch",
           CREDENTIALS_SECRET: ENCRYPTION_KEY,
         });
 
-        const composed = processMocks.secrets() as SecretService;
+        const composed = composition.secrets();
+        if (!composed) throw new Error("The production composition installed no secret feature.");
         await expect(composed.getValues({ projectId: "project-1" })).rejects.toThrow(
           /OPENAI_API_KEY/,
         );
@@ -543,12 +524,13 @@ describe("ApiProductionComposition", () => {
         databaseMocks.rows.push({ name: LANGY_VK_SECRET_NAME, encryptedValue: "unused" });
         databaseMocks.rows.push({ name: "OPENAI_API_KEY", encryptedValue: "unused" });
 
-        await composeWithout({
+        const composition = await composeWithout({
           DATABASE_URL: "postgresql://localhost/langwatch",
           CREDENTIALS_SECRET: ENCRYPTION_KEY,
         });
 
-        const composed = processMocks.secrets() as SecretService;
+        const composed = composition.secrets();
+        if (!composed) throw new Error("The production composition installed no secret feature.");
         await expect(composed.list({ projectId: "project-1" })).resolves.toEqual([
           expect.objectContaining({ name: "OPENAI_API_KEY" }),
         ]);
@@ -557,9 +539,9 @@ describe("ApiProductionComposition", () => {
 
     describe("when the deployment configured a key but no database", () => {
       it("composes no secret service, because a cipher is not a service", async () => {
-        await composeWithout({ CREDENTIALS_SECRET: ENCRYPTION_KEY });
+        const composition = await composeWithout({ CREDENTIALS_SECRET: ENCRYPTION_KEY });
 
-        expect(processMocks.secrets()).toBeUndefined();
+        expect(composition.secrets()).toBeUndefined();
       });
     });
 
@@ -567,9 +549,11 @@ describe("ApiProductionComposition", () => {
       it("composes no secret service rather than one that fails on every request", async () => {
         databaseMocks.configured.value = true;
 
-        await composeWithout({ DATABASE_URL: "postgresql://localhost/langwatch" });
+        const composition = await composeWithout({
+          DATABASE_URL: "postgresql://localhost/langwatch",
+        });
 
-        expect(processMocks.secrets()).toBeUndefined();
+        expect(composition.secrets()).toBeUndefined();
       });
 
       /** @scenario "A process with no key composes no secret service" */
@@ -712,7 +696,6 @@ describe("ApiProductionComposition", () => {
 
         const composition = ApiProductionComposition.create({
           agents: new Proxy(AgentService.prototype, {}),
-          secrets: secretService().service,
           apiKeys: apiKeyService(resolvedKey).service,
           organizations: organizationService(),
           auth: new TestAuthComposition(),
@@ -1007,15 +990,11 @@ class TestMetrics extends ApiMetricsPort {
 function productionComposition(
   overrides: {
     agents?: AgentService;
-    secrets?: SecretService;
     metrics?: ApiMetricsPort;
-  } = {
-    secrets: secretService().service,
-  },
+  } = {},
 ): ApiProductionComposition {
   return ApiProductionComposition.create({
     agents: overrides.agents ?? new Proxy(AgentService.prototype, {}),
-    ...(overrides.secrets ? { secrets: overrides.secrets } : {}),
     ...(overrides.metrics ? { metrics: overrides.metrics } : {}),
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
@@ -1043,7 +1022,6 @@ async function composeSelfComposedAgents(
   source: Readonly<Record<string, unknown>>,
 ): Promise<ApiProductionComposition> {
   const composition = ApiProductionComposition.create({
-    secrets: secretService().service,
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
     organizations: organizationService(),
@@ -1064,7 +1042,6 @@ async function composeSelfComposedAuthz(
 ): Promise<ApiProductionComposition> {
   const composition = ApiProductionComposition.create({
     agents: new Proxy(AgentService.prototype, {}),
-    secrets: secretService().service,
     auth: new TestAuthComposition(),
   });
   await composition.compose({
@@ -1083,7 +1060,6 @@ async function composeSelfComposedAuth(
 ): Promise<ApiProductionComposition> {
   const composition = ApiProductionComposition.create({
     agents: new Proxy(AgentService.prototype, {}),
-    secrets: secretService().service,
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
     organizations: organizationService(),
@@ -1275,16 +1251,6 @@ function organizationService() {
   });
 }
 
-function secretService() {
-  const create = vi.fn<SecretService["create"]>().mockResolvedValue(secret);
-  const service = new Proxy(SecretService.prototype, {
-    get(target, property, receiver) {
-      return property === "create" ? create : Reflect.get(target, property, receiver);
-    },
-  });
-  return { service, create };
-}
-
 /**
  * The optional collaborators nothing supplies: `api.main.ts` composes with no
  * options, so each of these falls back on its own default rather than a
@@ -1306,7 +1272,6 @@ describe("given the optional collaborators no host supplies", () => {
     // `api.main.ts` composes — nothing supplied at all.
     const composition = ApiProductionComposition.create({
       agents: new Proxy(AgentService.prototype, {}),
-      secrets: secretService().service,
       auth: new TestAuthComposition(),
     });
     await composition.compose({
@@ -1349,7 +1314,6 @@ describe("given the optional collaborators no host supplies", () => {
       queueMocks.composed.value = undefined;
       const composition = ApiProductionComposition.create({
         agents: new Proxy(AgentService.prototype, {}),
-        secrets: secretService().service,
         auth: new TestAuthComposition(),
       });
       await composition.compose({

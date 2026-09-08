@@ -6,7 +6,7 @@ import {
   type PiiAnalysisPort,
 } from "@langwatch/data-privacy-server";
 import type { TenantId } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan, PIIRedactionLevel } from "@langwatch/trace-contract";
 import { TraceSpanPiiRedactionPort } from "@langwatch/trace-server";
 import { WorkerPiiAnalysisAdapter } from "../platform/infrastructure/worker-pii-analysis.adapter.ts";
@@ -47,7 +47,7 @@ export function createWorkerTracePrivacy(options: {
    * writing is what puts an `OrganizationService` behind the service.
    */
   dataPrivacy: DataPrivacyResolutionPort;
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   metrics?: PiiAnalysisMetricsPort;
 }): WorkerTracePrivacy {
   const transport = WorkerPiiAnalysisAdapter.create({

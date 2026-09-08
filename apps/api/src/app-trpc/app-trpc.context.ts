@@ -22,7 +22,7 @@ import type {
 import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GithubService } from "@langwatch/github-contract";
 import type { AuthzApi, AuthzService } from "@langwatch/authz-contract";
-import type { FeatureFlagApp } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { DashboardApp } from "@langwatch/dashboard-server";
 import type { DatasetApp } from "@langwatch/dataset-server";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
@@ -30,11 +30,12 @@ import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { OrganizationApp } from "@langwatch/organization-server";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ModelProviderApp } from "@langwatch/model-provider-server";
 import type { MonitorApp } from "@langwatch/monitor-server";
 import type { StoredObjectApp } from "@langwatch/stored-object-server";
+import type { SecretApi } from "@langwatch/secret-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { TraceApp } from "@langwatch/trace-server";
@@ -85,7 +86,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * This deployment's flag store. Read by `featureFlag.*` and, through it, by
    * every rollout gate the browser asks about.
    */
-  featureFlag: FeatureFlagApp;
+  featureFlag: FeatureFlagApi;
   /**
    * The AI Gateway's one application, as all six core gateway surfaces reach it.
    */
@@ -150,7 +151,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * pin cannot outlive the trace it points at, which is the one thing the pin
    * surface reads it for.
    */
-  dataRetention: DataRetentionService;
+  dataRetention: DataRetentionApi;
   /**
    * The provider gateway, as the provider, cost-rule and translation surfaces
    * reach it.
@@ -173,6 +174,11 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * plan provider and a wider slice invites a second.
    */
   planProvider: Pick<PlanProvider, "getActivePlan">;
+  /**
+   * A project's stored credentials, as `secrets.*` and every process
+   * collaborator that decrypts a stored value read them.
+   */
+  secrets: SecretApi;
   /** The share ledger behind a link, a pin, and the anonymous trace read. */
   share: ShareApi;
   /** The clusters a project's traces were grouped into. */

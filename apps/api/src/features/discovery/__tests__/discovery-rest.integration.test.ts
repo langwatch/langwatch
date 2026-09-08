@@ -11,7 +11,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
   NoApiTrpcFeatures,
 } from "../../../api.application.ts";
 import { ApiHttpListener } from "../../../api-http.listener.ts";
@@ -247,7 +246,6 @@ async function startApi() {
   const application = ApiApplication.create({
     features: new NoApiTrpcFeatures(),
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     rest,
     http: {
       createContext: async () => ({

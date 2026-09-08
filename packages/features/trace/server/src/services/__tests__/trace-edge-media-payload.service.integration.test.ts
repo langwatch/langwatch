@@ -9,7 +9,7 @@
  */
 import { createHash } from "node:crypto";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
@@ -80,7 +80,7 @@ describe("the ingest path's payload preparation", () => {
       const putSpool = vi.fn();
       const prepared = await TraceEdgeMediaPayloadService.create({
         deps: {
-          featureFlags: { isEnabled: async () => true } as never as FeatureFlagService,
+          featureFlags: { isEnabled: async () => true } as never as FeatureFlagApi,
           hasContentDropRules: async () => false,
           service: fakeStore(),
         },

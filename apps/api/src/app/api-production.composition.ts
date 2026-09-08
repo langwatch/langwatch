@@ -4,7 +4,6 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   createApp,
   LocalFeatureApis,
-  ResourceScope,
   type BootedRuntime,
 } from "@langwatch/runtime-composition";
 import { AgentApi } from "@langwatch/agent-contract";
@@ -20,12 +19,12 @@ import {
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { SecretApi } from "@langwatch/secret-contract";
+import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
 import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
-import { SecretApp, type SecretEncryptionPort } from "@langwatch/secret-server";
-import { RESERVED_PROJECT_SECRET_NAMES } from "@langwatch/secret-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { Hono } from "hono";
 import { register } from "prom-client";
 import {
@@ -88,10 +87,8 @@ import {
   refusingPromptFeature,
 } from "../features/prompt/prompt.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
-import {
-  composeFeatureFlagFeature,
-  refusingFeatureFlagFeature,
-} from "../features/feature-flag/feature-flag.composition.ts";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { installApiFeatureFlag } from "../features/feature-flag/feature-flag.composition.ts";
 import {
   composeAnalyticsFeature,
   refusingAnalyticsFeature,
@@ -164,11 +161,7 @@ import {
 } from "../features/scenario/scenario.composition.ts";
 import { composeRoleFeature, refusingRoleFeature } from "../features/role/role.composition.ts";
 import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition.ts";
-import {
-  composeDataRetentionFeature,
-  LoggedApiDataRetentionAbsence,
-  refusingDataRetentionFeature,
-} from "../features/data-retention/data-retention.composition.ts";
+import { installApiDataRetention } from "../features/data-retention/data-retention.composition.ts";
 import {
   composeMonitorFeature,
   composeMonitorService,
@@ -324,7 +317,8 @@ import {
   ApiRuntimeProcessPort,
   type ApiRuntimeCompositionOptions,
 } from "../api.main.ts";
-import { ApiSecretRestFeature } from "../api-secret-rest.feature.ts";
+import { installApiSecret } from "../features/secret/secret.composition.ts";
+import type { ComposedSecretFeature } from "../features/secret/secret.composition.types.ts";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
 import { requestTraceIds } from "@langwatch/api/rest";
 import type {
@@ -504,11 +498,6 @@ export type ApiProductionCompositionOptions = {
    */
   agents?: AgentApi;
   /**
-   * A host's already-composed secret service, when it has one. Optional since this process can
-   * build its own: see {@link ApiProductionComposition.resolveSecrets} for which wins.
-   */
-  secrets?: SecretApp;
-  /**
    * A host's already-composed API-key service, when it has one.
    */
   apiKeys?: ApiKeyApi;
@@ -662,7 +651,26 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedUsageEnforcement: UsageService | undefined;
   private composedAnalytics!: ComposedAnalyticsFeature;
-  private composedFeatureFlag!: ComposedFeatureFlagFeature;
+  /**
+   * The rollout store, or none. There is no refusing twin: a process that
+   * opened no database installs the feature at all.
+   */
+  private composedFeatureFlag: ComposedFeatureFlagFeature | undefined;
+  /**
+   * The flag answer every gate on this process reads, handed out BEFORE the
+   * feature is installed. Eventing's kill switch is read by AuthZ, AuthZ by the
+   * tenant directories, and those directories are what a tenant-targeted flag
+   * read is authorized against — so the reference is what breaks a ring that is
+   * otherwise unbreakable. Bound the moment the feature installs, and every
+   * call before that refuses by name.
+   */
+  private composedFeatureFlagApi!: FeatureFlagApi;
+  /**
+   * The peers a feature installed BEFORE the tenant directories reads through.
+   * Its own scope rather than {@link agentClients}: that one is ready when the
+   * agent feature installs, and this one when the tenant half has composed.
+   */
+  private readonly deferredApis = new LocalFeatureApis();
   private composedDataset!: ComposedDatasetFeature;
   private composedEvaluator!: ComposedEvaluatorFeature;
   private composedPrompt!: ComposedPromptFeature;
@@ -707,7 +715,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedRole!: ComposedRoleFeature;
   private composedHome!: ComposedHomeFeature;
 
-  private composedDataRetention!: ComposedDataRetentionFeature;
+  /**
+   * How long a project's scopes keep what they captured, or none. There is no
+   * refusing twin: a process with no database bounds nothing.
+   */
+  private composedDataRetention: ComposedDataRetentionFeature | undefined;
   private composedMonitor!: ComposedMonitorFeature;
   private composedStoredObject!: ComposedStoredObjectFeature;
   /**
@@ -842,8 +854,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The one evaluator-id slug rule on this process.
    */
   private readonly evaluatorIdSlug = EvaluationNameAutoslugService.create();
-  private secrets: SecretApi | undefined;
-  private secretApp: SecretApp | undefined;
+  /**
+   * The project's stored credentials, or none. There is no refusing twin: a
+   * process holding no cipher installs neither the namespace nor the two REST
+   * families, rather than serving doors over a store it cannot decrypt.
+   */
+  private composedSecret: ComposedSecretFeature | undefined;
+  /**
+   * The process's ONE project-credential door. Created here rather than inside
+   * `composeDoors` because the secret families authenticate through it and they
+   * install before that method runs.
+   */
+  private composedHandlerCredentials!: ApiHandlerManagedCredentials;
   private requestPolicy: ApiRequestPolicy | undefined;
 
   private constructor(private readonly options: ApiProductionCompositionOptions) {
@@ -868,15 +890,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       options.resources.own("audit-log", () => auditLog.stop());
       this.composedAuditLog = auditLog.auditLog();
     }
-    // The process's ONE rollout store, composed before every feature that gates on a flag —
-    // Eventing included, since the kill switch each command it produces consults is read from
-    // here.
-    this.composedFeatureFlag = this.composedDatabase?.connection
-      ? composeFeatureFlagFeature({
-          prisma: this.composedDatabase.connection.client,
-          config: options.config.featureFlags,
-        })
-      : refusingFeatureFlagFeature();
+    // The process's ONE flag answer, handed out here and installed further
+    // down. Eventing's kill switch reads it, AuthZ is composed over Eventing,
+    // the tenant directories over AuthZ — and a tenant-targeted flag read is
+    // authorized against those same directories. The reference is what lets
+    // that ring compose in one order instead of none.
+    this.deferredApis.declare(FeatureFlagApi);
+    this.deferredApis.declare(ProjectApi);
+    this.deferredApis.declare(OrganizationApi);
+    this.composedFeatureFlagApi = this.deferredApis.reference(FeatureFlagApi);
     this.composedEventing = this.composeEventing(options, queueInfrastructure);
     // The four identity definitions, registered PRODUCER-only on this process's own
     // Eventing. Before the Auth graph rather than beside the person-shaped features,
@@ -918,8 +940,34 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       );
     }
 
-    this.secretApp = this.resolveSecretApp(encryption);
-    this.secrets = this.secretApp;
+    // The process's ONE project-credential door, resolved before the two
+    // secret REST families that authenticate through it: a key refused at the
+    // packaged families cannot be accepted at `/api/secret`.
+    this.composedHandlerCredentials = ApiHandlerManagedCredentials.create({
+      apiKeys: tenancy.apiKeys,
+      authz,
+    });
+    // The deployment's rollout flags, over the three directories a
+    // tenant-targeted read is authorized against. Installed here, and the
+    // reference handed out above is bound to it: everything that gates on a
+    // flag composed before this line reads THIS application.
+    const flagDatabase = this.composedDatabase?.connection;
+    this.composedFeatureFlag =
+      flagDatabase && this.composedAuthz
+        ? await installApiFeatureFlag({
+            prisma: flagDatabase.client,
+            config: options.config.featureFlags,
+            peers: {
+              permissions: this.composedAuthz.app,
+              projects: this.deferredApis.reference(ProjectApi),
+              organizations: this.deferredApis.reference(OrganizationApi),
+            },
+          })
+        : undefined;
+    if (this.composedFeatureFlag) {
+      this.deferredApis.bind(FeatureFlagApi, this.composedFeatureFlag.app);
+    }
+    this.composedSecret = await this.resolveSecretApp(encryption);
     this.composedIsSaas = options.config.infrastructure.modelProvider.isSaas;
     this.composedRestEnvironment = {
       demoProjectId: options.config.authz.demoProjectId,
@@ -980,7 +1028,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           // not any one feature's, so a gate and the surface beside it cannot
           // disagree.
           plans: this.resolvePlanProvider(options),
-          featureFlags: this.composedFeatureFlag.app.flags,
+          featureFlags: this.composedFeatureFlagApi,
           // One variable, one meaning: `IS_SAAS` is what decides whether this
           // installation bills through Stripe, read from the one leaf that
           // already carries it rather than from a second of its own.
@@ -1019,11 +1067,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // to, the ledger an anonymous read redeems its token against, and the tree
     // the grid labels its rows from. A second of any of them would be a second
     // answer to one question.
-    this.composedDataRetention = this.composeDataRetention(
-      options,
-      infrastructure,
-      queueInfrastructure,
-    );
+    this.composedDataRetention = infrastructure
+      ? await this.composeDataRetention(options, infrastructure, queueInfrastructure)
+      : undefined;
     this.composedDataPrivacy = infrastructure
       ? composeDataPrivacyFeature({
           infrastructure,
@@ -1033,12 +1079,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedTopic = infrastructure
       ? composeTopicFeature({ infrastructure })
       : refusingTopicFeature();
+    const retention = this.composedDataRetention;
     this.composedShare =
-      infrastructure && this.composedTenancy && this.composedAuthz
+      infrastructure && this.composedTenancy && this.composedAuthz && retention
         ? await installApiShare({
             infrastructure,
             peers: {
-              dataRetention: this.composedDataRetention.service,
+              dataRetention: retention.service,
               permissions: this.composedAuthz.app,
             },
             // The SAME Redis the queue owns, which presence and the broadcast
@@ -1109,6 +1156,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // seeding, because every one of them resolves an organization or a project through the
     // tenancy graph.
     this.composeTenantFeatures(options, encryption, queueInfrastructure, infrastructure);
+    // The two tenant directories the rollout gate and the retention surface
+    // authorize a tenant-targeted read against, bound now that the half that
+    // owns them has composed. Both features installed above hold references to
+    // these, and every call through one before this line refuses by name.
+    if (this.composedFeatureFlag) {
+      this.deferredApis.bind(ProjectApi, this.composedProject.app);
+      this.deferredApis.bind(OrganizationApi, this.composedOrganization.app);
+      this.deferredApis.ready();
+      options.resources.own("api deferred feature apis", () => this.deferredApis.close());
+    }
     // Who else is looking at this project. Installed HERE because this is the
     // first line at which the project directory it resolves a project's
     // presence policy through is open, over the fan-out the process created
@@ -1268,21 +1325,30 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME retention cascade `/settings/data-retention` writes, so a
       // first paid seat subscription's default and an operator's override are
       // one set of rules rather than two.
-      dataRetention: this.composedDataRetention.service,
+      dataRetention: this.composedDataRetention?.service,
       ...(this.composedMail ? { mail: this.composedMail } : {}),
     });
-    // The two features with no refusing twin. Neither mounts without its own
-    // application — `ctx.app.share` and the one plan answer are read by
-    // surfaces those features do not own — so the record refuses whole rather
-    // than serving slices with nothing behind them.
+    // The five features with no refusing twin. None mounts without its own
+    // application — `ctx.app.share`, `ctx.app.secrets`, the retention window
+    // and the one plan answer are all read by surfaces those features do not
+    // own — so the record refuses whole rather than serving slices with
+    // nothing behind them.
     const share = this.composedShare;
     const entitlement = this.composedEntitlement;
+    const dataRetention = this.composedDataRetention;
+    const featureFlag = this.composedFeatureFlag;
+    const secret = this.composedSecret;
     const trpcAbsence = LoggedApiTrpcFeaturesAbsence.create(
       createLogger(options.config.serviceName),
     );
-    if (infrastructure && (!share || !entitlement)) trpcAbsence.absent("no-collaborators");
+    if (
+      infrastructure &&
+      (!share || !entitlement || !dataRetention || !featureFlag || !secret)
+    ) {
+      trpcAbsence.absent("no-collaborators");
+    }
     const features =
-      share && entitlement
+      share && entitlement && dataRetention && featureFlag && secret
         ? ApiTrpcFeaturesComposition.tryCompose({
             // What a feature composes ITSELF out of, built once above and handed to
             // every `compose<Feature>()` the record's literal names.
@@ -1292,7 +1358,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             // refusing gateway stands in rather than a second condition here.
             composed: {
               analytics: this.composedAnalytics,
-              featureFlag: this.composedFeatureFlag,
+              featureFlag,
               dataset: this.composedDataset,
               evaluator: this.composedEvaluator,
               prompt: this.composedPrompt,
@@ -1300,7 +1366,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               langy: this.composedLangy,
               ops: this.composedOps,
               scenario: this.composedScenario,
-              dataRetention: this.composedDataRetention,
+              dataRetention,
               home: this.composedHome,
               role: this.composedRole,
               monitor: this.composedMonitor,
@@ -1328,6 +1394,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               user: this.composedUser,
               presence: this.composedPresence,
               apiKey: this.composedApiKey,
+              secret,
             },
             // The ONE application every packaged surface reads off `ctx.app`. One
             // literal, and every slice on it is contributed by the feature that
@@ -1343,10 +1410,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
                 analytics: this.composedAnalytics.analytics,
                 annotation: this.composedAnnotation.app,
                 modelProviders: this.composedModelProvider.app,
-                dataRetention: this.composedDataRetention.service,
+                dataRetention: dataRetention.service,
                 // The booted entitlement application, which resolves the plan off
                 // the SAME sources this process's own provider does.
                 planProvider: entitlement.app,
+                secrets: secret.app,
                 share: share.app,
                 topics: this.composedTopic.service,
                 traces: this.composedTrace.traces,
@@ -1365,7 +1433,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
                 dashboard: this.composedAnalytics.dashboard,
                 dataset: this.composedDataset.app,
                 evaluatorApp: this.composedEvaluator.app,
-                featureFlag: this.composedFeatureFlag.app,
+                featureFlag: featureFlag.app,
                 prompts: this.composedPrompt.app,
                 gateway: this.composedGateway.app,
                 github,
@@ -1433,7 +1501,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // Read once, in api.config.ts, and handed down: every mounted surface
       // validates its declared outputs or none of them does.
       validateOutput: options.config.validateTrpcOutput,
-      secrets: this.secretApp,
       requestPolicy: this.requestPolicy,
       ...this.composeDoors(
         authz,
@@ -1528,24 +1595,26 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The secret service this process serves, and where it came from. Precedence, and the reason
-   * for it: 1. An injected service wins.
+   * The project's stored credentials, over this process's own connection and its own
+   * cipher. Absent where it holds neither: a deployment given no key can neither read
+   * nor write a secret, so it mounts no door that would pretend to.
    */
-  private resolveSecretApp(encryption: SecretEncryptionPort | undefined): SecretApp | undefined {
-    if (this.options.secrets) return this.options.secrets;
+  secrets(): SecretApi | undefined {
+    return this.composedSecret?.app;
+  }
 
+  /** Installs the feature only where this process holds both a connection and a cipher. */
+  private async resolveSecretApp(
+    encryption: SecretEncryptionPort | undefined,
+  ): Promise<ComposedSecretFeature | undefined> {
     const database = this.composedDatabase;
     if (!database || !encryption) return undefined;
 
-    return SecretApp.create({
-      dependencies: {},
-      infrastructure: {
-        database: database.connection.client,
-        encryption,
-        reservedNames: RESERVED_PROJECT_SECRET_NAMES,
-      },
-      config: undefined,
-      resources: new ResourceScope(),
+    return await installApiSecret({
+      prisma: database.connection.client,
+      encryption,
+      // The SAME door every packaged REST family authenticates through.
+      credential: (input) => this.composedHandlerCredentials.authenticate(input),
     });
   }
 
@@ -1621,7 +1690,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     /** The key the credentials handed to that data plane are signed under. */
     gatewayJwtSecret: string | undefined,
   ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
-    const secrets = this.secretApp;
     const gatewayApp = this.composedGateway.app;
     // One credential resolution for both doors: the framework-shaped
     // `AppRestSecurity` every packaged REST family is built from, and the
@@ -1650,17 +1718,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // example. Their own relative order is the array's; see
     // `createApiProcessRestFeatures`.
     const rest = new Hono();
-    const handlerManagedCredentials = ApiHandlerManagedCredentials.create({
-      apiKeys: tenancy.apiKeys,
-      authz,
-    });
+    // The process's ONE credential door, resolved before this method ran
+    // because the secret families install over it.
+    const handlerManagedCredentials = this.composedHandlerCredentials;
     // The OTLP receiver, over this process's own producer registration and its
     // own Redis. Absent where there is no command queue: a receiver with
     // nowhere to send a span would answer 200 to data it then drops.
     const payloads = composeApiTraceSpool({
       storage: this.composedStoredObject.storage,
       azureRetentionConfirmed: this.azureSpoolRetentionConfirmed,
-      featureFlags: this.composedFeatureFlag.app.flags,
+      featureFlags: this.composedFeatureFlagApi,
       logger: createLogger("langwatch:api:trace-ingest:edge-spool"),
     });
     const otlpIngest = composeApiTraceIngest({
@@ -1677,7 +1744,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // worker's content drop reads: a picture stored here is one object, and
       // it is not stored at all for a project whose policy discards it.
       media: {
-        featureFlags: this.composedFeatureFlag.app.flags,
+        featureFlags: this.composedFeatureFlagApi,
         hasContentDropRules: (projectId) => this.composedDataPrivacy.dropsAnyContent(projectId),
         ...(this.composedStoredObject.bytes
           ? { service: ApiTraceMediaStore.create(this.composedStoredObject.bytes) }
@@ -2179,7 +2246,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       publicBaseUrl,
       rateLimit: (request) => this.rateLimiter.consume(request),
       redis: this.composedQueueRedis,
-      secrets,
       session: authoringSession,
       // The SAME dedup gate and command sender the OTLP receiver and the SDK
       // collector use, which is what makes a retried `POST /api/events/track`
@@ -2258,14 +2324,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     })) {
       rest.route("/", processRestApp);
     }
+    // `/api/secret` and `/api/secrets`, each with its `/api/v1` twin. Nothing
+    // is mounted on a process that installed no secret feature: a door over a
+    // store it cannot decrypt is worse than no door.
+    for (const secretRestApp of this.composedSecret?.rest ?? []) {
+      rest.route("/", secretRestApp);
+    }
     return {
       rest: rest
-        .route(
-          "/",
-          secrets
-            ? ApiSecretRestFeature.create({ secrets, security: projectRestPolicy })
-            : new Hono(),
-        )
         .route(
           "/",
           createApiKeysRestApp({
@@ -2453,7 +2519,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       resources: options.resources,
       queue: queueInfrastructure,
       processName: options.config.serviceName,
-      killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlag.app.flags),
+      killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlagApi),
       report: LoggedApiEventingAbsence.create(logger),
     });
   }
@@ -2615,7 +2681,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return composeApiLangyRest({
       langy: this.composedLangy.app,
       apiKeys: tenancy.apiKeys,
-      featureFlags: this.composedFeatureFlag.app.flags,
+      featureFlags: this.composedFeatureFlagApi,
       // The guarded client this process already opened, read through the two
       // fields the actor bridge selects. A second directory would be a second
       // answer to "who owns this key".
@@ -2794,7 +2860,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       apiKeys: tenancy.apiKeys,
       organizations: this.composedOrganization.app,
       authz,
-      featureFlags: this.composedFeatureFlag.app.flags,
+      featureFlags: this.composedFeatureFlagApi,
       publicBaseUrl,
     });
   }
@@ -2810,7 +2876,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       auth: auth?.auth,
       apiKeys: tenancy.apiKeys,
       prisma: this.composedDatabase?.connection.client,
-      featureFlags: this.composedFeatureFlag.app.flags,
+      featureFlags: this.composedFeatureFlagApi,
     });
   }
 
@@ -3040,7 +3106,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       prisma: database.client,
       authz,
       projects,
-      featureFlags: this.composedFeatureFlag.app.flags,
+      featureFlags: this.composedFeatureFlagApi,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       langWatchQL: options.config.infrastructure.clickhouse.langwatchQl,
       resources: options.resources,
@@ -3187,22 +3253,30 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The retention surface, over this process's own graph. One peer: the operator allow-list,
-   * taken off the identity half rather than parsed a second time, so "who may keep data
-   * forever" and "who sees the operator sidebar" are never two answers.
+   * The retention surface, over this process's own graph. The operator allow-list is the
+   * user directory's, taken rather than parsed a second time, so "who may keep data
+   * forever" and "who sees the operator sidebar" are never two answers. The two tenant
+   * directories are the references the process binds once the tenant half has composed:
+   * this feature installs BEFORE it, because the share ledger it bounds is what that half
+   * administers a project's sharing through.
    */
-  private composeDataRetention(
+  private async composeDataRetention(
     options: ApiRuntimeCompositionOptions,
-    infrastructure: ApiTrpcInfrastructure | undefined,
+    infrastructure: ApiTrpcInfrastructure,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
-  ): ComposedDataRetentionFeature {
-    const ops = this.composedUser.ops;
-    const tenancy = this.composedTenancy;
-    if (!infrastructure || !ops || !tenancy) return refusingDataRetentionFeature();
+  ): Promise<ComposedDataRetentionFeature | undefined> {
+    const permissions = this.composedAuthz?.app;
+    if (!permissions) return undefined;
 
-    return composeDataRetentionFeature({
+    return await installApiDataRetention({
       infrastructure,
-      peers: { ops, projects: tenancy.projects, organizations: tenancy.organizations },
+      peers: {
+        projects: this.deferredApis.reference(ProjectApi),
+        organizations: this.deferredApis.reference(OrganizationApi),
+        permissions,
+        // The SAME directory the /me screens answer from.
+        users: this.composedUser.app,
+      },
       // The platform application's own floor. Stated rather than read from
       // config: defaulting to the adapter's shorter value would silently
       // shorten every project's window on a deployment that never changed a
@@ -3212,7 +3286,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // reads run on: the meter counts the rows the explorer reads.
       redis: queueInfrastructure?.redis ?? null,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
-      report: LoggedApiDataRetentionAbsence.create(createLogger(options.config.serviceName)),
     });
   }
 
@@ -3242,7 +3315,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // composes, and that needs the same database, tenancy and identity.
     const workflows = this.composedWorkflowRuntime?.workflows;
     const modelProviders = this.composedModelProviders;
-    const secrets = this.secrets;
+    const secrets = this.composedSecret?.app;
     const traces = this.composedTrace.traces;
     if (!workflows || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
 
@@ -3306,7 +3379,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // two would leave a browser watching a channel nothing writes to.
     const broadcast = this.composedBroadcast;
     const share = this.composedShare;
-    if (!database || !tenancy || !grants || !share) return refusingTraceFeature();
+    // The retention window every trace read's floor is widened to. There is no
+    // refusing twin: a read stack that cannot say how far back a project keeps
+    // its traffic would answer a wrong window rather than a narrower one.
+    const retention = this.composedDataRetention;
+    if (!database || !tenancy || !grants || !share || !retention) return refusingTraceFeature();
 
     return composeTraceFeature({
       prisma: database.client,
@@ -3344,7 +3421,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           dataPrivacy: this.composedDataPrivacy.service,
           projects: tenancy.projects,
           plans: this.resolvePlanProvider(options),
-          dataRetention: this.composedDataRetention.service,
+          dataRetention: retention.service,
           topics: this.composedTopic.service,
           // The evaluations behind a trace, on the SAME ClickHouse and the
           // SAME retention cascade the trace itself is read through. Every
@@ -3354,7 +3431,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             ? {
                 evaluations: composeApiEvaluationReads({
                   resolveClickHouseClient: this.composedClickHouse.resolveClient,
-                  dataRetention: this.composedDataRetention.service,
+                  dataRetention: retention.service,
                   processName: options.config.serviceName,
                 }),
               }

@@ -23,7 +23,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../api-request.policy.ts";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application.ts";
+import { ApiApplication, MissingAgentService } from "../../api.application.ts";
 import { composeDatasetService } from "../../features/dataset/dataset.composition.ts";
 import { composeEvaluatorService } from "../../features/evaluator/evaluator.composition.ts";
 import { composeMonitorService } from "../../features/monitor/monitor.composition.ts";
@@ -358,7 +358,6 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

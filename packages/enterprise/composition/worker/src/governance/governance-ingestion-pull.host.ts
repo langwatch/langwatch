@@ -12,7 +12,7 @@ import type {
   GovernanceIngestionPullSchedulePort,
 } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
 import type { GovernanceEncryption } from "@langwatch/enterprise-api/governance/governance-infrastructure.adapter";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { computeNextRunAt } from "@langwatch/eventing/server";
 import {
   estimateModelCost,
@@ -72,7 +72,7 @@ export type WorkerGovernanceIngestionPullHostOptions = {
    * would decrypt to noise and the pull would authenticate with garbage.
    */
   encryption: GovernanceEncryption;
-  featureFlags: Pick<FeatureFlagService, "isEnabled">;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   logger?: Logger;
 };
 

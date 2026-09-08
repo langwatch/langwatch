@@ -62,7 +62,7 @@ import type {
   SlackActionParams,
 } from "@langwatch/automation-contract";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -101,7 +101,7 @@ export type ApiAutomationCompositionOptions = Readonly<{
   /** The monitors a trigger watches, named in the trigger list. */
   monitors: MonitorService;
   /** The rollout gate the webhook channel is behind. */
-  featureFlags: FeatureFlagService;
+  featureFlags: FeatureFlagApi;
   /** Which plan an organization is on, for the persist ceiling. */
   plans: AutomationPlanProvider;
   /** The provider registry, already bound to this deployment's cipher. */

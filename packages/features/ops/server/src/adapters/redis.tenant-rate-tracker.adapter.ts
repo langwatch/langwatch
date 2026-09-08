@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port.ts";
@@ -19,7 +19,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   private constructor(
     private readonly redis: IORedis | Cluster,
     private readonly now: () => number,
-    private readonly featureFlags: FeatureFlagService | undefined,
+    private readonly featureFlags: FeatureFlagApi | undefined,
   ) {
     super();
   }
@@ -27,7 +27,7 @@ export class RedisTenantRateTrackerAdapter extends AnomalyRateTrackerPort {
   static create(options: {
     redis: IORedis | Cluster;
     now?: (() => number) | undefined;
-    featureFlags?: FeatureFlagService | undefined;
+    featureFlags?: FeatureFlagApi | undefined;
   }): RedisTenantRateTrackerAdapter {
     return new RedisTenantRateTrackerAdapter(
       options.redis,

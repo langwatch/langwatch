@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition.ts";
@@ -28,15 +27,16 @@ import {
   stubEntitlementFeature,
   stubPresenceFeature,
   stubShareFeature,
+  stubDataRetentionFeature,
+  stubFeatureFlagFeature,
+  stubSecretFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../langy/langy.composition.ts";
-import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition.ts";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
 import { refusingEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
-import { refusingFeatureFlagFeature } from "../../feature-flag/feature-flag.composition.ts";
 import { refusingMonitorFeature } from "../../monitor/monitor.composition.ts";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
 import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition.ts";
@@ -208,15 +208,16 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
       apiKey: refusingApiKeyFeature(),
+      secret: stubSecretFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
-      featureFlag: refusingFeatureFlagFeature(),
+      featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
       evaluator: refusingEvaluatorFeature(),
       prompt: refusingPromptFeature(),
-      dataRetention: refusingDataRetentionFeature(),
+      dataRetention: stubDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
       home: refusingHomeFeature(),
       role: refusingRoleFeature(),
@@ -257,7 +258,6 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

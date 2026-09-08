@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import { composeApiModelProviderHost } from "../../../app/api-model-provider-host.composition.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
@@ -61,7 +60,6 @@ function composeApplication(options: { host?: ReturnType<typeof realHost> } = {}
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

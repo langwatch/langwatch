@@ -5,7 +5,7 @@
  */
 
 import { nowInstant, toDate } from "@langwatch/time";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
 
@@ -114,7 +114,7 @@ export class BudgetOverviewService {
   private constructor(
     private readonly repository: GatewayBudgetOverviewRepository,
     private readonly organizations: OrganizationService,
-    private readonly featureFlags: FeatureFlagService,
+    private readonly featureFlags: FeatureFlagApi,
     private readonly personalVirtualKeys: PersonalVirtualKeyReader,
     private readonly personalUsage: PersonalUsageReader | undefined,
     private readonly budgetDecisions: GatewayService,
@@ -132,7 +132,7 @@ export class BudgetOverviewService {
   static create(options: {
     repository: GatewayBudgetOverviewRepository;
     organizations: OrganizationService;
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;

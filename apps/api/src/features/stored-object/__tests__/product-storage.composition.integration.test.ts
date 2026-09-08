@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -13,11 +13,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   MissingAgentService,
-  MissingSecretService,
 } from "../../../api.application.ts";
 import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
-import { composeDataRetentionFeature } from "../../data-retention/data-retention.composition.ts";
+import { createDataRetentionTrpcRouter } from "../../data-retention/data-retention-trpc.mount.ts";
+import type { ComposedDataRetentionFeature } from "../../data-retention/data-retention.composition.types.ts";
 import { composeMonitorFeature } from "../../monitor/monitor.composition.ts";
 import {
   composeStoredObjectFeature,
@@ -260,7 +260,7 @@ function testClickHouse(storage: ReturnType<typeof testObjectStorage>) {
 }
 
 /** The retention service the settings page reads through. */
-function testDataRetention(): DataRetentionService {
+function testDataRetention(): DataRetentionApi {
   return {
     getResolvedForProject: vi.fn(async () => ({ traces: 49 })),
     listOrganizationRules: vi.fn(async () => [
@@ -273,7 +273,7 @@ function testDataRetention(): DataRetentionService {
     getTotalStorageBytesForTenants: vi.fn(
       async ({ tenantIds }: { tenantIds: readonly string[] }) => tenantIds.length * 1_000,
     ),
-  } as unknown as DataRetentionService;
+  } as unknown as DataRetentionApi;
 }
 
 /** No S3 anywhere: this deployment addresses its bytes on its own disk. */
@@ -390,18 +390,13 @@ function composeHalf(
     resolveClickHouseClient:
       "resolveClickHouseClient" in rest ? rest.resolveClickHouseClient! : clickHouse.resolveClient,
   });
-  const dataRetention = composeDataRetentionFeature({
-    infrastructure,
-    peers: {
-      ops: { isAdmin: () => false } as never,
-      projects: {} as never,
-      organizations: {} as never,
-    },
-    defaultRetentionDays: 49,
-    redis: null,
-    resolveClickHouseClient: null,
-    dataRetention: testDataRetention(),
-  });
+  // The retention namespace over the answers this suite drives. The installer
+  // boots its own app over a real connection, which this world does not have;
+  // the wire names and the windows behind them are the ones under test.
+  const dataRetention: ComposedDataRetentionFeature = {
+    service: testDataRetention(),
+    router: (mount) => createDataRetentionTrpcRouter(mount.runtime),
+  };
 
   return {
     dataRetention,
@@ -447,7 +442,6 @@ function composeApplication(
 
   const application = ApiApplication.create({
     agents: new MissingAgentService(),
-    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

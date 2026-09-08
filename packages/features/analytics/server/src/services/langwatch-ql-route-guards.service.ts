@@ -7,7 +7,7 @@
 import type { PlatformUrlBuilder, RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
 
@@ -49,7 +49,7 @@ export class LangWatchQLRouteGuardsService {
    * project is the distinct identity.
    */
   async assertEnabled(input: {
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
     project: ProjectIdentity;
     projects: ProjectService;
   }): Promise<void> {
@@ -77,7 +77,7 @@ export class LangWatchQLRouteGuardsService {
     projects,
     requestedProjectId,
   }: {
-    featureFlags: FeatureFlagService;
+    featureFlags: FeatureFlagApi;
     project: ProjectIdentity;
     projects: ProjectService;
     requestedProjectId: string | undefined;
@@ -95,7 +95,7 @@ export class LangWatchQLRouteGuardsService {
  */
 export interface LangWatchQLRestPorts {
   /** The rollout switch the whole surface is behind. */
-  featureFlags: () => FeatureFlagService;
+  featureFlags: () => FeatureFlagApi;
   /** The project directory the flag's organization and the tenant key are read from. */
   projects: () => ProjectService;
   /** The governed statement runner and its schema description. */
