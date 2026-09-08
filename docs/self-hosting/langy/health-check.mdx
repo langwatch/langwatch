@@ -20,7 +20,9 @@ keywords:
 | Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
 | Check interval | 3 minutes or longer |
 
-The API key must come from the organization's API keys page (Settings → API keys) and carry the `langy:create` permission on the project. A service key, one issued to no user, is the right credential for a monitor: the turn runs as the key itself, named after it, and the project must have Langy access. A personal key also works, with the turn running as its owner, who must have Langy access. The project's own key from the project settings page has no identity to act as and is refused with `403`.
+The API key must come from the organization's API keys page (Settings → API keys) and carry the `langy:create` permission on the project. A service key, one issued to no user, is the right credential for a monitor: the turn runs as the key itself, named after it, and the project must have Langy access.
+
+A personal key also works, with the turn running as its owner, who must have Langy access. The project's own key from the project settings page has no identity to act as and is refused with `403`.
 
 `X-Project-Id` names the project the turn runs in. A key scoped to exactly one project may omit it; any other key without it is refused with `401`.
 
