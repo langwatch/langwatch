@@ -281,9 +281,23 @@ export function PeopleSpendPanel({
   );
 
   const people = peopleQuery.data ?? [];
-  const lockedByPlan =
-    (!isPlanLoading && !isEnterprise) ||
-    readHandledError(peopleQuery.error)?.code === "enterprise_plan_required";
+  const lockedByPlan = isLockedByPlan({
+    isPlanLoading,
+    isEnterprise,
+    error: peopleQuery.error,
+  });
+
+  // The two joins live here, next to the queries that feed them, so the table
+  // below stays a table: it is handed the department and the source for a row
+  // and never learns that either one came from a separate read.
+  const departmentFor = (actor: string) =>
+    departmentNameForActor({
+      actor,
+      assignments: assignmentsQuery.data,
+      departments: departmentsQuery.data,
+    });
+  const sourceFor = (target: string | null) =>
+    sourceForTarget({ target, sources: sourcesQuery.data });
 
   return (
     <VStack align="stretch" gap={3} width="full">
@@ -306,52 +320,123 @@ export function PeopleSpendPanel({
       {lockedByPlan ? (
         <EnterpriseLockedLine />
       ) : (
-        <>
-          <HandledErrorAlert
-            error={peopleQuery.error}
-            fallbackTitle="Couldn't load people"
-          />
-          {peopleQuery.isLoading ? (
-            <Box padding={6}>
-              <Spinner />
-            </Box>
-          ) : people.length === 0 ? (
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              padding={6}
-              color="fg.muted"
-              fontSize="sm"
-            >
-              {peopleQuery.error
-                ? "People's activity could not be read."
-                : PEOPLE_EMPTY_COPY}
-            </Box>
-          ) : (
-            <>
-              <PeopleTable
-                people={people}
-                departmentFor={(actor) =>
-                  departmentNameForActor({
-                    actor,
-                    assignments: assignmentsQuery.data,
-                    departments: departmentsQuery.data,
-                  })
-                }
-                sourceFor={(target) =>
-                  sourceForTarget({ target, sources: sourcesQuery.data })
-                }
-              />
-              <Text fontSize="xs" color="fg.muted">
-                {people.length} {people.length === 1 ? "person" : "people"}{" "}
-                shown.
-              </Text>
-            </>
-          )}
-        </>
+        <PeopleSpendResults
+          people={people}
+          error={peopleQuery.error}
+          isLoading={peopleQuery.isLoading}
+          departmentFor={departmentFor}
+          sourceFor={sourceFor}
+        />
       )}
     </VStack>
+  );
+}
+
+/**
+ * Whether the ranking is locked rather than merely missing. Two things say so
+ * and either is enough: the organization is on a plan that does not include
+ * this, or the read came back refused for exactly that reason. The plan is
+ * asked first, so an organization we already know cannot see this never waits
+ * on a request that can only be refused.
+ */
+function isLockedByPlan({
+  isPlanLoading,
+  isEnterprise,
+  error,
+}: {
+  isPlanLoading: boolean;
+  isEnterprise: boolean;
+  error: unknown;
+}): boolean {
+  if (!isPlanLoading && !isEnterprise) return true;
+  return readHandledError(error)?.code === "enterprise_plan_required";
+}
+
+/**
+ * What the panel shows once the plan allows it: the ranking, or the one thing
+ * standing in for it. This is separate from the panel because the panel's job
+ * is asking the questions and this one's job is answering with whichever of
+ * the three states we are actually in — still waiting, nobody to show, or the
+ * table itself.
+ */
+function PeopleSpendResults({
+  people,
+  error,
+  isLoading,
+  departmentFor,
+  sourceFor,
+}: {
+  people: readonly SpendByUserRow[];
+  error: unknown;
+  isLoading: boolean;
+  departmentFor: (actor: string) => string | null;
+  sourceFor: (target: string | null) => IngestionSource | null;
+}) {
+  return (
+    <>
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't load people" />
+      {isLoading ? (
+        <Box padding={6}>
+          <Spinner />
+        </Box>
+      ) : people.length === 0 ? (
+        <PeopleEmptyLine error={error} />
+      ) : (
+        <PeopleRanking
+          people={people}
+          departmentFor={departmentFor}
+          sourceFor={sourceFor}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * An empty table means one of two very different things, and the reader
+ * deserves to know which: either nobody used AI in the window, or we could not
+ * read it and are not claiming that nobody did.
+ */
+function PeopleEmptyLine({ error }: { error: unknown }) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={6}
+      color="fg.muted"
+      fontSize="sm"
+    >
+      {error ? "People's activity could not be read." : PEOPLE_EMPTY_COPY}
+    </Box>
+  );
+}
+
+/**
+ * The table and the count under it. They are one piece because the count is
+ * about the table: it tells the reader how much of the ranking they are
+ * looking at, so it is never shown without one.
+ */
+function PeopleRanking({
+  people,
+  departmentFor,
+  sourceFor,
+}: {
+  people: readonly SpendByUserRow[];
+  departmentFor: (actor: string) => string | null;
+  sourceFor: (target: string | null) => IngestionSource | null;
+}) {
+  return (
+    <>
+      <PeopleTable
+        people={people}
+        departmentFor={departmentFor}
+        sourceFor={sourceFor}
+      />
+      <Text fontSize="xs" color="fg.muted">
+        {people.length} {people.length === 1 ? "person" : "people"} shown.
+      </Text>
+    </>
   );
 }
 
