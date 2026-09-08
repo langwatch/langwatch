@@ -154,7 +154,17 @@ function InsightRow({ severity, headline, date }: SampleInsight) {
   );
 }
 
-/** One thing the reader went back to, and the kind of thing it was. */
+/**
+ * One thing the reader went back to, and the kind of thing it was.
+ *
+ * The kind is a chip rather than a run of small text: it is a category out of
+ * a closed set — Costs, Directory, Sources, Agents, Dashboard — and five of
+ * them down the right of a list read as a second column of prose when they are
+ * set as words. `surface` neutral is the house mark for a category on a row;
+ * the greyed `subtle` badge is the section's mark for sample and metadata, and
+ * reusing it here would say the same thing twice beside the heading that
+ * already says it.
+ */
 function ActivityRow({
   name,
   kind,
@@ -167,6 +177,31 @@ function ActivityRow({
         <Icon boxSize={3.5} color="fg.muted" flexShrink={0}>
           <RowIcon />
         </Icon>
+        {/*
+          These properties decide who gives way when the column narrows, and
+          the answer is the name. They do two separate jobs, which is worth
+          keeping straight because they look like one.
+
+          `minWidth: 0` and `overflow: hidden` each drop this item's automatic
+          minimum size to zero, which is what lets flexbox shrink it at all; a
+          flex item otherwise refuses to go below its own min-content. The chip
+          beside it is left at `min-width: auto`, so it holds its word. That
+          asymmetry is the whole mechanism, and it needs nothing on the chip:
+          a `flexShrink: 0` there was measured across seven configurations —
+          one-word label and two, wrapping and not, prop present and absent —
+          and changed no geometry at any width, so it was removed rather than
+          left as decoration.
+
+          `overflow: hidden` and `textOverflow: ellipsis` then do the second
+          job: clip the shrunken box and draw the ellipsis. Without the clip
+          the name still shrinks, but its ink keeps painting at full length,
+          out of its box and across the gap toward the chip.
+
+          Both falsified in Chromium rather than reasoned about. Drop the clip
+          and the name's ink hit-tests in the gap beside it; drop both levers
+          and the name stops truncating while the chip lands 44.1px outside its
+          row at a 150px column. The browser test next door asserts each.
+        */}
         <Text
           fontSize="sm"
           color="fg"
@@ -178,9 +213,9 @@ function ActivityRow({
         >
           {name}
         </Text>
-        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+        <Badge size="sm" variant="surface" colorPalette="gray">
           {kind}
-        </Text>
+        </Badge>
       </RowFrame>
     </Link>
   );

@@ -17,7 +17,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
-import { AnomalyRulesTab } from "@ee/governance/dashboard/components/AnomalyRulesTab";
 import { DashboardSelect } from "@ee/governance/dashboard/components/DashboardSelect";
 import type { EnvironmentRow } from "@ee/governance/dashboard/components/environments/discoveredEnvironments";
 import {
@@ -57,6 +56,7 @@ import {
   KeyRound,
   LayoutGrid,
   List as ListIcon,
+  Plug,
   Plus,
 } from "lucide-react";
 import {
@@ -68,6 +68,7 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "react-router";
+import { GovernanceEmptyState } from "~/components/governance/empty";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import {
   SampleDataBanner,
@@ -288,24 +289,31 @@ function IngestionSourceList({
   isLoading,
   error,
   sources,
-  addControl,
   rotatingId,
   archivingId,
   onEdit,
   onRotate,
   onArchive,
+  createAction,
 }: {
   canRead: boolean;
   canManage: boolean;
   isLoading: boolean;
   error: unknown;
   sources: Source[] | undefined;
-  addControl?: ReactNode;
   rotatingId: string | null;
   archivingId: string | null;
   onEdit: (id: string) => void;
   onRotate: (id: string) => void;
   onArchive: (id: string) => void;
+  /**
+   * The page header's OWN create control, rendered a second time inside the
+   * empty state. Not a second control in the sense the create-on-top rule
+   * forbids: same component, so same label, same weight and same flow. This is
+   * deliberately not the `addControl` slot that used to sit in the table's
+   * header — that one was a differently-worded outline button and is gone.
+   */
+  createAction?: ReactNode;
 }) {
   // Only claim "none connected" (and only count) when we actually know: on
   // a load failure the alert below says what went wrong instead, and a
@@ -321,11 +329,9 @@ function IngestionSourceList({
         />
       )}
 
+      {/* No `action`: create lives in the page header, on every pane. */}
       {canRead && (
-        <ConnectorsHeader
-          sources={knowsFleet ? sources : undefined}
-          action={addControl}
-        />
+        <ConnectorsHeader sources={knowsFleet ? sources : undefined} />
       )}
 
       {isLoading && <Spinner size="sm" />}
@@ -335,10 +341,23 @@ function IngestionSourceList({
         fallbackTitle="Couldn't load ingestion sources"
       />
 
+      {/* A grey sentence used to sit here, which told a reader the state and
+          left them in it. The way out is the page header's own Add source,
+          rendered again here rather than described: a sentence naming a button
+          goes stale the moment the button is renamed, and nothing checks
+          prose. Same component, so one label, one weight, one flow. */}
       {canRead && knowsFleet && sources.length === 0 && (
-        <Text fontSize="sm" color="fg.muted">
-          No sources connected yet.
-        </Text>
+        <GovernanceEmptyState
+          testId="ingestion-sources-empty"
+          icon={Plug}
+          headline="No sources connected yet"
+          description={
+            canManage
+              ? "A source is where this organization's AI usage is read from. Connect one and its events start arriving here."
+              : "A source is where this organization's AI usage is read from. Once someone connects one, its events arrive here."
+          }
+          action={createAction}
+        />
       )}
 
       {canRead && knowsFleet && sources.length > 0 && (
@@ -710,8 +729,16 @@ function useAddSourceParam({
 
 /**
  * The inventory's tabs: Catalog (the registered tools, as cards),
- * Environments (where those tools run), Sources (the ingestion-sources table)
- * and Anomaly rules (formerly /governance/anomaly-rules).
+ * Environments (where those tools run) and Sources (the ingestion-sources
+ * table). Every one of them answers "what does this organization run", which
+ * is the question this page exists for.
+ *
+ * ANOMALY RULES USED TO BE A FOURTH TAB AND IS NOT ONE ANY MORE. A rule is a
+ * standing instruction about what to watch for, not a thing the organization
+ * runs, so it belongs with alerts and signals rather than in an inventory.
+ * `AnomalyRulesTab` itself is untouched and still exported, because the
+ * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
+ * the same component.
  *
  * The tool-tiles editor used to be the Catalog pane. It moved off this page
  * entirely: tiles are the launcher grid on the personal AI-tools portal and
@@ -719,12 +746,7 @@ function useAddSourceParam({
  * organization runs. See `~/components/governance/ToolCatalogPanel` for where
  * that composition now waits for a home.
  */
-const INVENTORY_TABS = [
-  "catalog",
-  "environments",
-  "sources",
-  "anomaly-rules",
-] as const;
+const INVENTORY_TABS = ["catalog", "environments", "sources"] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
 
 const isInventoryTab = (value: string | null): value is InventoryTab =>
@@ -788,8 +810,7 @@ function InventoryTabLabel({
  *
  * Counts sit on a tab only where the pane's own list is already loaded, which
  * is Catalog and Sources — both read the source list the page holds anyway.
- * Environments is derived from that same list, so it counts too; Anomaly rules
- * would need a query of its own and carries none.
+ * Environments is derived from that same list, so it counts too.
  */
 function InventoryTabs({
   inventoryTab,
@@ -839,13 +860,6 @@ function InventoryTabs({
         >
           <InventoryTabLabel label="Sources" count={sourceCount} />
         </Tabs.Trigger>
-        <Tabs.Trigger
-          value="anomaly-rules"
-          color="fg.muted"
-          _selected={{ color: "fg", fontWeight: "semibold" }}
-        >
-          Anomaly rules
-        </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="catalog" paddingTop={4}>
         {catalog}
@@ -857,9 +871,6 @@ function InventoryTabs({
         <VStack align="stretch" gap={4} width="full">
           {sources}
         </VStack>
-      </Tabs.Content>
-      <Tabs.Content value="anomaly-rules" paddingTop={4}>
-        <AnomalyRulesTab />
       </Tabs.Content>
     </Tabs.Root>
   );
@@ -887,21 +898,22 @@ function InventorySourcesPane({
       isLoading={sourcesQuery.isLoading}
       error={page.sample.active ? null : sourcesQuery.error}
       sources={sourcesQuery.data}
-      addControl={
-        page.canManage ? (
-          <AddSourceControl
-            isEnterprise={page.isEnterprise}
-            sourceCount={sourcesQuery.data?.length ?? 0}
-            onAdd={page.startComposer}
-          />
-        ) : undefined
-      }
       rotatingId={pendingId(mutations.rotate)}
       archivingId={pendingId(mutations.archive)}
       onEdit={page.setEditingSourceId}
       onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
       onArchive={(id) =>
         mutations.archive.mutate({ organizationId: orgId, id })
+      }
+      createAction={
+        page.canManage ? (
+          <AddSourceControl
+            isEnterprise={page.isEnterprise}
+            sourceCount={sourcesQuery.data?.length ?? 0}
+            onAdd={page.startComposer}
+            label="Add source"
+          />
+        ) : undefined
       }
     />
   );
@@ -974,17 +986,15 @@ function InventoryHeaderActions({
         onToggle={page.sample.toggle}
         size="sm"
       />
-      {inventoryTab === "catalog" && page.canManage && (
-        <AddIngestionSourceMenu
-          isEnterprise={page.isEnterprise}
-          hint="A tool joins the catalog when you connect it as a source."
-          onPick={page.startComposer}
-        >
-          <Button size="sm" colorPalette="orange">
-            <Plus size={14} /> Add tool
-          </Button>
-        </AddIngestionSourceMenu>
-      )}
+      {(inventoryTab === "catalog" || inventoryTab === "sources") &&
+        page.canManage && (
+          <AddSourceControl
+            isEnterprise={page.isEnterprise}
+            sourceCount={page.sourcesQuery.data?.length ?? 0}
+            onAdd={page.startComposer}
+            label={inventoryTab === "catalog" ? "Add tool" : "Add source"}
+          />
+        )}
       {inventoryTab === "environments" && (
         <Button
           size="sm"
@@ -995,6 +1005,41 @@ function InventoryHeaderActions({
         </Button>
       )}
     </HStack>
+  );
+}
+
+/**
+ * The Catalog pane, wired to the page's reads.
+ *
+ * Extracted for the same reason the sources pane is: the page's own body is a
+ * layout, and a pane's five props are not layout. `canManage` chooses the
+ * empty-state SENTENCE; the action beside it is the header's own control
+ * rendered a second time, which is why it is passed rather than rebuilt.
+ */
+function InventoryCatalogPane({
+  page,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+}) {
+  return (
+    <ToolCatalogTab
+      canRead={page.canRead}
+      canManage={page.canManage}
+      sources={page.sourcesQuery.data}
+      health={page.healthQuery.data}
+      sampleActive={page.sample.active}
+      layout={page.catalogLayout}
+      addToolAction={
+        page.canManage ? (
+          <AddSourceControl
+            isEnterprise={page.isEnterprise}
+            sourceCount={page.sourcesQuery.data?.length ?? 0}
+            onAdd={page.startComposer}
+            label="Add tool"
+          />
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -1044,15 +1089,7 @@ function InventoryPage() {
           catalogCount={catalogCount}
           environmentCount={environments.length}
           sourceCount={sourcesQuery.data?.length}
-          catalog={
-            <ToolCatalogTab
-              canRead={page.canRead}
-              sources={sourcesQuery.data}
-              health={page.healthQuery.data}
-              sampleActive={page.sample.active}
-              layout={page.catalogLayout}
-            />
-          }
+          catalog={<InventoryCatalogPane page={page} />}
           environments={
             <EnvironmentsTab
               canRead={page.canRead}
@@ -1120,15 +1157,35 @@ function EditingSourceDrawer({
   );
 }
 
-/** Mounted only for a viewer holding `ingestionSources:manage`. */
+/**
+ * The page's ONE create control, mounted only for a viewer holding
+ * `ingestionSources:manage`.
+ *
+ * There used to be two: a solid "Add tool" in the page header and a second,
+ * outline "Add source" down inside the Sources table's own header. Both opened
+ * the same menu and created the same thing, so a reader had to work out which
+ * of two differently-worded, differently-weighted buttons was the real one.
+ * Create now lives in the page header, on every pane, and nothing inside the
+ * content region creates anything.
+ *
+ * The label still changes with the pane, because the panes genuinely list
+ * different views of the same object: the catalog lists tools and the table
+ * lists sources. What must not change is that there is one of them.
+ *
+ * The plan cap lives here rather than at either call site. It used to be
+ * carried by the in-content control alone, so the header's Add tool would
+ * happily open a menu for an organization that had already hit its limit.
+ */
 function AddSourceControl({
   isEnterprise,
   sourceCount,
   onAdd,
+  label,
 }: {
   isEnterprise: boolean;
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
+  label: string;
 }) {
   const atCap =
     !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
@@ -1143,12 +1200,12 @@ function AddSourceControl({
       hint={
         !isEnterprise
           ? `Your plan includes up to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources. Upgrade to Enterprise for unlimited.`
-          : undefined
+          : "A tool joins the catalog when you connect it as a source."
       }
       onPick={onAdd}
     >
-      <Button variant="outline" size="sm" disabled={atCap}>
-        <Plus size={14} /> Add source
+      <Button size="sm" colorPalette="orange" disabled={atCap}>
+        <Plus size={14} /> {label}
       </Button>
     </AddIngestionSourceMenu>
   );

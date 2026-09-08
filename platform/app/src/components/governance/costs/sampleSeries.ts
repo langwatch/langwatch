@@ -187,21 +187,101 @@ export function sampleLine(
   }));
 }
 
+/** The `count` months after `day`, as ISO first-of-month days. */
+export function monthsAfter(day: string, count: number): string[] {
+  const start = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return [];
+  const out: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    out.push(
+      new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1))
+        .toISOString()
+        .slice(0, 10),
+    );
+  }
+  return out;
+}
+
+/** How many trailing periods the run rate is taken from. */
+const RUN_RATE_PERIODS = 3;
+/** What the run rate is assumed to do each month it is carried forward. */
+const PROJECTED_DRIFT = 1.02;
+/** How far ahead the panel forecasts when the caller does not say: a quarter. */
+const MONTHS_PROJECTED_AHEAD = 3;
+
 /**
- * Metered spend split into the part already served and the part still
- * projected, so the forecast panel can paint the run-rate tail in a lighter
- * shade. The last quarter of the window is the projection.
+ * Metered spend already served, and the months still to come.
+ *
+ * A FORECAST POINTS FORWARD. This used to shade the last quarter of the window
+ * itself, which meant the panel called "forecast" projected nothing: every
+ * month it drew had already happened, and the only thing the shading said was
+ * that we had stopped trusting our own measurements three months back. The
+ * projected months are now months the window does not contain — they come
+ * after its last day, and the chart's axis runs past today because that is
+ * what a forecast is.
+ *
+ * The projected values are a run rate carried forward, not another roll of the
+ * generator. Measured spend is noisy because serving traffic is noisy; a
+ * projection is an average with an assumption on it, and drawing it with the
+ * same jitter as the measured months would claim we can forecast next month's
+ * wobble. So the tail leaves from the mean of the last three measured months
+ * and drifts gently.
+ *
+ * `measured` and `projected` are returned apart because the ranked panels are
+ * totalled from this series, and money nobody has spent must never be counted
+ * as spend. The chart concatenates them; the totals take `measured` alone.
+ *
+ * `monthsAhead` exists because the projection has to survive the fold. The
+ * chart's buckets are whatever interval the reader picked, and a three-month
+ * projection folded to a YEAR lands inside the same bucket as nine measured
+ * months — one bar silently holding spend and forecast together, which is the
+ * one thing this panel must never do. The caller therefore reaches at least a
+ * bucket ahead, so the projected months always have a bucket of their own.
+ *
+ * An options object rather than four positional arguments: three of these are
+ * numbers and strings that would read identically in the wrong order.
  */
-export function sampleForecast(
-  days: string[],
-  labels: readonly string[],
-  dailyTopValue: number,
-): { buckets: DailyBucket[]; projectedFromDay: string | null } {
-  const splitIndex = Math.floor(days.length * 0.75);
-  return {
-    buckets: sampleDaily(days, labels, dailyTopValue),
-    projectedFromDay: days[splitIndex] ?? null,
-  };
+export function sampleForecast({
+  days,
+  labels,
+  monthlyTopValue,
+  monthsAhead = MONTHS_PROJECTED_AHEAD,
+}: {
+  days: string[];
+  labels: readonly string[];
+  monthlyTopValue: number;
+  monthsAhead?: number;
+}): {
+  measured: DailyBucket[];
+  projected: DailyBucket[];
+  projectedFromDay: string | null;
+} {
+  const measured = sampleDaily(days, labels, monthlyTopValue);
+  const lastDay = days[days.length - 1];
+  if (!lastDay) return { measured, projected: [], projectedFromDay: null };
+
+  const tail = measured.slice(-RUN_RATE_PERIODS);
+  const runRate = new Map(
+    labels.map((label) => {
+      const values = tail.map(
+        (bucket) => bucket.points.find((p) => p.key === label)?.value ?? 0,
+      );
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return [label, values.length === 0 ? 0 : total / values.length];
+    }),
+  );
+
+  const ahead = monthsAfter(lastDay, monthsAhead);
+  const projected = ahead.map((day, index) => ({
+    day,
+    points: labels.map((label) => ({
+      key: label,
+      label,
+      value: Math.round((runRate.get(label) ?? 0) * PROJECTED_DRIFT ** index),
+    })),
+  }));
+
+  return { measured, projected, projectedFromDay: ahead[0] ?? null };
 }
 
 /**
@@ -222,28 +302,104 @@ export function sampleForecast(
 export function sampleSeats(
   periods: string[],
   pools: readonly string[] = SAMPLE_SEAT_POOLS,
-  seatsPerPool = 140,
 ): DailyBucket[] {
-  const boughtRandom = seededRandom(hashLabel("seats-bought"));
-  const assignedRandom = seededRandom(hashLabel("seats-assigned"));
-  return periods.map((day, index) => {
-    // Bought grows in steps, the way a company buys licences: a block at a
-    // time, and it never falls back on its own.
-    const bought = Math.round(
-      pools.length * seatsPerPool * (1 + index * 0.04 + boughtRandom() * 0.05),
-    );
-    // Assigned trails it. Never above, because a provider cannot seat more
-    // people than the licences bought, and the panel would read as a defect.
-    const assigned = Math.round(bought * (0.62 + assignedRandom() * 0.24));
+  return periods.map((day) => {
+    const counts = sampleSeatPools(day, pools);
+    const total = (pick: (pool: SampleSeatPool) => number) =>
+      counts.reduce((sum, pool) => sum + pick(pool), 0);
     return {
       day,
       points: [
-        { key: "bought", label: "Seats bought", value: bought },
-        { key: "assigned", label: "Seats assigned", value: assigned },
+        {
+          key: "bought",
+          label: "Seats bought",
+          value: total((pool) => pool.seatsBought),
+        },
+        {
+          key: "assigned",
+          label: "Seats assigned",
+          value: total((pool) => pool.seatsAssigned),
+        },
       ],
     };
   });
 }
+
+/** One licence pool's counts at a point in time. */
+export interface SampleSeatPool {
+  skuPartNumber: string;
+  seatsBought: number;
+  seatsAssigned: number;
+}
+
+/**
+ * How many seats each pool holds in a given month, and how many are sat in.
+ *
+ * THE SHAPE IS THE POINT. Seats are bought on a contract and assigned by
+ * hand afterwards, so the two series do not move together: purchasing steps
+ * up once at renewal and then holds flat for a year, while assignment starts
+ * near the floor — the seats are paid for before anyone has been given one —
+ * and catches up over the following quarters. The generator used to scale
+ * assigned as a near-constant fraction of bought, which drew two lines rising
+ * in parallel and taught the reader that idle seats are a fixed overhead. They
+ * are not. They are a spike at renewal that the organization works off, and an
+ * admin reading this panel is looking for exactly that.
+ *
+ * Renewal is January for every pool. Staggering the three would smear the step
+ * across the aggregate chart, and a step nobody can see is a shape nobody
+ * learns.
+ *
+ * Deterministic in `day` alone, so the lane card and the chart beside it can
+ * both ask for the same month and cannot disagree about it.
+ */
+export function sampleSeatPools(
+  day: string,
+  pools: readonly string[] = SAMPLE_SEAT_POOLS,
+): SampleSeatPool[] {
+  const date = new Date(`${day}T00:00:00Z`);
+  const monthsSinceRenewal = Number.isNaN(date.getTime())
+    ? 0
+    : date.getUTCMonth();
+  const renewals = Number.isNaN(date.getTime())
+    ? 0
+    : date.getUTCFullYear() - SEAT_CONTRACT_EPOCH_YEAR;
+
+  return pools.map((skuPartNumber, index) => {
+    const random = seededRandom(hashLabel(skuPartNumber));
+    const base = SEAT_POOL_BASE + index * 60;
+    // Licences are bought in blocks, so the step lands on a round number
+    // rather than wherever the growth rate happened to fall.
+    const bought =
+      Math.round(
+        (base * (1 + SEATS_ADDED_PER_RENEWAL * Math.max(0, renewals))) / 10,
+      ) * 10;
+    // Saturating rather than linear: the first weeks after a renewal assign
+    // most of the backlog and the last stragglers take the rest of the year.
+    const progress = monthsSinceRenewal / 11;
+    const eased = 1 - (1 - progress) ** 2;
+    const ceiling =
+      ASSIGNED_AT_RENEWAL +
+      (ASSIGNED_BY_YEAR_END - ASSIGNED_AT_RENEWAL) * eased;
+    // Never above bought: a provider cannot seat more people than the licences
+    // paid for, and a bar that crossed would read as a defect in the read.
+    const seatsAssigned = Math.min(
+      bought,
+      Math.round(bought * ceiling * (0.94 + random() * 0.06)),
+    );
+    return { skuPartNumber, seatsBought: bought, seatsAssigned };
+  });
+}
+
+/** The year the invented organization signed its first seat contract. */
+const SEAT_CONTRACT_EPOCH_YEAR = 2024;
+/** Seats in the smallest pool at signing. The others are bigger by a step. */
+const SEAT_POOL_BASE = 140;
+/** How much bigger each renewal makes a pool. */
+const SEATS_ADDED_PER_RENEWAL = 0.18;
+/** Share of a freshly renewed pool that already has somebody in it. */
+const ASSIGNED_AT_RENEWAL = 0.34;
+/** Share assigned by the month before the next renewal. */
+const ASSIGNED_BY_YEAR_END = 0.95;
 
 /** What the Adoption panel shows when nothing has been measured yet. */
 export interface SampleAdoption {

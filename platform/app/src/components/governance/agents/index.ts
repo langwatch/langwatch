@@ -36,4 +36,10 @@ export {
   type GovernanceAgentRow,
   SAMPLE_AGENT_ROWS,
 } from "./agentRows";
+export {
+  AGENTS_EMPTY_COPY,
+  APPLICATIONS_EMPTY_COPY,
+  type GovernanceEmptyStateCopy,
+  NO_MATCHING_AGENTS_COPY,
+} from "./emptyStates";
 export { RegisterAgentDialog } from "./RegisterAgentDialog";

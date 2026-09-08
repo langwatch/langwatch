@@ -98,7 +98,8 @@ Feature: The governance overview opens with a hero and nothing else
     When the recent activity list renders
     Then each row leads with the mark of the screen it goes back to
     And the name follows as body text, the whole row leading to that screen
-    And the kind of thing it was sits at the right of the row, muted
+    And the kind of thing it was sits at the right of the row as a neutral chip
+    And the chip keeps its width as the column narrows, the name giving way instead
     And no row leads to a screen this organization is not offered
 
   @integration

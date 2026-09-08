@@ -46,8 +46,43 @@ Feature: The AI Governance Agents page
     Given the sample agent cards are on screen
     When the reader turns sample data off
     Then no agent card remains
-    And the pane says agents appear here as they are detected
+    And the pane renders the page's own empty state, headed
+      "No agents registered yet"
+    And that empty state offers a way to register one
     And the banner is gone
+
+  # ---------------------------------------------------------------------------
+  # Empty states. One shared shape (~/components/governance/empty), three
+  # different sets of words, because a page that has nothing to show still has
+  # something to say and it is never the same sentence twice.
+  #
+  # The rule that matters most is the last scenario in this block. A reader
+  # holding ten agents who filtered nine of them out of view has not arrived at
+  # an empty page; they have arrived at a filter that is too narrow, and telling
+  # them to go register an agent is the page failing to read its own state. The
+  # shared component cannot enforce this, because it cannot see WHY the list is
+  # empty. Only the page knows, so the page decides.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Every empty state on the page carries a way out
+    Given no organization-wide agent read exists
+    And the reader has turned sample data off
+    When a governance viewer opens the Agents page
+    And they open the Applications tab
+    Then each pane renders an empty state with a glyph, a headline, a sentence
+      and a button
+    And neither pane is a bare sentence in a dashed box
+
+  @integration
+  # Title kept on one line: the parity checker's title group cannot cross a
+  # newline, so a wrapped title binds a phantom that matches no scenario.
+  Scenario: Filtering everything out offers the filters back, not a registration
+    Given the sample agent cards are on screen
+    When the reader picks a source and an ownership that no agent satisfies
+    Then the pane says no agent matches these filters
+    And the way out is clearing the filters, not registering an agent
+    And clearing them brings the cards back
 
   @integration
   Scenario: The sample toggle and the register action sit in the page header
@@ -86,6 +121,15 @@ Feature: The AI Governance Agents page
     When the Agents page renders
     Then a Source chip, an Ownership chip and a Sort chip are in one row under the header
     And no native select element exists anywhere on the page
+
+  # The controls that narrow the content do not live inside it. The api keys
+  # settings page is the house pattern: its scope filter and its create action
+  # share a header row above a table that always renders something.
+  @integration
+  Scenario: The filter row sits outside the content it narrows
+    When the Agents page renders
+    Then no filter chip is inside the tab content region
+    And the Applications tab, which has nothing to filter, renders no chips
 
   @integration
   Scenario: Filtering by source leaves only that source's agents

@@ -204,7 +204,7 @@ describe("Costs page, a read the server declined", () => {
     expect(
       screen.queryByRole("button", { name: /try again/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Billed spend by person")).toBeInTheDocument();
+    expect(screen.getByText("Billed spend by API key")).toBeInTheDocument();
   });
 });
 

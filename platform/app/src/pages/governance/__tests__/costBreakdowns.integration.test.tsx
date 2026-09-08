@@ -22,6 +22,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,6 +41,21 @@ const harness = vi.hoisted(() => ({
     isError: false,
     refetch: undefined as unknown,
   },
+  /**
+   * The cost summary's lanes: whether any source is reporting a figure.
+   *
+   * Configurable because this is the screen's signal for whether anything is
+   * connected at all, and the adoption headcount cannot state its own absence
+   * — see the "count that cannot state its own absence" section of the spec.
+   *
+   * Lanes rather than `unavailableReason`, because the organization the defect
+   * was reported on has neither structural reason set: it has a cost store and
+   * a governance project, and simply nothing flowing through them. Keying the
+   * fixture on the reason alone would have reproduced a case the live screen
+   * was not in. Defaults to reporting, which is what every test here assumed
+   * before it was a variable.
+   */
+  lanesReport: true,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -84,12 +100,16 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: {
             unavailableReason: null,
-            billed: { amountUsd: 123.45, cellsWithoutAmount: 0 },
-            gateway: { amountUsd: 67.89, cellsWithoutAmount: 0 },
+            billed: harness.lanesReport
+              ? { amountUsd: 123.45, cellsWithoutAmount: 0 }
+              : { amountUsd: null, cellsWithoutAmount: 0 },
+            gateway: harness.lanesReport
+              ? { amountUsd: 67.89, cellsWithoutAmount: 0 }
+              : { amountUsd: null, cellsWithoutAmount: 0 },
             seats: { status: "awaiting_data" },
-            series: [
-              { day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 },
-            ],
+            series: harness.lanesReport
+              ? [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }]
+              : [],
             windowDays: 30,
           },
           isLoading: false,
@@ -129,6 +149,7 @@ beforeEach(() => {
     spendOverTime: undefined,
   };
   harness.spenders = { data: undefined, isError: false, refetch: vi.fn() };
+  harness.lanesReport = true;
 });
 
 afterEach(() => cleanup());
@@ -245,6 +266,78 @@ describe("the cost breakdown panels", () => {
     });
   });
 
+  /**
+   * The adoption headcount is the one figure here that cannot say "unmeasured"
+   * — the activity summary types it as a plain number and zero-fills it when
+   * nothing is connected. So these two cases send the SAME zero and differ
+   * only in whether a source is behind it, which is the whole rule.
+   */
+  describe("given the activity read answers zero active people", () => {
+    beforeEach(() => {
+      harness.activity.summary = {
+        activeUsersThisWindow: 0,
+        newUsersThisWindow: 0,
+        spentThisWindowUsd: "0",
+      };
+      harness.activity.spendByDepartment = [];
+      harness.activity.spendByUser = [];
+      harness.activity.spendOverTime = { buckets: [] };
+    });
+
+    /** @scenario "An adoption count of zero from a connected source is shown as the measurement it is" */
+    it("shows the zero when a source is connected, because a quiet window is a finding", () => {
+      harness.lanesReport = true;
+
+      renderScreen();
+
+      const adoption = screen
+        .getByText("People using AI tools")
+        .closest("[data-testid='cost-panel']");
+      expect(adoption).not.toBeNull();
+      expect(
+        within(adoption as HTMLElement).getByText("0"),
+      ).toBeInTheDocument();
+      // An organization that already has a source must not be told to add one.
+      expect(
+        within(adoption as HTMLElement).queryByRole("link", {
+          name: /Add a source/,
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "An adoption count of zero with nothing connected is not reported as a measurement" */
+    it("withholds the same zero when nothing is connected, and names what would fill it", async () => {
+      harness.lanesReport = false;
+
+      renderScreen();
+      // An organization with nothing connected comes up in sample mode, so the
+      // real screen is the one BEHIND the toggle — which is where the zero was
+      // printed, under the page's own banner saying nothing had been recorded.
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Hide sample data" }));
+
+      const adoption = screen
+        .getByText("Adoption")
+        .closest("[data-testid='cost-panel']") as HTMLElement;
+      // No headcount, and no label standing over a blank where one was.
+      expect(within(adoption).queryByText("0")).not.toBeInTheDocument();
+      expect(
+        within(adoption).queryByText("People using AI tools"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(adoption).getByText(
+          "How many people used an AI tool in this period.",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(adoption).getByText(
+          "Fills from the activity a connected source reports.",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("given the spender breakdown answers with rows", () => {
     beforeEach(() => {
       harness.spenders.data = {
@@ -265,16 +358,45 @@ describe("the cost breakdown panels", () => {
             amountUsd: 6,
             cellsWithoutAmount: 0,
           },
+          // Spend the provider attributed to no credential at all. It is on
+          // every real version of this list, so it is on this one.
+          {
+            provider: "",
+            rawActorId: "",
+            label: null,
+            agentId: "",
+            amountUsd: 3,
+            cellsWithoutAmount: 0,
+          },
         ],
         windowDays: 30,
       };
     });
 
-    it("names each row's provider, so one person billed at two providers is not a duplicate", () => {
+    it("names each row's provider, so one key billed at two providers is not a duplicate", () => {
       renderScreen();
 
       expect(screen.getByText("openai_admin")).toBeInTheDocument();
       expect(screen.getByText("databricks")).toBeInTheDocument();
+    });
+
+    /** @scenario "The billed breakdown names the key the provider charged, not a person" */
+    it("titles the panel for the key, and says so on the row naming none", () => {
+      renderScreen();
+
+      // An invoice records which credential was presented, never who was
+      // holding it. Titling this by person promised an attribution the
+      // billing pipeline cannot make — a key four engineers share billed as
+      // one person's spend.
+      expect(screen.getByText("Billed spend by API key")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Billed spend by person"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("No key named")).toBeInTheDocument();
+      // "Metered spend by person" is a different panel and stays by person on
+      // purpose: it reads cost recorded on traces as they were served, where
+      // the actor IS known. Only the invoice cannot name one.
+      expect(screen.getByText("Metered spend by person")).toBeInTheDocument();
     });
   });
 
@@ -286,7 +408,7 @@ describe("the cost breakdown panels", () => {
     it("says the read failed instead of vanishing as if nobody spent anything", () => {
       renderScreen();
 
-      expect(screen.getByText("Billed spend by person")).toBeInTheDocument();
+      expect(screen.getByText("Billed spend by API key")).toBeInTheDocument();
       expect(screen.getByTestId("cost-spenders-error")).toBeInTheDocument();
     });
 
