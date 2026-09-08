@@ -162,13 +162,7 @@
 								// `export * from`, which reach every export including
 								// the ones listed here and would otherwise walk past
 								// this rule. Ordinary named imports stay allowed.
-								"importNames": [
-									"*",
-									"Avatar",
-									"Dialog",
-									"Drawer",
-									"Modal"
-								],
+								"importNames": ["*", "Avatar", "Dialog", "Drawer", "Modal"],
 								"message": "Import these from their wrapper in ~/components/ui: avatar, dialog, drawer. Modal-style flows use the Dialog wrapper too (see AICreateModal, RunScenarioModal) — there is no Modal wrapper. The avatar wrapper derives initials in grapheme clusters, where Chakra uses charAt(0) and returns half of any character outside the basic plane — customers do name projects and suites with a leading emoji; taking the first character of customer-typed text goes through ~/utils/firstGrapheme anywhere else too. The dialog and drawer wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Each re-exports the rest of the library's component unchanged, so the import is the whole difference."
 							}
 						}
@@ -265,33 +259,6 @@
 				"ee/scim/scim.service.ts",
 				"ee/scim/webhooks.ts"
 			],
-			"linter": {
-				"rules": {
-					"complexity": {
-						"noExcessiveCognitiveComplexity": "off",
-						"noExcessiveLinesPerFunction": "off"
-					}
-				}
-			}
-		},
-		{
-			// Same case as ee/scim above, and measured rather than assumed. The
-			// anomaly-rules pane was lifted out of
-			// ee/governance/dashboard/pages/anomaly-rules.tsx into a component
-			// of its own when anomaly rules stopped being an inventory tab. The
-			// page it came from carried these findings already: linting the
-			// pre-move file reports complexity 18, 17 and 25 and a 158-line
-			// function, against 18, 17, 25 and 157 lines here — the same four
-			// findings, the same functions, one line shorter for the wrapper
-			// that no longer sits around them.
-			//
-			// The new-violations gate compares per path and cannot follow an
-			// extraction (one file becoming two is not a rename), so it reads a
-			// move as fresh code. Rewriting a working Enterprise-gated flow to
-			// satisfy a rule its own source file was already tolerated under is
-			// not what this pull request set out to do. New governance
-			// dashboard code still gets the rules via fresh files.
-			"includes": ["ee/governance/dashboard/components/AnomalyRulesTab.tsx"],
 			"linter": {
 				"rules": {
 					"complexity": {
@@ -430,9 +397,7 @@
 			// REMOVE THIS BLOCK if the arms ever stop being flat -- the moment
 			// one does more than project, the file has earned the split the
 			// rule is asking for.
-			"includes": [
-				"src/server/event-sourcing/pipelines/identity/pipeline.ts"
-			],
+			"includes": ["src/server/event-sourcing/pipelines/identity/pipeline.ts"],
 			"linter": {
 				"rules": {
 					"complexity": {
