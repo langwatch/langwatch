@@ -90,4 +90,24 @@ composed) and now work under the Enterprise gate; the data-scope refusal is 403 
 uncalled operations went, including `removeExclusiveApiKeyRoles` (api-key retirement; Kimi's lane may want it back).
 Follow-up in authz web: `authz-api.ts` hand-writes the role maps → `ContractApiMap<typeof roleTrpc>`.
 
-## suite REST — pending lane report
+## suite (feature landed; REST families + web governed)
+
+`installApiSuite({ prisma, peers: { scenarios, agents, prompts, projects }, infrastructure, rest: { credential, platformUrl,
+errors } })` returns `{ app, routers(mount) → { suites }, rest: MountableRestApp[] }`; `mountSuiteRest` in
+`apps/api/src/features/suite/suite-rest.mount.ts`.
+- `apps/api/src/features/scenario/scenario.composition.ts`: replace the `SuiteApp.create({...})` block with the install
+  (peers `scenarioApi`, `options.agents`, `promptApp`, `options.projects`; infrastructure `execution`,
+  `resolveClickHouseClient`, `defaultRetentionDays`, `generateId`, optional `connectedPresence`; `database` gone);
+  `scenario.composition.types.ts` `suites: SuiteApp` → `SuiteApi`; `refuse<SuiteApp>` → `refuse<SuiteApi>`.
+- `apps/api/src/app-trpc/app-trpc.context.ts`: `SuiteApp` → `SuiteApi` (`@langwatch/suite-contract`).
+- `apps/api/src/app-rest/app-rest.packaged-families.ts`: delete the `@langwatch/suite-server` import block (`SuiteApp`,
+  `createRunPlansV1RestApp`, `createSuiteRestApp`, `createTestSuitesV1RestApp`), `suites?: (() => SuiteApp)` in
+  `ApiPackagedRestServices`, the three family-name union members `"run-plans" | "suites" | "test-suites"`, and the three
+  `mount(...)` calls.
+- `apps/api/src/app/api-production.composition.ts`: `rest: { credential: (input) => this.composedHandlerCredentials.authenticate(input),
+  platformUrl: <ports.platformUrl the packaged families used>, errors: ApiRestObservabilityComposition.create().legacyErrorHandler }`;
+  beside the secret loop (~line 2368) `for (const suiteRestApp of this.composedSuite?.rest ?? []) rest.route("/", suiteRestApp);`.
+- `apps/api/src/tasks/openapi-document/openapi-document.surface.ts` `mountProcessTailFamilies`: mount `mountSuiteRest({ suites:
+  refuse("The suite application"), credential: refuse("The project credential door"), platformUrl: () => "", errors: refuseAtRuntime })`.
+- Regenerate `apps/api/src/features/discovery/openapi-document.json` + `docs/api-reference/openapiLangWatch.json` once apps/api
+  compiles: the alias family's operation ids become the declared names with version suffixes (`listSuites`, `listSuites_latest`, …).
