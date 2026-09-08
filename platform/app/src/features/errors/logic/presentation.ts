@@ -3173,7 +3173,7 @@ const presentations = {
   },
   voice_agents_disabled: {
     // Must match VOICE_AGENTS_DISABLED_MESSAGE in
-    // ~/server/featureFlag/voiceAgents (kept a literal here so this
+    // ~/server/featureFlag/voiceAgents.message (kept a literal here so this
     // client-bundled registry never imports server-only Prisma code).
     title: "Voice agents are not enabled for this project",
     describe: () => "Ask an admin to turn the feature on for this project.",

@@ -2,9 +2,7 @@ import { featureFlagService } from "~/server/featureFlag";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 
-/** The copy every voice-agent refusal shows the customer (AC29). */
-export const VOICE_AGENTS_DISABLED_MESSAGE =
-  "Voice agents are not enabled for this project";
+export { VOICE_AGENTS_DISABLED_MESSAGE } from "./voiceAgents.message";
 
 /**
  * The one server-side read of `release_voice_agents_enabled` (AC29). Every

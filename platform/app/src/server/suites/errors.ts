@@ -13,7 +13,10 @@ import {
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
-import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents";
+// This file is reachable from client-bundled code (via suite-evaluators), so
+// it must only import from the message module below, never server runtime
+// (prisma, feature-flag service) — see src/server/featureFlag/voiceAgents.message.ts.
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 
 /**
  * Base class for suite domain errors.
