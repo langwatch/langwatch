@@ -11,10 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/monitor-web/screens/online-evaluations", async () => {
+vi.mock("@langwatch/monitor-web/online-evaluations", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/monitor-web/screens/online-evaluations")
-  >("@langwatch/monitor-web/screens/online-evaluations");
+    typeof import("@langwatch/monitor-web/online-evaluations")
+  >("@langwatch/monitor-web/online-evaluations");
   return {
     ...actual,
     monitorApi: {

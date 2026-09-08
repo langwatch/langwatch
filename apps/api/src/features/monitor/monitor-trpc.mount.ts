@@ -1,45 +1,21 @@
-/**
- * `getPerformanceForProject` needs `evaluations:view` AND `analytics:view` —
- * the only AND-composed permission check in the codebase.
- */
-import { createTrpcApiService, type TrpcApiMount } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  MonitorTrpcApi,
-  type MonitorTrpcContext,
-  type MonitorTrpcPorts,
-} from "@langwatch/monitor-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+/** Binds the feature's declared procedures to this process's execution path. */
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { monitorTrpcTransport } from "@langwatch/monitor-server";
 
 /**
- * The `.use()` surface every tRPC procedure builder shares. Named at the one
- * seam that stacks a second declared check onto a builder whose input generics
- * belong to the feature package, so the composition below needs no `any`.
+ * The one slice of the process context the `monitors` namespace reads.
+ *
+ * `monitors` is also the wire namespace the browser calls and the key tRPC
+ * hashes into its query cache, so the two spellings are the same on purpose.
  */
-type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
+export interface MonitorHostContext {
+  app: Readonly<{ monitors: MonitorApi }>;
+}
 
-/** Mounts `monitors.*` on the app process's tRPC root. */
-export function createMonitorTrpcRouter<
-  TContext extends MonitorTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(options: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: MonitorTrpcPorts }>) {
-  const service = createTrpcApiService(options);
-  const alsoRequire =
-    (permission: AuthzPermission) =>
-    <TProcedure>(procedure: TProcedure): TProcedure =>
-      (procedure as unknown as ChainableProcedure).use(
-        options.middlewares.declaredCheck({ kind: "permission", permission }),
-      ) as unknown as TProcedure;
-
-  return MonitorTrpcApi.create(
-    options.root,
-    {
-      protected: service.protected,
-      policy: service.policy,
-      alsoRequire,
-      validateOutput: service.validateOutput,
-    },
-    options.ports,
-  );
+/** Mounts `monitors.*`. */
+export function createMonitorTrpcRouter<TContext extends MonitorHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(monitorTrpcTransport, (ctx) => ctx.app.monitors);
 }

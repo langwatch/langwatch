@@ -628,7 +628,42 @@ const presentations = {
     describe: () =>
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
   },
+  monitor_not_found: {
+    title: "Online evaluation not found",
+    describe: () => "It may have been deleted. Reload the list and pick another one.",
+  },
+  monitor_check_type_unknown: {
+    // The reader is in the online evaluation wizard, having chosen a check the
+    // platform no longer runs — usually a saved draft from an older release.
+    title: "This check isn't one we can run",
+    describe: () => "Pick an evaluator from the list, then save the online evaluation again.",
+  },
+  monitor_check_settings_invalid: {
+    title: "These evaluator settings aren't valid",
+    describe: () => "Check the highlighted fields on the evaluator, then save again.",
+  },
+  monitor_source_project_forbidden: {
+    title: "You can't copy from that project",
+    describe: () =>
+      "Copying an online evaluation needs permission to manage evaluations in the project it comes from. Ask an administrator there for access.",
+  },
   evaluator_not_found: { title: "Evaluator not found" },
+  evaluator_source_permission_denied: {
+    title: "You can't copy from that project",
+    describe: () =>
+      "Copying an evaluator needs permission to manage evaluations in the project it comes from. Ask an administrator there for access.",
+  },
+  evaluator_type_immutable: {
+    title: "An evaluator's type can't be changed",
+    describe: () =>
+      "Every result already recorded was scored by the type it was created with. Create a new evaluator for the other type.",
+  },
+  evaluator_workflow_evaluator_exists: {
+    // The reader is naming a workflow in the evaluator editor and that workflow
+    // already backs an evaluator; one workflow answers for one evaluator.
+    title: "This workflow already has an evaluator",
+    describe: () => "Edit the evaluator that already uses it, or pick another workflow.",
+  },
   evaluator_workflow_version_required: {
     // Raised while copying a workflow evaluator into another project: there is
     // no saved version to replicate, so the copy would be a broken replica.
@@ -2540,6 +2575,25 @@ const presentations = {
   dataset_stale_columns: {
     title: "This dataset's columns have changed",
     describe: () => "Reload to pick up the current columns, then make your change again.",
+  },
+  dataset_not_found: {
+    title: "That dataset is gone",
+    describe: () =>
+      "It was archived, or it belongs to another project. Reload the list and pick one that is still there.",
+  },
+  dataset_chunk_too_large: {
+    title: "That value is too large to save",
+    describe: () => "Shorten the value in this row, then save again.",
+  },
+  dataset_duplicate_record_id: {
+    title: "Two rows share the same identifier",
+    describe: () =>
+      "Every row needs its own identifier. Give one of them a different identifier, then save again.",
+  },
+  dataset_too_large_to_export: {
+    title: "This dataset is too large to export here",
+    describe: () =>
+      "Export it in pages instead, or filter it down to the rows you need and export those.",
   },
   department_not_found: {
     title: "That department is gone",

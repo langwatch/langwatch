@@ -25,10 +25,19 @@
   ],
   "references": [
     {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../runtime-composition/tsconfig.build.json"
     }
   ]
 }

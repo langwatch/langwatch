@@ -206,3 +206,68 @@ export const monitorReplicationInputSchema = z
   })
   .strict();
 export type MonitorReplicationInput = z.infer<typeof monitorReplicationInputSchema>;
+
+/**
+ * Replicating a monitor between two projects the caller administers, evaluator
+ * and backing workflow included. The actor is named because the copied
+ * workflow's first saved version is recorded against whoever asked for it.
+ */
+export const monitorCopyInputSchema = z
+  .object({
+    monitorId: z.string().min(1),
+    sourceProjectId: z.string().min(1),
+    targetProjectId: z.string().min(1),
+    actor: z.object({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+export type MonitorCopyInput = z.infer<typeof monitorCopyInputSchema>;
+
+/**
+ * A partial change to a monitor: every field left out keeps the value the
+ * monitor already has, which is the one description of that rule.
+ */
+export const monitorPatchInputSchema = z
+  .object({
+    id: z.string().min(1),
+    projectId: z.string().min(1),
+    changes: z
+      .object({
+        name: z.string().min(1).optional(),
+        enabled: z.boolean().optional(),
+        checkType: z.string().min(1).optional(),
+        executionMode: monitorExecutionModeSchema.optional(),
+        preconditions: monitorPreconditionsSchema.optional(),
+        parameters: monitorSettingsSchema.optional(),
+        mappings: z.unknown().optional(),
+        sample: z.number().min(0).max(1).optional(),
+        evaluatorId: z.string().min(1).nullable().optional(),
+        level: z.enum(["trace", "thread"]).optional(),
+        threadIdleTimeout: z.number().int().positive().nullable().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type MonitorPatchInput = z.infer<typeof monitorPatchInputSchema>;
+
+/**
+ * The seven-day trend window, in the reader's own time zone.
+ *
+ * The actor is named because the trend joins two verticals: it needs
+ * `evaluations:view` for the monitors AND `analytics:view` for the comparison
+ * window, and the transport runtime declares no AND-composed check, so the
+ * application proves both.
+ */
+export const monitorPerformanceInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    timeZone: z.string().min(1).max(100).optional(),
+    actor: z.object({ id: z.string().min(1) }).strict(),
+  })
+  .strict();
+export type MonitorPerformanceInput = z.infer<typeof monitorPerformanceInputSchema>;
+
+/** A check as a caller proposed it, before the monitor holding it is written. */
+export const monitorRunnableCheckInputSchema = z
+  .object({ checkType: z.string().min(1), parameters: z.unknown() })
+  .strict();
+export type MonitorRunnableCheckInput = z.infer<typeof monitorRunnableCheckInputSchema>;

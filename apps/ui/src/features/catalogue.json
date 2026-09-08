@@ -285,7 +285,7 @@
       "id": "online-evaluations",
       "root": "monitor",
       "uses": {
-        "screens": ["@langwatch/monitor-web/screens/online-evaluations"],
+        "screens": ["@langwatch/monitor-web/online-evaluations"],
         "surfaces": []
       }
     },

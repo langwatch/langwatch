@@ -1,158 +1,210 @@
 /**
- * The real-time evaluations running against a project's traffic, composed as their own
- * feature.
+ * The real-time evaluations running against a project's traffic, installed over
+ * this process's own graph.
  */
 import { AnalyticsComparisonWindowService } from "@langwatch/analytics-server";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import type { MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import {
   MonitorPerformanceAdapter,
   type EvaluationClickHouseResolver,
-  type MonitorPerformanceService,
 } from "@langwatch/evaluation-server";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import { EvaluatorReplicationApi, type EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
+import { EvaluatorReplicationApi } from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
-import type { Logger } from "@langwatch/observability";
-import { monitorPreconditionsSchema, type MonitorService } from "@langwatch/monitor-contract";
 import {
-  MonitorApp,
-  PostgresMonitorAdapter,
-  type MonitorTrpcPorts,
+  monitorServer,
+  MonitorEvaluatorPort,
+  MonitorPerformancePort,
+  MonitorReplicationPort,
 } from "@langwatch/monitor-server";
+import { createApp } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createMonitorTrpcRouter } from "./monitor-trpc.mount.ts";
+import type { ComposedMonitorFeature } from "./monitor.composition.types.ts";
 
 /**
- * The ONE monitor service on this process.
+ * Copying an evaluator's backing workflow, as this process performs it.
+ *
+ * The workflow half belongs to the Workflow feature and is resolved per
+ * request there; the monitor asks for it by naming the person the copy is
+ * recorded against, so nothing about a tRPC context reaches this feature.
  */
-export function composeMonitorService(options: {
-  infrastructure: ApiTrpcInfrastructure;
-  peers: Readonly<{
-    /** The evaluator a monitor runs, through the ONE evaluator service. */
-    evaluators: EvaluatorService;
-  }>;
-}): MonitorService {
-  return PostgresMonitorAdapter.create({
-    database: options.infrastructure.prisma,
-    evaluators: options.peers.evaluators,
-    generateId: () => `monitor_${nanoid()}`,
-  });
-}
-
-/** Reports the one capability this feature can be composed without. */
-export abstract class ApiMonitorAbsenceReport {
-  abstract absent(capability: "clickhouse"): void;
-}
-
-/** Writes the absence to the process log, once, at composition time. */
-export class LoggedApiMonitorAbsence extends ApiMonitorAbsenceReport {
-  static create(logger: Pick<Logger, "warn">): LoggedApiMonitorAbsence {
-    return new LoggedApiMonitorAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
-
-  absent(capability: "clickhouse"): void {
-    this.logger.warn(
-      { capability },
-      "API process composed no ClickHouse connection: the monitors page's seven-day trend refuses by name rather than reporting that no monitor caught anything.",
-    );
-  }
-}
+export type MonitorWorkflowReplication = Readonly<{
+  replicateEvaluatorWorkflow(
+    input: Readonly<{
+      workflowId: string;
+      sourceProjectId: string;
+      targetProjectId: string;
+      actor: Readonly<{ id: string }>;
+    }>,
+  ): Promise<string>;
+  deleteReplicatedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<void>;
+}>;
 
 /** The other features' services the monitor surface reaches, named one by one. */
 export type MonitorPeers = Readonly<{
-  /**
-   * The monitor service the execution half already composed, taken rather than
-   * built: an experiment upserts its own monitor through that same service, and
-   * two would let the monitors list disagree with what an experiment created.
-   */
-  monitors: MonitorService;
-  /**
-   * The evaluator service the execution half composed. The monitor copy rolls
-   * an evaluator back through it when the monitor insert fails.
-   */
+  /** The caller's own grants, for the standing a declared check cannot cover. */
+  permissions: AuthzApiContract;
+  /** The evaluator a monitor runs, through the ONE evaluator service. */
   evaluators: EvaluatorService;
   /**
-   * The evaluator replication the product-group half already built over this process's
-   * workflow application. Taken rather than rebuilt, because a second replication would
-   * be a second answer to what copying an evaluator does to the graph behind it.
+   * The evaluator replication the product-group half already built over this
+   * process's workflow application. Taken rather than rebuilt, because a second
+   * replication would be a second answer to what copying an evaluator does to
+   * the graph behind it.
    */
-  evaluatorReplication: Pick<
-    EvaluatorTrpcPorts,
-    "replicateEvaluatorWorkflow" | "deleteReplicatedWorkflow"
-  >;
+  workflowReplication: MonitorWorkflowReplication;
 }>;
 
-/** Everything the monitor surface is composed from besides its peers. */
-export type MonitorFeatureCollaborators = MonitorPeers &
-  Readonly<{
-    /** The routed ClickHouse the trend is read on, or null where there is none. */
-    resolveClickHouseClient: ((projectId: string) => Promise<unknown>) | null;
-    report?: ApiMonitorAbsenceReport;
-  }>;
-
-import type { ComposedMonitorFeature } from "./monitor.composition.types.ts";
-
-/** Composes the monitor surface over this process's own graph. */
-export function composeMonitorFeature(options: {
+/** Installs the monitor surfaces over this process's own graph. */
+export async function installApiMonitor(options: {
+  infrastructure: ApiTrpcInfrastructure;
   peers: MonitorPeers;
+  /** The routed ClickHouse the seven-day trend is read on, or null where there is none. */
   resolveClickHouseClient: ((projectId: string) => Promise<unknown>) | null;
-  report?: ApiMonitorAbsenceReport;
-}): ComposedMonitorFeature {
-  const collaborators: MonitorFeatureCollaborators = {
-    ...options.peers,
-    resolveClickHouseClient: options.resolveClickHouseClient,
-    ...(options.report ? { report: options.report } : {}),
-  };
-  if (!collaborators.resolveClickHouseClient) collaborators.report?.absent("clickhouse");
-  const composed = composeMonitors(collaborators);
+}): Promise<ComposedMonitorFeature> {
+  const { prisma } = options.infrastructure;
+  const { permissions, evaluators, workflowReplication } = options.peers;
+
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withProvided(AuthzApi, permissions)
+    .withFeature(monitorServer, {
+      infrastructure: {
+        evaluators: new ProcessMonitorEvaluators(evaluators),
+        performance: composeMonitorPerformance(options.resolveClickHouseClient),
+        replication: new ProcessMonitorReplication(evaluators, workflowReplication),
+        generateId: () => `monitor_${nanoid()}`,
+      },
+    })
+    .boot({ role: "api" });
+
+  const app = runtime.feature(monitorServer).provided;
 
   return {
-    router: (mount) => createMonitorTrpcRouter({ ...mount, ports: composed.ports }),
-    app: composed.app,
+    routers: (mount) => ({ monitors: createMonitorTrpcRouter(mount.runtime) }),
+    app,
+    restServices: { monitors: () => app },
   };
 }
 
-/**
- * The monitor surface on a process that composed no evaluator graph.
- */
-export function refusingMonitorFeature(): ComposedMonitorFeature {
-  const refuse = <T>(): T =>
-    new Proxy(
-      {},
-      {
-        get: () => (): never => {
-          throw new ApiMonitorUnavailableError("The monitor surface");
-        },
-        has: () => true,
-      },
-    ) as T;
+/** The one evaluator service on this process, as the monitor reads it. */
+class ProcessMonitorEvaluators extends MonitorEvaluatorPort {
+  constructor(private readonly evaluators: EvaluatorService) {
+    super();
+  }
 
-  return {
-    router: (mount) =>
-      createMonitorTrpcRouter({
-        ...mount,
-        ports: {
-          // The parser is read while the router is BUILT, so it stays real:
-          // a procedure cannot be constructed without its input schema.
-          preconditionsSchema: monitorPreconditionsSchema,
-          resolvePreviousPeriodStartMs: () => {
-            throw new ApiMonitorUnavailableError("The monitor performance trend");
-          },
-          copyEvaluatorToProject: () => {
-            throw new ApiMonitorUnavailableError("Copying a monitor between projects");
-          },
-          deleteReplicatedWorkflow: () => {
-            throw new ApiMonitorUnavailableError("Copying a monitor between projects");
-          },
-        },
-      }),
-    app: refuse<MonitorApp>(),
-  };
+  getById(input: { id: string; projectId: string }) {
+    return this.evaluators.getById(input);
+  }
+
+  archive(input: { id: string; projectId: string }) {
+    return this.evaluators.archive(input);
+  }
+}
+
+/** The evaluator copy, over the process's own replication of the graph behind it. */
+class ProcessMonitorReplication extends MonitorReplicationPort {
+  constructor(
+    private readonly evaluators: EvaluatorService,
+    private readonly workflows: MonitorWorkflowReplication,
+  ) {
+    super();
+  }
+
+  async copyEvaluatorToProject(input: {
+    evaluatorId: string;
+    sourceProjectId: string;
+    targetProjectId: string;
+    actor: { id: string };
+  }) {
+    const copied = await EvaluatorReplicationApi.create({
+      replicateEvaluatorWorkflow: (replication) =>
+        this.workflows.replicateEvaluatorWorkflow({ ...replication, actor: input.actor }),
+      deleteReplicatedWorkflow: (replication) =>
+        this.workflows.deleteReplicatedWorkflow(replication),
+    }).copyToProject({
+      evaluators: this.evaluators,
+      evaluatorId: input.evaluatorId,
+      sourceProjectId: input.sourceProjectId,
+      targetProjectId: input.targetProjectId,
+    });
+
+    return { id: copied.id, workflowId: copied.workflowId };
+  }
+
+  deleteReplicatedWorkflow(input: { workflowId: string; projectId: string }) {
+    return this.workflows.deleteReplicatedWorkflow(input);
+  }
+}
+
+/**
+ * The seven-day trend, over the SAME routed ClickHouse the object probe reads.
+ * `MonitorPerformanceAdapter` composes the read and the fold that turns its
+ * buckets into a guardrail's pass rate or an evaluator's mean score; the
+ * comparison window is the analytics page's own, so the trend covers the exact
+ * runs a reader sees when they open analytics for this evaluation.
+ */
+function composeMonitorPerformance(
+  resolveClickHouseClient: ((projectId: string) => Promise<unknown>) | null,
+): MonitorPerformancePort {
+  const window = AnalyticsComparisonWindowService.create();
+  const previousPeriodStartMs = ({ startMs, endMs }: { startMs: number; endMs: number }) =>
+    window.currentVsPrevious({ startDate: startMs, endDate: endMs }).previousPeriodStartDate.getTime();
+
+  if (!resolveClickHouseClient) return new UncomposedMonitorPerformance(previousPeriodStartMs);
+
+  // The one cast this seam takes, and the same one the stored-object port
+  // takes: the routed connection is typed `unknown` here so this module does
+  // not have to name a ClickHouse client, and each reader states the shape its
+  // own package declares.
+  const evaluations = MonitorPerformanceAdapter.create({
+    resolveClickHouse: resolveClickHouseClient as EvaluationClickHouseResolver,
+  });
+
+  return new ClickHouseMonitorPerformance(evaluations, previousPeriodStartMs);
+}
+
+class ClickHouseMonitorPerformance extends MonitorPerformancePort {
+  constructor(
+    private readonly evaluations: { getMonitorPerformance: MonitorPerformancePort["getMonitorPerformance"] },
+    private readonly window: (range: { startMs: number; endMs: number }) => number,
+  ) {
+    super();
+  }
+
+  getMonitorPerformance(query: MonitorPerformanceQuery) {
+    return this.evaluations.getMonitorPerformance(query);
+  }
+
+  previousPeriodStartMs(range: { projectId: string; startMs: number; endMs: number }): number {
+    return this.window(range);
+  }
+}
+
+/** The trend on a deployment that composed no ClickHouse connection. */
+class UncomposedMonitorPerformance extends MonitorPerformancePort {
+  constructor(private readonly window: (range: { startMs: number; endMs: number }) => number) {
+    super();
+  }
+
+  getMonitorPerformance(): Promise<never> {
+    return Promise.reject(
+      new ApiMonitorUnavailableError(
+        "The monitor performance trend, because this deployment composed no ClickHouse connection,",
+      ),
+    );
+  }
+
+  previousPeriodStartMs(range: { projectId: string; startMs: number; endMs: number }): number {
+    return this.window(range);
+  }
 }
 
 /** A capability this deployment did not compose, refused by name. */
@@ -166,93 +218,4 @@ class ApiMonitorUnavailableError extends HandledError {
     });
     this.name = "ApiMonitorUnavailableError";
   }
-}
-
-// ---------------------------------------------------------------------------
-// Monitors
-// ---------------------------------------------------------------------------
-
-/**
- * The seven-day trend, over the SAME routed ClickHouse the object probe reads. The trend
- * alone: `MonitorPerformanceAdapter` composes the read and the fold that turns its
- * buckets into a guardrail's pass rate or an evaluator's mean score, and nothing else.
- */
-function composeMonitorPerformance(
-  options: MonitorFeatureCollaborators,
-): Pick<MonitorPerformanceService, "getMonitorPerformance"> {
-  const resolve = options.resolveClickHouseClient;
-  if (!resolve) {
-    return {
-      getMonitorPerformance: () =>
-        Promise.reject(
-          new ApiMonitorUnavailableError(
-            "The monitor performance trend, because this deployment composed no ClickHouse connection,",
-          ),
-        ),
-    };
-  }
-  // The one cast this seam takes, and the same one the stored-object port
-  // takes above: the routed connection is typed `unknown` here so this module
-  // does not have to name a ClickHouse client, and each reader states the
-  // shape its own package declares.
-  return MonitorPerformanceAdapter.create({
-    resolveClickHouse: resolve as EvaluationClickHouseResolver,
-  });
-}
-
-function composeMonitors(options: MonitorFeatureCollaborators): {
-  app: MonitorApp;
-  ports: MonitorTrpcPorts;
-} {
-  const app = MonitorApp.create({
-    monitors: options.monitors,
-    evaluations: composeMonitorPerformance(options),
-    evaluators: options.evaluators,
-  });
-
-  return {
-    app,
-    ports: {
-      /**
-       * The precondition SHAPE, not its vocabulary. Which rules a given field may carry
-       * is the trace-filter registry's answer, and that registry now lives in a browser
-       * package no server module may value-import.
-       */
-      preconditionsSchema: monitorPreconditionsSchema,
-      // The previous window comes from the same helper the analytics page
-      // uses, so the trend comparison covers the exact same runs a person sees
-      // when they open analytics for this evaluation.
-      resolvePreviousPeriodStartMs: ({ startMs, endMs }) =>
-        AnalyticsComparisonWindowService.create()
-          .currentVsPrevious({ startDate: startMs, endDate: endMs })
-          .previousPeriodStartDate.getTime(),
-      copyEvaluatorToProject: (ctx, input) =>
-        EvaluatorReplicationApi.create({
-          replicateEvaluatorWorkflow: (replication) =>
-            options.evaluatorReplication.replicateEvaluatorWorkflow(
-              evaluatorContext(ctx),
-              replication,
-            ),
-          deleteReplicatedWorkflow: (replication) =>
-            options.evaluatorReplication.deleteReplicatedWorkflow(
-              evaluatorContext(ctx),
-              replication,
-            ),
-        }).copyToProject({
-          evaluators: options.evaluators,
-          ...input,
-        }),
-      deleteReplicatedWorkflow: (ctx, input) =>
-        options.evaluatorReplication.deleteReplicatedWorkflow(evaluatorContext(ctx), input),
-    },
-  };
-}
-
-/**
- * The same request, as the EVALUATOR ports declare their context.
- */
-function evaluatorContext(
-  ctx: unknown,
-): Parameters<EvaluatorTrpcPorts["replicateEvaluatorWorkflow"]>[0] {
-  return ctx as Parameters<EvaluatorTrpcPorts["replicateEvaluatorWorkflow"]>[0];
 }

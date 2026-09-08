@@ -1,10 +1,11 @@
 /**
  * The procedures this package calls, and the hooks that call them.
  *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as every other feature
- * family's map says of itself: the procedures are mounted by the process out of
- * `@langwatch/monitor-server`, which a web package may not import even for a
- * type, and the router type does not exist until a process instantiates one.
+ * The `monitors` half is READ OFF THE CONTRACT: `@langwatch/monitor-contract`
+ * declares every procedure once, and `ContractApiMap` turns that declaration
+ * into the shape these hooks are typed against, so the browser restates none
+ * of it. The two borrowed namespaces below are still written by hand, because
+ * their own contracts have not moved yet.
  *
  * THE SEGMENT NAMES ARE LOAD-BEARING. `monitors` and `experiments` are mount
  * points on the root router and tRPC hashes that path into the React Query
@@ -13,41 +14,13 @@
  * evaluation drawer and the guardrails drawer among them, which is exactly how
  * the list refreshes after a drawer save.
  *
- * `experiments.getAllByProjectId` IS ANOTHER FEATURE'S PROCEDURE and costs
- * nothing: a procedure map names STRINGS. The screen reads it for one answer —
- * whether a monitor was authored in the legacy wizard, in which case Edit opens
- * the workbench instead of the drawer — and it decides that with
- * `@langwatch/experiment-contract`'s own predicate rather than restating the
- * shape. `cross-feature` exempts a contract by construction.
- *
- * `OnlineEvaluationPerformance` IS THE PRODUCER'S OWN TYPE:
- * `@langwatch/evaluation-contract` declares it and
- * `EvaluationService.getMonitorPerformance` is annotated with it.
- *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package.
  */
 
-import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
-import { createFeatureApi } from "@langwatch/api/web";
-
-/**
- * A monitor, as this list reads it.
- *
- * NARROWED FROM `@langwatch/monitor-contract`'s `Monitor` rather than named
- * whole, and the narrowing is the point: `parameters` is arbitrary JSON, the
- * preconditions are a legacy union, and the mappings are the trace family's
- * vocabulary. A list that names them would drag three schemas it never reads.
- */
-export type MonitorListRow = {
-  id: string;
-  name: string;
-  checkType: string;
-  enabled: boolean;
-  executionMode: string;
-  experimentId: string | null;
-};
+import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import type { monitorTrpc } from "@langwatch/monitor-contract";
 
 /** One experiment, as the legacy-wizard check reads it. */
 export type MonitorExperimentRow = {
@@ -56,48 +29,12 @@ export type MonitorExperimentRow = {
   workbenchState: unknown;
 };
 
-export type MonitorApiMap = {
-  monitors: {
-    /** Every online evaluation and guardrail configured in the project. */
-    getAllForProject: {
-      query: { input: { projectId: string }; output: MonitorListRow[] };
-    };
-
-    /**
-     * The last seven days for every monitor at once.
-     *
-     * Sent unbatched (`skipBatch`) because it is a ClickHouse read behind a
-     * page of Postgres reads, and a batch would hold the whole list behind it.
-     */
-    getPerformanceForProject: {
-      query: {
-        input: { projectId: string; timeZone: string };
-        output: OnlineEvaluationPerformance[];
-      };
-    };
-
-    /** Pauses or resumes one monitor. */
-    toggle: {
-      mutation: {
-        input: { id: string; projectId: string; enabled: boolean };
-        output: unknown;
-      };
-    };
-
-    /** Deletes one monitor. */
-    delete: {
-      mutation: { input: { id: string; projectId: string }; output: unknown };
-    };
-
-    /** Replicates a monitor — and the evaluator behind it — into another project. */
-    copy: {
-      mutation: {
-        input: { monitorId: string; projectId: string; sourceProjectId: string };
-        output: unknown;
-      };
-    };
-  };
-
+/**
+ * The procedures this package borrows from other namespaces. A procedure map
+ * names STRINGS, so borrowing one costs nothing; `cross-feature` exempts a
+ * contract by construction.
+ */
+type BorrowedProcedures = {
   organization: {
     /**
      * The organization graph the application shell already holds.
@@ -140,6 +77,9 @@ export type MonitorApiMap = {
     };
   };
 };
+
+/** Everything this family calls: the declared namespace plus the borrowed two. */
+export type MonitorApiMap = ContractApiMap<typeof monitorTrpc> & BorrowedProcedures;
 
 /**
  * The monitor family's typed tRPC hooks. Same machinery, same transport and

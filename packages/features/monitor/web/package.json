@@ -7,10 +7,13 @@
     "src"
   ],
   "type": "module",
+  "main": "./src/online-evaluations.ts",
+  "types": "./dist/online-evaluations.d.ts",
   "exports": {
-    "./screens/online-evaluations": {
-      "types": "./dist/screens/online-evaluations/index.d.ts",
-      "default": "./src/screens/online-evaluations/index.ts"
+    "./online-evaluations": {
+      "langwatch-declaration-source": "./src/online-evaluations.ts",
+      "types": "./dist/online-evaluations.d.ts",
+      "default": "./src/online-evaluations.ts"
     }
   },
   "scripts": {

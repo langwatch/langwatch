@@ -1,10 +1,13 @@
-/** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { MonitorApp } from "@langwatch/monitor-server";
+/** Kept separate from the composition so importing the router/app type never pulls in the boot graph. */
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { createMonitorTrpcRouter } from "./monitor-trpc.mount.ts";
 
 /** The namespace and the `ctx.app.monitors` slice the REST family reads. */
 export type ComposedMonitorFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createMonitorTrpcRouter>;
-  app: MonitorApp;
+  routers(mount: ApiTrpcFeatureMount): Readonly<{
+    monitors: ReturnType<typeof createMonitorTrpcRouter>;
+  }>;
+  app: MonitorApi;
+  restServices: Readonly<{ monitors: () => MonitorApi }>;
 }>;

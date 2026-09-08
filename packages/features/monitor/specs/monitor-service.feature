@@ -44,3 +44,10 @@ Feature: Monitor service boundary
     Given no monitor exists for the project and id
     When a caller requests it
     Then MonitorNotFoundError is thrown
+
+  @integration
+  Scenario: A write naming an absent monitor is refused by name
+    Given no monitor exists for the project and id
+    When a caller toggles or deletes it
+    Then the write is refused as monitor_not_found rather than as a server fault
+    And every stored backend answers the same refusal

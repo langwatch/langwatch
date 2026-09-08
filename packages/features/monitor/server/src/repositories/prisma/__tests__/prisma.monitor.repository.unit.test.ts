@@ -65,7 +65,7 @@ function repositoryWith(row: unknown = STORED) {
     },
   };
 
-  return { calls, repository: PrismaMonitorRepository.create(database as never) };
+  return { calls, repository: PrismaMonitorRepository.create({ prisma: database as never }) };
 }
 
 describe("PrismaMonitorRepository", () => {

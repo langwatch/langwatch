@@ -52,6 +52,7 @@ const rows: OnlineEvaluationRow[] = [
     enabled: true,
     executionMode: "ON_MESSAGE",
     performance: {
+      monitorId: "monitor-up",
       metric: "score",
       points: [0.68, 0.72, 0.75, 0.8, 0.86],
       current: 0.86,
@@ -65,6 +66,7 @@ const rows: OnlineEvaluationRow[] = [
     enabled: true,
     executionMode: "AS_GUARDRAIL",
     performance: {
+      monitorId: "monitor-down",
       metric: "pass_rate",
       points: [0.96, 0.94, 0.91, 0.88],
       current: 0.88,
@@ -78,6 +80,7 @@ const rows: OnlineEvaluationRow[] = [
     enabled: false,
     executionMode: "ON_MESSAGE",
     performance: {
+      monitorId: "monitor-empty",
       metric: "score",
       points: [],
       current: null,
@@ -200,6 +203,7 @@ describe("<OnlineEvaluationsTable />", () => {
           {
             ...rows[0]!,
             performance: {
+              monitorId: "monitor-up",
               metric: "score",
               points: [0.8, 0.8, 0.8],
               current: 0.8,

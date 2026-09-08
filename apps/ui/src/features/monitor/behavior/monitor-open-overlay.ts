@@ -4,7 +4,7 @@
  * chrome this application doesn't yet supply — a recorded gap, not a bug.
  */
 
-import type { MonitorOverlayRequest } from "@langwatch/monitor-web/screens/online-evaluations";
+import type { MonitorOverlayRequest } from "@langwatch/monitor-web/online-evaluations";
 
 export function overlayQuery(request: MonitorOverlayRequest): Record<string, string | undefined> {
   return {

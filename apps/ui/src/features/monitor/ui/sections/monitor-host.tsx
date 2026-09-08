@@ -8,7 +8,7 @@ import {
   monitorApi,
   MonitorHostProvider,
   type MonitorHostPort,
-} from "@langwatch/monitor-web/screens/online-evaluations";
+} from "@langwatch/monitor-web/online-evaluations";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
