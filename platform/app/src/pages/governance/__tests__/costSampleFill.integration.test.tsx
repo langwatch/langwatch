@@ -13,9 +13,11 @@
  *      and "could not be loaded" is only another way of saying the screen has
  *      nothing on it. Every real alert returns the moment the toggle goes off.
  *   2. NOTHING INVENTED IS UNLABELLED. Suppressing the failure is only safe
- *      because the banner says nothing on the page is real and every invented
- *      figure carries the badge — including the lanes, which are the largest
- *      numbers on the screen and were never badged before.
+ *      because the banner says nothing on the page is real. It says it once,
+ *      for the whole screen, and the per-panel badges stand down under it
+ *      rather than repeating it sixteen times — so the assertion that they are
+ *      absent is only sound while the assertion that the banner is present
+ *      holds, and the two are made in the same test on purpose.
  *
  * Spec: specs/governance/governance-cost-screen.feature
  *       specs/ai-governance/dashboard/governance-ui-controls.feature
@@ -23,6 +25,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import {
+  SampleMark,
+  SampleSaidOnce,
+} from "~/components/governance/costs/sampleMark";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -155,11 +161,11 @@ describe("the cost screen in sample mode", () => {
       expect(
         screen.queryByText("Cost data could not be loaded"),
       ).not.toBeInTheDocument();
-      // The lanes are on screen, carrying figures, under the sample badge.
+      // The lanes are on screen, carrying figures, under the sample banner —
+      // which is the thing saying they are invented now that the lanes no
+      // longer each repeat it.
       expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
-      expect(
-        within(screen.getByTestId("cost-lane-billed")).getByText("sample"),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/nothing here is real/i)).toBeInTheDocument();
     });
 
     it("brings the failure straight back when the reader turns sample off", async () => {
@@ -183,7 +189,12 @@ describe("the cost screen in sample mode", () => {
 
       const panel = panelFor("Billed spend by person");
 
-      expect(within(panel).getByText("sample")).toBeInTheDocument();
+      // Invented spenders in the panel, not a badge on it: the reserved `.test`
+      // domain is what makes them recognisably not anybody's, and it is in the
+      // rows themselves rather than in a mark that can be suppressed.
+      expect(within(panel).getAllByText(/@acme\.test/).length).toBeGreaterThan(
+        0,
+      );
       expect(
         screen.queryByText(/could not be loaded/i),
       ).not.toBeInTheDocument();
@@ -191,10 +202,14 @@ describe("the cost screen in sample mode", () => {
   });
 
   describe("given the activity reads never answered", () => {
-    /** @scenario "Every invented panel carries the sample badge" */
-    /** @scenario "Every invented figure on the screen carries the sample badge" */
-    it("badges every invented panel and lane", async () => {
+    /** @scenario "The screen says figures are invented once, not once per panel" */
+    it("says it in the banner and nowhere else", async () => {
       await renderInSampleMode();
+
+      // The banner is the one statement, and it has to be a real one: if it
+      // ever stops rendering, the assertion below turns into a check that an
+      // unmarked screen of invented money is unmarked, and passes.
+      expect(screen.getByText(/nothing here is real/i)).toBeInTheDocument();
 
       for (const title of [
         "Adoption",
@@ -207,7 +222,7 @@ describe("the cost screen in sample mode", () => {
         "Conversations over time",
         "Tokens over time",
       ]) {
-        expect(within(panelFor(title)).getByText("sample")).toBeInTheDocument();
+        expect(within(panelFor(title)).queryByText("sample")).toBeNull();
       }
       for (const laneId of [
         "cost-lane-billed",
@@ -215,8 +230,8 @@ describe("the cost screen in sample mode", () => {
         "cost-lane-seats",
       ]) {
         expect(
-          within(screen.getByTestId(laneId)).getByText("sample"),
-        ).toBeInTheDocument();
+          within(screen.getByTestId(laneId)).queryByText("sample"),
+        ).toBeNull();
       }
     });
 
@@ -292,6 +307,41 @@ describe("the cost screen in sample mode", () => {
       const panel = panelFor("Cost by department");
       expect(panel.textContent).toContain("Engineering");
       expect(panel.textContent).not.toContain("Marketing");
+    });
+  });
+
+  /**
+   * The other half of the suppression, asserted on the mark itself.
+   *
+   * The page cannot reach this state today — a panel is only ever invented
+   * while sample mode is on, and sample mode is what raises the banner — so
+   * there is no screen to drive it through. That is exactly why it is worth
+   * pinning: the day someone renders an invented panel on a measured page,
+   * this is the guarantee that stops it going out unmarked, and nothing on
+   * the page would notice if it quietly stopped holding.
+   */
+  describe("given an invented panel with no banner above it", () => {
+    /** @scenario "The sample mark returns wherever no banner speaks for it" */
+    it("marks it, because nothing else on the screen would", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SampleMark shown />
+        </ChakraProvider>,
+      );
+
+      expect(screen.getByText("sample")).toBeInTheDocument();
+    });
+
+    it("stands down again once a banner is speaking for it", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SampleSaidOnce said>
+            <SampleMark shown />
+          </SampleSaidOnce>
+        </ChakraProvider>,
+      );
+
+      expect(screen.queryByText("sample")).toBeNull();
     });
   });
 });

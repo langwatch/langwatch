@@ -131,11 +131,14 @@ Feature: The People page is two tabs, People and Departments
     When alice opens the People page
     Then the sample-data toggle, Run match pass and Add department sit at the top right of the header
     And each is rendered at the small size
-    And Add department is solid, because a department is the one thing on this
-      screen that exists only because somebody made it
-    And Run match pass is outline, because it recomputes over what is already there
-    And the sample-data toggle is ghost, because it changes what is shown rather
-      than anything about the organization
+    And Add department is solid, in the section's orange
+    And Run match pass is outline
+    And the sample-data toggle is ghost at rest and subtle once pressed, never solid
+    # Add department is the solid one because a department is the only thing on
+    # this screen that exists because somebody made it: a person arrives here
+    # because a provider named them, and Run match pass recomputes over what is
+    # already there. Orange rather than the default grey, so it matches the
+    # Inventory page's Add tool. Rulebook: governance-ui-controls.feature.
 
   @integration
   Scenario: Run match pass is a header action, not a panel's own button

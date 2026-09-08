@@ -230,7 +230,6 @@ beforeEach(() => {
   harness.inputs = {};
   harness.answers = {};
   harness.mutations = [];
-  window.sessionStorage.clear();
 });
 
 afterEach(() => cleanup());
@@ -465,6 +464,77 @@ describe("the filter row", () => {
     });
   });
 
+  describe("when the department choice is longer than a pill can hold", () => {
+    /** @scenario "A choice too long for a pill uses the app's own select" */
+    it("offers every department through the app's own select", async () => {
+      harness.permissions = MANAGER_PERMISSIONS;
+      // Two dozen departments is past the point where a menu pill reads as a
+      // list of choices rather than a wall. The dialog takes the organization's
+      // department list whole and caps nothing, so the count here is the
+      // organization's, not the control's.
+      const departments = Array.from({ length: 24 }, (_, index) => ({
+        id: `dept-${index + 1}`,
+        name: `Department ${index + 1}`,
+      }));
+      harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
+      harness.answers["departments.list"] = { data: departments };
+      // Assigning a department needs an account to assign, so the row has to
+      // be one the match engine has already tied to a member.
+      harness.answers["governancePeople.list"] = {
+        data: [
+          discovered({
+            displayText: "Jane Doe",
+            rawActorId: "jane.doe@example.com",
+            link: {
+              userId: "user-1",
+              evidenceKind: "verified_email",
+              memberName: "Jane Doe",
+              departmentName: null,
+            },
+          }),
+        ],
+      };
+      renderPeopleAt(["/governance/people"]);
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Actions for/ }),
+      );
+      await userEvent.click(
+        await screen.findByRole("menuitem", { name: "Assign department" }),
+      );
+
+      const dialog = await screen.findByRole("dialog");
+      // The app's own select opens through a combobox and a listbox, which is
+      // what makes it operable in the app's palette on a dark screen. A native
+      // select would hand the whole choice to the operating system.
+      const trigger = within(dialog).getByRole("combobox", {
+        name: "Department",
+      });
+      await userEvent.click(trigger);
+
+      // The listbox mounts in a portal directly under the body, which puts it
+      // outside the open dialog - so Zag's modal pass marks its container
+      // aria-hidden and the default role query skips it. That is a jsdom
+      // ordering artifact, not a defect in the control, so the options are
+      // read through the listbox the trigger names.
+      const listboxId = trigger.getAttribute("aria-controls");
+      const listbox = document.getElementById(listboxId ?? "");
+      expect(listbox).not.toBeNull();
+      const options = within(listbox as HTMLElement).getAllByRole("option", {
+        hidden: true,
+      });
+      // Unassigned plus every department, none dropped for want of room.
+      expect(options).toHaveLength(departments.length + 1);
+      expect(options.map((option) => option.textContent)).toContain(
+        "Department 24",
+      );
+      // The rule holds with the dialog open, which is the state that used to
+      // hide it: Ark marks the page behind a modal aria-hidden, so a check
+      // that walked ancestors would pass here without looking at anything.
+      expect(findNativeSelects(document.body)).toHaveLength(0);
+    });
+  });
+
   describe("when the address already names a frame, a department and a sort", () => {
     /** @scenario "The chosen time frame, department and sort are part of the address" */
     it("reads all three back from the address", () => {
@@ -578,6 +648,13 @@ function ButtonReferences() {
       <Button size="sm" variant="ghost">
         reference ghost small
       </Button>
+      {/* The kit draws the pressed toggle subtle AND orange
+          (SampleDataControls.tsx), so the reference carries the palette too.
+          Without it this compares against a grey subtle button and fails for a
+          reason that has nothing to do with the rule. */}
+      <Button size="sm" variant="subtle" colorPalette="orange">
+        reference subtle small
+      </Button>
       {/* Solid in the section's own colour, which is what Inventory's Add tool
           renders and what a create action here has to match. A plain solid
           button is grey, and comparing against that would let the page drift
@@ -631,8 +708,11 @@ describe("the page header", () => {
     });
 
     /** @scenario "Primary page actions sit top-right in the page header" */
-    it("renders them small, with only the create action solid", () => {
+    it("puts them last in the header, with only the create action solid", () => {
       harness.permissions = MANAGER_PERMISSIONS;
+      // The toggle is drawn ghost at rest and subtle while pressed, so the
+      // state is seeded rather than assumed: this test is about the rest half.
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       renderPeopleWithReferences("/governance/people");
 
       const header = screen.getByTestId("people-page-header");
@@ -644,6 +724,20 @@ describe("the page header", () => {
 
       const actions = within(header).getAllByRole("button");
       expect(actions).toHaveLength(3);
+      // Top-right, not merely somewhere on the page. jsdom computes no layout,
+      // so position is asserted structurally: every action follows the title
+      // in document order and they share the header's last child, which is the
+      // end of a space-between row.
+      const heading = within(header).getByRole("heading", { name: "People" });
+      const group = header.lastElementChild;
+      expect(group).not.toBeNull();
+      for (const action of actions) {
+        expect(
+          heading.compareDocumentPosition(action) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(group).toContainElement(action);
+      }
       // Exactly one, not "at most one": a header where nothing is solid reads
       // as a header with no primary action, which is the drift this rule
       // exists to catch.
@@ -666,6 +760,30 @@ describe("the page header", () => {
         within(header).getByRole("button", { name: /See sample data/ })
           .className,
       ).toBe(ghostSmall);
+    });
+
+    /** @scenario "Primary page actions sit top-right in the page header" */
+    it("draws the pressed sample toggle subtle, still not solid", async () => {
+      harness.permissions = MANAGER_PERMISSIONS;
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderPeopleWithReferences("/governance/people");
+
+      const subtleSmall = screen.getByText("reference subtle small").className;
+      const solidSmall = screen.getByText("reference solid small").className;
+      const header = screen.getByTestId("people-page-header");
+
+      await userEvent.click(
+        within(header).getByRole("button", { name: /See sample data/ }),
+      );
+
+      // The toggle changes how it is drawn once it is pressed, and that is the
+      // kit's business. What this page owes the section is that pressing it
+      // never produces a second solid button competing with Add department.
+      const pressed = within(header).getByRole("button", {
+        name: /sample data/i,
+      });
+      expect(pressed.className).toBe(subtleSmall);
+      expect(pressed.className).not.toBe(solidSmall);
     });
 
     /** @scenario "Run match pass is a header action, not a panel's own button" */
@@ -817,8 +935,10 @@ describe("the Departments tab", () => {
       const field = within(dialog).getByRole("textbox", {
         name: "Department name",
       });
-      // Click before typing: the dialog moves focus to itself as it opens, and
-      // typing into a field that has not been focused yet drops the keystrokes.
+      // Let the dialog claim focus first, then take it. It moves focus to its
+      // own content as it opens, and a click that lands before that move is
+      // undone by it, leaving the keystrokes to fall on the floor.
+      await waitFor(() => expect(dialog).toHaveFocus());
       await userEvent.click(field);
       await waitFor(() => expect(field).toHaveFocus());
       await userEvent.type(field, "Engineering");
