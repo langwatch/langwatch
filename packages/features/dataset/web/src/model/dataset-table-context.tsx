@@ -5,7 +5,19 @@
  * zustand store, the standalone dataset editor backs it with its own store)
  * and only ever talk to this interface.
  */
+import type { DatasetAttachment } from "@langwatch/dataset-contract";
 import { createContext, type ReactNode, type RefObject, useContext } from "react";
+
+/**
+ * Stores a file the reader picked in an image or file cell, and answers with
+ * the reference the cell keeps.
+ *
+ * A callback rather than a project id, because the cells are elements: they
+ * present what they are given and never reach a transport themselves. The
+ * table's host builds this from `useDatasetAttachmentUpload`, the same way it
+ * builds `renderImage`.
+ */
+export type DatasetAttachmentUpload = (input: { file: File }) => Promise<DatasetAttachment>;
 
 export type CellPosition = {
   row: number;
@@ -39,6 +51,9 @@ export type DatasetTableContextValue = {
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleRowSelection: (row: number) => void;
   renderImage: (value: string) => ReactNode | null;
+  /** Absent where the table has nowhere to store bytes; the editor then offers
+   *  the URL field alone. */
+  uploadAttachment?: DatasetAttachmentUpload;
   /** Where the floating cell editor portals to. Required when the table is
    *  hosted inside a modal dialog: portaling to document.body would land
    *  outside the dialog's pointer-events scope and the editor would be

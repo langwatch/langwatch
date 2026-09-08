@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { type DatasetColumnType, parseDatasetFileCell } from "@langwatch/dataset-contract";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import {
   type MouseEvent as ReactMouseEvent,
@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { useDatasetTable } from "../../model/dataset-table-context.tsx";
+import { DatasetCellFile } from "./dataset-cell-file.tsx";
 import {
   formatJsonCellValue,
   JSON_LIKE_TYPES,
@@ -68,6 +69,7 @@ export function DatasetCellDisplay({
   const showClamped = isCompact && isOverflowing;
   const expandedMaxHeight = `${customHeight ?? EXPANDED_DEFAULT_MAX_HEIGHT}px`;
   const image = dataType === "image" && value ? renderImage(value) : null;
+  const isFile = dataType === "file" && value.length > 0 && parseDatasetFileCell(value) !== null;
 
   useEffect(() => {
     if (!isExpanded) {
@@ -168,7 +170,7 @@ export function DatasetCellDisplay({
         maxHeight={isCompact ? `${COMPACT_MAX_HEIGHT}px` : isExpanded ? expandedMaxHeight : void 0}
         overflow={isCompact ? "hidden" : isExpanded ? "auto" : void 0}
       >
-        {image ?? (
+        {image ?? (isFile ? <DatasetCellFile value={value} /> : null) ?? (
           <>
             {displayValue.text}
             {displayValue.truncated && (

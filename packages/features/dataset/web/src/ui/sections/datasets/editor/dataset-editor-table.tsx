@@ -57,6 +57,7 @@ import {
 import { datasetTableCss } from "../../../../model/dataset-table-styles.ts";
 import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body.tsx";
 import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync.ts";
+import { useDatasetAttachmentUpload } from "../../../../behavior/use-dataset-attachment-upload.ts";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -175,6 +176,7 @@ export function DatasetEditorTable({
   editorPortalRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const { project } = useOrganizationTeamProject();
+  const uploadAttachment = useDatasetAttachmentUpload({ projectId: project?.id });
   const [store] = useState(() => createDatasetEditorStore());
   const editColumnsDrawer = useDisclosure();
   const addRowsFromCSVModal = useDisclosure();
@@ -548,6 +550,7 @@ export function DatasetEditorTable({
       toggleCellExpanded,
       toggleRowSelection,
       renderImage,
+      uploadAttachment,
       editorPortalRef,
     }),
     [
@@ -560,6 +563,7 @@ export function DatasetEditorTable({
       setSelectedCell,
       toggleCellExpanded,
       toggleRowSelection,
+      uploadAttachment,
       editorPortalRef,
     ],
   );

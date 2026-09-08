@@ -20,6 +20,16 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
+// The grid asks for a way to store a file picked in an image or file cell, and
+// that is the package's own tRPC binding rather than the studio's.
+vi.mock("../../../../../behavior/dataset-api.ts", () => ({
+  datasetApi: {
+    datasetRecord: {
+      uploadAttachment: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+    },
+  },
+}));
+
 const updateMutate = vi.fn();
 const deleteManyMutate = vi.fn();
 const getAllQuery = vi.fn();

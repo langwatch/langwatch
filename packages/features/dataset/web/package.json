@@ -30,6 +30,10 @@
       "types": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
       "default": "./src/ui/elements/datasets/editor/render-dataset-image.tsx"
     },
+    "./surfaces/dataset-attachment-upload": {
+      "types": "./src/behavior/use-dataset-attachment-upload.ts",
+      "default": "./src/behavior/use-dataset-attachment-upload.ts"
+    },
     "./surfaces/dataset-record-sync": {
       "types": "./src/behavior/datasets/editor/use-dataset-record-sync.ts",
       "default": "./src/behavior/datasets/editor/use-dataset-record-sync.ts"

@@ -11,6 +11,8 @@
  * renders the picture imports it rather than owning it.
  */
 
+import { parseDatasetAttachmentReference } from "@langwatch/dataset-contract";
+
 /** The image URL a cell value names, or `null` when it names none. */
 export const datasetImageUrl = (value: unknown): string | null => {
   if (!value) return null;
@@ -20,6 +22,14 @@ export const datasetImageUrl = (value: unknown): string | null => {
   // Markdown image syntax: ![alt](url)
   const markdownMatch = /^!\[.*?\]\((.*?)\)$/.exec(text);
   if (markdownMatch?.[1]) return markdownMatch[1];
+
+  // A file uploaded into the cell. The reference carries no extension and no
+  // host, so none of the heuristics below would recognise it. Only the bare
+  // reference counts, which is what an image cell stores; a markdown link is
+  // the file cell's shape and the picture detector in the design system
+  // answers the same way for it.
+  const attachment = parseDatasetAttachmentReference(text);
+  if (attachment?.path === text) return attachment.path;
 
   if (text.startsWith("data:image/")) {
     return /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i.test(text) ? text : null;
