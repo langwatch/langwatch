@@ -32,7 +32,9 @@ pnpm --filter @langwatch/architecture-lint test:unit tests/frontend-boundary.uni
 Group the lint lines by rule name and count. A hard violation is an entry followed by an
 `  allowed:` line. Note which are in a `*-baseline.json` (pre-existing, tolerated) and
 which are new. The `feature-shape` entries are the conversion debt: list each kind and
-what replaces it. Read the parity banner (`✗ THIS RUN FAILS: …`), not a per-file `✓`.
+what replaces it (the table in `.claude/skills/feature-convert/SKILL.md` maps every kind
+to its annotation counterpart; converting is that skill's job, the audit only names the
+gaps). Read the parity banner (`✗ THIS RUN FAILS: …`), not a per-file `✓`.
 
 ## 2. Shape, grammar, naming and data scoping (server)
 
@@ -66,7 +68,9 @@ Walk `server/src` against `references/server.md`:
   constructing a service, reading `process.env` or a header, returning a `Response`,
   domain logic in a mapping helper.
 - Legacy pieces (`contract/src/<f>.service.ts`, `adapters/postgres.*`, `fixtures/`,
-  `testing.ts`, `transport/<surface>/`, `ports/` used for a peer feature): each is a
+  `testing.ts`, `transport/<surface>/`, `ports/` used for a peer feature, a missing
+  `<f>.server.ts` or `app/<f>.app.ts`, an installer no process boots, a `refusing*`
+  twin in `apps/api/src/features/<f>/`, web `screens/`/`surfaces/` folders): each is a
   finding with its replacement, cross-checked against the `feature-shape` baseline.
 - Folders outside the grammar (`utils`, `lib`, `helpers`, `domain`, `composition`,
   `types`): say where each file belongs. Filenames: dot between qualifier and subject,

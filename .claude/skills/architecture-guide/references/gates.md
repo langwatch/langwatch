@@ -68,6 +68,9 @@ entry is itself reported). Diff the violation LIST before and after, not the tot
 wrong placement trades one violation for another.
 
 `feature-shape-baseline.json` is the conversion inventory: one entry per feature and
-legacy kind (`contract-service`, `persistence-adapter`, `fixtures-directory`,
-`testing-entry`, `nested-transport`, `unregistered-repositories`,
-`postgres-without-memory`). A feature is converted when it has no entries left.
+kind, measured against annotation. Pieces annotation has no place for:
+`contract-service`, `persistence-adapter`, `fixtures-directory`, `testing-entry`,
+`nested-transport`, `unregistered-repositories`, `postgres-without-memory`,
+`nested-web-entry`, `refusing-composition`. Pieces of annotation a feature still lacks:
+`no-installer`, `no-app`, `installer-not-booted`. A feature is converted when it has no
+entries left; the `feature-convert` skill closes them kind by kind.

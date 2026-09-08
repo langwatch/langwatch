@@ -30,7 +30,7 @@ function write(path: string, content = "export {};\n"): void {
   writeFileSync(absolute, content, "utf8");
 }
 
-function pkg(kind: "contract" | "server", feature = "widget"): ClassifiedPackage {
+function pkg(kind: "contract" | "server" | "web", feature = "widget"): ClassifiedPackage {
   const featureRoot = join(root, `packages/features/${feature}`);
   const directory = join(featureRoot, kind);
 
@@ -61,14 +61,23 @@ function referenceFeature(): void {
   write("packages/features/widget/server/src/repositories/memory/memory.widget.repository.ts");
   write("packages/features/widget/server/src/transport/widget.rest.ts");
   write("packages/features/widget/server/src/transport/widget.trpc.ts");
+  write("packages/features/widget/web/src/widgets.ts");
+  write(
+    "apps/api/src/features/widget/widget.composition.ts",
+    'createApp().withFeature(widgetServer).boot({ role: "api" });\n',
+  );
+}
+
+function everyPackage(): ClassifiedPackage[] {
+  return [pkg("contract"), pkg("server"), pkg("web")];
 }
 
 function findings() {
-  return collectFeatureShapeFindings(root, catalogue, [pkg("contract"), pkg("server")]);
+  return collectFeatureShapeFindings(root, catalogue, everyPackage());
 }
 
 function violations() {
-  return lintFeatureShape(root, catalogue, [pkg("contract"), pkg("server")]);
+  return lintFeatureShape(root, catalogue, everyPackage());
 }
 
 function baseline(entries: readonly { feature: string; kind: string }[]): void {
@@ -178,10 +187,7 @@ describe("feature shape", () => {
     });
 
     it("collects and formats the inventory as one sorted entry per feature and kind", () => {
-      const entries = collectFeatureShapeBaseline(root, catalogue, [
-        pkg("contract"),
-        pkg("server"),
-      ]);
+      const entries = collectFeatureShapeBaseline(root, catalogue, everyPackage());
 
       expect(entries.map((entry) => entry.kind)).toEqual([
         "contract-service",
@@ -221,6 +227,76 @@ describe("feature shape", () => {
       });
 
       expect(findings().map((finding) => finding.kind)).toEqual(["postgres-without-memory"]);
+    });
+  });
+
+  describe("given a feature that lacks a piece of the reference", () => {
+    it("asks for the installer when no <feature>.server.ts exists", () => {
+      referenceFeature();
+      rmSync(join(root, "packages/features/widget/server/src/widget.server.ts"));
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["no-installer"]);
+    });
+
+    it("asks for the one app when no app/<feature>.app.ts exists", () => {
+      referenceFeature();
+      rmSync(join(root, "packages/features/widget/server/src/app/widget.app.ts"));
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["no-app"]);
+    });
+
+    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
+    it("reports an installer no process boots, naming the installer file", () => {
+      referenceFeature();
+      rmSync(join(root, "apps/api/src/features/widget/widget.composition.ts"));
+
+      expect(findings()).toEqual([
+        {
+          feature: "widget",
+          kind: "installer-not-booted",
+          path: "packages/features/widget/server/src/widget.server.ts",
+        },
+      ]);
+    });
+
+    it("accepts a worker-side installer named after the feature", () => {
+      referenceFeature();
+      write(
+        "apps/api/src/features/widget/widget.composition.ts",
+        'createApp().withFeature(workerWidgetServer).boot({ role: "worker" });\n',
+      );
+
+      expect(findings()).toEqual([]);
+    });
+
+    it("reports a refusing twin beside the feature's composition", () => {
+      referenceFeature();
+      write(
+        "apps/api/src/features/widget/widget-absence.ts",
+        "export function refusingWidgetFeature() {}\n",
+      );
+
+      expect(findings()).toEqual([
+        {
+          feature: "widget",
+          kind: "refusing-composition",
+          path: "apps/api/src/features/widget/widget-absence.ts",
+        },
+      ]);
+    });
+
+    it("reports web entries still nested under screens/ or surfaces/", () => {
+      referenceFeature();
+      write("packages/features/widget/web/src/screens/widgets/index.ts");
+      write("packages/features/widget/web/src/surfaces");
+
+      expect(findings()).toEqual([
+        {
+          feature: "widget",
+          kind: "nested-web-entry",
+          path: "packages/features/widget/web/src/screens",
+        },
+      ]);
     });
   });
 

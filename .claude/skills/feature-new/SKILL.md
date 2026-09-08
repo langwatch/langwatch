@@ -16,7 +16,7 @@ still has one.
 
 ## 0. Decide the subject and check ownership
 
-- The feature name is a lower-kebab noun (`secret`, `model-provider`, `coding-agent`).
+- The feature name is a lower-kebab noun (`annotation`, `model-provider`, `coding-agent`).
 - Open `packages/features/catalogue.json`. If the subject already belongs to a feature,
   stop: this is `feature-extend` on the owner, not a new package.
 - Ask only if two readings lead to materially different packages (project-scoped versus
@@ -29,18 +29,20 @@ named failures as scenarios, each tagged `@unit` or `@integration`, each with th
 code it will carry (see `spec-bind`):
 
 ```gherkin
-Feature: Secrets
+Feature: Annotation scores
   @integration
-  Scenario: A project member creates a secret
+  Scenario: A project member defines a score
     Given a project the caller may manage
-    When they create a secret named MY_SECRET
-    Then the secret is stored encrypted and listed without its value
+    When they define a score named Accuracy with a LIKERT data type
+    Then the score is listed for the project and can be attached to an annotation
 
   @unit
-  Scenario: Creating a secret with a taken name is refused
-    When they create a secret whose name already exists in the project
-    Then the request fails with secret_name_taken
+  Scenario: A score outside the project is refused
+    When an annotation names a score another project owns
+    Then the request fails with annotation_score_invalid
 ```
+
+(`packages/features/annotation/specs/annotation-service.feature` is the full reference.)
 
 Also create `packages/features/<name>/feature.json` with `{ "layoutVersion": 0 }`,
 `adrs/README.md` with a `001-<name>-boundary.md` modelled on

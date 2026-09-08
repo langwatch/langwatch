@@ -128,4 +128,8 @@ a pure function or a value, it moves into A's contract, not into a shared `utils
 The web half never names `AppRouter` (ADR-130). It declares the procedures it calls as a
 map typed from contract inputs and outputs in `web/src/behavior/<name>-api.ts`; see
 `references/web.md`. The contract's job is to export the input and output types that map
-needs.
+needs. The api-map is transitional: once `@langwatch/api/contract` ships
+`defineTrpcContract`, the contract declares the procedures themselves in
+`<f>.trpc.ts` (name, kind, input, output) and the browser derives its client from that
+declaration. Keep the web map's segment and procedure names identical to the transport's
+so the move is mechanical.

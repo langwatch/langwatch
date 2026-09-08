@@ -17,7 +17,7 @@ in a web package is private.
 ## 1. Decide the id and where the code lives
 
 The id is lower-kebab and names what the consumer mounts, not where the file sits:
-`trace-filters`, `annotation-form`, `department-picker`, `dataset-table`. The export path
+`annotation-card`, `annotation-chips`, `annotation-form`, `annotation-scores`. The export path
 is the contract; the module behind it is a flat entry file `src/<id>.ts` that names what
 the consumer may reach (the older `surfaces/<id>/index.ts` barrel is still accepted).
 
@@ -61,7 +61,7 @@ section may. A surface that needs data composes a section.
   "id": "trace",
   "root": "trace",
   "uses": {
-    "screens": ["@langwatch/trace-web/screens/trace"],
+    "screens": ["@langwatch/trace-web/screens/traces"],
     "surfaces": ["@langwatch/annotation-web/annotation-form"]
   }
 }

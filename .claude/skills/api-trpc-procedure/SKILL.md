@@ -25,6 +25,14 @@ tRPC is the first-party browser transport only. Public integrations get REST
 (`feature-shape: nested-transport`); add new procedures to the flat declaration, creating
 `transport/<f>.trpc.ts` if the feature has none yet.
 
+The declaration is about to split (`references/server.md`, "Where transports are going"):
+the contract will name each procedure with its input and output
+(`defineTrpcContract`), the server will bind permission and handler to that name
+(`defineTrpcRouter`), and the browser will derive its client from the contract. Write the
+procedure today so that move is a cut and paste: the input schema in
+`<f>-trpc.schemas.ts`, the output a contract schema, the wire name the same in the
+declaration and the web map.
+
 ## 1. Spec first
 
 Golden path plus each named refusal, tagged and bound per the `spec-bind` skill.
@@ -105,6 +113,17 @@ with one entry per namespace; `apps/api/src/app-trpc/app-trpc.features.ts` names
 (`annotationScore: annotationRouters.annotationScore`) and the composed slot is declared
 on `ComposedApiFeatures` in `app-trpc.composed.ts`. A new namespace touches those two
 files; a new procedure on an existing namespace touches neither.
+
+**Find where the namespace is mounted today before adding to it.** Only annotation is fully
+on this path; other features' namespaces may still be mounted directly in
+`apps/api/src/api.application.ts` over a legacy `transport/api-trpc/` class, and a
+feature-record key with the same name would silently replace it (and its React Query cache
+key). Run
+`grep -n "<namespace>" apps/api/src/app-trpc/app-trpc.features.ts apps/api/src/api.application.ts`.
+When the namespace already exists on the legacy shape, mount the new flat declaration
+beside it with `mount.root.mergeRouters(legacyRouter, newRouter)` under the one wire name,
+as `governance` and `user` do in `app-trpc.features.ts`, and note the remaining legacy
+router as conversion debt.
 
 Test it: `apps/api/src/features/<f>/__tests__/<f>.composition.integration.test.ts` drives
 the real mount with `createApiFixture` peers and a recording Prisma client.

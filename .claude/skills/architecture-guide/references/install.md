@@ -79,12 +79,14 @@ user. The reference is `apps/ui/src/features/annotation`.
    `installed-ui-drawers.unit.test.ts` and `installed-ui-drawers.integration.test.tsx`
    pin and open every registered drawer.
 
-5. **Name the address.**
-   A `WebInstallation` installs its routes directly under the `project` parent, so
-   `apps/ui/src/model/ui-route-table.ts` carries only the loader-key pages of the older
-   `uiFeature` installs and the `UiRedirectDescriptor` entries for retired addresses.
-   Then update the root `feature-map.json`, the live public map of routes, MCP tools and
-   CLI commands (see the `feature-map` skill).
+5. **Pin the addresses.**
+   A `WebInstallation` needs no route-table entry: its routes are spliced under the
+   `project` parent where `apps/ui/src/model/ui-route-table.ts` marks
+   `webRouteParent: "project"`, and the table otherwise carries only the loader-key pages
+   of the older `uiFeature` installs plus `UiRedirectDescriptor` entries for retired
+   addresses. What pins a new page is the page-key list in
+   `apps/ui/tests/installed-ui-features.unit.test.ts` and the root `feature-map.json`, the
+   live public map of routes, MCP tools and CLI commands (see the `feature-map` skill).
 
 ## Transport
 

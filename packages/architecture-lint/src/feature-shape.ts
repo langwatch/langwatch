@@ -6,8 +6,9 @@ import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } 
 const BASELINE_FILE = "feature-shape-baseline.json";
 
 /**
- * Pieces of the pre-ADR-133 shape the annotation reference no longer has; the
- * baseline of who still carries which may only shrink.
+ * Pieces of the pre-ADR-133 shape the annotation reference no longer has, and the
+ * pieces of the reference a feature still lacks; the baseline of who carries which
+ * may only shrink.
  */
 export const FEATURE_SHAPE_LEGACY_KINDS = [
   "contract-service",
@@ -17,6 +18,11 @@ export const FEATURE_SHAPE_LEGACY_KINDS = [
   "nested-transport",
   "unregistered-repositories",
   "postgres-without-memory",
+  "no-installer",
+  "no-app",
+  "installer-not-booted",
+  "refusing-composition",
+  "nested-web-entry",
 ] as const;
 
 export type FeatureShapeLegacyKind = (typeof FEATURE_SHAPE_LEGACY_KINDS)[number];
@@ -45,7 +51,27 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ postgres, memory }) and select it with .withRepositories() in <feature>.server.ts.",
   "postgres-without-memory":
     "Every Prisma repository has a memory twin under repositories/memory/, bundled by memory.<feature>.repositories.ts, so the app is tested without a database.",
+  "no-installer":
+    'The server package is installed through src/<feature>.server.ts: defineFeature("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
+  "no-app":
+    "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
+  "installer-not-booted":
+    "A process boots the installer: createApp(...).withPersistence(...).withProvided(PeerApi, peer).withFeature(<feature>Server).boot({ role }) in apps/api, apps/worker or apps/tasks. Delete the hand-built composition.",
+  "refusing-composition":
+    "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
+  "nested-web-entry":
+    "Public web pieces are flat entries src/<id>.ts exported as ./<id>; the screens/ and surfaces/ directories are the older spelling.",
 };
+
+const BOOT_SCAN_ROOTS = [
+  "apps/api/src",
+  "apps/worker/src",
+  "apps/tasks/src",
+  "packages/enterprise/composition",
+];
+const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
+const BOOTED_INSTALLER = /withFeature\(\s*([A-Za-z0-9_]+)/g;
+const REFUSING_EXPORT = /export function refusing/;
 
 const PERSISTENCE_ADAPTER = /^(?:postgres|prisma)\.[a-z0-9-]+\.adapter\.ts$/;
 
@@ -85,6 +111,48 @@ function files(path: string): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+function sourceFiles(path: string): string[] {
+  if (!isDirectory(path)) return [];
+
+  return readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const skipped = entry.name === "__tests__" || entry.name === "node_modules";
+    if (skipped) return [];
+
+    const child = join(path, entry.name);
+    if (entry.isDirectory()) return sourceFiles(child);
+
+    return entry.name.endsWith(".ts") ? [child] : [];
+  });
+}
+
+function pascalCase(feature: string): string {
+  return feature
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+/** Every `<x>Server` identifier a process hands to `withFeature(...)`. */
+function bootedInstallers(root: string): Set<string> {
+  const booted = new Set<string>();
+  for (const scanRoot of BOOT_SCAN_ROOTS) {
+    for (const file of sourceFiles(join(root, scanRoot))) {
+      for (const match of readFileSync(file, "utf8").matchAll(BOOTED_INSTALLER)) {
+        booted.add(match[1]!);
+      }
+    }
+  }
+
+  return booted;
+}
+
+function isBooted(feature: string, booted: ReadonlySet<string>): boolean {
+  const pascal = pascalCase(feature);
+  const camel = pascal.charAt(0).toLowerCase() + pascal.slice(1);
+
+  return [...booted].some((name) => name === `${camel}Server` || name.endsWith(`${pascal}Server`));
+}
+
 function compareEntries(left: FeatureShapeBaselineEntry, right: FeatureShapeBaselineEntry): number {
   return left.feature.localeCompare(right.feature) || left.kind.localeCompare(right.kind);
 }
@@ -109,12 +177,22 @@ function serverFindings(
   root: string,
   feature: string,
   pkg: ClassifiedPackage,
+  booted: ReadonlySet<string>,
 ): FeatureShapeFinding[] {
   const src = join(pkg.root, "src");
   const findings: FeatureShapeFinding[] = [];
   const add = (kind: FeatureShapeLegacyKind, path: string): void => {
     findings.push({ feature, kind, path: workspacePath(root, path) });
   };
+
+  const installer = join(src, `${feature}.server.ts`);
+  const installed = isFile(installer);
+  const bootedSomewhere = installed && isBooted(feature, booted);
+  if (!installed) add("no-installer", src);
+  else if (!bootedSomewhere) add("installer-not-booted", installer);
+
+  const appMissing = !isFile(join(src, "app", `${feature}.app.ts`));
+  if (appMissing) add("no-app", src);
 
   const adapter = files(join(src, "adapters")).find((name) => PERSISTENCE_ADAPTER.test(name));
   if (adapter) add("persistence-adapter", join(src, "adapters", adapter));
@@ -141,6 +219,31 @@ function serverFindings(
   return findings;
 }
 
+function webFindings(root: string, feature: string, pkg: ClassifiedPackage): FeatureShapeFinding[] {
+  const src = join(pkg.root, "src");
+
+  return ["screens", "surfaces"].flatMap((name) => {
+    const directory = join(src, name);
+    const populated = sourceFiles(directory).length > 0;
+
+    return populated
+      ? [{ feature, kind: "nested-web-entry" as const, path: workspacePath(root, directory) }]
+      : [];
+  });
+}
+
+function compositionFindings(root: string, feature: string): FeatureShapeFinding[] {
+  return COMPOSITION_ROOTS.flatMap((compositionRoot) =>
+    sourceFiles(join(root, compositionRoot, feature))
+      .filter((file) => REFUSING_EXPORT.test(readFileSync(file, "utf8")))
+      .map((file) => ({
+        feature,
+        kind: "refusing-composition" as const,
+        path: workspacePath(root, file),
+      })),
+  );
+}
+
 /** Every legacy piece a catalogue feature still carries, against the annotation shape. */
 export function collectFeatureShapeFindings(
   root: string,
@@ -148,17 +251,27 @@ export function collectFeatureShapeFindings(
   packages: readonly ClassifiedPackage[],
 ): FeatureShapeFinding[] {
   const features = new Set(catalogue.map((entry) => entry.id));
+  const booted = bootedInstallers(root);
+  const composed = new Set<string>();
 
   return packages
     .flatMap((pkg) => {
       const feature = pkg.feature;
       if (pkg.layoutVersion !== 0 || !feature || !features.has(feature)) return [];
 
-      if (pkg.kind === "contract") return contractFindings(root, feature, pkg);
+      const firstPackageOfFeature = !composed.has(feature);
+      composed.add(feature);
+      const composition = firstPackageOfFeature ? compositionFindings(root, feature) : [];
 
-      if (pkg.kind === "server") return serverFindings(root, feature, pkg);
+      if (pkg.kind === "contract") return [...composition, ...contractFindings(root, feature, pkg)];
 
-      return [];
+      if (pkg.kind === "server") {
+        return [...composition, ...serverFindings(root, feature, pkg, booted)];
+      }
+
+      if (pkg.kind === "web") return [...composition, ...webFindings(root, feature, pkg)];
+
+      return composition;
     })
     .sort((left, right) => compareEntries(left, right) || left.path.localeCompare(right.path));
 }

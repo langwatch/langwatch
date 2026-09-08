@@ -2,7 +2,7 @@
 name: feature-extend
 description: "Add or change one capability in an existing LangWatch feature package end to end: a new operation, a new field, a new screen section or drawer, a new failure mode. Walks contract (schema, API operation, error) → server (repository interface and both backends, service, app, transport declaration) → composition → web (api-map, hook, section, screen) with the spec scenario written first and every layer kept inside the annotation shape. Use whenever someone asks to add a mutation, a column, a filter, a button that does something new, a validation, an error message, or 'make <feature> also do X', and the subject already has a package under packages/features or packages/enterprise/features. For the transport step itself, hand off to api-rest-route or api-trpc-procedure."
 user-invocable: true
-argument-hint: "<feature> <what to add, e.g. 'archive a secret'>"
+argument-hint: "<feature> <what to add, e.g. 'annotation: mark an annotation resolved'>"
 ---
 
 # Extend a feature

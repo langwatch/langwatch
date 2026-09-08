@@ -256,6 +256,18 @@ export const annotationScoreTrpcTransport = defineTransport(AnnotationApi).withR
 );
 ```
 
+**Where transports are going.** The next step of `@langwatch/api` splits the declaration
+from the implementation: the contract declares each tRPC procedure once
+(`contract/src/<f>.trpc.ts`, `defineTrpcContract("<f>").query("getById").withInput(…).withOutput(…)`
+from `@langwatch/api/contract`), the server binds permission and handler to a procedure
+the contract already named (`defineTrpcRouter(<F>Api, <f>Trpc).procedure("getById").withPermission(…).handle(…)`
+from `@langwatch/api/trpc`), and the browser derives its typed client from
+`typeof <f>Trpc` instead of a hand-written api-map. REST stays one complete endpoint per
+route, in the server (`defineRestRouter(<F>Api).withNamespace("<f>s").withVersion("v1")`).
+Until that lands, annotation's `defineTransport` files are the shape to copy: the
+procedure names, schemas and permissions they carry are exactly what the split moves,
+so write them once, in the contract's vocabulary, and nothing is thrown away.
+
 Handlers receive `{ input, app, actor, scope, signal }`: `input` is the merged, parsed
 params/query/body; `scope` is the authorized target (`{ tier: "project", id }`); `actor`
 is the authenticated principal. Input and output schemas are mandatory; a no-content

@@ -25,7 +25,17 @@ grep -rn "<f>" apps/tasks/src/tasks.catalogue.ts
 A boot error names the gap exactly: `MissingProviderError` says which token no one
 provided for which feature, `DuplicateProviderError` and `DependencyCycleError` likewise.
 A tRPC 404 with a booted app is a namespace never named; a REST 404 is a declaration never
-mounted.
+mounted, or an address nobody claims: check the declaration's routes and the family's
+`basePath` and aliases before assuming a missing mount (annotation answers under
+`/api/annotations`; a plural or singular the family never declared is simply not a route).
+
+Also check whether the feature's installer is booted at all:
+`grep -rn "withFeature(<f>Server" apps/api/src apps/worker/src`. Many features still
+export a `defineFeature` installer that no process installs, while the roots hand-build
+their app and adapter (`feature-shape: installer-not-booted`, often beside a
+`refusing<F>Feature()` twin, `refusing-composition`). That is conversion debt the
+`feature-convert` skill closes (step 7), not a wiring gap you fix by adding a mount, and
+the report should say which it found.
 
 ## apps/api
 

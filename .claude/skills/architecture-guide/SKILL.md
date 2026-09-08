@@ -30,7 +30,9 @@ web packages install through `apps/ui/src/features/catalogue.json` like any othe
 `adrs/`, shared decision ADR-133). Every other feature is being converted to its shape;
 `packages/architecture-lint/src/feature-shape-baseline.json` is the list of what each
 feature still carries from the older shape, and it may only shrink. Copy annotation, not
-the feature next to it.
+the feature next to it. Pointed at any other feature, the task skills produce this same
+shape: `feature-convert` closes a feature's entries kind by kind; `feature-new`,
+`feature-extend`, `api-rest-route`, `api-trpc-procedure` and `web-surface` add to it.
 
 ```
 packages/features/annotation/
@@ -120,6 +122,12 @@ Read the one that matches the layer you are about to touch. Each is short.
   is never a port: name its `*Api` token in `static dependencies`.
 - Test builders live in `app/__tests__/<f>.fixture.ts`; there is no `fixtures/` and no
   `testing.ts` in a server package (`feature-shape: fixtures-directory`, `testing-entry`).
+- A feature exists to be installed: `<f>.server.ts` is its installer, `app/<f>.app.ts` its
+  one app, and some process boots it with `createApp(...).withFeature(<f>Server)`. A
+  server package without them, or an installer no process boots while the root hand-builds
+  the app, is conversion debt (`feature-shape: no-installer`, `no-app`,
+  `installer-not-booted`). A process installs a feature or does not; there is no
+  `refusing<F>Feature()` twin (`feature-shape: refusing-composition`).
 - Only `repositories/prisma/**` names Prisma, through `PrismaRepository.for("Model")`, and
   every query on a project model carries `projectId`. `as PrismaClient` is a lint failure.
 - Utilities do not get a `utils/` folder; they belong to a service, a `rules/<name>.rules.ts`
@@ -127,7 +135,8 @@ Read the one that matches the layer you are about to touch. Each is short.
 - A web package's public entries are flat files at `src/<entry>.ts`, each listed in its
   `package.json` `exports` and declared by the consuming feature in
   `apps/ui/src/features/catalogue.json`. `./screens/<id>` and `./surfaces/<id>` are the
-  older spelling and still allowed.
+  older spelling, inventoried as `feature-shape: nested-web-entry` until the feature
+  converts.
 - Never re-export for backwards compatibility; update the importers. Never `import()`
   inline; the exceptions are a web entry file's lazy screen loader and the SDK's CLI boot.
 - Throw a `HandledError` only when the cause is known and the caller can act; register

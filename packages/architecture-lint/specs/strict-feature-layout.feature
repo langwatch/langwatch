@@ -49,12 +49,18 @@ Feature: Strict versioned feature source layout
 
   @unit @architecture
   Scenario: A pre-reference feature shape is inventoried, never admitted
-    Given a catalogue feature whose contract or server still carries a piece the annotation reference has no place for
-    And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, unselected repositories, or Prisma repositories without memory twins
+    Given a catalogue feature that still carries a piece the annotation reference has no place for, or lacks a piece the reference has
+    And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, unselected repositories, Prisma repositories without memory twins, a nested web entry, a refusing composition twin, a missing installer or app, or an installer no process boots
     When architecture lint checks the workspace
     Then a piece the feature-shape baseline does not list is reported with the reference shape it should take
     And a baseline entry whose piece is gone is reported as stale
     And the baseline only shrinks
+
+  @integration @architecture
+  Scenario: The reference feature carries no legacy piece
+    Given the annotation feature is the shape every other feature converts to
+    When architecture lint measures the real workspace
+    Then annotation's contract, server and web packages have no feature-shape finding
 
   @unit @architecture
   Scenario: Strict services, ports, and contract builds remain mechanically bounded
