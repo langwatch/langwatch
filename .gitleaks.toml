@@ -344,9 +344,17 @@ regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
 # GitHub PAT, Stripe live key and Slack bot token appended to this file are each
 # still reported, identically to the same string in a file this block does not
 # cover.
+#
+# Anchored at the END only, and the asymmetry is deliberate. gitleaks matches
+# this pattern against an ABSOLUTE path, so a leading `^` matches nothing and
+# would silently disable the block rather than fail loudly — verified by scanning
+# with `^...$` and watching the intended file start reporting again. Without the
+# trailing `$` the pattern is a substring match, which also swallows
+# `toolCards.tsx`, `toolCards.ts.bak` and `toolCards.ts.orig`; with it, those
+# three are scanned again and only the named file is exempt.
 [[allowlists]]
 description = "Governance tool-card row identifiers are UI keys, not credentials"
 targetRules = ["generic-api-key"]
 paths = [
-  '''platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts''',
+  '''platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''',
 ]
