@@ -14,7 +14,13 @@ import {
   resolveSeedLicense,
 } from "../localDevLicense";
 
-function isSignedFor(licenseKey: string, publicKey: string): boolean {
+function isSignedFor({
+  licenseKey,
+  publicKey,
+}: {
+  licenseKey: string;
+  publicKey: string;
+}): boolean {
   const parsed = parseLicenseKey(licenseKey);
   return parsed !== null && verifySignature(parsed, publicKey);
 }
@@ -25,19 +31,29 @@ const SEED_CANDIDATES = [
 ] as const;
 
 describe("LOCAL_DEV_ENTERPRISE_LICENSE_KEY", () => {
-  describe("when verified with the key the app boots with by default", () => {
-    it("verifies", () => {
-      expect(
-        isSignedFor(LOCAL_DEV_ENTERPRISE_LICENSE_KEY, DEFAULT_PUBLIC_KEY),
-      ).toBe(true);
+  describe("given the app boots with the default key", () => {
+    describe("when the local-dev license is verified", () => {
+      it("verifies", () => {
+        expect(
+          isSignedFor({
+            licenseKey: LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+            publicKey: DEFAULT_PUBLIC_KEY,
+          }),
+        ).toBe(true);
+      });
     });
 
     // Documents why the seed used to show an invalid license: the ee fixture
     // is signed with the test-suite private key, not the default one.
-    it("rejects the ee test fixture license", () => {
-      expect(isSignedFor(TEST_SUITE_LICENSE_KEY, DEFAULT_PUBLIC_KEY)).toBe(
-        false,
-      );
+    describe("when the ee test fixture license is verified", () => {
+      it("rejects it", () => {
+        expect(
+          isSignedFor({
+            licenseKey: TEST_SUITE_LICENSE_KEY,
+            publicKey: DEFAULT_PUBLIC_KEY,
+          }),
+        ).toBe(false);
+      });
     });
   });
 });
@@ -81,11 +97,13 @@ describe("resolveSeedLicense", () => {
     describe("when the stored license already verifies", () => {
       it("keeps it, so a re-seed never clobbers a license someone activated", () => {
         const activated = LOCAL_DEV_ENTERPRISE_LICENSE_KEY;
+        // Candidates deliberately exclude the stored key, so a resolver that
+        // skipped the stored branch could not pass by coincidence.
         expect(
           resolveSeedLicense({
             stored: activated,
             publicKey: DEFAULT_PUBLIC_KEY,
-            candidates: SEED_CANDIDATES,
+            candidates: [TEST_SUITE_LICENSE_KEY],
           }),
         ).toBe(activated);
       });

@@ -34,16 +34,22 @@ export function resolveSeedLicense({
   publicKey: string;
   candidates?: readonly [string, ...string[]];
 }): string {
-  if (stored && isSignedFor(stored, publicKey)) {
+  if (stored && isSignedFor({ licenseKey: stored, publicKey })) {
     return stored;
   }
   return (
-    candidates.find((candidate) => isSignedFor(candidate, publicKey)) ??
+    candidates.find((licenseKey) => isSignedFor({ licenseKey, publicKey })) ??
     candidates[0]
   );
 }
 
-function isSignedFor(licenseKey: string, publicKey: string): boolean {
+function isSignedFor({
+  licenseKey,
+  publicKey,
+}: {
+  licenseKey: string;
+  publicKey: string;
+}): boolean {
   const parsed = parseLicenseKey(licenseKey);
   return parsed !== null && verifySignature(parsed, publicKey);
 }
