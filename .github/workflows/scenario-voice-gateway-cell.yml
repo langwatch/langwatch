@@ -49,13 +49,11 @@ jobs:
         run: |
           url="$SCENARIO_VOICE_GATEWAY_URL"
 
-          # Check if URL is empty
           if [ -z "$url" ]; then
             echo "::error::gateway_url is empty"
             exit 1
           fi
 
-          # Check if URL starts with https://
           case "$url" in
             https://*)
               ;;
@@ -65,30 +63,26 @@ jobs:
               ;;
           esac
 
-          # Extract host from URL: remove https:// prefix, then remove everything from first / or : onward
-          host="${url#https://}"        # remove https:// prefix
-          host="${host%%/*}"             # remove everything from first /
-          host="${host%%:*}"             # remove everything from first : (port)
+          authority="${url#https://}"
+          authority="${authority%%/*}"
 
-          # Check if host is empty
-          if [ -z "$host" ]; then
+          if [ -z "$authority" ]; then
             echo "::error::gateway_url '$url' has an empty host"
             exit 1
           fi
 
-          # Check for @ in host (userinfo trick like https://gateway.langwatch.ai@evil.com)
-          case "$host" in
+          # Reject userinfo in authority (e.g., attacker@host would let attacker sit before @ while httpx connects elsewhere)
+          case "$authority" in
             *@*)
-              echo "::error::gateway_url '$url' contains @ in the host part, which could be used to redirect to another host"
+              echo "::error::gateway_url '$url' contains @ in the authority, which could be used to redirect to another host"
               exit 1
               ;;
           esac
 
-          # Check if host matches the allowlist
-          # Only gateway.langwatch.ai or subdomains under langwatch.ai are permitted
+          host="${authority%%:*}"
+
           case "$host" in
             gateway.langwatch.ai|*.langwatch.ai)
-              # Valid hostname - this is a LangWatch-controlled origin
               ;;
             *)
               echo "::error::gateway_url '$url' is not an https origin under langwatch.ai; refusing to send the virtual key there"
