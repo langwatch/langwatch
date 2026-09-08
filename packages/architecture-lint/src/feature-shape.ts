@@ -145,6 +145,7 @@ function pascalCase(feature: string): string {
 /** Every `<x>Server` identifier a process hands to `withFeature(...)`. */
 function bootedInstallers(root: string): Set<string> {
   const booted = new Set<string>();
+
   for (const scanRoot of BOOT_SCAN_ROOTS) {
     for (const file of sourceFiles(join(root, scanRoot))) {
       for (const match of readFileSync(file, "utf8").matchAll(BOOTED_INSTALLER)) {
@@ -191,6 +192,7 @@ function serverFindings(
 ): FeatureShapeFinding[] {
   const src = join(pkg.root, "src");
   const findings: FeatureShapeFinding[] = [];
+
   const add = (kind: FeatureShapeLegacyKind, path: string): void => {
     findings.push({ feature, kind, path: workspacePath(root, path) });
   };
@@ -198,6 +200,7 @@ function serverFindings(
   const installer = join(src, `${feature}.server.ts`);
   const installed = isFile(installer);
   const bootedSomewhere = installed && isBooted(feature, booted);
+
   if (!installed) add("no-installer", src);
   else if (!bootedSomewhere) add("installer-not-booted", installer);
 
@@ -219,9 +222,11 @@ function serverFindings(
   const legacyRuntime = sourceFiles(src).find((file) =>
     LEGACY_TRANSPORT_BUILDER.test(readFileSync(file, "utf8")),
   );
+
   if (legacyRuntime) add("legacy-transport-runtime", legacyRuntime);
 
   const repositories = join(src, "repositories");
+
   if (isDirectory(repositories)) {
     const registered = files(repositories).some((name) => name.endsWith(".registry.ts"));
     if (!registered) add("unregistered-repositories", repositories);
@@ -297,6 +302,7 @@ export function collectFeatureShapeBaseline(
   packages: readonly ClassifiedPackage[],
 ): FeatureShapeBaselineEntry[] {
   const entries = new Map<string, FeatureShapeBaselineEntry>();
+
   for (const { feature, kind } of collectFeatureShapeFindings(root, catalogue, packages)) {
     entries.set(entryKey({ feature, kind }), { feature, kind });
   }
@@ -307,6 +313,7 @@ export function collectFeatureShapeBaseline(
 export function formatFeatureShapeBaseline(entries: readonly FeatureShapeBaselineEntry[]): string {
   const sorted = [...entries].sort(compareEntries);
   const lines = ["{", '  "version": 0,', '  "entries": ['];
+
   for (const [index, entry] of sorted.entries()) {
     lines.push(`    ${JSON.stringify(entry)}${index + 1 === sorted.length ? "" : ","}`);
   }
@@ -332,6 +339,7 @@ export function readFeatureShapeBaselineFile(file: string): {
   if (!existsSync(file)) return { exists: false, entries: [], violations: [] };
 
   let raw: unknown;
+
   try {
     raw = JSON.parse(readFileSync(file, "utf8"));
   } catch (error) {
@@ -345,6 +353,7 @@ export function readFeatureShapeBaselineFile(file: string): {
   }
 
   const parsed = baselineSchema.safeParse(raw);
+
   if (!parsed.success) {
     return {
       exists: true,
@@ -360,8 +369,10 @@ export function readFeatureShapeBaselineFile(file: string): {
 
   const violations: ArchitectureViolation[] = [];
   const entries: FeatureShapeBaselineEntry[] = [];
+
   for (const [index, entry] of parsed.data.entries.entries()) {
     const result = entrySchema.safeParse(entry);
+
     if (!result.success) {
       violations.push(
         baselineViolation(
@@ -370,6 +381,7 @@ export function readFeatureShapeBaselineFile(file: string): {
           `Use { feature, kind } with kind one of ${FEATURE_SHAPE_LEGACY_KINDS.join(", ")}.`,
         ),
       );
+
       continue;
     }
 
@@ -379,6 +391,7 @@ export function readFeatureShapeBaselineFile(file: string): {
   const unsorted = entries.some(
     (entry, index) => index > 0 && compareEntries(entries[index - 1]!, entry) >= 0,
   );
+
   if (unsorted) {
     violations.push(
       baselineViolation(
@@ -403,8 +416,10 @@ export function lintFeatureShape(
   const file = baselineFile(root);
   const baseline = readFeatureShapeBaselineFile(file);
   const violations = [...baseline.violations];
+
   const emptyBaseline =
     baseline.exists && baseline.entries.length === 0 && baseline.violations.length === 0;
+
   if (emptyBaseline) {
     violations.push(
       baselineViolation(
