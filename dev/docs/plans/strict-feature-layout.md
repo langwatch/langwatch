@@ -145,7 +145,7 @@ per-package form; the whole-repository form runs once before a push.
 
 - **09-07. Configuration is schema-driven.** Each feature's config is a zod schema parsed at boot; `process.env` only in the boot file.
 - **09-07. `try*` methods are refused.** Absence is a nullable return on `find*` only.
-- **09-08. Annotation is the shape** (clause 9). The feature-convert skill is the procedure; the feature-shape lint is the ratchet.
+- **09-08. Annotation is the shape** (clause 9). The `module` skill (`references/convert.md`) is the procedure; the feature-shape lint is the ratchet.
 - **09-08. Rebuild `@langwatch/api` around one path per transport.** Two paths during phase 2; `MANAGEMENT_API_VERSION` dies in phase 3; `ConnectUpgradeRouterPort` stays; dated addresses are a promise (`api-package-rebuild.md`, decisions 1 to 5).
 - **09-08. Fold `@langwatch/platform-api-client` and `@langwatch/runtime-composition/contract` into `@langwatch/api`** (`./web`, `./contract`). DONE `a0e6374877`.
 - **09-08. Rename features to modules** after the fold, one agent, TS-LSP, mostly `git mv`; `featureApi` and kin take module names in the same lane. Tree shape unconfirmed (section 9).
