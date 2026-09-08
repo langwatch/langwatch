@@ -30,7 +30,10 @@ import {
   CHART_SEAT_CONTRACT_FILL,
   CHART_SEAT_FILL,
 } from "~/components/governance/chartTheme";
-import { azureBillingNoteSentence } from "~/components/governance/costLaneFormat";
+import {
+  azureBillingNoteSentence,
+  laneTrendPct,
+} from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
   CostForecastArea,
@@ -560,11 +563,18 @@ function CostLanes({
   // Both lanes' shapes come off the one series the totals above them were
   // summed from, so a card's sparkline and its figure cannot describe
   // different money.
+  const seriesOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
+    data.series.map((day) => ({ day: day.day, value: pick(day) }));
   const trendOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
-    aggregateLaneTrend(
-      data.series.map((day) => ({ day: day.day, value: pick(day) })),
-      interval,
-    );
+    aggregateLaneTrend(seriesOf(pick), interval);
+  // Measured on the unfolded series, and the fold is drawn from the same one.
+  // The sparkline is a picture of the calendar and wants the buckets; the
+  // badge is a comparison of two spans and cannot have them, because a bucket
+  // is whatever number of days the calendar left in it. Folding first made a
+  // year of unchanged spend report growth on every day the page could be
+  // opened, the size of it set by which quarter today happened to fall in.
+  const trendPctOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
+    laneTrendPct(seriesOf(pick));
   return (
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
@@ -583,6 +593,7 @@ function CostLanes({
               : null
           }
           trend={trendOf((day) => day.billedUsd)}
+          trendPct={trendPctOf((day) => day.billedUsd)}
           interval={interval}
           sample={sample}
         />
@@ -594,6 +605,7 @@ function CostLanes({
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
           trend={trendOf((day) => day.gatewayUsd)}
+          trendPct={trendPctOf((day) => day.gatewayUsd)}
           interval={interval}
           sample={sample}
         />

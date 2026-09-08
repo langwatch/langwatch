@@ -16,6 +16,7 @@ import {
   laneTrendBadge,
   laneTrendPct,
 } from "../costLaneFormat";
+import { aggregateLaneTrend } from "../costs/costsWindow";
 
 describe("azureBillingNoteSentence", () => {
   /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
@@ -135,5 +136,50 @@ describe("laneTrendPct", () => {
     // Counted as a zero, the withheld day would drag the earlier half down and
     // report a rise that never happened.
     expect(laneTrendPct(withheld)).toBe(laneTrendPct(withoutIt));
+  });
+
+  /** @scenario "An odd number of periods does not invent a rise out of the split" */
+  it("reports level when every period is equal and the count is odd", () => {
+    // Five equal periods split three-against-two. Compared as sums, the larger
+    // half wins on nothing but holding one more period, and the card reports a
+    // rise on a window where nothing changed.
+    const flat = [
+      { value: 100 },
+      { value: 100 },
+      { value: 100 },
+      { value: 100 },
+      { value: 100 },
+    ];
+
+    expect(laneTrendPct(flat)).toBe(0);
+    expect(laneTrendBadge(laneTrendPct(flat))).toBe("level");
+  });
+
+  /** @scenario "A flat year read by quarter reports level, not growth" */
+  it("reports level for a year of identical daily spend folded to quarters", () => {
+    // The screen's own default: a year in view, bucketed by quarter. A year
+    // straddles five calendar quarters, the first and last of them partial, so
+    // the buckets differ in count AND in the number of days each covers. Both
+    // differences are properties of the calendar, not of the spending.
+    const start = Date.UTC(2026, 0, 15);
+    const days = Array.from({ length: 365 }, (_, index) => ({
+      day: new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+      value: 1000 as number | null,
+    }));
+
+    // Spend never moved, so the badge may not say it did.
+    expect(laneTrendPct(days)).toBe(0);
+    expect(laneTrendBadge(laneTrendPct(days))).toBe("level");
+
+    // Why the daily series and not the folded one: the fold is honest about
+    // the calendar and therefore useless for measuring change. Constant daily
+    // spend lands in buckets that differ several-fold, because January is
+    // fourteen days of a quarter and April is ninety-one. No comparison of
+    // those buckets — summed, averaged, or otherwise — can recover a figure
+    // the fold has already thrown away, so the trend is measured before it.
+    const folded = aggregateLaneTrend(days, "quarter");
+    const totals = folded.map((bucket) => bucket.value ?? 0);
+    expect(folded.length).toBe(5);
+    expect(Math.min(...totals) * 3).toBeLessThan(Math.max(...totals));
   });
 });
