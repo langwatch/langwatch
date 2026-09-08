@@ -1,3 +1,7 @@
+# 2026-09-08: the builder these scenarios were bound through is deleted (dev/docs/plans/api-legacy-delete.md).
+# The behaviour is still the requirement. Each scenario is @unimplemented until the new runtime
+# (defineRestRouter + createRestRuntime) earns it again with a bound test; then retag and remove
+# the file from LEGACY_INERT in packages/architecture-lint/src/check-feature-parity.ts.
 # See ../adrs/001-rpc-first-fluent-registration.md (its RPC half is withdrawn)
 # See ../../specs/features/domain-error-contract.feature (the error-event
 # payload contract this transport adopts for mid-stream handled failures)
@@ -11,20 +15,20 @@ Feature: SSE streaming endpoints
   Background:
     Given a service created with createService
 
-  @unit
+  @unimplemented
   Scenario: An SSE endpoint is a dotted name mounted as a GET
     When the author calls registerSse with "things.watch", a version, a
       handler and a chain declaring its events
     Then the endpoint serves GET /api/things/{version}/things.watch
     And the route table counts it as a GET route
 
-  @typecheck
+  @typecheck @unimplemented
   Scenario: A stream cannot declare a request body or path params
     Given a registerSse definition chain
     Then withInput and withParams are not offered
     And request data arrives through withQuery only
 
-  @unit
+  @unimplemented
   Scenario: Emitted events are validated against their declared schema
     Given an events map declaring "result" with a score field
     When the handler emits "result" with a conforming payload
@@ -35,27 +39,27 @@ Feature: SSE streaming endpoints
   # One stream, two error frames: a validation failure is an authoring bug
   # told to the caller, a handled error is a domain outcome told in the
   # domain's shape.
-  @unit
+  @unimplemented
   Scenario: A non-conforming emit fails loudly on the stream
     Given the same events map
     When the handler emits "result" with a payload that fails validation
     Then an "error" event carrying the issues is written to the stream
     And the emit rejects, so the handler must catch to continue streaming
 
-  @unit
+  @unimplemented
   Scenario: A handler error reaches the service error handler
     Given a streaming handler that throws
     When the stream is being served
     Then the error propagates to the service's error handling
     And the client sees a completed stream rather than a hung one
 
-  @unit
+  @unimplemented
   Scenario: Client disconnect settles the stream's completion
     Given a client that disconnects mid-stream
     When the request instrumentation asks for the stream's completion
     Then it settles rather than leaking
 
-  @unit
+  @unimplemented
   Scenario: A stream is declared on a family at any scope
     Given a project-scoped family declares a stream
     When a request reaches it

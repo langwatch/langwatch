@@ -1,49 +1,72 @@
-// Typed tRPC root and policy exports. Runtime dependencies remain injected;
-// the framework and error vocabularies are exported from their own entrypoints.
+// @langwatch/api/trpc -- the typed tRPC root, the one execution path a declared
+// procedure runs, and the policy spine a process builds its `procedure` from.
+// Runtime dependencies remain injected; the framework and error vocabularies are
+// exported from their own entrypoints.
 
-export { TrpcRootDefinition, type TrpcRoot } from "./trpc-root.ts";
 export {
+  createTrpcErrorFormatter,
+  createTrpcHandlerBinding,
+  createTrpcRuntime,
   defineTrpcRouter,
+  parseGovernedOutput,
+  resolveTrustedHandlerArguments,
+  TrpcHandlerBinding,
+  TrpcRootDefinition,
+  type ApiHandlerAdapter,
+  type TrpcBuildableProcedure,
   type TrpcContractHandlerArguments,
   type TrpcContractProcedures,
+  type TrpcErrorCausePayloadPort,
   type TrpcFeatureApiWitness,
+  type TrpcHandlerActor,
   type TrpcProceduresNotImplemented,
+  type TrpcProcedureFactory,
+  type TrpcProcedureRequest,
+  type TrpcRoot,
   type TrpcRouterAccess,
   type TrpcRouterBuilder,
   type TrpcRouterDeclaration,
   type TrpcRouterImplementation,
   type TrpcRouterMount,
-  type TrpcProcedureFactory,
-  type TrpcProcedureRequest,
-} from "./trpc-router.ts";
+  type TrpcRuntime,
+  type TrpcRuntimeAuditEntry,
+  type TrpcRuntimeContext,
+  type TrpcRuntimePorts,
+  type TrpcRuntimeRequest,
+} from "./runtime.ts";
+
 export {
-  appTrpcCustomPolicy,
-  appTrpcNoPermissionPolicy,
-  appTrpcPolicy,
-  appTrpcPolicyAny,
-  appTrpcServiceAuthorizedPolicy,
-  createTrpcApiService,
-  declaredPolicy,
-  type AppTrpcPolicy,
-  type AppTrpcPolicyMiddlewares,
-  type TrpcApiMount,
-  type TrpcApiPorts,
-  type TrpcApiPublicMount,
-  type TrpcApiPublicService,
-  type TrpcApiService,
-} from "./trpc-api-service.ts";
-export { auditScopeIds, deriveAuditTarget, isAuditLogExempt } from "./trpc-audit.ts";
-export { redactAuditArgs } from "./trpc-audit-redaction.ts";
-export {
+  auditScopeIds,
+  callerTraceContext,
+  deriveAuditTarget,
   handleTrpcCallLogging,
+  isAuditLogExempt,
   isSilencedCall,
   recordTrpcCall,
+  redactAuditArgs,
   resetSlowCallThrottle,
   resolveSlowCallBudgetMs,
-} from "./trpc-call-logging.ts";
-export { callerTraceContext } from "./trpc-caller-trace.ts";
+  TrpcFailureTraceIds,
+  trpcFailureTraceIds,
+} from "./audit.ts";
+
 export {
   createDeclaredAuthzMiddlewares,
+  createIsPublicProcedure,
+  createPermissionProcedureBuilder,
+  createScopeLineageGuard,
+  createTrpcRuntimePolicy,
+  type PendingPermissionProcedureBuilder,
+  type TrpcActor,
+  type TrpcActorPort,
+  type TrpcAuditEntry,
+  type TrpcAuditPort,
+  type TrpcAuthenticatedMiddlewareContext,
+  type TrpcAuthorizationDecisions,
+  type TrpcAuthorizationDenialPort,
+  type TrpcAuthorizationPort,
+  type TrpcCauseTranslationPort,
+  type TrpcCheckMiddleware,
   type TrpcContextOnlyCheckParams,
   type TrpcContextOnlyDeclaredCheck,
   type TrpcDeclaredAuthzContext,
@@ -51,60 +74,17 @@ export {
   type TrpcDeclaredAuthzPorts,
   type TrpcDeclaredCheck,
   type TrpcDeclaredCheckParams,
+  type TrpcErrorReportingPort,
+  type TrpcIdentityPort,
+  type TrpcMiddlewareContext,
   type TrpcOrganizationRole,
-} from "./trpc-declared-authz.ts";
-export {
-  createTrpcErrorFormatter,
-  type TrpcErrorCausePayloadPort,
-} from "./trpc-error-formatter.ts";
-export { TrpcFailureTraceIds, trpcFailureTraceIds } from "./trpc-failure-trace.ts";
-export {
-  createIsPublicProcedure,
-  createPermissionProcedureBuilder,
-  type PendingPermissionProcedureBuilder,
-  type TrpcCheckMiddleware,
   type TrpcPolicyChainMiddlewares,
-} from "./trpc-permission-builder.ts";
-export type { TrpcPolicyContext } from "./trpc-policy-context.ts";
-export type {
-  TrpcActor,
-  TrpcActorPort,
-  TrpcAuditEntry,
-  TrpcAuditPort,
-  TrpcAuthorizationDecisions,
-  TrpcAuthorizationDenialPort,
-  TrpcAuthorizationPort,
-  TrpcCauseTranslationPort,
-  TrpcErrorReportingPort,
-  TrpcIdentityPort,
-  TrpcRequestHeaders,
-  TrpcRequestLike,
-  TrpcResponseLike,
-  TrpcTranslatedCause,
-} from "./trpc-policy-ports.ts";
-export {
-  createTrpcProcedure,
-  createTrpcService,
-  type TrpcBareProcedure,
-  type TrpcDeclaredAbsent,
-  type TrpcPolicyDecorator,
-  type TrpcProcedureChain,
-  type TrpcProcedureConfig,
-  type TrpcService,
-  type TrpcServiceConfig,
-  type TrpcServiceProcedures,
-  type TrpcUndeclared,
-} from "./trpc-service-builder.ts";
-export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.ts";
-export { createScopeLineageGuard } from "./trpc-scope-lineage.ts";
-export { createTrpcRouter, type TrpcTransportDescriptor } from "./create-trpc-router.ts";
-export {
-  createTrpcRuntime,
-  type TrpcRuntime,
-  type TrpcRuntimeAuditEntry,
-  type TrpcRuntimeContext,
-  type TrpcRuntimePorts,
-  type TrpcRuntimeRequest,
-} from "./trpc-runtime.ts";
-export type { TrpcHandlerBinding } from "./trpc-handler.ts";
+  type TrpcPolicyContext,
+  type TrpcRequestHeaders,
+  type TrpcRequestLike,
+  type TrpcResponseLike,
+  type TrpcRuntimePolicyPorts,
+  type TrpcTranslatedCause,
+} from "./policy.ts";
+
 export type { ApiHandlerArguments } from "../handler-arguments.ts";

@@ -212,6 +212,7 @@ the document with the discovery task.
 3. Scenarios added and the test binding each.
 4. Suite results table.
 5. Line counts of `rest-router.ts`, `rest-runtime.ts`, `rest-openapi.ts` before and after.
-6. Baseline lines to delete (`feature-shape-baseline.json`, `api-package-files-baseline.json`).
+6. Baseline lines to delete (`feature-shape-baseline.json`; the api-package-files ratchet is now the
+   `TARGET_FILES` set in `packages/architecture-lint/tests/api-package-files.unit.test.ts`).
 7. Left open: every wire fact you could not preserve, every file you wanted and were not
    allowed, every legacy behaviour you think is a bug. Facts, not proposals.

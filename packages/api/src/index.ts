@@ -42,4 +42,4 @@ export {
   requiresOnTeam,
 } from "./access-policy.ts";
 
-export { isInternalSecretValid } from "./rest/security/internal-secret.ts";
+export { isInternalSecretValid } from "./rest/security.ts";

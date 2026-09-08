@@ -21,14 +21,14 @@ Feature: API framework boundary and package authoring
     Then every symbol comes from the package root exports
     And no import reaches an implementation file by path
 
-  @architecture @unit
+  @architecture @unit @unimplemented
   Scenario: The application is the composition root
     Given the application's API router
     When services are mounted
     Then each family builds its own app from its own file
     And the framework never enumerates the families
 
-  @architecture @unit
+  @architecture @unit @unimplemented
   Scenario: Handlers use the process-composed application
     Given the host has composed one application instance
     When a feature endpoint handles a request
@@ -36,7 +36,7 @@ Feature: API framework boundary and package authoring
     And the authenticated principal is available as context.actor()
     And the feature does not construct or resolve a service per request
 
-  @security @unit
+  @security @unit @unimplemented
   Scenario: Every mounted endpoint has one explicit access policy
     Given REST and SSE endpoints built with the framework
     When the application composition root receives their mount reports
@@ -44,7 +44,7 @@ Feature: API framework boundary and package authoring
       public policy with a written reason
     And a missing policy fails the service build
 
-  @security @unit
+  @security @unit @unimplemented
   Scenario: Disabling credential middleware does not make a route public
     Given an endpoint declaring withAuth "none"
     When it declares no public access policy
@@ -66,7 +66,7 @@ Feature: API framework boundary and package authoring
     And it may still call the same application services and authorization
       engine
 
-  @unit @validation
+  @unit @validation @unimplemented
   Scenario: A rule that matters is enforced in the editor and at startup
     Given an authoring rule with a type-level statement
     When the same rule is exercised from a JavaScript-shaped call

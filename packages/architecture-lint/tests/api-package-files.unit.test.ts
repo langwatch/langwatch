@@ -1,30 +1,42 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = resolve(import.meta.dirname, "../../..");
 const API_SOURCE = join(root, "packages/api/src");
-const BASELINE = resolve(import.meta.dirname, "../src/api-package-files-baseline.json");
 
-/** The files the rebuild plan ends with; anything else is legacy on its way out. */
+/**
+ * The whole source surface of `@langwatch/api`, named file by file.
+ *
+ * The legacy builder family and the 66 files only it reached are gone, so this
+ * is no longer a target the package is converging on: it IS the package, and
+ * the two assertions below hold it there in both directions.
+ */
 const TARGET_FILES = new Set([
   "index.ts",
-  "contract/index.ts",
-  "contract/trpc-contract.ts",
+  "access-policy.ts",
+  "composition.ts",
+  "errors.ts",
+  "handler-arguments.ts",
+  "ports.ts",
+  "schema.ts",
+  "websocket.ts",
   "access/index.ts",
   "access/access.ts",
-  "trpc/index.ts",
-  "trpc/trpc-router.ts",
-  "trpc/trpc-runtime.ts",
+  "contract/index.ts",
+  "contract/trpc-contract.ts",
+  // Nine transport files. Anything else under rest/ or trpc/ is a regression.
   "rest/index.ts",
-  "rest/rest-router.ts",
-  "rest/rest-runtime.ts",
-  "rest/rest-openapi.ts",
-  "rest/rest-idempotency.ts",
-  // The project and credential the transport reads, described rather than
-  // imported: the contracts that own them declare their procedures with
-  // ./contract, so importing them back would close a declaration cycle.
+  "rest/runtime.ts",
+  "rest/request.ts",
   "rest/credential.ts",
+  "rest/response.ts",
+  "rest/openapi.ts",
+  "rest/security.ts",
+  "trpc/index.ts",
+  "trpc/runtime.ts",
+  "trpc/policy.ts",
+  "trpc/audit.ts",
   // The browser door, folded in from @langwatch/platform-api-client.
   "web/index.ts",
   "web/feature-api.ts",
@@ -43,14 +55,12 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe("the @langwatch/api source surface", () => {
-  const baseline = JSON.parse(readFileSync(BASELINE, "utf8")) as { files: string[] };
-  const allowed = new Set([...baseline.files, ...TARGET_FILES]);
   const present = sourceFiles(API_SOURCE).sort();
 
   describe("when the package gains a source file", () => {
     /** @scenario "The api package accepts no new file outside the rebuild target" */
-    it("refuses every file that is neither in the baseline nor in the rebuild target", () => {
-      const additions = present.filter((file) => !allowed.has(file));
+    it("refuses every file the layout does not name", () => {
+      const additions = present.filter((file) => !TARGET_FILES.has(file));
 
       expect(additions).toEqual([]);
     });
@@ -58,10 +68,10 @@ describe("the @langwatch/api source surface", () => {
 
   describe("when the package loses a source file", () => {
     /** @scenario "The api package accepts no new file outside the rebuild target" */
-    it("ratchets the baseline down so a deleted file cannot come back", () => {
-      const stale = baseline.files.filter((file) => !present.includes(file));
+    it("ratchets the layout down so a deleted file cannot come back", () => {
+      const missing = [...TARGET_FILES].filter((file) => !present.includes(file)).sort();
 
-      expect(stale).toEqual([]);
+      expect(missing).toEqual([]);
     });
   });
 });

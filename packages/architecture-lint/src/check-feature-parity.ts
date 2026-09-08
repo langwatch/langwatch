@@ -267,6 +267,14 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
+  // 2026-09-08 api-legacy-delete: the builder these were bound through is gone
+  // and the new runtime has not earned every behaviour back yet. Each scenario
+  // is @unimplemented; the requirement stands. Remove an entry with its first
+  // real binding (dev/docs/plans/api-legacy-delete.md).
+  "packages/api/specs/endpoint-capabilities.feature",
+  "packages/api/specs/public-rest.feature",
+  "packages/api/specs/sse-streaming.feature",
+  "packages/api/specs/versioned-routing.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-lint's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its

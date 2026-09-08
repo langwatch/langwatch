@@ -1,3 +1,7 @@
+# 2026-09-08: the builder these scenarios were bound through is deleted (dev/docs/plans/api-legacy-delete.md).
+# The behaviour is still the requirement. Each scenario is @unimplemented until the new runtime
+# (defineRestRouter + createRestRuntime) earns it again with a bound test; then retag and remove
+# the file from LEGACY_INERT in packages/architecture-lint/src/check-feature-parity.ts.
 # See ../adrs/002-explicit-version-namespaces.md
 Feature: Explicit compatibility version namespaces
 
@@ -11,32 +15,32 @@ Feature: Explicit compatibility version namespaces
     Given a service "things" with endpoints registered at "2026-01-15"
     And an override of one endpoint registered at "2026-08-07"
 
-  @unit
+  @unimplemented
   Scenario: A dated URL is served by the latest registration on or before it
     When a caller requests /api/things/2026-03-01/things.list
     Then the "2026-01-15" registration answers
     And the response carries X-API-Version "2026-03-01"
 
-  @unit
+  @unimplemented
   Scenario: The latest namespace serves the newest registrations
     When a caller requests /api/things/latest/things.list
     Then the "2026-08-07" registration answers
     And the response carries X-API-Version-Status "latest"
 
-  @unit
+  @unimplemented
   Scenario: The preview namespace is separate from latest
     Given an endpoint registered only at preview
     When a caller requests it under latest
     Then it is not found
     And under preview it answers with X-API-Version-Status "preview"
 
-  @unit
+  @unimplemented
   Scenario: The bare path serves the latest registrations
     When a caller requests /api/things/things.list with no version segment
     Then the "2026-08-07" registration answers
     And the response carries X-API-Version-Status "latest"
 
-  @unit
+  @unimplemented
   Scenario: Every family answers at its /api/v1 path and its bare path
     When a caller requests /api/v1/things/things.list
     Then the same handler answers as at /api/things/things.list
@@ -44,39 +48,39 @@ Feature: Explicit compatibility version namespaces
     And the mount is reported once, carrying /api/v1/things/things.list as its
       canonical path
 
-  @unit
+  @unimplemented
   Scenario: A family already under /api/v1 is mounted once
     Given a family whose base path is /api/v1/agents
     When its routes are mounted
     Then no route is mounted at /api/v1/v1/agents
     And the family answers only at /api/v1/agents
 
-  @unit
+  @unimplemented
   Scenario: The dated and latest namespaces answer under both prefixes
     When a caller requests /api/v1/things/2026-03-01/things.list
     Then the "2026-01-15" registration answers
     And /api/v1/things/latest/things.list serves the "2026-08-07" registration
     And the same two URLs answer without the /v1 segment
 
-  @unit
+  @unimplemented
   Scenario: An unknown version namespace is rejected
     When a caller requests /api/things/2026-13-99/things.list
     Then the answer is 404 from the namespace guard
     And /api/v1/things/2026-13-99/things.list answers 404 from the same guard
 
-  @unit
+  @unimplemented
   Scenario: Withdrawal answers 410 from its version onward
     Given "things.get" withdrawn at "2026-08-07"
     Then /api/things/2026-08-07/things.get answers 410 Gone
     And /api/things/2026-01-15/things.get still answers
     And the 410 response carries the version headers
 
-  @unit
+  @unimplemented
   Scenario: Errors carry the version headers too
     When a request fails validation under a dated namespace
     Then the error response carries X-API-Version and X-API-Version-Status
 
-  @integration
+  @unimplemented
   Scenario: The document carries every dated version plus latest
     Given the service declares documentable endpoints
     When the OpenAPI document is generated
@@ -85,27 +89,27 @@ Feature: Explicit compatibility version namespaces
     And a path for /api/things/latest/things.list
     And each version's schemas are the ones that version serves
 
-  @integration
+  @unimplemented
   Scenario: Preview never reaches the document
     Given an endpoint registered only at preview
     When the OpenAPI document is generated
     Then no documented path contains the preview namespace
 
-  @integration
+  @unimplemented
   Scenario: One logical route reaches the document once
     When the OpenAPI document is generated
     Then the bare path carries the declared operation id
     And the latest namespace's operation id is suffixed "latest"
     And no /api/v1 twin appears as a second operation
 
-  @unit
+  @unimplemented
   Scenario: A family serves one static generation instead of dated namespaces
     Given a family declares the generation its base path already names
     When it is built
     Then its routes answer once, at that path
     And no dated namespace or latest alias is mounted beside them
 
-  @unit
+  @unimplemented
   Scenario: A family at a shared prefix mounts its own paths and their canonical address
     Given a family declares that its published paths are its whole contract
     When it is built
