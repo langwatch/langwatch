@@ -15,10 +15,13 @@ import { RunResultsTable } from "../RunResultsTable";
 
 afterEach(cleanup);
 
-function run(
-  scenarioRunId: string,
-  callerKind: "simulated" | "human" | undefined,
-): ScenarioRunData {
+function run({
+  scenarioRunId,
+  callerKind,
+}: {
+  scenarioRunId: string;
+  callerKind: "simulated" | "human" | undefined;
+}): ScenarioRunData {
   return {
     scenarioId: `scenario-${scenarioRunId}`,
     batchRunId: "batch-1",
@@ -57,7 +60,10 @@ describe("RunResultsTable Caller column", () => {
   describe("given a pool run and a panel run", () => {
     /** @scenario The results table shows a Caller column for both simulated and panel runs */
     it("shows a Caller column reading Simulated and You", () => {
-      renderTable([run("pool", "simulated"), run("panel", "human")]);
+      renderTable([
+        run({ scenarioRunId: "pool", callerKind: "simulated" }),
+        run({ scenarioRunId: "panel", callerKind: "human" }),
+      ]);
 
       const header = screen.getByTestId("run-results-table-header");
       expect(within(header).getByText("Caller")).toBeInTheDocument();
@@ -75,7 +81,7 @@ describe("RunResultsTable Caller column", () => {
 
   describe("when no run has a caller", () => {
     it("hides the Caller column", () => {
-      renderTable([run("text", undefined)]);
+      renderTable([run({ scenarioRunId: "text", callerKind: undefined })]);
       const header = screen.getByTestId("run-results-table-header");
       expect(within(header).queryByText("Caller")).not.toBeInTheDocument();
     });

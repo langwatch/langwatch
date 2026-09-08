@@ -61,7 +61,7 @@ describe("talkReducer", () => {
         { type: "CONNECTED", conversationId: "conv_1" },
         { type: "LIMIT_REACHED" },
       ]);
-      expect(state).toMatchObject({ kind: "saving", cutAtLimit: true });
+      expect(state).toMatchObject({ kind: "saving", isCutAtLimit: true });
     });
   });
 
@@ -92,13 +92,13 @@ describe("talkReducer", () => {
           runId: "voicecall_1",
           agentId: "agent_1",
           hasAudio: false,
-          fetchFailed: true,
+          hasFetchFailed: true,
         },
       ]);
       expect(state).toMatchObject({
         kind: "done",
         runId: "voicecall_1",
-        fetchFailed: true,
+        hasFetchFailed: true,
         hasAudio: false,
       });
     });

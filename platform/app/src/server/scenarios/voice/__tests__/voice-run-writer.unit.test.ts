@@ -43,7 +43,7 @@ function fakeRecord(overrides: Partial<CallRecord> = {}): CallRecord {
     endedAt: 2,
     durationMs: 1000,
     turns: [],
-    cutAtLimit: false,
+    isCutAtLimit: false,
     source: "provider",
     ...overrides,
   };
@@ -62,7 +62,7 @@ describe("writeVoiceCallRun", () => {
           scenarioRunId: "run_1",
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
-          record: fakeRecord({ cutAtLimit: true }),
+          record: fakeRecord({ isCutAtLimit: true }),
         });
 
         const { metadata } = mockStartRun.mock.calls[0]?.[0] as {

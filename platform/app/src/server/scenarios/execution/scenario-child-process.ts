@@ -135,7 +135,7 @@ type ChildOutputResult = {
   reasoning?: string;
   error?: string;
   agentInstance?: { hostname: string; label: string | null };
-  cutAtLimit?: boolean;
+  isCutAtLimit?: boolean;
 };
 
 /**
@@ -209,7 +209,7 @@ function buildOutputResult({
   // The run was ended by LangWatch at the max call duration (AC28); the parent
   // records the marker so the run header can show "Cut at the call limit".
   if (callLimitTimer?.wasCut()) {
-    outputResult.cutAtLimit = true;
+    outputResult.isCutAtLimit = true;
   }
   // The connected agent instance that answered the run's turns, for the
   // parent's record of which process served the run.

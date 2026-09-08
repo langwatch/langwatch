@@ -102,7 +102,7 @@ describe("TalkToItPanel", () => {
                 runId: "voicecall_x",
                 agentId: "agent_1",
                 source: "provider",
-                fetchFailed: false,
+                hasFetchFailed: false,
                 hasAudio: true,
                 audioUrl,
               }),
@@ -192,7 +192,7 @@ describe("TalkToItPanel", () => {
             runId: "voicecall_x",
             agentId: "agent_1",
             source: "provider",
-            fetchFailed: false,
+            hasFetchFailed: false,
             hasAudio: false,
           });
         }

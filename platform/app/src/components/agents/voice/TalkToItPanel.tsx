@@ -186,7 +186,7 @@ function applyFinishSuccess({
     agentId: String(data.agentId ?? ""),
     hasAudio: Boolean(data.hasAudio),
     audioUrl: typeof data.audioUrl === "string" ? data.audioUrl : undefined,
-    fetchFailed: Boolean(data.fetchFailed),
+    hasFetchFailed: Boolean(data.hasFetchFailed),
   });
 }
 
@@ -194,13 +194,13 @@ async function runFinish({
   props,
   refs,
   dispatch,
-  cutAtLimit,
+  isCutAtLimit,
   nameOverride,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  cutAtLimit: boolean;
+  isCutAtLimit: boolean;
   nameOverride?: string;
 }): Promise<void> {
   // Read off the ref, not a closed-over `state` param: a provider-initiated
@@ -216,7 +216,7 @@ async function runFinish({
     transcript,
     startedAt: refs.startedAt.current || Date.now(),
     endedAt: Date.now(),
-    cutAtLimit,
+    isCutAtLimit,
     ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
   };
   let res: Response;
@@ -251,21 +251,21 @@ async function runEndCall({
   refs,
   dispatch,
   finish,
-  cutAtLimit,
+  isCutAtLimit,
 }: {
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  finish: (cutAtLimit: boolean) => Promise<void>;
-  cutAtLimit: boolean;
+  finish: (isCutAtLimit: boolean) => Promise<void>;
+  isCutAtLimit: boolean;
 }): Promise<void> {
   stopTick(refs);
-  dispatch(cutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
+  dispatch(isCutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
   try {
     await refs.session.current?.hangUp();
   } catch {
     // The socket may already be closed; the finish still runs.
   }
-  await finish(cutAtLimit);
+  await finish(isCutAtLimit);
 }
 
 /** Ask for the mic first so a denial is a clean, retryable state (AC27). */
@@ -357,7 +357,7 @@ async function runStart({
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
   setMicLevel: (level: number) => void;
-  endCall: (cutAtLimit: boolean) => void;
+  endCall: (isCutAtLimit: boolean) => void;
   /** True once a newer start attempt or an unmount superseded this one. */
   isStale: () => boolean;
 }): Promise<void> {
@@ -449,12 +449,13 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    (cutAtLimit: boolean, nameOverride?: string) =>
-      runFinish({ props, refs, dispatch, cutAtLimit, nameOverride }),
+    (isCutAtLimit: boolean, nameOverride?: string) =>
+      runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(
-    (cutAtLimit: boolean) => runEndCall({ refs, dispatch, finish, cutAtLimit }),
+    (isCutAtLimit: boolean) =>
+      runEndCall({ refs, dispatch, finish, isCutAtLimit }),
     [refs, finish],
   );
   const start = useCallback(() => {
@@ -470,9 +471,9 @@ function useTalkToItCall(props: TalkToItPanelProps) {
     });
   }, [props, refs, endCall]);
   const saveWithName = useCallback(
-    (cutAtLimit: boolean, name: string) => {
+    (isCutAtLimit: boolean, name: string) => {
       dispatch({ type: "HANG_UP" }); // back to saving
-      void finish(cutAtLimit, name);
+      void finish(isCutAtLimit, name);
     },
     [finish],
   );
@@ -589,7 +590,7 @@ function NeedsNameView({
   state: Extract<TalkState, { kind: "needsName" }>;
   pendingName: string;
   setPendingName: (value: string) => void;
-  onSave: (cutAtLimit: boolean, name: string) => void;
+  onSave: (isCutAtLimit: boolean, name: string) => void;
 }) {
   return (
     <VStack align="stretch" gap={2} data-testid="talk-needs-name">
@@ -603,7 +604,7 @@ function NeedsNameView({
       <Button
         colorPalette="blue"
         disabled={pendingName.trim().length === 0}
-        onClick={() => onSave(state.cutAtLimit, pendingName.trim())}
+        onClick={() => onSave(state.isCutAtLimit, pendingName.trim())}
         data-testid="talk-name-save"
       >
         Save
@@ -710,12 +711,12 @@ function DoneView({
 }) {
   return (
     <VStack align="stretch" gap={3} data-testid="talk-done">
-      {state.cutAtLimit && (
+      {state.isCutAtLimit && (
         <Text color="fg.muted" data-testid="talk-cut-marker">
           {CUT_AT_LIMIT_MESSAGE}
         </Text>
       )}
-      {state.fetchFailed && (
+      {state.hasFetchFailed && (
         <Text color="fg.muted" data-testid="talk-fetch-failed">
           {FETCH_FAILED_NOTICE}
         </Text>

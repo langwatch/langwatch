@@ -42,6 +42,8 @@ import {
   finishVoiceSession,
   mintVoiceSession,
   VoiceAgentsGateDisabledError,
+  VoiceRecordingKeyMissingError,
+  VoiceRecordingUnavailableError,
   VoiceSessionInvalidError,
   VoiceUnauthenticatedError,
 } from "~/server/scenarios/voice/voice-session.service";
@@ -144,7 +146,7 @@ secured
           .default([]),
         startedAt: z.number(),
         endedAt: z.number(),
-        cutAtLimit: z.boolean().default(false),
+        isCutAtLimit: z.boolean().default(false),
         // Set for a "Call it myself" run: the scenario the call is written
         // under and scored against (AC23). Absent for a drawer call.
         scenarioId: z.string().trim().min(1).optional(),
@@ -169,7 +171,7 @@ secured
         transcript: body.transcript,
         startedAt: body.startedAt,
         endedAt: body.endedAt,
-        cutAtLimit: body.cutAtLimit,
+        isCutAtLimit: body.isCutAtLimit,
         scenarioId: body.scenarioId,
       });
       return c.json(result, 200);
@@ -204,14 +206,14 @@ export const route = secured
         projectId,
         scenarioRunId: scenarioRunIdForConversation(conversationId),
       });
-      if (!run) return c.json({ error: "Recording unavailable" }, 404);
+      if (!run) throw new VoiceRecordingUnavailableError();
 
       // Drawer calls only run on ElevenLabs today.
       const credential = await ports.resolveCredential({
         projectId,
         transport: "elevenlabs_convai",
       });
-      if (!credential) return c.json({ error: "No key" }, 404);
+      if (!credential) throw new VoiceRecordingKeyMissingError();
 
       // A timeout on the connect/headers phase only: once the response
       // arrives we stop racing the timeout against the body so a long
@@ -243,13 +245,13 @@ export const route = secured
         // A refused redirect, a connect timeout, or a network failure all
         // mean the same thing to the player: no recording to play. Answer
         // 404 rather than letting the rejection surface as a 500.
-        return c.json({ error: "Recording unavailable" }, 404);
+        throw new VoiceRecordingUnavailableError();
       } finally {
         clearTimeout(timeout);
         c.req.raw.signal.removeEventListener("abort", onCallerAbort);
       }
       if (!upstream.ok || !upstream.body) {
-        return c.json({ error: "Recording unavailable" }, 404);
+        throw new VoiceRecordingUnavailableError();
       }
       return new Response(upstream.body, {
         status: 200,

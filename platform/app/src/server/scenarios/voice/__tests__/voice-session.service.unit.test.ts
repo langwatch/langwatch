@@ -36,10 +36,13 @@ function fakeRunner(
   };
 }
 
-function fakePorts(
-  runner: VoiceTransportRunner,
-  over: Partial<VoiceSessionPorts> = {},
-): VoiceSessionPorts {
+function fakePorts({
+  runner,
+  over = {},
+}: {
+  runner: VoiceTransportRunner;
+  over?: Partial<VoiceSessionPorts>;
+}): VoiceSessionPorts {
   return {
     resolveCredential: vi.fn(async () => CREDENTIAL),
     resolveVoiceAgentRow: vi.fn(async () => ({
@@ -75,7 +78,7 @@ const FINISH_BASE = {
   transcript: [{ role: "caller" as const, text: "hi" }],
   startedAt: 1000,
   endedAt: 5000,
-  cutAtLimit: false,
+  isCutAtLimit: false,
   conversationId: "conv_1",
 };
 
@@ -83,7 +86,7 @@ describe("mintVoiceSession", () => {
   describe("when the project has a key and the row is a voice agent", () => {
     /** @scenario "Session mint returns only the signed URL, the conversation id and the max duration" */
     it("returns the signed URL, a signed session token and the max duration — never the key", async () => {
-      const ports = fakePorts(fakeRunner());
+      const ports = fakePorts({ runner: fakeRunner() });
       const result = await mintVoiceSession(ports, {
         projectId: "p1",
         transport: "elevenlabs_convai",
@@ -114,8 +117,9 @@ describe("mintVoiceSession", () => {
       const mintSpy = vi.fn(async () => ({
         signedUrl: "wss://signed.example/abc",
       }));
-      const ports = fakePorts(fakeRunner({ mintSession: mintSpy }), {
-        resolveVoiceAgentRow,
+      const ports = fakePorts({
+        runner: fakeRunner({ mintSession: mintSpy }),
+        over: { resolveVoiceAgentRow },
       });
 
       const result = await mintVoiceSession(ports, {
@@ -140,7 +144,10 @@ describe("mintVoiceSession", () => {
   describe("when there is no saved agent row yet (an unsaved draft)", () => {
     it("mints against the body's vendor agent id and carries a null row id", async () => {
       const resolveVoiceAgentRow = vi.fn();
-      const ports = fakePorts(fakeRunner(), { resolveVoiceAgentRow });
+      const ports = fakePorts({
+        runner: fakeRunner(),
+        over: { resolveVoiceAgentRow },
+      });
 
       const result = await mintVoiceSession(ports, {
         projectId: "p1",
@@ -160,8 +167,11 @@ describe("mintVoiceSession", () => {
   describe("when the named row is missing or not a voice agent", () => {
     it("refuses with VoiceAgentRowNotFoundError and never calls the transport", async () => {
       const runner = fakeRunner();
-      const ports = fakePorts(runner, {
-        resolveVoiceAgentRow: vi.fn(async () => null),
+      const ports = fakePorts({
+        runner,
+        over: {
+          resolveVoiceAgentRow: vi.fn(async () => null),
+        },
       });
 
       await expect(
@@ -180,8 +190,11 @@ describe("mintVoiceSession", () => {
   describe("when the project has no key", () => {
     it("refuses with the missing-key message and never calls the transport", async () => {
       const runner = fakeRunner();
-      const ports = fakePorts(runner, {
-        resolveCredential: vi.fn(async () => null),
+      const ports = fakePorts({
+        runner,
+        over: {
+          resolveCredential: vi.fn(async () => null),
+        },
       });
 
       await expect(
@@ -210,10 +223,13 @@ describe("finishVoiceSession", () => {
       const findExistingRun = vi.fn(async ({ scenarioRunId }) =>
         stored === scenarioRunId ? { agentId: "agent_row" } : null,
       );
-      const ports = fakePorts(runner, {
-        writeCallRun,
-        findExistingRun,
-        createVoiceAgent: vi.fn(async () => ({ id: "agent_row" })),
+      const ports = fakePorts({
+        runner,
+        over: {
+          writeCallRun,
+          findExistingRun,
+          createVoiceAgent: vi.fn(async () => ({ id: "agent_row" })),
+        },
       });
 
       const first = await finishVoiceSession(ports, {
@@ -234,7 +250,7 @@ describe("finishVoiceSession", () => {
     it("creates the voice agent from the form values before writing the run", async () => {
       const runner = fakeRunner();
       const createVoiceAgent = vi.fn(async () => ({ id: "agent_new" }));
-      const ports = fakePorts(runner, { createVoiceAgent });
+      const ports = fakePorts({ runner, over: { createVoiceAgent } });
 
       const result = await finishVoiceSession(ports, {
         ...FINISH_BASE,
@@ -260,7 +276,7 @@ describe("finishVoiceSession", () => {
             endedAt: 2000,
             durationMs: 1000,
             turns: [],
-            cutAtLimit: false,
+            isCutAtLimit: false,
             source: "provider",
           }),
         ),
@@ -268,7 +284,7 @@ describe("finishVoiceSession", () => {
       const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
         async () => {},
       );
-      const ports = fakePorts(runner, { writeCallRun });
+      const ports = fakePorts({ runner, over: { writeCallRun } });
 
       await expect(
         finishVoiceSession(ports, {
@@ -286,18 +302,18 @@ describe("finishVoiceSession", () => {
       const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
         async () => {},
       );
-      const ports = fakePorts(runner, { writeCallRun });
+      const ports = fakePorts({ runner, over: { writeCallRun } });
 
       await finishVoiceSession(ports, {
         ...FINISH_BASE,
         token: { ...TOKEN, agentId: "agent_row" },
-        cutAtLimit: true,
+        isCutAtLimit: true,
       });
 
       const written = writeCallRun.mock.calls[0]?.[0] as {
         record: CallRecord;
       };
-      expect(written.record.cutAtLimit).toBe(true);
+      expect(written.record.isCutAtLimit).toBe(true);
     });
   });
 
@@ -311,10 +327,13 @@ describe("finishVoiceSession", () => {
       const resolveScenarioSet = vi.fn(async () => ({
         scenarioSetId: "set_x",
       }));
-      const ports = fakePorts(runner, {
-        writeCallRun,
-        resolveScenarioSet,
-        createVoiceAgent: vi.fn(async () => ({ id: "agent_row" })),
+      const ports = fakePorts({
+        runner,
+        over: {
+          writeCallRun,
+          resolveScenarioSet,
+          createVoiceAgent: vi.fn(async () => ({ id: "agent_row" })),
+        },
       });
 
       const result = await finishVoiceSession(ports, {
@@ -343,7 +362,10 @@ describe("finishVoiceSession", () => {
       const resolveScenarioSet = vi.fn(async () => ({
         scenarioSetId: "set_x",
       }));
-      const ports = fakePorts(runner, { writeCallRun, resolveScenarioSet });
+      const ports = fakePorts({
+        runner,
+        over: { writeCallRun, resolveScenarioSet },
+      });
 
       const result = await finishVoiceSession(ports, {
         ...FINISH_BASE,
@@ -360,8 +382,11 @@ describe("finishVoiceSession", () => {
     /** @scenario "No ElevenLabs key leaves the server through any response or log" */
     it("returns no ElevenLabs key in the finish response", async () => {
       const runner = fakeRunner();
-      const ports = fakePorts(runner, {
-        resolveScenarioSet: vi.fn(async () => ({ scenarioSetId: "set_x" })),
+      const ports = fakePorts({
+        runner,
+        over: {
+          resolveScenarioSet: vi.fn(async () => ({ scenarioSetId: "set_x" })),
+        },
       });
 
       const result = await finishVoiceSession(ports, {
@@ -382,14 +407,14 @@ describe("finishVoiceSession", () => {
           throw new Error("key rotated");
         }),
       });
-      const ports = fakePorts(runner);
+      const ports = fakePorts({ runner });
 
       const result = await finishVoiceSession(ports, {
         ...FINISH_BASE,
         token: { ...TOKEN, agentId: "agent_row" },
       });
 
-      expect(result.fetchFailed).toBe(true);
+      expect(result.hasFetchFailed).toBe(true);
       expect(result.source).toBe("browser");
       expect(result.hasAudio).toBe(false);
     });

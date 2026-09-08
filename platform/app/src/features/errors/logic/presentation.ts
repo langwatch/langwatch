@@ -3200,6 +3200,14 @@ const presentations = {
     title: "A name is required to save the agent",
     describe: () => "",
   },
+  voice_recording_unavailable: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_recording_key_missing: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
   voice_conversation_mismatch: {
     title: "This conversation does not belong to the minted session",
     describe: () => "",

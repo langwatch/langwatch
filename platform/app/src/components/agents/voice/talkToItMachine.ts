@@ -41,11 +41,11 @@ export type TalkState =
       transcript: VoiceTurn[];
       elapsedMs: number;
     }
-  | { kind: "saving"; transcript: VoiceTurn[]; cutAtLimit: boolean }
+  | { kind: "saving"; transcript: VoiceTurn[]; isCutAtLimit: boolean }
   | {
       kind: "needsName";
       transcript: VoiceTurn[];
-      cutAtLimit: boolean;
+      isCutAtLimit: boolean;
       conversationId?: string;
     }
   | {
@@ -56,8 +56,8 @@ export type TalkState =
       hasAudio: boolean;
       /** Same-origin proxy URL to play the recording, when there is one. */
       audioUrl?: string;
-      fetchFailed: boolean;
-      cutAtLimit: boolean;
+      hasFetchFailed: boolean;
+      isCutAtLimit: boolean;
     }
   | { kind: "error"; code: ErrorCode; message: string };
 
@@ -80,7 +80,7 @@ export type TalkEvent =
       agentId: string;
       hasAudio: boolean;
       audioUrl?: string;
-      fetchFailed: boolean;
+      hasFetchFailed: boolean;
     }
   | { type: "NAME_REQUIRED" }
   | { type: "SAVE_FAILED"; message: string }
@@ -144,14 +144,14 @@ const talkHandlers: TalkHandlers = {
 
   HANG_UP: (state) =>
     state.kind === "live"
-      ? { kind: "saving", transcript: state.transcript, cutAtLimit: false }
+      ? { kind: "saving", transcript: state.transcript, isCutAtLimit: false }
       : state,
 
   // The call ends by itself at the limit — the post-call view is reached with
   // no Hang up click (AC12) — and the run is marked cut (AC28-shaped).
   LIMIT_REACHED: (state) =>
     state.kind === "live"
-      ? { kind: "saving", transcript: state.transcript, cutAtLimit: true }
+      ? { kind: "saving", transcript: state.transcript, isCutAtLimit: true }
       : state,
 
   NAME_REQUIRED: (state) =>
@@ -159,7 +159,7 @@ const talkHandlers: TalkHandlers = {
       ? {
           kind: "needsName",
           transcript: state.transcript,
-          cutAtLimit: state.cutAtLimit,
+          isCutAtLimit: state.isCutAtLimit,
         }
       : state,
 
@@ -169,9 +169,9 @@ const talkHandlers: TalkHandlers = {
     agentId: event.agentId,
     hasAudio: event.hasAudio,
     audioUrl: event.audioUrl,
-    fetchFailed: event.fetchFailed,
+    hasFetchFailed: event.hasFetchFailed,
     transcript: transcriptOf(state),
-    cutAtLimit: "cutAtLimit" in state ? state.cutAtLimit : false,
+    isCutAtLimit: "isCutAtLimit" in state ? state.isCutAtLimit : false,
   }),
 
   SAVE_FAILED: (_state, event) => ({

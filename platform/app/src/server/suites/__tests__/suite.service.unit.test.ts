@@ -323,27 +323,29 @@ describe("SuiteService", () => {
     });
 
     describe("given a target is a voice agent and the project's flag is off", () => {
-      /** @scenario "A run against a voice target is refused while the project's flag is off" */
-      it("refuses the run before resolving anything and never queues it", async () => {
-        isVoiceAgentsEnabled.mockResolvedValue(false);
-        const { service, suiteRunService } = createService();
-        const suite = makeSuite({
-          targets: [
-            { type: "voice", referenceId: "voice_agent_1" },
-          ] as SuiteTarget[],
-        });
+      describe("when the suite run is triggered", () => {
+        /** @scenario "A run against a voice target is refused while the project's flag is off" */
+        it("refuses the run before resolving anything and never queues it", async () => {
+          isVoiceAgentsEnabled.mockResolvedValue(false);
+          const { service, suiteRunService } = createService();
+          const suite = makeSuite({
+            targets: [
+              { type: "voice", referenceId: "voice_agent_1" },
+            ] as SuiteTarget[],
+          });
 
-        await expect(
-          service.run({ suite, ...RUN_DEFAULTS }),
-        ).rejects.toBeInstanceOf(VoiceAgentsDisabledError);
-        expect(suiteRunService.startRun).not.toHaveBeenCalled();
-        expect(isVoiceAgentsEnabled).toHaveBeenCalledWith(
-          "release_voice_agents_enabled",
-          expect.objectContaining({
-            projectId: RUN_DEFAULTS.projectId,
-            organizationId: RUN_DEFAULTS.organizationId,
-          }),
-        );
+          await expect(
+            service.run({ suite, ...RUN_DEFAULTS }),
+          ).rejects.toBeInstanceOf(VoiceAgentsDisabledError);
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
+          expect(isVoiceAgentsEnabled).toHaveBeenCalledWith(
+            "release_voice_agents_enabled",
+            expect.objectContaining({
+              projectId: RUN_DEFAULTS.projectId,
+              organizationId: RUN_DEFAULTS.organizationId,
+            }),
+          );
+        });
       });
     });
 

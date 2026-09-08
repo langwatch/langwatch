@@ -11,7 +11,6 @@ describe("voice countdown", () => {
     it("flags the red window at or below 60 seconds remaining and not above", () => {
       const max = 90;
 
-      // 60s or fewer before the limit → flagged.
       const nearEnd = remainingSeconds({
         elapsedMs: 45_000,
         maxCallSeconds: max,
@@ -19,7 +18,6 @@ describe("voice countdown", () => {
       expect(nearEnd).toBe(45);
       expect(isRedCountdown(nearEnd)).toBe(true);
 
-      // More than 60s before the limit → not flagged.
       const early = remainingSeconds({
         elapsedMs: 10_000,
         maxCallSeconds: max,

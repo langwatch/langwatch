@@ -437,6 +437,8 @@ export const APP_ERROR_CODES = [
   "voice_key_missing",
   "voice_mint_failed",
   "voice_name_required",
+  "voice_recording_key_missing",
+  "voice_recording_unavailable",
   "voice_session_invalid",
   // The webhook platform names its two endpoint failures itself, in
   // `~/app/api/webhooks/[[...route]]/error-handler`, rather than deriving

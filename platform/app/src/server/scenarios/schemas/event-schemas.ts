@@ -172,7 +172,7 @@ export const langwatchMetadataSchema = z.object({
    * True when LangWatch ended a voice call at VOICE_CALL_MAX_SECONDS; the run
    * header shows "Cut at the call limit" (AC28). Absent otherwise.
    */
-  cutAtLimit: z.boolean().optional(),
+  isCutAtLimit: z.boolean().optional(),
 });
 
 /**

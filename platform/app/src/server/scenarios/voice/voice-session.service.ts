@@ -123,6 +123,39 @@ export class VoiceAgentsGateDisabledError extends HandledError {
   }
 }
 
+/**
+ * The audio proxy found no run for this conversation in the project, or the
+ * provider had nothing to stream back. Kept 404 (not 400) so it reads like
+ * the resource itself is missing, matching the flag-off and row-not-found
+ * responses on the same door.
+ */
+export class VoiceRecordingUnavailableError extends HandledError {
+  declare readonly code: "voice_recording_unavailable";
+  constructor() {
+    super(
+      "voice_recording_unavailable",
+      "The call recording is not available",
+      {
+        httpStatus: 404,
+      },
+    );
+    this.name = "VoiceRecordingUnavailableError";
+  }
+}
+
+/** The audio proxy has no provider key to fetch the recording with. */
+export class VoiceRecordingKeyMissingError extends HandledError {
+  declare readonly code: "voice_recording_key_missing";
+  constructor() {
+    super(
+      "voice_recording_key_missing",
+      "The call recording is not available",
+      { httpStatus: 404 },
+    );
+    this.name = "VoiceRecordingKeyMissingError";
+  }
+}
+
 export interface VoiceSessionPorts {
   /** The provider key and host for this project's transport, or null. */
   resolveCredential(input: {
@@ -276,7 +309,7 @@ export interface FinishResult {
   source: CallRecord["source"];
   /** True only when the provider fetch itself errored (not "not ready yet"):
    *  the panel shows the fetch-failed notice (AC15). */
-  fetchFailed: boolean;
+  hasFetchFailed: boolean;
   hasAudio: boolean;
   /** The same-origin proxy URL the panel plays the recording through, when the
    *  provider returned audio. Absent otherwise, and the panel renders no
@@ -300,18 +333,18 @@ async function fetchProviderRecord(
     conversationId,
     projectId,
   }: { transport: VoiceTransport; conversationId: string; projectId: string },
-): Promise<{ record: CallRecord | null; fetchFailed: boolean }> {
+): Promise<{ record: CallRecord | null; hasFetchFailed: boolean }> {
   const credential = await ports.resolveCredential({ projectId, transport });
-  if (!credential) return { record: null, fetchFailed: false };
+  if (!credential) return { record: null, hasFetchFailed: false };
   try {
     const record = await runnerFor(ports, transport).fetchCallRecord({
       conversationId,
       credential,
       audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
     });
-    return { record, fetchFailed: false };
+    return { record, hasFetchFailed: false };
   } catch {
-    return { record: null, fetchFailed: true };
+    return { record: null, hasFetchFailed: true };
   }
 }
 
@@ -386,7 +419,7 @@ export async function finishVoiceSession(
     transcript: BrowserTranscriptTurn[];
     startedAt: number;
     endedAt: number;
-    cutAtLimit: boolean;
+    isCutAtLimit: boolean;
     conversationId?: string;
     /** Set for a "Call it myself" run: the scenario the call is scored under
      *  (AC23). Absent for a drawer call. */
@@ -412,7 +445,7 @@ export async function finishVoiceSession(
       runId: scenarioRunId,
       agentId: token.agentId ?? existing.agentId ?? "",
       source: "provider",
-      fetchFailed: false,
+      hasFetchFailed: false,
       hasAudio: false,
       scenarioSetId: scenarioContext?.scenarioSetId,
     };
@@ -421,7 +454,7 @@ export async function finishVoiceSession(
   // Prefer the provider's record; fall back to the live transcript when it is
   // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
   // mismatched conversation is rejected without leaving an orphan agent behind.
-  const { record: providerRecord, fetchFailed } = await fetchProviderRecord(
+  const { record: providerRecord, hasFetchFailed } = await fetchProviderRecord(
     ports,
     { transport, conversationId, projectId: input.projectId },
   );
@@ -444,14 +477,14 @@ export async function finishVoiceSession(
   });
 
   const record = providerRecord
-    ? { ...providerRecord, cutAtLimit: input.cutAtLimit }
+    ? { ...providerRecord, isCutAtLimit: input.isCutAtLimit }
     : browserTranscriptToCallRecord({
         conversationId,
         transport,
         transcript: input.transcript,
         startedAt: input.startedAt,
         endedAt: input.endedAt,
-        cutAtLimit: input.cutAtLimit,
+        isCutAtLimit: input.isCutAtLimit,
       });
 
   await ports.writeCallRun({
@@ -467,7 +500,7 @@ export async function finishVoiceSession(
     runId: scenarioRunId,
     agentId: agentRowId,
     source: record.source,
-    fetchFailed,
+    hasFetchFailed,
     hasAudio: Boolean(record.audioUrl),
     audioUrl: record.audioUrl,
     scenarioSetId: scenarioContext?.scenarioSetId,

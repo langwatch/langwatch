@@ -92,10 +92,13 @@ function throwSyncFromSourceError(error: unknown): never {
  * voice source must not land in a project whose flag is off, no matter how
  * many rows are receiving it.
  */
-async function assertVoiceAgentsEnabledForReceivers(
-  sourceType: string,
-  receivingProjectIds: readonly string[],
-): Promise<void> {
+async function assertVoiceAgentsEnabledForReceivers({
+  sourceType,
+  receivingProjectIds,
+}: {
+  sourceType: string;
+  receivingProjectIds: readonly string[];
+}): Promise<void> {
   if (sourceType !== "voice") return;
   for (const projectId of receivingProjectIds) {
     await assertVoiceAgentsEnabled(projectId);
@@ -466,9 +469,10 @@ export const agentsRouter = createTRPCRouter({
         id: input.agentId,
         projectId: input.sourceProjectId,
       });
-      await assertVoiceAgentsEnabledForReceivers(source?.type ?? "", [
-        input.projectId,
-      ]);
+      await assertVoiceAgentsEnabledForReceivers({
+        sourceType: source?.type ?? "",
+        receivingProjectIds: [input.projectId],
+      });
       try {
         return await agentService.copyAgent(
           {
@@ -556,12 +560,12 @@ export const agentsRouter = createTRPCRouter({
         id: input.agentId,
         projectId: input.projectId,
       });
-      await assertVoiceAgentsEnabledForReceivers(
-        source?.type ?? "",
-        copies
+      await assertVoiceAgentsEnabledForReceivers({
+        sourceType: source?.type ?? "",
+        receivingProjectIds: copies
           .filter((c) => copyIdsToPush.includes(c.id))
           .map((c) => c.projectId),
-      );
+      });
 
       try {
         return await agentService.pushToCopies(
@@ -616,9 +620,10 @@ export const agentsRouter = createTRPCRouter({
             "You do not have permission to manage evaluations in the source project",
         });
       }
-      await assertVoiceAgentsEnabledForReceivers(source.type, [
-        input.projectId,
-      ]);
+      await assertVoiceAgentsEnabledForReceivers({
+        sourceType: source.type,
+        receivingProjectIds: [input.projectId],
+      });
       try {
         return await agentService.syncFromSource(
           input.agentId,

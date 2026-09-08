@@ -70,7 +70,6 @@ describe("voiceCallTargetOf", () => {
   });
 
   describe("when the run dialog runs one scenario", () => {
-    /** @scenario "Call it myself against a scenario and be scored on its criteria" */
     it("carries that scenario id so the call is scored under it", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
@@ -92,7 +91,6 @@ describe("voiceCallTargetOf", () => {
   });
 
   describe("when the selected target is not a voice agent", () => {
-    /** @scenario "Existing HTTP, Code and Workflow agent flows are unchanged" */
     it("resolves no voice-call, so no Call it myself action is offered", () => {
       expect(
         voiceCallTargetOf({

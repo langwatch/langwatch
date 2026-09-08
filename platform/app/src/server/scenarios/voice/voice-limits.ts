@@ -32,10 +32,13 @@ export const VOICE_HTTP_TIMEOUT_MS = 15_000;
 
 /** Parse a positive integer env var, falling back to `fallback` for anything
  *  missing, empty, non-numeric, non-integer or non-positive. */
-export function parsePositiveIntEnv(
-  raw: string | undefined,
-  fallback: number,
-): number {
+export function parsePositiveIntEnv({
+  raw,
+  fallback,
+}: {
+  raw: string | undefined;
+  fallback: number;
+}): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const parsed = Number(raw);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) return fallback;
@@ -45,18 +48,18 @@ export function parsePositiveIntEnv(
 export function voiceCallMaxSeconds(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
-  const parsed = parsePositiveIntEnv(
-    env.VOICE_CALL_MAX_SECONDS,
-    VOICE_CALL_MAX_SECONDS_DEFAULT,
-  );
+  const parsed = parsePositiveIntEnv({
+    raw: env.VOICE_CALL_MAX_SECONDS,
+    fallback: VOICE_CALL_MAX_SECONDS_DEFAULT,
+  });
   return Math.min(parsed, VOICE_CALL_MAX_SECONDS_CEILING);
 }
 
 export function voiceRunsMaxConcurrent(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
-  return parsePositiveIntEnv(
-    env.VOICE_RUNS_MAX_CONCURRENT,
-    VOICE_RUNS_MAX_CONCURRENT_DEFAULT,
-  );
+  return parsePositiveIntEnv({
+    raw: env.VOICE_RUNS_MAX_CONCURRENT,
+    fallback: VOICE_RUNS_MAX_CONCURRENT_DEFAULT,
+  });
 }
