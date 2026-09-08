@@ -11,23 +11,11 @@ import { getHexColorForString } from "~/utils/rotatingColors";
 import { fmtMoney } from "./CostCharts";
 
 /**
- * The billed-spend-by-API-key list (ADR-128 §14 / ADR-129).
- *
- * This panel reads the PULLED lane's spender breakdown — what the provider's
- * own bill attributed to each credential — which is different money from the
- * "Metered spend by person" panel beside it (the cost recorded on traces as
- * they were served). The two disagree on purpose and are never reconciled
- * here; each is labeled for its lane, same discipline as the totals.
- *
- * A KEY, NOT A PERSON. The panel used to be titled by person, which claimed an
- * attribution the invoice cannot make: a provider bill knows which credential
- * was presented, and a key four engineers share bills as one line. The read
- * side still resolves a key discovery has matched to the identity screen's
- * display text, so a row may well carry somebody's name — as the holder of
- * that key, which is a smaller and truer claim than "this person's spend".
+ * Provider-reported cost grouped by the provider's user id (ADR-129).
+ * The read resolves those ids through discovered people; it does not group
+ * by API key or prove who physically used a shared credential.
  *
  * Spec: specs/governance/governance-cost-screen.feature
- *   Rule: Pulled spend says who spent it, in the words the identity screen uses
  */
 
 /** One row of the tRPC spender DTO, as the panel receives it. */
@@ -42,7 +30,7 @@ export interface SpenderRow {
 }
 
 /** The copy for the bucket row — the screen's words, never a DTO invention. */
-export const NOT_NAMED_LABEL = "No key named";
+export const NOT_NAMED_LABEL = "Unattributed spend";
 
 export interface SpenderDisplayRow {
   key: string;
@@ -90,9 +78,7 @@ export function spenderDisplayRows(rows: SpenderRow[]): SpenderDisplayRow[] {
 }
 
 function SpenderName({ row }: { row: SpenderDisplayRow }) {
-  // Wider than the other ranked lists because this column carries badges as
-  // well as a name, and a key truncated to `checkout-…` cannot be told from
-  // the next key sharing its prefix.
+  // Leave room for the provider and optional agent beside the user's label.
   return (
     <HStack flex="0 0 62%" gap={2} minWidth={0}>
       <Text
@@ -160,7 +146,7 @@ function SpenderFigure({ row }: { row: SpenderDisplayRow }) {
       fontVariantNumeric="tabular-nums"
       title={
         row.amountUsd === null
-          ? `${row.cellsWithoutAmount} of this key's rows hold no US-dollar figure, so no total is shown`
+          ? `${row.cellsWithoutAmount} of this user's rows hold no US-dollar figure, so no total is shown`
           : undefined
       }
       color={row.amountUsd === null ? "fg.muted" : undefined}
@@ -181,10 +167,12 @@ export function CostSpenderError({ onRetry }: { onRetry: () => void }) {
     <Alert.Root status="error" data-testid="cost-spenders-error">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Title>Billed spend by API key could not be loaded</Alert.Title>
+        <Alert.Title>
+          Provider-reported spend by user could not be loaded
+        </Alert.Title>
         <Alert.Description>
-          Something went wrong reading which keys spent this money. The totals
-          above are a separate read and stand on their own.
+          Something went wrong reading which users the provider named for this
+          spend. The totals above are a separate read and stand on their own.
         </Alert.Description>
       </Alert.Content>
       <Button size="xs" variant="outline" onClick={onRetry} alignSelf="center">

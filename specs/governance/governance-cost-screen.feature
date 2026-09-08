@@ -940,29 +940,14 @@ Feature: One cost screen, three honest lanes
       # that is an outage, not an empty account, so the panel says it
       # failed instead of vanishing as if nobody spent anything.
 
-    # =======================================================================
-    # A BILL KNOWS A CREDENTIAL, NOT A PERSON. This panel was titled by
-    # person, which promised an attribution the billing pipeline cannot make:
-    # a provider's invoice records which key was presented, so a key four
-    # engineers share billed as one person's spend and the screen said so
-    # without hedging.
-    #
-    # The read is unchanged. A key discovery has matched still resolves to
-    # the identity screen's display text, so a row may well carry somebody's
-    # name — as the holder of that key, which is a smaller and truer claim
-    # than that the money is theirs. What changed is that the panel now
-    # claims exactly as much as the invoice does.
-    # =======================================================================
-
-    @integration
-    Scenario: The billed breakdown names the key the provider charged, not a person
-      Given pulled cost recorded against several API keys
+    @integration @regression
+    Scenario: The provider-reported breakdown names users and keeps unattributed spend
+      Given the provider-reported cost breakdown returns users and unnamed spend
       When a permitted viewer opens the cost screen
-      Then the panel is titled for the API key it charges against
-      And the row for spend the provider named no key for says so in those words
-      # The empty and declined states carry the same framing — see the
-      # scenarios under the declined-read rule below, whose copy names a key
-      # rather than an actor.
+      Then the panel is titled "Provider-reported spend by user"
+      And the unnamed row is labelled "Unattributed spend"
+      And the panel does not claim to group by API key
+      And metered spend stays in its own panel
 
     @integration
     Scenario: The spender breakdown stays behind the identity screen's permission
