@@ -6,7 +6,7 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

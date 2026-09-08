@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.ts";
 
 /** The callable browser-session capability shared with process features. */

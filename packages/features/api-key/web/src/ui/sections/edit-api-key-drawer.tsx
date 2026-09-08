@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 /**
  * "Edit API key": the same ceiling as create, applied to a key that already
  * exists. Selections are clamped TWICE: a level stored on the key, or picked

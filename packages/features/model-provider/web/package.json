@@ -95,12 +95,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",

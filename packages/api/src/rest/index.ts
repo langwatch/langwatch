@@ -274,6 +274,11 @@ export {
   type RestOrganizationCredentialPrincipal,
   type RestProjectCredentialPrincipal,
 } from "./credential-principal.ts";
+export type {
+  RestProjectIdentity,
+  RestResolvedOrganizationCredential,
+  RestResolvedProjectCredential,
+} from "./credential.ts";
 
 // Who is behind a personal-workspace key.
 export {

@@ -32,10 +32,13 @@
       "path": "../packages/enterprise/composition/worker/tsconfig.build.json"
     },
     {
+      "path": "../packages/audit-log-null/tsconfig.build.json"
+    },
+    {
       "path": "../packages/features/audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../packages/features/audit-log/server/tsconfig.build.json"
+      "path": "../packages/enterprise/features/audit-log/server/tsconfig.build.json"
     },
     {
       "path": "../packages/enterprise/features/billing/contract/tsconfig.build.json"
@@ -480,9 +483,6 @@
     },
     {
       "path": "../packages/plans/tsconfig.build.json"
-    },
-    {
-      "path": "../packages/platform-api-client/tsconfig.build.json"
     },
     {
       "path": "../packages/prisma-client/tsconfig.build.json"

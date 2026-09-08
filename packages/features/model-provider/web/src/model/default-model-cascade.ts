@@ -12,7 +12,7 @@ import type {
   ModelDefaultEffective,
   ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** A saved default as the browser holds one: its instants are ISO strings. */
 type ModelDefaultConfigSnapshot = WireOf<StoredModelDefaultConfigSnapshot>;

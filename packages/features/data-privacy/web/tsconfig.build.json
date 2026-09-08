@@ -27,6 +27,9 @@
   ],
   "references": [
     {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/web/tsconfig.build.json"
     },
     {
@@ -34,9 +37,6 @@
     },
     {
       "path": "../../../design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../../platform-api-client/tsconfig.build.json"
     },
     {
       "path": "../../../redaction/tsconfig.build.json"

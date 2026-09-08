@@ -24,7 +24,7 @@
  * applied for the third time.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package.
  */
 
@@ -33,7 +33,7 @@ import type {
   EvaluatorCopy,
   EvaluatorHistoryEntry,
 } from "@langwatch/evaluator-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 
 /** An evaluator and a project, the input nine of these ten procedures take. */
 export type EvaluatorIdInput = { id: string; projectId: string };

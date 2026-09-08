@@ -27,8 +27,8 @@ errors), [react.md](./react.md), [error-handling.md](./error-handling.md).
                                 │ hands over its client + its QueryClient
                                 ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ @langwatch/platform-api-client   (no feature role — this is why it can    │
-│                                   name @trpc/server types)               │
+│ @langwatch/api/web   (the browser half of @langwatch/api. No feature     │
+│                       role — this is why it can name @trpc/server types) │
 │                                                                          │
 │   createFeatureApi<Map>()   turns a feature's plain procedure map into    │
 │                             a real @trpc/react-query binding             │
@@ -55,7 +55,7 @@ is the single most important property here and it is explained in full below.
 
 ## Where a browser component gets its typed client
 
-**Where this is going:** `packages/platform-api-client` already exports a
+**Where this is going:** `@langwatch/api/web` already exports a
 single shared `trpcReact` built against `apps/api`'s root router type (see
 `secret/web/src/behavior/secret-api.ts`). It is meant to replace the
 per-feature `createFeatureApi<Map>()` maps described below once the api-map
@@ -67,7 +67,7 @@ it builds itself.
 
 ```ts
 // packages/features/trace/web/src/trace-api.ts
-import { createFeatureApi } from "@langwatch/platform-api-client";
+import { createFeatureApi } from "@langwatch/api/web";
 import type { TraceHeader, TraceHeaderReadInput } from "@langwatch/trace-contract";
 
 export type TraceApiMap = {
@@ -97,10 +97,18 @@ One dependency and one map. That is the whole contract.
 ```jsonc
 // packages/features/<feature>/web/package.json
 "dependencies": {
-  "@langwatch/platform-api-client": "workspace:*",
+  "@langwatch/api": "workspace:*",
   "@langwatch/<feature>-contract": "workspace:*"
 }
 ```
+
+**`@langwatch/api/web` is the only subpath a feature web package may import.**
+The other entries — `.`, `./rest`, `./trpc`, `./contract`, `./access` and
+`./composition` — are the server's half of the same package, and
+`ui-screen-closure` refuses every one of them from a browser closure. The
+allow-list in `packages/architecture-lint/src/frontend-ui-boundaries.ts` names
+`@langwatch/api/web` and nothing else, so reaching for a deeper import fails the
+lint rather than quietly pulling server code into the bundle.
 
 It does **not** declare `@trpc/client`, `@trpc/react-query`, `@trpc/server` or
 `@tanstack/react-query`. It does not build a client, choose a URL, or mount a
@@ -117,7 +125,7 @@ Two hard walls, both worth knowing before someone tries to route around them.
    rejected exactly like a value import. Since `AnyRouter`,
    `TRPCQueryProcedure` and `TRPCBuiltRouter` all live there, a feature package
    cannot name a router type at all. Hence the plain `{ query: { input, output } }`
-   map: it needs no tRPC types, and `@langwatch/platform-api-client` — which has
+   map: it needs no tRPC types, and `@langwatch/api/web` — which has
    no feature role and so is unclassified by that lint — converts it.
 
 2. **A web package may not import its own feature's server package.**
@@ -460,7 +468,7 @@ as a prop instead of from `useOrganizationTeamProject`, and the toast comes from
 
 ### 6. Proving it
 
-`packages/platform-api-client/tests/trpc-query-key.unit.test.ts` asserts the load-
+`packages/api/src/web/__tests__/trpc-query-key.unit.test.ts` asserts the load-
 bearing property against tRPC's own `getQueryKey`: two independent
 `createFeatureApi` instances derive identical keys, and `trpcQueryKey` matches
 what tRPC produces for both the procedure-wide and the input-specific form. If
@@ -553,7 +561,7 @@ three places that depend on the exact byte shape of a tRPC key. A port that
 hides React Query cannot express that, and the Agent adapter's attempt to is the
 `["agent-ui", ...]` bug. My recommendation: keep ports for imperative CRUD
 screens, use this pattern for cache-orchestrating features, and either widen the
-governed allowlist to permit `@langwatch/platform-api-client` in `behavior/` or
+governed allowlist to permit `@langwatch/api/web` in `behavior/` or
 accept that Trace will not be a governed package. Do not silently do both.
 
 ---
@@ -599,9 +607,9 @@ Two specific findings worth acting on:
 
 ## Rules
 
-1. A feature web package declares `@langwatch/platform-api-client` and its own
-   contract. Never `@trpc/*`, never `@tanstack/react-query`, never a server
-   package.
+1. A feature web package declares `@langwatch/api` and its own
+   contract, and imports only through the `@langwatch/api/web` subpath. Never
+   `@trpc/*`, never `@tanstack/react-query`, never a server package.
 2. One `createFeatureApi<Map>()` per feature web package, at module scope.
 3. The shell mounts the Provider with **its** client and **its** QueryClient.
    The package never builds either.
@@ -628,7 +636,7 @@ Two specific findings worth acting on:
 
 - Fix `agent-ui-host.adapter.tsx`'s `["agent-ui", …]` cache namespace. It is a
   live bug, not a style difference.
-- Add `@langwatch/platform-api-client` and `@langwatch/trace-web` to the package
+- Add `@langwatch/api` and `@langwatch/trace-web` to the package
   test matrix in `.github/workflows/langwatch-app-ci.yml`. Package suites run
   only if a workflow names them, and neither is named — so the key-encoding test
   above does not run in CI yet.

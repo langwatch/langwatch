@@ -28,14 +28,15 @@ feature converts; do not add one.
 
 Contract must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,
 Eventing, application aliases, or its own server and web packages. It may import `zod`,
-`@langwatch/handled-error`, `@langwatch/time`, `@langwatch/runtime-composition/contract`
-(only that subpath, for `featureApi`) and other features' contracts.
+`@langwatch/handled-error`, `@langwatch/time`, `@langwatch/runtime-composition` (only
+`featureApi`, `FeatureApiToken` and `FeatureName`), `@langwatch/api/contract` (only
+`defineTrpcContract`) and other features' contracts.
 
 ## The callable API and its token
 
 ```ts
 // contract/src/annotation.api.ts
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 export interface AnnotationApi {
   create(input: CreateAnnotationInput): Promise<Annotation>;

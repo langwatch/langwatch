@@ -13,11 +13,11 @@
  * RBAC and carries full project access by design, so a permission asked of it
  * is answered by the credential CLASS and not by a binding lookup.
  */
-import type {
-  ResolvedApiKeyToken,
-  ResolvedOrganizationApiKeyToken,
-} from "@langwatch/api-key-contract";
 import type { Context } from "hono";
+import type {
+  RestResolvedOrganizationCredential,
+  RestResolvedProjectCredential,
+} from "./credential.ts";
 
 /**
  * The credential a project-scoped door resolved: a scoped key, or the legacy
@@ -55,7 +55,7 @@ export type RestCredentialPrincipal =
 
 /** The principal a resolved token stands for. */
 export function credentialPrincipalOfToken(
-  resolved: ResolvedApiKeyToken,
+  resolved: RestResolvedProjectCredential,
 ): RestProjectCredentialPrincipal {
   if (resolved.type !== "apiKey") return { kind: "legacyProjectKey" };
   return {
@@ -73,7 +73,7 @@ export function credentialPrincipalOfToken(
 
 /** The principal a resolved organization token stands for. */
 export function organizationCredentialPrincipalOfToken(
-  resolved: ResolvedOrganizationApiKeyToken,
+  resolved: RestResolvedOrganizationCredential,
 ): RestOrganizationCredentialPrincipal {
   return {
     kind: "organizationApiKey",
@@ -93,7 +93,7 @@ export function organizationCredentialPrincipalOfToken(
  * loudly, because no caller can act on it.
  */
 export function credentialPrincipalOf(c: Context): RestProjectCredentialPrincipal {
-  const resolved = c.get("resolvedToken") as ResolvedApiKeyToken | undefined;
+  const resolved = c.get("resolvedToken") as RestResolvedProjectCredential | undefined;
   if (!resolved) {
     throw new Error(
       "A handler asked for the request's credential principal with no resolved credential — mount the project authentication middleware before it",
@@ -108,7 +108,7 @@ export function credentialPrincipalOf(c: Context): RestProjectCredentialPrincipa
  * is mis-wired, and a blank principal widens the question instead of failing.
  */
 export function organizationCredentialPrincipalOf(c: Context): RestOrganizationCredentialPrincipal {
-  const resolved = c.get("orgResolvedToken") as ResolvedOrganizationApiKeyToken | undefined;
+  const resolved = c.get("orgResolvedToken") as RestResolvedOrganizationCredential | undefined;
   if (!resolved) {
     throw new Error(
       "A handler asked for the request's organization credential principal with no resolved credential — mount the organization authentication middleware before it",

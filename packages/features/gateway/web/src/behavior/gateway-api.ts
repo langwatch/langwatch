@@ -4,7 +4,7 @@
  */
 
 import type { Instant } from "@langwatch/time";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   GatewayApplicableBudget,
   GatewayBudgetLedgerStatus,
@@ -351,7 +351,7 @@ export type WebhookEndpointHealth = {
 
 /**
  * One event a webhook endpoint can subscribe to. Restated rather than imported: the catalogue
- * is `@langwatch/enterprise-webhook-contract`'s, and this is a core package — a
+ * is `@langwatch/webhook-contract`'s, and this is a core package — a
  * core-to-enterprise dependency is exactly the direction the manifest check refuses.
  */
 export type WebhookEventType = {

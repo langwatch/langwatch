@@ -6,7 +6,7 @@ import {
   FeatureApiUnavailableError,
   MissingProviderError,
 } from "../src/boot-errors.ts";
-import { featureApi } from "../src/contract.ts";
+import { featureApi } from "../src/feature-api-token.ts";
 import {
   defineFeature,
   serverFeature,

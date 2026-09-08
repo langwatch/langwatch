@@ -38,7 +38,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",

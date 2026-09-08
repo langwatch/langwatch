@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 import { defineRestRouter } from "../rest-router.ts";
 

@@ -10,7 +10,7 @@ import type {
   RetentionStorageUsage,
   RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 
 /** One scope an override is written at. */
 type RetentionScopeInput = {

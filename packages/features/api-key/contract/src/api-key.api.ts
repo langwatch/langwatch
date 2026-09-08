@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { ApiKeyService } from "./api-key.service.ts";
 import type {
   ApiKey,

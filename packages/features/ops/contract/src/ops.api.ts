@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { AdminIdentity } from "./admin.ts";
 import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type { DashboardData, GroupInfo } from "./ops-dashboard.ts";

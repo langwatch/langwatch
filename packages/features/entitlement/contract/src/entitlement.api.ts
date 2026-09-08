@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { Plan } from "./plan.ts";
 import type { ResolvePlanInput } from "./provider.ts";
 

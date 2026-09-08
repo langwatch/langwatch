@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type {

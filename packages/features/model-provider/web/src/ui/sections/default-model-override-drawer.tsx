@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 /**
  * `defaultModelOverride`: authoring or editing one ModelDefaultConfig policy.
  * Inherit on the wire = key absence. Missing on purpose: the Langy pill

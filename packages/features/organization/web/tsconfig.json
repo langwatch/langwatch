@@ -19,6 +19,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../../csv/tsconfig.build.json"
     },
     {
@@ -26,9 +29,6 @@
     },
     {
       "path": "../../../enterprise/features/licensing/web/tsconfig.build.json"
-    },
-    {
-      "path": "../../../platform-api-client/tsconfig.build.json"
     },
     {
       "path": "../../../time/tsconfig.build.json"

@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, ChevronRight } from "lucide-react";
 import type { Evaluator } from "@langwatch/evaluator-contract";

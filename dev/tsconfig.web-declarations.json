@@ -86,12 +86,12 @@
     "../packages/features/analytics/web/src/ui/sections/filters/filter-sidebar.tsx",
     "../packages/features/analytics/web/src/ui/sections/filters/filter-toggle.tsx",
     "../packages/features/analytics/web/src/ui/sections/use-filter-params.ts",
-    "../packages/features/annotation/web/src/index.ts",
-    "../packages/features/annotation/web/src/screens/annotation-scores/index.ts",
-    "../packages/features/annotation/web/src/screens/annotations/index.ts",
-    "../packages/features/annotation/web/src/surfaces/annotation-card/index.ts",
-    "../packages/features/annotation/web/src/surfaces/annotation-chips/index.ts",
-    "../packages/features/annotation/web/src/surfaces/annotation-form/index.ts",
+    "../packages/features/annotation/web/src/annotation-scores.ts",
+    "../packages/features/annotation/web/src/annotations.ts",
+    "../packages/features/annotation/web/src/annotation-card.ts",
+    "../packages/features/annotation/web/src/annotation-chips.ts",
+    "../packages/features/annotation/web/src/annotation-form.ts",
+    "../packages/features/annotation/web/src/testing.tsx",
     "../packages/features/coding-agent/web/src/activity.ts",
     "../packages/features/coding-agent/web/src/index.ts",
     "../packages/features/coding-agent/web/src/surfaces/agent-identity.ts",
@@ -297,6 +297,9 @@
   ],
   "references": [
     {
+      "path": "../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../packages/csv/tsconfig.build.json"
     },
     {
@@ -403,9 +406,6 @@
     },
     {
       "path": "../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../packages/platform-api-client/tsconfig.build.json"
     },
     {
       "path": "../packages/redaction/tsconfig.build.json"

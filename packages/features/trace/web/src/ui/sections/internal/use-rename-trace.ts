@@ -1,4 +1,4 @@
-import { useInvalidateProcedure } from "@langwatch/platform-api-client/invalidate";
+import { useInvalidateProcedure } from "@langwatch/api/web";
 import { readChangeTraceNameRejection } from "@langwatch/trace-contract";
 import { traceApi } from "../../../behavior/trace-api.ts";
 

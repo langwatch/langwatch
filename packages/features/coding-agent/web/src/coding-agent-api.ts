@@ -6,7 +6,7 @@
  * `api.codingAgents.*` call sites that have not moved.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 import type {
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPullRequestDetail,

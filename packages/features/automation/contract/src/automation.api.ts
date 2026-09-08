@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { Monitor } from "@langwatch/monitor-contract";
 import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { CustomGraphNameRef } from "./custom-graph.ts";

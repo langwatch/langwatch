@@ -173,7 +173,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   if (layoutVersion === 0 && role === "contract" && capability === "api") {
     write(
       `${prefix}/src/${feature}.api.ts`,
-      `import { featureApi } from "@langwatch/runtime-composition/contract"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = featureApi<${className(feature)}Api>("${feature}");`,
+      `import { featureApi } from "@langwatch/runtime-composition"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = featureApi<${className(feature)}Api>("${feature}");`,
     );
   }
   if (layoutVersion === 0 && role === "server") {
@@ -659,6 +659,14 @@ describe("strict feature source layout", () => {
       "export class AgentApi { static create() { return new AgentApi(); } }",
     );
     write(
+      "packages/features/agent/server/src/transport/agent.rest.ts",
+      "export const agentRest = {};",
+    );
+    write(
+      "packages/features/agent/server/src/transport/agent.trpc.ts",
+      "export const agentTrpc = {};",
+    );
+    write(
       "packages/features/agent/server/src/fixtures/agent.fixture.ts",
       "export const agentFixture = { id: 'agent_1' };",
     );
@@ -683,13 +691,28 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "packages/features/widget/contract/src/widget.service.ts"));
     write(
       "packages/features/widget/contract/src/widget.api.ts",
-      'import { featureApi } from "@langwatch/runtime-composition/contract"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
+      'import { featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
     );
 
     expect(policies()).not.toContain("feature-source-layout");
   });
 
-  it("rejects the runtime composition root from a portable API contract", () => {
+  it("rejects process wiring bound from the composition root by a portable API contract", () => {
+    featurePackage({
+      feature: "widget",
+      role: "contract",
+      dependencies: { "@langwatch/runtime-composition": "workspace:*" },
+    });
+    rmSync(join(root, "packages/features/widget/contract/src/widget.service.ts"));
+    write(
+      "packages/features/widget/contract/src/widget.api.ts",
+      'import { createApp, featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget"); export const app = createApp;',
+    );
+
+    expect(policies()).toContain("feature-source-layout");
+  });
+
+  it("accepts the feature-API vocabulary bound from the composition root", () => {
     featurePackage({
       feature: "widget",
       role: "contract",
@@ -701,7 +724,7 @@ describe("strict feature source layout", () => {
       'import { featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
     );
 
-    expect(policies()).toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-source-layout");
   });
 
   /**

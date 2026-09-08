@@ -3,7 +3,7 @@
  * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
  */
 
-import { trpcQueryKey } from "@langwatch/platform-api-client/query-key";
+import { trpcQueryKey } from "@langwatch/api/web";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";

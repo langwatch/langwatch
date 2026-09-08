@@ -16,7 +16,8 @@
     "./src/contract/index.ts",
     "./src/rest/index.ts",
     "./src/trpc/index.ts",
-    "./src/composition.ts"
+    "./src/composition.ts",
+    "./src/web/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -36,9 +37,6 @@
       "path": "../actor/tsconfig.build.json"
     },
     {
-      "path": "../features/api-key/contract/tsconfig.build.json"
-    },
-    {
       "path": "../features/authz/contract/tsconfig.build.json"
     },
     {
@@ -46,12 +44,6 @@
     },
     {
       "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../features/project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../features/stored-object/contract/tsconfig.build.json"
     }
   ]
 }

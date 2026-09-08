@@ -16,7 +16,7 @@ it("accepts the fluent annotation REST router and rejects a body from an implici
     accepted,
     `import { z } from "zod";
 import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 interface AnnotationApi {
   getAnnotation(input: { id: string }): Promise<{ id: string }>;
@@ -51,7 +51,7 @@ transportDeclaration.router();
   writeFileSync(
     rejected,
     `import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 const AnnotationApi = featureApi<object>("annotation");
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")
@@ -63,7 +63,7 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
     mismatchedParams,
     `import { z } from "zod";
 import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 const AnnotationApi = featureApi<object>("annotation");
 const annotationRestParamsSchema = z.object({ id: z.string() });
@@ -78,7 +78,7 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   writeFileSync(
     unpermitted,
     `import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 const AnnotationApi = featureApi<object>("annotation");
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")

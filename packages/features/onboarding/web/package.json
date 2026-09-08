@@ -100,12 +100,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/project-web": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",

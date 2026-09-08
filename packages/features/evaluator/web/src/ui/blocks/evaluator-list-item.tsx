@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, Code, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";

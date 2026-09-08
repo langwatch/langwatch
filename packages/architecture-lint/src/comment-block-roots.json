@@ -167,12 +167,12 @@
       "expires": "2026-10-01"
     },
     {
-      "root": "packages/enterprise/features/webhook/contract",
+      "root": "packages/features/webhook/contract",
       "blocks": 1,
       "expires": "2026-10-01"
     },
     {
-      "root": "packages/enterprise/features/webhook/server",
+      "root": "packages/features/webhook/server",
       "blocks": 42,
       "expires": "2026-10-01"
     },
@@ -779,11 +779,6 @@
     {
       "root": "packages/otlp",
       "blocks": 30,
-      "expires": "2026-10-15"
-    },
-    {
-      "root": "packages/platform-api-client",
-      "blocks": 10,
       "expires": "2026-10-15"
     },
     {

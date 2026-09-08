@@ -30,7 +30,7 @@ import type { MediaProbeResult } from "@langwatch/scenario-web/surfaces/media-pa
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web/surfaces/agent-traces";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
 import type { ExportProgress, ExportProgressEvent } from "../model/export-types.ts";

@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 /**
  * The snippets that call this evaluator from a customer's own code. A
  * narrowed family-local copy of the old `EvaluatorApiUsageDialog`, which

@@ -22,10 +22,10 @@
       "path": "../../../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../../../design-system/tsconfig.build.json"
+      "path": "../../../../api/tsconfig.build.json"
     },
     {
-      "path": "../../../../platform-api-client/tsconfig.build.json"
+      "path": "../../../../design-system/tsconfig.build.json"
     },
     {
       "path": "../../../../time/tsconfig.build.json"

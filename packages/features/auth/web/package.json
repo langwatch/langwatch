@@ -21,9 +21,9 @@
   "dependencies": {
     "@better-auth/passkey": "1.7.1",
     "@hookform/resolvers": "^5.4.0",
+    "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@paper-design/shaders-react": "^0.0.76",
     "better-auth": "^1.7.1",

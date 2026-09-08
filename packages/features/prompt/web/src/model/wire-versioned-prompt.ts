@@ -1,5 +1,5 @@
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /**
  * A versioned prompt the way the browser holds one.

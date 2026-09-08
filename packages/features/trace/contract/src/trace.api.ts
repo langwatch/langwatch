@@ -15,7 +15,7 @@ import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { SpanTreeDeltaInput, SpanTreeInput } from "./trace.queries.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =

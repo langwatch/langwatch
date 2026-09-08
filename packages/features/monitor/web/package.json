@@ -19,12 +19,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "lucide-react": "^1.22.0",
     "react-icons": "^5.5.0"
   },

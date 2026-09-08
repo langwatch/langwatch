@@ -33,6 +33,9 @@
   ],
   "references": [
     {
+      "path": "../../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../../../design-system/tsconfig.build.json"
     },
     {
@@ -40,9 +43,6 @@
     },
     {
       "path": "../../../../plans/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../platform-api-client/tsconfig.build.json"
     },
     {
       "path": "../../../../ui-host/tsconfig.build.json"

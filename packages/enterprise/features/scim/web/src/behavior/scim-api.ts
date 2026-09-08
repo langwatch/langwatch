@@ -13,11 +13,11 @@
  * screen keeps the minted one in local state until the dialog closes.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { type FeatureApi, createFeatureApi } from "@langwatch/api/web";
 
 /** The organization every SCIM procedure is scoped to. */
 type OrganizationScope = { organizationId: string };
@@ -52,4 +52,4 @@ export type ScimApiMap = {
  * The SCIM family's typed tRPC hooks. Same machinery, same transport and same
  * React Query cache as the application's `api` proxy.
  */
-export const scimApi = createFeatureApi<ScimApiMap>();
+export const scimApi: FeatureApi<ScimApiMap> = createFeatureApi<ScimApiMap>();

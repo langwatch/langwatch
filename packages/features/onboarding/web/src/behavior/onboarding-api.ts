@@ -21,13 +21,13 @@
  * wire change and a decision, not an addition.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package. Recorded here so the finding it
  * raises is a decision rather than a surprise.
  */
 
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */

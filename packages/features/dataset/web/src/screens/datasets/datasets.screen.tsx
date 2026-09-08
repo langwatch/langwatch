@@ -25,7 +25,7 @@ import {
   datasetDisplayRecordCount,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";

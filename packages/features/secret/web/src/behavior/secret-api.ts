@@ -25,11 +25,11 @@
  * rather than trusting the projection that satisfies it today.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { type FeatureApi, createFeatureApi } from "@langwatch/api/web";
 import type {
   CreateSecretInput,
   ListSecretsInput,
@@ -73,4 +73,4 @@ export type SecretApiMap = {
 };
 
 /** The Secrets family's typed tRPC hooks. */
-export const secretApi = createFeatureApi<SecretApiMap>();
+export const secretApi: FeatureApi<SecretApiMap> = createFeatureApi<SecretApiMap>();

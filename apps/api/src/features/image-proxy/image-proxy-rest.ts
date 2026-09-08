@@ -15,6 +15,7 @@ import {
   type ServiceContext,
 } from "@langwatch/api/rest";
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
+import { isReadbackSafe } from "@langwatch/stored-object-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /** How long a proxied image may be cached: it is addressed by its own URL. */
@@ -85,7 +86,10 @@ export function createImageProxyRestApp(options: {
       // script — so the CSP sandbox is what makes the type safe to honour.
       return new Response(await response.arrayBuffer(), {
         headers: {
-          "Content-Type": safeMediaType(mediaTypeOf(contentType)),
+          "Content-Type": safeMediaType({
+            mediaType: mediaTypeOf(contentType),
+            readbackSafe: isReadbackSafe,
+          }),
           "Content-Disposition": `inline; filename="${proxiedFilename(url)}"`,
           "Cache-Control": CACHE_CONTROL,
           ...STORED_OBJECT_RESPONSE_BASE_HEADERS,

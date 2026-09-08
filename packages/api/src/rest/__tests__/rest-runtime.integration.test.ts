@@ -6,7 +6,7 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";

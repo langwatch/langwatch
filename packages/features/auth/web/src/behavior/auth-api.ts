@@ -19,13 +19,13 @@
  * only reason to exist, and neither has a `frontDoor.*` twin to call instead.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package — the same exception every
  * family since governance has carried.
  */
 
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { type FeatureApi, createFeatureApi } from "@langwatch/api/web";
 
 /**
  * The deployment facts only a request can answer.
@@ -113,4 +113,4 @@ export type AuthApiMap = {
  * React Query cache as the application's `api` proxy — see `createFeatureApi`
  * for why separate instances still share cache entries.
  */
-export const authApi = createFeatureApi<AuthApiMap>();
+export const authApi: FeatureApi<AuthApiMap> = createFeatureApi<AuthApiMap>();

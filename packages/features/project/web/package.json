@@ -32,12 +32,12 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-web": "workspace:*",
     "@langwatch/navigation-web": "workspace:*",
     "@langwatch/organization-web": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-host": "workspace:*",

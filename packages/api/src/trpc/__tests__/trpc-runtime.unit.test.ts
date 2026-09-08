@@ -6,7 +6,7 @@
  */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

@@ -19,7 +19,7 @@ import type {
   AuthzPermission,
   EnforcedScopeFields,
 } from "@langwatch/authz-contract";
-import type { FeatureApiToken } from "@langwatch/runtime-composition/contract";
+import type { FeatureApiToken } from "@langwatch/runtime-composition";
 import type {
   AnyTRPCRootTypes,
   TRPCBuiltRouter,

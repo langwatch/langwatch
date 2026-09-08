@@ -15,14 +15,16 @@
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "references": [
+    { "path": "../../../handled-error/tsconfig.build.json" },
+    { "path": "../../scenario/contract/tsconfig.build.json" },
     {
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../design-system/tsconfig.build.json"
+      "path": "../../../api/tsconfig.build.json"
     },
     {
-      "path": "../../../platform-api-client/tsconfig.build.json"
+      "path": "../../../design-system/tsconfig.build.json"
     },
     {
       "path": "../../../time/tsconfig.build.json"

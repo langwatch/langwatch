@@ -11,7 +11,7 @@ import { Database, Search } from "lucide-react";
 
 import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
 import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { readableDate } from "../../model/readable-date.ts";
 
 export type DatasetPickerSelection = {

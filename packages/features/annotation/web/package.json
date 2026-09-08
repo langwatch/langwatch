@@ -49,11 +49,11 @@
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-web": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",

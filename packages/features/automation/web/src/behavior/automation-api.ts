@@ -23,7 +23,7 @@ import type {
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /** The project every automation procedure is scoped to. */
 type ProjectScope = { projectId: string };

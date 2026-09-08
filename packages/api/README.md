@@ -1,6 +1,6 @@
 # @langwatch/api
 
-LangWatch's API framework, in five entry points.
+LangWatch's API framework, in six entry points.
 
 | Import                | What it is                                                                                                                                                                                                                                                                    |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9,13 +9,15 @@ LangWatch's API framework, in five entry points.
 | `@langwatch/api`      | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework. |
 | `@langwatch/api/rest` | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                        |
 | `@langwatch/api/trpc` | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                         |
+| `@langwatch/api/web` | The browser's half: `createFeatureApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a web package may import. |
 
 None re-exports another. A consumer that wants the error vocabulary imports
 `@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
 one wiring tRPC imports `@langwatch/api/trpc`; one *declaring* procedures for
-both a server and a browser imports `@langwatch/api/contract`. Most REST call
-sites need two of the five, and that is the point — the import says which half
-of the framework a file depends on.
+both a server and a browser imports `@langwatch/api/contract`; a feature web
+package imports `@langwatch/api/web`. Most REST call sites need two of the six,
+and that is the point — the import says which half of the framework a file
+depends on.
 
 REST is built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Existing services accept Standard Schema; the public REST surface requires Zod 4 so it can derive HTTP documentation from one input object. tRPC is built on [@trpc/server](https://trpc.io) and chooses none of its concretes.
 
@@ -514,6 +516,12 @@ src/
     trpc-audit.ts, trpc-audit-redaction.ts    # The audit trail and its action-keyed redaction table
     trpc-call-logging.ts, trpc-caller-trace.ts, trpc-failure-trace.ts, trpc-error-formatter.ts
     trpc-scope-lineage.ts
+
+  web/
+    index.ts                     # "./web" -- the browser's typed hooks and cache keys
+    feature-api.ts               # createFeatureApi, ContractApiMap, RouterFromMap, OutputsFromMap, WireOf
+    trpc-query-key.ts            # trpcQueryKey / trpcQueryFilter: tRPC's cache key from a path string
+    use-invalidate-procedure.ts  # Invalidating a procedure the feature's own map does not declare
 ```
 
 ## LLM instructions

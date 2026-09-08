@@ -31,10 +31,10 @@
   ],
   "references": [
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../../api/tsconfig.build.json"
     },
     {
-      "path": "../../../platform-api-client/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../ui-host/tsconfig.build.json"

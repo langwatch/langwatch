@@ -15,11 +15,11 @@
  * resolver that decides it caches its answer.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host.ts";
 
 export type ProjectApiMap = {

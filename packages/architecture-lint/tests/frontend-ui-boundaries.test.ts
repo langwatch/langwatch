@@ -616,7 +616,7 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
-  it("allows an owner-only screen to use the typed client and React Query, but not raw tRPC transport", () => {
+  it("allows an owner-only screen the browser half of the API, but not its server half or raw tRPC transport", () => {
     const promptWeb = webPackage("prompt", {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
     });
@@ -626,7 +626,8 @@ describe("frontend UI architecture boundaries", () => {
     write(
       "packages/features/prompt/web/src/screens/prompt-studio/index.ts",
       [
-        'import "@langwatch/platform-api-client";',
+        'import "@langwatch/api/web";',
+        'import "@langwatch/api";',
         'import "@tanstack/react-query";',
         'import "@trpc/client";',
         'import "@trpc/react-query/shared";',
@@ -634,7 +635,7 @@ describe("frontend UI architecture boundaries", () => {
     );
 
     const found = policies([promptWeb]).filter((policy) => policy === "ui-screen-closure");
-    expect(found).toHaveLength(2);
+    expect(found).toHaveLength(3);
   });
 
   it("reads a method named fetch on an object as the method it is", () => {

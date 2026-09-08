@@ -7,7 +7,7 @@
  */
 
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** A listed provider as the browser holds one: its instants are ISO strings. */
 export type ModelProviderListRow = WireOf<ModelProviderListEntry>;

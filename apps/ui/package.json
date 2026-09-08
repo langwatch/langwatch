@@ -96,7 +96,7 @@
     "@langwatch/onboarding-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",
     "@langwatch/organization-web": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/project-web": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/react-rum": "workspace:*",

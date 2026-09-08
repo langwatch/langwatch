@@ -50,6 +50,28 @@ function violation(file: string, message: string, allowed: string): Architecture
   return { policy: "feature-source-layout", file, message, allowed };
 }
 
+/**
+ * The composition root's feature-API vocabulary: the DI token a contract
+ * declares its callable API with, and the name of a feature. Everything else
+ * the package exports is process wiring a contract may not reach.
+ */
+const FEATURE_API_VOCABULARY = new Set(["featureApi", "FeatureApiToken", "FeatureName"]);
+
+/** What an import of the composition root binds that a contract may not. */
+function compositionBindingsBeyondFeatureApi(statement: ts.ImportDeclaration): string[] {
+  const clause = statement.importClause;
+  if (!clause) return [];
+  if (clause.name) return ["a default import"];
+
+  const bindings = clause.namedBindings;
+  if (!bindings) return [];
+  if (!ts.isNamedImports(bindings)) return ["a namespace import"];
+
+  return bindings.elements
+    .map((element) => (element.propertyName ?? element.name).text)
+    .filter((name) => !FEATURE_API_VOCABULARY.has(name));
+}
+
 function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
   const services = files.filter((file) => {
@@ -76,11 +98,14 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
 
         if (statement.moduleSpecifier.text !== "@langwatch/runtime-composition") continue;
 
+        const bound = compositionBindingsBeyondFeatureApi(statement);
+        if (bound.length === 0) continue;
+
         violations.push(
           violation(
             api,
-            "A portable feature API may import only the runtime-composition contract subpath.",
-            'Import featureApi from "@langwatch/runtime-composition/contract"; the runtime root is a composition boundary.',
+            `A portable feature API may bind only the feature-API vocabulary from @langwatch/runtime-composition; it binds ${bound.join(", ")}.`,
+            "Import featureApi, FeatureApiToken or FeatureName and nothing else; the rest of the runtime root is a composition boundary.",
           ),
         );
       }

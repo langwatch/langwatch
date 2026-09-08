@@ -5,8 +5,7 @@
  */
 
 import type { annotationScoreTrpc } from "@langwatch/annotation-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
-import type { ContractApiMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
 
 /** The score-settings transport. Same cache as `annotationApi`, own Provider. */
 export const annotationScoresApi = createFeatureApi<ContractApiMap<typeof annotationScoreTrpc>>();

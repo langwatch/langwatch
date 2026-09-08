@@ -1,6 +1,6 @@
 import type { PaginatedProjects, Project, ProjectWithTeam, UpdateProjectInput } from "./project.ts";
 import type { TopicClusteringRequest } from "./project.responses.ts";
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
 export interface ProjectApi {

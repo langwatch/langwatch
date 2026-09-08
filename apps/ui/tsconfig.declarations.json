@@ -134,7 +134,7 @@
       "path": "../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../packages/platform-api-client/tsconfig.build.json"
+      "path": "../../packages/api/tsconfig.build.json"
     },
     {
       "path": "../../packages/prisma-client/tsconfig.build.json"

@@ -1,5 +1,14 @@
 import type { TRPCUntypedClient } from "@trpc/client";
-import { createTRPCReact } from "@trpc/react-query";
+import { type CreateTRPCReact, createTRPCReact } from "@trpc/react-query";
+// Load-bearing, not convenience: a web package's `export const fooApi =
+// createFeatureApi<FooMap>()` emits a declaration naming these, and only this
+// package depends on `@trpc/react-query`. Without them TS2883 refuses the
+// emit and asks every call site for a hand-written annotation.
+export type {
+  DecorateRouterRecord,
+  UseTRPCMutationResult,
+  UseTRPCQueryResult,
+} from "@trpc/react-query/shared";
 import type {
   AnyTRPCRootTypes,
   inferRouterOutputs,
@@ -35,6 +44,45 @@ export type ProcedureShape =
  * them. The nesting is load-bearing: those segments become the tRPC cache key.
  */
 export type FeatureApiMap = { [segment: string]: ProcedureShape | FeatureApiMap };
+
+/**
+ * The two sides of a declared schema, read structurally: `z.input` and
+ * `z.output` are themselves indexed reads of `_zod`, so this package needs no
+ * zod dependency to read the same answer.
+ */
+type SchemaInput<Schema> = Schema extends { _zod: { input: infer Value } } ? Value : never;
+/** A member declared without output answers nothing. @see SchemaInput */
+type SchemaOutput<Schema> = Schema extends { _zod: { output: infer Value } } ? Value : void;
+
+type ContractIo<Input, Output> = {
+  input: SchemaInput<Input>;
+  output: SchemaOutput<Output>;
+};
+
+/** One declared procedure, in the shape {@link ProcedureShape} states by hand. */
+type ContractMemberShape<Member> = Member extends {
+  kind: infer Kind;
+  input: infer Input;
+  output: infer Output;
+}
+  ? Kind extends "query"
+    ? { query: ContractIo<Input, Output> }
+    : Kind extends "mutation"
+      ? { mutation: ContractIo<Input, Output> }
+      : { subscription: ContractIo<Input, Output> }
+  : never;
+
+/**
+ * The map a tRPC contract describes, keyed by the namespace it declares, so a
+ * web package restates none of its server's procedures. Intersect several when
+ * a package calls more than one namespace.
+ */
+export type ContractApiMap<TContract> = TContract extends {
+  namespace: infer Namespace extends string;
+  members: infer Members;
+}
+  ? { [Segment in Namespace]: { [Name in keyof Members]: ContractMemberShape<Members[Name]> } }
+  : never;
 
 type ProceduresFrom<TMap> = {
   [K in keyof TMap]: TMap[K] extends { query: { input: infer TIn; output: infer TOut } }
@@ -117,18 +165,19 @@ export type WireOf<TValue> = OutputsFromMap<{
  * mutation invalidates an un-migrated list — with no coordination between them.
  *
  * It is also the thing to not get wrong. A binding that invents its own key
- * namespace — `["agent-ui", path, input]`, which is what
- * `platform/app/src/runtime/ui/features/agent-ui-host.adapter.tsx` does today —
- * shares no prefix with any tRPC key, so its cache is invisible to every
- * invalidation the rest of the application performs, and vice versa. The
- * symptom is stale UI that looks random.
+ * namespace — `["agent-ui", path, input]` — shares no prefix with any tRPC
+ * key, so its cache is invisible to every invalidation the rest of the
+ * application performs, and vice versa. The symptom is stale UI that looks
+ * random.
  *
  * What separate instances DO cost: `useUtils()` is scoped to the feature's own
  * map, so it cannot name another feature's procedures. Use `trpcQueryFilter`
  * for those — deliberately more visible than a typed call, because reaching
  * into another feature's cache should be.
  */
-export function createFeatureApi<TMap extends FeatureApiMap>() {
+export type FeatureApi<TMap extends FeatureApiMap> = CreateTRPCReact<RouterFromMap<TMap>, unknown>;
+
+export function createFeatureApi<TMap extends FeatureApiMap>(): FeatureApi<TMap> {
   return createTRPCReact<RouterFromMap<TMap>>();
 }
 

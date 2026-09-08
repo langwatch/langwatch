@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { MetricDataPointPreparation, MetricPiiRedactionLevel } from "./metric.service.ts";
 
 /** Callable metric preparation capability shared by ingestion transports. */

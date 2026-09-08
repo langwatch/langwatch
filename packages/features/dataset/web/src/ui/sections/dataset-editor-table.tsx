@@ -15,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { DatasetColumns, DatasetPage } from "@langwatch/dataset-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Pagination } from "@langwatch/design-system/pagination";
 import {

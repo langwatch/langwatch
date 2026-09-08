@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { ModelProvider } from "./model-provider.ts";
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {

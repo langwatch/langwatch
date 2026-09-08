@@ -46,11 +46,11 @@ import type {
   CheckPreconditionRule,
 } from "../../../model/evaluations/types.ts";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** An evaluator as the drawer holds one: off a query, so its instants are strings. */
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
-import type { MappingState, TRACE_MAPPINGS } from "@langwatch/trace-contract";
+import type { MappingState, TRACE_MAPPINGS } from "@langwatch/dataset-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";

@@ -7,7 +7,7 @@
  * entry rather than for a call, so invalidation reaches an un-migrated list.
  */
 
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   LegacyModelProvider,
   ModelDefaultEffective,

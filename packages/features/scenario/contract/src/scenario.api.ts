@@ -1,0 +1,81 @@
+import { featureApi } from "@langwatch/runtime-composition";
+import type {
+  AgentTestRunResult,
+  AgentTestTurnResult,
+  AgentWithFields,
+} from "@langwatch/agent-contract";
+import type { RunActor } from "./run-actor.ts";
+import type {
+  Scenario,
+  ScenarioReferenceState,
+  ScenarioTestSuite,
+  ScenarioTestSuiteCreateInput,
+  ScenarioTestSuiteIdInput,
+  ScenarioTestSuiteRenameInput,
+  ScenarioTestSuiteRunDefinition,
+  ScenarioTestSuiteUpdateInput,
+  ScenarioRunConfig,
+} from "./scenario.ts";
+import type {
+  ResolveScenarioRunParametersInput,
+  ResolvedScenarioRunParameters,
+  ResolvedScenarioRunParametersForScenario,
+} from "./scenario.service.ts";
+import type { RunParameterValues } from "./scenario.parameters.ts";
+import type { SimulationExternalSetSummary } from "./simulation.ts";
+import type { SimulationProjectDateRangeInput } from "./simulation.service.ts";
+
+export interface TestAgentRunInput {
+  projectId: string;
+  agent: AgentWithFields;
+  actor: RunActor | undefined;
+}
+
+export interface TestAgentTurnInput extends TestAgentRunInput {
+  message: string;
+  params?: Record<string, string | number | boolean>;
+}
+
+/** Callable scenario capability used by peer features such as Suite. */
+export interface ScenarioApi {
+  testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
+  testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
+  list(input: { projectId: string }): Promise<Scenario[]>;
+  listTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]>;
+  getReferenceStates(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<ScenarioReferenceState[]>;
+  getRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]>;
+  getModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]>;
+  resolveRunParameters(
+    input: ResolveScenarioRunParametersInput,
+  ): Promise<ResolvedScenarioRunParameters>;
+  resolveRunParametersForScenarios(input: {
+    scenarios: ScenarioRunConfig[];
+    values?: RunParameterValues;
+  }): Promise<ResolvedScenarioRunParametersForScenario[]>;
+  getNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]>;
+  tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
+  updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
+  getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition>;
+  archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite>;
+  renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite>;
+  getInternalSuiteSummaries(
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationExternalSetSummary[]>;
+}
+
+export const ScenarioApi = featureApi<ScenarioApi>("scenario");

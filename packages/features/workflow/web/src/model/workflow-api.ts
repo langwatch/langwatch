@@ -75,7 +75,7 @@ import {
   createFeatureApi,
   type OutputsFromMap,
   type RouterFromMap,
-} from "@langwatch/platform-api-client/feature-api";
+} from "@langwatch/api/web";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
 export type WorkflowProjectPath = {

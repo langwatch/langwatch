@@ -4,7 +4,7 @@
  * `trpcQueryKey`'s, so a dispatch here and a typed hook share ONE entry.
  */
 
-import { trpcQueryKey } from "@langwatch/platform-api-client/query-key";
+import { trpcQueryKey } from "@langwatch/api/web";
 import type { QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";

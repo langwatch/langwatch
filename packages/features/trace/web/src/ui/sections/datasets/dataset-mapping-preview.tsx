@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 /**
  * The mapping half of the "Add to Dataset" drawer: which trace field fills which
  * dataset column, and what the rows will look like once it does.

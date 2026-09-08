@@ -4,7 +4,10 @@
 import { Readable } from "node:stream";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
+import {
+  isReadbackSafe,
+  StoredObjectOwnerLookupUnavailableError,
+} from "@langwatch/stored-object-contract";
 import type { Context, Env, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated } from "@langwatch/api";
@@ -125,7 +128,7 @@ function streamFileResponse({
   mediaType: string;
   requestedFilename?: string;
 }): Response {
-  const contentType = safeMediaType(mediaType);
+  const contentType = safeMediaType({ mediaType, readbackSafe: isReadbackSafe });
   const filename =
     (requestedFilename ? sanitizeFilenameSegment(requestedFilename) : "") ||
     sanitizeFilenameSegment(row.id);

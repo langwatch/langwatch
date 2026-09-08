@@ -94,7 +94,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/evaluator-web": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",

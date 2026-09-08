@@ -10,7 +10,7 @@ it("infers trailing middleware arguments and rejects wrong facts and responses",
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import { defineRestRouter } from "../src/rest/rest-router.ts";
 import { defineRestMiddleware } from "../src/rest/transport-middleware.ts";
 const api = featureApi<object>("annotation");

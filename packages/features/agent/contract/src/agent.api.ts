@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { Agent, AgentWithFields } from "./agent.ts";
 import type { AgentReferenceState } from "./agent.queries.ts";
 import type {

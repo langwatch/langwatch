@@ -8,7 +8,7 @@ import {
   createFeatureApi,
   type FeatureApi,
   type OutputsFromMap,
-} from "@langwatch/platform-api-client/feature-api";
+} from "@langwatch/api/web";
 import type {
   AggregateDiscovery,
   AggregateEventView,

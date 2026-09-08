@@ -21,13 +21,13 @@
  * after a role is created is exactly the bug that would follow.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE'S SCREEN
- * TREE. ADR-004 seals a screen's closure off from `@langwatch/platform-api-client`,
+ * TREE. ADR-004 seals a screen's closure off from `@langwatch/api/web`,
  * and the import below is the only one of it here. Recorded so the finding it
  * raises is a decision rather than a surprise.
  */
 
 import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 import type { Role } from "@langwatch/role-contract";
 
 /** One organization, the tenant key every procedure on these surfaces takes. */

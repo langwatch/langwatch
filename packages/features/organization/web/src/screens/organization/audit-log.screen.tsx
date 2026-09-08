@@ -20,7 +20,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { UiSlot } from "@langwatch/ui-host/slots";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;

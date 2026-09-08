@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 /**
  * Default Models — every policy the caller can see, one row per policy. The
  * page-level scope filter narrows rows inclusively (parents + children),

@@ -6,7 +6,7 @@
  */
 
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { type Instant, toDate } from "@langwatch/time";
 import { readableDate } from "./display-formatters.ts";
 

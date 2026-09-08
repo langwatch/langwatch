@@ -1,7 +1,7 @@
 # Web packages
 
 `packages/features/<name>/web` is `@langwatch/<name>-web`. It is optional, browser-safe,
-and depends on the feature's contract, `@langwatch/platform-api-client`,
+and depends on the feature's contract, `@langwatch/api/web`,
 `@langwatch/design-system`, `@langwatch/ui-host` and `@langwatch/ui-drawer`. It never
 imports the server package or `apps/*`. The reference is
 `packages/features/annotation/web`.
@@ -97,7 +97,7 @@ carries facts the screen needs (`project`, `currentUser`, `hasPermission`,
 ```ts
 // behavior/annotation-api.ts
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
-import { createFeatureApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 
 type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> & ContractApiMap<typeof annotationScoreTrpc>;
 export const annotationApi = createFeatureApi<AnnotationProcedures>();
@@ -110,7 +110,8 @@ export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
   the one thing written by hand, in a `BorrowedProcedures` type that says so, until that
   feature's contract declares it.
 - `createFeatureApi`, `ContractApiMap`, `WireOf` and `OutputsFromMap` live in
-  `@langwatch/platform-api-client/feature-api`. Types come from the contract, never from
+  `@langwatch/api/web` — the one subpath of `@langwatch/api` a web package may name.
+  Types come from the contract, never from
   `AppRouter` (ADR-130) and never `any`.
 - The segment names are the tRPC cache key and must equal the namespaces the process
   mounts (`annotation`, `annotationScore` in `apps/api/src/app-trpc/app-trpc.features.ts`).

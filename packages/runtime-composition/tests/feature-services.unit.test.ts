@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
-import { featureApi } from "../src/contract.ts";
+import { featureApi } from "../src/feature-api-token.ts";
 import { defineFeature, type FeatureSetup } from "../src/feature-installer.ts";
 import { ResourceScope, type ResourceOwnership } from "../src/resource-scope.ts";
 

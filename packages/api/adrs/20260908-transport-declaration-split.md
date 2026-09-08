@@ -99,7 +99,7 @@ segment now travels **with** the declaration, so
 
 ### The browser derives its client
 
-`@langwatch/platform-api-client` gained `ContractApiMap<TContract>`, which turns
+`@langwatch/api/web` gained `ContractApiMap<TContract>`, which turns
 a contract's type into the `FeatureApiMap` shape `createFeatureApi` already
 took. The annotation web package went from 281 lines of hand-written map to
 
@@ -110,7 +110,7 @@ type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> &
 ```
 
 `WireOf` and `OutputsFromMap` are unchanged and keep working over it, because
-the derived map is the same shape the hand-written one was. `platform-api-client`
+the derived map is the same shape the hand-written one was. The browser door
 takes no zod dependency for this: `z.input` and `z.output` are themselves
 indexed reads of a schema's `_zod` key, so the derivation reads the same key.
 

@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-web": "workspace:*",
     "@langwatch/config": "workspace:*",
@@ -37,7 +38,6 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-host": "workspace:*",

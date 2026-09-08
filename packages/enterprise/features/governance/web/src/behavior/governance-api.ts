@@ -15,7 +15,7 @@
  * sharing a cache with the `api.aiTools.*` call sites that have not moved.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package. It buys a content-faithful move:
  * every `api.x.y.useQuery(...)` call site in the eleven screens is the line it
  * was in `platform/app`. Replacing it means a port per procedure and a rewrite
@@ -27,7 +27,7 @@
  * that name, and nothing checks that promise until the generator exists.
  */
 
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorSummary,

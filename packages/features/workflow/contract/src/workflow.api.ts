@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 
 /** Callable capability exposed by the composed Workflow application. */
 export interface WorkflowApi {

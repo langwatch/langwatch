@@ -6,7 +6,7 @@
 
 import type { AgentType } from "@langwatch/agent-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 
 export type NavigationHomeResolution = {
   destination: string;
@@ -110,7 +110,7 @@ export type NavigationApiMap = {
   annotation: {
     /** The badge on the Annotations entry: how many items still want a look. */
     getPendingItemsCount: {
-      query: { input: { projectId: string }; output: number };
+      query: { input: { projectId: string }; output: { count: number } };
     };
   };
 

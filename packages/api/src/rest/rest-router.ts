@@ -1,5 +1,5 @@
 import type { AuthzDeclaredScopeId, AuthzPermission } from "@langwatch/authz-contract";
-import type { FeatureApiToken } from "@langwatch/runtime-composition/contract";
+import type { FeatureApiToken } from "@langwatch/runtime-composition";
 import { z } from "zod";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 

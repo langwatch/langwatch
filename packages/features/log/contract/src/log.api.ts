@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition/contract";
+import { featureApi } from "@langwatch/runtime-composition";
 import type { CanonicalTraceLogRecord } from "./log-record.ts";
 import type { LogPiiRedactionLevel, LogPreparation } from "./log-preparation.types.ts";
 

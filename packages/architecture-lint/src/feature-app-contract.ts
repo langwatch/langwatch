@@ -326,7 +326,7 @@ function canonicalApiTokenDeclaration(
   if (!parts) return false;
 
   const importedHelper = importedFeatureApi(declaration.file, parts.expression.text, resolver);
-  if (importedHelper !== "@langwatch/runtime-composition/contract") return false;
+  if (importedHelper !== "@langwatch/runtime-composition") return false;
 
   const interfaceDeclaration = exportedInterface(declaration.file, parts.typeName.text, resolver);
 
@@ -391,7 +391,7 @@ function validApiTokenDeclaration(
 
   const helper = importedFeatureApi(file, call.expression.text, resolver);
 
-  return helper === "@langwatch/runtime-composition/contract";
+  return helper === "@langwatch/runtime-composition";
 }
 function importedFeatureApi(
   file: string,
@@ -582,7 +582,7 @@ function contractViolations(
     violations.push(
       add(
         "A feature API must export its canonical featureApi token.",
-        `Export const ${name} = featureApi<${name}>("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition/contract.`,
+        `Export const ${name} = featureApi<${name}>("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition.`,
       ),
     );
 
@@ -747,7 +747,7 @@ function validDefinedConcreteSurface(
   if (hasTypeScriptPrivateImplementation(app)) return false;
 
   const provided = new Set<string>();
-  const metadata = new Set(["contract", "dependencies", "configSchema"]);
+  const metadata = new Set(["contract", "dependencies", "configSchema", "repositories"]);
   for (const member of publicMembers(app)) {
     if (
       !validConcreteMember(
@@ -938,7 +938,7 @@ function concreteAppViolations(
           appViolation(
             file,
             "A concrete feature app exposes a different public surface from its API contract.",
-            "Implement only callable API operations; keep owned services and helpers private, and expose static readonly contract, dependencies, configSchema and create metadata.",
+            "Implement only callable API operations; keep owned services and helpers private, and expose static readonly contract, dependencies, configSchema, repositories and create metadata.",
           ),
         );
     }
@@ -1303,10 +1303,13 @@ function validDefinedApp(
 }
 
 function validDefinedStages(stages: string[]): boolean {
-  const hasApp = stages[0] === "withApp";
+  const hasRepositories = stages[0] === "withRepositories";
+  const appIndex = hasRepositories ? 1 : 0;
+  const hasApp = stages[appIndex] === "withApp";
   const hasBuild = stages.at(-1) === "build";
   const hasOptionalTransports =
-    stages.length === 2 || (stages.length === 3 && stages[1] === "withTransports");
+    stages.length === appIndex + 2 ||
+    (stages.length === appIndex + 3 && stages[appIndex + 1] === "withTransports");
 
   return hasApp && hasBuild && hasOptionalTransports;
 }
@@ -1390,11 +1393,11 @@ function lintFeatureOwner(
       appViolation(
         installerFile,
         hidden
-          ? "The canonical installer hides its serverFeature declaration."
+          ? "The canonical installer hides its defineFeature declaration."
           : `Catalogue feature "${owner.id}" has no canonical server installer.`,
         hidden
-          ? "Call the runtime-composition serverFeature factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
-          : "Move the existing construction into one feature-owned serverFeature installer that provides its app, then rewire API, worker and task composition to reuse it.",
+          ? "Call the runtime-composition defineFeature factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
+          : "Move the existing construction into defineFeature(...).withApp(...), then rewire API, worker and task composition to reuse that installer.",
       ),
     );
 

@@ -21,7 +21,7 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "../model/prisma-types.ts";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * Every filter the audit table narrows by, in the one shape both the table and

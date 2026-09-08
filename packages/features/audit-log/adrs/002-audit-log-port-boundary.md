@@ -27,7 +27,7 @@ organization package's own tRPC and REST doors.
 
 ## Dependencies
 
-Zod 4 and `@langwatch/runtime-composition/contract`, and nothing else. The
+Zod 4 and `featureApi` from `@langwatch/runtime-composition`, and nothing else. The
 package is browser-safe and Apache-licensed, so an OSS feature may depend on the
 capability without depending on the Enterprise implementation.
 

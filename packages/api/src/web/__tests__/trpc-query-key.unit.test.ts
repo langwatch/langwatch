@@ -1,7 +1,7 @@
 import { getQueryKey } from "@trpc/react-query";
 import { describe, expect, it } from "vitest";
-import { createFeatureApi } from "../src/feature-api.ts";
-import { trpcQueryFilter, trpcQueryKey } from "../src/trpc-query-key.ts";
+import { createFeatureApi } from "../feature-api.ts";
+import { trpcQueryFilter, trpcQueryKey } from "../trpc-query-key.ts";
 
 /**
  * The one property the whole feature-web data-access pattern rests on: a query

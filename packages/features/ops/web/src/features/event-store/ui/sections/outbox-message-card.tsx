@@ -3,7 +3,7 @@ import { useState } from "react";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view.tsx";
 import type { ProcessOutboxMessageView as StoredProcessOutboxMessageView } from "@langwatch/ops-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** One outbox row as the browser receives it: a key holding `undefined` is absent. */
 type ProcessOutboxMessageView = WireOf<StoredProcessOutboxMessageView>;

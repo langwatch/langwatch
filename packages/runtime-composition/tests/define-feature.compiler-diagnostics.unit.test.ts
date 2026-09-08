@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const installer = resolve(root, "src/feature-installer.ts");
 const application = resolve(root, "src/application.ts");
-const contract = resolve(root, "src/contract.ts");
+const contract = resolve(root, "src/feature-api-token.ts");
 const repositoryRegistry = resolve(root, "src/repository-registry.ts");
 const tsc = resolve(root, "node_modules/.bin/tsc");
 type Diagnostic = { line: number; code: string; text: string };

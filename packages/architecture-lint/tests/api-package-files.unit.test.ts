@@ -6,7 +6,7 @@ const root = resolve(import.meta.dirname, "../../..");
 const API_SOURCE = join(root, "packages/api/src");
 const BASELINE = resolve(import.meta.dirname, "../src/api-package-files-baseline.json");
 
-/** The eleven files the rebuild plan ends with; anything else is legacy on its way out. */
+/** The files the rebuild plan ends with; anything else is legacy on its way out. */
 const TARGET_FILES = new Set([
   "index.ts",
   "contract/index.ts",
@@ -21,6 +21,15 @@ const TARGET_FILES = new Set([
   "rest/rest-runtime.ts",
   "rest/rest-openapi.ts",
   "rest/rest-idempotency.ts",
+  // The project and credential the transport reads, described rather than
+  // imported: the contracts that own them declare their procedures with
+  // ./contract, so importing them back would close a declaration cycle.
+  "rest/credential.ts",
+  // The browser door, folded in from @langwatch/platform-api-client.
+  "web/index.ts",
+  "web/feature-api.ts",
+  "web/trpc-query-key.ts",
+  "web/use-invalidate-procedure.ts",
 ]);
 
 function sourceFiles(directory: string): string[] {

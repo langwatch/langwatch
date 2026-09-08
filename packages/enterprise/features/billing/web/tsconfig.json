@@ -22,6 +22,9 @@
       "path": "../../../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../licensing/web/tsconfig.build.json"
     },
     {
@@ -38,9 +41,6 @@
     },
     {
       "path": "../../../../plans/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../platform-api-client/tsconfig.build.json"
     },
     {
       "path": "../../../../time/tsconfig.build.json"

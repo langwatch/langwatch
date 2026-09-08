@@ -3,7 +3,7 @@ import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/r
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import { PinnedAwareJsonView } from "../../../../ui/elements/ops-pinned-json-view.tsx";
 import type { ProcessInstanceDetail as StoredProcessInstanceDetail } from "@langwatch/ops-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** The detail as the browser receives it: a key holding `undefined` is absent. */
 type ProcessInstanceDetail = WireOf<StoredProcessInstanceDetail>;

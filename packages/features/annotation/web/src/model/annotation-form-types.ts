@@ -6,7 +6,7 @@ import type {
   AnnotationScoreDataType,
   ScoreOptions,
 } from "@langwatch/annotation-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 /**

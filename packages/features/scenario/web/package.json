@@ -58,7 +58,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",

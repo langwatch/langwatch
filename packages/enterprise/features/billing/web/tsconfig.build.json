@@ -30,13 +30,13 @@
     "**/testing.tsx"
   ],
   "references": [
+    { "path": "../../../../api/tsconfig.build.json" },
     { "path": "../../../../design-system/tsconfig.build.json" },
     { "path": "../contract/tsconfig.build.json" },
     { "path": "../../licensing/contract/tsconfig.build.json" },
     { "path": "../../licensing/web/tsconfig.build.json" },
     { "path": "../../../../features/entitlement/contract/tsconfig.build.json" },
     { "path": "../../../../plans/tsconfig.build.json" },
-    { "path": "../../../../platform-api-client/tsconfig.build.json" },
     { "path": "../../../../time/tsconfig.build.json" },
     { "path": "../../../../ui-host/tsconfig.build.json" }
   ]

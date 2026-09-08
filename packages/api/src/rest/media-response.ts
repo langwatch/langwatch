@@ -4,7 +4,6 @@
  * surface applies the exact same Content-Type coercion + security headers —
  * widening the allowlist or tightening the headers updates all of them at once.
  */
-import { isReadbackSafe } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -20,12 +19,21 @@ export const STORED_OBJECT_RESPONSE_BASE_HEADERS: Readonly<Record<string, string
 
 /**
  * Resolves the Content-Type for a stored-object response: the requested type
- * when it is in the shared readback-safe allowlist (see `@langwatch/stored-object-contract`),
- * otherwise `application/octet-stream` to neutralize MIME sniffing and
- * stored-XSS primitives.
+ * when `readbackSafe` accepts it, otherwise `application/octet-stream` to
+ * neutralize MIME sniffing and stored-XSS primitives.
+ *
+ * The allowlist is the stored-object contract's `isReadbackSafe`, passed in
+ * rather than imported: the ingest path applies the same predicate, so it
+ * belongs to the feature that owns stored objects, not to the transport.
  */
-export function safeMediaType(mediaType: string): string {
-  return isReadbackSafe(mediaType) ? mediaType : "application/octet-stream";
+export function safeMediaType({
+  mediaType,
+  readbackSafe,
+}: {
+  mediaType: string;
+  readbackSafe: (mediaType: string) => boolean;
+}): string {
+  return readbackSafe(mediaType) ? mediaType : "application/octet-stream";
 }
 
 /**

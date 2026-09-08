@@ -4,7 +4,7 @@
 
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { toEpochMs } from "@langwatch/time";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { useState } from "react";
 
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";

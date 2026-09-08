@@ -227,7 +227,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-web": "workspace:*",
     "@langwatch/ops-web": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/presence-web": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",

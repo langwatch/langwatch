@@ -17,7 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";

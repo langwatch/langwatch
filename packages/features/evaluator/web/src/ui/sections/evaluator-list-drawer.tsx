@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 /**
  * "Choose Evaluator": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns evaluators. KNOWN GAP: "New

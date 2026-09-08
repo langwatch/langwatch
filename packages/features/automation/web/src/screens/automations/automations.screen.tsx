@@ -41,7 +41,7 @@ import {
 import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
 import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers.ts";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** A monitor as the browser holds one: the wire carries its instants as strings. */
 type Monitor = WireOf<StoredMonitor>;

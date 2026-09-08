@@ -17,7 +17,9 @@ const contractRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function sourceOf(name: string): string {
   const path = join(contractRoot, name);
+
   expect(existsSync(path), `${path} is the contract entry this guard reads; it moved`).toBe(true);
+
   return readFileSync(path, "utf8");
 }
 
@@ -34,6 +36,7 @@ describe("defineTrpcContract", () => {
       .query("getById")
       .withInput(z.object({ id: z.string() }))
       .withOutput(z.object({ id: z.string() }))
+
       .mutation("deleteById")
       .withInput(z.object({ id: z.string() }))
       .build();
@@ -52,6 +55,7 @@ describe("defineTrpcContract", () => {
     /** @scenario "A contract declares a procedure once, in a browser-safe module" */
     it("reaches no server framework, tRPC runtime or Node API from its own module", () => {
       expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual([]);
+
       expect(valueImports(sourceOf("index.ts"))).toEqual(["./trpc-contract.ts"]);
     });
   });
@@ -62,6 +66,7 @@ describe("defineTrpcContract", () => {
         defineTrpcContract("annotation")
           .query("getById")
           .withInput(z.object({ id: z.string() }))
+
           .mutation("getById" as never)
           .withInput(z.object({ id: z.string() }));
 

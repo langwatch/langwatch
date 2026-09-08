@@ -40,7 +40,7 @@ function install(kind: "legacy" | "defined" = "legacy", extra = ""): void {
 }
 function api(
   members = "get(): string;",
-  helper = "@langwatch/runtime-composition/contract",
+  helper = "@langwatch/runtime-composition",
   name = "widget",
 ): void {
   write(
@@ -91,6 +91,27 @@ describe("feature API contract lint", () => {
   it("accepts the concrete app with callable operation and private service", () => {
     install("defined");
     expect(findings()).toEqual([]);
+  });
+  it("accepts static repository registration without exposing repositories on the API", () => {
+    install("defined", "static readonly repositories = { rows: PrismaWidgetRepository };");
+    expect(findings()).toEqual([]);
+  });
+  it("accepts repository installation before the canonical app stage", () => {
+    install("defined");
+    const file = `${server}/src/widget.server.ts`;
+    write(
+      file,
+      readFileSync(join(root, file), "utf8").replace(
+        'defineFeature("widget").withApp',
+        'defineFeature("widget").withRepositories(WidgetRepositories).withApp',
+      ),
+    );
+
+    expect(findings()).toEqual([]);
+  });
+  it("rejects repository registration exposed on the App instance", () => {
+    install("defined", "readonly repositories = { rows: PrismaWidgetRepository };");
+    expect(findings().some((item) => item.message.includes("different public surface"))).toBe(true);
   });
   it.each(["constructor", "public constructor", "protected constructor"])(
     "rejects externally accessible construction through %s",
@@ -265,14 +286,14 @@ describe("feature API contract lint", () => {
       );
     },
   );
-  it("rejects a root runtime helper import", () => {
-    api("get(): string;", "@langwatch/runtime-composition");
+  it("rejects a helper imported from anywhere but the composition root", () => {
+    api("get(): string;", "@langwatch/runtime-composition/contract");
     expect(findings().some((item) => item.message.includes("canonical featureApi token"))).toBe(
       true,
     );
   });
   it("rejects a token with the wrong feature name", () => {
-    api("get(): string;", "@langwatch/runtime-composition/contract", "other");
+    api("get(): string;", "@langwatch/runtime-composition", "other");
     expect(findings().some((item) => item.message.includes("canonical featureApi token"))).toBe(
       true,
     );
@@ -301,7 +322,7 @@ describe("feature API contract lint", () => {
     });
     write(
       "packages/features/peer/contract/src/peer.api.ts",
-      'import { featureApi } from "@langwatch/runtime-composition/contract"; export interface PeerApi { ping(): void; } export const PeerApi = featureApi<PeerApi>("peer");',
+      'import { featureApi } from "@langwatch/runtime-composition"; export interface PeerApi { ping(): void; } export const PeerApi = featureApi<PeerApi>("peer");',
     );
     write("packages/features/peer/contract/src/index.ts", 'export { PeerApi } from "./peer.api";');
     write(

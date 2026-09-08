@@ -1,4 +1,4 @@
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { Badge, Box, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { Radio, Trash2 } from "lucide-react";
 

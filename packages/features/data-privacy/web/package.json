@@ -19,10 +19,10 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-web": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "lucide-react": "^1.22.0",
     "safe-regex2": "^5.1.1"

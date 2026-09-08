@@ -19,13 +19,13 @@
  * to pricing a plan. The analytics family's argument, applied again.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
+ * seals a screen's closure off from `@langwatch/api/web`, and the
  * import below is the only one in the package.
  */
 
 import type { Plan } from "@langwatch/entitlement-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { createFeatureApi } from "@langwatch/platform-api-client/feature-api";
+import { createFeatureApi } from "@langwatch/api/web";
 import type { Currency } from "../model/billing-plans.ts";
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
