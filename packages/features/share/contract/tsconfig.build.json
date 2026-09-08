@@ -23,6 +23,7 @@
     "**/__bench__/**"
   ],
   "references": [
+    { "path": "../../data-retention/contract/tsconfig.build.json" },
     {
       "path": "../../../handled-error/tsconfig.build.json"
     }

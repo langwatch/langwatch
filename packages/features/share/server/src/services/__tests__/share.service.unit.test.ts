@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   ShareLinkExhaustedError,
   ShareLinkExpiredError,
@@ -11,10 +10,10 @@ import {
   type ShareWithProject,
   TraceSharingDisabledError,
 } from "@langwatch/share-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { ShareCacheRepository } from "../share-cache.repository.ts";
-import type { ShareRepository } from "../share.repository.ts";
-import { ShareService } from "../../services/share.service.ts";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ShareCacheRepository } from "../../repositories/share-cache.repository.ts";
+import type { ShareRepository } from "../../repositories/share.repository.ts";
+import { ShareService } from "../share.service.ts";
 
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
@@ -50,20 +49,25 @@ const userViewer: ShareViewer = { type: "user", id: "user_1" };
 
 describe("ShareService", () => {
   let repo: ShareRepository;
-  let dataRetention: DataRetentionService;
-  let projects: ProjectService;
-  let permissions: AuthzService;
+  let dataRetention: DataRetentionApi;
+  let permissions: AuthzApi;
   let cache: ShareCacheRepository;
   let service: ShareService;
 
   beforeEach(() => {
     repo = {
-      tryFindByToken: vi.fn(),
-      tryFindById: vi.fn(),
-      listByResource: vi.fn(),
-      hasActiveShareForResource: vi.fn().mockResolvedValue(false),
+      findTraceSharingConfig: vi.fn().mockResolvedValue({
+        orgEnabled: true,
+        projectEnabled: true,
+      }),
+      findByToken: vi.fn(),
+      findById: vi.fn(),
+      existsById: vi.fn().mockResolvedValue(false),
+      findAllByResource: vi.fn(),
+      countActiveForResource: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
       consumeView: vi.fn().mockResolvedValue(true),
+      findAllIdsByResource: vi.fn().mockResolvedValue([]),
       deleteById: vi.fn(),
       deleteByResource: vi.fn(),
       findAllTraceShareResourceIds: vi.fn(),
@@ -73,25 +77,18 @@ describe("ShareService", () => {
       autoUnpin: vi.fn().mockResolvedValue(void 0),
       autoPin: vi.fn().mockResolvedValue(void 0),
       unpin: vi.fn().mockResolvedValue(void 0),
-    } as unknown as DataRetentionService;
-    projects = {
-      tryGetTraceSharingConfig: vi.fn().mockResolvedValue({
-        orgEnabled: true,
-        projectEnabled: true,
-      }),
-    } as unknown as ProjectService;
+    } as unknown as DataRetentionApi;
     permissions = {
       getDecision: vi.fn().mockResolvedValue({ permitted: false }),
-    } as unknown as AuthzService;
+    } as unknown as AuthzApi;
     cache = {
       isNewViewing: vi.fn().mockResolvedValue(true),
-      tryGetPayload: vi.fn().mockResolvedValue(null),
+      findPayload: vi.fn().mockResolvedValue(null),
       setPayload: vi.fn().mockResolvedValue(void 0),
     } as unknown as ShareCacheRepository;
     service = ShareService.create({
       repository: repo,
       dataRetention,
-      projects,
       permissions,
       cache,
     });
@@ -106,7 +103,7 @@ describe("ShareService", () => {
      */
     describe("given the same viewer re-opens a link inside the window", () => {
       beforeEach(() => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare());
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
       });
 
       it("does not consume another view", async () => {
@@ -124,7 +121,7 @@ describe("ShareService", () => {
       /** @scenario A viewer refreshing a single-view link keeps access */
       it("still resolves a link their own earlier view already spent", async () => {
         vi.mocked(cache.isNewViewing).mockResolvedValue(false);
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 1 }));
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 1 }));
 
         await expect(
           service.resolveForViewer({
@@ -139,7 +136,7 @@ describe("ShareService", () => {
     describe("given a viewer opening a link for the first time", () => {
       /** @scenario A different viewer cannot reuse someone else's viewing */
       it("consumes a view", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare());
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
         vi.mocked(cache.isNewViewing).mockResolvedValue(true);
 
         await service.resolveForViewer({
@@ -154,7 +151,7 @@ describe("ShareService", () => {
 
     describe("given no viewer key (dedupe unavailable)", () => {
       it("counts every request, the stricter behaviour", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare());
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
         vi.mocked(cache.isNewViewing).mockResolvedValue(false);
 
         await service.resolveForViewer({
@@ -171,7 +168,7 @@ describe("ShareService", () => {
   describe("resolveForViewer", () => {
     describe("given no share matches the token", () => {
       it("throws not-found", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(null);
+        vi.mocked(repo.findByToken).mockResolvedValue(null);
 
         await expect(
           service.resolveForViewer({
@@ -191,7 +188,7 @@ describe("ShareService", () => {
       /** @scenario A link is resolvable only while both org and project allow sharing */
       /** @scenario Disabling trace sharing for the organization disables it everywhere */
       it("throws not-found when the ORGANIZATION disabled sharing", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
+        vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({
             project: {
               traceSharingEnabled: true,
@@ -209,7 +206,7 @@ describe("ShareService", () => {
       });
 
       it("throws the same not-found as a bad token when the PROJECT disabled sharing", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
+        vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({
             project: {
               traceSharingEnabled: false,
@@ -227,7 +224,7 @@ describe("ShareService", () => {
       });
 
       it("resolves when BOTH the org and the project allow sharing", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare());
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
 
         const share = await service.resolveForViewer({
           token: "tok_abc",
@@ -241,7 +238,7 @@ describe("ShareService", () => {
     describe("given the link expired in the past", () => {
       /** @scenario A timed link stops resolving after its expiry */
       it("throws expired and does not consume a view", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
+        vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ expiresAt: new Date(Date.now() - 1000) }),
         );
 
@@ -256,7 +253,7 @@ describe("ShareService", () => {
       /** @scenario A public link resolves for an anonymous viewer */
       /** @scenario A link with no expiry and no view cap resolves indefinitely */
       it("grants an anonymous viewer and consumes one view", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare());
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
 
         const share = await service.resolveForViewer({
           token: "tok_abc",
@@ -274,9 +271,7 @@ describe("ShareService", () => {
 
     describe("given an organization-scoped link", () => {
       it("denies a non-member", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ visibility: "ORGANIZATION" }),
-        );
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ visibility: "ORGANIZATION" }));
 
         await expect(
           service.resolveForViewer({
@@ -289,9 +284,7 @@ describe("ShareService", () => {
 
       /** @scenario An organization link requires a member of the same organization */
       it("grants a member of that organization", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ visibility: "ORGANIZATION" }),
-        );
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ visibility: "ORGANIZATION" }));
         vi.mocked(permissions.getDecision).mockResolvedValue({
           permitted: true,
         } as never);
@@ -313,7 +306,7 @@ describe("ShareService", () => {
     describe("given a project-scoped link", () => {
       /** @scenario A project link requires a member of the same project */
       it("grants a member of that project", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ visibility: "PROJECT" }));
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ visibility: "PROJECT" }));
         vi.mocked(permissions.getDecision).mockResolvedValue({
           permitted: true,
         } as never);
@@ -332,7 +325,7 @@ describe("ShareService", () => {
       });
 
       it("denies a non-member", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ visibility: "PROJECT" }));
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ visibility: "PROJECT" }));
 
         await expect(
           service.resolveForViewer({ token: "tok_abc", viewer: anonymousViewer }),
@@ -343,7 +336,7 @@ describe("ShareService", () => {
     describe("given a single-view link", () => {
       /** @scenario A single-view link resolves exactly once */
       it("grants the first view through the atomic consume", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 0 }));
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 0 }));
 
         const share = await service.resolveForViewer({
           token: "tok_abc",
@@ -359,7 +352,7 @@ describe("ShareService", () => {
       });
 
       it("throws exhausted once the view was already spent, without a write attempt", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 1 }));
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 1 }));
 
         await expect(
           service.resolveForViewer({ token: "tok_abc", viewer: anonymousViewer }),
@@ -376,9 +369,7 @@ describe("ShareService", () => {
          */
         /** @scenario Simultaneous opens cannot beat the view cap */
         it("throws exhausted when the atomic consume reports no view left", async () => {
-          vi.mocked(repo.tryFindByToken).mockResolvedValue(
-            buildShare({ maxViews: 1, viewCount: 0 }),
-          );
+          vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 0 }));
           vi.mocked(repo.consumeView).mockResolvedValue(false);
 
           await expect(
@@ -415,7 +406,7 @@ describe("ShareService", () => {
 
     describe("when the project disabled trace sharing", () => {
       it("refuses to mint a link", async () => {
-        vi.mocked(projects.tryGetTraceSharingConfig).mockResolvedValue({
+        vi.mocked(repo.findTraceSharingConfig).mockResolvedValue({
           orgEnabled: true,
           projectEnabled: false,
         });
@@ -493,8 +484,8 @@ describe("ShareService", () => {
   describe("revokeById", () => {
     describe("when other links still cover the trace", () => {
       it("revokes the link but keeps the trace pinned", async () => {
-        vi.mocked(repo.tryFindById).mockResolvedValue(buildShare());
-        vi.mocked(repo.hasActiveShareForResource).mockResolvedValue(true);
+        vi.mocked(repo.findById).mockResolvedValue(buildShare());
+        vi.mocked(repo.countActiveForResource).mockResolvedValue(1);
 
         await service.revokeById({ id: "share_1", projectId: PROJECT_ID });
 
@@ -509,8 +500,8 @@ describe("ShareService", () => {
     describe("when it was the trace's last link", () => {
       /** @scenario A revoked link stops resolving */
       it("revokes the link and auto-unpins the trace", async () => {
-        vi.mocked(repo.tryFindById).mockResolvedValue(buildShare());
-        vi.mocked(repo.hasActiveShareForResource).mockResolvedValue(false);
+        vi.mocked(repo.findById).mockResolvedValue(buildShare());
+        vi.mocked(repo.countActiveForResource).mockResolvedValue(0);
 
         await service.revokeById({ id: "share_1", projectId: PROJECT_ID });
 
@@ -525,11 +516,11 @@ describe("ShareService", () => {
       it("does nothing — the lookup is project-scoped, so it returns null", async () => {
         // tryFindById is scoped by projectId now, so a cross-tenant id never
         // resolves; the service just no-ops on the null.
-        vi.mocked(repo.tryFindById).mockResolvedValue(null);
+        vi.mocked(repo.findById).mockResolvedValue(null);
 
         await service.revokeById({ id: "share_1", projectId: PROJECT_ID });
 
-        expect(repo.tryFindById).toHaveBeenCalledWith({
+        expect(repo.findById).toHaveBeenCalledWith({
           id: "share_1",
           projectId: PROJECT_ID,
         });
@@ -541,7 +532,7 @@ describe("ShareService", () => {
   describe("unpinTrace", () => {
     /** @scenario Active shares own their pin annotation */
     it("rejects manual unpinning while a share is active", async () => {
-      vi.mocked(repo.hasActiveShareForResource).mockResolvedValue(true);
+      vi.mocked(repo.countActiveForResource).mockResolvedValue(1);
 
       await expect(
         service.unpinTrace({ projectId: PROJECT_ID, traceId: "trace_a" }),
@@ -551,7 +542,7 @@ describe("ShareService", () => {
     });
 
     it("delegates the pin removal when the trace is not shared", async () => {
-      vi.mocked(repo.hasActiveShareForResource).mockResolvedValue(false);
+      vi.mocked(repo.countActiveForResource).mockResolvedValue(0);
 
       await service.unpinTrace({
         projectId: PROJECT_ID,
@@ -572,9 +563,9 @@ describe("ShareService", () => {
     };
 
     it("uses the same redaction-aware key for reads and writes", async () => {
-      vi.mocked(cache.tryGetPayload).mockResolvedValue({ trace: "cached" });
+      vi.mocked(cache.findPayload).mockResolvedValue({ trace: "cached" });
 
-      await expect(service.tryGetCachedPayload({ token: "token", protections })).resolves.toEqual({
+      await expect(service.findCachedPayload({ token: "token", protections })).resolves.toEqual({
         trace: "cached",
       });
       await service.cachePayload({
@@ -583,7 +574,7 @@ describe("ShareService", () => {
         payload: { trace: "fresh" },
       });
 
-      const readKey = vi.mocked(cache.tryGetPayload).mock.calls[0]?.[0];
+      const readKey = vi.mocked(cache.findPayload).mock.calls[0]?.[0];
       expect(cache.setPayload).toHaveBeenCalledWith(readKey, {
         trace: "fresh",
       });

@@ -1279,10 +1279,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/share/contract/src/share.api.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/share/server/src/share.server.ts"
     },
     {

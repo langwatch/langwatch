@@ -14,13 +14,15 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./surfaces/share-link-views": {
-      "types": "./dist/surfaces/share-link-views.d.ts",
-      "default": "./src/surfaces/share-link-views.ts"
+    "./share-link-views": {
+      "langwatch-declaration-source": "./src/share-link-views.ts",
+      "types": "./dist/share-link-views.d.ts",
+      "default": "./src/share-link-views.ts"
     },
-    "./surfaces/share-links": {
-      "types": "./dist/surfaces/share-links.d.ts",
-      "default": "./src/surfaces/share-links.ts"
+    "./share-links": {
+      "langwatch-declaration-source": "./src/share-links.ts",
+      "types": "./dist/share-links.d.ts",
+      "default": "./src/share-links.ts"
     }
   },
   "scripts": {
@@ -29,9 +31,9 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/time": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "react-icons": "^5.7.0"
   },
   "devDependencies": {

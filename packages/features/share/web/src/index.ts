@@ -1,4 +1,3 @@
-export { copyShareLink } from "./copy-share-link.ts";
 export { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-link-form.tsx";
 export {
   expiryToInstant,
@@ -8,6 +7,6 @@ export {
 } from "./share-expiry.ts";
 export { describeShareLink, isShareLinkSpent, type ShareLinkView } from "./share-link-status.ts";
 export { ShareLinkRow } from "./share-link-row.tsx";
+export { copyShareLink, shareUrlForToken } from "./share-links.ts";
 export { ShareLinksList } from "./share-links-list.tsx";
 export { ShareTraceDialogBody } from "./share-trace-dialog-body.tsx";
-export { shareUrlForToken } from "./share-url.ts";

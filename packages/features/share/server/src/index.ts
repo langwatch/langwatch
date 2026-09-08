@@ -1,6 +1,4 @@
-export { PostgresShareAdapter } from "./adapters/postgres.share.adapter.ts";
-export {
-  PinnedTraceTrpcApi,
-  type PinnedTraceTrpcContext,
-} from "./transport/api-trpc/pinned-trace.api.ts";
-export { ShareTrpcApi, type ShareTrpcContext } from "./transport/api-trpc/share.api.ts";
+export type { ShareInfrastructure } from "./app/share.app.ts";
+export { shareServer } from "./share.server.ts";
+export { pinnedTraceTrpcTransport } from "./transport/pinned-trace.trpc.ts";
+export { shareTrpcTransport } from "./transport/share.trpc.ts";

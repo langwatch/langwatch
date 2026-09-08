@@ -1,6 +1,6 @@
-export abstract class ShareCacheRepository {
-  abstract isNewViewing(input: { shareId: string; viewerKey: string }): Promise<boolean>;
+export interface ShareCacheRepository {
+  isNewViewing(input: { shareId: string; viewerKey: string }): Promise<boolean>;
 
-  abstract tryGetPayload(key: string): Promise<unknown | null>;
-  abstract setPayload(key: string, payload: unknown): Promise<void>;
+  findPayload(key: string): Promise<unknown | null>;
+  setPayload(key: string, payload: unknown): Promise<void>;
 }

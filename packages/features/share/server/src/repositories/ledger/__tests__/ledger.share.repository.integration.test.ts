@@ -21,11 +21,7 @@
  *
  * @see packages/features/share/specs/share.feature
  */
-import {
-  AUTHZ_ENGINE_MIGRATION_NAME,
-  type AuthzGrantsService,
-  type AuthzService,
-} from "@langwatch/authz-contract";
+import { AUTHZ_ENGINE_MIGRATION_NAME, type AuthzApi } from "@langwatch/authz-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -47,6 +43,7 @@ import {
   type Team,
 } from "@langwatch/prisma-client/generated";
 import { LedgerShareRepository } from "../ledger.share.repository.ts";
+import { PrismaShareGrantRepository } from "../../prisma/prisma.share-grant.repository.ts";
 import { PrismaShareRepository } from "../../prisma/prisma.share.repository.ts";
 import { AuthzCollectorService, PostgresAuthzAdapter } from "@langwatch/authz-server/testing";
 
@@ -84,26 +81,22 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
   let token: string;
   let shareLinkId: string;
 
-  /** Never reached: every case here is a read or an accounting write, and a
-   *  mint or a revoke would be a different suite. */
-  const writer = {
+  /** The mint and revoke halves are never reached: every case here is a read
+   *  or an accounting write, and either would be a different suite. */
+  const authz = {
+    isOnEngine: async () => true,
     attachResourceGrant: async () => {
       throw new Error("this suite mints nothing");
     },
     revokeResourceGrants: async () => {
       throw new Error("this suite revokes nothing");
     },
-  } as unknown as AuthzGrantsService;
-
-  const authz = {
-    isOnEngine: async () => true,
-  } as unknown as AuthzService;
+  } as unknown as AuthzApi;
 
   const repository = () =>
     LedgerShareRepository.create({
-      legacy: PrismaShareRepository.create({ database: prisma }),
-      prisma,
-      grants: writer,
+      head: PrismaShareRepository.create({ prisma }),
+      grants: PrismaShareGrantRepository.create({ prisma }),
       authz,
     });
 

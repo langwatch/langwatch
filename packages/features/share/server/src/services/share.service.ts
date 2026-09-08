@@ -1,6 +1,6 @@
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
 import {
   createShareInputSchema,
   PinnedToActiveShareError,
@@ -8,9 +8,13 @@ import {
   revokeShareInputSchema,
   shareResourceInputSchema,
   sharedPayloadCacheInputSchema,
-  ShareService as ShareServiceContract,
+  ShareLinkExhaustedError,
+  ShareLinkExpiredError,
+  ShareLinkForbiddenError,
+  ShareLinkNotFoundError,
   shareViewerSchema,
   tracePinInputSchema,
+  TraceSharingDisabledError,
   type CreateShareInput,
   type ResolveShareInput,
   type RevokeShareInput,
@@ -22,17 +26,9 @@ import {
   type ShareWithProject,
   type TracePinInput,
 } from "@langwatch/share-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { fromDate, type Instant, nowInstant, toEpochMs } from "@langwatch/time";
 import { createHash } from "node:crypto";
 import { customAlphabet } from "nanoid";
-import {
-  ShareLinkExhaustedError,
-  ShareLinkExpiredError,
-  ShareLinkForbiddenError,
-  ShareLinkNotFoundError,
-  TraceSharingDisabledError,
-} from "@langwatch/share-contract";
 import type { ShareCacheRepository } from "../repositories/share-cache.repository.ts";
 import type { ShareRepository } from "../repositories/share.repository.ts";
 
@@ -42,33 +38,28 @@ const generateShareToken = customAlphabet(
   32,
 );
 
-export class ShareService extends ShareServiceContract {
-  static create(options: {
-    repository: ShareRepository;
-    dataRetention: DataRetentionService;
-    projects: ProjectService;
-    permissions: AuthzService;
-    cache: ShareCacheRepository;
-  }): ShareService {
+type ShareServiceOptions = {
+  repository: ShareRepository;
+  dataRetention: DataRetentionApi;
+  permissions: AuthzApi;
+  cache: ShareCacheRepository;
+};
+
+export class ShareService {
+  readonly #options: ShareServiceOptions;
+
+  static create(options: ShareServiceOptions): ShareService {
     return new ShareService(options);
   }
 
-  private constructor(
-    private readonly options: {
-      repository: ShareRepository;
-      dataRetention: DataRetentionService;
-      projects: ProjectService;
-      permissions: AuthzService;
-      cache: ShareCacheRepository;
-    },
-  ) {
-    super();
+  private constructor(options: ShareServiceOptions) {
+    this.#options = options;
   }
 
   async listForResource(input: ShareResourceInput): Promise<ShareLink[]> {
     const parsed = shareResourceInputSchema.parse(input);
 
-    return this.options.repository.listByResource(parsed);
+    return this.#options.repository.findAllByResource(parsed);
   }
 
   /**
@@ -77,7 +68,7 @@ export class ShareService extends ShareServiceContract {
    */
   async resolveForViewer(input: ResolveShareInput): Promise<ShareWithProject> {
     const { token, viewer, viewerKey } = resolveShareInputSchema.parse(input);
-    const share = await this.options.repository.tryFindByToken(token);
+    const share = await this.#options.repository.findByToken(token);
 
     if (!share) {
       throw new ShareLinkNotFoundError();
@@ -92,18 +83,18 @@ export class ShareService extends ShareServiceContract {
     }
 
     // Audience is checked before expiry so outsiders do not learn link state.
-    const audienceOk = await this.checkAudience(share, viewer);
+    const audienceOk = await this.#checkAudience(share, viewer);
     if (!audienceOk) {
       throw new ShareLinkForbiddenError();
     }
 
-    if (ShareService.isExpired(share)) {
+    if (ShareService.#isExpired(share)) {
       throw new ShareLinkExpiredError();
     }
 
     // A deduplicated refresh may reuse the viewing that exhausted the link.
     if (viewerKey) {
-      const isNewViewing = await this.options.cache.isNewViewing({
+      const isNewViewing = await this.#options.cache.isNewViewing({
         shareId: share.id,
         viewerKey,
       });
@@ -114,11 +105,11 @@ export class ShareService extends ShareServiceContract {
     }
 
     // The conditional consume remains authoritative under races.
-    if (ShareService.isViewExhausted(share)) {
+    if (ShareService.#isViewExhausted(share)) {
       throw new ShareLinkExhaustedError();
     }
 
-    const consumed = await this.options.repository.consumeView({
+    const consumed = await this.#options.repository.consumeView({
       id: share.id,
       projectId: share.projectId,
       maxViews: share.maxViews,
@@ -131,21 +122,21 @@ export class ShareService extends ShareServiceContract {
     return share;
   }
 
-  private async checkAudience(share: ShareWithProject, viewer: ShareViewer): Promise<boolean> {
+  async #checkAudience(share: ShareWithProject, viewer: ShareViewer): Promise<boolean> {
     const visibility: ShareVisibility = share.visibility;
 
     switch (visibility) {
       case "PUBLIC":
         return true;
       case "ORGANIZATION":
-        return this.hasViewerPermission({
+        return this.#hasViewerPermission({
           viewer,
           tier: "organization",
           id: share.project.team.organizationId,
           permission: "organization:view",
         });
       case "PROJECT":
-        return this.hasViewerPermission({
+        return this.#hasViewerPermission({
           viewer,
           tier: "project",
           id: share.projectId,
@@ -156,7 +147,7 @@ export class ShareService extends ShareServiceContract {
     }
   }
 
-  private async hasViewerPermission({
+  async #hasViewerPermission({
     viewer,
     tier,
     id,
@@ -172,7 +163,7 @@ export class ShareService extends ShareServiceContract {
       return false;
     }
 
-    const decision = await this.options.permissions.getDecision({
+    const decision = await this.#options.permissions.getDecision({
       userId: parsedViewer.id,
       permission,
       scope: { tier, id },
@@ -186,7 +177,7 @@ export class ShareService extends ShareServiceContract {
     const parsed = createShareInputSchema.parse(input);
 
     if (parsed.resourceType === "TRACE") {
-      const config = await this.options.projects.tryGetTraceSharingConfig(parsed.projectId);
+      const config = await this.#options.repository.findTraceSharingConfig(parsed.projectId);
       const enabled = config?.orgEnabled === true && config.projectEnabled;
 
       if (!enabled) {
@@ -195,7 +186,7 @@ export class ShareService extends ShareServiceContract {
     }
 
     const { expiresAt, ...resource } = parsed;
-    const share = await this.options.repository.create({
+    const share = await this.#options.repository.create({
       token: generateShareToken(),
       ...resource,
       expiresAt: expiresAt ? fromDate(expiresAt) : null,
@@ -205,7 +196,7 @@ export class ShareService extends ShareServiceContract {
       try {
         // Idempotent (upsert): keeps the trace pinned while it is shared,
         // without clobbering a pre-existing manual pin.
-        await this.options.dataRetention.autoPin({
+        await this.#options.dataRetention.autoPin({
           projectId: parsed.projectId,
           traceId: parsed.resourceId,
         });
@@ -222,7 +213,7 @@ export class ShareService extends ShareServiceContract {
         // can't mask the original pin error, and log it — an orphaned live
         // token would otherwise survive silently and stay listable.
         try {
-          await this.options.repository.deleteById({
+          await this.#options.repository.deleteById({
             id: share.id,
             projectId: parsed.projectId,
           });
@@ -247,26 +238,26 @@ export class ShareService extends ShareServiceContract {
   /** Revoke a single link. Auto-unpins only when it was the trace's last share. */
   async revokeById(input: RevokeShareInput): Promise<void> {
     const { id, projectId } = revokeShareInputSchema.parse(input);
-    const share = await this.options.repository.tryFindById({ id, projectId });
+    const share = await this.#options.repository.findById({ id, projectId });
 
     if (!share) {
       return;
     }
 
-    await this.options.repository.deleteById({ id, projectId });
+    await this.#options.repository.deleteById({ id, projectId });
 
     if (share.resourceType === "TRACE") {
-      const stillShared = await this.options.repository.hasActiveShareForResource({
+      const stillShared = await this.#options.repository.countActiveForResource({
         projectId,
         resourceType: "TRACE",
         resourceId: share.resourceId,
       });
 
-      if (!stillShared) {
+      if (stillShared === 0) {
         // Best-effort: the link is already revoked (the user's intent); a
         // failed unpin only leaves an orphan pin annotation, which is logged.
         try {
-          await this.options.dataRetention.autoUnpin({
+          await this.#options.dataRetention.autoUnpin({
             projectId,
             traceId: share.resourceId,
           });
@@ -288,7 +279,7 @@ export class ShareService extends ShareServiceContract {
     // createShare rollback).
     if (resourceType === "TRACE") {
       try {
-        await this.options.dataRetention.autoUnpin({
+        await this.#options.dataRetention.autoUnpin({
           projectId,
           traceId: resourceId,
         });
@@ -302,7 +293,7 @@ export class ShareService extends ShareServiceContract {
       }
     }
 
-    await this.options.repository.deleteByResource({
+    await this.#options.repository.deleteByResource({
       projectId,
       resourceType,
       resourceId,
@@ -314,11 +305,11 @@ export class ShareService extends ShareServiceContract {
     // `source=share` pins disappear with their share. Manual pins survive
     // because `autoUnpin` skips traces with a manual pin. Without this loop,
     // disabling trace sharing left orphaned share-sourced pins behind.
-    const traceIds = await this.options.repository.findAllTraceShareResourceIds(projectId);
+    const traceIds = await this.#options.repository.findAllTraceShareResourceIds(projectId);
 
     for (const traceId of traceIds) {
       try {
-        await this.options.dataRetention.autoUnpin({ projectId, traceId });
+        await this.#options.dataRetention.autoUnpin({ projectId, traceId });
       } catch (error) {
         logger.error(
           { projectId, traceId, error },
@@ -327,31 +318,31 @@ export class ShareService extends ShareServiceContract {
       }
     }
 
-    await this.options.repository.deleteAllTraceShares(projectId);
+    await this.#options.repository.deleteAllTraceShares(projectId);
   }
 
   async unpinTrace(input: TracePinInput): Promise<void> {
     const parsed = tracePinInputSchema.parse(input);
-    const isShared = await this.options.repository.hasActiveShareForResource({
+    const activeShares = await this.#options.repository.countActiveForResource({
       ...parsed,
       resourceType: "TRACE",
       resourceId: parsed.traceId,
     });
 
-    if (isShared) {
+    if (activeShares > 0) {
       throw new PinnedToActiveShareError(
         "This trace is currently shared. Disable the share before unpinning.",
       );
     }
 
-    await this.options.dataRetention.unpin(parsed);
+    await this.#options.dataRetention.unpin(parsed);
   }
 
-  async tryGetCachedPayload(input: SharedPayloadCacheInput): Promise<unknown | null> {
+  async findCachedPayload(input: SharedPayloadCacheInput): Promise<unknown | null> {
     const parsed = sharedPayloadCacheInputSchema.parse(input);
     const key = ShareService.buildPayloadCacheKey(parsed);
 
-    return this.options.cache.tryGetPayload(key);
+    return this.#options.cache.findPayload(key);
   }
 
   async cachePayload(input: SharedPayloadCacheInput & { payload: unknown }): Promise<void> {
@@ -361,43 +352,40 @@ export class ShareService extends ShareServiceContract {
     });
     const key = ShareService.buildPayloadCacheKey(parsed);
 
-    await this.options.cache.setPayload(key, input.payload);
+    await this.#options.cache.setPayload(key, input.payload);
   }
 
   static buildPayloadCacheKey({ token, protections }: SharedPayloadCacheInput): string {
     const fingerprint = createHash("sha256")
-      .update(ShareService.stableStringify(protections))
+      .update(ShareService.#stableStringify(protections))
       .digest("hex")
       .slice(0, 32);
 
     return `${token}:${fingerprint}`;
   }
 
-  private static isExpired(
-    share: Pick<ShareLink, "expiresAt">,
-    now: Instant = nowInstant(),
-  ): boolean {
+  static #isExpired(share: Pick<ShareLink, "expiresAt">, now: Instant = nowInstant()): boolean {
     return share.expiresAt != null && toEpochMs(share.expiresAt) <= now.epochMilliseconds;
   }
 
-  private static isViewExhausted(share: { maxViews: number | null; viewCount: number }): boolean {
+  static #isViewExhausted(share: { maxViews: number | null; viewCount: number }): boolean {
     return share.maxViews != null && share.viewCount >= share.maxViews;
   }
 
-  private static stableStringify(value: unknown): string {
+  static #stableStringify(value: unknown): string {
     if (value === null || typeof value !== "object") {
       return JSON.stringify(value);
     }
 
     if (Array.isArray(value)) {
-      return `[${value.map((item) => ShareService.stableStringify(item)).join(",")}]`;
+      return `[${value.map((item) => ShareService.#stableStringify(item)).join(",")}]`;
     }
 
     const entries = Object.entries(value)
       .filter(([, entry]) => entry !== void 0)
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
     const properties = entries.map(
-      ([key, entry]) => `${JSON.stringify(key)}:${ShareService.stableStringify(entry)}`,
+      ([key, entry]) => `${JSON.stringify(key)}:${ShareService.#stableStringify(entry)}`,
     );
 
     return `{${properties.join(",")}}`;

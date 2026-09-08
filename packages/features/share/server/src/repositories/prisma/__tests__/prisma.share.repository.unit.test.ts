@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaShareRepository } from "../prisma.share.repository.ts";
+
+type ShareDatabase = Parameters<typeof PrismaShareRepository.create>[0]["prisma"];
 
 /**
  * Tenant-isolation guard, carried over from #5834 (which pinned the same
@@ -8,20 +9,22 @@ import { PrismaShareRepository } from "../prisma.share.repository.ts";
  * lookup must carry `projectId` in the query itself, so a cross-tenant row is
  * never returned into memory even transiently.
  *
- * `tryFindByToken` is deliberately exempt: the token is the capability, and the
+ * `findByToken` is deliberately exempt: the token is the capability, and the
  * anonymous viewer has no project to scope by. Its tenancy comes from the
  * token's unguessability plus the audience check in `ShareService`.
  */
 describe("PrismaShareRepository tenant scoping", () => {
   const buildRepository = (shareLink: Record<string, unknown>) =>
-    PrismaShareRepository.create({ database: { shareLink } as unknown as PrismaClient });
+    PrismaShareRepository.create({
+      prisma: { shareLink, project: { findUnique: vi.fn() } } as unknown as ShareDatabase,
+    });
 
   describe("when looking a link up by id", () => {
     it("scopes the query by projectId", async () => {
       const findFirst = vi.fn().mockResolvedValue(null);
       const repository = buildRepository({ findFirst });
 
-      await repository.tryFindById({ id: "share_1", projectId: "project_1" });
+      await repository.findById({ id: "share_1", projectId: "project_1" });
 
       expect(findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -36,7 +39,7 @@ describe("PrismaShareRepository tenant scoping", () => {
       const findMany = vi.fn().mockResolvedValue([]);
       const repository = buildRepository({ findMany });
 
-      await repository.listByResource({
+      await repository.findAllByResource({
         projectId: "project_1",
         resourceType: "TRACE",
         resourceId: "trace_1",
@@ -59,7 +62,7 @@ describe("PrismaShareRepository tenant scoping", () => {
       const count = vi.fn().mockResolvedValue(0);
       const repository = buildRepository({ count });
 
-      await repository.hasActiveShareForResource({
+      await repository.countActiveForResource({
         projectId: "project_1",
         resourceType: "TRACE",
         resourceId: "trace_1",

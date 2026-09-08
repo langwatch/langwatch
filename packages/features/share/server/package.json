@@ -22,15 +22,17 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/time": "workspace:*",
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@trpc/server": "^11.18.0",
     "ioredis": "5.10.1",
     "nanoid": "^5.1.5",

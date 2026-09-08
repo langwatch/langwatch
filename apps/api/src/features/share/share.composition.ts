@@ -3,88 +3,51 @@
  * administers the links; `pinnedTrace.*` is the same ledger read as the traces a person
  * kept.
  */
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
-import { HandledError } from "@langwatch/handled-error";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
-import { PostgresShareAdapter } from "@langwatch/share-server";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import {
+  DataRetentionApi,
+  type DataRetentionApi as DataRetentionApiContract,
+} from "@langwatch/data-retention-contract";
+import { createApp } from "@langwatch/runtime-composition";
+import { shareServer, type ShareInfrastructure } from "@langwatch/share-server";
 
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createPinnedTraceTrpcRouter, createShareTrpcRouter } from "./share-trpc.mount.ts";
-
-/** The other features' services a share link is bounded and authorized by. */
-export type SharePeers = Readonly<{
-  /** The window a shared trace stays readable inside. */
-  dataRetention: DataRetentionService;
-  /** Resolves a project's organization, team and department. */
-  projects: ProjectService;
-  /** Emits the authorization grants a share hands its viewer. */
-  grants: AuthzGrantsService;
-}>;
-
 import type { ComposedShareFeature } from "./share.composition.types.ts";
 
-/** Composes the share ledger over this process's own graph. */
-export function composeShareFeature(options: {
+/** The other features' apps a share link is bounded and authorized by. */
+export type SharePeers = Readonly<{
+  /** The window a shared trace stays readable inside, and the pin a live link holds. */
+  dataRetention: DataRetentionApiContract;
+  /** Decides an audience, and records the grant a share hands its viewer. */
+  permissions: AuthzApiContract;
+}>;
+
+/** Installs the share surfaces over this process's own graph. */
+export async function installApiShare(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: SharePeers;
   /** The viewer cache; `null` runs the ledger uncached. */
-  redis: Parameters<typeof PostgresShareAdapter.create>[0]["redis"];
-}): ComposedShareFeature {
-  const service = PostgresShareAdapter.create({
-    database: options.infrastructure.prisma,
-    dataRetention: options.peers.dataRetention,
-    projects: options.peers.projects,
-    permissions: options.infrastructure.authz,
-    grants: options.peers.grants,
-    redis: options.redis,
-  });
+  redis: ShareInfrastructure["redis"];
+}): Promise<ComposedShareFeature> {
+  const { prisma } = options.infrastructure;
+  const { dataRetention, permissions } = options.peers;
 
-  return { service, routers: mountRouters };
-}
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withProvided(DataRetentionApi, dataRetention)
+    .withProvided(AuthzApi, permissions)
+    .withFeature(shareServer, { infrastructure: { redis: options.redis } })
+    .boot({ role: "api" });
 
-/**
- * The share surfaces on a process that composed no database. Both namespaces still mount
- * and every call refuses by name, so the settings form says the deployment cannot answer
- * rather than reporting that a project has shared nothing.
- */
-export function refusingShareFeature(): ComposedShareFeature {
-  const service = new Proxy(
-    {},
-    {
-      get: () => (): never => {
-        throw new ApiShareUnavailableError("Sharing");
-      },
-      has: () => true,
-    },
-  ) as ShareService;
+  const app = runtime.feature(shareServer).provided;
 
-  return { service, routers: mountRouters };
-}
-
-/**
- * Both routers, over the mount alone. Neither takes ports: every answer is read off
- * `ctx.app.share`, which is the service above — so a refusing composition and a real one
- * mount the same two namespaces and differ only in what the slice answers.
- */
-function mountRouters(mount: ApiTrpcFeatureMount) {
   return {
-    share: createShareTrpcRouter(mount),
-    pinnedTrace: createPinnedTraceTrpcRouter(mount),
+    routers: (mount) => ({
+      share: createShareTrpcRouter(mount.runtime),
+      pinnedTrace: createPinnedTraceTrpcRouter(mount.runtime),
+    }),
+    app,
   };
-}
-
-/** A capability this deployment did not compose, refused by name. */
-class ApiShareUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} is not available on this deployment.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiShareUnavailableError";
-  }
 }

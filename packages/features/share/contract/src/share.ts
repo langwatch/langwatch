@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const SHARE_KSUID_RESOURCE = "share";
+
 export const shareResourceTypeSchema = z.enum(["TRACE", "THREAD"]);
 export type ShareResourceType = z.infer<typeof shareResourceTypeSchema>;
 
@@ -83,6 +85,9 @@ export const tracePinInputSchema = z
   .object({ projectId: z.string().min(1), traceId: z.string().min(1) })
   .strict();
 export type TracePinInput = z.infer<typeof tracePinInputSchema>;
+
+export const shareProjectScopeSchema = z.object({ projectId: z.string().min(1) }).strict();
+export type ShareProjectScope = z.infer<typeof shareProjectScopeSchema>;
 
 export const sharedPayloadCacheInputSchema = z
   .object({

@@ -1,14 +1,14 @@
-/** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ShareService } from "@langwatch/share-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+/** Kept apart from the composition so the router/app type never pulls in the installer. */
+import type { ShareApi } from "@langwatch/share-contract";
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { createPinnedTraceTrpcRouter, createShareTrpcRouter } from "./share-trpc.mount.ts";
 
-/** The two namespaces and the service `ctx.app.share` carries. */
+/** The two namespaces and the `ctx.app.share` ledger every share door reads. */
 export type ComposedShareFeature = Readonly<{
   routers(mount: ApiTrpcFeatureMount): {
-    share: ReturnType<typeof createShareTrpcRouter>;
-    pinnedTrace: ReturnType<typeof createPinnedTraceTrpcRouter>;
+    share: ReturnType<typeof createShareTrpcRouter<ApiTrpcContext>>;
+    pinnedTrace: ReturnType<typeof createPinnedTraceTrpcRouter<ApiTrpcContext>>;
   };
   /** For `ctx.app.share` — the one ledger every share door reads. */
-  service: ShareService;
+  app: ShareApi;
 }>;

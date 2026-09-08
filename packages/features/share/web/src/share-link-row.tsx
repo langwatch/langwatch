@@ -5,7 +5,7 @@ import type { ShareLinkView } from "./share-link-status.ts";
 import type { IconType } from "react-icons";
 import { LuBuilding2, LuCopy, LuFolderClosed, LuGlobe, LuTrash2 } from "react-icons/lu";
 import { describeShareLink, isShareLinkSpent } from "./share-link-status.ts";
-import { shareUrlForToken } from "./share-url.ts";
+import { shareUrlForToken } from "./share-links.ts";
 
 /** Terse labels for the link list — the icon already carries the meaning, and
  *  the full phrasing lives in the "Who can access" select. */

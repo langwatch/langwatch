@@ -11,11 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": [
-    "./src/index.ts",
-    "./src/surfaces/share-link-views.ts",
-    "./src/surfaces/share-links.ts"
-  ],
+  "files": ["./src/index.ts", "./src/share-link-views.ts", "./src/share-links.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
