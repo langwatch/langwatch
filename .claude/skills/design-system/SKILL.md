@@ -20,7 +20,7 @@ Look here before writing a component:
   `@langwatch/design-system/provider` and `/color-mode` are the app-level wrappers,
   `/testing` the render helpers.
 - `packages/design-system/src/index.ts` — the formatters and small pure helpers
-  (money, metrics, slugify, text overflow); do not reimplement one in a feature.
+  (money, metrics, slugify, text overflow); do not reimplement one in a module.
 - `packages/design-system/stories/` for what a component looks like,
   `packages/design-system/specs/` for what it promises.
 
@@ -35,6 +35,7 @@ Read before building, not after:
   `ScopeChipPicker`, never a hand-rolled Select.
 - `dev/docs/best_practices/copywriting.md` — no abbreviations, no internals in copy.
 
-A component that a second feature needs is published as a surface, not copied; see the
-`web-surface` skill. A component the whole product needs belongs in the design system.
-Adding one there means a story and a spec scenario alongside it.
+A component that a second module needs is published as a surface, not copied; see
+`.claude/skills/module/references/web-surface.md`. A component the whole product needs
+belongs in the design system. Adding one there means a story and a spec scenario
+alongside it.

@@ -1,24 +1,17 @@
----
-name: feature-new
-description: "Create a new LangWatch feature package trio (packages/features/<name>/{contract,server,web}) in the annotation shape and wire it into apps/api, apps/worker and apps/ui: spec file first, then the contract's schemas, errors and callable <Name>Api token, the server's installer, app, services, repository interfaces with Prisma and memory backends and flat REST/tRPC declarations, the web entry and api-map, the API-side composition and mounts, the UI installation and catalogue entries. Use whenever someone asks to add a feature, a new domain, a new settings page with its own data, a new tRPC/REST surface for a thing that has no package yet, or says 'scaffold', 'new feature package', 'add a <noun> feature'. Also use it when a request looks like a big addition to an existing feature but the noun is a different subject in packages/features/catalogue.json."
-user-invocable: true
-argument-hint: "<feature-name> [what it does] [--no-web] [--worker]"
----
-
-# Create a feature
+# Create a module
 
 Read `.claude/skills/architecture-guide/SKILL.md` first, then the references for
 contract, server, web and install as you reach each step. Everything below is the order
 that keeps the linter green from the first commit. **Copy `packages/features/annotation`**;
-it is the reference and the only feature with no entry in
-`packages/architecture-lint/src/feature-shape-baseline.json`. Do not copy a feature that
+it is the reference and the only module with no entry in
+`packages/architecture-lint/src/feature-shape-baseline.json`. Do not copy a module that
 still has one.
 
 ## 0. Decide the subject and check ownership
 
-- The feature name is a lower-kebab noun (`annotation`, `model-provider`, `coding-agent`).
-- Open `packages/features/catalogue.json`. If the subject already belongs to a feature,
-  stop: this is `feature-extend` on the owner, not a new package.
+- The module's name is a lower-kebab noun (`annotation`, `model-provider`, `coding-agent`).
+- Open `packages/features/catalogue.json`. If the subject already belongs to a module,
+  stop: this is `references/extend.md` on the owner, not a new package.
 - Ask only if two readings lead to materially different packages (project-scoped versus
   organization-scoped, say). Otherwise decide and state it.
 
@@ -26,7 +19,7 @@ still has one.
 
 Create `packages/features/<name>/specs/<name>.feature`. Write the golden path and the
 named failures as scenarios, each tagged `@unit` or `@integration`, each with the error
-code it will carry (see `spec-bind`):
+code it will carry (see the `spec-bind` skill):
 
 ```gherkin
 Feature: Annotation scores
@@ -47,7 +40,7 @@ Feature: Annotation scores
 Also create `packages/features/<name>/feature.json` with `{ "layoutVersion": 0 }`,
 `adrs/README.md` with a `001-<name>-boundary.md` modelled on
 `packages/features/annotation/adrs/001-annotation-service-boundary.md`, and add the
-feature to `packages/features/catalogue.json`:
+module to `packages/features/catalogue.json`:
 
 ```json
 { "id": "<name>", "root": "packages/features/<name>", "classification": "core", "subjects": ["<name>"] }
@@ -140,7 +133,7 @@ tests are `.integration.test.tsx` with the jsdom docblock. Add the package to
 
 ## 5. Wire it
 
-Follow `.claude/skills/feature-wire/SKILL.md` for the details. In short:
+Follow `references/wire.md` for the details. In short:
 
 - **apps/api**: `apps/api/src/features/<name>/{<name>.composition.ts, <name>.composition.types.ts, <name>-trpc.mount.ts[, <name>-rest.mount.ts]}`
   modelled on `apps/api/src/features/annotation/`; `installApi<Name>` called from
@@ -148,7 +141,7 @@ Follow `.claude/skills/feature-wire/SKILL.md` for the details. In short:
   `apps/api/src/app-trpc/app-trpc.features.ts`; the composed slot on
   `ComposedApiFeatures` in `app-trpc.composed.ts`.
 - **apps/worker** (`--worker`): install the same `<name>Server` in the capability root
-  that owns its jobs (`apps/worker/src/app/worker-*.composition.ts`), list the feature in
+  that owns its jobs (`apps/worker/src/app/worker-*.composition.ts`), list the module in
   `apps/worker/src/features/catalogue.json`; queue jobs also need an
   `apps/worker/src/features/job-registry.json` entry, which is a deliberate, reviewed
   change.
@@ -169,7 +162,7 @@ then `.claude/skills/architecture-guide/references/gates.md` for the three new p
 `@langwatch/runtime-composition` (typecheck fails if `feature-names.generated.ts` lags),
 `@langwatch/platform-api`, `@langwatch/ui`, architecture-lint and parity. Your new
 `.feature` file must report all bound, and `feature-shape` must report nothing for the new
-feature: a new feature never gets a baseline entry.
+module: a new module never gets a baseline entry.
 
 ## Report
 

@@ -1,0 +1,23 @@
+{
+  "skill_name": "module-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit packages/features/experiment for layout and boundary problems.",
+      "expected_output": "Runs architecture-lint filtered to the package, parity, tsc and tests first, then reports findings with file:line and rule names, classifies absences as STALE / DELIBERATE / REAL GAP, and changes nothing.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Is the gateway module clean enough to open a PR?",
+      "expected_output": "Produces the structured audit report with mechanical counts, findings ordered by severity, and a recommended fix order; distinguishes baselined violations from new ones.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "This service layer looks overengineered - too many tiny files and a port with only one implementation. Audit it.",
+      "expected_output": "Runs the ast-grep identity-function and same-name-delegation detectors plus the shape survey first, then answers the four reading questions (database client boundary, what the composition root actually passes, how many implementations each port has, whether errors carry their own status) with file:line evidence, and separates real findings from a Keep list rather than proposing to collapse a port with genuine polymorphism.",
+      "files": []
+    }
+  ]
+}

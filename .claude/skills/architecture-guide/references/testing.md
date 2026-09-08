@@ -2,7 +2,7 @@
 
 ## Specs are the requirements
 
-Feature files live in `packages/features/<name>/specs/*.feature` (feature-owned),
+Feature files live in `packages/features/<name>/specs/*.feature` (module-owned),
 any `packages/**/specs/` directory, `specs/**` (repo-wide) and `sdks/typescript/specs`.
 Those are the roots `check-feature-parity` walks. Write or extend the scenario before
 writing code, and write the failure paths as scenarios with a named error code alongside
@@ -97,10 +97,10 @@ See `gates.md`. Never `npx vitest`, never a hand-rolled vitest config, never
 
 | Rule                                                                                       | Source                                                     | Catches                                                     |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `feature-source-layout`, `-filename`, `-subject`                                           | `oxlint-plugin.mjs` over the lint-core grammar module      | wrong folder, wrong dot/hyphen, another feature's subject   |
+| `feature-source-layout`, `-filename`, `-subject`                                           | `oxlint-plugin.mjs` over the lint-core grammar module      | wrong folder, wrong dot/hyphen, another module's subject   |
 | `feature-shape`, `feature-shape-baseline`                                                  | `src/feature-shape.ts`                                     | a legacy piece (contract service, persistence adapter, fixtures/, testing.ts, nested transport, unregistered or memory-less repositories) not in the shrinking inventory |
-| `feature-app-contract`, `feature-app-factory`                                              | `src/feature-app-contract.ts`, `src/feature-setup-infrastructure.ts` | a contract without its `*Api` token, an app whose public surface differs from its API, a feature capability smuggled through infrastructure |
-| `prisma-containment`, `prisma-table-ownership`                                             | `oxlint-plugin.mjs`, `src/prisma-table-ownership.ts`       | Prisma outside `repositories/prisma`; two features claiming one table |
+| `feature-app-contract`, `feature-app-factory`                                              | `src/feature-app-contract.ts`, `src/feature-setup-infrastructure.ts` | a contract without its `*Api` token, an app whose public surface differs from its API, a capability smuggled through infrastructure |
+| `prisma-containment`, `prisma-table-ownership`                                             | `oxlint-plugin.mjs`, `src/prisma-table-ownership.ts`       | Prisma outside `repositories/prisma`; two modules claiming one table |
 | `typed-prisma-seam`                                                                        | `oxlint-plugin.mjs`                                        | `as PrismaClient`, `database: object`                       |
 | `private-runtime-export`                                                                   | `src/feature-layout.ts`                                    | index re-exporting repositories/stores/projections          |
 | `strict-port-module`                                                                       | `src/port-modules.ts`                                      | a port that is not an abstract `*Port` class                |

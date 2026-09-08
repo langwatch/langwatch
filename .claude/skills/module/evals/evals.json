@@ -1,0 +1,59 @@
+{
+  "skill_name": "module",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a new 'saved-view' module: users can save a named set of trace filters per project, list them and delete them. Settings page under the project.",
+      "expected_output": "Creates packages/features/saved-view/{contract,server,web} with feature.json, a spec file written first, a catalogue.json subject, zod schemas with infer, a callable <Name>Api interface with its featureApi token, an installer built with defineFeature, an app class over private services, repository interfaces with Prisma and memory backends selected by defineRepositories, a flat tRPC declaration via defineTrpcContract in the contract and defineTrpcRouter / defineRestRouter, an apps/api composition that boots the installer with createApp, apps/ui catalogue and WebInstallation registrations, error codes registered in handled-error, and tests binding every scenario; runs scoped gates only.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Scaffold a module for webhook signing keys, server only, no UI yet.",
+      "expected_output": "Creates contract and server only, no web package, names the absence of a UI, and still writes the spec, the API token, the installer, the app, the service, both repository backends, the transport declaration and the composition.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "In the secret module, add the ability to rotate a secret's value and record who rotated it.",
+      "expected_output": "Adds a tagged scenario first, an input schema and the operation on the SecretApi in contract, the operation on the app and its service, a repository method carrying projectId on the interface and on both the Prisma and memory backends, an inline tRPC handler on the flat declaration, the api-map entry and a hook in web, an error code if a failure is named, and binds tests at each layer; does not touch other modules' packages.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Prompts should refuse a version note longer than 500 characters with a clear error.",
+      "expected_output": "Adds a failure scenario with a stable code, a HandledError subclass in the prompt contract, the code in app-codes.ts and copy in presentation.ts, the check in the service (not the transport), and a unit test asserting the code, not the message.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "packages/features/trace/server/src/services/redaction.service.ts contains PII stripping that belongs to data-privacy. Move it.",
+      "expected_output": "Moves the pure stripper into data-privacy contract (or server service if it needs runtime), repoints every importer including tests and vi.mock paths, adds no re-export, deletes the source, updates package.json dependencies and runs pnpm install, and runs tsc on every consumer to catch TS2304.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "apps/ui/src/features/prompts/ui/blocks/VariableChip.tsx is a generic prompt component; it should live in the prompt web package.",
+      "expected_output": "Moves it to packages/features/prompt/web/src/ui/elements or blocks with a kebab filename, keeps the layer direction, exposes it only through a surface or screen if apps/ui still needs it, repoints imports, and checks the install registries and screen closure.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "The dataset package has a REST app but hitting /api/v1/datasets returns 404 on the api process.",
+      "expected_output": "Finds that the dataset REST declaration is never mounted, adds the <f>-rest.mount.ts over the composed app using createRestRuntime (never the deleted security.createServiceVersionedApp / mountProjectTransport builders), registers the family from the API root only when the module is installed, adds or extends the composition test, and does not regenerate the OpenAPI document.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Install the annotation-queue screen from @langwatch/annotation-web into apps/ui at /:project/annotations/queue.",
+      "expected_output": "Adds the catalogue.json use, the private apps/ui module folder with a host implementing the HostPort and a routes file built with uiPage, the WebInstallation in installed-ui-features, the pinned page key, feature-map.json, and runs the install guard tests.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Make the worker run the new dataset-normalization command.",
+      "expected_output": "Installs the dataset server in the capability root that owns the job with .withFeature, adds the catalogue entry, and calls out the job-registry.json change as deliberate; proves routability with the capability-mount test.",
+      "files": []
+    }
+  ]
+}

@@ -6,12 +6,14 @@ remain authoritative; do not copy them into local docs. Read the nearest
 
 ## Use the repository skills
 
-- Use `feature-inventory` before a broad split or when ownership is unclear.
-- Use `feature-migration` for an app-to-package extraction or composition cutover.
-- Use `feature-migration-review` before staging a migration batch.
+- Use `module` to build or change a module: create one, extend it, convert it to the
+  annotation shape, wire it into a process, move code into it, or publish a web surface.
+- Use `module-review` to audit a module, a directory, a diff or a branch, including
+  before a broad split, when ownership is unclear, or before staging a conversion batch.
 
-The skills live under `.agents/skills/`. They supplement, rather than replace,
-the accepted ADRs and the architecture linter.
+The skills live under `.claude/skills/` (`.agents/skills` is a link to the same
+directory). They supplement, rather than replace, the accepted ADRs and the
+architecture linter.
 
 ## Architecture
 
@@ -39,13 +41,18 @@ the accepted ADRs and the architecture linter.
   other feature contracts. Do not pass callback bags, service locators,
   `Pick`/`Omit` views, `Parameters`/`ReturnType` mirrors, or another feature's
   repository.
-- Ordinary service and repository methods return a value or throw a concrete
-  domain error. Only a method named `try*` may return `null`/`undefined`.
-  `require*` is forbidden. Add a method only for a real caller.
-- Hono uses `context.app`, tRPC uses `ctx.app`, and workers receive the composed
-  app explicitly. Authenticated handlers use `context.actor()` and
-  `context.authorize()`. A tenant target may be input when authorisation checks
-  that same target.
+- Required service and repository operations return a value or throw a concrete
+  domain error. Use `find*` only when absence is a normal outcome the caller handles;
+  it returns `null` or `undefined`. Do not name methods `try*` or `require*`.
+  Add a method only for a real caller.
+- REST and tRPC use inline `@langwatch/api` handlers with parsed input and
+  explicit app/actor/scope facts. Parsed middleware facts are typed trailing
+  arguments, never merged into input; no raw request, response or headers.
+  Return a schema-compatible JSON object, array or void. Special protocols need
+  framework integrations. Output mismatches log safe validation details and
+  metadata without content, then preserve the response; input and authorization
+  remain enforced. See ADR-133. Workers receive the composed app explicitly.
+  A tenant target may be input when authorization checks that same target.
 - Only composition roots import feature server installers. Feature packages
   import other features through contracts. No `getApp`, `tryGetApp`, global
   Prisma, per-request construction, or import-time registration.
@@ -137,6 +144,10 @@ the accepted ADRs and the architecture linter.
   Oxfmt, Oxc, architecture lint, and `git diff --check`. Also run:
   `pnpm --filter @langwatch/architecture-lint review:test-quality` for changed
   tests and `review:comment-blocks` when reviewing long comments.
+  Run Oxc from the repository root with
+  `pnpm exec oxlint --quiet --config .oxlintrc.architecture.json <paths>`.
+  Whole-feature compliance requires the whole feature directory, including tests;
+  a plain Oxc run or selected-file pass does not establish architecture compliance.
 - If the full workspace is red from unrelated work, prove the changed slice and
   report the exact remaining diagnostics. Do not call a blocked check green.
 

@@ -1,7 +1,7 @@
 # Web packages
 
 `packages/features/<name>/web` is `@langwatch/<name>-web`. It is optional, browser-safe,
-and depends on the feature's contract, `@langwatch/api/web`,
+and depends on the module's contract, `@langwatch/api/web`,
 `@langwatch/design-system`, `@langwatch/ui-host` and `@langwatch/ui-drawer`. It never
 imports the server package or `apps/*`. The reference is
 `packages/features/annotation/web`.
@@ -21,7 +21,7 @@ Allowed imports (`UI_LAYER_DEPENDENCIES` in
 `packages/architecture-lint/src/frontend-ui-boundaries.ts`):
 
 | from        | may import                                  |
-| ----------- | ------------------------------------------- |
+| ----------- | -------------------------------------------- |
 | entry file  | any implementation module                   |
 | model       | model                                       |
 | behavior    | model, behavior                             |
@@ -59,9 +59,9 @@ export { default as AnnotationQueueLayout } from "./ui/sections/annotation-queue
 ```
 
 - The export path is the contract. `ui-web-public-entry` accepts a flat `./<id>` when
-  `apps/ui/src/features/catalogue.json` declares it: listed under one feature's
-  `uses.screens` it is that feature's **screen**; listed under any feature's
-  `uses.surfaces` it is a **surface** another feature may mount. `./screens/<id>` and
+  `apps/ui/src/features/catalogue.json` declares it: listed under one module's
+  `uses.screens` it is that module's **screen**; listed under any module's
+  `uses.surfaces` it is a **surface** another module may mount. `./screens/<id>` and
   `./surfaces/<id>` are the older spelling and still accepted; new packages use the flat
   form. An undeclared flat entry is a violation.
 - `ui-screen-closure` walks the whole import graph behind each entry and rejects direct
@@ -75,18 +75,18 @@ export { default as AnnotationQueueLayout } from "./ui/sections/annotation-queue
 
 ## Screen versus surface versus page
 
-A **screen** is a whole page the owning feature publishes; several page keys may share
+A **screen** is a whole page the owning module publishes; several page keys may share
 one screen with the view as a prop (`annotations-screen.tsx` takes `{ view }` and serves
-inbox, mine, all and one queue). A **surface** is an embeddable piece another feature
+inbox, mine, all and one queue). A **surface** is an embeddable piece another module
 mounts: a card, a form body, chips, a picker, a store. A **page** is an address in
-`apps/ui`, answered by a route the private feature folder installs (`install.md`).
+`apps/ui`, answered by a route the private module folder installs (`install.md`).
 
 ## Host ports
 
 A screen never reads the session, the project or the router directly. It declares what
 it needs as an abstract `*HostPort` class in `model/<f>-host.ts`, published with a
 `<F>HostProvider` context and a `use<F>Host()` hook, and the application's private
-feature folder implements it in its host component from `useUiCapabilities()`. The port
+module folder implements it in its host component from `useUiCapabilities()`. The port
 carries facts the screen needs (`project`, `currentUser`, `hasPermission`,
 `isOwnPersonalWorkspace`, `route.params`) and the actions it takes (`navigate`,
 `notifySuccess`, `notifyFailure`), never a `pathname`: the view arrives as a prop.
@@ -104,13 +104,13 @@ export const annotationApi = createFeatureApi<AnnotationProcedures>();
 export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
 ```
 
-- The feature's own namespaces are derived from the contract's `<f>.trpc.ts`
+- The module's own namespaces are derived from the contract's `<f>.trpc.ts`
   declarations: no hand-written map, so the browser cannot disagree with the server about
-  an input or an output. A procedure another feature owns and this package still calls is
+  an input or an output. A procedure another module owns and this package still calls is
   the one thing written by hand, in a `BorrowedProcedures` type that says so, until that
-  feature's contract declares it.
+  module's contract declares it.
 - `createFeatureApi`, `ContractApiMap`, `WireOf` and `OutputsFromMap` live in
-  `@langwatch/api/web` — the one subpath of `@langwatch/api` a web package may name.
+  `@langwatch/api/web`, the one subpath of `@langwatch/api` a web package may name.
   Types come from the contract, never from
   `AppRouter` (ADR-130) and never `any`.
 - The segment names are the tRPC cache key and must equal the namespaces the process
@@ -120,7 +120,7 @@ export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
   errors are read with `readHandledError` and rendered from the code-keyed registry;
   `error.message` on the wire is the code slug, never toast it. Map `meta.fieldErrors`
   onto form fields instead of a toast.
-- Subscriptions ride the SSE link the shell configures; a feature never opens its own
+- Subscriptions ride the SSE link the shell configures; a module never opens its own
   EventSource.
 
 ## Components and hooks
@@ -139,7 +139,7 @@ export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
 
 Drawers are URL-routed singletons from `@langwatch/ui-drawer`: `?drawer.open=<name>`
 names the open one, `drawer.<key>` carries serialisable props, a module-scope store
-carries the rest, and a stack makes the back button work. A feature that owns drawers
+carries the rest, and a stack makes the back button work. A module that owns drawers
 registers them from its private `apps/ui/src/features/<f>/index.ts`
 (`uiFeature({ drawers })` or the installation's drawer contribution); a sub-flow navigates
 (`openDrawer("target", { onSuccess, onClose: goBack })`), never mounts another drawer

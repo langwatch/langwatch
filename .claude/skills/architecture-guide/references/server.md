@@ -2,7 +2,7 @@
 
 `packages/features/<name>/server` is `@langwatch/<name>-server`. `apps/api`, `apps/worker`
 and `apps/tasks` all boot it. A request enters through a transport declaration the
-process mounted, reaches the feature's one app, which calls its private services;
+process mounted, reaches the module's one app, which calls its private services;
 services use repository interfaces; the repository backend was chosen once at boot.
 The reference is `packages/features/annotation/server`.
 
@@ -45,7 +45,7 @@ tasks/<name>.task.ts                                  a one-shot program compose
 migrations/<name>-import.<name>.migration.ts
 ```
 
-Still parsed by the grammar but inventoried by `feature-shape` and gone when a feature
+Still parsed by the grammar but inventoried by `feature-shape` and gone when a module
 converts: `testing.ts`, `fixtures/`, `adapters/postgres.*.adapter.ts` (and any other
 persistence adapter), `transport/<surface>/<name>.api.ts` (`api-trpc`, `api-rest`,
 `public-rest`, `api-mcp`, `api-ws`). Do not add new ones.
@@ -97,11 +97,11 @@ export const annotationServer = defineFeature("annotation")
   .build();
 ```
 
-One installer per feature, reused by every process role. `defineFeature` takes the
-catalogue name; the framework derives the public namespace (`annotation` → `annotations`
-for REST under `/api/v1`, and the tRPC namespace) so the feature writes neither. A feature
-without persistence omits `.withRepositories`; a feature with a worker contribution adds
-it here too. `index.ts` exports this and the transport declarations only.
+One installer per module, reused by every process role. `defineFeature` takes the
+catalogue name; the framework derives the public namespace (`annotation` becomes
+`annotations` for REST under `/api/v1`, and the tRPC namespace) so the module writes
+neither. A module without persistence omits `.withRepositories`; a module with a worker
+contribution adds it here too. `index.ts` exports this and the transport declarations only.
 
 **`app/<f>.app.ts`**: the one public object.
 
@@ -133,7 +133,7 @@ export class AnnotationApp implements AnnotationApi {
 
 `FeatureSetup<Dependencies, Infrastructure, Config, Repositories>`: peers arrive typed
 from the declared tokens, technical infrastructure (an object storage client, an
-encryption port) as the second parameter, validated feature config as the third,
+encryption port) as the second parameter, validated module config as the third,
 repositories as the fourth. Peer enrichment (users, traces), reference validation,
 authorization decisions through `AuthzApi`, review workflows and side effects across
 entities all live in the app. Thin forwarding methods are intentional: they are the
@@ -212,7 +212,7 @@ bundle. Repositories are never exported from `index.ts` (`private-runtime-export
 **Prisma containment and the typed seam.** Only `repositories/prisma/**` imports Prisma
 (`prisma-containment`), through `PrismaRepository.for("Model", …)` from
 `@langwatch/prisma-client`, which declares the model delegates the repository owns
-(`prisma-table-ownership` checks two features never claim one table) and hands
+(`prisma-table-ownership` checks two modules never claim one table) and hands
 `this.prisma` typed. Rows are mapped to contract values before returning and uncertain
 JSON columns are parsed with the contract schema. `as PrismaClient` and `database: object`
 are rejected by `typed-prisma-seam`. Every query on a project-level model includes
@@ -222,7 +222,7 @@ are rejected by `typed-prisma-seam`. Every query on a project-level model includ
 **`ports/`**: technical infrastructure only, an abstract class ending in `Port`
 (`strict-port-module`): encryption, object storage, a clock. It arrives through the
 app's `FeatureSetup` infrastructure parameter, provided by the process with
-`.withInfrastructure({...})`. A peer feature is never a port. A port with one
+`.withInfrastructure({...})`. A peer module is never a port. A port with one
 implementation that production always supplies is over-abstraction; take the concrete
 dependency.
 
@@ -278,9 +278,9 @@ export const annotationRest = defineRestRouter(AnnotationApi)
 Handlers receive `{ input, app, actor, scope, signal }`: `input` is the merged, parsed
 params/query/body; `scope` is the authorized target (`{ tier: "project", id }`); `actor`
 is the authenticated principal. Input and output schemas are mandatory; a no-content
-route declares no output and returns `void`. The `api-rest-route` and `api-trpc-procedure`
-skills are the recipes; `references/config-composition.md` says how a process mounts a
-declaration.
+route declares no output and returns `void`. `.claude/skills/module/references/extend.md`
+sections 6 and 7 are the recipes; `references/config-composition.md` says how a process
+mounts a declaration.
 
 **`tasks/`**: a one-shot program extending `Task` from `@langwatch/task`, listed in
 `apps/tasks/src/tasks.catalogue.ts` and run with

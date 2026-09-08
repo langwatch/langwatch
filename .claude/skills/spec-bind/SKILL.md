@@ -13,7 +13,7 @@ fails the run. Both look like coverage in a diff, so do all four steps or none.
 ## 1. Put the file where the checker looks
 
 `check-feature-parity` walks `specs/`, every `specs/` directory under `packages/`
-(discovered, so a feature's own `packages/features/<f>/specs/` counts) and
+(discovered, so a module's own `packages/features/<f>/specs/` counts) and
 `sdks/typescript/specs`. A `.feature` file anywhere else is invisible.
 
 Write behaviour from the user's side. `Then the job fails without retry`, never

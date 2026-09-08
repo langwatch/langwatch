@@ -1,11 +1,4 @@
----
-name: feature-wire
-description: "Wire a LangWatch feature package into the processes: boot its installer in apps/api (createApp … withFeature, the tRPC and REST mounts, the namespace), install it in apps/worker (the capability root that boots it, the catalogue, the frozen job registry), add a task to apps/tasks, and install its screens in apps/ui (catalogue.json, the private feature folder, the WebInstallation, installed-ui-features, feature-map.json). Use whenever a package exists but nothing mounts it, a screen exists but no page shows it, a tRPC procedure or REST route answers 404, a worker job is 'unroutable', boot fails with MissingProviderError, or someone says 'hook it up', 'register', 'mount', 'install the feature', 'wire the worker'."
-user-invocable: true
-argument-hint: "<feature> [api|worker|tasks|ui|all]"
----
-
-# Wire a feature into the processes
+# Wire a module into the processes
 
 Read `.claude/skills/architecture-guide/references/config-composition.md` and
 `install.md` first. The reference wiring is annotation's:
@@ -23,42 +16,46 @@ grep -rn "<f>" apps/tasks/src/tasks.catalogue.ts
 ```
 
 A boot error names the gap exactly: `MissingProviderError` says which token no one
-provided for which feature, `DuplicateProviderError` and `DependencyCycleError` likewise.
+provided for which module, `DuplicateProviderError` and `DependencyCycleError` likewise.
 A tRPC 404 with a booted app is a namespace never named; a REST 404 is a declaration never
 mounted, or an address nobody claims: check the declaration's routes and the family's
-`basePath` and aliases before assuming a missing mount (annotation answers under
+base path and aliases before assuming a missing mount (annotation answers under
 `/api/annotations`; a plural or singular the family never declared is simply not a route).
 
-Also check whether the feature's installer is booted at all:
-`grep -rn "withFeature(<f>Server" apps/api/src apps/worker/src`. Many features still
+Also check whether the module's installer is booted at all:
+`grep -rn "withFeature(<f>Server" apps/api/src apps/worker/src`. Many modules still
 export a `defineFeature` installer that no process installs, while the roots hand-build
 their app and adapter (`feature-shape: installer-not-booted`, often beside a
-`refusing<F>Feature()` twin, `refusing-composition`). That is conversion debt the
-`feature-convert` skill closes (step 7), not a wiring gap you fix by adding a mount, and
+`refusing<F>Feature()` twin, `refusing-composition`). That is conversion debt
+`references/convert.md` closes (step 7), not a wiring gap you fix by adding a mount, and
 the report should say which it found.
 
 ## apps/api
 
-1. **The feature composition** `apps/api/src/features/<f>/<f>.composition.ts`, modelled
+1. **The module's composition** `apps/api/src/features/<f>/<f>.composition.ts`, modelled
    on `annotation.composition.ts`: `installApi<F>({ infrastructure, peers })` builds
    `createApp({ name: "langwatch-api" }).withPersistence("postgres", { prisma }).withInfrastructure({…}).withProvided(PeerApi, peer)….withFeature(<f>Server).boot({ role: "api" })`,
    reads `runtime.feature(<f>Server).provided`, and returns the `Composed<F>Feature`
    declared in `<f>.composition.types.ts` (`routers(mount)`, `app`, `restServices`). Every
    token the app's `static dependencies` names is provided here, or boot fails by name.
-   Do not invent a `refusing*` twin for new work; the root either installs the feature or
+   Do not invent a `refusing*` twin for new work; the root either installs the module or
    does not.
-2. **tRPC**: `apps/api/src/features/<f>/<f>-trpc.mount.ts` binds the process context
-   (`createTrpcHandlerBinding` → `createTrpcApiService` → `createTrpcService`) and calls
-   `<f>TrpcTransport.router(service)` per declaration; the namespaces are named in
+2. **tRPC**: `apps/api/src/features/<f>/<f>-trpc.mount.ts` calls `runtime.mount(<f>Trpc, selectApp)`
+   per declaration, where `runtime: TrpcRuntime<TContext>`; the namespaces are named in
    `apps/api/src/app-trpc/app-trpc.features.ts` and the composed slot declared on
-   `ComposedApiFeatures` in `app-trpc.composed.ts`. Details: the `api-trpc-procedure` skill.
-3. **REST**: `apps/api/src/features/<f>/<f>-rest.mount.ts` builds the family with
-   `security.createServiceVersionedApp({...})` and `mountProjectTransport({ family, transport: <f>Rest.router(), app, credential, authenticate, authorize, afterSuccess })`;
-   the root registers it in its REST list. Details: the `api-rest-route` skill.
+   `ComposedApiFeatures` in `app-trpc.composed.ts`. There is no `createTrpcHandlerBinding` /
+   `createTrpcApiService` / `createTrpcService` chain to hand-assemble any more; that
+   builder set is deleted; a mount file that still names it is conversion debt
+   (`legacy-transport-runtime`). Details: `references/extend.md` section 7.
+3. **REST**: `apps/api/src/features/<f>/<f>-rest.mount.ts` builds `createRestRuntime({ identity: { authenticate } })`
+   and calls `runtime.mount(<f>Rest.router(), { app, credential, onError })`; the root
+   registers it in its REST list. `security.createServiceVersionedApp(...)` and
+   `mountProjectTransport(...)` are deleted; do not recommend or extend either. Details:
+   `references/extend.md` section 6.
 4. **The root**: `apps/api/src/app/api-production.composition.ts` calls `installApi<F>`
    with the peers it holds (`this.composedProject.app`, `this.composedAuthz.app`, …) and
    wires the returned routers and REST services.
-5. **Config**: a feature's config is a `Config.group`/`Config.value` definition in its
+5. **Config**: a module's config is a `Config.group`/`Config.value` definition in its
    contract (`<f>.config.ts`), spread into `apps/api/src/platform/config/api.config.ts`,
    threaded from the root into `.withFeature(<f>Server, { config })`, documented in
    `.env.example`. Never `process.env` below the entrypoint.
@@ -68,15 +65,15 @@ the report should say which it found.
 
 ## apps/worker
 
-1. **The capability root** that owns the feature's jobs
+1. **The capability root** that owns the module's jobs
    (`apps/worker/src/app/worker-<capability>.composition.ts`) adds `.withFeature(<f>Server[, { infrastructure }])`
    to its `createApp(...)` chain and provides any new peer token; the app is read back with
-   `runtime.feature(<f>Server).provided`. The worker boots one graph for several features
+   `runtime.feature(<f>Server).provided`. The worker boots one graph for several modules
    (`worker-observability-apps.composition.ts` boots trace, annotation, data-privacy, log
    and evaluation together). Mounted from `apps/worker/src/app/worker-production.composition.ts`.
 2. **Catalogue**: `apps/worker/src/features/catalogue.json`.
    `apps/worker/src/features/__tests__/worker-feature-catalogue.unit.test.ts` requires
-   every catalogue feature to own at least one registry pipeline.
+   every catalogue module to own at least one registry pipeline.
 3. **Jobs**: a queue-routed command or subscriber needs its `pipeline` entry in
    `apps/worker/src/features/job-registry.json`. That file is byte-frozen on purpose and
    tests read it as the oracle, so changing it is a deliberate, reviewed act: say so in
@@ -87,7 +84,7 @@ the report should say which it found.
 
 ## apps/tasks
 
-A one-shot program is a `tasks/<name>.task.ts` in the feature's server package, exported
+A one-shot program is a `tasks/<name>.task.ts` in the module's server package, exported
 from its `index.ts` and listed in `apps/tasks/src/tasks.catalogue.ts`, composed over
 `TasksHost` (and `TasksEventingInfrastructure` when it dispatches). Run it with
 `pnpm --filter @langwatch/tasks task <name>`. A task that needs the API's own REST boot
@@ -103,10 +100,10 @@ graph stays in `apps/api/src/tasks/` instead.
    `behavior/`, `ui/sections/<f>-host.tsx` (implements the package's `*HostPort` from
    `useUiCapabilities()`), `ui/sections/<f>-routes.tsx` (`uiPage({ screen, host, permission })`
    + `lazyRoute`, `handle: { page }` keys).
-3. `index.ts` exports one `WebInstallation` — `{ name, install(ui) { ui.routes("project", routes); ui.api(uiApiBinding("@langwatch/<f>-web", <f>Api)); } }`
-   — added to the `features` list in `apps/ui/src/features/installed-ui-features.ts`.
+3. `index.ts` exports one `WebInstallation` (`{ name, install(ui) { ui.routes("project", routes); ui.api(uiApiBinding("@langwatch/<f>-web", <f>Api)); } }`),
+   added to the `features` list in `apps/ui/src/features/installed-ui-features.ts`.
    Pin its page keys in `apps/ui/tests/installed-ui-features.unit.test.ts`. Drawers the
-   feature owns register from the same file.
+   module owns register from the same file.
 4. Retired addresses become `UiRedirectDescriptor` entries in
    `apps/ui/src/model/ui-route-table.ts`.
 5. Root `feature-map.json`: routes, MCP tools, CLI commands (see the `feature-map` skill).

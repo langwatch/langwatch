@@ -32,11 +32,11 @@ pnpm --filter @langwatch/architecture-lint test:unit tests/frontend-boundary.uni
 ```
 
 `lint` runs the CLI in `packages/architecture-lint/src/cli.ts`; the oxlint half runs
-separately over `.oxlintrc.architecture.json`. Filter the CLI output to your feature
+separately over `.oxlintrc.architecture.json`. Filter the CLI output to your module
 (`grep "packages/features/<f>"`) and to the policies you care about; the full output is
 thousands of lines while the burn-down is in progress. Read `check:feature-parity`'s
 `✗ THIS RUN FAILS: …` banner, never a `grep -c`: a `✓ all bound` under one `▸` heading is
-scoped to that file and says nothing about the run. See `../../spec-bind/SKILL.md`.
+scoped to that file and says nothing about the run. See `.claude/skills/spec-bind/SKILL.md`.
 
 ## Registries, when you touched them
 
@@ -73,13 +73,14 @@ stops seeing it), and a file under 20 lines read only by its own folder is a fra
 file that reads it. Its messages say where the code belongs. When you hit one, fold the code
 into the file that owns the noun; when no file does, split the folder, never the file.
 
-`feature-shape-baseline.json` is the conversion inventory: one entry per feature and
+`feature-shape-baseline.json` is the conversion inventory: one entry per module and
 kind, measured against annotation. Pieces annotation has no place for:
 `contract-service`, `persistence-adapter`, `fixtures-directory`, `testing-entry`,
 `nested-transport`, `legacy-transport-runtime` (a transport that still names
-`createVersionedApp`, `createTrpcService`, `mountProjectTransport` or their kin instead of
-being mounted by the process on the runtimes), `unregistered-repositories`,
+`createServiceApp`, `createServiceVersionedApp`, `createTrpcService`,
+`createProjectVersionedApp`, `mountProjectTransport` or their kin instead of being
+mounted by the process on the runtimes), `unregistered-repositories`,
 `postgres-without-memory`, `nested-web-entry`, `refusing-composition`. Pieces of annotation a
-feature still lacks:
-`no-installer`, `no-app`, `installer-not-booted`. A feature is converted when it has no
-entries left; the `feature-convert` skill closes them kind by kind.
+module still lacks:
+`no-installer`, `no-app`, `installer-not-booted`. A module is converted when it has no
+entries left; `.claude/skills/module/references/convert.md` closes them kind by kind.

@@ -1,16 +1,9 @@
----
-name: feature-convert
-description: "Convert one existing LangWatch feature package to the annotation shape, piece by piece, until packages/architecture-lint/src/feature-shape-baseline.json has no entry left for it: abstract contract service → <Feature>Api token; adapters/postgres.* → repository interfaces with Prisma and memory backends selected by defineRepositories; hand-built services and peers → one app with static dependencies; transport/api-trpc and api-rest classes → procedures declared once in the contract (defineTrpcContract) and bound in flat defineTrpcRouter / defineRestRouter declarations; fixtures/ and testing.ts → app/__tests__/<f>.fixture.ts; the hand-built or refusing composition in apps/api → createApp(...).withFeature(<f>Server); web screens/ and surfaces/ folders → flat src/<id>.ts entries. Use whenever someone says 'convert <feature>', 'bring <feature> into the annotation shape', 'make api-key look like annotation', 'clean up <feature>', 'what is left in <feature>', 'kill the adapters', 'remove the refusing twin', or points a skill at a feature that still has feature-shape entries. Same procedure for every feature: the input changes, the output shape does not."
-user-invocable: true
-argument-hint: "<feature> [contract|repositories|app|transport|composition|web|all]"
----
+# Convert a module to the annotation shape
 
-# Convert a feature to the annotation shape
-
-`packages/features/annotation` is the shape. This skill is the same procedure for every
-other feature: measure the distance, then close each gap by copying the annotation
+`packages/features/annotation` is the shape. This reference is the same procedure for
+every other module: measure the distance, then close each gap by copying the annotation
 counterpart and moving the existing behaviour into it. Nothing is redesigned on the way:
-every operation, error code, query and screen the feature has today it still has after
+every operation, error code, query and screen the module has today it still has after
 (lift and shift). Read `.claude/skills/architecture-guide/SKILL.md`, then
 `references/server.md` and `references/contract.md`; keep the annotation file open beside
 the one you are writing.
@@ -18,7 +11,7 @@ the one you are writing.
 ## 0. Measure the distance
 
 ```bash
-F=<feature>; P=packages/features/$F
+F=<module>; P=packages/features/$F
 grep -n "\"$F\"" packages/architecture-lint/src/feature-shape-baseline.json
 find $P/contract/src $P/server/src $P/web/src -type f | grep -v __tests__ | grep -v node_modules | sort
 ls apps/api/src/features/$F apps/worker/src/features/$F 2>/dev/null
@@ -27,8 +20,8 @@ grep -rn "withFeature(" apps/api/src apps/worker/src apps/tasks/src | grep -v __
 
 Each baseline `kind` is one gap, and each gap has exactly one target in annotation:
 
-| kind                        | what the feature has                                    | copy this from annotation                                                                    |
-| --------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| kind                        | what the module has                                     | copy this from annotation                                                                    |
+| ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `contract-service`          | `contract/src/<f>.service.ts` abstract class            | `contract/src/annotation.api.ts` (interface + `featureApi` token)                            |
 | `persistence-adapter`       | `server/src/adapters/postgres.<x>.adapter.ts`           | `repositories/prisma/prisma.annotation-score.repository.ts` and its memory twin              |
 | `unregistered-repositories` | repositories chosen by an adapter or the process        | `repositories/annotation-repositories.registry.ts`, `annotation.repositories.ts`             |
@@ -36,10 +29,10 @@ Each baseline `kind` is one gap, and each gap has exactly one target in annotati
 | `no-app`                    | services constructed by transports or the process       | `app/annotation.app.ts`                                                                      |
 | `no-installer`              | no `<f>.server.ts`                                      | `annotation.server.ts`                                                                       |
 | `nested-transport`          | `transport/api-trpc/<f>.api.ts`, `transport/api-rest/…` | `transport/annotation.trpc.ts`, `annotation-score.trpc.ts`, `annotation.rest.ts`             |
-| `legacy-transport-runtime`  | any file naming `createVersionedApp`, `createTrpcService`, `mountProjectTransport` or their kin | the same declarations, mounted by the process on `createRestRuntime` / `createTrpcRuntime` (`apps/api/src/features/annotation/annotation-rest.mount.ts`, `annotation-trpc.mount.ts`) |
+| `legacy-transport-runtime`  | any file naming `createServiceApp`, `createServiceVersionedApp`, `createTrpcService`, `createProjectVersionedApp`, `mountProjectTransport` or their kin (all deleted) | the same declarations, mounted by the process on `createRestRuntime` / `createTrpcRuntime` (`apps/api/src/features/annotation/annotation-rest.mount.ts`, `annotation-trpc.mount.ts`) |
 | `fixtures-directory`, `testing-entry` | `fixtures/`, `testing.ts` exported to other packages | `app/__tests__/annotation.fixture.ts`                                              |
 | `installer-not-booted`      | `apps/api/src/features/<f>/<f>.composition.ts` hand-builds the app | `apps/api/src/features/annotation/annotation.composition.ts` (`installApiAnnotation`) |
-| `refusing-composition`      | `refusing<F>Feature()` / `<f>-absence.ts`               | nothing: annotation's api composition installs the feature or the root does not call it     |
+| `refusing-composition`      | `refusing<F>Feature()` / `<f>-absence.ts`               | nothing: annotation's api composition installs the module or the root does not call it     |
 | `nested-web-entry`          | `web/src/screens/<id>/index.ts`, `surfaces/<id>/…`      | `web/src/annotation-scores.ts` (flat entry) and `web/package.json` `exports`                 |
 
 Work top to bottom: contract, repositories, services, app, installer, transports,
@@ -64,7 +57,7 @@ export const ApiKeyApi = featureApi<ApiKeyApi>("api-key");
   becomes a thrown `HandledError` from `<f>.errors.ts`.
 - A member that returns another service, a getter, a `tryGetX` lookup: it becomes a plain
   operation or it is dropped because no caller uses it (say which in the report). A
-  `tryX` never survives the move: it becomes `getX` that throws the feature's
+  `tryX` never survives the move: it becomes `getX` that throws the module's
   not-found error, and every caller that branched on `undefined` now catches or lets
   it propagate. `findX` returning `undefined` is only for an absence the caller
   treats as a normal answer.
@@ -91,7 +84,7 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
    share rows share a `memory.<f>.database.ts`. A twin is only proven by a contract test
    (`repositories/__tests__/<x>.repository.contract.test.ts`) that runs the same cases
    against the memory and the Prisma backends; the installation test booting over the
-   twin proves nothing about the twin. Five features landed without one on 2026-09-08.
+   twin proves nothing about the twin. Five modules landed without one on 2026-09-08.
 4. `repositories/<f>.repositories.ts` (the bundle interface),
    `repositories/prisma/prisma.<f>.repositories.ts` (`prismaRepositories({...})`),
    `repositories/memory/memory.<f>.repositories.ts` (`static readonly requires = [] as const`,
@@ -112,8 +105,8 @@ service takes `{ queues, items }`), and methods that parse the input with the co
 schema, call the repository and throw the entity's error. Anything a service does today
 that is **not** that moves up into the app in step 4:
 
-- calling a peer feature (users, projects, organizations, authz, traces),
-- calling another service of this feature,
+- calling a peer module (users, projects, organizations, authz, traces),
+- calling another service of this module,
 - reading a port,
 - logging a decision or emitting an event.
 
@@ -180,8 +173,11 @@ handler calling one app operation. Logic found in the class body beyond input ma
 moves to the app first. The web package's hand-written map for these namespaces is then
 replaced by `ContractApiMap<typeof apiKeyTrpc>`. REST becomes `transport/<f>.rest.ts` with
 `defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(MANAGEMENT_API_VERSION)…build()`,
-same paths, same operation ids (`withDocs`), same schemas. Delete the `api-trpc/` and
-`api-rest/` folders. The `api-trpc-procedure` and `api-rest-route` skills hold the
+same paths, same operation ids (`withDocs`), same schemas, mounted with `createRestRuntime`
+(see `references/extend.md` section 6.3 for the current mount shape; the older
+`security.createServiceVersionedApp` / `mountProjectTransport` builders are deleted; a
+mount file that still names them is `legacy-transport-runtime`, not a pattern). Delete the
+`api-trpc/` and `api-rest/` folders. `references/extend.md` sections 6 and 7 hold the
 builder details and the browser side.
 
 ## 7. Composition: boot the installer
@@ -192,9 +188,9 @@ copied from `annotation.composition.ts`: `createApp({ name: "langwatch-api" }).w
 `restServices`. The root (`api-production.composition.ts`) calls it with the peers it
 holds and no longer constructs the app. Delete `refusing<F>Feature`, `<f>-absence.ts`,
 `Unavailable*` errors that exist only for the twin, and every call site: boot names a
-missing provider by token. The worker root that owns the feature's jobs adds
-`.withFeature(<f>Server)` to its own `createApp` chain the same way. Details in the
-`feature-wire` skill; the composition integration test drives the real mount with
+missing provider by token. The worker root that owns the module's jobs adds
+`.withFeature(<f>Server)` to its own `createApp` chain the same way. Details in
+`references/wire.md`; the composition integration test drives the real mount with
 `createApiFixture` peers.
 
 ## 8. Web: flat entries
@@ -203,20 +199,20 @@ Each `web/src/screens/<id>/index.ts` (or `surfaces/<id>/…`) becomes `web/src/<
 the same exports, listed in `package.json` `exports` as `"./<id>"` with
 `langwatch-declaration-source`, `types`, `default`; `apps/ui/src/features/catalogue.json`
 `uses.screens`/`uses.surfaces` is updated to `@langwatch/<f>-web/<id>`, and the
-importing feature folder under `apps/ui/src/features/` follows. Delete the folders. The
+importing module folder under `apps/ui/src/features/` follows. Delete the folders. The
 layers under `model/`, `behavior/`, `ui/` do not move.
 
 ## 9. Tests, then the ratchet
 
 - `app/__tests__/<f>-installation.unit.test.ts` boots
   `createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withFeature(<f>Server).boot({ role })`
-  for every role the feature serves.
+  for every role the module serves.
 - Service unit tests over the memory repositories; the Prisma repositories' integration
   test if the package declares a datastore; every existing test re-pointed at the new
   names (a `vi.mock` of a deleted path mocks nothing: grep for the old paths).
 - Sabotage once per moved behaviour: break the memory twin, watch the service test fail
   for the right reason, restore.
-- Gates per `.claude/skills/architecture-guide/references/gates.md`. Then the feature's
+- Gates per `.claude/skills/architecture-guide/references/gates.md`. Then the module's
   entries in `feature-shape-baseline.json` are stale and the root session deletes them;
   the lint reports the ones still standing. Done means
   `grep -c "\"<f>\"" packages/architecture-lint/src/feature-shape-baseline.json` is 0.
@@ -229,8 +225,15 @@ layers under `model/`, `behavior/`, `ui/` do not move.
   `try*`, no optional collaborators, no `process.env` below the entrypoint.
 - Comments under five lines; identifiers say what a thing is (`ApiKeyService`), not what
   it used to be (`LegacyApiKeyGrantService` is a smell to resolve, not to carry).
-- A gap you cannot close in this change (a peer feature with no `*Api` token yet, a job
+- A gap you cannot close in this change (a peer module with no `*Api` token yet, a job
   the worker registry freezes) is named in the report with the file that blocks it.
+- **When auditing your own converted diff, compare old and new observable behaviour
+  field by field**: response DTOs, auth, error/status mapping, sorting, pagination and
+  cursors, money/time units, query tables, retries, idempotency and side effects. Passing
+  package tests is not proof the conversion is complete; a field silently dropped or a
+  status code that changed is a behaviour regression even when every test is green.
+  Compare deleted tests against the canonical coverage too: list every scenario a
+  deletion loses and restore meaningful coverage before removing the old test file.
 - The spec wins. If the converted code answers differently from a bound scenario or a doc
   comment (a refusal that now succeeds, a status that changed), the code is wrong: fix the
   code, never the assertion. A lane once rewrote a test so a key bound to nobody could
@@ -240,12 +243,12 @@ layers under `model/`, `behavior/`, `ui/` do not move.
   Edit/Write for every change, no scripted rewrites (`sed`, heredocs) over files you have
   not read; a moved file goes with `mv`, not `git mv` (lanes never touch the index).
 - A memory twin, a Prisma repository and a service are three files, not one 500-line
-  class: an app past ~30 public operations is several features wearing one door; say so
+  class: an app past ~30 public operations is several modules wearing one door; say so
   in the report rather than folding a fifth namespace in.
 
 ## Report
 
-For each kind the feature carried: closed or still open, and the file that proves it.
+For each kind the module carried: closed or still open, and the file that proves it.
 The operations on `<F>Api`; the repositories and their two backends; the peers in
 `static dependencies` and who provides them; the transports and their namespaces;
 what was deleted; gate numbers; what is left and why.

@@ -12,6 +12,11 @@ ten top-level categories, each with `children`, each child a feature with its `s
 `FEATURE_MAP.md` is the coverage table derived from it — edit both in one change. Use the
 underscore form; never create `FEATURE-MAP.md`.
 
+A **feature** here is a customer-facing capability, a row in this map, named the way a
+user would name it. It is not the same thing as a **module** (`packages/features/<name>`,
+the contract/server/web package trio); one feature can be served by several modules, and
+one module can serve several features.
+
 ## The entry shape
 
 ```json

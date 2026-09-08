@@ -66,7 +66,7 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
    const found = runRule(rule, { code, cwd: workspace.cwd, filename });
    ```
 
-   `createFixtureWorkspace` writes a throwaway tree, so a feature rename cannot break the
+   `createFixtureWorkspace` writes a throwaway tree, so a module rename cannot break the
    lint suite. Its `catalogue` option writes the real `catalogue.json` shape,
    `{ version, features: [{ id, subjects }] }`; pass `files` for anything else.
    `afterAll(() => workspace.cleanup())`.

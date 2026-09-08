@@ -8,20 +8,25 @@ Project-specific Claude Code configuration for LangWatch.
 .claude/
 ├── settings.json             # Shared Claude Code project settings
 ├── skills/
+│   ├── architecture-guide/   # The repository layout reference (contract/server/web, config, install, testing)
 │   ├── browser-pair/         # Claude-specific browser pairing workflow
 │   ├── browser-test/         # Claude-specific browser test workflow
-│   ├── code-review/          # Claude-specific code review workflow
+│   ├── chakra-ui-builder/    # Build UI with Chakra UI v3
+│   ├── chakra-ui-migrate/    # Migrate a project from Chakra UI v2 to v3
+│   ├── chakra-ui-refactor/   # Review and convert UI code to Chakra UI v3
+│   ├── design-system/        # Where LangWatch's components, tokens and Chakra setup live
 │   ├── feature-map/          # Claude-specific feature-map workflow
 │   ├── haven-setup/          # Haven environment setup workflow
 │   ├── langwatch-kanban/     # Manage LangWatch GitHub project board
 │   ├── lint-rule/            # Add or change a langwatch oxlint rule
-│   ├── chakra-ui-builder -> ../../.agents/skills/chakra-ui-builder
-│   ├── chakra-ui-migrate -> ../../.agents/skills/chakra-ui-migrate
-│   └── chakra-ui-refactor -> ../../.agents/skills/chakra-ui-refactor
+│   ├── mail-template/        # Add or change a transactional email
+│   ├── module/                # Build or change a module: new, extend, convert, wire, move, web-surface
+│   ├── module-review/         # Audit a module, a directory, a diff or a branch, and for over-abstraction
+│   └── spec-bind/            # Bind a Gherkin scenario to the test that proves it
 └── README.md
 ```
 
-The Chakra UI entries are symlinks to the shared repository-agent skills under
-`.agents/skills/`; keep one source for those instructions. The other entries
-are Claude-specific workflows and remain separate from both the product skill
-compiler under `skills/` and the repository guidance in `.agents/skills/`.
+This is the one skills directory for the repository. `.agents/skills` is a relative
+symlink to `skills/` above, kept only so tooling that discovers skills at the older
+location still finds the same files. There is nothing under `.agents/skills` that is
+not here.

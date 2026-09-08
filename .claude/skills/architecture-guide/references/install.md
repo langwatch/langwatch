@@ -1,7 +1,7 @@
-# Installing a feature into apps/ui
+# Installing a module into apps/ui
 
 The application does not import screens ad hoc. One registry at the features root is the
-only place allowed to compose private features. Five steps put a screen in front of a
+only place allowed to compose private modules. Five steps put a screen in front of a
 user. The reference is `apps/ui/src/features/annotation`.
 
 1. **The web package exports a flat entry.**
@@ -24,12 +24,12 @@ user. The reference is `apps/ui/src/features/annotation`.
 
    `root` is the private folder under `apps/ui/src/features/`. `ui-web-capability-declaration`
    checks each entry names an exact exported entry; a flat entry under `screens` belongs
-   to this one feature, under `surfaces` it is shared. `governedWebPackages` lists every
+   to this one module, under `surfaces` it is shared. `governedWebPackages` lists every
    `*-web` package under the frontend rules; a new web package is added there.
 
-3. **A private feature folder adapts the screen to this application.**
+3. **A private module folder adapts the screen to this application.**
    `apps/ui/src/features/<f>/{index.ts, behavior/, ui/sections/<f>-host.tsx, ui/sections/<f>-routes.tsx}`.
-   Only `index.ts` may sit at the feature root (`ui-feature-layout`). The host component
+   Only `index.ts` may sit at the module root (`ui-feature-layout`). The host component
    implements the web package's `*HostPort` from `useUiCapabilities()` (session,
    navigation, route, feedback) and wraps children in the package's provider. The routes
    file builds pages with `uiPage` and installs them with `lazyRoute`:
@@ -57,7 +57,7 @@ user. The reference is `apps/ui/src/features/annotation`.
    with the shared fallbacks, then the screen. `handle.page` is the page key the install
    test pins.
 
-4. **The feature's `index.ts` is its whole install surface.**
+4. **The module's `index.ts` is its whole install surface.**
 
    ```ts
    export const annotationWeb: WebInstallation = {
@@ -70,12 +70,12 @@ user. The reference is `apps/ui/src/features/annotation`.
    };
    ```
 
-   One `WebInstallation` (`apps/ui/src/behavior/ui-web-installation.ts`) per feature
+   One `WebInstallation` (`apps/ui/src/behavior/ui-web-installation.ts`) per module
    directory, added to the `features` list in
    `apps/ui/src/features/installed-ui-features.ts`. `collectWebInstallations` refuses a
    route installed twice and an api binding installed twice, and still accepts the older
-   `uiFeature({ name, api, loaders, drawers? })` value while other features convert.
-   `apps/ui/tests/installed-ui-features.unit.test.ts` pins every page key per feature;
+   `uiFeature({ name, api, loaders, drawers? })` value while other modules convert.
+   `apps/ui/tests/installed-ui-features.unit.test.ts` pins every page key per module;
    `installed-ui-drawers.unit.test.ts` and `installed-ui-drawers.integration.test.tsx`
    pin and open every registered drawer.
 
@@ -92,14 +92,14 @@ user. The reference is `apps/ui/src/features/annotation`.
 
 One tRPC client for the whole browser (`apps/ui/src/behavior/ui-feature-transport.ts`):
 `httpBatchLink`, a non-batched `httpLink` and `sseSubscriptionLink`, all superjson.
-Feature hooks bind through `uiApiBinding(name, api)`. Public config is read from the
+Module hooks bind through `uiApiBinding(name, api)`. Public config is read from the
 meta tag by `apps/ui/src/behavior/public-config.ts`.
 
 ## apps/ui's own layout
 
 `src/{model, behavior, ui, features/<f>, styles}` plus `ui.entrypoint.tsx` and
 `index.ts`. A file anywhere else fails `ui-root-catch-all`.
-Global layers may not import a private feature; the registry is the seam.
+Global layers may not import a private module; the registry is the seam.
 
 ## Checks after installing
 

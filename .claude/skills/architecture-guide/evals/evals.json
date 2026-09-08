@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Where should a helper that formats a model provider name for display live? It is used by both the API's REST responses and the settings screen.",
-      "expected_output": "Names the contract package of the owning feature (model-provider/contract) as the home for a framework-free shared value, rejects a shared utils folder, and explains the dependency direction.",
+      "expected_output": "Names the contract package of the owning module (model-provider/contract) as the home for a framework-free shared value, rejects a shared utils folder, and explains the dependency direction.",
       "files": []
     },
     {
@@ -15,8 +15,8 @@
     },
     {
       "id": 3,
-      "prompt": "Explain how a screen in a feature web package ends up as a page a user can open.",
-      "expected_output": "Walks the install steps: the flat web entry export, catalogue.json, the private apps/ui feature folder whose host implements the HostPort and whose routes use uiPage (host, guard, screen), the WebInstallation in installed-ui-features, the pinned page keys, feature-map.json.",
+      "prompt": "Explain how a screen in a module's web package ends up as a page a user can open.",
+      "expected_output": "Walks the install steps: the flat web entry export, catalogue.json, the private apps/ui module folder whose host implements the HostPort and whose routes use uiPage (host, guard, screen), the WebInstallation in installed-ui-features, the pinned page keys, feature-map.json.",
       "files": []
     }
   ]

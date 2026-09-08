@@ -1,7 +1,7 @@
 # Contract packages
 
 `packages/features/<name>/contract` is `@langwatch/<name>-contract`. It is the only
-part of a feature that other features, the server half and the web half may all import,
+part of a module that other modules, the server half and the web half may all import,
 so it carries what exists, what can be asked, and what can go wrong, never how anything
 is done. The reference is `packages/features/annotation/contract`.
 
@@ -24,13 +24,13 @@ queries | service` plus `api`; `schemas` and `types` are ordinary qualifiers the
 grammar accepts. A server artifact suffix in contract source (`adapter, mapper, migration,
 port, projection, repository, store`) fails `feature-source-layout`. A `<name>.service.ts`
 (the old abstract service) is inventoried by `feature-shape` and is deleted when the
-feature converts; do not add one.
+module converts; do not add one.
 
 Contract must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,
 Eventing, application aliases, or its own server and web packages. It may import `zod`,
 `@langwatch/handled-error`, `@langwatch/time`, `@langwatch/runtime-composition` (only
 `featureApi`, `FeatureApiToken` and `FeatureName`), `@langwatch/api/contract` (only
-`defineTrpcContract`) and other features' contracts.
+`defineTrpcContract`) and other modules' contracts.
 
 ## The callable API and its token
 
@@ -51,9 +51,9 @@ export const AnnotationApi = featureApi<AnnotationApi>("annotation");
 
 - One interface of callable operations. No service-valued properties, getters,
   repositories, transport objects or lookup methods (`feature-app-contract`).
-- The same-named `const` is the runtime token. It is the only thing another feature may
+- The same-named `const` is the runtime token. It is the only thing another module may
   depend on: the peer names it in its app's `static dependencies`, the process provides an
-  implementation with `.withProvided(AnnotationApi, app)` or by installing the feature,
+  implementation with `.withProvided(AnnotationApi, app)` or by installing the module,
   and boot rejects a missing, duplicate or cyclic provider by name.
 - `featureApi` takes a `FeatureName`, the literal union generated from
   `packages/features/catalogue.json` (`packages/runtime-composition/src/feature-names.generated.ts`,
@@ -118,9 +118,9 @@ export class AnnotationNotFoundError extends HandledError {
 - Tests assert on `code`, never on message prose.
 - A peer's error propagates as itself: the app does not wrap `ProjectNotFoundError`.
 
-## Sharing across features
+## Sharing across modules
 
-Feature B needs feature A's capability: B's app names `A`'s token in `static dependencies`
+Module B needs module A's capability: B's app names A's token in `static dependencies`
 (`projects: ProjectApi`), the container hands B's `create(setup)` a `setup.dependencies.projects`
 typed as `ProjectApi`, and B calls it. B never imports `@langwatch/a-server`, never
 declares a port for A, and never takes A's service or repository. If the shared thing is

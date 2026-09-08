@@ -48,7 +48,7 @@ details. Do not "fix" this.
   react-email on a worker's boot graph, which
   `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` will catch.
 - **Links arrive built.** A template never assembles a URL from a base host it read
-  itself. The feature that owns the destination passes the link.
+  itself. The module that owns the destination passes the link.
 
 ## Check it
 

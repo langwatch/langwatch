@@ -1,11 +1,4 @@
----
-name: feature-move
-description: "Move code into its owning LangWatch feature package the lift-and-shift way: a module, a service, a screen, a test or a whole family relocates from wherever it sits (an app, another feature, a shared package) into the right layer folder of the owner, imports are repointed at every consumer, nothing is copied, nothing is re-exported for compatibility, and the moves that silently break things (vi.mock paths, source-reading guards, TS2304 half-reverts, install registries) are swept afterwards. Use this whenever someone says 'move', 'relocate', 'this belongs in <feature>', 'extract into a package', 'lift and shift', 'feature-source-subject fired', 'wrong package', or a lint finding says code claims another feature's subject."
-user-invocable: true
-argument-hint: "<what to move> -> <feature>/<contract|server|web>/<layer>"
----
-
-# Move code into its owner
+# Move code into its owning module
 
 Read `.claude/skills/architecture-guide/SKILL.md`. Follow the order; the sweep in step 4
 is where moves break.
@@ -28,17 +21,17 @@ is where moves break.
 ## 1. Map source to destination
 
 For each file, decide the destination folder from the grammar (`references/server.md`,
-`references/web.md`, `references/contract.md`). Rename to the canonical filename
-(`prisma.<name>.repository.ts`, `<name>.service.ts`, lower-kebab for web). Write the map
-down before moving: `from -> to`, one line each; it is the report's spine and the sweep's
-checklist.
+`references/web.md`, `references/contract.md`, all under `architecture-guide`). Rename to
+the canonical filename (`prisma.<name>.repository.ts`, `<name>.service.ts`, lower-kebab
+for web). Write the map down before moving: `from -> to`, one line each; it is the
+report's spine and the sweep's checklist.
 
 Pure, framework-free code shared by both halves goes to the contract. A hook or
 component goes to the web package. A Prisma read goes into `repositories/prisma/` behind
 the repository interface (with its memory twin under `repositories/memory/`), never into a
 service. Nothing moves INTO a legacy piece: not into `adapters/`, `fixtures/`, `testing.ts`,
 a `transport/<surface>/` folder or a contract `.service.ts` (`feature-shape`); if the
-destination feature has only those, create the annotation-shaped home.
+destination module has only those, create the annotation-shaped home.
 
 ## 2. Move
 
@@ -59,10 +52,10 @@ grep -rn "<old path or old module name>" --include=*.ts --include=*.tsx --includ
 
 Fix each importer. Cross-package consumers import from the destination package's public
 entry: for a server package that means nothing but the installer and transport
-declarations — a peer calls the feature through its `*Api` token, never an import; for a
+declarations: a peer module calls it through its `*Api` token, never an import; for a
 web package a declared flat entry (or `./screens/*` / `./surfaces/*`). If a consumer would
 need something the entry does not export, that is the redesign seam: add an operation to
-the `<F>Api`, or publish a surface, not the internal module.
+the `<F>Api`, or publish a surface (`references/web-surface.md`), not the internal module.
 
 ## 4. The second-pass sweep (this is where moves break)
 
@@ -91,7 +84,7 @@ Run every item; each has bitten a previous move.
 - **Package manifests**: the destination `package.json` gains the dependencies the moved
   code needs; the source loses the ones nothing uses any more; run `pnpm install` once
   (never hand-link into `node_modules`).
-- **Ownership**: if the file's subject is another feature's, the move is to that feature;
+- **Ownership**: if the file's subject is another module's, the move is to that module;
   `feature-source-subject` will say so.
 - **Frontend boundary**: a server file that moved next to something importing React now
   fails `tests/frontend-boundary.unit.test.ts`.
