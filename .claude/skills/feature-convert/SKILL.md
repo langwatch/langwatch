@@ -36,6 +36,7 @@ Each baseline `kind` is one gap, and each gap has exactly one target in annotati
 | `no-app`                    | services constructed by transports or the process       | `app/annotation.app.ts`                                                                      |
 | `no-installer`              | no `<f>.server.ts`                                      | `annotation.server.ts`                                                                       |
 | `nested-transport`          | `transport/api-trpc/<f>.api.ts`, `transport/api-rest/…` | `transport/annotation.trpc.ts`, `annotation-score.trpc.ts`, `annotation.rest.ts`             |
+| `legacy-transport-runtime`  | any file naming `createVersionedApp`, `createTrpcService`, `mountProjectTransport` or their kin | the same declarations, mounted by the process on `createRestRuntime` / `createTrpcRuntime` (`apps/api/src/features/annotation/annotation-rest.mount.ts`, `annotation-trpc.mount.ts`) |
 | `fixtures-directory`, `testing-entry` | `fixtures/`, `testing.ts` exported to other packages | `app/__tests__/annotation.fixture.ts`                                              |
 | `installer-not-booted`      | `apps/api/src/features/<f>/<f>.composition.ts` hand-builds the app | `apps/api/src/features/annotation/annotation.composition.ts` (`installApiAnnotation`) |
 | `refusing-composition`      | `refusing<F>Feature()` / `<f>-absence.ts`               | nothing: annotation's api composition installs the feature or the root does not call it     |

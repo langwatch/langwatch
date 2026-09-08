@@ -70,7 +70,10 @@ wrong placement trades one violation for another.
 `feature-shape-baseline.json` is the conversion inventory: one entry per feature and
 kind, measured against annotation. Pieces annotation has no place for:
 `contract-service`, `persistence-adapter`, `fixtures-directory`, `testing-entry`,
-`nested-transport`, `unregistered-repositories`, `postgres-without-memory`,
-`nested-web-entry`, `refusing-composition`. Pieces of annotation a feature still lacks:
+`nested-transport`, `legacy-transport-runtime` (a transport that still names
+`createVersionedApp`, `createTrpcService`, `mountProjectTransport` or their kin instead of
+being mounted by the process on the runtimes), `unregistered-repositories`,
+`postgres-without-memory`, `nested-web-entry`, `refusing-composition`. Pieces of annotation a
+feature still lacks:
 `no-installer`, `no-app`, `installer-not-booted`. A feature is converted when it has no
 entries left; the `feature-convert` skill closes them kind by kind.

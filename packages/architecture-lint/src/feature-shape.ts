@@ -16,6 +16,7 @@ export const FEATURE_SHAPE_LEGACY_KINDS = [
   "fixtures-directory",
   "testing-entry",
   "nested-transport",
+  "legacy-transport-runtime",
   "unregistered-repositories",
   "postgres-without-memory",
   "no-installer",
@@ -47,6 +48,8 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
     "A server package exports its installer and transport declarations only; tests import doubles from the package's own __tests__ directories.",
   "nested-transport":
     "One flat declaration per protocol: transport/<feature>.rest.ts built with defineRestRouter(<Feature>Api), and transport/<feature>.trpc.ts built with defineTrpcRouter(<Feature>Api, <feature>Trpc) over the contract's <feature>.trpc.ts declaration.",
+  "legacy-transport-runtime":
+    "A transport is a declaration the process mounts on its runtime: defineRestRouter(<Feature>Api) mounted with createRestRuntime, defineTrpcRouter mounted with createTrpcRuntime. The legacy builders (createVersionedApp, createTrpcService, mountProjectTransport and their kin) are deleted when the last family leaves them.",
   "unregistered-repositories":
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ postgres, memory }) and select it with .withRepositories() in <feature>.server.ts.",
   "postgres-without-memory":
@@ -72,6 +75,13 @@ const BOOT_SCAN_ROOTS = [
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
 const BOOTED_INSTALLER = /withFeature\(\s*([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;
+
+/**
+ * The builders of the two legacy execution paths. A family that names one still
+ * runs through them, however flat its transport folder is.
+ */
+const LEGACY_TRANSPORT_BUILDER =
+  /\b(?:createVersionedApp|createProjectVersionedApp|createServiceVersionedApp|createRestService|createProjectApp|createOrgApp|createServiceApp|createTrpcService|createTrpcApiService|mountProjectTransport|mountProjectRestRouter)\b/;
 
 const PERSISTENCE_ADAPTER = /^(?:postgres|prisma)\.[a-z0-9-]+\.adapter\.ts$/;
 
@@ -205,6 +215,11 @@ function serverFindings(
 
   const nested = subdirectories(join(src, "transport"))[0];
   if (nested) add("nested-transport", join(src, "transport", nested));
+
+  const legacyRuntime = sourceFiles(src).find((file) =>
+    LEGACY_TRANSPORT_BUILDER.test(readFileSync(file, "utf8")),
+  );
+  if (legacyRuntime) add("legacy-transport-runtime", legacyRuntime);
 
   const repositories = join(src, "repositories");
   if (isDirectory(repositories)) {

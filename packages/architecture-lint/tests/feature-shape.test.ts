@@ -111,7 +111,10 @@ describe("feature shape", () => {
       write("packages/features/widget/server/src/adapters/postgres.widget.adapter.ts");
       write("packages/features/widget/server/src/fixtures/widget.fixture.ts");
       write("packages/features/widget/server/src/testing.ts");
-      write("packages/features/widget/server/src/transport/api-trpc/widget.api.ts");
+      write(
+        "packages/features/widget/server/src/transport/api-trpc/widget.api.ts",
+        "export const widgetApi = createTrpcService({ name: 'widget' });\n",
+      );
     });
 
     /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
@@ -126,6 +129,11 @@ describe("feature shape", () => {
           feature: "widget",
           kind: "fixtures-directory",
           path: "packages/features/widget/server/src/fixtures",
+        },
+        {
+          feature: "widget",
+          kind: "legacy-transport-runtime",
+          path: "packages/features/widget/server/src/transport/api-trpc/widget.api.ts",
         },
         {
           feature: "widget",
@@ -149,7 +157,7 @@ describe("feature shape", () => {
     it("rejects each piece that the baseline does not list, pointing at the reference shape", () => {
       const rejected = violations().filter((violation) => violation.policy === "feature-shape");
 
-      expect(rejected).toHaveLength(5);
+      expect(rejected).toHaveLength(6);
       expect(rejected.map((violation) => violation.allowed)).toEqual(
         expect.arrayContaining([expect.stringContaining("defineTrpcRouter")]),
       );
@@ -159,6 +167,7 @@ describe("feature shape", () => {
       baseline([
         { feature: "widget", kind: "contract-service" },
         { feature: "widget", kind: "fixtures-directory" },
+        { feature: "widget", kind: "legacy-transport-runtime" },
         { feature: "widget", kind: "nested-transport" },
         { feature: "widget", kind: "persistence-adapter" },
         { feature: "widget", kind: "testing-entry" },
@@ -172,6 +181,7 @@ describe("feature shape", () => {
       baseline([
         { feature: "widget", kind: "contract-service" },
         { feature: "widget", kind: "fixtures-directory" },
+        { feature: "widget", kind: "legacy-transport-runtime" },
         { feature: "widget", kind: "nested-transport" },
         { feature: "widget", kind: "persistence-adapter" },
         { feature: "widget", kind: "testing-entry" },
@@ -192,6 +202,7 @@ describe("feature shape", () => {
       expect(entries.map((entry) => entry.kind)).toEqual([
         "contract-service",
         "fixtures-directory",
+        "legacy-transport-runtime",
         "nested-transport",
         "persistence-adapter",
         "testing-entry",
@@ -204,6 +215,25 @@ describe("feature shape", () => {
           )
           .join("\n")}\n  ]\n}\n`,
       );
+    });
+  });
+
+  describe("given a flat transport that still names a legacy builder", () => {
+    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
+    it("reports the family as running on the legacy runtime, naming the file", () => {
+      referenceFeature();
+      write(
+        "packages/features/widget/server/src/transport/widget.rest.ts",
+        'const { service } = security.createVersionedApp({ name: "widgets" });\n',
+      );
+
+      expect(findings()).toEqual([
+        {
+          feature: "widget",
+          kind: "legacy-transport-runtime",
+          path: "packages/features/widget/server/src/transport/widget.rest.ts",
+        },
+      ]);
     });
   });
 
