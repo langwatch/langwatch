@@ -55,7 +55,9 @@ import {
 import {
   DECLARED_ANSWER,
   ENDPOINT_ROUTE,
+  isDeclined,
   REQUEST_FAMILY,
+  type Declined,
   type RouteResponse,
 } from "./response.ts";
 
@@ -343,7 +345,7 @@ export type FeatureApiWitness<Api> = FeatureApiToken<Api>;
 
 type SourceSchema = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
 type Missing = undefined;
-type RouteSource = SourceSchema | Missing;
+type RouteSource = SourceSchema | RestRawBodyDeclared | Missing;
 type PathParameterNames<Path extends string> = Path extends `${string}:${infer Tail}`
   ? Tail extends `${infer Name}/${infer Rest}`
     ? Name | PathParameterNames<`/${Rest}`>
@@ -367,14 +369,26 @@ type DistinctSchema<
 type SourceInput<Schema extends RouteSource> = Schema extends SourceSchema
   ? z.output<Schema>
   : unknown;
+/** A raw body is read, never parsed, so it contributes nothing to the input. */
+type ParsedBody<Body extends RouteSource> = Body extends RestRawBodyDeclared ? Missing : Body;
 type RouteInput<Params extends RouteSource, Query extends RouteSource, Body extends RouteSource> = [
   Params,
   Query,
-  Body,
+  ParsedBody<Body>,
 ] extends [Missing, Missing, Missing]
   ? undefined
-  : SourceInput<Params> & SourceInput<Query> & SourceInput<Body>;
-type OutputSchema = z.ZodObject | z.ZodArray | z.ZodVoid | z.ZodUndefined;
+  : SourceInput<Params> & SourceInput<Query> & SourceInput<ParsedBody<Body>>;
+/**
+ * The body a route answers with, as a schema. A discriminated union is one
+ * answer with several shapes — a create that either found the object or started
+ * an upload — and publishes as `oneOf` with its discriminator.
+ */
+type OutputSchema =
+  | z.ZodObject
+  | z.ZodArray
+  | z.ZodVoid
+  | z.ZodUndefined
+  | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
 
 export type RestTransportDocs = Readonly<{
   readonly summary?: string;
@@ -495,13 +509,72 @@ type StoredHandlerArguments<Api> = Readonly<{
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
   signal: AbortSignal | undefined;
+  /** Read once, only for a route that declared it; undefined everywhere else. */
+  raw: string | Uint8Array | undefined;
+  request: Request;
 }>;
 type StoredHandler<Api> = {
   invoke(args: StoredHandlerArguments<Api>, ...facts: unknown[]): unknown;
 }["invoke"];
+/**
+ * A handler with its declaration's own types erased. The door, the raw form and
+ * the parsed input each shape the arguments differently, so no one written
+ * signature is comparable to all of them; `handle` is where they are enforced.
+ */
+type ErasedHandler = (args: never, ...facts: never[]) => unknown;
 type MiddlewareFacts<Middleware extends readonly RestTransportMiddleware[]> = {
   [Index in keyof Middleware]: z.output<Middleware[Index]["schema"]>;
 };
+// ─────────────────────────────────────────────────────────────────────────────
+// Bytes in and bytes out: the two declarations that take the framework's parser
+// and serialiser off a route, for a body that IS the evidence and an answer
+// that is not JSON.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** How a route that reads its own body wants the bytes it was sent. */
+export type RestRawBodyForm = "text" | "bytes";
+
+/**
+ * A route whose body is the evidence — a signature is computed over the exact
+ * characters a sender wrote, spacing included — so nothing parses it: the form
+ * the handler reads it in, and the media type the document publishes for it.
+ */
+export type RestRawBody = Readonly<{ form: RestRawBodyForm; mediaType: string }>;
+
+/** What the handler is handed for the form it asked for. */
+type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text" ? string : Uint8Array;
+
+/** The `Body` slot of a route that reads its own bytes. */
+export type RestRawBodyDeclared<Form extends RestRawBodyForm = RestRawBodyForm> = Readonly<{
+  rawBody: Form;
+}>;
+
+/** What a route that writes its own body publishes, and nothing of its shape. */
+export type RestRawResponse = Readonly<{ produces: readonly string[] }>;
+
+/** The body a raw answer carries; `null` for a 204, a 304, or a HEAD twin. */
+export type RestRawBodyOut = ReadableStream | Uint8Array | string | null;
+
+/** The answer of a route that writes its own bytes. */
+export type RestRawAnswer = Readonly<{
+  status?: ContentfulStatusCode;
+  headers?: Readonly<Record<string, string>>;
+  body: RestRawBodyOut;
+}>;
+
+/**
+ * What a raw-answering handler returns: its own answer, a whole `Response` it
+ * is forwarding, or — on an any-method route alone — a decline, which hands the
+ * request to whatever is mounted after this family.
+ */
+export type RestRawResult = RestRawAnswer | Response | Declined;
+
+/** The `Output` slot of a route that writes its own bytes: no schema at all. */
+export type RestRawAnswerDeclared = Readonly<{ rawAnswer: "declared" }>;
+
+/** The methods a route may name, spelled the way HTTP spells them. */
+export type RestMethodName = Uppercase<HttpMethod>;
+
 /** The statuses a route declares answers for, each with the body it carries. */
 export type RestRouteAnswers = Readonly<Record<number, OutputSchema>>;
 type AnswerResult<Answers extends RestRouteAnswers> = {
@@ -511,16 +584,31 @@ type AnswerResult<Answers extends RestRouteAnswers> = {
   }>;
 }[keyof Answers];
 /**
- * What the handler returns: the one declared body, one `{ status, body }` of
- * the several a route declared, or nothing. The answer slot holds either one
- * schema or the map, so a route states its answers in exactly one place.
+ * What the handler returns: its own bytes, the one declared body, one
+ * `{ status, body }` of the several a route declared, or nothing. The answer
+ * slot holds exactly one of those, so a route states its answers in one place.
  */
-type RouteResult<Output extends RouteAnswer> = Output extends OutputSchema
-  ? z.input<Output> | Promise<z.input<Output>>
-  : Output extends RestRouteAnswers
-    ? AnswerResult<Output> | Promise<AnswerResult<Output>>
-    : void | Promise<void>;
-type RouteAnswer = OutputSchema | RestRouteAnswers | Missing;
+type RouteResult<Output extends RouteAnswer> = Output extends RestRawAnswerDeclared
+  ? RestRawResult | Promise<RestRawResult>
+  : Output extends OutputSchema
+    ? z.input<Output> | Promise<z.input<Output>>
+    : Output extends RestRouteAnswers
+      ? AnswerResult<Output> | Promise<AnswerResult<Output>>
+      : void | Promise<void>;
+type RouteAnswer = OutputSchema | RestRouteAnswers | RestRawAnswerDeclared | Missing;
+
+/** The bytes a route that declared a raw body is handed, beside its input. */
+type RawBodyArguments<Body extends RouteSource> = Body extends RestRawBodyDeclared<infer Form>
+  ? Readonly<{ raw: RawBodyValue<Form> }>
+  : unknown;
+
+/**
+ * The request a route that writes its own bytes reads for itself: the method an
+ * any-method route dispatches on, and the whole `Request` an alias forwards.
+ */
+type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAnswerDeclared
+  ? Readonly<{ request: Request }>
+  : unknown;
 
 /**
  * Where a route's permission is checked. `route` asks it at the scope the
@@ -549,6 +637,14 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly output: OutputSchema;
   /** Present exactly when the route declared several answers with `responds`. */
   readonly answers?: RestRouteAnswers;
+  /** Present exactly when the route reads its own body instead of parsing one. */
+  readonly rawBody?: RestRawBody;
+  /** Present exactly when the route writes its own body instead of a schema's. */
+  readonly rawResponse?: RestRawResponse;
+  /** Every method this one declaration answers; the declared method alone by default. */
+  readonly methods?: readonly HttpMethod[];
+  /** True for the one route of a path that answers whatever method arrives. */
+  readonly anyMethod?: boolean;
   readonly status?: ContentfulStatusCode;
   readonly middleware?: readonly RestTransportMiddleware[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
@@ -574,6 +670,28 @@ export type RestTransportDeclaration<Api> = Readonly<{
   /** Applies to every route the family declares, unless a route names its own. */
   readonly deprecated?: RestDeprecation;
   readonly routes: readonly RestTransportRoute<Api>[];
+}>;
+
+/** Everything a route has declared so far, before `handle` freezes it. */
+type RouteState = Readonly<{
+  params?: z.ZodObject;
+  input?: SourceSchema;
+  query?: z.ZodObject;
+  output?: OutputSchema;
+  answers?: RestRouteAnswers;
+  rawBody?: RestRawBody;
+  rawResponse?: RestRawResponse;
+  methods?: readonly HttpMethod[];
+  anyMethod?: boolean;
+  permission?: AuthzPermission;
+  permissionTarget?: RestPermissionTarget;
+  access?: RouteAccess;
+  version?: DateVersion;
+  docs?: RestTransportDocs;
+  status?: ContentfulStatusCode;
+  middleware?: readonly RestTransportMiddleware[];
+  bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
+  deprecated?: RestDeprecation;
 }>;
 
 type RouteReady<
@@ -606,22 +724,7 @@ class RouteBuilder<
     private readonly method: Method,
     private readonly path: Path,
     private readonly operation: string,
-    private readonly state: Readonly<{
-      params?: z.ZodObject;
-      input?: SourceSchema;
-      query?: z.ZodObject;
-      output?: OutputSchema;
-      answers?: RestRouteAnswers;
-      permission?: AuthzPermission;
-      permissionTarget?: RestPermissionTarget;
-      access?: RouteAccess;
-      version?: DateVersion;
-      docs?: RestTransportDocs;
-      status?: ContentfulStatusCode;
-      middleware?: readonly RestTransportMiddleware[];
-      bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
-      deprecated?: RestDeprecation;
-    }> = {},
+    private readonly state: RouteState = {},
   ) {}
 
   withParams<Schema extends z.ZodObject>(
@@ -682,12 +785,57 @@ class RouteBuilder<
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
+    assertParsedBodyFree({ operation: this.operation, state: this.state });
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.query, schema);
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       input: schema,
+    });
+  }
+
+  /**
+   * The body is the evidence, so nothing parses it: the handler is handed the
+   * exact characters or bytes it was sent, read once, beside its validated path
+   * and query input. The declared body cap still runs first.
+   */
+  withRawBody<Form extends RestRawBodyForm>(
+    this: RouteBuilder<
+      Api,
+      Exclude<HttpMethod, "get" | "head">,
+      Path,
+      Params,
+      Body,
+      Query,
+      Output,
+      Permission,
+      Middleware,
+      Access,
+      Door
+    >,
+    form: Form,
+    options: Readonly<{ mediaType?: string }> = {},
+  ): RouteBuilder<
+    Api,
+    Exclude<HttpMethod, "get" | "head">,
+    Path,
+    Params,
+    RestRawBodyDeclared<Form>,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertBodyMethod(this.method, this.path);
+    assertSourceUnset("rawBody", this.state.rawBody);
+    assertParsedBodyFree({ operation: this.operation, state: this.state });
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      rawBody: { form, mediaType: options.mediaType ?? DEFAULT_RAW_MEDIA_TYPE[form] },
     });
   }
 
@@ -853,6 +1001,7 @@ class RouteBuilder<
     Door
   > {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
+    assertSchemaAnswerFree({ operation: this.operation, state: this.state });
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -882,11 +1031,100 @@ class RouteBuilder<
     Door
   > {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
+    assertSchemaAnswerFree({ operation: this.operation, state: this.state });
     assertDeclaredAnswers({ operation: this.operation, answers });
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       answers,
+    });
+  }
+
+  /**
+   * The route writes its own body, so no schema describes it: the handler
+   * returns `{ status, headers, body }` or a whole `Response` it is
+   * forwarding, and the document publishes the media types it names.
+   */
+  withRawResponse(
+    options: Readonly<{ produces: string | readonly string[] }>,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    RestRawAnswerDeclared,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertSourceUnset("rawResponse", this.state.rawResponse);
+    assertSchemaAnswerFree({ operation: this.operation, state: this.state });
+
+    const produces = typeof options.produces === "string" ? [options.produces] : options.produces;
+
+    assertProduces({ operation: this.operation, produces });
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      rawResponse: { produces: [...produces] },
+    });
+  }
+
+  /**
+   * Every method this one declaration answers. `["GET", "HEAD"]` is the twin a
+   * reader publishes: Hono answers HEAD from the GET route, and the runtime
+   * drops the body it would have written rather than leaving the stream open.
+   */
+  methods(
+    names: readonly RestMethodName[],
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    const methods = names.map((name) => name.toLowerCase() as HttpMethod);
+
+    assertSourceUnset("methods", this.state.methods);
+    assertDeclaredMethods({ operation: this.operation, method: this.method, methods });
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      methods,
+    });
+  }
+
+  /**
+   * One path, whatever method arrives: an alias that rewrites and forwards, a
+   * handshake whose own library terminates the request. It publishes no
+   * operation, because it has none to publish, and writes its own answer.
+   */
+  anyMethod(): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      anyMethod: true,
     });
   }
 
@@ -907,7 +1145,9 @@ class RouteBuilder<
         >
       : never,
     handler: (
-      args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api, Door>,
+      args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api, Door> &
+        RawBodyArguments<Body> &
+        RawResponseArguments<Output>,
       ...facts: MiddlewareFacts<Middleware>
     ) => TResult,
   ): RestTransportRouter<Api, Door> {
@@ -918,7 +1158,11 @@ class RouteBuilder<
       state: this.state,
     });
 
-    this.router.assertRouteAvailable(this.method, this.path, this.operation);
+    this.router.assertRouteAvailable(
+      this.state.methods ?? [this.method],
+      this.path,
+      this.operation,
+    );
 
     this.router.routes.push({
       method: this.method,
@@ -939,11 +1183,15 @@ class RouteBuilder<
           }),
       output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
       ...(this.state.answers ? { answers: this.state.answers } : {}),
+      ...(this.state.rawBody ? { rawBody: this.state.rawBody } : {}),
+      ...(this.state.rawResponse ? { rawResponse: this.state.rawResponse } : {}),
+      methods: this.state.methods ?? [this.method],
+      ...(this.state.anyMethod ? { anyMethod: true } : {}),
       ...(this.state.status === void 0 ? {} : { status: this.state.status }),
       ...(this.state.middleware ? { middleware: this.state.middleware } : {}),
       ...(this.state.bodyLimit ? { bodyLimit: this.state.bodyLimit } : {}),
       ...(this.state.deprecated ? { deprecated: this.state.deprecated } : {}),
-      handler: handler as StoredHandler<Api>,
+      handler: handler as ErasedHandler,
     });
 
     return this.router;
@@ -1153,9 +1401,15 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
     return new RouteBuilder(this, "delete", path, operation);
   }
 
-  assertRouteAvailable(method: HttpMethod, path: string, operation: string): void {
-    if (this.routes.some((route) => route.method === method && route.path === path)) {
-      throw new Error(`REST ${method.toUpperCase()} ${path} is already registered`);
+  assertRouteAvailable(methods: readonly HttpMethod[], path: string, operation: string): void {
+    const taken = this.routes
+      .filter((route) => route.path === path)
+      .flatMap((route) => route.methods ?? [route.method]);
+
+    const clash = methods.find((method) => taken.includes(method));
+
+    if (clash) {
+      throw new Error(`REST ${clash.toUpperCase()} ${path} is already registered`);
     }
 
     if (this.routes.some((route) => route.operation === operation)) {
@@ -1255,17 +1509,7 @@ function assertRouteReady({
   method: HttpMethod;
   path: string;
   operation: string;
-  state: Readonly<{
-    params?: z.ZodObject;
-    permission?: AuthzPermission;
-    permissionTarget?: RestPermissionTarget;
-    access?: RouteAccess;
-    query?: z.ZodObject;
-    input?: SourceSchema;
-    output?: OutputSchema;
-    answers?: RestRouteAnswers;
-    status?: ContentfulStatusCode;
-  }>;
+  state: RouteState;
 }): void {
   if (!state.permission && !state.access) {
     throw new Error(`REST ${operation} must declare withPermission() or withAccess()`);
@@ -1283,10 +1527,137 @@ function assertRouteReady({
 
   if (state.permissionTarget) assertPermissionTarget({ operation, state });
 
+  if (state.anyMethod && !state.rawResponse) {
+    throw new Error(
+      `REST ${operation} answers every method, and no one schema describes what each of them ` +
+        "answers with; it must declare withRawResponse()",
+    );
+  }
+
+  if (state.anyMethod && state.methods) {
+    throw new Error(`REST ${operation} answers every method and also names some of them`);
+  }
+
+  assertMethodsCarryTheirBody({ operation, state });
+
   if (/:([A-Za-z0-9_]+)/.test(path) && !state.params) {
     throw new Error(`REST ${method.toUpperCase()} ${path} must declare withParams()`);
   }
 }
+
+/**
+ * A body is read once: a route that named a schema for it cannot also ask for
+ * the exact bytes, and one that asked for the bytes cannot also name a schema.
+ */
+function assertParsedBodyFree({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  if (!state.input && !state.rawBody) return;
+
+  throw new Error(
+    `REST ${operation} declares both a raw body and a parsed input; the body is read once`,
+  );
+}
+
+/** A route answers with a schema or with its own bytes, never with both. */
+function assertSchemaAnswerFree({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  const schema = state.output ?? state.answers;
+
+  if (!schema && !state.rawResponse) return;
+
+  throw new Error(
+    `REST ${operation} declares both an output schema and a raw response; it answers one way`,
+  );
+}
+
+/** The media types a raw answer publishes: at least one, each of them written. */
+function assertProduces({
+  operation,
+  produces,
+}: {
+  operation: string;
+  produces: readonly string[];
+}): void {
+  const named = produces.filter((mediaType) => mediaType.trim() !== "");
+
+  if (named.length === produces.length && named.length > 0) return;
+
+  throw new Error(`REST ${operation} writes its own body and names no media type it produces`);
+}
+
+/** Every method a declaration names: real, distinct, and its own among them. */
+function assertDeclaredMethods({
+  operation,
+  method,
+  methods,
+}: {
+  operation: string;
+  method: HttpMethod;
+  methods: readonly HttpMethod[];
+}): void {
+  if (methods.length === 0) {
+    throw new Error(`REST ${operation} named no method to answer`);
+  }
+
+  if (new Set(methods).size !== methods.length) {
+    throw new Error(`REST ${operation} names the same method twice`);
+  }
+
+  if (!methods.includes(method)) {
+    throw new Error(
+      `REST ${operation} answers ${methods.map((name) => name.toUpperCase()).join(", ")} and was ` +
+        `declared as ${method.toUpperCase()}, which is not among them`,
+    );
+  }
+}
+
+/**
+ * A body only reaches a method that carries one: naming GET or HEAD beside a
+ * declared body would type a handler for a request that can never carry it, and
+ * an any-method route cannot know which method arrived before it is parsed.
+ */
+function assertMethodsCarryTheirBody({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  if (!state.input && !state.rawBody) return;
+
+  if (state.anyMethod) {
+    throw new Error(`REST ${operation} answers every method, and a body reaches only some of them`);
+  }
+
+  const bodyless = (state.methods ?? []).filter(isBodylessMethod);
+
+  if (bodyless.length === 0) return;
+
+  throw new Error(
+    `REST ${operation} declares a body and answers ` +
+      `${bodyless.map((name) => name.toUpperCase()).join(", ")}, which carries none`,
+  );
+}
+
+function isBodylessMethod(method: HttpMethod): boolean {
+  return method === "get" || method === "head";
+}
+
+/** The media type a raw body publishes when the route names none of its own. */
+const DEFAULT_RAW_MEDIA_TYPE = {
+  text: "text/plain",
+  bytes: "application/octet-stream",
+} as const satisfies Record<RestRawBodyForm, string>;
 
 /**
  * A route checked at the scope its own path names has to parse that scope: the
@@ -1403,6 +1774,7 @@ function permissionOf(permission: AuthzPermission | undefined): AuthzPermission 
 const ROUTE_PARAMS = "routeParams" as const;
 const VERSION_REQUEST = "apiVersionRequest" as const;
 const ROUTE_INPUT = "endpointInput" as const;
+const ROUTE_RAW_BODY = "endpointRawBody" as const;
 
 /** Who the family's own door authenticated, and what its credential resolved. */
 export type RestCaller = Readonly<{
@@ -1512,12 +1884,14 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
         for (const scope of scopes) app.use(scope, middleware);
       }
 
+      const served = new Map<string, Set<HttpMethod>>();
+
       for (const route of declaration.routes) {
         for (const mount of addressesOf({ route, declaration })) {
           mountRoute({
             app,
             basePath,
-            method: route.method,
+            route,
             path: mount.path,
             v1Twin: declaration.v1Twin,
             stack: routeStack({
@@ -1532,9 +1906,12 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
             credentialClass:
               route.access?.kind === "public" ? "none" : CREDENTIAL_CLASS[credential],
             family: declaration.namespace,
+            served,
           });
         }
       }
+
+      mountMethodGuards({ app, served });
 
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
       app.onError(options.onError);
@@ -1687,10 +2064,13 @@ function routeStack<Api>({
   const limit = route.bodyLimit;
   const family = declaration.namespace;
   const deprecated = route.deprecated ?? declaration.deprecated;
+  // An any-method route publishes no operation, because it has none: one
+  // handler stands behind every method the path can be sent.
+  const documents = documented && route.anyMethod !== true;
 
   return [
     versionContext({ route, family, version, status }),
-    ...(documented ? [documentRoute({ route, suffix, ...(deprecated ? { deprecated } : {}) })] : []),
+    ...(documents ? [documentRoute({ route, suffix, ...(deprecated ? { deprecated } : {}) })] : []),
     // Ahead of everything that can refuse: a deprecated endpoint's answer says
     // so whether it succeeded or not.
     ...(deprecated
@@ -1708,11 +2088,26 @@ function routeStack<Api>({
           }),
         ]
       : []),
-    ...validators({ route, documented, paramSource }),
+    // After the cap and before the validators, which never see a raw body: the
+    // bytes are read once, exactly as they were sent.
+    ...(route.rawBody ? [rawBodyMiddleware(route.rawBody)] : []),
+    ...validators({ route, documented: documents, paramSource }),
     inputMiddleware({ route, paramSource }),
     handlerMiddleware({ route, credential: declaration.credential, ports, options, facts }),
   ];
 }
+
+/** The exact characters or bytes a route that parses nothing was sent. */
+function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
+  return async (context, next) => {
+    const bytes = new Uint8Array(await context.req.raw.arrayBuffer());
+
+    context.set(ROUTE_RAW_BODY, rawBody.form === "text" ? TEXT.decode(bytes) : bytes);
+    await next();
+  };
+}
+
+const TEXT = new TextDecoder();
 
 /** Every deprecated route is reported once per process, on its first call. */
 const reportedDeprecations = new Set<string>();
@@ -1912,25 +2307,26 @@ function handlerMiddleware<Api>({
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): MiddlewareHandler {
-  return async (context) => {
+  return async (context, next) => {
     const input = context.get(ROUTE_INPUT);
 
     // A public route resolves nothing: no credential is read, no scope is
     // established, and the handler is told so rather than handed a guess.
     if (route.access?.kind === "public") {
       const result = await route.handler(
-        {
-          app: options.app(),
+        handlerArguments({
+          context,
+          route,
+          options,
           input,
           actor: null,
           scope: null,
           target: null,
-          signal: context.req.raw.signal,
-        },
+        }),
         ...(await resolveFacts({ route, facts, context })),
       );
 
-      return respond({ context, route, result });
+      return answerWith({ context, next, route, result });
     }
 
     const permission = route.access ? void 0 : permissionOf(route.permission);
@@ -1956,21 +2352,84 @@ function handlerMiddleware<Api>({
     const target = await checkRouteScope({ route, caller, ports, input });
 
     const result = await route.handler(
-      {
-        app: options.app(),
+      handlerArguments({
+        context,
+        route,
+        options,
         input,
         actor: doorActorOf({ credential, actor: decision.actor }),
         scope: doorScopeOf({ credential, caller }),
         target,
-        signal: context.req.raw.signal,
-      },
+      }),
       ...(await resolveFacts({ route, facts, context })),
     );
 
     caller.markUsed?.();
 
-    return respond({ context, route, result });
+    return answerWith({ context, next, route, result });
   };
+}
+
+/** What every handler is called with, whichever door let the request in. */
+function handlerArguments<Api>({
+  context,
+  route,
+  options,
+  input,
+  actor,
+  scope,
+  target,
+}: {
+  context: Context;
+  route: RestTransportRoute<Api>;
+  options: RestMountOptions<Api>;
+  input: unknown;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  target: AuthzDeclaredScopeId | null;
+}): StoredHandlerArguments<Api> {
+  return {
+    app: options.app(),
+    input,
+    actor,
+    scope,
+    target,
+    signal: context.req.raw.signal,
+    request: context.req.raw,
+    raw: route.rawBody ? (context.get(ROUTE_RAW_BODY) as string | Uint8Array) : undefined,
+  };
+}
+
+/**
+ * The answer: the declared schema's, the route's own bytes, or — from an
+ * any-method route that recognised nothing of its own — none at all, so
+ * whatever is mounted after this family routes the request as it always did.
+ */
+async function answerWith<Api>({
+  context,
+  next,
+  route,
+  result,
+}: {
+  context: Context;
+  next: () => Promise<void>;
+  route: RestTransportRoute<Api>;
+  result: unknown;
+}): Promise<Response | undefined> {
+  if (!route.rawResponse) return respond({ context, route, result });
+
+  if (!isDeclined(result)) return respondRaw({ context, route, result });
+
+  if (!route.anyMethod) {
+    throw new Error(
+      `REST ${route.operation} declined a request it was matched by method and path; only an ` +
+        "any-method route, which matched neither, may decline",
+    );
+  }
+
+  await next();
+
+  return undefined;
 }
 
 /**
@@ -2158,6 +2617,45 @@ function respond({
 }
 
 /**
+ * The bytes a route wrote for itself, verbatim: its own `{ status, headers,
+ * body }`, or a whole `Response` it is forwarding. Nothing is validated,
+ * because the route declared that nothing describes it.
+ */
+function respondRaw({
+  context,
+  route,
+  result,
+}: {
+  context: Context;
+  route: RestTransportRoute<unknown>;
+  result: unknown;
+}): Response {
+  if (result instanceof Response) return result;
+
+  const answer = result as RestRawAnswer | null;
+
+  if (!answer || typeof answer !== "object" || !("body" in answer)) {
+    throw new Error(
+      `REST ${route.operation} writes its own body, and answered with neither a Response nor ` +
+        "{ status, headers, body }",
+    );
+  }
+
+  const status = answer.status ?? 200;
+  const headers = { ...answer.headers };
+
+  // Hono answers HEAD from the GET route, so the twin's body is dropped here
+  // rather than left for a garbage collector to close.
+  if (context.req.method === "HEAD") {
+    if (answer.body instanceof ReadableStream) void answer.body.cancel();
+
+    return context.body(null, status, headers);
+  }
+
+  return context.body(answer.body as never, status, headers);
+}
+
+/**
  * One of the several answers a route declared. The status comes from the
  * handler, but only the declared ones are servable — an undeclared status is a
  * plain `Error`, because no caller can act on a route answering off-contract.
@@ -2271,7 +2769,8 @@ function dateFallback<Api>({
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): MiddlewareHandler {
   const candidates = declaration.routes.map((route) => ({
-    method: route.method,
+    methods: route.methods ?? [route.method],
+    anyMethod: route.anyMethod === true,
     pattern: route.path || "/",
     stack: routeStack({
       route,
@@ -2296,10 +2795,10 @@ function dateFallback<Api>({
     const marker = context.req.routePath.indexOf("/:apiVersion");
     const mountBase = marker >= 0 ? context.req.routePath.slice(0, marker) : basePath;
     const rest = context.req.path.slice(mountBase.length + requested.length + 1) || "/";
-    const method = context.req.method.toLowerCase();
+    const method = context.req.method.toLowerCase() as HttpMethod;
 
     for (const candidate of candidates) {
-      if (candidate.method !== method) continue;
+      if (!serves(candidate, method)) continue;
 
       const params = matchPath(candidate.pattern, rest);
 
@@ -2315,6 +2814,14 @@ function dateFallback<Api>({
 
     return next();
   };
+}
+
+/** Whether a candidate of the date fallback answers the method that arrived. */
+function serves(
+  candidate: Readonly<{ methods: readonly HttpMethod[]; anyMethod: boolean }>,
+  method: HttpMethod,
+): boolean {
+  return candidate.anyMethod || candidate.methods.includes(method);
 }
 
 /**
@@ -2404,57 +2911,123 @@ function decodeSegment(value: string): string {
 function mountRoute({
   app,
   basePath,
-  method,
+  route,
   path,
   v1Twin,
   stack,
   policy,
   credentialClass,
   family,
+  served,
 }: {
   app: Hono;
   basePath: string;
-  method: HttpMethod;
+  route: RestTransportRoute<unknown>;
   path: string;
   v1Twin: boolean;
   stack: MiddlewareHandler[];
   policy: AccessPolicy;
   credentialClass: CredentialClass;
   family: string;
+  served: Map<string, Set<HttpMethod>>;
 }): void {
   const absolute = mergePath(basePath, path);
   const alias = v1Twin ? canonicalV1Path(absolute) : null;
+  const methods = route.methods ?? [route.method];
+  const addresses = alias ? [absolute, alias] : [absolute];
 
-  register({ app, method, path: absolute, stack });
-  if (alias) register({ app, method, path: alias, stack: undescribedStack(stack) });
+  register({ app, route, methods, path: absolute, stack });
 
-  registerRoutePolicy({
-    method,
-    path: absolute,
-    ...(alias ? { canonicalPath: alias } : {}),
-    policy,
-    family,
-    credentialClass,
-  });
+  if (alias) register({ app, route, methods, path: alias, stack: undescribedStack(stack) });
+
+  for (const method of route.anyMethod ? ["all"] : methods) {
+    registerRoutePolicy({
+      method,
+      path: absolute,
+      ...(alias ? { canonicalPath: alias } : {}),
+      policy,
+      family,
+      credentialClass,
+    });
+  }
+
+  if (route.anyMethod) return;
+
+  for (const address of addresses) {
+    const known = served.get(address) ?? new Set<HttpMethod>();
+
+    served.set(address, known);
+
+    for (const method of methods) known.add(method);
+  }
 }
 
 function register({
   app,
-  method,
+  route,
+  methods,
   path,
   stack,
 }: {
   app: Hono;
-  method: HttpMethod;
+  route: RestTransportRoute<unknown>;
+  methods: readonly HttpMethod[];
   path: string;
   stack: MiddlewareHandler[];
 }): void {
   const handlers = stack as [MiddlewareHandler, ...MiddlewareHandler[]];
 
-  // Hono exposes no `.head` shortcut, and HEAD is answered from the GET route
-  // before routing, so that registration is for the registry and the document.
-  if (method === "head") app.on("HEAD", path, ...handlers);
-  else app[method](path, ...handlers);
+  if (route.anyMethod) {
+    app.all(path, ...handlers);
+
+    return;
+  }
+
+  for (const method of methods) {
+    // Hono exposes no `.head` shortcut, and HEAD is answered from the GET route
+    // before routing, so that registration is for the registry and the document.
+    if (method === "head") app.on("HEAD", path, ...handlers);
+    else app[method](path, ...handlers);
+  }
+}
+
+/**
+ * A path this family serves, asked for with a method it does not: 405 with the
+ * `Allow` header naming what it does serve. Written here rather than thrown,
+ * because `Allow` is the whole of the answer the router owes.
+ */
+function mountMethodGuards({
+  app,
+  served,
+}: {
+  app: Hono;
+  served: ReadonlyMap<string, Set<HttpMethod>>;
+}): void {
+  for (const [path, methods] of served) {
+    const allow = allowHeaderOf(methods);
+
+    app.all(path, async (context, next) => {
+      const asked = context.req.method.toLowerCase() as HttpMethod;
+
+      if (methods.has(asked)) return next();
+
+      context.header("Allow", allow);
+
+      return context.body(null, 405);
+    });
+  }
+}
+
+/** What the path serves, as `Allow` spells it; HEAD rides on GET, as Hono serves it. */
+function allowHeaderOf(methods: ReadonlySet<HttpMethod>): string {
+  const named = new Set(methods);
+
+  if (named.has("get")) named.add("head");
+
+  return [...named]
+    .map((method) => method.toUpperCase())
+    .sort()
+    .join(", ");
 }
 
 const HANDLER_CREDENTIAL = {

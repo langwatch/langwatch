@@ -102,6 +102,7 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   }
 });
 
+/** @scenario "A route answers one of several shapes, told apart by a field" */
 it("infers trailing middleware arguments and rejects wrong facts and responses", () => {
   const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-middleware-"));
   const fixture = join(directory, "fixture.ts");
@@ -136,6 +137,9 @@ const conflict = z.discriminatedUnion("kind", [
 ]);
 defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .post("/:id", "conflict").withParams(z.object({ id: z.string() })).withInput(conflict);
+defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
+  .get("/", "shapes").withPermission("annotations:view")
+  .withOutput(z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]));
 `,
   );
 
@@ -144,12 +148,15 @@ defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
       .split("\n")
       .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
 
-    expect(errors).toHaveLength(5);
+    expect(errors).toHaveLength(6);
     expect(errors[0]).toContain("Property 'token' does not exist");
     expect(errors[1]).toContain("number");
     expect(errors[2]).toContain("Response");
     expect(errors[3]).toContain("Property 'text' does not exist");
     expect(errors[4]).toContain("never");
+    // A union that names no field telling its shapes apart cannot be published
+    // as `oneOf` with a discriminator, so the declaration refuses it.
+    expect(errors[5]).toContain("ZodUnion");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -113,6 +113,14 @@ Feature: Transport declaration split
     And a version segment that names no servable version is refused
 
   @integration
+  Scenario: A route answers one of several shapes, told apart by a field
+    Given a create that either finds what the caller asked for or starts the work of making it
+    When it declares the two shapes its answer takes and the field that tells them apart
+    Then each shape it returns is served, and one it never declared is diagnosed
+    And the published document offers both shapes with that field as the discriminator
+    And a union that names no field telling its shapes apart does not compile
+
+  @integration
   Scenario: A collection route is addressed at the family root, with no trailing slash
     Given a REST declaration carrying a collection route and a by-id route beside it
     When a caller addresses the collection by its dated path, by latest, by the bare path or by the /api/v1 twin

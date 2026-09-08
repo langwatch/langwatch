@@ -298,6 +298,89 @@ describe("defineRestRouter", () => {
     });
   });
 
+  describe("when a route reads or writes its own bytes", () => {
+    const HookApi = featureApi<{ record(): Promise<void> }>("webhook");
+    const answer = z.object({ ok: z.boolean() });
+
+    function hook() {
+      return defineRestRouter(HookApi)
+        .withNamespace("hooks")
+        .withVersion("2026-08-07")
+        .post("/hook", "recordHook")
+        .withPermission("annotations:manage");
+    }
+
+    /** @scenario "A handler is given the exact request bytes" */
+    it("refuses a route that declares both a raw body and a parsed one", () => {
+      expect(() => hook().withRawBody("bytes").withInput(z.object({ a: z.number() }))).toThrow(
+        /both a raw body and a parsed input/,
+      );
+
+      expect(() => hook().withInput(z.object({ a: z.number() })).withRawBody("bytes")).toThrow(
+        /both a raw body and a parsed input/,
+      );
+
+      expect(() => hook().withRawBody("bytes").withRawBody("text")).toThrow(
+        /already declared withRawBody/,
+      );
+    });
+
+    /** @scenario "An endpoint answers outside the JSON contract when it declares what it produces" */
+    it("refuses a route that declares both a schema and a raw answer, or names no media type", () => {
+      expect(() => hook().withOutput(answer).withRawResponse({ produces: "text/plain" })).toThrow(
+        /both an output schema and a raw response/,
+      );
+
+      expect(() => hook().withRawResponse({ produces: "text/plain" }).withOutput(answer)).toThrow(
+        /both an output schema and a raw response/,
+      );
+
+      expect(() => hook().withRawResponse({ produces: [] })).toThrow(/names no media type/);
+      expect(() => hook().withRawResponse({ produces: "   " })).toThrow(/names no media type/);
+    });
+
+    /** @scenario "A reader answers HEAD with the headers its GET would carry and no body" */
+    it("refuses a body beside a method that carries none, and a method set it is not in", () => {
+      expect(() =>
+        hook()
+          .withInput(z.object({ a: z.number() }))
+          .methods(["POST", "GET"])
+          .withOutput(answer)
+          .handle(() => ({ ok: true })),
+      ).toThrow(/declares a body and answers GET, which carries none/);
+
+      expect(() => hook().methods(["GET"])).toThrow(/which is not among them/);
+      expect(() => hook().methods([])).toThrow(/named no method/);
+      expect(() => hook().methods(["POST", "POST"])).toThrow(/the same method twice/);
+    });
+
+    /** @scenario "One path answers every method when that is the surface" */
+    it("refuses an any-method route with a body, with named methods, or with no media type", () => {
+      expect(() =>
+        hook()
+          .withInput(z.object({ a: z.number() }))
+          .anyMethod()
+          .withRawResponse({ produces: "application/json" })
+          .handle(() => new Response()),
+      ).toThrow(/a body reaches only some of them/);
+
+      expect(() =>
+        hook()
+          .anyMethod()
+          .methods(["POST"])
+          .withRawResponse({ produces: "application/json" })
+          .handle(() => new Response()),
+      ).toThrow(/answers every method and also names some of them/);
+
+      expect(() =>
+        hook()
+          .anyMethod()
+          .withOutput(answer)
+          .handle(() => ({ ok: true })),
+      ).toThrow(/it must declare withRawResponse/);
+    });
+  });
+
   describe("when a family declares the door it answers behind", () => {
     const OrganizationApi = featureApi<{ listRoles(): Promise<void> }>("role");
 

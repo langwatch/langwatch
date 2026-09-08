@@ -8,7 +8,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { featureApi } from "@langwatch/runtime-composition";
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -16,6 +16,7 @@ import { z } from "zod";
 import { anyAuthenticated, publicRoute, securityRequirement } from "../../access/access.ts";
 import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
+import { declined } from "../response.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
 import {
   createRestRuntime,
@@ -1334,5 +1335,409 @@ describe("a family behind one directory connection's SCIM token", () => {
     ).toEqual([{ scim_bearer: [] }]);
 
     expect(securityRequirement("scimToken")).toEqual([{ scim_bearer: [] }]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bytes in: a body that is the evidence, read once and never parsed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface HookApi {
+  record(input: { digest: string }): Promise<void>;
+}
+
+const HookApi = featureApi<HookApi>("webhook");
+
+const hooks = defineRestRouter(HookApi)
+  .withNamespace("hooks")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/bytes", "recordHookBytes")
+  .withRawBody("bytes")
+  .withPermission("annotations:manage")
+  .withOutput(z.object({ digest: z.string(), length: z.number() }))
+  .withBodyLimit({ maxBytes: BODY_CAP_BYTES, onExceeded: () => new PayloadTooLargeError() })
+  .handle(({ raw }) => ({ digest: new TextDecoder().decode(raw), length: raw.length }))
+
+  .post("/text/:id", "recordHookText")
+  .withParams(z.object({ id: z.string() }))
+  .withRawBody("text", { mediaType: "application/json" })
+  .withPermission("annotations:manage")
+  .withOutput(z.object({ id: z.string(), body: z.string() }))
+  .handle(({ input, raw }) => ({ id: input.id, body: raw }))
+  .build();
+
+function hooksApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+  });
+
+  return runtime.mount(hooks.router(), { app: () => ({}) as HookApi, onError: createErrorHandler() });
+}
+
+describe("a route whose body is the evidence", () => {
+  /** @scenario "A handler is given the exact request bytes" */
+  it("hands the handler the exact bytes, and the text form beside a validated path", async () => {
+    // Deliberately not the JSON a parser hands back: a signature is computed
+    // over these characters, spacing included.
+    const exact = '{ "a" :  1 }';
+
+    const bytes = await hooksApp().request("/api/v1/hooks/bytes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: exact,
+    });
+    const text = await hooksApp().request("/api/v1/hooks/text/hook-1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: exact,
+    });
+
+    expect(bytes.status).toBe(200);
+    await expect(bytes.json()).resolves.toEqual({ digest: exact, length: exact.length });
+    await expect(text.json()).resolves.toEqual({ id: "hook-1", body: exact });
+  });
+
+  /** @scenario "A handler is given the exact request bytes" */
+  it("still measures the declared cap before the handler reads the bytes", async () => {
+    const response = await hooksApp().request("/api/v1/hooks/bytes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "x".repeat(BODY_CAP_BYTES + 1),
+    });
+
+    expect(response.status).toBe(413);
+  });
+
+  /** @scenario "A handler is given the exact request bytes" */
+  it("publishes the media type the route named, with no schema", async () => {
+    const published = await generateSpecs(hooksApp(), SPEC_OPTIONS);
+    const paths = published.paths ?? {};
+
+    expect((paths["/api/v1/hooks/bytes"] as any)?.post?.requestBody).toEqual({
+      required: true,
+      content: { "application/octet-stream": {} },
+    });
+    expect((paths["/api/v1/hooks/text/{id}"] as any)?.post?.requestBody).toEqual({
+      required: true,
+      content: { "application/json": {} },
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bytes out: a route that writes its own answer, its HEAD twin, and the
+// any-method alias that forwards or declines.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ObjectApi {
+  readById(input: { id: string }): Promise<{ mediaType: string; bytes: string }>;
+}
+
+const ObjectApi = featureApi<ObjectApi>("stored-object");
+
+const cancelled: string[] = [];
+
+/** A body the storage driver opened: closing it is the route's own duty. */
+function objectStream(id: string, bytes: string): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(bytes));
+      controller.close();
+    },
+    cancel() {
+      cancelled.push(id);
+    },
+  });
+}
+
+const objectApplication: ObjectApi = {
+  readById: async ({ id }) => ({ mediaType: "text/plain", bytes: `bytes-of-${id}` }),
+};
+
+const storedObjects = defineRestRouter(ObjectApi)
+  .withNamespace("files")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .get("/:id", "readStoredObject")
+  .withParams(z.object({ id: z.string() }))
+  .withPermission("traces:view")
+  .withRawResponse({ produces: ["application/octet-stream", "text/plain"] })
+  .methods(["GET", "HEAD"])
+  .handle(async ({ app, input }) => {
+    const row = await app.readById({ id: input.id });
+
+    return {
+      status: 200,
+      headers: { "Content-Type": row.mediaType, "Content-Length": String(row.bytes.length) },
+      body: objectStream(input.id, row.bytes),
+    } as const;
+  })
+  .build();
+
+function storedObjectsApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+  });
+
+  return runtime.mount(storedObjects.router(), {
+    app: () => objectApplication,
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a route that writes its own answer", () => {
+  /** @scenario "An endpoint answers outside the JSON contract when it declares what it produces" */
+  it("writes the handler's own status, headers and stream verbatim", async () => {
+    const response = await storedObjectsApp().request("/api/v1/files/object-1");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/plain");
+    expect(response.headers.get("content-length")).toBe("17");
+    expect(response.headers.get("X-API-Version")).toBe(VERSION);
+    await expect(response.text()).resolves.toBe("bytes-of-object-1");
+  });
+
+  /** @scenario "An endpoint answers outside the JSON contract when it declares what it produces" */
+  it("publishes the media types it names, with no schema beside them", async () => {
+    const published = await generateSpecs(storedObjectsApp(), SPEC_OPTIONS);
+    const item = published.paths?.["/api/v1/files/{id}"] as any;
+
+    expect(item?.get?.responses?.["200"]?.content).toEqual({
+      "application/octet-stream": {},
+      "text/plain": {},
+    });
+    expect(item?.get?.responses?.["200"]?.content?.["text/plain"]?.schema).toBeUndefined();
+  });
+
+  /** @scenario "A reader answers HEAD with the headers its GET would carry and no body" */
+  it("answers HEAD with the GET headers, no body, and closes what the handler opened", async () => {
+    cancelled.length = 0;
+
+    const response = await storedObjectsApp().request("/api/v1/files/object-2", {
+      method: "HEAD",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/plain");
+    expect(response.headers.get("content-length")).toBe("17");
+    await expect(response.text()).resolves.toBe("");
+    expect(cancelled).toEqual(["object-2"]);
+  });
+
+  /** @scenario "A reader answers HEAD with the headers its GET would carry and no body" */
+  it("publishes the endpoint under both the methods it declared", async () => {
+    const app = storedObjectsApp();
+    const published = await generateSpecs(app, SPEC_OPTIONS);
+    const item = published.paths?.["/api/v1/files/{id}"] as any;
+
+    expect(item?.get?.operationId).toBe("readStoredObject");
+    expect(item?.head?.operationId).toBe("readStoredObject");
+    expect(getRoutePolicy("head", "/api/v1/files/:id")).toMatchObject({ family: "files" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const seenByAlias: string[] = [];
+
+const aliases = defineRestRouter(ObjectApi)
+  .withNamespace("aliased")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .get("/*", "forwardAliased")
+  .withAccess(
+    publicRoute({ reason: "the alias terminates nothing; it rewrites and forwards" }),
+  )
+  .withRawResponse({ produces: ["application/json"] })
+  .anyMethod()
+  .handle(({ request }) => {
+    const path = new URL(request.url).pathname;
+
+    seenByAlias.push(`${request.method} ${path}`);
+
+    if (!path.endsWith("/known")) return declined();
+
+    return new Response("rewritten", { status: 200, headers: { "Content-Type": "text/plain" } });
+  })
+  .build();
+
+function aliasHost(): Hono {
+  const runtime = createRestRuntime({ identity: { authenticate: () => ({ actor: null, scope: null }) } });
+  const family = runtime.mount(aliases.router(), {
+    app: () => objectApplication,
+    onError: createErrorHandler(),
+  });
+  const host = new Hono();
+
+  host.route("/", family);
+  host.get("/api/v1/aliased/its-own", (context) => context.text("the namespace behind the alias"));
+
+  return host;
+}
+
+describe("one path that answers every method", () => {
+  /** @scenario "One path answers every method when that is the surface" */
+  it("answers whatever method arrives, publishes no operation, and is recorded once", async () => {
+    seenByAlias.length = 0;
+
+    const host = aliasHost();
+    const read = await host.request("/api/v1/aliased/known");
+    const removed = await host.request("/api/v1/aliased/known", { method: "DELETE" });
+    const published = await generateSpecs(aliasHost(), SPEC_OPTIONS);
+
+    expect(await read.text()).toBe("rewritten");
+    expect(removed.status).toBe(200);
+    expect(seenByAlias).toEqual([
+      "GET /api/v1/aliased/known",
+      "DELETE /api/v1/aliased/known",
+    ]);
+    expect(published.paths?.["/api/v1/aliased/*"]).toBeUndefined();
+    expect(getRoutePolicy("all", "/api/v1/aliased/*")).toMatchObject({ family: "aliased" });
+  });
+
+  /** @scenario "An any-method route declines a request that is not its own" */
+  it("declines what it does not recognise, and what is mounted after it answers", async () => {
+    seenByAlias.length = 0;
+
+    const host = aliasHost();
+    const passedOn = await host.request("/api/v1/aliased/its-own");
+    const unknown = await host.request("/api/v1/aliased/nobody-owns-this");
+
+    expect(await passedOn.text()).toBe("the namespace behind the alias");
+    expect(unknown.status).toBe(404);
+    expect(seenByAlias).toEqual([
+      "GET /api/v1/aliased/its-own",
+      "GET /api/v1/aliased/nobody-owns-this",
+    ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A path this family serves with another method.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("a path the family serves with another method", () => {
+  /** @scenario "A path the family serves with another method answers 405, not 404" */
+  it("answers 405 with Allow at every address, and serves the methods it does declare", async () => {
+    const app = secretsApp();
+
+    for (const address of [
+      `/api/secrets/${VERSION}/secret-1`,
+      "/api/secrets/latest/secret-1",
+      "/api/secrets/secret-1",
+      "/api/v1/secrets/secret-1",
+    ]) {
+      const refused = await app.request(address, { method: "DELETE" });
+
+      expect(refused.status).toBe(405);
+      expect(refused.headers.get("allow")).toBe("GET, HEAD");
+      expect(await refused.text()).toBe("");
+    }
+
+    const collection = await app.request("/api/secrets", { method: "DELETE" });
+
+    expect(collection.status).toBe(405);
+    expect(collection.headers.get("allow")).toBe("GET, HEAD, POST");
+
+    const served = await app.request("/api/secrets/secret-1");
+
+    expect(served.status).toBe(200);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// One answer with several shapes, told apart by a field.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface UploadApi {
+  create(input: { name: string }): Promise<{ known: boolean }>;
+}
+
+const UploadApi = featureApi<UploadApi>("dataset");
+
+const createdUpload = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("existing"), id: z.string() }),
+  z.object({ status: z.literal("pending"), url: z.string() }),
+]);
+
+const uploads = defineRestRouter(UploadApi)
+  .withNamespace("uploads")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .post("/", "createUpload")
+  .withInput(z.object({ name: z.string() }))
+  .withPermission("datasets:manage")
+  .withOutput(createdUpload)
+  .handle(async ({ app, input }) => {
+    const found = await app.create({ name: input.name });
+
+    if (input.name === "off-contract") return { status: "gone", id: "u-0" } as never;
+
+    return found.known
+      ? ({ status: "existing", id: "u-1" } as const)
+      : ({ status: "pending", url: "https://upload.test/u-2" } as const);
+  })
+  .build();
+
+function uploadsApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+    },
+  });
+
+  return runtime.mount(uploads.router(), {
+    app: () => ({ create: async ({ name }) => ({ known: name === "known" }) }),
+    onError: createErrorHandler(),
+  });
+}
+
+async function createUpload(app: Hono, name: string): Promise<Response> {
+  return app.request("/api/v1/uploads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+describe("a route whose answer takes one of several shapes", () => {
+  /** @scenario "A route answers one of several shapes, told apart by a field" */
+  it("serves each declared shape and diagnoses one it never declared", async () => {
+    const logger = createLogger("langwatch:api:output-validation");
+    const diagnosed = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const app = uploadsApp();
+
+    await expect((await createUpload(app, "known")).json()).resolves.toEqual({
+      status: "existing",
+      id: "u-1",
+    });
+    await expect((await createUpload(app, "new")).json()).resolves.toEqual({
+      status: "pending",
+      url: "https://upload.test/u-2",
+    });
+
+    await createUpload(app, "off-contract");
+
+    expect(diagnosed).toHaveBeenCalledTimes(1);
+    diagnosed.mockRestore();
+  });
+
+  /** @scenario "A route answers one of several shapes, told apart by a field" */
+  it("publishes both shapes with the field that tells them apart", async () => {
+    const published = await generateSpecs(uploadsApp(), SPEC_OPTIONS);
+    const schema = (published.paths?.["/api/v1/uploads"] as any)?.post?.responses?.["200"]?.content?.[
+      "application/json"
+    ]?.schema;
+
+    expect(schema?.discriminator).toEqual({ propertyName: "status" });
+    expect(schema?.oneOf).toHaveLength(2);
+    expect(schema?.oneOf?.[0]?.properties?.status?.const).toBe("existing");
+    expect(schema?.oneOf?.[1]?.properties?.url?.type).toBe("string");
+    expect(schema?.oneOf?.[0]?.$schema).toBeUndefined();
   });
 });

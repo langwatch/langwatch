@@ -143,19 +143,23 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     When the family is built
     Then it refuses, naming the port to pass
 
-  @unimplemented
+  @integration
   Scenario: A handler is given the exact request bytes
     Given an endpoint declares that its body must not be parsed
     When a request arrives
     Then the handler is given the bytes exactly as they were sent, read once
+    And it is given them as text when text is what it asked for, beside its validated path input
+    And the declared body cap still refuses an oversized body before the handler runs
+    And the published document names the media type the endpoint said it reads, with no schema
     And a route that declares both a raw body and a parsed one refuses to build
 
-  @unimplemented
-  Scenario: An endpoint answers outside the JSON contract when it declares why
-    Given an endpoint declares a written reason for answering outside the JSON contract
-    When it returns a string, or a whole response of its own
-    Then the answer is written with the declared content type, or passed through untouched
-    And declaring both a schema and a raw answer, or a raw answer with no reason, refuses to build
+  @integration
+  Scenario: An endpoint answers outside the JSON contract when it declares what it produces
+    Given an endpoint declares the media types it writes for itself
+    When it returns its own status, headers and body, or a whole response it is forwarding
+    Then the answer is written verbatim, with nothing validated on the way out
+    And the published document lists those media types with no schema beside them
+    And declaring both a schema and a raw answer, or a raw answer naming no media type, refuses to build
 
   @unimplemented
   Scenario: An endpoint declares the headers every answer carries
@@ -163,15 +167,27 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     When it answers
     Then they are set beside the framework's own
 
-  @unimplemented
+  @integration
   Scenario: One path answers every method when that is the surface
     Given a path is registered for every method
     When requests of different methods arrive
     Then the same handler answers each of them
     And the path publishes no operation, because it has none to publish
+    And the route registry records the path once, for every method
+    And an any-method route declaring a body, or naming no media type it writes, refuses to build
 
-  @unimplemented
+  @integration
   Scenario: An any-method route declines a request that is not its own
     Given an any-method route answers only the paths it recognises
     When a request it does not recognise arrives
     Then it declines and the namespace mounted after it answers as it always did
+    And a route matched by method and path that declines fails, because it matched
+
+  @integration
+  Scenario: A reader answers HEAD with the headers its GET would carry and no body
+    Given an endpoint declares that it answers both GET and HEAD
+    When a caller sends HEAD
+    Then the answer carries the headers the GET answer would have carried, and no body
+    And the body the handler opened is closed rather than left for a collector
+    And the published document lists the endpoint under both methods
+    And declaring a body beside a method that carries none refuses to build

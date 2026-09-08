@@ -106,7 +106,9 @@ export interface EndpointDocs {
 export interface RouteResponse {
   // If the description is missing, it will break our documentations
   description: string;
-  content: Record<string, { schema: any }>;
+  // A media type with no schema is what a route that writes its own bytes
+  // publishes: the type is the whole of what it can promise.
+  content: Record<string, { schema?: any }>;
   // Response headers a caller can read something from. Only worth declaring
   // for a header that carries meaning the body does not.
   headers?: Record<string, { description: string; schema: { type: "string"; enum?: string[] } }>;
@@ -133,6 +135,11 @@ const DECLINED_ANSWER: Declined = Object.freeze({ [DECLINED]: true as const });
 /** @see Declined */
 export function declined(): Declined {
   return DECLINED_ANSWER;
+}
+
+/** Whether a handler's answer is the decline rather than a response. */
+export function isDeclined(answer: unknown): answer is Declined {
+  return answer === DECLINED_ANSWER;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -123,6 +123,14 @@ Feature: Explicit compatibility version namespaces
     Then each route answers at its dated, its latest and its bare path
     And no /api/v1 address is registered for it, nor a version guard under one
 
+  @integration
+  Scenario: A path the family serves with another method answers 405, not 404
+    Given a family serving one path with one method
+    When a caller sends a method the family does not serve there
+    Then the answer is 405, naming in Allow every method that path does serve
+    And the same holds at the dated address, at latest, at the bare path and at the /api/v1 twin
+    And a path the family serves with that method answers as it always did
+
   @unimplemented
   Scenario: A family at a shared prefix mounts its own paths and their canonical address
     Given a family declares that its published paths are its whole contract

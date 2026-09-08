@@ -8,7 +8,7 @@
 import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
 
-import type { ZodType } from "zod";
+import { z, type ZodType } from "zod";
 
 import type { CredentialClass } from "../access-policy.ts";
 import type { EndpointDocs, RouteResponse } from "./response.ts";
@@ -60,6 +60,12 @@ export function restRouteDocumentation({
 
   if (route.docs?.tags !== undefined) options.tags = [...route.docs.tags];
 
+  // The body of a route nothing parses: the media type it is sent as, and no
+  // schema, because the declaration named none to publish.
+  if (route.rawBody) {
+    options.requestBody = { required: true, content: { [route.rawBody.mediaType]: {} } };
+  }
+
   // An empty requirement list is the document's way of saying "no credential",
   // which is exactly what a public route is; it also overrides the document's
   // own default requirement, which every other operation inherits. A route the
@@ -92,17 +98,50 @@ export function documentRoute(input: {
  * document sees exactly the statuses the handler is typed to return.
  */
 function declaredAnswers(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
+  if (route.rawResponse) return rawAnswer(route);
+
   const answers = route.answers ?? { [route.status ?? 200]: route.output };
   const published: Record<string, RouteResponse> = {};
 
   for (const [status, schema] of Object.entries(answers)) {
     published[status] = {
       description: answerDescription(Number(status)),
-      content: { "application/json": { schema: resolver(schema) } },
+      content: { "application/json": { schema: answerSchema(schema) } },
     };
   }
 
   return published;
+}
+
+/** What a route that writes its own body publishes: the media types, no shape. */
+function rawAnswer(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
+  const status = String(route.status ?? 200);
+  const content: RouteResponse["content"] = {};
+
+  for (const mediaType of route.rawResponse?.produces ?? []) content[mediaType] = {};
+
+  return { [status]: { description: answerDescription(Number(status)), content } };
+}
+
+/**
+ * The published shape of one answer. A discriminated union is `oneOf` with the
+ * field a caller branches on, which the schema resolver alone does not name, so
+ * its members are converted here and the discriminator written beside them.
+ */
+function answerSchema(schema: RestTransportRoute<unknown>["output"]): unknown {
+  if (!(schema instanceof z.ZodDiscriminatedUnion)) return resolver(schema);
+
+  return {
+    oneOf: schema.options.map((option) => publishedMember(option)),
+    discriminator: { propertyName: schema.def.discriminator },
+  };
+}
+
+/** One member of a published union, without the draft the document declares. */
+function publishedMember(option: z.ZodObject): Record<string, unknown> {
+  const { $schema: _draft, ...member } = z.toJSONSchema(option, { io: "output" });
+
+  return member;
 }
 
 /** The reason phrase a declared answer publishes; every 2xx is a success. */
