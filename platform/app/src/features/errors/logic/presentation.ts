@@ -2257,6 +2257,35 @@ const presentations = {
   },
 
   // ---- datasets ----
+  dataset_attachment_too_large: {
+    title: "That file is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      return typeof maxBytes === "number"
+        ? `Pick a file under ${Math.round(maxBytes / 1024 / 1024)} MB.`
+        : "Pick a smaller file.";
+    },
+  },
+  dataset_attachment_type_refused: {
+    // `meta.refused` is our own list of media types, not customer input. The
+    // copy names the kinds of file someone recognises rather than the list,
+    // which is long and reads as jargon next to a cell.
+    title: "That kind of file isn't accepted",
+    describe: () =>
+      "Web pages, scripts and scalable vector images cannot be attached. Pick a picture, a document, an audio file or a video.",
+  },
+  dataset_attachment_unavailable: {
+    // The reference in the cell no longer reads back: the object was removed,
+    // or the bytes never landed. Uploading again is a real action, so this is
+    // not the "we've been notified" shape.
+    title: "That attachment could not be read",
+    describe: (error) => {
+      const name = str(error, "fileName", "");
+      return name
+        ? `"${name}" is no longer available. Upload it again, then run the row.`
+        : "It is no longer available. Upload it again, then run the row.";
+    },
+  },
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",

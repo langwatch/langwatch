@@ -64176,6 +64176,15 @@ openapi: "POST /api/dataset/{slugOrId}/upload"
 
 ---
 
+# FILE: ./api-reference/datasets/create-attachments.mdx
+
+---
+title: "Create Attachments"
+openapi: "POST /api/dataset/attachments"
+---
+
+---
+
 # FILE: ./api-reference/datasets/create-dataset.mdx
 
 ---

@@ -3,10 +3,10 @@
  *
  * Who may probe a stored object. The renderer asks this procedure why a media
  * element failed, so the gate has to match the one the bytes themselves are
- * served behind (`app/api/files/[[...route]]/app.ts` accepts traces:view OR
- * scenarios:view). When it was narrower, a viewer who could fetch a recording
- * could not find out why its player failed, and the player never left its
- * loading state.
+ * served behind (`app/api/files/[[...route]]/app.ts` accepts traces:view,
+ * scenarios:view OR datasets:view). When it was narrower, a viewer who could
+ * fetch a recording could not find out why its player failed, and the player
+ * never left its loading state.
  *
  * Real Postgres, real router, no mocks: each caller's only grant is an
  * explicit CUSTOM role binding, so a pass can only come from that grant.
@@ -157,10 +157,24 @@ describe("storedObjects.headById: who may probe", () => {
     });
   });
 
-  describe("given a viewer holding neither trace nor scenario access", () => {
+  describe("given a viewer whose only grant is dataset access", () => {
+    /** @scenario "A viewer with trace access can probe trace media" */
+    it("still answers the probe for a viewer holding datasets:view", async () => {
+      const caller = await seedCaller(["datasets:view"]);
+
+      const result = await caller.storedObjects.headById({
+        projectId: PROJECT,
+        id: `absent-${nanoid(6)}`,
+      });
+
+      expect(result).toEqual({ status: "not_found" });
+    });
+  });
+
+  describe("given a viewer holding none of the media permissions", () => {
     /** @scenario "A viewer with trace access can probe trace media" */
     it("refuses the probe, naming the permission to ask for", async () => {
-      const caller = await seedCaller(["datasets:view"]);
+      const caller = await seedCaller(["prompts:view"]);
 
       await expect(
         caller.storedObjects.headById({

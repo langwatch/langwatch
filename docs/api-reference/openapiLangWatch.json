@@ -14289,6 +14289,18 @@
         ]
       }
     },
+    "/api/dataset/attachments": {
+      "post": {
+        "operationId": "postApiDatasetAttachments",
+        "description": "Upload a file for an image or file column and get the reference a cell holds",
+        "responses": {},
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/dataset/direct-upload": {
       "post": {
         "operationId": "postApiDatasetDirectUpload",

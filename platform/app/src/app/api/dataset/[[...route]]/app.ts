@@ -7,6 +7,10 @@ import {
   requires,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import {
+  DatasetAttachmentTooLargeError,
+  storeDatasetAttachment,
+} from "../../../../server/datasets/attachments";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {
@@ -18,6 +22,11 @@ import {
   datasetColumnTypeSchema,
   datasetConfirmColumnsSchema,
 } from "../../../../server/datasets/types";
+import { bodyLimit } from "../../../../server/routes/_lib/body-limit";
+import {
+  DATASET_ATTACHMENT_MAX_BYTES,
+  DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
+} from "../../../../shared/datasets/attachment-policy";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type DatasetServiceMiddlewareVariables,
@@ -297,6 +306,70 @@ secured.access(requires("datasets:create")).post(
       }
       throw error;
     }
+  },
+);
+
+// ── Upload a file into a dataset cell ──────────────────────────
+// Registered before /:slugOrId so "attachments" is not matched as a slug.
+// Session-cookie (or API-key) authenticated in-handler, and gated on
+// `datasets:manage` — the same grain that a dataset record change asks for.
+//
+// The body cap sits above the file cap by the multipart framing allowance, so
+// a file of exactly the maximum size is not refused for its envelope. Both
+// refusals answer with the same handled error, so the caller reads one code.
+secured.access(directUploadSessionAuth).post(
+  "/attachments",
+  bodyLimit({
+    maxSize: DATASET_ATTACHMENT_REQUEST_MAX_BYTES,
+    onError: () => {
+      throw new DatasetAttachmentTooLargeError(DATASET_ATTACHMENT_MAX_BYTES);
+    },
+  }),
+  describeRoute({
+    description:
+      "Upload a file for an image or file column and get the reference a cell holds",
+  }),
+  async (c) => {
+    const body = await c.req.parseBody();
+
+    // The project comes from the request because there is no `authMiddleware`
+    // to set `c.get("project")` on this route. The query param is what the
+    // editor sends; the form field keeps a plain multipart caller working.
+    const projectIdValue = c.req.query("projectId") ?? body.projectId;
+    if (
+      !projectIdValue ||
+      typeof projectIdValue !== "string" ||
+      projectIdValue.trim() === ""
+    ) {
+      throw new UnprocessableEntityError("projectId is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectIdValue.trim());
+    if (!auth.ok) {
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
+    }
+
+    const file = body.file;
+    if (!file || !(file instanceof File)) {
+      throw new UnprocessableEntityError("file field is required");
+    }
+
+    const datasetId = body.datasetId;
+    if (datasetId !== undefined && typeof datasetId !== "string") {
+      throw new UnprocessableEntityError("datasetId must be a string");
+    }
+
+    const stored = await storeDatasetAttachment({
+      projectId: auth.projectId,
+      datasetId: datasetId?.trim() === "" ? undefined : datasetId,
+      fileName: file.name,
+      declaredMediaType: file.type,
+      bytes: Buffer.from(await file.arrayBuffer()),
+    });
+
+    return c.json(stored, 200);
   },
 );
 

@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -298,21 +299,22 @@ func TestRewriteFetchesPDFIntoFilePart(t *testing.T) {
 	assert.True(t, strings.HasPrefix(fileData, "data:application/pdf;base64,"), "pdf must inline as a data URL, got %q", fileData)
 }
 
-// imageTypedNode builds a signature node declaring the given inputs, used to
-// exercise the image-typed-input resolution that runs before message templating.
-func imageTypedNode(fields ...dsl.Field) *dsl.Node {
+// attachmentTypedNode builds a signature node declaring the given inputs, used
+// to exercise the attachment-input resolution that runs before message
+// templating.
+func attachmentTypedNode(fields ...dsl.Field) *dsl.Node {
 	return &dsl.Node{ID: "sig", Type: dsl.ComponentSignature, Data: dsl.Component{Inputs: fields}}
 }
 
 // @scenario "An image-typed field whose URL is an image is fetched and inlined"
-func TestInlineImageInputsResolvesRemoteImageToDataURL(t *testing.T) {
+func TestInlineAttachmentInputsResolvesRemoteImageToDataURL(t *testing.T) {
 	srv := attachmentServer(t)
 	defer srv.Close()
 	f := loopbackFetcher()
-	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	node := attachmentTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 	inputs := map[string]any{"picture": srv.URL + "/cat.png"}
 
-	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
 	require.Nil(t, ne)
 	got, _ := out["picture"].(string)
 	assert.True(t, strings.HasPrefix(got, "data:image/png;base64,"),
@@ -322,14 +324,14 @@ func TestInlineImageInputsResolvesRemoteImageToDataURL(t *testing.T) {
 }
 
 // @scenario "An image-typed field whose URL cannot be fetched fails the run with a clear error"
-func TestInlineImageInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
+func TestInlineAttachmentInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
 	srv := attachmentServer(t)
 	deadURL := srv.URL + "/cat.png"
 	srv.Close() // nothing is listening now
 	f := loopbackFetcher()
-	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	node := attachmentTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 
-	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": deadURL})
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"picture": deadURL})
 	require.Nil(t, out)
 	require.NotNil(t, ne, "an explicit image field with an unfetchable URL must fail the run")
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -337,24 +339,25 @@ func TestInlineImageInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
 }
 
 // @scenario "An image-typed field whose URL is not an image fails the run with a clear error"
-func TestInlineImageInputsFailsClearlyWhenNotAnImage(t *testing.T) {
+// @scenario "An image-typed input holding a remote non-image still fails the run"
+func TestInlineAttachmentInputsFailsClearlyWhenNotAnImage(t *testing.T) {
 	srv := attachmentServer(t)
 	defer srv.Close()
 	f := loopbackFetcher()
-	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	node := attachmentTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
 
-	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
 	require.Nil(t, out)
 	require.NotNil(t, ne, "an image field pointing at a web page must fail the run")
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
 	assert.Contains(t, ne.Message, "image", "the error must explain it could not be loaded as an image")
 }
 
-func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
+func TestInlineAttachmentInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
 	f := loopbackFetcher()
 	// picture is image-typed but already an inline data URL (no fetch needed);
 	// link is str-typed and must not be eagerly fetched even though it is a URL.
-	node := imageTypedNode(
+	node := attachmentTypedNode(
 		dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage},
 		dsl.Field{Identifier: "link", Type: dsl.FieldTypeStr},
 	)
@@ -362,7 +365,7 @@ func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
 		"picture": "data:image/png;base64,AAAA",
 		"link":    "http://127.0.0.1:1/skip.png",
 	}
-	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
 	require.Nil(t, ne)
 	assert.Equal(t, "data:image/png;base64,AAAA", out["picture"], "an inline data URL must pass through untouched")
 	assert.Equal(t, "http://127.0.0.1:1/skip.png", out["link"], "a str-typed URL must not be eagerly fetched")
@@ -492,4 +495,78 @@ func TestTrimTrailingPunct(t *testing.T) {
 	url, trailing = trimTrailingPunct("https://x/cat.png")
 	assert.Equal(t, "https://x/cat.png", url)
 	assert.Empty(t, trailing)
+}
+
+// @scenario "A file-typed input holding a remote URL is fetched and delivered by its content type"
+func TestInlineAttachmentInputsResolvesRemoteFileToDataURL(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := attachmentTypedNode(dsl.Field{Identifier: "report", Type: dsl.FieldTypeFile})
+	inputs := map[string]any{"report": srv.URL + "/doc.pdf"}
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, inputs)
+	require.Nil(t, ne)
+	got, _ := out["report"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:application/pdf;name=doc.pdf;base64,"),
+		"the file-typed URL must inline with its name, got %q", got)
+	assert.Equal(t, srv.URL+"/doc.pdf", inputs["report"],
+		"the original inputs map must keep the readable URL, not a base64 blob")
+
+	// The splitter that runs next must turn it into a document the model reads.
+	msgs := splitMessagesWithAttachments(userMessage("Read " + got))
+	file := firstPartOfType(t, msgs[0], "file")
+	data, _ := file["file"].(map[string]any)
+	assert.Equal(t, "doc.pdf", data["filename"], "the file name comes from the URL path")
+}
+
+// @scenario "A file-typed input accepts any content type"
+func TestInlineAttachmentInputsAcceptsAnyContentTypeForFileFields(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := attachmentTypedNode(dsl.Field{Identifier: "report", Type: dsl.FieldTypeFile})
+
+	out, ne := f.inlineAttachmentInputs(context.Background(), node, map[string]any{"report": srv.URL + "/page"})
+	require.Nil(t, ne, "the author declared the field a file, so any content type is the file they meant")
+	got, _ := out["report"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:text/html;name=page;base64,"), "got %q", got)
+
+	msgs := splitMessagesWithAttachments(userMessage(got))
+	file := firstPartOfType(t, msgs[0], "file")
+	data, _ := file["file"].(map[string]any)
+	assert.Equal(t, "page", data["filename"])
+}
+
+// @scenario "A large inlined text file keeps a summary in the trace"
+func TestMessagesForTracingSummarizesOversizedTextAttachment(t *testing.T) {
+	big := strings.Repeat("a", maxTracedAttachmentBytes+1)
+	messages := []app.ChatMessage{{Role: "user", Content: []any{
+		map[string]any{"type": "text", "text": "read this"},
+		map[string]any{"type": "text", "text": big},
+	}}}
+
+	traced := messagesForTracing(messages)
+	parts, ok := traced[0].Content.([]any)
+	require.True(t, ok)
+	_, prompt := partType(t, parts[0])
+	assert.Equal(t, "read this", prompt["text"], "ordinary prompt text is never summarized")
+	_, summary := partType(t, parts[1])
+	assert.Equal(t, fmt.Sprintf("[text, %d bytes]", len(big)), summary["text"])
+
+	original, _ := messages[0].Content.([]any)
+	_, kept := partType(t, original[1])
+	assert.Equal(t, big, kept["text"], "the model still receives the whole text")
+}
+
+func TestDataURLWithNameSurvivesPunctuationInTheFileName(t *testing.T) {
+	// A semicolon, a comma or a space would end the parameter early and hide
+	// the whole data URL from the splitter.
+	att := &fetchedAttachment{mediaType: "application/pdf", data: []byte("%PDF-1.4")}
+	built := dataURLWithName(att, "q3, final; v2.pdf")
+
+	msgs := splitMessagesWithAttachments(userMessage("Read " + built))
+	file := firstPartOfType(t, msgs[0], "file")
+	data, _ := file["file"].(map[string]any)
+	assert.Equal(t, "q3, final; v2.pdf", data["filename"])
 }

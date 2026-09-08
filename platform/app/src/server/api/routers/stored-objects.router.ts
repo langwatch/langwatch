@@ -25,8 +25,9 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
  * `exists: true` — the renderer then mapped that to "transient decode
  * error" and dropped the missing badge.
  *
- * Auth: session user must have `traces:view` OR `scenarios:view` on
- * `projectId`, mirroring the `/api/files/:id` route's own gate. The same
+ * Auth: session user must have `traces:view`, `scenarios:view` OR
+ * `datasets:view` on `projectId`, mirroring the `/api/files/:id` route's own
+ * gate. The same
  * stored object is trace media for one viewer and scenario media for another,
  * and the two permissions are separate categories a custom role can hold one
  * of. A probe narrower than the read it describes leaves a viewer who can
@@ -41,7 +42,7 @@ export const storedObjectsRouter = createTRPCRouter({
         id: z.string(),
       }),
     )
-    .permissionAny("traces:view", "scenarios:view")
+    .permissionAny("traces:view", "scenarios:view", "datasets:view")
     .query(async ({ input }) => {
       const { projectId, id } = input;
       const service = createStoredObjectsService({ projectId });

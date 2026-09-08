@@ -19,6 +19,15 @@ import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters"
 /** The input field a connected agent column reads the turn from. */
 export const CONNECTED_INPUT_FIELD = "input";
 
+/**
+ * The input field a connected agent column reads an attachment from.
+ *
+ * Optional and typed as a file, so an image or file column maps onto it. The
+ * value reaches the agent as a content part beside the text of the turn, which
+ * is how an OpenAI style message carries a picture or a document.
+ */
+export const CONNECTED_ATTACHMENT_FIELD = "attachment";
+
 /** The output field a connected agent column writes the answer to. */
 export const CONNECTED_OUTPUT_FIELD = "output";
 
@@ -67,6 +76,7 @@ export const connectedTargetFields = (
 ): { inputs: Field[]; outputs: Field[] } => ({
   inputs: [
     { identifier: CONNECTED_INPUT_FIELD, type: "str" },
+    { identifier: CONNECTED_ATTACHMENT_FIELD, type: "file", optional: true },
     ...connectedParameterDefinitions(source).map(
       (definition): Field => ({
         identifier: definition.name,

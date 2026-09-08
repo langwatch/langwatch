@@ -84,6 +84,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { generateOtelSpanId, generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
+import { resolveAttachmentInputs } from "./attachments";
 import {
   buildConnectedCall,
   CONNECTED_BUSY_RETRY_BUDGET_MS,
@@ -1627,7 +1628,12 @@ export async function* executeCell(
             state: { execution: { status: "idle" as const } },
           },
           node_id: targetNodeId,
-          inputs: buildTargetInputs(cell),
+          inputs: await buildDispatchInputs({
+            cell,
+            projectId,
+            datasetColumns,
+            fetchExternal: targetReadsExternalAttachments(cell),
+          }),
           origin: "evaluation",
         },
       };
@@ -1769,7 +1775,12 @@ export async function* executeWorkflowCell({
 
   try {
     const traceId = cell.traceId ?? generateOtelTraceId();
-    const inputs = buildTargetInputs(cell);
+    const inputs = await buildDispatchInputs({
+      cell,
+      projectId,
+      datasetColumns,
+      fetchExternal: true,
+    });
 
     // The workflow's own evaluator nodes carry the scores we surface per row.
     // Keep each node's display name so results show it (e.g. "Exact Match")
@@ -2017,21 +2028,28 @@ const dispatchAgentOf = (agent: TypedAgent): DispatchAgent => {
  * The one turn a row sends: the mapped row as a single user message, in its
  * own conversation and inside the trace of the cell.
  */
-const connectedTurnParams = ({
+const connectedTurnParams = async ({
   cell,
   projectId,
   agent,
   dispatchAgent,
+  datasetColumns,
   traceId,
 }: {
   cell: ExecutionCell;
   projectId: string;
   agent: TypedAgent;
   dispatchAgent: ReturnType<typeof dispatchAgentOf>;
+  datasetColumns: Array<{ id: string; name: string; type: string }>;
   traceId: string;
-}): Omit<Parameters<ConnectedDispatch>[0], "signal"> => {
+}): Promise<Omit<Parameters<ConnectedDispatch>[0], "signal">> => {
   const { messages, params } = buildConnectedCall({
-    inputs: buildTargetInputs(cell),
+    inputs: await buildDispatchInputs({
+      cell,
+      projectId,
+      datasetColumns,
+      fetchExternal: true,
+    }),
     definitions: connectedParameterDefinitions(agent.config),
   });
   return {
@@ -2195,6 +2213,7 @@ const connectedTurn = async ({
     cell,
     projectId,
     agent,
+    datasetColumns = [],
     isAborted,
     dispatch = relayDispatch,
     sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -2209,11 +2228,12 @@ const connectedTurn = async ({
       isAborted,
       budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
       callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-      params: connectedTurnParams({
+      params: await connectedTurnParams({
         cell,
         projectId,
         agent,
         dispatchAgent,
+        datasetColumns,
         traceId,
       }),
     });
@@ -2709,6 +2729,74 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
 
   return inputs;
 };
+
+/**
+ * The dataset column type an input field is mapped from, or nothing.
+ *
+ * A fixed value, and a mapping onto another target's output, name no column,
+ * so they have no type. The resolver reads that as "not an attachment column"
+ * and leaves the value alone.
+ */
+const columnTypeOfInputFor =
+  ({
+    cell,
+    datasetColumns,
+  }: {
+    cell: ExecutionCell;
+    datasetColumns: Array<{ id: string; name: string; type: string }>;
+  }) =>
+  (inputField: string): string | undefined => {
+    const datasetId = cell.datasetEntry._datasetId as string | undefined;
+    if (!datasetId) return undefined;
+    const mapping = cell.targetConfig.mappings[datasetId]?.[inputField];
+    if (mapping?.type !== "source" || mapping.source !== "dataset") {
+      return undefined;
+    }
+    return datasetColumns.find((column) => column.name === mapping.sourceField)
+      ?.type;
+  };
+
+/**
+ * The inputs a target is dispatched with, attachments included.
+ *
+ * Every target kind goes through here, because none of them can open a
+ * LangWatch file reference: the engine is another service and an agent is
+ * another company's process. `fetchExternal` is what separates the two
+ * remaining cases. An agent also needs an address on the public internet read
+ * for it; a prompt does not, because the engine reads that address itself and
+ * reports its own copy for a bad one.
+ *
+ * The same record is dispatched and shown as the cell's inputs. An inlined
+ * attachment is therefore in the trace too, where the span pipeline moves it
+ * back out into a stored object, so nothing is kept twice.
+ */
+const buildDispatchInputs = async ({
+  cell,
+  projectId,
+  datasetColumns,
+  fetchExternal,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  datasetColumns: Array<{ id: string; name: string; type: string }>;
+  fetchExternal: boolean;
+}): Promise<Record<string, unknown>> =>
+  resolveAttachmentInputs({
+    projectId,
+    inputs: buildTargetInputs(cell),
+    columnTypeOfInput: columnTypeOfInputFor({ cell, datasetColumns }),
+    fetchExternal,
+  });
+
+/**
+ * Whether the target reads its own attachments.
+ *
+ * An agent runs outside the platform, so the run reads every address for it.
+ * A prompt and an evaluator run in the engine, which fetches an address of
+ * its own accord.
+ */
+const targetReadsExternalAttachments = (cell: ExecutionCell): boolean =>
+  cell.targetConfig.type === "agent" || cell.targetConfig.type === "workflow";
 
 /**
  * Build the per-target metadata stored with a run (startExperimentRun's
