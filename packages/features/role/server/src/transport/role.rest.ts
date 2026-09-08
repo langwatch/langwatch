@@ -50,6 +50,7 @@ const wire = (role: Role): RoleRest => ({
 export const roleRest = defineRestRouter(RoleApi)
   .withNamespace("roles")
   .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("organizationKey")
 
   .get("/", "listRoles")
   .withPermission("organization:manage")
