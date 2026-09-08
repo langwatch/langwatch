@@ -40,7 +40,7 @@ export interface GovernanceAgentRow {
   owner: string | null;
   models: string[];
   source: AgentSource;
-  /** United States dollars over the last 30 days, or `null` if never called. */
+  /** United States dollars over the last 30 days, or `null` if not measured. */
   costUsd30d: number | null;
   requests30d: number | null;
   /**
@@ -140,7 +140,7 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     owner: "People Operations",
     models: ["gpt-5-mini"],
     source: "copilot_studio",
-    costUsd30d: 388.05,
+    costUsd30d: null,
     requests30d: 21800,
     lastActiveMinutesAgo: 95,
   },
@@ -158,7 +158,7 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     owner: "IT Service Desk",
     models: ["gpt-5-mini"],
     source: "copilot_studio",
-    costUsd30d: 214.6,
+    costUsd30d: null,
     requests30d: 15600,
     lastActiveMinutesAgo: 1500,
   },

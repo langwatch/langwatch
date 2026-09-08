@@ -351,7 +351,7 @@ describe("the cost breakdown panels", () => {
             amountUsd: 6,
             cellsWithoutAmount: 0,
           },
-          // Spend the provider attributed to no credential at all. It is on
+          // Spend the provider attributed to no user. It is on
           // every real version of this list, so it is on this one.
           {
             provider: "",
@@ -366,29 +366,24 @@ describe("the cost breakdown panels", () => {
       };
     });
 
-    it("names each row's provider, so one key billed at two providers is not a duplicate", () => {
+    it("names each row's provider, so one user reported at two providers is not a duplicate", () => {
       renderScreen();
 
       expect(screen.getByText("openai_admin")).toBeInTheDocument();
       expect(screen.getByText("databricks")).toBeInTheDocument();
     });
 
-    /** @scenario "The billed breakdown names the key the provider charged, not a person" */
-    it("titles the panel for the key, and says so on the row naming none", () => {
+    /** @scenario "The provider-reported breakdown names users and keeps unattributed spend" */
+    it("labels the returned users without presenting them as API keys", () => {
       renderScreen();
 
-      // An invoice records which credential was presented, never who was
-      // holding it. Titling this by person promised an attribution the
-      // billing pipeline cannot make — a key four engineers share billed as
-      // one person's spend.
-      expect(screen.getByText("Billed spend by API key")).toBeInTheDocument();
       expect(
-        screen.queryByText("Billed spend by person"),
+        screen.getByText("Provider-reported spend by user"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Billed spend by API key"),
       ).not.toBeInTheDocument();
-      expect(screen.getByText("No key named")).toBeInTheDocument();
-      // "Metered spend by person" is a different panel and stays by person on
-      // purpose: it reads cost recorded on traces as they were served, where
-      // the actor IS known. Only the invoice cannot name one.
+      expect(screen.getByText("Unattributed spend")).toBeInTheDocument();
       expect(screen.getByText("Metered spend by person")).toBeInTheDocument();
     });
   });
@@ -401,7 +396,9 @@ describe("the cost breakdown panels", () => {
     it("says the read failed instead of vanishing as if nobody spent anything", () => {
       renderScreen();
 
-      expect(screen.getByText("Billed spend by API key")).toBeInTheDocument();
+      expect(
+        screen.getByText("Provider-reported spend by user"),
+      ).toBeInTheDocument();
       expect(screen.getByTestId("cost-spenders-error")).toBeInTheDocument();
     });
 

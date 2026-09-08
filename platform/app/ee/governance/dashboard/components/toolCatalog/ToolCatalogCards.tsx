@@ -12,6 +12,7 @@ import {
   TOOL_CARD_ROW_META,
   TOOL_CARD_ROWS,
   type ToolCard,
+  toolCardMissingReason,
   toolInitials,
 } from "./toolCards";
 
@@ -177,7 +178,7 @@ export function ToolCatalogCard({ card }: { card: ToolCard }) {
             key={row}
             label={TOOL_CARD_ROW_META[row].label}
             value={card.values[row]}
-            filledBy={TOOL_CARD_ROW_META[row].filledBy}
+            filledBy={toolCardMissingReason(card, row)}
           />
         ))}
       </Box>

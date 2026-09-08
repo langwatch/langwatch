@@ -450,6 +450,13 @@ Feature: One cost screen, three honest lanes
   # comparison would mean a different thing on every screen it appeared on,
   # while measuring mostly the noise of a single day.
   #
+  # The halves are compared as AVERAGES, and on the series as read rather
+  # than the one folded for the sparkline. Both are needed and neither is
+  # enough: averages settle halves holding a different NUMBER of periods,
+  # measuring before the fold settles halves covering a different LENGTH of
+  # time. Read as totals off folded buckets, a year of unchanged daily spend
+  # reported growth on every date the page could be opened.
+  #
   # It carries no colour. Spend rising is a fact about a window, not a fault,
   # and a red arrow would have this card judging an organization's AI
   # programme by whether it grew.
@@ -466,6 +473,26 @@ Feature: One cost screen, three honest lanes
     Given a lane series of fewer periods than the comparison needs
     When the card's change figure is read
     Then there is none, rather than a figure drawn from too little
+
+  @unit
+  Scenario: An odd number of periods does not invent a rise out of the split
+    Given a lane series of an odd number of periods that all cost the same
+    When the card's change figure is read
+    Then it reports level, not the rise the uneven split would produce
+    # The halves are compared as AVERAGES for this reason. An odd count splits
+    # unevenly, and compared as totals the larger half wins on nothing but
+    # holding one more period — five identical periods reported a 50% rise.
+
+  @unit
+  Scenario: A flat year read by quarter reports level, not growth
+    Given a year of identical daily spend and an interval of Quarter
+    When the card's change figure is read
+    Then it reports level
+    # Measured on the series as read, never on the folded one. A calendar
+    # bucket is not a unit of time that may be compared: a January holding
+    # fourteen days of a quarter sits beside a full ninety-one-day April, so
+    # the buckets differ in length as well as in number. Averages fix halves
+    # of unequal count; only measuring before the fold fixes unequal length.
 
   @unit
   Scenario: A day whose figure is withheld is left out of the change, never counted as zero
@@ -697,6 +724,14 @@ Feature: One cost screen, three honest lanes
     And a row for the same day and lane written by the current version
     When the cost screen reads that day
     Then only the amount from the current version is counted
+
+  @integration
+  Scenario: A window whose spend never moved says level, not growth
+    Given a year in which every day cost exactly the same
+    When the cost lanes are shown
+    Then each lane's change badge reads level
+    # Mounted, not computed in isolation. The defect was never in the
+    # percentage alone — it was in which series the screen handed it.
 
   @integration
   Scenario: A refund-heavy billed day renders negative as reported
@@ -940,29 +975,14 @@ Feature: One cost screen, three honest lanes
       # that is an outage, not an empty account, so the panel says it
       # failed instead of vanishing as if nobody spent anything.
 
-    # =======================================================================
-    # A BILL KNOWS A CREDENTIAL, NOT A PERSON. This panel was titled by
-    # person, which promised an attribution the billing pipeline cannot make:
-    # a provider's invoice records which key was presented, so a key four
-    # engineers share billed as one person's spend and the screen said so
-    # without hedging.
-    #
-    # The read is unchanged. A key discovery has matched still resolves to
-    # the identity screen's display text, so a row may well carry somebody's
-    # name — as the holder of that key, which is a smaller and truer claim
-    # than that the money is theirs. What changed is that the panel now
-    # claims exactly as much as the invoice does.
-    # =======================================================================
-
-    @integration
-    Scenario: The billed breakdown names the key the provider charged, not a person
-      Given pulled cost recorded against several API keys
+    @integration @regression
+    Scenario: The provider-reported breakdown names users and keeps unattributed spend
+      Given the provider-reported cost breakdown returns users and unnamed spend
       When a permitted viewer opens the cost screen
-      Then the panel is titled for the API key it charges against
-      And the row for spend the provider named no key for says so in those words
-      # The empty and declined states carry the same framing — see the
-      # scenarios under the declined-read rule below, whose copy names a key
-      # rather than an actor.
+      Then the panel is titled "Provider-reported spend by user"
+      And the unnamed row is labelled "Unattributed spend"
+      And the panel does not claim to group by API key
+      And metered spend stays in its own panel
 
     @integration
     Scenario: The spender breakdown stays behind the identity screen's permission

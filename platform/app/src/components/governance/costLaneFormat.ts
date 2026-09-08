@@ -76,6 +76,21 @@ export function formatLaneUsd(amountUsd: number | null): string {
  * day. Halves say the same thing at any granularity: is this window ending
  * heavier than it started.
  *
+ * The halves are compared as AVERAGES, never as totals. An odd number of
+ * periods splits unevenly, and on totals the larger half then wins on nothing
+ * but holding one more period: five identical periods reported a 50% rise, and
+ * a year of unchanged daily spend reported growth on every day it could be
+ * opened. Averages ask the only question worth asking of two spans of
+ * different size — is a period in the later half heavier than one in the
+ * earlier half.
+ *
+ * This is why the caller must pass the series at its own granularity and not
+ * one folded to the filter bar's interval. Averages fix halves of unequal
+ * COUNT; nothing fixes halves of unequal LENGTH, and a calendar fold makes
+ * those routinely — a January that is fourteen days of a quarter next to a
+ * full ninety-one-day April. The fold is for the sparkline, which is drawing
+ * the calendar and should.
+ *
  * Null when the comparison cannot be made honestly: fewer than four periods to
  * split, or an earlier half that holds nothing to divide by. Withheld days
  * (§21) are skipped rather than counted as zero, since a zero would report
@@ -89,10 +104,11 @@ export function laneTrendPct(
   );
   if (stated.length < 4) return null;
   const middle = Math.floor(stated.length / 2);
-  const sum = (from: number, to: number) =>
-    stated.slice(from, to).reduce((total, point) => total + point.value, 0);
-  const earlier = sum(0, middle);
-  const later = sum(middle, stated.length);
+  const mean = (from: number, to: number) =>
+    stated.slice(from, to).reduce((total, point) => total + point.value, 0) /
+    (to - from);
+  const earlier = mean(0, middle);
+  const later = mean(middle, stated.length);
   if (earlier <= 0) return null;
   return ((later - earlier) / earlier) * 100;
 }

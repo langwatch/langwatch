@@ -30,7 +30,10 @@ import {
   CHART_SEAT_CONTRACT_FILL,
   CHART_SEAT_FILL,
 } from "~/components/governance/chartTheme";
-import { azureBillingNoteSentence } from "~/components/governance/costLaneFormat";
+import {
+  azureBillingNoteSentence,
+  laneTrendPct,
+} from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
   CostForecastArea,
@@ -560,11 +563,18 @@ function CostLanes({
   // Both lanes' shapes come off the one series the totals above them were
   // summed from, so a card's sparkline and its figure cannot describe
   // different money.
+  const seriesOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
+    data.series.map((day) => ({ day: day.day, value: pick(day) }));
   const trendOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
-    aggregateLaneTrend(
-      data.series.map((day) => ({ day: day.day, value: pick(day) })),
-      interval,
-    );
+    aggregateLaneTrend(seriesOf(pick), interval);
+  // Measured on the unfolded series, and the fold is drawn from the same one.
+  // The sparkline is a picture of the calendar and wants the buckets; the
+  // badge is a comparison of two spans and cannot have them, because a bucket
+  // is whatever number of days the calendar left in it. Folding first made a
+  // year of unchanged spend report growth on every day the page could be
+  // opened, the size of it set by which quarter today happened to fall in.
+  const trendPctOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
+    laneTrendPct(seriesOf(pick));
   return (
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
@@ -583,6 +593,7 @@ function CostLanes({
               : null
           }
           trend={trendOf((day) => day.billedUsd)}
+          trendPct={trendPctOf((day) => day.billedUsd)}
           interval={interval}
           sample={sample}
         />
@@ -594,6 +605,7 @@ function CostLanes({
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
           trend={trendOf((day) => day.gatewayUsd)}
+          trendPct={trendPctOf((day) => day.gatewayUsd)}
           interval={interval}
           sample={sample}
         />
@@ -920,28 +932,10 @@ const MANAGE_DEPARTMENTS = {
 } as const;
 
 /**
- * The billed-spend-by-key panel's slot in the grid.
- *
- * BY KEY, NOT BY PERSON. A provider's invoice attributes spend to the
- * credential that was presented, and nothing else — it has no idea who was
- * holding it. Titling this by person promised an attribution the billing
- * pipeline cannot make and quietly turned a key four engineers share into one
- * person's spend. The read is unchanged; what changed is that the screen now
- * claims exactly as much as the bill does.
- *
- * Different money from "Metered spend by person" on purpose: that panel is the
- * cost recorded on traces as they were served, this one is what the provider's
- * BILL charged. They disagree legitimately and are never reconciled — each is
- * labeled for its lane.
- *
- * ONE PANEL, FOUR CONTENTS. This used to return a different `CostPanel` per
- * state, sample included, which made the invented case a separate panel that
- * happened to look like the real one. A panel is a real component whose data
- * source is invented in sample mode, never a sample panel of its own: the
- * shell, the title and the badge are decided once here, and only the rows
- * below them differ.
+ * The same user-grouped panel for real data, samples, empty and failed reads.
+ * Provider-reported cost stays separate from costs recorded on traces.
  */
-const BILLED_BY_KEY = "Billed spend by API key";
+const PROVIDER_REPORTED_BY_USER = "Provider-reported spend by user";
 
 function SpenderPanelSlot({
   spenders,
@@ -956,7 +950,7 @@ function SpenderPanelSlot({
   const rows = showSample ? sampleSpenderRows() : measured;
 
   return (
-    <CostPanel title={BILLED_BY_KEY} sample={invented}>
+    <CostPanel title={PROVIDER_REPORTED_BY_USER} sample={invented}>
       <SpenderPanelBody rows={rows} spenders={spenders} />
     </CostPanel>
   );
@@ -978,8 +972,8 @@ function SpenderPanelBody({
   return (
     <CostPanelEmpty
       unanswered={spenders.rows === null}
-      what="What the provider's own bill charged against each API key."
-      source="Fills once a billing source is pulling and its rows name a key."
+      what="Cost grouped by the user the provider reports. Shared-key activity may belong to more than one person."
+      source="Fills once a cost source reports users. Spend without a reported user stays unattributed."
       action={ADD_A_SOURCE}
     />
   );

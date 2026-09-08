@@ -60,13 +60,12 @@ export const TOOL_CARD_ROW_META: Record<
   },
   licencePerMonth: {
     label: "Licence per month",
-    filledBy:
-      "What a seat costs is not read from any provider. It comes off the contract, which nothing here holds yet.",
+    filledBy: "Contract price required to calculate monthly licence cost.",
   },
   idlePerMonth: {
-    label: "Idle per month",
+    label: "Unassigned licence cost",
     filledBy:
-      "Idle spend is bought seats minus assigned ones at the contract price, so it needs both the licence list and that price.",
+      "Assigned seat counts and contract price required to calculate monthly unassigned licence cost.",
   },
   eventsLast24Hours: {
     label: "Events · 24 hours",
@@ -138,6 +137,25 @@ export interface ToolCard {
   values: Partial<Record<ToolCardRow, string | number>>;
   /** True only on `SAMPLE_TOOL_CARDS`, so the renderer can badge them. */
   sample?: boolean;
+}
+
+/** Explain a missing measurement in terms of the source actually connected. */
+export function toolCardMissingReason(
+  card: ToolCard,
+  row: ToolCardRow,
+): string {
+  if (card.sourceType === "copilot_studio_dataverse") {
+    if (row === "tokens30Days") {
+      return "Token reporting not connected. Copilot tokens require an additional telemetry source.";
+    }
+    if (row === "usage30Days") {
+      return "Complete dollar spend requires billing data. Conversation credits alone are not a dollar total.";
+    }
+  }
+  if (card.sourceType === "databricks_genie" && row === "tokens30Days") {
+    return "Token counts are not reported by the connected Genie conversation source.";
+  }
+  return TOOL_CARD_ROW_META[row].filledBy;
 }
 
 /**
@@ -306,9 +324,7 @@ export const SAMPLE_TOOL_CARDS: ToolCard[] = [
     sourceType: "claude_code",
     badges: ["seatsAndLicences", "metered"],
     values: {
-      seats: "44 of 60 active",
-      licencePerMonth: "$1,140",
-      idlePerMonth: "$304",
+      seats: "44 of 60 assigned",
       eventsLast24Hours: 8412,
       usage30Days: "$3,268",
       attributed: "91%",
@@ -326,9 +342,7 @@ export const SAMPLE_TOOL_CARDS: ToolCard[] = [
     sourceType: "claude_cowork",
     badges: ["seatsAndLicences", "metered"],
     values: {
-      seats: "28 of 40 active",
-      licencePerMonth: "$1,000",
-      idlePerMonth: "$300",
+      seats: "28 of 40 assigned",
       eventsLast24Hours: 1904,
       usage30Days: "$820",
       attributed: "78%",
@@ -346,15 +360,11 @@ export const SAMPLE_TOOL_CARDS: ToolCard[] = [
     sourceType: "copilot_studio_dataverse",
     badges: ["seatsAndLicences", "billed"],
     values: {
-      seats: "120 of 200 active",
-      licencePerMonth: "$4,000",
-      idlePerMonth: "$1,600",
+      seats: "120 of 200 assigned",
       eventsLast24Hours: 5310,
-      usage30Days: "$2,140",
       attributed: "84%",
       topDepartment: "Customer Support",
       agents: 31,
-      tokens30Days: 96400000,
       conversations30Days: 18720,
     },
     sample: true,
@@ -366,9 +376,7 @@ export const SAMPLE_TOOL_CARDS: ToolCard[] = [
     sourceType: null,
     badges: ["seatsAndLicences", "billed"],
     values: {
-      seats: "310 of 340 active",
-      licencePerMonth: "$6,460",
-      idlePerMonth: "$570",
+      seats: "310 of 340 assigned",
       eventsLast24Hours: 22180,
       usage30Days: "$6,460",
       attributed: "96%",
@@ -386,9 +394,7 @@ export const SAMPLE_TOOL_CARDS: ToolCard[] = [
     sourceType: "openai_compliance",
     badges: ["seatsAndLicences", "billed"],
     values: {
-      seats: "180 of 250 active",
-      licencePerMonth: "$15,000",
-      idlePerMonth: "$4,200",
+      seats: "180 of 250 assigned",
       eventsLast24Hours: 14060,
       usage30Days: "$15,000",
       attributed: "88%",
@@ -406,9 +412,7 @@ export const SAMPLE_TOOL_CARDS: ToolCard[] = [
     sourceType: null,
     badges: ["seatsAndLicences", "billed"],
     values: {
-      seats: "62 of 75 active",
-      licencePerMonth: "$1,500",
-      idlePerMonth: "$260",
+      seats: "62 of 75 assigned",
       eventsLast24Hours: 9730,
       usage30Days: "$1,500",
       attributed: "72%",

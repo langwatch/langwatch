@@ -555,9 +555,9 @@ describe("given an admin on the Inventory page", () => {
       renderScreen();
       const card = screen.getByTestId("tool-card-sample-claude-code");
       // Money reads fine at four digits, and shortening it would be worse:
-      // "$1.1K" hides the hundreds a renewal conversation turns on.
-      expect(within(card).getByText("$1,140")).toBeInTheDocument();
-      expect(within(card).getByText("44 of 60 active")).toBeInTheDocument();
+      // "$3.3K" hides the detail of the reported usage amount.
+      expect(within(card).getByText("$3,268")).toBeInTheDocument();
+      expect(within(card).getByText("44 of 60 assigned")).toBeInTheDocument();
     });
 
     /** @scenario "A failed read raises no alert while sample mode is on" */

@@ -78,6 +78,11 @@ export function AgentCard({
       <SimpleGrid columns={3} gap={3}>
         <AgentFigure
           label="Cost · 30 days"
+          missingReason={
+            agent.source === "copilot_studio"
+              ? "Dollar cost per agent needs billing data and a supported calculation."
+              : "The platform has not measured this yet."
+          }
           value={
             agent.costUsd30d === null
               ? null
