@@ -1230,6 +1230,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dataset/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Upload a file for an image or file column and get the reference a cell holds */
+        post: operations["postApiDatasetAttachments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dataset/direct-upload": {
         parameters: {
             query?: never;
@@ -9589,6 +9606,16 @@ export interface operations {
         responses: never;
     };
     postApiDatasetUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiDatasetAttachments: {
         parameters: {
             query?: never;
             header?: never;
