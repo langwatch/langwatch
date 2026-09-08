@@ -63,6 +63,15 @@ const SESSION = { user: { id: "u1" }, expires: "1" } as any;
 
 function makePrisma(overrides: any = {}) {
   return {
+    // The attribution resolver honours the acting id only when it names a
+    // User row (a service key acts as itself and its id names an ApiKey),
+    // so the VK path's `actorUserId: "u1"` assertions need "u1" to exist.
+    user: {
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
+        where.id === SESSION.user.id ? { id: where.id } : null,
+      ),
+      ...overrides.user,
+    },
     project: {
       findUnique: vi.fn().mockResolvedValue({
         apiKey: "sk-lw-test-project-key",
