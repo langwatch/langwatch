@@ -150,14 +150,14 @@ class RequestRecorder:
             if response.status_code >= 300:
                 try:
                     # Safe: httpx caches the body, so the OpenAI client still
-                    # reads the same bytes. The bare except is deliberate —
-                    # logging must never break the real call.
+                    # reads the same bytes. Catch specific transport and decode
+                    # errors, never raising — logging must never break the real call.
                     body_bytes = await response.aread()
                     body_text = body_bytes.decode("utf-8", errors="replace")
                     body_collapsed = " ".join(body_text.split())
                     record.body = body_collapsed[:300]
-                except Exception:
-                    pass
+                except (httpx.HTTPError, UnicodeDecodeError, RuntimeError) as exc:
+                    record.body = f"<body unreadable: {type(exc).__name__}: {exc}>"
             return response
 
         httpx.AsyncClient.send = send  # type: ignore[assignment,method-assign]
