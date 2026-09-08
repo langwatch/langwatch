@@ -123,11 +123,8 @@ import {
   composeExperimentFeature,
   refusingExperimentFeature,
 } from "../features/experiment/experiment.composition.ts";
-import {
-  composeEvaluationFeature,
-  ApiEvaluationUnavailableError,
-  refusingEvaluationFeature,
-} from "../features/evaluation/evaluation.composition.ts";
+import type { EvaluationClickHouseResolver } from "@langwatch/evaluation-server";
+import { installApiEvaluation } from "../features/evaluation/evaluation.composition.ts";
 import {
   composeApiEvaluatorExecution,
   LoggedApiEvaluatorExecutionAbsence,
@@ -163,7 +160,7 @@ import {
   LoggedApiScenarioAbsence,
   refusingScenarioFeature,
 } from "../features/scenario/scenario.composition.ts";
-import { composeRoleFeature, refusingRoleFeature } from "../features/role/role.composition.ts";
+import { installApiRole } from "../features/role/role.composition.ts";
 import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition.ts";
 import { installApiDataRetention } from "../features/data-retention/data-retention.composition.ts";
 import {
@@ -173,10 +170,9 @@ import {
   refusingMonitorFeature,
 } from "../features/monitor/monitor.composition.ts";
 import {
-  composeStoredObjectFeature,
   DeferredPayloadStagingAdapter,
+  installApiStoredObject,
   LoggedApiStoredObjectAbsence,
-  refusingStoredObjectFeature,
 } from "../features/stored-object/stored-object.composition.ts";
 import {
   ApiOrganizationSeatLicense,
@@ -254,10 +250,12 @@ import {
   refusingModelProviderFeature,
   type ApiModelProviderHostPort,
 } from "../features/model-provider/model-provider.composition.ts";
+import { installApiDashboard } from "../features/dashboard/dashboard.composition.ts";
+import type { HealthProbeRestPorts } from "../features/health/health-probe-rest.ts";
 import {
-  composeSavedViewFeature,
-  refusingSavedViewFeature,
-} from "../features/dashboard/saved-view.composition.ts";
+  installApiPlatformHealth,
+  type ComposedPlatformHealthFeature,
+} from "../features/platform-health/platform-health.composition.ts";
 import { installApiEntitlement } from "../features/entitlement/entitlement.composition.ts";
 import { refusingAnnotationFeature } from "../features/annotation/annotation-absence.ts";
 import { installApiAnnotation } from "../features/annotation/annotation.composition.ts";
@@ -427,7 +425,10 @@ import {
 } from "./api-scim.composition.ts";
 import { composeApiAudit, LoggedApiAuditAbsence } from "./api-audit.composition.ts";
 import type { PlatformOperatorPort } from "@langwatch/identity-server";
-import { RedisNlpLambdaArnCacheAdapter } from "@langwatch/workflow-server";
+import {
+  HttpWorkflowNlpRuntimeAdapter,
+  RedisNlpLambdaArnCacheAdapter,
+} from "@langwatch/workflow-server";
 import {
   composeApiEnterpriseApplication,
   LoggedApiEnterpriseApplicationAbsence,
@@ -469,7 +470,7 @@ import type { ComposedEnterpriseFeature } from "../features/enterprise/enterpris
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition.types.ts";
 import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types.ts";
 import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types.ts";
-import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types.ts";
+import type { ComposedDashboardFeature } from "../features/dashboard/dashboard.composition.types.ts";
 import type { ComposedEntitlementFeature } from "../features/entitlement/entitlement.composition.types.ts";
 import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types.ts";
 import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types.ts";
@@ -703,7 +704,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedExecutionMonitors: MonitorService | undefined;
   private composedWorkflow!: ComposedWorkflowFeature;
   private composedExperiment!: ComposedExperimentFeature;
-  private composedEvaluation!: ComposedEvaluationFeature;
+  /**
+   * One trace re-scored, and the pipeline the result is reported on, or none.
+   * There is no refusing twin: a process that opened no graph has nothing to
+   * re-score and nowhere to report a score to.
+   */
+  private composedEvaluation: ComposedEvaluationFeature | undefined;
   private composedTrace!: ComposedTraceFeature;
   /** The seat gate `licenseEnforcement.*` answers from; see {@link optionalPorts}. */
   private composedSeatAllowances: ApiSeatAllowancePort | undefined;
@@ -717,7 +723,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * refusing twin: a process that opened no database has no tree to label from.
    */
   private composedTopic: ComposedTopicFeature | undefined;
-  private composedRole!: ComposedRoleFeature;
+  /**
+   * The organization's custom roles and their bindings, or none. There is no
+   * refusing twin: `ctx.app.roles` is read by the invitation half as well, so
+   * the record refuses whole rather than offering a role surface with no
+   * ledger behind it.
+   */
+  private composedRole: ComposedRoleFeature | undefined;
   private composedHome!: ComposedHomeFeature;
 
   /**
@@ -742,7 +754,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedIntegrationsChecks!: ComposedIntegrationsChecksFeature;
   private composedAnnotation!: ComposedAnnotationFeature;
   private composedNotification: ComposedNotificationFeature | undefined;
-  private composedSavedView!: ComposedSavedViewFeature;
+  /**
+   * A project's dashboards, the graphs on them, the saved charts they place and
+   * the explorer's stored filter sets, or none. There is no refusing twin: a
+   * process that opened no database has no dashboard to place a card on.
+   */
+  private composedDashboard: ComposedDashboardFeature | undefined;
+  /**
+   * The monitoring-keyed report on this deployment's own subsystems, or none.
+   * None without both monitoring secrets: a report nobody can be told apart
+   * from anyone else is not a report.
+   */
+  private composedPlatformHealth: ComposedPlatformHealthFeature | undefined;
   private composedEntitlement: ComposedEntitlementFeature | undefined;
   private composedHttpProxy!: ComposedHttpProxyFeature;
   private composedStudioDispatch: WorkflowStudioDispatchService | undefined;
@@ -1052,7 +1075,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // sign-up and presence. Composed over the SAME user directory the browser-session boundary
     // resolves through and the SAME organization service the REST doors serve from — a second
     // of either would be a second answer to who somebody is.
-    this.composePersonFeatures(options, auth, tenancy);
+    await this.composePersonFeatures(options, auth, tenancy);
     // The product half: a reviewer's annotations, the support inbox, the project's privacy
     // rules and its setup checklist. It composes FIRST because it is the one half that cannot
     // be missing on a process holding a database, which is what makes it the seed the other
@@ -1115,6 +1138,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // reads all of them, and after the analytics half because its ClickHouse is
     // the one that opened there.
     this.composedTrace = this.composeTrace(options, authz, encryption);
+    // One trace re-scored, and the pipeline every re-score reports on. HERE
+    // because it stands on the trace read stack and the retention cascade its
+    // reads are floored by, and both open on the two lines above.
+    this.composedEvaluation = await this.installEvaluation(options, infrastructure, retention);
     // The monthly allowance the two ingest doors enforce, composed HERE because this is the
     // first line at which everything it stands on is open: the guarded client, the ClickHouse
     // the analytics half opened, and the one plan provider the trace group just resolved.
@@ -1146,18 +1173,35 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: options.config.serviceName,
       report: LoggedApiAgentPipelinesAbsence.create(createLogger(options.config.serviceName)),
     });
-    this.composedScenario = this.composeScenario(options, authz, queueInfrastructure, encryption);
+    this.composedScenario = await this.composeScenario(
+      options,
+      authz,
+      queueInfrastructure,
+      encryption,
+    );
     // The roles a member is granted and the strip of what they last opened.
     // Both used to ride inside the product-group half, so a process missing any
     // one of its six collaborators lost every role surface with it.
     this.composedRole =
       infrastructure && this.composedAuthz
-        ? composeRoleFeature({
+        ? await installApiRole({
             infrastructure,
-            grants: this.composedAuthz.grants,
-            authzApp: this.composedAuthz.app,
+            peers: {
+              // The SAME permission answers the declared check on the same
+              // procedure asks; a second AuthZ here would be a second answer.
+              permissions: this.composedAuthz.app,
+              // The tenant directory the process binds once the tenant half
+              // has composed: this feature installs BEFORE it, because the
+              // invitation half reads assignability through the roles below.
+              organizations: this.deferredApis.reference(OrganizationApi),
+              users: this.composedUser.app,
+            },
+            // The SAME plan provider every allowance banner reads: a
+            // capability refused here and offered there would be one
+            // organization on two plans.
+            plans: this.resolvePlanProvider(options),
           })
-        : refusingRoleFeature();
+        : undefined;
     this.composedHome = infrastructure
       ? composeHomeFeature({ infrastructure })
       : refusingHomeFeature();
@@ -1198,7 +1242,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // execution and product-group halves because the monitor surface takes their monitor
     // service, evaluator service and evaluator replication — one graph per answer, rather than
     // a second one that could disagree.
-    this.composedStoredObject = this.composeStoredObject(options);
+    this.composedStoredObject = await this.installStoredObject(options);
     this.azureSpoolRetentionConfirmed =
       options.config.infrastructure.storedObjects.azureSpoolRetentionConfirmed;
     // The `Idempotency-Key` receipt ledger, over the SAME database every keyed
@@ -1272,12 +1316,42 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // question is one existence read over the project's scope cascade, and that table holds
     // every stored credential in the deployment. A reviewer's comments, scores and queues.
     this.composedAnnotation = await this.installAnnotation(infrastructure);
-    // The stored filter sets, and the spend the billing screen reports. Both
-    // used to ride inside the observability half, so a process missing the
-    // trace read stack lost a person's saved views with it.
-    this.composedSavedView = infrastructure
-      ? composeSavedViewFeature({ infrastructure })
-      : refusingSavedViewFeature();
+    // A project's dashboards, the graphs on them, the saved workbench charts
+    // they place and the explorer's stored filter sets. It installs HERE
+    // because it stands on three peers already open: the charted reads a saved
+    // statement runs through, the alert automations a card's bell renders, and
+    // the project directory a dashboard's own address is built from.
+    this.composedDashboard = infrastructure
+      ? await installApiDashboard({
+          infrastructure,
+          peers: {
+            analytics: this.composedAnalytics.analytics,
+            automation: this.composedAutomation.app,
+            projects: this.composedProject.app,
+          },
+          ports: {
+            ...this.composedAnalytics.dashboardPorts,
+            // Empty, exactly as the graph ports this replaces answered: this
+            // process composes no redaction for a card's alert parameters, so
+            // none of a provider's stored secrets leaves the server.
+            redactActionParams: () => ({}),
+            platformUrl: createPlatformUrlBuilder(
+              options.config.infrastructure.execution.publicBaseUrl,
+            ),
+          },
+        })
+      : undefined;
+    // The deployment's own liveness report, over the SAME five probes the
+    // project-keyed `/api/health/*` family answers from: two doors, one answer
+    // to what a subsystem's health is. Absent without both monitoring secrets.
+    this.composedPlatformHealth = await installApiPlatformHealth({
+      apiKey: options.config.platformHealth.apiKey,
+      probeApiKey: options.config.platformHealth.probeApiKey,
+      probes: this.composeHealthProbes({
+        publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
+        apiKeys: tenancy.apiKeys,
+      }),
+    });
     // The durable notification record the approaching-limit warning writes,
     // so the next reading knows this organization was already told.
     this.composedNotification = infrastructure
@@ -1352,11 +1426,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // command is recorded on before it runs.
     const sso = await this.composeSso(options);
     if (sso) options.resources.own("api single sign-on", () => sso.stop());
-    // The eight features with no refusing twin. None mounts without its own
+    // The eleven features with no refusing twin. None mounts without its own
     // application — `ctx.app.share`, `ctx.app.secrets`, `ctx.app.topics`,
-    // `ctx.app.sso`, the resolved privacy policy, the retention window and the
-    // one plan answer are all read by surfaces those features do not own — so
-    // the record refuses whole rather than serving slices with nothing behind.
+    // `ctx.app.sso`, `ctx.app.dashboard`, `ctx.app.evaluations`, the resolved
+    // privacy policy, the retention window and the one plan answer are all read
+    // by surfaces those features do not own — so the record refuses whole
+    // rather than serving slices with nothing behind.
     const share = this.composedShare;
     const entitlement = this.composedEntitlement;
     const dataRetention = this.composedDataRetention;
@@ -1364,6 +1439,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const secret = this.composedSecret;
     const topic = this.composedTopic;
     const dataPrivacy = this.composedDataPrivacy;
+    const dashboard = this.composedDashboard;
+    const evaluation = this.composedEvaluation;
+    const role = this.composedRole;
+    // The caller's own grants, as `authz.*` reports them back. The same
+    // application every declared check on this root already runs on.
+    const permissions = this.composedAuthz?.app;
     const trpcAbsence = LoggedApiTrpcFeaturesAbsence.create(
       createLogger(options.config.serviceName),
     );
@@ -1376,12 +1457,27 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         !secret ||
         !topic ||
         !dataPrivacy ||
+        !dashboard ||
+        !evaluation ||
+        !role ||
+        !permissions ||
         !sso)
     ) {
       trpcAbsence.absent("no-collaborators");
     }
     const features =
-      share && entitlement && dataRetention && featureFlag && secret && topic && dataPrivacy && sso
+      share &&
+      entitlement &&
+      dataRetention &&
+      featureFlag &&
+      secret &&
+      topic &&
+      dataPrivacy &&
+      dashboard &&
+      evaluation &&
+      role &&
+      permissions &&
+      sso
         ? ApiTrpcFeaturesComposition.tryCompose({
             // What a feature composes ITSELF out of, built once above and handed to
             // every `compose<Feature>()` the record's literal names.
@@ -1401,14 +1497,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               scenario: this.composedScenario,
               dataRetention,
               home: this.composedHome,
-              role: this.composedRole,
+              role,
               monitor: this.composedMonitor,
               storedObject: this.composedStoredObject,
               bugReport: this.composedBugReport,
               dataPrivacy,
               integrationsChecks: this.composedIntegrationsChecks,
               annotation: this.composedAnnotation,
-              savedView: this.composedSavedView,
+              dashboard,
               entitlement,
               httpProxy: this.composedHttpProxy,
               modelProvider: this.composedModelProvider,
@@ -1417,7 +1513,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               trace: this.composedTrace,
               workflow: this.composedWorkflow,
               experiment: this.composedExperiment,
-              evaluation: this.composedEvaluation,
+              evaluation,
               organization: this.composedOrganization,
               project: this.composedProject,
               codingAgent: this.composedCodingAgent,
@@ -1455,7 +1551,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
                 traces: this.composedTrace.traces,
                 workflows: this.composedWorkflow.app,
                 experiments: this.composedExperiment.app,
-                evaluations: this.composedEvaluation.app,
+                evaluations: evaluation.app,
                 automation: this.composedAutomation.app,
                 codingAgentApp: this.composedCodingAgent.app,
                 projects: this.composedProject.app,
@@ -1464,8 +1560,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
                 // `subscription.*`. Empty off Stripe, which is what makes the
                 // surface report that this deployment does not bill.
                 ...this.composedBillingWebhook.application,
-                authzApp: this.composedRole.authzApp,
-                dashboard: this.composedAnalytics.dashboard,
+                authzApp: permissions,
+                dashboard: dashboard.app,
                 dataset: this.composedDataset.app,
                 evaluatorApp: this.composedEvaluator.app,
                 featureFlag: featureFlag.app,
@@ -1476,7 +1572,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
                 ops: this.composedOps.app,
                 monitors: this.composedMonitor.app,
                 permissions: authz,
-                roles: this.composedRole.app,
+                roles: role.app,
                 scenarios: this.composedScenario.scenarios,
                 storedObjectApp: this.composedStoredObject.app,
                 suites: this.composedScenario.suites,
@@ -1712,6 +1808,111 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * and the subscription lane beside them. Each REST family is the packaged builder over the
    * one {@link ApiRestSecurity}.
    */
+  /**
+   * The evaluation surface, over this process's own graph. Four things gate
+   * it, and every one is something an evaluation READS: the studio graph its
+   * custom evaluators are published from, the trace it re-scores, the routed
+   * ClickHouse its run history is written to, and the retention cascade that
+   * history is floored by.
+   */
+  private async installEvaluation(
+    options: ApiRuntimeCompositionOptions,
+    infrastructure: ApiTrpcInfrastructure | undefined,
+    retention: ComposedDataRetentionFeature | undefined,
+  ): Promise<ComposedEvaluationFeature | undefined> {
+    const workflowRuntime = this.composedWorkflowRuntime;
+    const modelProviders = this.composedModelProviders;
+    const eventing = this.composedEventing?.eventSourcing;
+    const resolveClickHouse = this.composedClickHouse?.resolveClient;
+    if (!infrastructure || !workflowRuntime || !modelProviders || !eventing) return undefined;
+    if (!retention || !resolveClickHouse) return undefined;
+
+    const logger = createLogger(options.config.serviceName);
+
+    return await installApiEvaluation({
+      infrastructure,
+      peers: {
+        workflows: this.composedWorkflow.app,
+        traces: this.composedTrace.traces,
+        modelProviders,
+      },
+      collaborators: {
+        // The studio's own re-score, over the process's ONE evaluator runtime.
+        // Resolved at the call rather than passed as a value: the runtime is
+        // built FROM the evaluator service and the trace read stack, and an
+        // absent one still refuses by name a layer down.
+        runTraceEvaluation: (input) =>
+          this.requireEvaluatorExecution().runEvaluationForTrace(input),
+        // One liveness probe at the evaluator backend, down the engine's own
+        // streaming route. A probe that cannot be sent is not a failed
+        // evaluation, so the outcome is logged and swallowed.
+        probeEvaluatorRuntime: async ({ projectId }) => {
+          const { nlpRuntime } = workflowRuntime;
+          if (!(nlpRuntime instanceof HttpWorkflowNlpRuntimeAdapter)) return;
+          try {
+            await nlpRuntime.probe({ projectId });
+          } catch (error) {
+            logger.debug({ error, projectId }, "evaluator keep-alive probe failed");
+          }
+        },
+        // This process sends no product signal for a completed run; the worker
+        // that drains the pipeline is where a run is counted.
+        trackEvaluationRan: () => undefined,
+        environment: globalThis.process.env,
+      },
+      processName: options.config.serviceName,
+      eventing,
+      resolveClickHouse: resolveClickHouse as EvaluationClickHouseResolver,
+      dataRetention: retention.service,
+    });
+  }
+
+  /**
+   * The evaluation feature, or the refusal a caller that cannot degrade needs.
+   */
+  private requireEvaluation(): ComposedEvaluationFeature {
+    const evaluation = this.composedEvaluation;
+    if (!evaluation) {
+      throw new ApiEvaluationUnavailableError(
+        "evaluation pipeline, so it cannot report a run's result",
+      );
+    }
+    return evaluation;
+  }
+
+  /**
+   * The five subsystem probes. Every one posts a canary back through this
+   * deployment's own public boundary, so the origin is what decides whether
+   * they exist at all; the automation application and the workflow lookup are
+   * the two probes' own collaborators.
+   */
+  private composeHealthProbes(options: {
+    publicBaseUrl: string | undefined;
+    apiKeys: ApiResolvedTenancy["apiKeys"];
+  }): HealthProbeRestPorts | undefined {
+    const { publicBaseUrl, apiKeys } = options;
+    const automationApp = this.composedAutomation.service;
+    const workflowService = this.composedWorkflow.service;
+    if (!publicBaseUrl || !automationApp || !workflowService) return undefined;
+
+    return {
+      resolveProjectByApiKey: async (token: string) => {
+        const resolved = await apiKeys.findResolvedToken({ token });
+        return resolved?.type === "legacyProjectKey" ? { id: resolved.project.id } : null;
+      },
+      publicBaseUrl,
+      automation: () => automationApp,
+      workflowExists: async (input: { workflowId: string; projectId: string }) => {
+        try {
+          await workflowService.getById({ id: input.workflowId, projectId: input.projectId });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    };
+  }
+
   private composeDoors(
     authz: AuthzService,
     tenancy: ApiResolvedTenancy,
@@ -1890,19 +2091,21 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // one catalogue; the saved charts sit on the same Dashboard application
     // the browser's dashboards do.
     const analyticsFeature = this.composedAnalytics;
+    const dashboardFeature = this.composedDashboard;
     const projects = this.composedTenancy?.projects;
-    const langWatchQL = projects
-      ? {
-          collaborators: {
-            featureFlags: () => analyticsFeature.featureFlags,
-            projects: () => projects,
-            langWatchQL: () => analyticsFeature.langWatchQL,
-            protectionsFor: (input: { projectId: string; credential: RestCredentialPrincipal }) =>
-              analyticsFeature.apiKeyProtections(input),
-          },
-          dashboard: () => analyticsFeature.dashboard,
-        }
-      : undefined;
+    const langWatchQL =
+      projects && dashboardFeature
+        ? {
+            collaborators: {
+              featureFlags: () => analyticsFeature.featureFlags,
+              projects: () => projects,
+              langWatchQL: () => analyticsFeature.langWatchQL,
+              protectionsFor: (input: { projectId: string; credential: RestCredentialPrincipal }) =>
+                analyticsFeature.apiKeyProtections(input),
+            },
+            dashboard: dashboardFeature.restServices.dashboard,
+          }
+        : undefined;
     // The management family's five collaborators, or none. The organization object is the
     // identity half's own merged one — the canonical settings reads plus the membership
     // operations the contract does not declare — so the management door and the members screen
@@ -2023,33 +2226,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           workflows: () => experimentRun.workflows,
         }
       : undefined;
-    // The five subsystem probes. Every one of them posts a canary back through this
-    // deployment's own public boundary, so the origin is what decides whether the family exists
-    // at all; the automation application and the workflow lookup are the two probes' own
-    // collaborators.
-    const automationApp = this.composedAutomation.service;
-    const healthProbes =
-      publicBaseUrl && automationApp && workflowService
-        ? {
-            resolveProjectByApiKey: async (token: string) => {
-              const resolved = await tenancy.apiKeys.findResolvedToken({ token });
-              return resolved?.type === "legacyProjectKey" ? { id: resolved.project.id } : null;
-            },
-            publicBaseUrl,
-            automation: () => automationApp,
-            workflowExists: async (input: { workflowId: string; projectId: string }) => {
-              try {
-                await workflowService.getById({
-                  id: input.workflowId,
-                  projectId: input.projectId,
-                });
-                return true;
-              } catch {
-                return false;
-              }
-            },
-          }
-        : undefined;
+    // The five subsystem probes, built once for both doors that read them: the
+    // project-keyed `/api/health/*` family here, and the monitoring-keyed
+    // platform-health family the process installed above.
+    const healthProbes = this.composeHealthProbes({ publicBaseUrl, apiKeys: tenancy.apiKeys });
     // The SAME invitation service `organization.*` administers over tRPC, so a
     // provisioning tool that creates an invitation here and an administrator
     // who lists them in the app see one set of invitations with one acceptance
@@ -2113,7 +2293,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // the execution fold's own `reportEvaluation`, which is the same command
     // the workbench's re-scores travel on; without it the collector still
     // records spans and counts the evaluations as rejected by name.
-    const reportEvaluation = this.composedEvaluation.reportEvaluation;
+    const reportEvaluation = this.composedEvaluation?.reportEvaluation;
     // The batch result log's three collaborators. All three travel together
     // because they are ONE write: the rows are a run's history, addressed by
     // the experiment the first of them resolved and scored by the verdict
@@ -2261,7 +2441,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       scenario: this.composedScenario,
       analytics: this.composedAnalytics,
       authz,
-      authzComposition: this.composedAuthz,
       credentials: handlerManagedCredentials,
       encryption: this.composedEncryption,
       experiment: this.composedExperiment,
@@ -2277,8 +2456,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       enterprise: this.composedEnterprise,
       dataset: this.composedDataset,
       evaluator: this.composedEvaluator,
-      role: this.composedRole,
       monitor: this.composedMonitor,
+      dashboard: this.composedDashboard,
+      legacyErrors: ApiRestObservabilityComposition.create().legacyErrorHandler,
       storedObject: this.composedStoredObject,
       plans,
       publicBaseUrl,
@@ -2307,6 +2487,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       services: {
         packaged,
         ...this.composedAnnotation.restServices,
+        ...this.composedStoredObject.restServices,
         analytics: () => analytics,
         ...(langWatchQL ? { langWatchQL } : {}),
         ...(promptApp
@@ -2330,6 +2511,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(traceReads ? { traceReads } : {}),
         ...(traceLegacy ? { traceLegacy } : {}),
         organizations: () => tenancy.organizations,
+        ...(this.composedPlatformHealth
+          ? { platformHealth: this.composedPlatformHealth.rest }
+          : {}),
       },
       ports: {
         handlerManagedCredential: (input) => handlerManagedCredentials.authenticate(input),
@@ -2367,6 +2551,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // store it cannot decrypt is worse than no door.
     for (const secretRestApp of this.composedSecret?.rest ?? []) {
       rest.route("/", secretRestApp);
+    }
+    // `/api/v1/run-plans`, `/api/v1/test-suites` and the deprecated
+    // `/api/suites` alias. All three read the SAME application, so the fallback
+    // order and the resolved organization never disagree between doors.
+    for (const suiteRestApp of this.composedScenario.suiteRest) {
+      rest.route("/", suiteRestApp);
     }
     return {
       rest: rest
@@ -3199,11 +3389,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * Composes the three person-shaped features: the two signed-out doors, the signed-in person's
    * account, and the project's credentials.
    */
-  private composePersonFeatures(
+  private async composePersonFeatures(
     options: ApiRuntimeCompositionOptions,
     auth: ApiAuthSessionCompositionPort,
     tenancy: ApiResolvedTenancy,
-  ): void {
+  ): Promise<void> {
     const database = this.composedDatabase?.connection;
     const projects = this.composedTenancy?.projects;
     const processName = options.config.serviceName;
@@ -3238,10 +3428,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName,
     });
 
-    this.composedUser = composeUserFeature({
+    this.composedUser = await composeUserFeature({
       prisma: database.client,
       peers: {
-        users: session.users,
         auth: session.auth,
         organizations: tenancy.organizations,
         // ADR-027's mode, resolved once by the feature that owns the
@@ -3288,15 +3477,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The object store, over this process's own graph. One thing gates it: the database, because
-   * the BYOC route lookup is a row read.
+   * The object store, over this process's own graph. The database is what it stands on: the
+   * BYOC route lookup is a row read, so a process with none cannot install it at all.
    */
-  private composeStoredObject(options: ApiRuntimeCompositionOptions): ComposedStoredObjectFeature {
-    const database = this.composedDatabase?.connection;
-    if (!database) return refusingStoredObjectFeature();
-
+  private async installStoredObject(
+    options: ApiRuntimeCompositionOptions,
+  ): Promise<ComposedStoredObjectFeature> {
+    const database = this.requireDatabase().connection;
     const clickHouse = this.composedClickHouse;
-    const feature = composeStoredObjectFeature({
+    const feature = await installApiStoredObject({
       prisma: database.client,
       resolveClickHouseClient: clickHouse?.resolveClient ?? null,
       // Every instance this process opened, for the id-only lookup an old trace's media
@@ -3374,12 +3563,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * Composes the scenario feature over this process's own graph.
    */
-  private composeScenario(
+  private async composeScenario(
     options: ApiRuntimeCompositionOptions,
     authz: AuthzService,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     encryption: SecretEncryptionPort | undefined,
-  ): ComposedScenarioFeature {
+  ): Promise<ComposedScenarioFeature> {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const agents = this.agentApi;
@@ -3401,9 +3590,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const traces = this.composedTrace.traces;
     if (!workflows || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
 
-    return composeScenarioFeature({
+    return await composeScenarioFeature({
       prisma: database.client,
       resources: options.resources,
+      // The three suite families answer through the SAME project-key door
+      // every other declared family on this process opens.
+      suiteRest: {
+        credential: (input) => this.composedHandlerCredentials.authenticate(input),
+        platformUrl: createPlatformUrlBuilder(
+          options.config.infrastructure.execution.publicBaseUrl,
+        ),
+        errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
+      },
       authz,
       agents,
       connectedPresence: (input) => agents.getPresence(input),
@@ -4130,8 +4328,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
     const database = this.composedDatabase?.connection;
     const grants = this.composedAuthz?.grants;
-    const roles = this.composedRole.roles;
-    if (!database || !grants) return undefined;
+    const roles = this.composedRole?.app;
+    if (!database || !grants || !roles) return undefined;
 
     this.composedOrganizationInvites = composeApiOrganizationInvites({
       prisma: database.client,
@@ -4323,7 +4521,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       });
       this.composedWorkflow = refusingWorkflowFeature();
       this.composedExperiment = refusingExperimentFeature();
-      this.composedEvaluation = refusingEvaluationFeature();
       return;
     }
 
@@ -4384,28 +4581,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       }),
     });
 
-    // The re-score and the pipeline producer, composed before the experiment
-    // feature because the workbench's own cells report on the SAME sender.
-    this.composedEvaluation = composeEvaluationFeature({
-      infrastructure,
-      peers: { modelProviders, workflowRuntime },
-      processName: options.config.serviceName,
-      eventing: this.composedEventing?.eventSourcing,
-      // The studio's own re-score, over the process's ONE evaluator runtime.
-      // Resolved at the call rather than passed as a value because the runtime
-      // is built FROM this evaluator service and the trace read stack: at this
-      // line neither exists yet, and at the call both do. An absent runtime
-      // still refuses by name, one layer down.
-      runEvaluationForTrace: (_ctx, input) =>
-        this.requireEvaluatorExecution().runEvaluationForTrace({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          evaluatorType: input.evaluatorType,
-          settings: input.settings,
-          mappings: input.mappings,
-        }),
-    });
-
     this.composedExperiment = composeExperimentFeature({
       infrastructure,
       peers: {
@@ -4416,7 +4591,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         evaluators,
         agents,
         modelProviders,
-        reportEvaluation: this.composedEvaluation.reportEvaluation,
+        // Resolved at the CALL rather than passed as a value: the evaluation
+        // feature installs after the trace read stack and the retention
+        // cascade it stands on, and both open after this line.
+        reportEvaluation: (data) => this.requireEvaluation().reportEvaluation(data),
       },
       processName: options.config.serviceName,
       // The SAME ClickHouse the charted reads run on, opened once by
@@ -4485,6 +4663,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       );
     }
     return execution;
+  }
+
+  /**
+   * This process's guarded connection, for the features that cannot be
+   * installed without one. Named rather than optional-chained: a feature whose
+   * every row read is a database read has no degraded form to offer.
+   */
+  private requireDatabase(): ApiDatabaseInfrastructure {
+    const database = this.composedDatabase;
+    if (!database) throw new ApiDatabaseRequiredError();
+    return database;
   }
 
   private composeQueue(options: ApiRuntimeCompositionOptions): ApiQueueInfrastructure | undefined {
@@ -4899,6 +5088,39 @@ class ApiTraceSpanIngestAdapter extends TraceSpanIngestPort {
 
   recordSpan(data: RecordSpanCommandData): Promise<void> {
     return this.commands.recordSpan(data);
+  }
+}
+
+/**
+ * A capability this deployment did not compose, refused by name rather than as
+ * an unhandled property read on `undefined`.
+ */
+class ApiEvaluationUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiEvaluationUnavailableError";
+  }
+}
+
+/**
+ * A feature whose whole subject is stored rows was asked for on a process that
+ * composed no connection. Named so the boot line reads the cause rather than a
+ * property read on undefined.
+ */
+class ApiDatabaseRequiredError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "This deployment composed no database connection", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiDatabaseRequiredError";
   }
 }
 

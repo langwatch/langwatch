@@ -2,7 +2,6 @@ import { type AuthzGrantsService } from "@langwatch/authz-contract";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { type OrganizationInvite, OrganizationUserRole } from "@langwatch/organization-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import type { RoleService } from "@langwatch/role-contract";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
 
@@ -14,7 +13,10 @@ import {
   resolveInviteDisplayStatus,
   type InviteDisplayStatus,
 } from "../rules/invite-display-status.rules.ts";
-import { type InviteServiceDependencies } from "../rules/invite-contracts.rules.ts";
+import {
+  type InviteAssignableRoles,
+  type InviteServiceDependencies,
+} from "../rules/invite-contracts.rules.ts";
 
 import { InviteCreationService } from "./invite-creation.service.ts";
 import { InviteAcceptanceService } from "./invite-acceptance.service.ts";
@@ -208,7 +210,7 @@ export class InviteService {
     return this.deps.plans;
   }
 
-  private get roleService(): RoleService {
+  private get roleService(): InviteAssignableRoles {
     return this.deps.roles;
   }
 

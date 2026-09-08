@@ -10,7 +10,7 @@ import type {
   EnabledGuardrailMonitor,
   MonitorEnabledGuardrailInput,
 } from "@langwatch/monitor-contract";
-import { MonitorService } from "@langwatch/monitor-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -40,10 +40,14 @@ const prisma = connection?.client as PrismaClient;
  * The monitor rows are part of what this suite exercises, so the monitor
  * lookup reads them back from the same database rather than being stubbed.
  */
-class MonitorRowsFromDatabase extends MonitorService {
-  async listEnabledGuardrailMonitors(
+function monitorRowsFromDatabase(): MonitorApi {
+  const refuse = (): never => {
+    throw new Error("not used");
+  };
+
+  const listEnabledGuardrailMonitors = async (
     input: MonitorEnabledGuardrailInput,
-  ): Promise<EnabledGuardrailMonitor[]> {
+  ): Promise<EnabledGuardrailMonitor[]> => {
     if (input.evaluatorIds.length === 0) return [];
     const rows = await prisma.monitor.findMany({
       where: {
@@ -60,46 +64,12 @@ class MonitorRowsFromDatabase extends MonitorService {
       checkType: row.checkType,
       parameters: row.parameters as EnabledGuardrailMonitor["parameters"],
     }));
-  }
-  getAllForProject(): never {
-    throw new Error("not used");
-  }
-  getEnabledOnMessageMonitors(): never {
-    throw new Error("not used");
-  }
-  getById(): never {
-    throw new Error("not used");
-  }
-  tryGetMonitorById(): never {
-    throw new Error("not used");
-  }
-  getAllByIds(): never {
-    throw new Error("not used");
-  }
-  toggle(): never {
-    throw new Error("not used");
-  }
-  create(): never {
-    throw new Error("not used");
-  }
-  update(): never {
-    throw new Error("not used");
-  }
-  delete(): never {
-    throw new Error("not used");
-  }
-  deleteForExperiment(): never {
-    throw new Error("not used");
-  }
-  upsertForExperiment(): never {
-    throw new Error("not used");
-  }
-  isNameAvailable(): never {
-    throw new Error("not used");
-  }
-  replicate(): never {
-    throw new Error("not used");
-  }
+  };
+
+  return new Proxy(
+    { listEnabledGuardrailMonitors },
+    { get: (target, name) => Reflect.get(target, name) ?? refuse, has: () => true },
+  ) as MonitorApi;
 }
 
 const suffix = nanoid(8);
@@ -128,7 +98,7 @@ const skipped: SingleEvaluationResult = {
   details: "input below the minimum length",
 };
 
-const monitors = new MonitorRowsFromDatabase();
+const monitors = monitorRowsFromDatabase();
 
 const guardrails = PrismaGatewayGuardrailRepository.create(prisma);
 

@@ -20,6 +20,11 @@ import { composeGatewayFeature } from "../../../features/gateway/gateway.composi
 import { refusingAuthFeature } from "../../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
 import {
+  stubDashboardFeature,
+  stubEvaluationFeature,
+  stubMonitorFeature,
+  stubRoleFeature,
+  stubStoredObjectFeature,
   stubDataPrivacyFeature,
   stubDataRetentionFeature,
   stubEntitlementFeature,
@@ -35,21 +40,16 @@ import { refusingAnalyticsFeature } from "../../../features/analytics/analytics.
 import { refusingDatasetFeature } from "../../../features/dataset/dataset.composition.ts";
 import { refusingEvaluatorFeature } from "../../../features/evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../../features/prompt/prompt.composition.ts";
-import { refusingMonitorFeature } from "../../../features/monitor/monitor.composition.ts";
 import { refusingHomeFeature } from "../../../features/project/home.composition.ts";
-import { refusingRoleFeature } from "../../../features/role/role.composition.ts";
 import { refusingScenarioFeature } from "../../../features/scenario/scenario.composition.ts";
-import { refusingStoredObjectFeature } from "../../../features/stored-object/stored-object.composition.ts";
 import { refusingBugReportFeature } from "../../../features/bug-report/bug-report.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
-import { refusingSavedViewFeature } from "../../../features/dashboard/saved-view.composition.ts";
 import { refusingHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../../features/model-provider/model-provider.composition.ts";
 import { refusingTraceFeature } from "../../../features/trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../../features/workflow/workflow.composition.ts";
 import { refusingExperimentFeature } from "../../../features/experiment/experiment.composition.ts";
-import { refusingEvaluationFeature } from "../../../features/evaluation/evaluation.composition.ts";
 import { refusingOrganizationFeature } from "../../../features/organization/organization.composition.ts";
 import { refusingProjectFeature } from "../../../features/project/project.composition.ts";
 import { refusingCodingAgentFeature } from "../../../features/coding-agent/coding-agent.composition.ts";
@@ -182,15 +182,15 @@ export function buildAppTrpcFeatures(
       evaluator: refusingEvaluatorFeature(),
       prompt: refusingPromptFeature(),
       dataRetention: stubDataRetentionFeature(),
-      monitor: refusingMonitorFeature(),
+      monitor: stubMonitorFeature(),
       home: refusingHomeFeature(),
-      role: refusingRoleFeature(),
-      storedObject: refusingStoredObjectFeature(),
+      role: stubRoleFeature(),
+      storedObject: stubStoredObjectFeature(),
       bugReport: refusingBugReportFeature(),
       dataPrivacy: stubDataPrivacyFeature(),
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),
-      savedView: refusingSavedViewFeature(),
+      dashboard: stubDashboardFeature(),
       entitlement: stubEntitlementFeature(),
       httpProxy: refusingHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
@@ -199,7 +199,7 @@ export function buildAppTrpcFeatures(
       trace: refusingTraceFeature(),
       workflow: refusingWorkflowFeature(),
       experiment: refusingExperimentFeature(),
-      evaluation: refusingEvaluationFeature(),
+      evaluation: stubEvaluationFeature(),
       organization: refusingOrganizationFeature(),
       project: refusingProjectFeature(),
       codingAgent: refusingCodingAgentFeature(),

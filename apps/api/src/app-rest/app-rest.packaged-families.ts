@@ -15,10 +15,10 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type {
   AppRestBroadcast,
   AppRestManagementAuditPort,
-  AppRestRbacVocabulary,
   AppRestSecurity,
   MountableRestApp,
   PlatformUrlBuilder,
+  RestErrorHandler,
 } from "@langwatch/api/rest";
 import { bodyLimit } from "@langwatch/api/rest";
 import {
@@ -26,15 +26,13 @@ import {
   createSlackTriggerRestApp,
   createTriggerRestApp,
 } from "@langwatch/automation-server";
-import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import { createRoleBindingsRestApp } from "@langwatch/authz-server";
+import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentApp, CodingAgentRestAuditPort } from "@langwatch/coding-agent-server";
 import {
   createCodingAgentRestApp,
   createCodingAgentV1RestApp,
 } from "@langwatch/coding-agent-server";
-import type { DashboardApp } from "@langwatch/dashboard-server";
-import { createDashboardsRestApp, createGraphsRestApp } from "@langwatch/dashboard-server";
+import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
 import { createDatasetRestApp } from "@langwatch/dataset-server";
 import type { GovernanceApp, ScimApp, WebhookApp } from "@langwatch/enterprise-api";
@@ -48,8 +46,7 @@ import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import { createEvaluatorsRestApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import { createExperimentsRestApp } from "@langwatch/experiment-server";
-import type { MonitorApp } from "@langwatch/monitor-server";
-import { createMonitorRestApp } from "@langwatch/monitor-server";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   createModelDefaultsRestApp,
@@ -67,8 +64,6 @@ import {
 } from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { createProjectRestApp } from "@langwatch/project-server";
-import type { RoleService } from "@langwatch/role-contract";
-import { createRolesRestApp } from "@langwatch/role-server";
 import type {
   ScenarioService,
   ScenarioTabRegistry,
@@ -85,12 +80,6 @@ import type {
   StoredObjectApp,
 } from "@langwatch/stored-object-server";
 import { createFilesRestApp } from "@langwatch/stored-object-server";
-import type { SuiteApp } from "@langwatch/suite-server";
-import {
-  createRunPlansV1RestApp,
-  createSuiteRestApp,
-  createTestSuitesV1RestApp,
-} from "@langwatch/suite-server";
 import {
   createEventsRestApp,
   type TrackedEventPorts,
@@ -105,9 +94,11 @@ import type { WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
 import { createWorkflowsRestApp } from "@langwatch/workflow-server";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { ZodType } from "zod";
-
 import type { ApiErrorBody } from "@langwatch/api/rest";
+
+import { mountDashboardRest } from "../features/dashboard/dashboard-rest.mount.ts";
+import { mountMonitorRest } from "../features/monitor/monitor-rest.mount.ts";
+import type { ApiHandlerManagedCredentialPort } from "./app-rest.process-features.ts";
 
 import {
   type AgentCacheStore,
@@ -136,8 +127,6 @@ export type ApiPackagedRestServices = Readonly<{
       })
     | undefined;
   apiKeys?: (() => ApiKeyService) | undefined;
-  /** Writing role bindings: the grants ledger `/api/role-bindings` appends to. */
-  authzGrants?: (() => AuthzGrantsService) | undefined;
   automation?: (() => AutomationApp) | undefined;
   /** Fan-out to every browser watching one tenant. */
   broadcast?: (() => AppRestBroadcast) | undefined;
@@ -145,13 +134,13 @@ export type ApiPackagedRestServices = Readonly<{
   codingAgents?: (() => CodingAgentApp) | undefined;
   /** Records who read an answer that names people. REST audits; tRPC does not. */
   codingAgentAudit?: (() => CodingAgentRestAuditPort) | undefined;
-  dashboard?: (() => DashboardApp) | undefined;
+  dashboard?: (() => DashboardApi) | undefined;
   datasets?: (() => DatasetApp) | undefined;
   evaluators?: (() => EvaluatorApp) | undefined;
   experiments?: (() => ExperimentApp) | undefined;
   governance?: (() => GovernanceApp) | undefined;
   modelProviders?: (() => ModelProviderService) | undefined;
-  monitors?: (() => MonitorApp) | undefined;
+  monitors?: (() => MonitorApi) | undefined;
   /** The organization directory `/api/groups`, `/api/teams` and `/api/me` read. */
   organizations?: (() => OrganizationService) | undefined;
   /**
@@ -161,15 +150,12 @@ export type ApiPackagedRestServices = Readonly<{
   /** Reading effective permissions and the bindings that confer them. */
   permissions?: (() => AuthzService) | undefined;
   projects?: (() => ProjectService) | undefined;
-  /** Custom roles, the Enterprise-gated half of RBAC. */
-  roles?: (() => RoleService) | undefined;
   scenarios?: (() => ScenarioService) | undefined;
   scenarioTabs?: (() => ScenarioTabRegistry) | undefined;
   /** The SCIM provisioning tokens an identity provider authenticates with. */
   scim?: (() => ScimApp) | undefined;
   simulations?: (() => SimulationService) | undefined;
   storedObjects?: (() => StoredObjectApp) | undefined;
-  suites?: (() => SuiteApp) | undefined;
   /**
    * One avatar object's metadata and bytes, for `/api/user-avatar`.
    */
@@ -218,8 +204,8 @@ export type ApiPackagedRestPorts = Readonly<{
   managementAudit: AppRestManagementAuditPort;
   /** Who an organization-authenticated REST write is attributed to (ADR-092). */
   organizationLedgerActor: (c: Context<any>) => OrganizationLedgerActor;
-  /** The permission vocabulary custom roles are built from. */
-  rbacVocabulary: AppRestRbacVocabulary;
+  /** The process's own error envelope, which every declared family answers in. */
+  legacyErrors: RestErrorHandler;
   /** The configured instance administrator credential, or undefined when unset. */
   instanceAdminKey: () => string | undefined;
   /** Whether this deployment is the hosted product rather than self-hosted. */
@@ -229,11 +215,11 @@ export type ApiPackagedRestPorts = Readonly<{
   /** One fixed-window counter, keyed on whatever the caller is identified by. */
   rateLimit: FilesRateLimiter;
   /**
-   * Which trace sources a monitor's `mappings` may name. A schema rather than a
-   * restatement here, so the request validator and the published document are built from
-   * one definition.
+   * Resolves a project API key and enforces one permission as a key ceiling.
+   * The declared families bind their own identity through it rather than
+   * through the security object the hand-written ones take.
    */
-  monitorMappingsSchema: ZodType;
+  handlerManagedCredential: ApiHandlerManagedCredentialPort;
   /**
    * The API-key ceiling for one permission, as a middleware. A route needing a
    * SECOND permission beyond its access policy installs one of these.
@@ -309,16 +295,11 @@ export type ApiPackagedRestFamilyName =
   | "monitors"
   | "organizations"
   | "projects"
-  | "role-bindings"
-  | "roles"
-  | "run-plans"
   | "scenario-events"
   | "scenarios"
   | "scim-tokens"
   | "simulation-runs"
-  | "suites"
   | "teams"
-  | "test-suites"
   | "triggers"
   | "user-avatar"
   | "tracked-events"
@@ -426,10 +407,7 @@ export function mountApiPackagedRestFamilies(options: {
   mount(
     "dashboards",
     dashboard
-      ? () => [
-          createDashboardsRestApp({ security, dashboard, platformUrl: ports.platformUrl }),
-          createGraphsRestApp({ security, dashboard }),
-        ]
+      ? () => mountDashboardRest({ dashboard, credential: ports.handlerManagedCredential })
       : null,
   );
 
@@ -536,11 +514,11 @@ export function mountApiPackagedRestFamilies(options: {
     "monitors",
     monitors
       ? () =>
-          createMonitorRestApp({
-            security,
-            app: monitors,
+          mountMonitorRest({
+            monitors,
+            credential: ports.handlerManagedCredential,
             platformUrl: ports.platformUrl,
-            mappingsSchema: ports.monitorMappingsSchema,
+            errors: ports.legacyErrors,
           })
       : null,
   );
@@ -569,35 +547,6 @@ export function mountApiPackagedRestFamilies(options: {
   );
 
   const permissions = services.permissions;
-  const authzGrants = services.authzGrants;
-  mount(
-    "role-bindings",
-    permissions && authzGrants && enterpriseGate
-      ? () =>
-          createRoleBindingsRestApp({
-            security,
-            enterpriseGate: enterpriseGate("MANAGEMENT_API"),
-            permissions,
-            grants: authzGrants,
-            ledgerActor: ports.organizationLedgerActor,
-          })
-      : null,
-  );
-
-  const roles = services.roles;
-  mount(
-    "roles",
-    roles && enterpriseGate
-      ? () =>
-          createRolesRestApp({
-            security,
-            enterpriseGate: enterpriseGate("RBAC"),
-            roles,
-            vocabulary: ports.rbacVocabulary,
-            ledgerActor: ports.organizationLedgerActor,
-          })
-      : null,
-  );
 
   const simulations = services.simulations;
   const scenarioTabs = services.scenarioTabs;
@@ -665,28 +614,6 @@ export function mountApiPackagedRestFamilies(options: {
             userAvatarObjects,
             rateLimit: ports.rateLimit,
           }).mountable
-      : null,
-  );
-
-  const suites = services.suites;
-  mount(
-    "suites",
-    suites ? () => createSuiteRestApp({ security, suites, platformUrl: ports.platformUrl }) : null,
-  );
-  // The published families a run plan and a test suite each own — `suites`
-  // above is the deprecated `/api/suites` alias that predates the split, and
-  // all three read the SAME SuiteApp so the fallback order and the resolved
-  // organization never disagree between doors.
-  mount(
-    "run-plans",
-    suites
-      ? () => createRunPlansV1RestApp({ security, suites, platformUrl: ports.platformUrl })
-      : null,
-  );
-  mount(
-    "test-suites",
-    suites
-      ? () => createTestSuitesV1RestApp({ security, suites, platformUrl: ports.platformUrl })
       : null,
   );
 

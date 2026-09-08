@@ -7,11 +7,9 @@ import type { ComposedApiFeatures } from "./app-trpc.composed.ts";
 
 import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount.ts";
 import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount.ts";
-import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount.ts";
 import { createExportTrpcRouter } from "../features/export/export-trpc.mount.ts";
 import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organization/organization-trpc.mount.ts";
 import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount.ts";
-import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount.ts";
 import { createSsoConnectionTrpcRouter } from "../features/sso/sso-trpc.mount.ts";
 import { composeGithubTrpcRouter } from "../features/github/github.composition.ts";
 import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount.ts";
@@ -43,7 +41,10 @@ export function createAppTrpcFeatures(options: {
   const traceRouters = composed.trace.routers(mount);
   const shareRouters = composed.share.routers(mount);
   const analyticsRouters = composed.analytics.routers(mount);
+  const dashboardRouters = composed.dashboard.routers(mount);
   const datasetRouters = composed.dataset.routers(mount);
+  const evaluationRouters = composed.evaluation.routers(mount);
+  const monitorRouters = composed.monitor.routers(mount);
   const roleRouters = composed.role.routers(mount);
   const secretRouters = composed.secret.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
@@ -73,7 +74,7 @@ export function createAppTrpcFeatures(options: {
     // the one entitlement application, because ONE answer to "which plan" is
     // the whole point of a plan provider.
     plan: entitlementRouters.plan,
-    savedViews: composed.savedView.router(mount),
+    savedViews: dashboardRouters.savedViews,
     // A project's stored credentials. In the record rather than beside it: the
     // namespace used to be mounted on the root directly, which put it outside
     // every audit that reads this list.
@@ -126,7 +127,7 @@ export function createAppTrpcFeatures(options: {
     // through `ctx.app.suites`.
     suites: scenarioRouters.suites,
     dataRetention: composed.dataRetention.router(mount),
-    monitors: composed.monitor.router(mount),
+    monitors: monitorRouters.monitors,
     storedObjects: composed.storedObject.router(mount),
     // The six core AI Gateway surfaces — one entry per namespace, straight off
     // `createGatewayTrpcRouters`. Composed over this process's own Prisma and
@@ -164,11 +165,14 @@ export function createAppTrpcFeatures(options: {
     // rather than dropping the namespace.
     currency: billing.currency,
     subscription: billing.subscription,
-    // One wire namespace assembled from three packaged transports, exactly as the client has always called it:
-    // the charted reads at `analytics.*`, the workbench at `analytics.lwql`, and the saved charts at
-    // `analytics.savedWorkbenchCharts`. Merged here rather than at the caller so the whole namespace is one entry
-    // in this list, and so nothing outside it can add a fourth door onto the same name.
-    analytics: analyticsRouters.analytics,
+    // One wire namespace assembled from two features, exactly as the client has always called it: the charted
+    // reads at `analytics.*`, the workbench at `analytics.lwql`, and the DASHBOARD's saved charts at
+    // `analytics.savedWorkbenchCharts`. Merged here rather than at either caller so the whole namespace is one
+    // entry in this list, and so nothing outside it can add a third door onto the same name.
+    analytics: mount.root.mergeRouters(
+      analyticsRouters.analytics,
+      mount.root.router({ savedWorkbenchCharts: dashboardRouters.savedWorkbenchCharts }),
+    ),
     // A reviewer's comments, their scores and the queues they travel in,
     // composed by the feature itself over this process's connection, its
     // ClickHouse and the trace-side senders it registered once.
@@ -179,13 +183,13 @@ export function createAppTrpcFeatures(options: {
     // standing back to them. It takes no ports: the answer comes from the same
     // AuthZ service every declared check on this root already runs on, so a
     // second one here would be a second answer to one question.
-    authz: createAuthzTrpcRouter(mount),
+    authz: createAuthzTrpcRouter(mount.runtime),
     batchRecord: datasetRouters.batchRecord,
     // The support inbox, composed by the feature itself: the reports are a
     // global table with no tenant column, read by the back office under the
     // staff declaration the package writes.
     bugReports: composed.bugReport.router(mount),
-    dashboards: createDashboardTrpcRouter(mount),
+    dashboards: dashboardRouters.dashboards,
     // A project's datasets and the rows inside them: two wire names for one
     // application, because the rows are only reachable through the dataset
     // that holds them and a second service over them could disagree about
@@ -198,7 +202,7 @@ export function createAppTrpcFeatures(options: {
     dataPrivacy: composed.dataPrivacy.router(mount),
     // One trace re-scored, composed by the feature itself: the same
     // `evaluation_processing` producer the workbench's own runs report on.
-    evaluations: composed.evaluation.router(mount),
+    evaluations: evaluationRouters.evaluations,
     // The evaluators a project defines, beside the `evaluations.*` surface
     // that RUNS them. Two namespaces, two owners, one wire: an evaluator is a
     // definition and an evaluation is a result.
@@ -216,7 +220,7 @@ export function createAppTrpcFeatures(options: {
     // which is not the scope id the input carries. The mount declares that
     // claim once for the whole surface.
     featureFlag: composed.featureFlag.router(mount),
-    graphs: analyticsRouters.graphs,
+    graphs: dashboardRouters.graphs,
     group: membershipRouters.group,
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened. Composed by the feature itself off the shared
@@ -261,8 +265,8 @@ export function createAppTrpcFeatures(options: {
     // names for one application, because who holds a role and what that role
     // grants are the same question asked from two ends.
     role: roleRouters.role,
-    roleBinding: createRoleBindingTrpcRouter(mount),
-    team: roleRouters.team,
+    roleBinding: roleRouters.roleBinding,
+    team: membershipRouters.team,
     // The signed-in person's own account. The process merges the Enterprise
     // /me dashboard reads into the same namespace, so `user.*` answers from
     // two owners on one wire name.

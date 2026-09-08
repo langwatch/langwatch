@@ -544,6 +544,34 @@ const registry = {
     ],
     docsPath: "/evaluations/evaluators/list",
   },
+  monitor_not_found: {
+    tips: [
+      "List what this project has: langwatch monitor list",
+      "The identifier in meta.monitorId names no online evaluation here; it may have been deleted, or it may belong to another project",
+    ],
+    docsPath: "/evaluations/real-time-evaluation",
+  },
+  monitor_check_type_unknown: {
+    tips: [
+      "The value in meta.checkType is not an evaluator this platform runs; pick one from langwatch evaluator list",
+      "A saved draft from an older release can carry a check that has since been withdrawn",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
+  monitor_check_settings_invalid: {
+    tips: [
+      "meta.fields names each setting the evaluator rejected; correct those and send the request again",
+      "Read the evaluator's own settings schema for what each field expects",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
+  monitor_source_project_forbidden: {
+    tips: [
+      "Copying an online evaluation needs permission to manage evaluations in the project named by meta.sourceProjectId",
+      "Ask an administrator of that project for access, then try the copy again",
+    ],
+    docsPath: "/platform/permissions",
+  },
 
   // ---- default models ----
   model_not_configured: {

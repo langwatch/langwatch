@@ -19,7 +19,6 @@ import {
   type OrganizationUser,
 } from "@langwatch/organization-contract";
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
-import type { RoleService } from "@langwatch/role-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type { OrganizationInviteMailPort } from "../ports/invite.port.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
@@ -32,6 +31,7 @@ import {
   INVITE_EXPIRATION_MS,
   type CreateAdminInviteInput,
   type CreateInvitesInviteInput,
+  type InviteAssignableRoles,
   type InviteServiceDependencies,
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
@@ -57,7 +57,7 @@ export class InviteCreationService {
     return this.deps.plans;
   }
 
-  private get roleService(): RoleService {
+  private get roleService(): InviteAssignableRoles {
     return this.deps.roles;
   }
 

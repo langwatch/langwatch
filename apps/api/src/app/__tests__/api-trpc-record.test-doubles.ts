@@ -20,14 +20,19 @@ import { createFeatureFlagTrpcRouter } from "../../features/feature-flag/feature
 import type { ComposedFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition.types.ts";
 import { createDataRetentionTrpcRouter } from "../../features/data-retention/data-retention-trpc.mount.ts";
 import type { ComposedDataRetentionFeature } from "../../features/data-retention/data-retention.composition.types.ts";
-import { refusingMonitorFeature } from "../../features/monitor/monitor.composition.ts";
+import { createMonitorTrpcRouter } from "../../features/monitor/monitor-trpc.mount.ts";
 import { refusingHomeFeature } from "../../features/project/home.composition.ts";
-import { refusingRoleFeature } from "../../features/role/role.composition.ts";
+import { createRoleBindingTrpcRouter, createRoleTrpcRouter } from "../../features/role/role-trpc.mount.ts";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
-import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition.ts";
+import { createStoredObjectTrpcRouter } from "../../features/stored-object/stored-object-trpc.mount.ts";
 import { refusingBugReportFeature } from "../../features/bug-report/bug-report.composition.ts";
 import { refusingAnnotationFeature } from "../../features/annotation/annotation.composition.ts";
-import { refusingSavedViewFeature } from "../../features/dashboard/saved-view.composition.ts";
+import {
+  createDashboardTrpcRouter,
+  createGraphTrpcRouter,
+  createSavedViewTrpcRouter,
+  createSavedWorkbenchChartTrpcRouter,
+} from "../../features/dashboard/dashboard-trpc.mount.ts";
 import {
   createOrganizationSpendTrpcRouter,
   createPlanTrpcRouter,
@@ -46,10 +51,15 @@ import type { ComposedTopicFeature } from "../../features/topic/topic.compositio
 import { refusingTraceFeature } from "../../features/trace/trace.composition.ts";
 import { createDataPrivacyTrpcRouter } from "../../features/data-privacy/data-privacy-trpc.mount.ts";
 import type { ComposedDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition.types.ts";
+import type { ComposedDashboardFeature } from "../../features/dashboard/dashboard.composition.types.ts";
+import type { ComposedEvaluationFeature } from "../../features/evaluation/evaluation.composition.types.ts";
+import type { ComposedMonitorFeature } from "../../features/monitor/monitor.composition.types.ts";
+import type { ComposedRoleFeature } from "../../features/role/role.composition.types.ts";
+import type { ComposedStoredObjectFeature } from "../../features/stored-object/stored-object.composition.types.ts";
 import { refusingIntegrationsChecksFeature } from "../../features/project/integrations-checks.composition.ts";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition.ts";
-import { refusingEvaluationFeature } from "../../features/evaluation/evaluation.composition.ts";
+import { createEvaluationTrpcRouter } from "../../features/evaluation/evaluation-trpc.mount.ts";
 import { refusingOrganizationFeature } from "../../features/organization/organization.composition.ts";
 import { refusingProjectFeature } from "../../features/project/project.composition.ts";
 import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
@@ -228,6 +238,63 @@ export function stubTopicFeature(): ComposedTopicFeature {
   };
 }
 
+/**
+ * The five features whose door landed: every namespace builds on the real
+ * declaration and every application call refuses by name.
+ */
+export function stubDashboardFeature(): ComposedDashboardFeature {
+  const app = stub<ComposedDashboardFeature["app"]>("dashboard");
+  return {
+    routers: (mount) => ({
+      dashboards: createDashboardTrpcRouter(mount.runtime),
+      graphs: createGraphTrpcRouter(mount.runtime),
+      savedViews: createSavedViewTrpcRouter(mount.runtime),
+      savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter(mount.runtime),
+    }),
+    app,
+    restServices: { dashboard: () => app },
+  };
+}
+
+export function stubEvaluationFeature(): ComposedEvaluationFeature {
+  return {
+    routers: (mount) => ({ evaluations: createEvaluationTrpcRouter(mount.runtime) }),
+    app: stub("evaluations"),
+    reportEvaluation: () => Promise.reject(new Error("evaluations.reportEvaluation")),
+  };
+}
+
+export function stubMonitorFeature(): ComposedMonitorFeature {
+  const app = stub<ComposedMonitorFeature["app"]>("monitors");
+  return {
+    routers: (mount) => ({ monitors: createMonitorTrpcRouter(mount.runtime) }),
+    app,
+    restServices: { monitors: () => app },
+  };
+}
+
+export function stubRoleFeature(): ComposedRoleFeature {
+  return {
+    routers: (mount) => ({
+      role: createRoleTrpcRouter(mount.runtime),
+      roleBinding: createRoleBindingTrpcRouter(mount.runtime),
+    }),
+    app: stub("roles"),
+  };
+}
+
+export function stubStoredObjectFeature(): ComposedStoredObjectFeature {
+  return {
+    router: (mount) => createStoredObjectTrpcRouter(mount.runtime),
+    app: stub("storedObjectApp"),
+    restServices: { storedObjects: () => stub("storedObjects") },
+    bytes: stub("storedObjects.bytes"),
+    payloadStaging: stub("storedObjects.payloadStaging"),
+    storage: { runtime: stub("storedObjects.storage"), aws: stub("storedObjects.aws") },
+    close: () => Promise.resolve(),
+  };
+}
+
 export function stubDataPrivacyFeature(): ComposedDataPrivacyFeature {
   return {
     app: stub("dataPrivacy"),
@@ -282,14 +349,14 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     dataRetention: stubDataRetentionFeature(),
     workflow: refusingWorkflowFeature(),
     experiment: refusingExperimentFeature(),
-    evaluation: refusingEvaluationFeature(),
-    monitor: refusingMonitorFeature(),
+    evaluation: stubEvaluationFeature(),
+    monitor: stubMonitorFeature(),
     home: refusingHomeFeature(),
-    role: refusingRoleFeature(),
-    storedObject: refusingStoredObjectFeature(),
+    role: stubRoleFeature(),
+    storedObject: stubStoredObjectFeature(),
     bugReport: refusingBugReportFeature(),
     annotation: refusingAnnotationFeature(),
-    savedView: refusingSavedViewFeature(),
+    dashboard: stubDashboardFeature(),
     entitlement: stubEntitlementFeature(),
     httpProxy: refusingHttpProxyFeature(),
     modelProvider: refusingModelProviderFeature(),

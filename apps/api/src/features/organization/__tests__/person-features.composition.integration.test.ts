@@ -22,7 +22,6 @@ import {
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
@@ -46,13 +45,6 @@ const SESSION_USER = {
   name: "Sam Rivers",
   email: "sam@acme.test",
   role: "ADMIN",
-};
-
-const accountInfo = {
-  id: SESSION_USER.id,
-  name: SESSION_USER.name,
-  email: SESSION_USER.email,
-  image: null,
 };
 
 /**
@@ -148,16 +140,15 @@ const rateLimit = async () => ({ allowed: true, resetAt: Date.now() + 60_000 });
 /**
  * The two features composed for real, over one connection.
  */
-function composePersonFeatures(
+async function composePersonFeatures(
   prisma: PrismaClient,
   grants: AuthzGrantsService,
   eventing: IdentityEventingPort = new SilentEventing(),
   plans: ApiTrpcInfrastructure["plans"] = roomyPlan(),
 ) {
-  const user = composeUserFeature({
+  const user = await composeUserFeature({
     prisma,
     peers: {
-      users: { getAccountInfo: async () => accountInfo } as unknown as UserService,
       auth: {} as unknown as AuthService,
       organizations: {
         getSettings: async () => ({ supportContact: null }),
@@ -208,7 +199,7 @@ class RecordingAudit extends ApiAuditPort {
   }
 }
 
-function composeApplication(
+async function composeApplication(
   overrides: { prismaClient?: PrismaClient; eventing?: IdentityEventingPort } = {},
 ) {
   const prisma = testPrisma();
@@ -216,7 +207,7 @@ function composeApplication(
   const audit = new RecordingAudit();
   const client = overrides.prismaClient ?? prisma.client;
 
-  const { user, organization } = composePersonFeatures(client, grants, overrides.eventing);
+  const { user, organization } = await composePersonFeatures(client, grants, overrides.eventing);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), user, organization },
@@ -322,13 +313,13 @@ function seatPrisma(members: ReadonlyArray<{ userId: string; role: string }>) {
  * itself is the composed one — this supplies only the plan the deployment is on and the
  * rows the census counts.
  */
-function composeSeatLicence(options: {
+async function composeSeatLicence(options: {
   plan: { maxMembers: number; maxMembersLite: number; overrideAddingLimitations?: boolean };
   members: ReadonlyArray<{ userId: string; role: string }>;
 }) {
   const prisma = seatPrisma(options.members);
   const { grants } = testGrants();
-  const { organization } = composePersonFeatures(prisma.client, grants, new SilentEventing(), {
+  const { organization } = await composePersonFeatures(prisma.client, grants, new SilentEventing(), {
     getActivePlan: async () => ({ type: "LAUNCH", free: false, ...options.plan }),
   } as never);
   const organizations = organization.rest;
@@ -341,7 +332,7 @@ describe("given an API process composed with its person-shaped features", () => 
   describe("when the sign-up ceremony creates somebody's first organization", () => {
     /** @scenario "A new organization is created with its first team" */
     it("runs the moved membership service through the real /api/trpc handler", async () => {
-      const { application, prisma, attachBindings } = composeApplication();
+      const { application, prisma, attachBindings } = await composeApplication();
 
       const { status, body } = await callTrpc(
         application,
@@ -384,7 +375,7 @@ describe("given an API process composed with its person-shaped features", () => 
 
   describe("when the signed-in person reads their own account", () => {
     it("answers off the user application this composition built", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "user.getAccountInfo", {});
 
@@ -397,7 +388,7 @@ describe("given an API process composed with its person-shaped features", () => 
 
   describe("when an administrator re-enables a membership the plan has no seat for", () => {
     it("refuses through the composed seat licence rather than writing the seat", async () => {
-      const { organizations, prisma } = composeSeatLicence({
+      const { organizations, prisma } = await composeSeatLicence({
         plan: { maxMembers: 2, maxMembersLite: 5 },
         members: [
           { userId: "user-a", role: "ADMIN" },
@@ -428,7 +419,7 @@ describe("given an API process composed with its person-shaped features", () => 
     });
 
     it("gives the seat back when the plan still has room for it", async () => {
-      const { organizations, prisma } = composeSeatLicence({
+      const { organizations, prisma } = await composeSeatLicence({
         plan: { maxMembers: 5, maxMembersLite: 5 },
         members: [
           { userId: "user-a", role: "ADMIN" },
@@ -452,7 +443,7 @@ describe("given an API process composed with its person-shaped features", () => 
 
   describe("when a role change assigns a custom role on a plan that does not carry them", () => {
     it("refuses through the same composed licence rather than binding the role", async () => {
-      const { organizations, prisma } = composeSeatLicence({
+      const { organizations, prisma } = await composeSeatLicence({
         plan: { maxMembers: 5, maxMembersLite: 5 },
         members: [{ userId: "user-a", role: "ADMIN" }],
       });
@@ -484,7 +475,7 @@ describe("given an API process composed with its person-shaped features", () => 
   describe("when a surface needs an Enterprise capability this process does not hold", () => {
     /** @scenario "A capability the deployment does not hold refuses by name" */
     it("refuses by name rather than answering without the plan gate", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(application, "group.listAll", {
         organizationId: "org-1",
@@ -622,7 +613,7 @@ describe("given an API process that registered the identity pipelines producer-o
     /** @scenario "A join request command lands on this process's own event stack" */
     it("stages the command through the real /api/trpc handler rather than appending here", async () => {
       const queue = producerEventing();
-      const { application } = composeApplication({
+      const { application } = await composeApplication({
         prismaClient: joinRequestPrisma(),
         eventing: queue.eventing,
       });

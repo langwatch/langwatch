@@ -14,12 +14,12 @@ import {
   TeamUserRole,
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
-import type { RoleService } from "@langwatch/role-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { InviteService } from "./invite.service.ts";
 import {
   ROLE_BINDING_KSUID_RESOURCE,
+  type InviteAssignableRoles,
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
 
@@ -36,7 +36,7 @@ export class InviteAcceptanceService {
     return this.deps.invites;
   }
 
-  private get roleService(): RoleService {
+  private get roleService(): InviteAssignableRoles {
     return this.deps.roles;
   }
 
@@ -194,7 +194,7 @@ export class InviteAcceptanceService {
       return teamMembershipData;
     }
 
-    const validRoles = await this.roleService.filterAssignable({
+    const validRoles = await this.roleService.filterAssignableRoles({
       roleIds: customRoleIds,
       organizationId: invite.organizationId,
     });

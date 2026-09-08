@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { EnabledGuardrailMonitor, MonitorService } from "@langwatch/monitor-contract";
+import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
 import type { GatewayGuardrailDirection } from "@langwatch/gateway-contract";
 import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
@@ -68,13 +68,13 @@ export type EvaluatorRunner = (args: EvaluatorRunInput) => Promise<SingleEvaluat
 export class GatewayGuardrailEvaluationService {
   private constructor(
     private readonly repository: GatewayGuardrailRepository,
-    private readonly monitors: MonitorService,
+    private readonly monitors: MonitorApi,
     private readonly runEvaluator: EvaluatorRunner,
   ) {}
 
   static create(input: {
     repository: GatewayGuardrailRepository;
-    monitors: MonitorService;
+    monitors: MonitorApi;
     runEvaluator: EvaluatorRunner;
   }): GatewayGuardrailEvaluationService {
     return new GatewayGuardrailEvaluationService(

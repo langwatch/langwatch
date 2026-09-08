@@ -35,7 +35,6 @@ import {
   composeApiPlanSources,
   composeApiUsageStats,
 } from "../../../app/api-usage.composition.ts";
-import { composeSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
 import { installApiNotification } from "../../notification/notification.composition.ts";
 import {
   createSpansTrpcRouter,
@@ -295,7 +294,6 @@ async function composeApplication() {
     composed: {
       ...stubComposedFeatures(),
       trace: testTraceGroupHalf(broadcast),
-      savedView: composeSavedViewFeature({ infrastructure }),
       entitlement: await installApiEntitlement({
         infrastructure,
         entitlement: {

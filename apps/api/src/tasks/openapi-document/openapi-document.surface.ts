@@ -10,11 +10,10 @@ import type { ConnectedAgentRuntime, LongPollTransportService } from "@langwatch
 import type { AuthRestPorts } from "@langwatch/auth-server";
 import { createGatewayPlatformRestApp, createGatewaySpendRestApp } from "@langwatch/gateway-server";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
-import { monitorApiMappingsSchema } from "@langwatch/monitor-contract";
 
-import { REGISTRY_RBAC_VOCABULARY } from "../../app/api-packaged-rest.composition.ts";
 
 import { mountSecretRest } from "../../features/secret/secret-rest.mount.ts";
+import { mountSuiteRest } from "../../features/suite/suite-rest.mount.ts";
 import {
   createApiProcessRestFeatures,
   type ApiProcessRestPorts,
@@ -121,7 +120,6 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
         },
       }),
       apiKeys: refuse("API keys"),
-      authzGrants: refuse("The grants ledger"),
       automation: refuse("Automations"),
       broadcast: refuse("Broadcast"),
       codingAgents: refuse("Coding agents"),
@@ -137,13 +135,11 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       organizationProvisioning: refuse("Organization provisioning"),
       permissions: refuse("Authorization"),
       projects: refuse("Projects"),
-      roles: refuse("Custom roles"),
       scenarios: refuse("Scenarios"),
       scenarioTabs: refuse("Scenario tabs"),
       scim: refuse("SCIM provisioning"),
       simulations: refuse("Simulations"),
       storedObjects: refuse("Stored objects"),
-      suites: refuse("Suites"),
       // A bag whose members refuse rather than a provider that does: the mount
       // reads the bag to build the family, and only a REQUEST would reach one
       // of the five ports inside it.
@@ -166,17 +162,12 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       organizationMiddleware: noopMiddleware,
       managementAudit: () => {},
       organizationLedgerActor: refuse("Ledger attribution") as never,
-      // The permission vocabulary is PUBLISHED: the custom-roles family
-      // describes its request body from it, so an empty stand-in would narrow
-      // the document's enum to nothing. The real one is a pure value.
-      rbacVocabulary: REGISTRY_RBAC_VOCABULARY,
+      handlerManagedCredential: refuse("The project credential door"),
+      legacyErrors: refuse("Error rendering") as never,
       instanceAdminKey: () => undefined,
       isSaas: () => true,
       reportError: () => {},
       rateLimit: refuse("Rate limiting") as never,
-      // Likewise published: the monitor `mappings` body is a SHAPE the
-      // document carries, so the schema has to be the real vocabulary.
-      monitorMappingsSchema: monitorApiMappingsSchema,
       requireApiKeyPermission: () => noopMiddleware,
       traceUsageGuard: noopMiddleware,
       requireProjectPermission: refuse("Project permission checks") as never,
@@ -338,6 +329,17 @@ function mountProcessTailFamilies(options: {
     credential: refuse("The project credential door"),
   })) {
     app.route("/", secretApp);
+  }
+
+  // The three suite families: the two published ones and the deprecated
+  // `/api/suites` alias that predates their split.
+  for (const suiteApp of mountSuiteRest({
+    suites: refuse("The suite application"),
+    credential: refuse("The project credential door"),
+    platformUrl: () => "",
+    errors: refuse("Error rendering") as never,
+  })) {
+    app.route("/", suiteApp);
   }
 
   app.route(

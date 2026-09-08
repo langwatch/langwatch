@@ -1,7 +1,14 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { RoleService } from "@langwatch/role-contract";
+import type { RoleApi } from "@langwatch/role-contract";
+
+/**
+ * The one role answer an invitation asks for: which of the roles it names may
+ * be granted in this organization. Narrowed rather than the whole API, because
+ * an invitation neither defines a role nor binds one.
+ */
+export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type {
   OrganizationInviteMailPort,
@@ -104,7 +111,7 @@ export type InviteServiceDependencies = Readonly<{
    * invitation validated against a different rule than `applyInvite` applies
    * would be accepted here and silently dropped on acceptance.
    */
-  roles: RoleService;
+  roles: InviteAssignableRoles;
   /** The shared per-invitation send window. */
   throttle: InviteSendThrottleService;
   /** This deployment's public origin, for the accept link. */

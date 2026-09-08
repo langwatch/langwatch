@@ -10,7 +10,7 @@ import { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectService } from "./support/test-project-service.ts";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
-import { MonitorService } from "@langwatch/monitor-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
 import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 
@@ -204,49 +204,13 @@ class UnusedEvaluatorService extends EvaluatorService {
   }
 }
 
-class UnusedMonitorService extends MonitorService {
-  getAllForProject(): never {
+/** Every monitor read refuses: this suite exercises the budget half only. */
+function unusedMonitors(): MonitorApi {
+  const refuse = (): never => {
     throw new Error("not used");
-  }
-  getEnabledOnMessageMonitors(): never {
-    throw new Error("not used");
-  }
-  listEnabledGuardrailMonitors(): never {
-    throw new Error("not used");
-  }
-  getById(): never {
-    throw new Error("not used");
-  }
-  tryGetMonitorById(): never {
-    throw new Error("not used");
-  }
-  getAllByIds(): never {
-    throw new Error("not used");
-  }
-  toggle(): never {
-    throw new Error("not used");
-  }
-  create(): never {
-    throw new Error("not used");
-  }
-  update(): never {
-    throw new Error("not used");
-  }
-  delete(): never {
-    throw new Error("not used");
-  }
-  deleteForExperiment(): never {
-    throw new Error("not used");
-  }
-  upsertForExperiment(): never {
-    throw new Error("not used");
-  }
-  isNameAvailable(): never {
-    throw new Error("not used");
-  }
-  replicate(): never {
-    throw new Error("not used");
-  }
+  };
+
+  return new Proxy({}, { get: () => refuse, has: () => true }) as MonitorApi;
 }
 
 class NullGatewayAuditPort extends GatewayAuditPort {
@@ -269,7 +233,7 @@ function serviceFor(result: GatewayBudgetCheckResult): {
       guardrails: GatewayGuardrailService.create({
         repository: new EmptyGuardrailRepository(),
         evaluators: new UnusedEvaluatorService(),
-        monitors: new UnusedMonitorService(),
+        monitors: unusedMonitors(),
         projects,
         audit: new NullGatewayAuditPort(),
       }),
@@ -305,7 +269,7 @@ function serviceOverCatalogues({
     guardrails: GatewayGuardrailService.create({
       repository: guardrailRepository,
       evaluators: new UnusedEvaluatorService(),
-      monitors: new UnusedMonitorService(),
+      monitors: unusedMonitors(),
       projects,
       audit: new NullGatewayAuditPort(),
     }),

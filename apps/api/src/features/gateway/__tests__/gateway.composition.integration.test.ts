@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { GithubService } from "@langwatch/github-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -24,6 +24,11 @@ import { composeGatewayFeature } from "../gateway.composition.ts";
 import { refusingAuthFeature } from "../../auth/auth.composition.ts";
 import { refusingUserFeature } from "../../user/user.composition.ts";
 import {
+  stubDashboardFeature,
+  stubEvaluationFeature,
+  stubMonitorFeature,
+  stubRoleFeature,
+  stubStoredObjectFeature,
   stubDataPrivacyFeature,
   stubEntitlementFeature,
   stubPresenceFeature,
@@ -39,19 +44,15 @@ import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.
 import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
 import { refusingEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
-import { refusingMonitorFeature } from "../../monitor/monitor.composition.ts";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
-import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition.ts";
 import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../annotation/annotation.composition.ts";
-import { refusingSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
 import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition.ts";
 import { refusingTraceFeature } from "../../trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../workflow/workflow.composition.ts";
 import { refusingExperimentFeature } from "../../experiment/experiment.composition.ts";
-import { refusingEvaluationFeature } from "../../evaluation/evaluation.composition.ts";
 import { refusingOrganizationFeature } from "../../organization/organization.composition.ts";
 import { refusingProjectFeature } from "../../project/project.composition.ts";
 import { refusingCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
@@ -59,7 +60,6 @@ import { refusingAutomationFeature } from "../../automation/automation.compositi
 import { refusingEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
 import { refusingOpsFeature } from "../../ops/ops.composition.ts";
 import { refusingHomeFeature } from "../../project/home.composition.ts";
-import { refusingRoleFeature } from "../../role/role.composition.ts";
 import {
   stub,
   stubCollaborators,
@@ -193,7 +193,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     peers: {
       projects,
       evaluators: {} as unknown as EvaluatorService,
-      monitors: {} as unknown as MonitorService,
+      monitors: stub<MonitorApi>("monitors"),
     },
     // No ClickHouse: the gateway ledger is a projection there, so the spend
     // source is off by name rather than answering a zero nobody can read.
@@ -218,15 +218,15 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       evaluator: refusingEvaluatorFeature(),
       prompt: refusingPromptFeature(),
       dataRetention: stubDataRetentionFeature(),
-      monitor: refusingMonitorFeature(),
+      monitor: stubMonitorFeature(),
       home: refusingHomeFeature(),
-      role: refusingRoleFeature(),
-      storedObject: refusingStoredObjectFeature(),
+      role: stubRoleFeature(),
+      storedObject: stubStoredObjectFeature(),
       bugReport: refusingBugReportFeature(),
       dataPrivacy: stubDataPrivacyFeature(),
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),
-      savedView: refusingSavedViewFeature(),
+      dashboard: stubDashboardFeature(),
       entitlement: stubEntitlementFeature(),
       httpProxy: refusingHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
@@ -235,7 +235,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       trace: refusingTraceFeature(),
       workflow: refusingWorkflowFeature(),
       experiment: refusingExperimentFeature(),
-      evaluation: refusingEvaluationFeature(),
+      evaluation: stubEvaluationFeature(),
       organization: refusingOrganizationFeature(),
       project: refusingProjectFeature(),
       codingAgent: refusingCodingAgentFeature(),

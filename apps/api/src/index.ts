@@ -65,12 +65,14 @@ export {
   refusingModelProviderFeature,
 } from "./features/model-provider/model-provider.composition.ts";
 export type { ComposedModelProviderFeature } from "./features/model-provider/model-provider.composition.types.ts";
-/** The stored filter sets the explorer offers. */
-export {
-  composeSavedViewFeature,
-  refusingSavedViewFeature,
-} from "./features/dashboard/saved-view.composition.ts";
-export type { ComposedSavedViewFeature } from "./features/dashboard/saved-view.composition.types.ts";
+/** A project's dashboards, their graphs, the saved charts they place, and the explorer's stored filter sets. */
+export { installApiDashboard } from "./features/dashboard/dashboard.composition.ts";
+export type {
+  DashboardPeers,
+  DashboardProcessPorts,
+} from "./features/dashboard/dashboard.composition.ts";
+export type { ComposedDashboardFeature } from "./features/dashboard/dashboard.composition.types.ts";
+export { mountDashboardRest } from "./features/dashboard/dashboard-rest.mount.ts";
 /**
  * The AI Gateway, composed as its own feature: one application for its six
  * tRPC namespaces, its `ctx.app` slice and its two REST families.
@@ -213,7 +215,6 @@ export {
   workbenchStateSchema,
   workbenchVersionProbeResponseSchema,
 } from "@langwatch/experiment-server";
-export { createDashboardsRestApp } from "@langwatch/dashboard-server";
 export { createApiKeysRestApp } from "@langwatch/api-key-server";
 export {
   createFilesRestApp,
@@ -240,14 +241,12 @@ export {
 export { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
 export { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "@langwatch/gateway-server";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
-export { createGraphsRestApp } from "@langwatch/dashboard-server";
 export { type AgentPlatformUrlBuilder, createAgentLegacyRestApp } from "@langwatch/agent-server";
 export { createTriggerRestApp } from "@langwatch/automation-server";
 export {
   type CodingAgentCallerScope,
   createCodingAgentRestApp,
 } from "@langwatch/coding-agent-server";
-export { createMonitorRestApp } from "@langwatch/monitor-server";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 export {
@@ -267,8 +266,6 @@ export {
   type OrganizationProvisioningSummary,
 } from "@langwatch/organization-server";
 export { createProjectRestApp } from "@langwatch/project-server";
-export { createRoleBindingsRestApp } from "@langwatch/authz-server";
-export { createRolesRestApp } from "@langwatch/role-server";
 export { createScimTokensRestApp } from "@langwatch/enterprise-api";
 export { createTeamsRestApp } from "@langwatch/organization-server";
 export {
@@ -283,11 +280,6 @@ export {
   createScenariosRestApp,
   createSimulationRunsRestApp,
 } from "@langwatch/scenario-server";
-export {
-  createRunPlansV1RestApp,
-  createSuiteRestApp,
-  createTestSuitesV1RestApp,
-} from "@langwatch/suite-server";
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,

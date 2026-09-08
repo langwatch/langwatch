@@ -11,17 +11,19 @@ import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition.
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
 import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition.ts";
-import { refusingMonitorFeature } from "../../features/monitor/monitor.composition.ts";
-import { refusingRoleFeature } from "../../features/role/role.composition.ts";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition.ts";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
-import { stubPresenceFeature } from "./api-trpc-record.test-doubles.ts";
+import {
+  stubDashboardFeature,
+  stubMonitorFeature,
+  stubPresenceFeature,
+  stubStoredObjectFeature,
+} from "./api-trpc-record.test-doubles.ts";
 import { refusingOrganizationFeature } from "../../features/organization/organization.composition.ts";
 import { refusingAutomationFeature } from "../../features/automation/automation.composition.ts";
 import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
-import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition.ts";
 
 const project = {
   id: "project-1",
@@ -43,12 +45,11 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
   const collaborators = composeApiPackagedRest({
     agents: undefined,
     connectedAgents: undefined,
-    monitor: refusingMonitorFeature(),
+    monitor: stubMonitorFeature(),
     scenario: refusingScenarioFeature(),
-    storedObject: refusingStoredObjectFeature(),
+    storedObject: stubStoredObjectFeature(),
     analytics: refusingAnalyticsFeature(),
     authz: { authorizeProjectPermission: async () => undefined } as never,
-    authzComposition: undefined,
     credentials: { authenticate: async () => null } as never,
     encryption: undefined,
     experiment: refusingExperimentFeature(),
@@ -61,7 +62,10 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     enterprise: refusingEnterpriseFeature(),
     dataset: refusingDatasetFeature(),
     evaluator: refusingEvaluatorFeature(),
-    role: refusingRoleFeature(),
+    dashboard: stubDashboardFeature(),
+    legacyErrors: (error) => {
+      throw error;
+    },
     plans: undefined,
     publicBaseUrl: undefined,
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),

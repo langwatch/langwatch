@@ -8,7 +8,7 @@ import type { ComposedLangyFeature } from "../features/langy/langy.composition.t
 import type { ComposedBugReportFeature } from "../features/bug-report/bug-report.composition.types.ts";
 import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition.types.ts";
 import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types.ts";
-import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types.ts";
+import type { ComposedDashboardFeature } from "../features/dashboard/dashboard.composition.types.ts";
 import type { ComposedEntitlementFeature } from "../features/entitlement/entitlement.composition.types.ts";
 import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types.ts";
 import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types.ts";
@@ -62,8 +62,8 @@ export type ComposedApiFeatures = Readonly<{
    */
   scenario: ComposedScenarioFeature;
   /**
-   * Two namespaces, the `ctx.app.analytics` and `ctx.app.dashboard` slices, and
-   * the governed-SQL runner the public LangWatchQL REST family takes whole.
+   * One namespace, the `ctx.app.analytics` slice, and the governed-SQL runner
+   * the public LangWatchQL REST family takes whole.
    */
   analytics: ComposedAnalyticsFeature;
   /**
@@ -83,8 +83,8 @@ export type ComposedApiFeatures = Readonly<{
   /** One namespace: the strip of entities a person recently opened. */
   home: ComposedHomeFeature;
   /**
-   * Two namespaces, the `ctx.app.roles` and `ctx.app.authzApp` slices, and the
-   * role service the invitation half asks about assignable custom roles.
+   * Two namespaces over the one `ctx.app.roles` application: a tenant's custom
+   * role definitions, and the bindings that hand them out.
    */
   role: ComposedRoleFeature;
   /** One namespace, over the policy this process supplies the packaged rules. */
@@ -102,8 +102,12 @@ export type ComposedApiFeatures = Readonly<{
    * family reads. Here rather than in the record's literal for that reason.
    */
   annotation: ComposedAnnotationFeature;
-  /** One namespace: the stored filter sets the explorer offers. */
-  savedView: ComposedSavedViewFeature;
+  /**
+   * Four namespaces — a project's dashboards, the graphs on them, the saved
+   * workbench charts they place and the explorer's stored filter sets — over
+   * the one `ctx.app.dashboard` slice the two REST families also read.
+   */
+  dashboard: ComposedDashboardFeature;
   /**
    * Three namespaces over one application: what the plan allows, what has been
    * used against it, and what it has cost.

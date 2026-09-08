@@ -9,6 +9,7 @@ export class MonitorNotFoundError extends HandledError {
       httpStatus: 404,
       fault: "customer",
       meta: { monitorId },
+      ...remediation("monitor_not_found"),
     });
     this.name = "MonitorNotFoundError";
   }
@@ -36,6 +37,7 @@ export class MonitorCheckTypeUnknownError extends HandledError {
       httpStatus: 400,
       fault: "customer",
       meta: { checkType },
+      ...remediation("monitor_check_type_unknown"),
     });
     this.name = "MonitorCheckTypeUnknownError";
   }
@@ -50,6 +52,7 @@ export class MonitorCheckSettingsInvalidError extends HandledError {
       httpStatus: 400,
       fault: "customer",
       meta: { checkType, fields: cause.issues.map((issue) => issue.path.join(".")) },
+      ...remediation("monitor_check_settings_invalid"),
     });
     this.name = "MonitorCheckSettingsInvalidError";
   }
@@ -63,7 +66,12 @@ export class MonitorSourceProjectForbiddenError extends HandledError {
     super(
       "monitor_source_project_forbidden",
       "You do not have permission to manage evaluations in the source project.",
-      { httpStatus: 403, fault: "customer", meta: { sourceProjectId } },
+      {
+        httpStatus: 403,
+        fault: "customer",
+        meta: { sourceProjectId },
+        ...remediation("monitor_source_project_forbidden"),
+      },
     );
     this.name = "MonitorSourceProjectForbiddenError";
   }

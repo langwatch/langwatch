@@ -23,7 +23,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { PostgresIdentityEmailAdapter } from "@langwatch/identity-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { RoleService } from "@langwatch/role-contract";
+import type { RoleApi } from "@langwatch/role-contract";
 import type { ApiOrganizationInvitePort } from "../features/organization/organization.composition.ts";
 
 /**
@@ -111,7 +111,7 @@ export type ApiOrganizationInvitesOptions = Readonly<{
   /** The ledger an accepted invitation's grants are written through. */
   grants: AuthzGrantsService;
   /** Where custom-role assignability is defined, for both write and accept. */
-  roles: RoleService;
+  roles: RoleApi;
   /** Which plan the organization is on, and therefore how many seats it holds. */
   plans: PlanProvider;
   /** The process's ONE fixed-window counter. */

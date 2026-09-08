@@ -19,7 +19,7 @@ import type {
   OrganizationUserRole,
   RoleBindingScopeType,
 } from "@langwatch/organization-contract";
-import type { RoleService } from "@langwatch/role-contract";
+import type { RoleApi } from "@langwatch/role-contract";
 import type {
   InviteWithOrganization,
   InviteWithRequester,
@@ -412,42 +412,16 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
 }
 
 /** All roles named are assignable, unless a test seeds a narrower answer. */
-export class FakeRoleService implements RoleService {
+export class FakeRoleService implements Pick<RoleApi, "filterAssignableRoles"> {
   constructor(private readonly assignableRoleIds: Set<string> | null = null) {}
 
-  async filterAssignable({ roleIds }: { roleIds: string[] }): Promise<string[]> {
+  async filterAssignableRoles({ roleIds }: { roleIds: string[] }): Promise<string[]> {
     if (this.assignableRoleIds === null) {
       return roleIds;
     }
 
     return roleIds.filter((id) => this.assignableRoleIds!.has(id));
   }
-
-  list = unsupported<RoleService["list"]>("list");
-  get = unsupported<RoleService["get"]>("get");
-  getForOrganization = unsupported<RoleService["getForOrganization"]>("getForOrganization");
-  tryGet = unsupported<RoleService["tryGet"]>("tryGet");
-  create = unsupported<RoleService["create"]>("create");
-  update = unsupported<RoleService["update"]>("update");
-  updateForOrganization =
-    unsupported<RoleService["updateForOrganization"]>("updateForOrganization");
-  remove = unsupported<RoleService["remove"]>("remove");
-  removeForOrganization =
-    unsupported<RoleService["removeForOrganization"]>("removeForOrganization");
-  assignToUser = unsupported<RoleService["assignToUser"]>("assignToUser");
-  removeFromUser = unsupported<RoleService["removeFromUser"]>("removeFromUser");
-  getAssignmentOrganization = unsupported<RoleService["getAssignmentOrganization"]>(
-    "getAssignmentOrganization",
-  );
-  tryGetUserBinding = unsupported<RoleService["tryGetUserBinding"]>("tryGetUserBinding");
-  validateAssignable = unsupported<RoleService["validateAssignable"]>("validateAssignable");
-  assertNoOrganizationExclusivePermissionsBelowOrganizationScope = unsupported<
-    RoleService["assertNoOrganizationExclusivePermissionsBelowOrganizationScope"]
-  >("assertNoOrganizationExclusivePermissionsBelowOrganizationScope");
-  isExclusiveToApiKey = unsupported<RoleService["isExclusiveToApiKey"]>("isExclusiveToApiKey");
-  removeExclusiveApiKeyRoles = unsupported<RoleService["removeExclusiveApiKeyRoles"]>(
-    "removeExclusiveApiKeyRoles",
-  );
 }
 
 /** A per-key sliding window, close enough to the real limiter to test the throttle honestly. */

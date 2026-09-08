@@ -7,7 +7,7 @@ import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { LangyApp } from "@langwatch/langy-server";
 import type { OpsApp } from "@langwatch/ops-server";
 import type { ScenarioApp } from "@langwatch/scenario-server";
-import type { SuiteApp } from "@langwatch/suite-server";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApp } from "@langwatch/api-key-server";
 import type { AutomationApp } from "@langwatch/automation-server";
@@ -25,8 +25,9 @@ import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GithubService } from "@langwatch/github-contract";
 import type { AuthzApi, AuthzService } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { DashboardApp } from "@langwatch/dashboard-server";
+import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp } from "@langwatch/dataset-server";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { OrganizationApp } from "@langwatch/organization-server";
@@ -35,7 +36,7 @@ import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ModelProviderApp } from "@langwatch/model-provider-server";
-import type { MonitorApp } from "@langwatch/monitor-server";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { StoredObjectApp } from "@langwatch/stored-object-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -43,8 +44,8 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceApp } from "@langwatch/trace-server";
 import type { ProjectApp } from "@langwatch/project-server";
 import type { PromptApp } from "@langwatch/prompt-server";
-import type { RoleApp } from "@langwatch/role-server";
-import type { UserApp } from "@langwatch/user-server";
+import type { RoleApi } from "@langwatch/role-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApp } from "@langwatch/workflow-server";
 
 /**
@@ -65,7 +66,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
   /** What the caller may do at one scope, as `authz.*` reports it back to them. */
   authzApp: AuthzApi;
   broadcast: PresenceEmitterPort;
-  dashboard: DashboardApp;
+  dashboard: DashboardApi;
   /**
    * A project's datasets, the rows inside them and the batch-evaluation
    * rollups over them. One application for all three surfaces, because a
@@ -73,11 +74,10 @@ export type ApiTrpcFeatureApplication = Readonly<{
    */
   dataset: DatasetApp;
   /**
-   * The evaluation command surface. `reportEvaluation` is a pipeline command
-   * rather than a service method, which is why the feature names it
-   * structurally and so does this.
+   * One trace's evaluations: what has been scored, what a re-score costs, and
+   * the pipeline command a workbench cell reports its own run on.
    */
-  evaluations: Readonly<{ reportEvaluation(data: never): Promise<unknown> }>;
+  evaluations: EvaluationApi;
   experiments: ExperimentApp;
   /**
    * The evaluators a project defines, and the model defaults one created
@@ -131,7 +131,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    */
   scenarios: ScenarioApp;
   /** The folders and suites those cases are grouped into, and their runs. */
-  suites: SuiteApp;
+  suites: SuiteApi;
   organizations: OrganizationApp;
   /**
    * The permission probe the flag surface authorizes its own tenant target
@@ -163,7 +163,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * The real-time evaluations running against a project's traffic, as the
    * wizard's reads and writes and the copy into another project reach them.
    */
-  monitors: MonitorApp;
+  monitors: MonitorApi;
   /**
    * The content-addressed object store, as the existence probe reads it. One
    * application for the probe and the byte read, because a renderer that was
@@ -207,8 +207,8 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * application for both surfaces: who holds a role and what that role grants
    * are the same question asked from two ends.
    */
-  roles: RoleApp;
-  users: UserApp;
+  roles: RoleApi;
+  users: UserApi;
   workflows: WorkflowApp;
   /**
    * The deployment answers `publicEnv` reads directly. One field today, and it

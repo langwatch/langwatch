@@ -11,16 +11,21 @@ import type {
   createJoinRequestTrpcRouter,
   createOnboardingTrpcRouter,
   createOrganizationTrpcRouter,
+  createTeamTrpcRouter,
 } from "./organization-trpc.mount.ts";
 
-/** The four namespaces this feature mounts, and the slice behind them. */
+/** The five namespaces this feature mounts, and the slice behind them. */
 export type ComposedOrganizationFeature = Readonly<{
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createOrganizationTrpcRouter>;
-  /** `group.*`, `joinRequests.*` and `onboarding.*`, over the membership half. */
+  /**
+   * `group.*`, `joinRequests.*`, `onboarding.*` and `team.*`, over the
+   * membership half.
+   */
   routers(mount: ApiTrpcFeatureMount): Readonly<{
     group: ReturnType<typeof createGroupTrpcRouter>;
     joinRequests: ReturnType<typeof createJoinRequestTrpcRouter>;
     onboarding: ReturnType<typeof createOnboardingTrpcRouter>;
+    team: ReturnType<typeof createTeamTrpcRouter>;
   }>;
   /** The `ctx.app.organizations` slice. */
   app: OrganizationApp;

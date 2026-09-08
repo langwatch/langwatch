@@ -72,6 +72,7 @@ import {
   type OrganizationRestService,
   type OrganizationTrpcPorts,
   type TeamRoleValue,
+  type TeamTrpcPorts,
 } from "@langwatch/organization-server";
 import {
   RoleBindingScopeType,
@@ -79,7 +80,7 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { RoleService } from "@langwatch/role-contract";
+import type { RoleApi } from "@langwatch/role-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { UserApp } from "@langwatch/user-server";
 import { z } from "zod";
@@ -95,6 +96,7 @@ import {
   createJoinRequestTrpcRouter,
   createOnboardingTrpcRouter,
   createOrganizationTrpcRouter,
+  createTeamTrpcRouter,
 } from "./organization-trpc.mount.ts";
 
 /**
@@ -145,7 +147,7 @@ export type OrganizationPeers = Readonly<{
    * validated against a second copy of assignability would be accepted on
    * write and silently dropped on acceptance.
    */
-  roles?: RoleService | undefined;
+  roles?: RoleApi | undefined;
   /** The deployment's cipher, for the organization's stored settings. */
   encryption: SecretEncryptionPort | undefined;
   /** The Enterprise application, where the deployment composed one. */
@@ -218,7 +220,12 @@ export function composeOrganizationFeature(options: {
 
   return {
     router: (mount) => createOrganizationTrpcRouter({ ...mount, auditLogCheck, ports }),
-    routers: (mount) => membershipRouters(mount, membership?.ports ?? refusingMembershipPorts()),
+    routers: (mount) =>
+      membershipRouters({
+        mount,
+        ports: membership?.ports ?? refusingMembershipPorts(),
+        team: composeTeamPorts(options.infrastructure),
+      }),
     app: membership?.app ?? refusingOrganizationApp(),
     rest: membership?.rest,
     provisioning: membership?.provisioning,
@@ -252,7 +259,15 @@ export function refusingOrganizationFeature(): ComposedOrganizationFeature {
           },
         ) as OrganizationTrpcPorts<typeof signUpDataSchema>,
       }),
-    routers: (mount) => membershipRouters(mount, refusingMembershipPorts()),
+    routers: (mount) =>
+      membershipRouters({
+        mount,
+        ports: refusingMembershipPorts(),
+        team: {
+          probeOrganizationPermission: refuse,
+          assertCustomRolesAllowed: refuse,
+        },
+      }),
     app: refusingOrganizationApp(),
     rest: undefined,
     provisioning: undefined,
@@ -631,13 +646,43 @@ type MembershipPorts = Readonly<{
   onboarding: OnboardingTrpcPorts<typeof signUpDataSchema>;
 }>;
 
-function membershipRouters(mount: ApiTrpcFeatureMount, ports: MembershipPorts) {
+function membershipRouters(options: {
+  mount: ApiTrpcFeatureMount;
+  ports: MembershipPorts;
+  team: TeamTrpcPorts;
+}) {
+  const { mount, ports } = options;
   return {
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
     joinRequests: createJoinRequestTrpcRouter({ ...mount, ports: ports.joinRequests }),
     // The sign-up ceremony, beside the `organization.createAndAssign` it is
     // built on: same package, same questionnaire schema, same opt-out reason.
     onboarding: createOnboardingTrpcRouter({ ...mount, ports: ports.onboarding }),
+    // The teams a member is placed in. Here rather than with the roles they
+    // hold: a team is an organization's own subdivision, and the surface's two
+    // answers are this deployment's permission probe and its plan gate.
+    team: createTeamTrpcRouter({ ...mount, ports: options.team }),
+  };
+}
+
+/** The two answers the team surface needs from this deployment. */
+function composeTeamPorts(infrastructure: ApiTrpcInfrastructure): TeamTrpcPorts {
+  return {
+    probeOrganizationPermission: (ctx, organizationId, permission) =>
+      infrastructure.authz.hasPermission({ userId: actorId(ctx), permission, organizationId }),
+    // Only a list that actually assigns a custom role is gated. A member list
+    // carrying none never touches the Enterprise capability, and refusing it
+    // would break team editing on every deployment without the plan.
+    assertCustomRolesAllowed: async (_ctx, input) => {
+      if (!input.members.some((member) => isCustomRole(member.role))) return;
+      const plan = await infrastructure.plans.getActivePlan({
+        organizationId: input.organizationId,
+      });
+      assertEnterprisePlanType({
+        planType: plan.type,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+    },
   };
 }
 

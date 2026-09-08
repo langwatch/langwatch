@@ -34,7 +34,8 @@ import {
   resolveMaxTokensCeiling,
 } from "@langwatch/model-provider-server";
 import type { Logger } from "@langwatch/observability";
-import { mappingStateSchema, type Span } from "@langwatch/trace-contract";
+import { mappingStateSchema } from "@langwatch/dataset-contract";
+import type { Span } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 /**

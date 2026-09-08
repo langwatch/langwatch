@@ -3,6 +3,7 @@
  */
 import type { AnnotationApp } from "@langwatch/annotation-server";
 import { createAnnotationsRestApp } from "@langwatch/annotation-server";
+import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   AppRestManagementAuditPort,
@@ -61,7 +62,8 @@ import type {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 
-import type { DashboardApp } from "@langwatch/dashboard-server";
+import type { DashboardApi } from "@langwatch/dashboard-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 
 import type { AppRestBroadcast } from "@langwatch/api/rest";
 import type { SimulationService } from "@langwatch/scenario-contract";
@@ -180,7 +182,7 @@ export type ApiProcessRestServices = Readonly<{
   langWatchQL?:
     | Readonly<{
         collaborators: ApiLangWatchQLRestCollaborators;
-        dashboard: () => DashboardApp;
+        dashboard: () => DashboardApi;
       }>
     | undefined;
   /**
@@ -279,6 +281,18 @@ export type ApiProcessRestServices = Readonly<{
    * for them.
    */
   packaged?: ApiPackagedRestCollaborators | undefined;
+  /**
+   * The deployment's own liveness report, or none. A mounted family rather
+   * than a service: the door is the feature's own mount, already bound to the
+   * secret this process reads it under.
+   */
+  platformHealth?: MountableRestApp | undefined;
+  /**
+   * The public stored-object family's application, or none. The SAME one
+   * `/api/files` reads bytes through, so an object confirmed on one door is
+   * the object the other serves.
+   */
+  storedObjects?: (() => StoredObjectApi) | undefined;
 }>;
 
 export type ApiProcessRestPorts = Readonly<{
@@ -420,6 +434,10 @@ export function createApiProcessRestFeatures(options: {
     features.push(createHealthProbeRestApp({ security, ports: healthProbes }));
   }
 
+  // The deployment's own report on itself, beside the five probes: the same
+  // subsystems asked at once, for an operator rather than for a load balancer.
+  if (services.platformHealth) features.push(services.platformHealth);
+
   // The charted reads' public door, over the SAME application the browser's
   // `analytics.getTimeseries` procedure resolves on, so a rule added on one
   // door cannot leave the other answering the old way.
@@ -539,6 +557,15 @@ export function createApiProcessRestFeatures(options: {
         annotations,
         credential: ports.handlerManagedCredential,
       }),
+    );
+  }
+
+  // `/api/stored-objects/2026-08-22/*`: the upload confirmation, the read and
+  // the delete, over the same project key every other declared family opens.
+  const storedObjects = services.storedObjects;
+  if (storedObjects) {
+    features.push(
+      mountStoredObjectRest({ storedObjects, credential: ports.handlerManagedCredential }),
     );
   }
 

@@ -9,13 +9,8 @@
 import type { filterFieldsEnum } from "@langwatch/analytics-contract";
 import type { sharedFiltersInputSchema, timeseriesInputSchema } from "@langwatch/analytics-server";
 import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
-import type { GraphTrpcPorts, SavedWorkbenchChartTrpcPorts } from "@langwatch/dashboard-server";
 import type { z } from "zod";
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import {
-  createGraphTrpcRouter,
-  createSavedWorkbenchChartTrpcRouter,
-} from "../dashboard/dashboard-trpc.mount.ts";
 import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount.ts";
 
 /** The filter fields this deployment offers, as the enum publishes them. */
@@ -40,30 +35,24 @@ type ApiReadInputWire = z.input<typeof sharedFiltersInputSchema>;
 type ApiTimeseriesInput = z.output<typeof timeseriesInputSchema>;
 type ApiTimeseriesInputWire = z.input<typeof timeseriesInputSchema>;
 
-/** The three port groups the `analytics.*` namespace is assembled from. */
+/** The two port groups the `analytics.*` namespace is assembled from. */
 export type AnalyticsFeaturePorts = Readonly<{
   reads: ApiAnalyticsReadPorts;
   workbench: LangWatchQLTrpcPorts;
-  savedCharts: SavedWorkbenchChartTrpcPorts;
 }>;
 
-/** The two namespaces, built the one way whether the feature composed or not. */
-export function analyticsRouters(
-  mount: ApiTrpcFeatureMount,
-  ports: AnalyticsFeaturePorts,
-  graphPorts: GraphTrpcPorts<ApiFilterField>,
-) {
+/**
+ * The charted reads and the workbench, built the one way whether the feature
+ * composed or not. `analytics.savedWorkbenchCharts` is the dashboard feature's
+ * and is merged onto this namespace by the process's tRPC record.
+ */
+export function analyticsRouters(mount: ApiTrpcFeatureMount, ports: AnalyticsFeaturePorts) {
   return {
     analytics: mount.root.mergeRouters(
       createAnalyticsTrpcRouter({ ...mount, ports: ports.reads }),
       mount.root.router({
         lwql: createLangWatchQLTrpcRouter({ ...mount, ports: ports.workbench }),
-        savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter({
-          ...mount,
-          ports: ports.savedCharts,
-        }),
       }),
     ),
-    graphs: createGraphTrpcRouter({ ...mount, ports: graphPorts }),
   };
 }

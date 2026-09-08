@@ -8,6 +8,7 @@ import type {
   AppRestManagementAuditPort,
   AppRestRbacVocabulary,
   PlatformUrlBuilder,
+  RestErrorHandler,
 } from "@langwatch/api/rest";
 import {
   ALL_PERMISSIONS,
@@ -18,7 +19,6 @@ import {
 } from "@langwatch/authz-contract";
 import { createEnterprisePlanGate } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { monitorApiMappingsSchema } from "@langwatch/monitor-contract";
 import type { Logger } from "@langwatch/observability";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
@@ -43,10 +43,9 @@ import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding
 import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition.types.ts";
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types.ts";
 import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types.ts";
-import type { ComposedRoleFeature } from "../features/role/role.composition.types.ts";
+import type { ComposedDashboardFeature } from "../features/dashboard/dashboard.composition.types.ts";
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition.types.ts";
 import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition.types.ts";
-import type { ApiAuthzComposition } from "./api-authz.composition.ts";
 import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
 import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session.ts";
 import type { ApiTraceIngestComposition } from "./api-trace-ingest.composition.ts";
@@ -91,7 +90,6 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   scenario: ComposedScenarioFeature;
   analytics: ComposedAnalyticsFeature;
   authz: AuthzService;
-  authzComposition: ApiAuthzComposition | undefined;
   credentials: ApiHandlerManagedCredentials;
   encryption: SecretEncryptionPort | undefined;
   experiment: ComposedExperimentFeature;
@@ -110,8 +108,11 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   enterprise: ComposedEnterpriseFeature;
   dataset: ComposedDatasetFeature;
   evaluator: ComposedEvaluatorFeature;
-  role: ComposedRoleFeature;
   monitor: ComposedMonitorFeature;
+  /** A project's dashboards and the graphs on them, where one was installed. */
+  dashboard: ComposedDashboardFeature | undefined;
+  /** The process's own error envelope, which every declared family answers in. */
+  legacyErrors: RestErrorHandler;
   storedObject: ComposedStoredObjectFeature;
   plans: PlanProvider | undefined;
   /** The deployment's public origin, where it declared one. */
@@ -179,7 +180,6 @@ export function composeApiPackagedRest(
         ? { agentsV1: agentsV1ConnectedFrom(options.connectedAgents) }
         : {}),
       apiKeys: () => options.apiKeys,
-      ...(options.authzComposition ? { authzGrants: () => options.authzComposition!.grants } : {}),
       ...(options.automation.service ? { automation: () => options.automation.service! } : {}),
       ...(options.codingAgent.service ? { codingAgents: () => options.codingAgent.service! } : {}),
       ...(options.enterprise.scim ? { scim: () => options.enterprise.scim! } : {}),
@@ -199,11 +199,10 @@ export function composeApiPackagedRest(
           });
         },
       }),
-      dashboard: () => options.analytics.dashboard,
+      ...(options.dashboard ? { dashboard: options.dashboard.restServices.dashboard } : {}),
       datasets: () => options.dataset.app,
       evaluators: () => options.evaluator.app,
       permissions: () => options.authz,
-      roles: () => options.role.roles,
       ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
       webhooks: () => webhooks,
@@ -213,7 +212,7 @@ export function composeApiPackagedRest(
         : {}),
       organizations: () => options.organizations,
       ...(options.projects ? { projects: () => options.projects! } : {}),
-      monitors: () => options.monitor.app,
+      monitors: options.monitor.restServices.monitors,
       storedObjects: () => options.storedObject.app,
       // The SAME application `/api/files` reads through, in the shape the
       // avatar family takes. Its row carries the owner kind, which is what
@@ -223,7 +222,6 @@ export function composeApiPackagedRest(
       scenarios: () => options.scenario.scenarioService,
       scenarioTabs: () => options.scenario.scenarioTabs,
       simulations: () => options.scenario.simulations,
-      suites: () => options.scenario.suites,
       // Both tracked-event URLs, over the SAME span collection the OTLP
       // receiver and the SDK collector send on. Absent where this process
       // registered no command queue: with nowhere to send the span, the door
@@ -240,18 +238,17 @@ export function composeApiPackagedRest(
       organizationMiddleware: createOrganizationMiddleware(() => options.organizations),
       managementAudit: options.managementAudit,
       organizationLedgerActor: orgRequestLedgerActor,
-      rbacVocabulary: REGISTRY_RBAC_VOCABULARY,
       instanceAdminKey: options.instanceAdminKey,
       isSaas: () => options.isSaas,
       // The compensation's own failure is reported and never raised: the
       // caller must still see the ORIGINAL failure.
       reportError: (error) => options.logger.error({ error }, "REST compensation failed"),
       rateLimit: options.rateLimit,
-      // The contract's own permissive parse. The field/rule cross-check needs
-      // the trace-mapping registry, which lives in `@langwatch/trace-web` and
-      // no server module may value-import a browser package — the same
-      // narrowing the monitors tRPC surface already settled for.
-      monitorMappingsSchema: monitorApiMappingsSchema,
+      // The SAME door every process-owned declared family authenticates
+      // through, so a project key opens one door on this process rather than
+      // two that could disagree about what it may reach.
+      handlerManagedCredential: (input) => options.credentials.authenticate(input),
+      legacyErrors: options.legacyErrors,
       requireApiKeyPermission: options.requireApiKeyPermission,
       // The SAME gate object both ingest doors hold, applied to the one packaged family
       // that reports run data: a scenario event is trace content, and a project over its

@@ -22,7 +22,7 @@ import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
-import { UserApi, type UserService } from "@langwatch/user-contract";
+import { UserApi } from "@langwatch/user-contract";
 import {
   userServer,
   UserPasswordHasherPort,
@@ -40,14 +40,6 @@ import type { ComposedUserFeature } from "./user.composition.types.ts";
 
 /** The other services the signed-in person's surfaces reach. */
 export type UserPeers = Readonly<{
-  /**
-   * The user directory the browser-session boundary already composed.
-   *
-   * Read by nothing here any more: the installer builds the same directory
-   * over the same rows from the repositories it selects. It stays on the type
-   * only until the one caller that passes it stops.
-   */
-  users: UserService;
   /** The Auth service the same boundary composed, for the account's own sessions. */
   auth: AuthService;
   /** The organization directory the support-contact read resolves through. */

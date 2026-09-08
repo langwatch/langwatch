@@ -1,7 +1,7 @@
 /**
- * The analytics half of {@link ApiTrpcCollaborators}: the two application slices the
- * charted surfaces read off `ctx.app`, and the four port groups the `analytics.*` and
- * `graphs.*` namespaces reach for.
+ * The analytics half of {@link ApiTrpcCollaborators}: the `ctx.app.analytics`
+ * slice the charted surfaces read, and the two port groups the `analytics.*`
+ * namespace reaches for.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
@@ -27,16 +27,6 @@ import type { Trigger } from "@langwatch/automation-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import {
-  AnalyticsSavedWorkbenchChartPolicyAdapter,
-  DashboardApp,
-  PostgresDashboardAdapter,
-  WorkbenchAccessPort,
-  WorkbenchAwareGraphVisibilityAdapter,
-  type DashboardGraphAlertLookup,
-  type GraphTrpcPorts,
-  SavedWorkbenchChartErrorsAdapter,
-} from "@langwatch/dashboard-server";
-import {
   isContentVisible,
   isContentVisibleToPublic,
   type ContentCategory,
@@ -49,14 +39,12 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import { nanoid } from "nanoid";
 import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import {
   analyticsRouters,
   type AnalyticsFeaturePorts,
   type ApiAnalyticsReadPorts,
-  type ApiFilterField,
 } from "./analytics-trpc.routers.ts";
 
 /**
@@ -89,54 +77,9 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   langWatchQL: ApiLangWatchQLConfigResolution | undefined;
   /** Releases the restricted identity's transport with the rest of the process. */
   resources: ResourceScope;
-  /**
-   * The alert watching a graph card. The two reads a card's bell renders, declared as
-   * themselves rather than as an automation service: Dashboard depends on nothing else
-   * Automation owns, and this process composes no automation vertical yet.
-   */
-  graphAlerts?: DashboardGraphAlertLookup;
-  /**
-   * Strips the provider secrets an alert's `actionParams` carries before the row leaves
-   * the server.
-   */
-  redactActionParams?: (
-    action: Trigger["action"],
-    actionParams: Record<string, unknown>,
-  ) => Record<string, unknown>;
 }>;
 
 import type { ComposedAnalyticsFeature } from "./analytics.composition.types.ts";
-
-/**
- * Dashboard's card-placement gate, answered by LangWatchQL's own rollout flag. Dashboard
- * states the question and this process answers it, so the feature package never reads
- * Analytics' server package to find out.
- */
-class LangWatchQLWorkbenchAccess extends WorkbenchAccessPort {
-  private constructor(
-    private readonly dependencies: {
-      featureFlags: FeatureFlagApi;
-      projects: ProjectService;
-    },
-  ) {
-    super();
-  }
-
-  static create(dependencies: {
-    featureFlags: FeatureFlagApi;
-    projects: ProjectService;
-  }): LangWatchQLWorkbenchAccess {
-    return new LangWatchQLWorkbenchAccess(dependencies);
-  }
-
-  isWorkbenchEnabled({ projectId }: { projectId: string }): Promise<boolean> {
-    return lwqlEnabled({
-      featureFlags: this.dependencies.featureFlags,
-      projectId,
-      projects: this.dependencies.projects,
-    });
-  }
-}
 
 /**
  * Composes the analytics half from this process's graph.
@@ -165,25 +108,6 @@ export function composeAnalyticsFeature(
       resolveClient: options.resolveClickHouseClient,
     }),
     langWatchQL,
-  });
-
-  const dashboard = DashboardApp.create({
-    dashboard: PostgresDashboardAdapter.create({
-      database: options.prisma,
-      ids: { generate: () => nanoid() },
-      // Both governors — the LangWatchQL validator over the SQL, the Vega-Lite
-      // policy over the specification — measured against the protections the
-      // WRITE arrived with, which every door resolves for its own caller.
-      savedWorkbenchChartPolicy: AnalyticsSavedWorkbenchChartPolicyAdapter.create({ langWatchQL }),
-      graphVisibility: WorkbenchAwareGraphVisibilityAdapter.create({
-        workbenchAccess: LangWatchQLWorkbenchAccess.create({
-          featureFlags,
-          projects: options.projects,
-        }),
-      }),
-      langWatchQL,
-    }).build(),
-    automation: options.graphAlerts ?? NO_GRAPH_ALERTS,
   });
 
   const protections = ApiAnalyticsProtections.create({
@@ -217,14 +141,20 @@ export function composeAnalyticsFeature(
     ctx: unknown,
     input: Readonly<{ projectId: string }>,
   ): Promise<LangWatchQLProtections> =>
-    protections.resolve({ userId: actorId(ctx), projectId: input.projectId });
+    resolveProtectionsFor({ actorId: actorId(ctx), projectId: input.projectId });
+
+  const resolveProtectionsFor = (input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<LangWatchQLProtections> =>
+    protections.resolve({ userId: input.actorId, projectId: input.projectId });
 
   /**
    * Who a session-authenticated execution runs as. The project's LangWatchQL secret is
    * hashed into the tenant capability the statement runs under: it is read server-side
    * and must never leave the calling procedure — no field of it may appear in a response.
    */
-  const resolveRunCaller = async (ctx: unknown, input: Readonly<{ projectId: string }>) => {
+  const resolveRunCallerFor = async (input: { actorId: string; projectId: string }) => {
     const project = await options.prisma.project.findUnique({
       where: { id: input.projectId },
       select: { id: true, lwqlKey: true },
@@ -232,10 +162,11 @@ export function composeAnalyticsFeature(
     if (!project) {
       throw new NotFoundError("project_not_found", "Project", input.projectId);
     }
-    return { project, protections: await resolveProtections(ctx, input) };
+    return { project, protections: await resolveProtectionsFor(input) };
   };
 
-  const savedChartPolicy = AnalyticsSavedWorkbenchChartPolicyAdapter.create({ langWatchQL });
+  const resolveRunCaller = (ctx: unknown, input: Readonly<{ projectId: string }>) =>
+    resolveRunCallerFor({ actorId: actorId(ctx), projectId: input.projectId });
 
   const ports = {
     reads: {
@@ -258,36 +189,16 @@ export function composeAnalyticsFeature(
       resolveProtections,
       resolveRunCaller,
     },
-
-    savedCharts: {
-      requireWorkbenchEnabled,
-      timeWindowSchema: lwqlTimeWindowSchema,
-      granularityStepSchema: lwqlGranularityStepSchema,
-      resolveProtections,
-      resolveRunCaller,
-      // Admitted against the CALLER's own protections before it is stored,
-      // which is the one place they are known: a member who cannot read costs
-      // must not be able to save a chart that selects them.
-      admitDefinition: (_ctx, input) =>
-        savedChartPolicy.admit({
-          projectId: input.projectId,
-          protections: input.protections,
-          definition: input.definition,
-        }),
-      mapError: SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError,
-    },
   } as AnalyticsFeaturePorts;
 
-  const graphPorts: GraphTrpcPorts<ApiFilterField> = {
-    filterFieldSchema: filterFieldsEnum,
-    redactActionParams: (action, actionParams) =>
-      options.redactActionParams ? options.redactActionParams(action, actionParams) : {},
-  };
-
   return {
-    routers: (mount) => analyticsRouters(mount, ports, graphPorts),
+    routers: (mount) => analyticsRouters(mount, ports),
     analytics,
-    dashboard,
+    dashboardPorts: {
+      isWorkbenchEnabled: ({ projectId }) => workbenchEnabled(projectId),
+      resolveProtections: resolveProtectionsFor,
+      resolveRunCaller: resolveRunCallerFor,
+    },
     langWatchQL,
     featureFlags,
     apiKeyProtections: (input) => protections.resolveForApiKey(input),
@@ -325,21 +236,6 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
       filterFieldRequiresSubkey,
     } as ApiAnalyticsReadPorts,
     workbench,
-    // Written out rather than spread from the workbench beside it: the two
-    // surfaces name DIFFERENT request contexts, so the shared members are not
-    // the same functions — one taking the workbench's context could not be
-    // handed a saved chart's.
-    savedCharts: {
-      // Applied while the procedure is built; it refuses when one is CALLED.
-      requireWorkbenchEnabled: <TProcedure>(procedure: TProcedure): TProcedure =>
-        (procedure as ChainableProcedure).use(refuse) as TProcedure,
-      timeWindowSchema: lwqlTimeWindowSchema,
-      granularityStepSchema: lwqlGranularityStepSchema,
-      resolveProtections: refuseAsync,
-      resolveRunCaller: refuseAsync,
-      admitDefinition: refuseAsync,
-      mapError: SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError,
-    },
   };
 
   const refusingApplication = <T>(): T =>
@@ -352,13 +248,13 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
     ) as T;
 
   return {
-    routers: (mount) =>
-      analyticsRouters(mount, ports, {
-        filterFieldSchema: filterFieldsEnum,
-        redactActionParams: () => ({}),
-      }),
+    routers: (mount) => analyticsRouters(mount, ports),
     analytics: refusingApplication<AnalyticsApp>(),
-    dashboard: refusingApplication<DashboardApp>(),
+    dashboardPorts: {
+      isWorkbenchEnabled: refuseAsync,
+      resolveProtections: refuseAsync,
+      resolveRunCaller: refuseAsync,
+    },
     langWatchQL: refusingApplication<LangWatchQLService>(),
     featureFlags: refusingApplication<FeatureFlagApi>(),
     apiKeyProtections: refuseAsync,
@@ -383,12 +279,6 @@ type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 
 /** The caller of one request, as the ports above read it. */
 const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().id;
-
-/** A deployment with no automation vertical: no card carries an alert. */
-const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
-  getByCustomGraphIds: () => Promise.resolve([]),
-  tryGetByCustomGraphId: () => Promise.resolve(null),
-};
 
 /**
  * What one member may read of a project's content, as LangWatchQL's catalogue asks it.

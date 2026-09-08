@@ -5,10 +5,9 @@
 import {
   createLangWatchQLRestApp,
   type LangWatchQLRestPorts,
-  type SavedWorkbenchChartRestService,
 } from "@langwatch/analytics-server";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
-import { type DashboardApp, SavedWorkbenchChartErrorsAdapter } from "@langwatch/dashboard-server";
+import type { DashboardApi } from "@langwatch/dashboard-contract";
 
 import { createPlatformUrlBuilder } from "../../app/api-rest-ports.ts";
 
@@ -22,17 +21,36 @@ export type ApiLangWatchQLRestCollaborators = Pick<
 export function mountLangWatchQLRest(options: {
   security: AppRestSecurity;
   collaborators: ApiLangWatchQLRestCollaborators;
-  dashboard: () => DashboardApp;
+  dashboard: () => DashboardApi;
   publicBaseUrl: string | undefined;
 }): MountableRestApp {
   return createLangWatchQLRestApp({
     security: options.security,
     ports: {
       ...options.collaborators,
-      charts: () => options.dashboard() as unknown as SavedWorkbenchChartRestService,
+      charts: () => {
+        const dashboard = options.dashboard();
+
+        return {
+          listSavedWorkbenchCharts: (input) => dashboard.listSavedWorkbenchCharts(input),
+          getSavedWorkbenchChart: (input) => dashboard.getSavedWorkbenchChart(input),
+          createSavedWorkbenchChart: (input) => dashboard.createSavedWorkbenchChart(input),
+          updateSavedWorkbenchChart: (input) => dashboard.updateSavedWorkbenchChart(input),
+          deleteSavedWorkbenchChart: (input) => dashboard.deleteSavedWorkbenchChart(input),
+          placeSavedWorkbenchChart: (input) => dashboard.placeSavedWorkbenchChart(input),
+          // The family publishes nothing on an unplace; the dashboard answers
+          // the detached chart, which this door has never returned.
+          unplaceSavedWorkbenchChart: async (input) => {
+            await dashboard.unplaceSavedWorkbenchChart(input);
+          },
+        };
+      },
       platformUrl: createPlatformUrlBuilder(options.publicBaseUrl),
-      mapSavedChartError: (error) =>
-        SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError(error),
+      // The dashboard contract's own refusals already carry the codes and
+      // statuses this family publishes, so the mapper only re-throws.
+      mapSavedChartError: (error) => {
+        throw error;
+      },
     },
   });
 }

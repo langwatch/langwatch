@@ -9,12 +9,12 @@ import {
   TeamNotInOrganizationError,
   TeamUserRole,
 } from "@langwatch/organization-contract";
-import type { RoleService } from "@langwatch/role-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import {
   type CreateInvitesInviteInput,
+  type InviteAssignableRoles,
   type InviteServiceDependencies,
   type ResolvedInviteTeams,
   type TeamAssignmentInput,
@@ -31,7 +31,7 @@ export class InviteTeamAssignmentService {
     return this.deps.invites;
   }
 
-  private get roleService(): RoleService {
+  private get roleService(): InviteAssignableRoles {
     return this.deps.roles;
   }
 
@@ -255,7 +255,7 @@ export class InviteTeamAssignmentService {
     // administrator on this path.
     const roleService = this.roleService;
     const validCustomRoleIds = new Set(
-      await roleService.filterAssignable({
+      await roleService.filterAssignableRoles({
         roleIds: customRoleIds,
         organizationId,
       }),
