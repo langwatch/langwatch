@@ -17,7 +17,7 @@ import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import { isDatasetAttachmentRef } from "~/shared/datasets/attachment-ref";
+import { isImageAttachmentRef } from "~/shared/datasets/attachment-ref";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
 import { ComparisonWinnerCell } from "./ComparisonWinnerCell";
@@ -88,14 +88,14 @@ type BuildColumnsOptions = {
  * The address a cell renders as a picture, or nothing.
  *
  * An uploaded picture is a reference relative to this origin, which
- * `getImageUrl` does not recognize, so it is taken as it is.
+ * `getImageUrl` does not recognize, so it is read here. Only a reference that
+ * names a picture: this table has no column type behind a value, so a
+ * reference to a document stays a document.
  */
 const cellPictureUrl = (value: unknown): string | null => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return (
-    getImageUrl(value) ?? (isDatasetAttachmentRef(trimmed) ? trimmed : null)
-  );
+  return getImageUrl(value) ?? (isImageAttachmentRef(trimmed) ? trimmed : null);
 };
 
 const buildColumns = ({

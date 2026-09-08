@@ -62,6 +62,27 @@ export function parseDatasetAttachmentRef(
   return name ? { projectId, objectId, name } : { projectId, objectId };
 }
 
+/**
+ * The file endings a stored reference names a picture with.
+ *
+ * SVG is absent because the upload route refuses `image/svg+xml`, so no
+ * stored reference can carry one.
+ */
+const IMAGE_NAME_PATTERN = /\.(jpe?g|gif|png|webp|bmp|avif|heic|tiff?)$/i;
+
+/**
+ * True for a stored-file reference that names a picture.
+ *
+ * A surface that knows the column type reads that instead. This is for the
+ * result tables, which see only the value: there, a reference to a PDF drawn
+ * as a picture renders as a broken image rather than as the file it is.
+ */
+export function isImageAttachmentRef(value: string): boolean {
+  const ref = parseDatasetAttachmentRef(value.trim());
+  if (!ref?.name) return false;
+  return IMAGE_NAME_PATTERN.test(ref.name);
+}
+
 /** The last part of an address on another site, or its host when it has none. */
 function displayNameOfUrl(value: string): string {
   let url: URL;

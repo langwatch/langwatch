@@ -101,6 +101,15 @@ Feature: Image and file cells in the dataset grid
     When I click the name of the document
     Then the file opens in a new tab
 
+  @unit
+  Scenario: A stored reference is drawn as a picture only when it names one
+    Given a results table that shows a dataset value with no column type behind it
+    When the value is a stored reference whose name ends in a picture ending
+    Then the table draws it as a picture
+    And a reference to a document or a recording stays the file it is
+    # A reference names its file, so the ending is what the table has. The
+    # grid does not need it: there the column type says what the value is.
+
   @integration
   Scenario: A data URL opens only for a type the browser shows
     Given I look at a file cell that holds the bytes of a PDF inline

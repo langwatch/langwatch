@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   attachmentDisplayName,
   isDatasetAttachmentRef,
+  isImageAttachmentRef,
   parseDatasetAttachmentRef,
 } from "../attachment-ref";
 
@@ -88,6 +89,30 @@ describe("dataset attachment references", () => {
 
     it("shows a plain word for an empty value", () => {
       expect(attachmentDisplayName("   ")).toBe("file");
+    });
+  });
+
+  describe("given a stored reference", () => {
+    describe("when the surface has no column type behind the value", () => {
+      /** @scenario "A stored reference is drawn as a picture only when it names one" */
+      it.each([
+        "/api/files/p/so_abc/shot.png",
+        "/api/files/p/so_abc/shot.JPEG",
+        "/api/files/p/so_abc/holiday%20photo.webp",
+      ])("reads %s as a picture", (value) => {
+        expect(isImageAttachmentRef(value)).toBe(true);
+      });
+
+      /** @scenario "A stored reference is drawn as a picture only when it names one" */
+      it.each([
+        "/api/files/p/so_abc/quarter.pdf",
+        "/api/files/p/so_abc/call.mp3",
+        "/api/files/p/so_abc",
+        "https://example.com/shot.png",
+        "data:image/png;base64,AAAA",
+      ])("does not read %s as a picture", (value) => {
+        expect(isImageAttachmentRef(value)).toBe(false);
+      });
     });
   });
 });

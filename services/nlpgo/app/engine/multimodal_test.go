@@ -219,6 +219,7 @@ func TestSplitMessagesWithAttachmentsInlinesTextOnlyUpToTheCeiling(t *testing.T)
 	}{
 		{name: "at the ceiling", size: maxInlineTextBytes, wantType: "text"},
 		{name: "one byte over the ceiling", size: maxInlineTextBytes + 1, wantType: "file"},
+		{name: "far over the ceiling", size: 4 * maxInlineTextBytes, wantType: "file"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -232,6 +233,17 @@ func TestSplitMessagesWithAttachmentsInlinesTextOnlyUpToTheCeiling(t *testing.T)
 			assert.Equal(t, tt.wantType, typ)
 		})
 	}
+}
+
+// @scenario "A text file over the inline ceiling is delivered as a file part"
+func TestDecodeTextPayloadRefusesAnOversizedPayloadWithoutDecoding(t *testing.T) {
+	// The length of the encoded form already says the document cannot fit, so
+	// nothing of its size is allocated to find that out.
+	payload := strings.Repeat("A", 4*maxInlineTextBytes)
+	require.Greater(t, encodedLen(payload), maxInlineTextBytes)
+
+	_, ok := decodeTextPayload(payload)
+	assert.False(t, ok)
 }
 
 // @scenario "A text file with bytes that are not valid text is delivered as a file part"

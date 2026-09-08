@@ -243,12 +243,27 @@ const maxInlineTextBytes = 1 << 20
 // declared media type can be wrong and unreadable characters must not go into
 // the prompt, and false for a document over maxInlineTextBytes; the caller
 // then sends the attachment as a file instead.
+//
+// The encoded length is read first, so a payload that cannot fit is refused
+// without allocating or decoding it. A 20 MB attachment reaches here as a
+// string already, but nothing else of that size is built for a document the
+// prompt never carries.
 func decodeTextPayload(payload string) (string, bool) {
+	if encodedLen(payload) > maxInlineTextBytes {
+		return "", false
+	}
 	data, err := decodeBase64(payload)
 	if err != nil || !utf8.Valid(data) || len(data) > maxInlineTextBytes {
 		return "", false
 	}
 	return string(data), true
+}
+
+// encodedLen is the number of bytes a base64 payload decodes to, read off its
+// length rather than by decoding it. Padding makes it an upper bound of at
+// most two bytes over, which no caller here is sensitive to.
+func encodedLen(payload string) int {
+	return len(strings.TrimRight(payload, "=")) / 4 * 3
 }
 
 // extensionForMediaType gives an attachment with no name of its own a file
