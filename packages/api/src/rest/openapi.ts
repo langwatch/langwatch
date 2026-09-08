@@ -8,9 +8,11 @@
 import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
 
+import type { ZodType } from "zod";
+
 import type { CredentialClass } from "../access-policy.ts";
-import type { EndpointDocs } from "./response.ts";
-import type { RestTransportRoute } from "./runtime.ts";
+import type { EndpointDocs, RouteResponse } from "./response.ts";
+import type { RestDeprecation, RestTransportRoute } from "./runtime.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a declared REST route publishes: its operation id and the answer the
@@ -41,9 +43,11 @@ export function operationIdOf({
 export function restRouteDocumentation({
   route,
   suffix,
+  deprecated,
 }: {
   route: RestTransportRoute<unknown>;
   suffix?: string | undefined;
+  deprecated?: RestDeprecation | undefined;
 }): DescribeRouteOptions {
   const status = String(route.status ?? 200);
 
@@ -53,6 +57,7 @@ export function restRouteDocumentation({
         description: "Success",
         content: { "application/json": { schema: resolver(route.output) } },
       },
+      ...route.docs?.responses,
     },
     operationId: operationIdOf({ operation: route.operation, suffix }),
   };
@@ -63,6 +68,18 @@ export function restRouteDocumentation({
 
   if (route.docs?.tags !== undefined) options.tags = [...route.docs.tags];
 
+  // An empty requirement list is the document's way of saying "no credential",
+  // which is exactly what a public route is; it also overrides the document's
+  // own default requirement, which every other operation inherits.
+  if (route.access) options.security = [];
+
+  if (deprecated) {
+    options.deprecated = true;
+    options.description = [options.description, deprecationNotice(deprecated)]
+      .filter((part) => part !== undefined && part !== "")
+      .join(" ");
+  }
+
   return options;
 }
 
@@ -70,9 +87,43 @@ export function restRouteDocumentation({
 export function documentRoute(input: {
   route: RestTransportRoute<unknown>;
   suffix?: string | undefined;
+  deprecated?: RestDeprecation | undefined;
 }): MiddlewareHandler {
   return describeRoute(restRouteDocumentation(input));
 }
+
+/**
+ * The answers an operation documents beyond its declared success, as the
+ * declaration writes them: `documentedResponses({ 404: apiErrorSchema })`.
+ */
+export function documentedResponses(
+  bodies: Readonly<Record<number, ZodType>>,
+): Record<number, RouteResponse> {
+  const responses: Record<number, RouteResponse> = {};
+
+  for (const [status, schema] of Object.entries(bodies)) {
+    responses[Number(status)] = {
+      description: RESPONSE_DESCRIPTIONS[Number(status)] ?? `Response ${status}`,
+      content: { "application/json": { schema: resolver(schema) } },
+    };
+  }
+
+  return responses;
+}
+
+/** The reason phrase each documented status is published with. */
+const RESPONSE_DESCRIPTIONS: Readonly<Record<number, string>> = {
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  409: "Conflict",
+  410: "Gone",
+  413: "Payload Too Large",
+  422: "Unprocessable Entity",
+  429: "Too Many Requests",
+  500: "Internal Server Error",
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The security requirement a documented operation publishes.
@@ -235,28 +286,33 @@ export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Marking a whole route family as a deprecated alias.
+// Marking a route, or a whole family, superseded.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Sets `Deprecation: true` and a `successor-version` link on every response of
- * the family it is applied to.
- */
-export function deprecatedAlias({
+/** The sentence a deprecated answer carries, written or derived. */
+export function deprecationNotice({
   successor,
   notice,
-}: {
-  /** The path of the family that replaces this one. */
-  successor: string;
-  notice?: string;
-}): MiddlewareHandler {
+}: RestDeprecation): string {
+  return notice ?? `This endpoint is deprecated; use ${successor}`;
+}
+
+/**
+ * The four deprecation headers, on every answer of whatever it is applied to:
+ * a declared route through the runtime, or a whole family through the mount's
+ * own middleware, which is how a plural alias marks itself.
+ */
+export function deprecatedAlias(deprecation: RestDeprecation): MiddlewareHandler {
+  const notice = deprecationNotice(deprecation);
+
   return async (c, next) => {
     // Prepared before the handler runs, so a refusal the family THROWS carries
     // them too: a header written after `next()` is never reached once the
     // error is on its way to the boundary.
     c.header("Deprecation", "true");
-    c.header("Link", `<${successor}>; rel="successor-version"`);
-    if (notice) c.header("X-API-Deprecation-Notice", notice);
+    c.header("Link", `<${deprecation.successor}>; rel="successor-version"`);
+    c.header("X-API-Deprecation-Notice", notice);
+    c.header("Warning", `299 - "${notice}"`);
     await next();
   };
 }

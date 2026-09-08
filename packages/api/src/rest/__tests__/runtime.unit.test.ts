@@ -8,10 +8,19 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { publicRoute } from "../../access/access.ts";
 import { ApiVersionConflictError, InvalidApiVersionError } from "../../errors.ts";
 import {
+  bindRestHeader,
+  bindRestMiddleware,
+  defineRestMiddleware,
+  type RestTransportMiddlewareBinding,
+} from "../request.ts";
+import {
   API_VERSION_HEADER,
+  createRestRuntime,
   defineRestRouter,
+  projectRestFacts,
   RestVersionSelector,
   restVersionSelectorMiddleware,
 } from "../runtime.ts";
@@ -104,6 +113,122 @@ describe("defineRestRouter", () => {
     }).toThrow(/already registered/);
 
     expect(() => defineRestRouter(api).withNamespace("Annotations")).toThrow(/lower kebab case/);
+  });
+
+  describe("when a route answers without a credential", () => {
+    /** @scenario "A route that answers without a credential names no tenant" */
+    it("refuses a public route whose own input names a scope", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      expect(() =>
+        defineRestRouter(api)
+          .withNamespace("ops")
+          .withVersion("2026-08-07")
+          .post("/report", "reportBug")
+          .withInput(z.object({ projectId: z.string() }))
+          .withAccess(publicRoute({ reason: "issue intake; reporters may hold no credential" }))
+          .handle(() => {}),
+      ).toThrow(/cannot take "projectId" as input/);
+    });
+
+    /** @scenario "A route that answers without a credential names no tenant" */
+    it("refuses a route that declares both a permission and public access", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      expect(() =>
+        defineRestRouter(api)
+          .withNamespace("ops")
+          .withVersion("2026-08-07")
+          .get("/health", "readHealth")
+          .withPermission("project:view")
+          .withAccess(publicRoute({ reason: "liveness probe; reads no project data" }))
+          .handle(() => {}),
+      ).toThrow(/declares both a permission and public access/);
+    });
+
+    it("refuses a route that declares neither", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      expect(() => {
+        const route = defineRestRouter(api)
+          .withNamespace("ops")
+          .withVersion("2026-08-07")
+          .get("/health", "readHealth");
+
+        Reflect.apply(route.handle, route, [() => {}]);
+      }).toThrow(/must declare withPermission\(\) or withAccess\(\)/);
+    });
+  });
+
+  describe("when a family declares how it is addressed", () => {
+    it("refuses an addressing declared after the first route", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      const router = defineRestRouter(api)
+        .withNamespace("ops")
+        .withVersion("2026-08-07")
+        .get("/health", "readHealth")
+        .withPermission("project:view")
+        .handle(() => {});
+
+      expect(() => router.withAddressing("v1-only")).toThrow(
+        /must declare its addressing before its routes/,
+      );
+    });
+  });
+});
+
+describe("a mount binding the facts a declaration names", () => {
+  const OpsApi = featureApi<{ ping(): Promise<void> }>("ops");
+  const surface = defineRestMiddleware("surface", z.string().nullable());
+
+  function declaration() {
+    return defineRestRouter(OpsApi)
+      .withNamespace("ops")
+      .withVersion("2026-08-07")
+      .get("/health", "readOpsHealth")
+      .withPermission("project:view")
+      .withMiddleware(projectRestFacts, surface)
+      .handle(() => {})
+      .build()
+      .router();
+  }
+
+  const project = bindRestMiddleware(projectRestFacts, () => ({
+    projectSlug: "acme",
+    viewerUserId: null,
+    actorId: "user-1",
+  }));
+
+  function mountWith(facts: readonly RestTransportMiddlewareBinding[]): () => void {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+      },
+    });
+
+    return () => {
+      runtime.mount(declaration(), {
+        app: () => ({ ping: async () => {} }),
+        credential: "projectKey",
+        onError: (error) => {
+          throw error;
+        },
+        facts,
+      });
+    };
+  }
+
+  /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
+  it("refuses a mount that bound no value for a declared fact, naming the fact and the route", () => {
+    expect(mountWith([project])).toThrow(
+      /GET \/api\/ops\/health declares the fact "surface", and this mount bound no value for it/,
+    );
+  });
+
+  /** @scenario "A route's declared facts are bound once at the mount and reach every handler" */
+  it("mounts once every declared fact is bound", () => {
+    expect(mountWith([project, bindRestHeader(surface, "x-langwatch-surface")])).not.toThrow();
   });
 });
 

@@ -62,14 +62,15 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Then the handler runs and the caller is served
     And the failure is logged
 
-  @unimplemented
+  @integration
   Scenario: Deprecation reaches the document and the wire
     Given an endpoint declaring withDeprecated "use things.createV2"
     When the OpenAPI document is generated
     Then every dated mount of the operation is marked deprecated with the notice
     And live responses carry Deprecation and X-API-Deprecation-Notice headers
+    And the first call of each deprecated route is reported once per process
 
-  @unimplemented
+  @integration
   Scenario: Deprecation headers ride errors too
     Given the same deprecated endpoint
     When a call fails validation

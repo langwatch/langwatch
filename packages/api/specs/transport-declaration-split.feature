@@ -133,6 +133,20 @@ Feature: Transport declaration split
     When the process publishes the OpenAPI document
     Then the operation is filed under exactly those tags
 
+  @integration
+  Scenario: A route's declared responses reach the published document
+    Given a route whose docs name an answer beyond the one it declares on success
+    When the process publishes the OpenAPI document
+    Then the operation lists that answer beside its success, with the status's own name
+
+  @integration
+  Scenario: A route's declared facts are bound once at the mount and reach every handler
+    Given routes declaring facts the process resolves, rather than the caller sends
+    When the process mounts the declaration and binds one value for each fact
+    Then each handler is handed the facts it declared, parsed, in the order it declared them
+    And every address the route answers at resolves them the same way
+    And a mount that bound no value for a declared fact is refused, naming the fact and the route
+
   @unit
   Scenario: A project id the credential did not resolve is a handled refusal
     Given a credential that resolved one project

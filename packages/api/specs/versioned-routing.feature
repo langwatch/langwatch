@@ -48,12 +48,19 @@ Feature: Explicit compatibility version namespaces
     And the mount is reported once, carrying /api/v1/things/things.list as its
       canonical path
 
-  @unimplemented
+  @integration
   Scenario: A family already under /api/v1 is mounted once
     Given a family whose base path is /api/v1/agents
     When its routes are mounted
     Then no route is mounted at /api/v1/v1/agents
     And the family answers only at /api/v1/agents
+
+  @integration
+  Scenario: A v1-only family answers nowhere else
+    Given a family that declares its published generation to be its whole contract
+    When a caller addresses it at its bare path, a dated path, latest, or a date it never registered
+    Then each of those is not found
+    And only the /api/v1 address answers
 
   @unimplemented
   Scenario: The dated and latest namespaces answer under both prefixes

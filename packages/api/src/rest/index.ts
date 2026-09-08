@@ -15,6 +15,7 @@ export {
   getRoutePolicy,
   isDateVersion,
   MANAGEMENT_API_VERSION,
+  projectRestFacts,
   registerRoutePolicy,
   RestVersionSelector,
   restVersionSelectorMiddleware,
@@ -27,7 +28,10 @@ export {
   type HttpMethod,
   type MountableRestApp,
   type RegisteredRoute,
+  type RestAddressing,
   type RestCaller,
+  type RestDeprecation,
+  type RestDeprecationLogPort,
   type RestMountOptions,
   type RestRuntime,
   type RestRuntimePorts,
@@ -177,7 +181,9 @@ export {
 // hono-openapi itself, and a peer-resolved copy has a different metadata symbol.
 export {
   deprecatedAlias,
+  deprecationNotice,
   documentedPathOf,
+  documentedResponses,
   documentRoute,
   handWrittenDocs,
   isHttpMethod,

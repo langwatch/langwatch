@@ -6,6 +6,8 @@ export {
   AccessWiringError,
   AuthenticationRequiredError,
   decide,
+  publicRoute,
+  SCOPE_INPUT_FIELDS,
   securityRequirement,
   type AccessActor,
   type AccessDecision,
@@ -14,4 +16,5 @@ export {
   type AuthorizePort,
   type Caller,
   type Credential,
+  type PublicRouteAccess,
 } from "./access.ts";

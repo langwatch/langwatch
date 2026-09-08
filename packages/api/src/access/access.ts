@@ -76,6 +76,22 @@ export type AccessDecision = Readonly<{
   scope: AuthzDeclaredScopeId | null;
 }>;
 
+/**
+ * A route that answers with no credential at all: nothing is authenticated, no
+ * scope is resolved, and the handler is handed a null actor. `reason` is the
+ * reviewable justification, exactly as the route registry has always demanded.
+ */
+export type PublicRouteAccess = Readonly<{ kind: "public"; reason: string }>;
+
+/** Declares one route unauthenticated, with the written reason it is safe. */
+export function publicRoute({ reason }: { reason: string }): PublicRouteAccess {
+  if (reason.trim() === "") {
+    throw new Error("publicRoute needs a written reason for answering without a credential");
+  }
+
+  return Object.freeze({ kind: "public", reason });
+}
+
 /** An anonymous caller on a declaration that needs one. */
 export class AuthenticationRequiredError extends Error {
   constructor() {
@@ -96,7 +112,12 @@ export class AccessWiringError extends Error {
   }
 }
 
-const SENSITIVE_SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
+/**
+ * Every input field that names a scope. A declaration that carries one is
+ * asking a question about a tenant, which is why a public route may declare
+ * none of them.
+ */
+export const SCOPE_INPUT_FIELDS = Object.values(SCOPE_TIER_FIELDS) as readonly ScopeTierField[];
 
 /**
  * The one check both runtimes run, after the parser and before the handler.
@@ -296,7 +317,7 @@ function assertNoSensitiveScope({
 
   const allowed = Object.keys(declaration.allow ?? {});
 
-  for (const field of SENSITIVE_SCOPE_FIELDS) {
+  for (const field of SCOPE_INPUT_FIELDS) {
     if (field in input && !allowed.includes(field)) {
       throw new Error(`${field} is not allowed to be used without permission check`);
     }

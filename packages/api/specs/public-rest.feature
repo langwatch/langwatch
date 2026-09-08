@@ -99,6 +99,20 @@ Feature: Public REST is a first-class API surface
     When a client calls it
     Then the response body carries that error's code
 
+  @integration
+  Scenario: A route that answers without a credential resolves none
+    Given a route declared public, with the written reason it is safe to expose
+    When a caller reaches it with nothing at all
+    Then the door never resolves a credential
+    And the handler is handed no actor and no scope
+    And the published document offers the operation no security requirement
+
+  @unit
+  Scenario: A route that answers without a credential names no tenant
+    Given a route declared public
+    When its own declaration names a scope field, or a permission beside its public access
+    Then the declaration is refused, naming what it cannot have
+
   @unimplemented
   Scenario: A personal caller cannot read another user's personal scope
     Given a request authenticated as one user

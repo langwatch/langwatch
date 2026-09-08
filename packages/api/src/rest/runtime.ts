@@ -26,21 +26,25 @@ import {
 } from "../access-policy.ts";
 import {
   decide,
+  SCOPE_INPUT_FIELDS,
   type AccessDenialPort,
   type AuthorizePort,
   type Credential,
+  type PublicRouteAccess,
 } from "../access/access.ts";
 import { ApiVersionConflictError, InvalidApiVersionError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
-import { documentRoute } from "./openapi.ts";
+import { deprecatedAlias, deprecationNotice, documentRoute } from "./openapi.ts";
 import {
   bodyLimit,
+  defineRestMiddleware,
   loggerMiddleware,
   requestValidationErrorFrom,
   tracerMiddleware,
   type RestTransportMiddleware,
+  type RestTransportMiddlewareBinding,
 } from "./request.ts";
-import { ENDPOINT_ROUTE, REQUEST_FAMILY } from "./response.ts";
+import { ENDPOINT_ROUTE, REQUEST_FAMILY, type RouteResponse } from "./response.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
@@ -364,14 +368,66 @@ export type RestTransportDocs = Readonly<{
   readonly description?: string;
   /** The groups the operation is filed under in the published reference. */
   readonly tags?: readonly string[];
+  /**
+   * The answers the operation documents beyond its declared success, built by
+   * `documentedResponses`. Merged over the generated success block.
+   */
+  readonly responses?: Readonly<Record<number, RouteResponse>>;
+}>;
+
+/**
+ * How a family is addressed. `dated` publishes the namespace's dated, latest
+ * and bare paths with their `/api/v1` twins; `v1-only` publishes exactly
+ * `/api/v1/<namespace>/...` and nothing else, for a surface whose published
+ * generation is its whole contract.
+ */
+export type RestAddressing = "dated" | "v1-only";
+
+/**
+ * What a project-scoped door knows about the caller beyond the request's own
+ * input: the slug a platform URL is built from, the person a personal view is
+ * filtered for, and the actor an action is recorded against. Named here, in the
+ * file that binds facts, so every project family declares the same one.
+ */
+export const projectRestFacts = defineRestMiddleware(
+  "projectRestFacts",
+  z.object({
+    projectSlug: z.string(),
+    viewerUserId: z.string().nullable(),
+    actorId: z.string(),
+  }),
+);
+
+/** What a superseded family or route answers with, and what replaces it. */
+export type RestDeprecation = Readonly<{
+  /** The path of the family or route that replaces this one. */
+  readonly successor: string;
+  readonly notice?: string;
 }>;
 
 type ProjectScope = Extract<AuthzDeclaredScopeId, { tier: "project" }>;
 type ProjectScopedHandlerArguments<Input, App> = Omit<ApiHandlerArguments<Input, App>, "scope"> & {
   readonly scope: ProjectScope;
 };
+/** A public route resolves no credential, so it knows neither actor nor scope. */
+type PublicHandlerArguments<Input, App> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "actor" | "scope"
+> & {
+  readonly actor: null;
+  readonly scope: null;
+};
+type HandlerArgumentsFor<Access extends RouteAccessKind, Input, App> = Access extends "public"
+  ? PublicHandlerArguments<Input, App>
+  : ProjectScopedHandlerArguments<Input, App>;
+type RouteAccessKind = "scoped" | "public";
 type StoredHandler<Api> = {
-  invoke(args: ProjectScopedHandlerArguments<unknown, Api>, ...facts: unknown[]): unknown;
+  invoke(
+    args:
+      | ProjectScopedHandlerArguments<unknown, Api>
+      | PublicHandlerArguments<unknown, Api>,
+    ...facts: unknown[]
+  ): unknown;
 }["invoke"];
 type MiddlewareFacts<Middleware extends readonly RestTransportMiddleware[]> = {
   [Index in keyof Middleware]: z.output<Middleware[Index]["schema"]>;
@@ -388,13 +444,17 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly docs?: RestTransportDocs;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
-  readonly permission: AuthzPermission;
+  /** Absent exactly when the route declared public access instead. */
+  readonly permission?: AuthzPermission;
+  /** Present exactly when the route answers with no credential. */
+  readonly access?: PublicRouteAccess;
   readonly permissionScope?: string;
   readonly query?: z.ZodObject;
   readonly output: OutputSchema;
   readonly status?: ContentfulStatusCode;
   readonly middleware?: readonly RestTransportMiddleware[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
+  readonly deprecated?: RestDeprecation;
   readonly handler: StoredHandler<Api>;
 }>;
 
@@ -405,6 +465,9 @@ export type RestTransportDeclaration<Api> = Readonly<{
   /** The family's own path segment: `/api/<namespace>`. */
   readonly namespace: string;
   readonly version: DateVersion;
+  readonly addressing: RestAddressing;
+  /** Applies to every route the family declares, unless a route names its own. */
+  readonly deprecated?: RestDeprecation;
   readonly routes: readonly RestTransportRoute<Api>[];
 }>;
 
@@ -430,6 +493,7 @@ class RouteBuilder<
   Output extends OutputSchema | Missing = Missing,
   Permission extends boolean = false,
   Middleware extends readonly RestTransportMiddleware[] = [],
+  Access extends RouteAccessKind = "scoped",
 > {
   constructor(
     private readonly router: RestTransportRouter<Api>,
@@ -442,11 +506,13 @@ class RouteBuilder<
       query?: z.ZodObject;
       output?: OutputSchema;
       permission?: AuthzPermission;
+      access?: PublicRouteAccess;
       version?: DateVersion;
       docs?: RestTransportDocs;
       status?: ContentfulStatusCode;
       middleware?: readonly RestTransportMiddleware[];
       bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
+      deprecated?: RestDeprecation;
     }> = {},
   ) {}
 
@@ -454,7 +520,7 @@ class RouteBuilder<
     schema: ExactPathSchema<Path, Schema> &
       DistinctSchema<Schema, Body> &
       DistinctSchema<Schema, Query>,
-  ): RouteBuilder<Api, Method, Path, Schema, Body, Query, Output, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Schema, Body, Query, Output, Permission, Middleware, Access> {
     assertSourceUnset("params", this.state.params);
     assertPathParameters(this.path, schema);
     assertDistinctSources(schema, this.state.input);
@@ -476,7 +542,8 @@ class RouteBuilder<
       Query,
       Output,
       Permission,
-      Middleware
+      Middleware,
+      Access
     >,
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Query>,
   ): RouteBuilder<
@@ -488,7 +555,8 @@ class RouteBuilder<
     Query,
     Output,
     Permission,
-    Middleware
+    Middleware,
+    Access
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
@@ -503,7 +571,7 @@ class RouteBuilder<
 
   withQuery<Schema extends z.ZodObject>(
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Body>,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Schema, Output, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Schema, Output, Permission, Middleware, Access> {
     assertSourceUnset("query", this.state.query);
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.input, schema);
@@ -516,16 +584,30 @@ class RouteBuilder<
 
   withPermission(
     permission: AuthzPermission,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, Access> {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       permission,
     });
   }
 
+  /**
+   * Declares the route unauthenticated. It resolves no credential and no
+   * scope, so its handler is handed a null actor and a null scope, and the
+   * document publishes it with no security requirement.
+   */
+  withAccess(
+    access: PublicRouteAccess,
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, "public"> {
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      access,
+    });
+  }
+
   withVersion(
     version: DateVersion,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
     assertVersionLabel(version);
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -536,16 +618,26 @@ class RouteBuilder<
 
   withDocs(
     docs: RestTransportDocs,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       docs,
     });
   }
 
+  /** Marks this one route superseded, whatever the family declared. */
+  withDeprecated(
+    deprecated: RestDeprecation,
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      deprecated,
+    });
+  }
+
   withOutput<Schema extends OutputSchema>(
     schema: Schema,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Schema, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Schema, Permission, Middleware, Access> {
     assertSourceUnset("output", this.state.output);
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -556,10 +648,10 @@ class RouteBuilder<
 
   handle<TResult extends RouteResult<Output>>(
     this: RouteReady<Path, Params, Permission> extends true
-      ? RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware>
+      ? RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access>
       : never,
     handler: (
-      args: ProjectScopedHandlerArguments<RouteInput<Params, Query, Body>, Api>,
+      args: HandlerArgumentsFor<Access, RouteInput<Params, Query, Body>, Api>,
       ...facts: MiddlewareFacts<Middleware>
     ) => TResult,
   ): RestTransportRouter<Api> {
@@ -581,11 +673,14 @@ class RouteBuilder<
       ...(this.state.params ? { params: this.state.params } : {}),
       ...(this.state.input ? { input: this.state.input } : {}),
       ...(this.state.query ? { query: this.state.query } : {}),
-      permission: permissionOf(this.state.permission),
+      ...(this.state.access
+        ? { access: this.state.access }
+        : { permission: permissionOf(this.state.permission) }),
       output: this.state.output ?? z.void(),
       ...(this.state.status === void 0 ? {} : { status: this.state.status }),
       ...(this.state.middleware ? { middleware: this.state.middleware } : {}),
       ...(this.state.bodyLimit ? { bodyLimit: this.state.bodyLimit } : {}),
+      ...(this.state.deprecated ? { deprecated: this.state.deprecated } : {}),
       handler: handler as StoredHandler<Api>,
     });
 
@@ -594,7 +689,7 @@ class RouteBuilder<
 
   withStatus(
     status: ContentfulStatusCode,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
     if (!Number.isInteger(status) || status < 200 || status > 299) {
       throw new Error(
         "REST JSON success status must be 200–299 except 204; omit output for no content",
@@ -609,7 +704,7 @@ class RouteBuilder<
 
   withBodyLimit(
     limit: Readonly<{ maxBytes: number; onExceeded(): Error }>,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware> {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, Permission, Middleware, Access> {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
       throw new Error("REST body limit must be a non-negative safe integer");
 
@@ -630,7 +725,8 @@ class RouteBuilder<
     Query,
     Output,
     Permission,
-    [...Middleware, ...Added]
+    [...Middleware, ...Added],
+    Access
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -641,12 +737,35 @@ class RouteBuilder<
 
 class RestTransportRouter<Api> {
   readonly routes: RestTransportRoute<Api>[] = [];
+  private addressing: RestAddressing = "dated";
+  private deprecated: RestDeprecation | undefined;
 
   constructor(
     private readonly api: FeatureApiWitness<Api>,
     readonly namespace: string,
     readonly version: DateVersion,
   ) {}
+
+  /**
+   * How the family is addressed. Declared before the first route, because it
+   * decides which paths every route in the family answers at.
+   */
+  withAddressing(addressing: RestAddressing): RestTransportRouter<Api> {
+    if (this.routes.length > 0) {
+      throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
+    }
+
+    this.addressing = addressing;
+
+    return this;
+  }
+
+  /** Marks every route of the family superseded by `successor`. */
+  withDeprecated(deprecated: RestDeprecation): RestTransportRouter<Api> {
+    this.deprecated = deprecated;
+
+    return this;
+  }
 
   /** The inert declaration a feature installer retains and a process mounts. */
   build(): Readonly<{
@@ -659,6 +778,8 @@ class RestTransportRouter<Api> {
       api: this.api,
       namespace: this.namespace,
       version: this.version,
+      addressing: this.addressing,
+      ...(this.deprecated ? { deprecated: this.deprecated } : {}),
       routes: this.routes,
     };
 
@@ -792,12 +913,51 @@ function assertRouteReady({
   method: HttpMethod;
   path: string;
   operation: string;
-  state: Readonly<{ params?: z.ZodObject; permission?: AuthzPermission; output?: OutputSchema }>;
+  state: Readonly<{
+    params?: z.ZodObject;
+    permission?: AuthzPermission;
+    access?: PublicRouteAccess;
+    query?: z.ZodObject;
+    input?: SourceSchema;
+    output?: OutputSchema;
+  }>;
 }): void {
-  if (!state.permission) throw new Error(`REST ${operation} must declare withPermission()`);
+  if (!state.permission && !state.access) {
+    throw new Error(`REST ${operation} must declare withPermission() or withAccess()`);
+  }
+
+  if (state.permission && state.access) {
+    throw new Error(`REST ${operation} declares both a permission and public access`);
+  }
+
+  if (state.access) assertNoScopeInput({ operation, state });
 
   if (/:([A-Za-z0-9_]+)/.test(path) && !state.params) {
     throw new Error(`REST ${method.toUpperCase()} ${path} must declare withParams()`);
+  }
+}
+
+/**
+ * A public route answers before any scope is resolved, so a scope field in its
+ * own input would be a tenant the request names and nothing checks.
+ */
+function assertNoScopeInput({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: Readonly<{ params?: z.ZodObject; query?: z.ZodObject; input?: SourceSchema }>;
+}): void {
+  const declared = [state.params, state.query, state.input]
+    .filter((schema): schema is SourceSchema => schema !== void 0)
+    .flatMap((schema) => sourceKeys(schema));
+
+  const named = SCOPE_INPUT_FIELDS.find((field) => declared.includes(field));
+
+  if (named) {
+    throw new Error(
+      `REST ${operation} answers without a credential, so it cannot take "${named}" as input`,
+    );
   }
 }
 
@@ -840,6 +1000,22 @@ export type RestRuntimePorts = Readonly<{
   /** Only a family whose routes carry a check of their own supplies these. */
   authorization?: Readonly<{ forRequest(request: Request): AuthorizePort }>;
   denials?: AccessDenialPort;
+  /** Where the first call of each deprecated route is recorded. */
+  deprecationLog?: RestDeprecationLogPort;
+}>;
+
+/**
+ * Told once per process the first time a deprecated route is called, so an
+ * operator learns a superseded endpoint is still in use without a line per
+ * request. Defaults to doing nothing.
+ */
+export type RestDeprecationLogPort = Readonly<{
+  deprecatedRouteCalled(input: {
+    family: string;
+    operation: string;
+    successor: string;
+    notice: string;
+  }): void;
 }>;
 
 /** What one family's mount states beyond its declaration. */
@@ -851,6 +1027,11 @@ export type RestMountOptions<Api> = Readonly<{
   onError: ErrorHandler;
   /** Applied under the family's paths before any route: the app container. */
   middleware?: readonly MiddlewareHandler[];
+  /**
+   * One binding per fact the declaration's routes name. A declared fact with
+   * no binding here is refused at mount rather than reaching a handler unset.
+   */
+  facts?: readonly RestTransportMiddlewareBinding[];
   /** Why the door, rather than a middleware chain, is what enforces the route. */
   reason?: string;
 }>;
@@ -866,10 +1047,14 @@ const HOST_ENFORCED = "project credential and permission enforced by the transpo
 export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
   return {
     mount: (declaration, options) => {
-      const basePath = `/api/${declaration.namespace}`;
+      const v1Only = declaration.addressing === "v1-only";
+      const basePath = v1Only
+        ? `${V1_PREFIX}/${declaration.namespace}`
+        : `/api/${declaration.namespace}`;
       const app = new Hono();
       const aliasPath = canonicalV1Path(basePath);
       const scopes = aliasPath ? [`${basePath}/*`, `${aliasPath}/*`] : [`${basePath}/*`];
+      const facts = factBindings({ declaration, options });
 
       for (const middleware of [
         tracerMiddleware({ name: declaration.namespace }),
@@ -880,7 +1065,7 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
       }
 
       for (const route of declaration.routes) {
-        for (const mount of addressesOf({ route, version: declaration.version })) {
+        for (const mount of addressesOf({ route, declaration })) {
           mountRoute({
             app,
             basePath,
@@ -888,19 +1073,20 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
             path: mount.path,
             stack: routeStack({
               route,
-              family: declaration.namespace,
+              declaration,
               ports,
               options,
+              facts,
               ...mount.context,
             }),
             policy: registryPolicy({ route, options }),
-            credentialClass: CREDENTIAL_CLASS[options.credential],
+            credentialClass: route.access ? "none" : CREDENTIAL_CLASS[options.credential],
             family: declaration.namespace,
           });
         }
       }
 
-      mountVersionGuards({ app, basePath, declaration, ports, options });
+      if (!v1Only) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
       app.onError(options.onError);
 
       return app;
@@ -908,21 +1094,58 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
   };
 }
 
-/** The three addresses one route answers at, and what each one reports. */
+/**
+ * Every binding the declaration's facts need, checked once at mount. A fact
+ * the mount did not bind is refused here, naming the fact and the route,
+ * rather than reaching a handler as an unset argument.
+ */
+function factBindings<Api>({
+  declaration,
+  options,
+}: {
+  declaration: RestTransportDeclaration<Api>;
+  options: RestMountOptions<Api>;
+}): ReadonlyMap<string, RestTransportMiddlewareBinding> {
+  const bound = new Map(
+    (options.facts ?? []).map((binding) => [binding.middleware.name, binding] as const),
+  );
+
+  for (const route of declaration.routes) {
+    for (const fact of route.middleware ?? []) {
+      if (bound.has(fact.name)) continue;
+
+      throw new Error(
+        `REST ${route.method.toUpperCase()} /api/${declaration.namespace}${route.path} declares ` +
+          `the fact "${fact.name}", and this mount bound no value for it`,
+      );
+    }
+  }
+
+  return bound;
+}
+
+/** The addresses one route answers at, and what each one reports. */
 function addressesOf({
   route,
-  version,
+  declaration,
 }: {
   route: RestTransportRoute<unknown>;
-  version: string;
+  declaration: RestTransportDeclaration<unknown>;
 }): readonly {
   path: string;
   context: { version: string; status: VersionStatus; suffix?: string };
 }[] {
+  const version = declaration.version;
   // A collection route's path is the family root, so it contributes nothing to
   // an address: concatenating it would date the namespace as `/<version>/`,
   // which no caller sends and a sibling `/:id` answers instead.
   const suffix = route.path === "/" ? "" : route.path;
+
+  // A v1-only family's published generation IS its contract: one address, no
+  // dated namespace, no latest alias, and nothing for a date to fall back to.
+  if (declaration.addressing === "v1-only") {
+    return [{ path: suffix || "/", context: { version, status: "stable" } }];
+  }
 
   return [
     { path: `/${version}${suffix}`, context: { version, status: "stable", suffix: dated(version) } },
@@ -944,9 +1167,10 @@ function dated(version: string): string {
  */
 function routeStack<Api>({
   route,
-  family,
+  declaration,
   ports,
   options,
+  facts,
   version,
   status,
   suffix,
@@ -954,9 +1178,10 @@ function routeStack<Api>({
   documented = true,
 }: {
   route: RestTransportRoute<Api>;
-  family: string;
+  declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimePorts;
   options: RestMountOptions<Api>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
   version: string;
   status: VersionStatus;
   suffix?: string | undefined;
@@ -964,10 +1189,17 @@ function routeStack<Api>({
   documented?: boolean;
 }): MiddlewareHandler[] {
   const limit = route.bodyLimit;
+  const family = declaration.namespace;
+  const deprecated = route.deprecated ?? declaration.deprecated;
 
   return [
     versionContext({ route, family, version, status }),
-    ...(documented ? [documentRoute({ route, suffix })] : []),
+    ...(documented ? [documentRoute({ route, suffix, ...(deprecated ? { deprecated } : {}) })] : []),
+    // Ahead of everything that can refuse: a deprecated endpoint's answer says
+    // so whether it succeeded or not.
+    ...(deprecated
+      ? [deprecatedAlias(deprecated), deprecationLog({ route, family, deprecated, ports })]
+      : []),
     // Ahead of the validators: they read the body to parse it, and a stream
     // read once cannot be drained again to measure it.
     ...(limit
@@ -982,8 +1214,39 @@ function routeStack<Api>({
       : []),
     ...validators({ route, documented, paramSource }),
     inputMiddleware({ route, paramSource }),
-    handlerMiddleware({ route, ports, options }),
+    handlerMiddleware({ route, ports, options, facts }),
   ];
+}
+
+/** Every deprecated route is reported once per process, on its first call. */
+const reportedDeprecations = new Set<string>();
+
+function deprecationLog<Api>({
+  route,
+  family,
+  deprecated,
+  ports,
+}: {
+  route: RestTransportRoute<Api>;
+  family: string;
+  deprecated: RestDeprecation;
+  ports: RestRuntimePorts;
+}): MiddlewareHandler {
+  const key = `${family} ${route.operation}`;
+
+  return async (context, next) => {
+    if (!reportedDeprecations.has(key)) {
+      reportedDeprecations.add(key);
+      ports.deprecationLog?.deprecatedRouteCalled({
+        family,
+        operation: route.operation,
+        successor: deprecated.successor,
+        notice: deprecationNotice(deprecated),
+      });
+    }
+
+    await next();
+  };
 }
 
 /**
@@ -1144,24 +1407,39 @@ function handlerMiddleware<Api>({
   route,
   ports,
   options,
+  facts,
 }: {
   route: RestTransportRoute<Api>;
   ports: RestRuntimePorts;
   options: RestMountOptions<Api>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): MiddlewareHandler {
   return async (context) => {
     const input = context.get(ROUTE_INPUT);
 
+    // A public route resolves nothing: no credential is read, no scope is
+    // established, and the handler is told so rather than handed a guess.
+    if (route.access) {
+      const result = await route.handler(
+        { app: options.app(), input, actor: null, scope: null, signal: context.req.raw.signal },
+        ...(await resolveFacts({ route, facts, context })),
+      );
+
+      return respond({ context, route, result });
+    }
+
+    const permission = permissionOf(route.permission);
+
     const caller = await ports.identity.authenticate({
       request: context.req.raw,
-      permission: route.permission,
+      permission,
     });
 
     const decision = await decide({
       declaration: {
         kind: "service-authorized",
         reason: options.reason ?? HOST_ENFORCED,
-        permissions: [route.permission],
+        permissions: [permission],
       },
       caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
       input,
@@ -1171,18 +1449,50 @@ function handlerMiddleware<Api>({
       ...(ports.denials ? { denials: ports.denials } : {}),
     });
 
-    const result = await route.handler({
-      app: options.app(),
-      input,
-      actor: decision.actor,
-      scope: projectScopeOf(caller.scope),
-      signal: context.req.raw.signal,
-    });
+    const result = await route.handler(
+      {
+        app: options.app(),
+        input,
+        actor: decision.actor,
+        scope: projectScopeOf(caller.scope),
+        signal: context.req.raw.signal,
+      },
+      ...(await resolveFacts({ route, facts, context })),
+    );
 
     caller.markUsed?.();
 
     return respond({ context, route, result });
   };
+}
+
+/**
+ * The declared facts, in declaration order, each parsed by the schema that
+ * declared it. Resolved after the access decision, so a refused request never
+ * asks the process for anything.
+ */
+async function resolveFacts({
+  route,
+  facts,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  context: Context;
+}): Promise<unknown[]> {
+  const resolved: unknown[] = [];
+
+  for (const fact of route.middleware ?? []) {
+    const binding = facts.get(fact.name);
+
+    if (!binding) {
+      throw new Error(`REST ${route.operation} declares the fact "${fact.name}" and none is bound`);
+    }
+
+    resolved.push(fact.schema.parse(await binding.resolve(context)));
+  }
+
+  return resolved;
 }
 
 function normalizedActor(actor: Actor | null): (Actor & { id: string }) | null {
@@ -1251,15 +1561,17 @@ function mountVersionGuards<Api>({
   declaration,
   ports,
   options,
+  facts,
 }: {
   app: Hono;
   basePath: string;
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimePorts;
   options: RestMountOptions<Api>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): void {
   const namespace = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
-  const fallback = dateFallback({ basePath, declaration, ports, options });
+  const fallback = dateFallback({ basePath, declaration, ports, options, facts });
   const notFound: MiddlewareHandler = async (context) => context.notFound();
 
   for (const guard of [namespace, `${namespace}/*`]) {
@@ -1292,20 +1604,23 @@ function dateFallback<Api>({
   declaration,
   ports,
   options,
+  facts,
 }: {
   basePath: string;
   declaration: RestTransportDeclaration<Api>;
   ports: RestRuntimePorts;
   options: RestMountOptions<Api>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): MiddlewareHandler {
   const candidates = declaration.routes.map((route) => ({
     method: route.method,
     pattern: route.path || "/",
     stack: routeStack({
       route,
-      family: declaration.namespace,
+      declaration,
       ports,
       options,
+      facts,
       version: declaration.version,
       status: "stable",
       paramSource: "context",
@@ -1512,11 +1827,13 @@ function registryPolicy<Api>({
 }): AccessPolicy {
   const reason = options.reason ?? HOST_ENFORCED;
 
+  if (route.access) return publicEndpoint(route.access.reason);
+
   if (options.credential === "public") return publicEndpoint(reason);
 
   return handlerManagedAuth({
     reason,
     credential: HANDLER_CREDENTIAL[options.credential],
-    permissions: [route.permission],
+    permissions: [permissionOf(route.permission)],
   });
 }
