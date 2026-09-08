@@ -60,6 +60,34 @@ Runtime follow-ups (packages/api): a credential door that establishes no tenant 
 so a secret-guarded family is not published as `security: []` with a `public` policy; declared non-2xx success
 statuses (`responds({ 200, 503 })`) so an unhealthy report is an answer, not an error-level log per poll.
 
-## role — pending lane report
+## role (feature landed)
+
+`RoleService` → `RoleApi`; `composeRoleFeature`/`refusingRoleFeature` → `await installApiRole({ infrastructure, peers: {
+permissions: this.composedAuthz.app, organizations: this.composedOrganization.app, users: <UserApi> }, plans:
+this.resolvePlanProvider(options) })` (async, not optional; the enclosing block is synchronous today).
+`ComposedRoleFeature` is `{ app: RoleApi, routers(mount) → { role, roleBinding } }`; it no longer carries `authzApp`
+(`authzApp: this.composedRole.authzApp` → `this.composedAuthz.app`) nor `roles` (`this.composedRole.roles` → `.app`).
+- `apps/api/src/app-trpc/app-trpc.features.ts`: `roleBinding: createRoleBindingTrpcRouter(mount)` → `roleRouters.roleBinding`;
+  `team: roleRouters.team` → the team router now belongs to organization: move `composeTeamPorts` +
+  `createTeamTrpcRouter` (old body at `git show 7c2e9ec87e:apps/api/src/features/role/role.composition.ts` lines 174–214)
+  beside the identical plan gate in `apps/api/src/features/organization/organization.composition.ts:341`.
+- `apps/api/src/app-trpc/app-trpc.composed.ts:85-89`: drop the doc sentence about `ctx.app.authzApp` and the role service.
+- `apps/api/src/index.ts:274`: delete `export { createRolesRestApp } from "@langwatch/role-server";`.
+- `apps/api/src/app-rest/app-rest.packaged-families.ts:65-66,581-593`: the `roles` family entry and `RoleService` import go;
+  the family returns when the organization door lands (`dev/docs/plans/api-rest-organization-door.md`) as
+  `apps/api/src/features/role/role-rest.mount.ts` binding `roleRestFacts`.
+- Test doubles calling `refusingRoleFeature()`: `app-trpc/__tests__/support/app-trpc-features.ts`,
+  `app/__tests__/api-packaged-rest.usage-guard.integration.test.ts`, `app/__tests__/api-trpc-record.test-doubles.ts`,
+  `features/gateway/__tests__/gateway.composition.integration.test.ts`.
+- organization (other feature, type only): `RoleService` → `RoleApi` and `filterAssignable` → `filterAssignableRoles` in
+  `rules/invite-contracts.rules.ts`, `services/invite-{acceptance,creation,team-assignment,}.service.ts`,
+  `services/__tests__/support/invite-fakes.ts` (drop the `unsupported<…>` members that no longer exist),
+  `apps/api/src/app/api-organization-invites.composition.ts`, `apps/api/src/features/organization/organization.composition.ts:88`.
+- `apps/api/src/app-rest/__tests__/api-rest.roles-family.integration.test.ts` (11 scenarios) re-points when the REST mount lands.
+
+Behaviour changes to know: custom-role create/update/assign used to answer 503 everywhere (no plan gate was ever
+composed) and now work under the Enterprise gate; the data-scope refusal is 403 `permission_denied`, not 401; six
+uncalled operations went, including `removeExclusiveApiKeyRoles` (api-key retirement; Kimi's lane may want it back).
+Follow-up in authz web: `authz-api.ts` hand-writes the role maps → `ContractApiMap<typeof roleTrpc>`.
 
 ## suite REST — pending lane report
