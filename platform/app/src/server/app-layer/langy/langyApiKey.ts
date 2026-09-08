@@ -371,6 +371,10 @@ export async function mintLangySessionApiKey({
   // own bindings were the ceiling above.
   const ownerUserId = serviceKey ? null : session.user.id;
 
+  const expiresAt = sessionKeyExpiry({
+    parentExpiresAt: serviceKey?.expiresAt ?? null,
+  });
+
   const service = ApiKeyService.create(prisma);
   // Its own span: this is the INSERT (plus the ceiling check). Separating it from
   // the probes above is the point — a fat `mint` span tells you nothing, but
@@ -404,7 +408,7 @@ export async function mintLangySessionApiKey({
         bindings: [
           { role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId },
         ],
-        expiresAt: new Date(Date.now() + LANGY_SESSION_KEY_TTL_MS),
+        expiresAt,
       }),
   );
 
@@ -413,8 +417,32 @@ export async function mintLangySessionApiKey({
 }
 
 /**
- * The service key `session.user.id` names, and the Langy candidates its own
- * bindings grant in `projectId`; null when the id is not a service key here.
+ * When the child's lease ends: the six-hour TTL, capped at the parent's own
+ * expiry when the parent is a service key.
+ *
+ * A personal key's child is owned by the user and re-intersected with their
+ * live grants on every use, so its lease is bounded by the person. An
+ * ownerless child has no such live ceiling: its lifetime is the one lever the
+ * mint holds, so a monitor's key that lapses in a minute cannot hand its
+ * worker six more hours. Revoking the parent is not mirrored onto a child
+ * already minted (the row carries no parent link); the TTL and the reaper
+ * bound that window.
+ */
+function sessionKeyExpiry({
+  parentExpiresAt,
+}: {
+  parentExpiresAt: Date | null;
+}): Date {
+  const leaseEnd = Date.now() + LANGY_SESSION_KEY_TTL_MS;
+  return parentExpiresAt && parentExpiresAt.getTime() < leaseEnd
+    ? parentExpiresAt
+    : new Date(leaseEnd);
+}
+
+/**
+ * The service key `session.user.id` names, the Langy candidates its own
+ * bindings grant in `projectId`, and its own expiry so the child's lease can
+ * be capped by it; null when the id is not a service key here.
  *
  * Only a live, ownerless key of this organization counts: a personal key's
  * id is never an actor (its owner is), and a key of another organization is
@@ -438,7 +466,11 @@ async function resolveServiceKeyCut({
   session: Session;
   projectId: string;
   organizationId: string;
-}): Promise<{ id: string; held: Permission[] } | null> {
+}): Promise<{
+  id: string;
+  held: Permission[];
+  expiresAt: Date | null;
+} | null> {
   const key = await prisma.apiKey.findUnique({
     where: { id: session.user.id },
     select: {
@@ -479,5 +511,5 @@ async function resolveServiceKeyCut({
       return held;
     },
   );
-  return { id: key.id, held };
+  return { id: key.id, held, expiresAt: key.expiresAt };
 }

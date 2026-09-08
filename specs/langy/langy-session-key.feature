@@ -105,17 +105,25 @@ Feature: Per-session caller-scoped Langy key
     Then no session key is minted
     And the chat is refused with an actionable error
 
+  @unit
   Scenario: A service key mints a session key clamped to its own bindings
     Given a service key, an API key issued to no user, acting as itself in this project
     When a Langy session key is minted for that key
     Then the session key is owned by no user, like its parent
     And the session key carries exactly the Langy actions the service key's own bindings grant here
 
+  @unit
   Scenario: A service key from another organization cannot mint here
     Given a service key that belongs to a different organization
     When a Langy session key is requested in its name for this project
     Then no session key is minted
     And the request is refused with an actionable error
+
+  @unit
+  Scenario: A service key's session key never outlives the service key
+    Given a service key that expires in a minute
+    When a Langy session key is minted for that key
+    Then the session key expires when the service key does, not six hours later
 
   Scenario: The session key acts only within the project it was minted for
     Given I have another project I also belong to
