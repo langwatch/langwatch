@@ -111,3 +111,23 @@ errors } })` returns `{ app, routers(mount) → { suites }, rest: MountableRestA
   refuse("The suite application"), credential: refuse("The project credential door"), platformUrl: () => "", errors: refuseAtRuntime })`.
 - Regenerate `apps/api/src/features/discovery/openapi-document.json` + `docs/api-reference/openapiLangWatch.json` once apps/api
   compiles: the alias family's operation ids become the declared names with version suffixes (`listSuites`, `listSuites_latest`, …).
+
+## authz (transports landed `7540100bd5`; contract service, adapter, registry still open)
+
+- `apps/api/src/app-trpc/app-trpc.features.ts:182`: `authz: createAuthzTrpcRouter(mount)` → `createAuthzTrpcRouter(mount.runtime)`.
+- `apps/api/src/index.ts:273`: delete `export { createRoleBindingsRestApp } from "@langwatch/authz-server";`.
+- `apps/api/src/app-rest/app-rest.packaged-families.ts:25,566-578`: the import and the `mount("role-bindings", …)` block go; the
+  family returns as `apps/api/src/features/authz/authz-rest.mount.ts` binding `roleBindingRestFacts` once the organization
+  door lands (the old check was `authz.hasApiKeyPermission` — an API-key-ceiling check the door must offer or the mount
+  must perform through the AuthzApi peer).
+- `apps/api/src/app-rest/__tests__/api-rest.role-bindings-family.integration.test.ts` re-points with the mount.
+
+Queued lane (not wiring): **`AuthzService` → `AuthzApi`** across ~150 files / 356 references and `PostgresAuthzAdapter` →
+repositories + registry with `installApiAuthz`/worker/tasks installers (`apps/api/src/app/api-authz.composition.ts:100`,
+worker and tasks compositions, four harnesses). One lane with TS-LSP rename, run when no other lane is live (it touches
+every feature). Blockers to decide first: `@langwatch/api` depends on `@langwatch/authz-contract` for the permission
+vocabulary, so authz's contract cannot import `defineTrpcContract` without a package cycle (`authzTrpc` sits in the
+server transport for now) — split the vocabulary out of authz-contract; `AuthzApi` has 54 operations (several
+features wearing one door). `@langwatch/authz-web/surfaces/scope-picker` → `./scope-picker` has ~40 importers across
+five feature webs plus tsconfig/vitest aliases (gateway, governance) — same lane.
+
