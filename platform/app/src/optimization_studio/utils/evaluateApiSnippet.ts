@@ -9,6 +9,14 @@ export const IMAGE_EXAMPLE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
 
 /**
+ * Placeholder file value for the API snippet. Truncated on purpose, so it
+ * stays readable and is not a usable file. Callers replace it with their own
+ * encoded file.
+ */
+export const FILE_EXAMPLE =
+  "data:application/pdf;base64,JVBERi0xLjQKJcfsj6IK...";
+
+/**
  * Example scalar value for an entry field type, or undefined when the type is
  * not a scalar. The evaluate endpoint only accepts string, number or boolean
  * parameter values, so structured inputs (lists, dicts, json schemas, chat
@@ -22,6 +30,8 @@ export function exampleParameterValue(
       return "example";
     case "image":
       return IMAGE_EXAMPLE;
+    case "file":
+      return FILE_EXAMPLE;
     case "float":
       return 0.5;
     case "int":

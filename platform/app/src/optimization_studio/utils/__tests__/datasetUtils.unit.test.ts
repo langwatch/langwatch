@@ -12,17 +12,25 @@ describe("datasetUtils column/field type conversion", () => {
     });
   });
 
+  describe("when a dataset column is typed file", () => {
+    it("converts the column to the file field type, not str", () => {
+      expect(datasetColumnTypeToFieldType("file")).toBe("file");
+    });
+  });
+
   describe("when node fields become demonstration dataset columns", () => {
     /** @scenario An image variable derives an image column in the demonstrations editor */
     it("keeps the image type on the derived column", () => {
       const fields: Field[] = [
         { identifier: "question", type: "str" },
         { identifier: "photo", type: "image" },
+        { identifier: "report", type: "file" },
       ];
 
       expect(fieldsToDatasetColumns(fields)).toEqual([
         { name: "question", type: "string" },
         { name: "photo", type: "image" },
+        { name: "report", type: "file" },
       ]);
     });
   });

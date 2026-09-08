@@ -1164,6 +1164,10 @@ const columnTypeToFieldType = (colType: string): Field["type"] => {
     case "json":
     case "object":
       return "dict";
+    case "image":
+      return "image";
+    case "file":
+      return "file";
     default:
       return "str";
   }

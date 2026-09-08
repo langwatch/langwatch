@@ -14247,6 +14247,10 @@
                             {
                               "type": "string",
                               "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "file"
                             }
                           ]
                         }
@@ -14816,6 +14820,10 @@
                             {
                               "type": "string",
                               "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "file"
                             }
                           ]
                         }
@@ -39234,6 +39242,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -39379,6 +39388,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -39487,6 +39500,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -39789,6 +39806,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -39934,6 +39952,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -40042,6 +40064,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -40332,6 +40358,7 @@
                             "float",
                             "bool",
                             "image",
+                            "file",
                             "list",
                             "list[str]",
                             "list[float]",
@@ -41237,6 +41264,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -41382,6 +41410,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -41490,6 +41522,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -41825,6 +41861,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -41970,6 +42007,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -42078,6 +42119,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -42450,6 +42495,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -42595,6 +42641,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -42703,6 +42753,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -43025,6 +43079,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -43170,6 +43225,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -43278,6 +43337,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -43577,6 +43640,7 @@
                             "float",
                             "bool",
                             "image",
+                            "file",
                             "list",
                             "list[str]",
                             "list[float]",
@@ -43948,6 +44012,7 @@
                                   "float",
                                   "bool",
                                   "image",
+                                  "file",
                                   "list",
                                   "list[str]",
                                   "list[float]",
@@ -44093,6 +44158,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -44201,6 +44270,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "image"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "file"
                                               }
                                             ]
                                           }
@@ -44366,6 +44439,7 @@
                                       "float",
                                       "bool",
                                       "image",
+                                      "file",
                                       "list",
                                       "list[str]",
                                       "list[float]",
@@ -44547,6 +44621,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "image"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "file"
                                               }
                                             ]
                                           }
@@ -44655,6 +44733,10 @@
                                                   {
                                                     "type": "string",
                                                     "const": "image"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "file"
                                                   }
                                                 ]
                                               }
@@ -44879,6 +44961,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -45060,6 +45143,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -45168,6 +45255,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }

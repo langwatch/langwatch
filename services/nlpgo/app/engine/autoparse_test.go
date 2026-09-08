@@ -26,6 +26,7 @@ func TestAutoparseValue(t *testing.T) {
 		{"already-typed value untouched", float64(7), dsl.FieldTypeFloat, float64(7)},
 		{"unparseable float left as string", "n/a", dsl.FieldTypeFloat, "n/a"},
 		{"image left as string", "https://x/y.png", dsl.FieldTypeImage, "https://x/y.png"},
+		{"file left as string", "/api/files/p/o/report.pdf", dsl.FieldTypeFile, "/api/files/p/o/report.pdf"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

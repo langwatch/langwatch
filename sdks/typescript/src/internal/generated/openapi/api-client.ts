@@ -6067,6 +6067,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description No process is holding the connected agent right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     callConnectedAgent: {
@@ -9574,7 +9581,7 @@ export interface operations {
                     /** @default [] */
                     columnTypes?: {
                         name: string;
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -9850,7 +9857,7 @@ export interface operations {
                     name?: string;
                     columnTypes?: {
                         name: string;
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -19466,7 +19473,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19491,7 +19498,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19508,7 +19515,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -19615,7 +19622,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -19669,7 +19676,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19694,7 +19701,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19711,7 +19718,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20235,7 +20242,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20260,7 +20267,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20277,7 +20284,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20409,7 +20416,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20434,7 +20441,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20451,7 +20458,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20588,7 +20595,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20613,7 +20620,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20630,7 +20637,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20745,7 +20752,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -20802,7 +20809,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20827,7 +20834,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20844,7 +20851,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21053,7 +21060,7 @@ export interface operations {
                         inputs?: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -21090,7 +21097,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -21107,7 +21114,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21166,7 +21173,7 @@ export interface operations {
                             inputs: {
                                 identifier: string;
                                 /** @enum {string} */
-                                type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                             }[];
                             outputs: {
                                 identifier: string;
@@ -21191,7 +21198,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21208,7 +21215,7 @@ export interface operations {
                                         columnTypes: {
                                             id?: string;
                                             name: string;
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -21249,7 +21256,7 @@ export interface operations {
                                 inputs: {
                                     identifier: string;
                                     /** @enum {string} */
-                                    type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                    type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                                 }[];
                                 outputs: {
                                     identifier: string;
@@ -21286,7 +21293,7 @@ export interface operations {
                                         columnTypes: {
                                             id?: string;
                                             name: string;
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -21303,7 +21310,7 @@ export interface operations {
                                             columnTypes: {
                                                 id?: string;
                                                 name: string;
-                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                             }[];
                                         };
                                     };
