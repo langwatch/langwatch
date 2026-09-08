@@ -27,7 +27,7 @@ import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors/index.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { TracePresenceAvatars } from "@langwatch/presence-web/surfaces/presence-indicators";
+import { TracePresenceAvatars } from "@langwatch/presence-web";
 import { useDejaViewLink } from "../../../use-deja-view-link.ts";
 import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";

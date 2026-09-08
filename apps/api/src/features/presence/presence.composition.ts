@@ -1,18 +1,19 @@
 /**
  * `presence.*` — who else is looking at this project, and where their cursor is —
- * installed over this process's own graph, together with the tenant fan-out it
- * publishes on. The fabric is the load-bearing half.
+ * installed over this process's own graph. The tenant fan-out it publishes on is
+ * the PROCESS's: three other halves ride the same one, so the process creates it
+ * and hands it here rather than this install owning a second.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
-  BroadcastAdapter,
+  type BroadcastAdapter,
   PresenceDiagnosticsPort,
   presenceServer,
   type PresenceInfrastructure,
 } from "@langwatch/presence-server";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
+import { createApp } from "@langwatch/runtime-composition";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 
 import { createPresenceTrpcRouter } from "./presence-trpc.mount.ts";
@@ -24,22 +25,18 @@ export type PresencePeers = Readonly<{
   users: UserApiContract;
 }>;
 
-/** Installs presence and the fabric it publishes on. */
+/** Installs presence over the tenant fan-out this process already owns. */
 export async function installApiPresence(options: {
-  /** The process's Redis, where it has one. Presence and the fan-out use it. */
+  /**
+   * The process's ONE fan-out, started and drained by whoever created it. Both
+   * the publish and the subscribe side are this object.
+   */
+  broadcast: BroadcastAdapter;
+  /** The process's Redis, where it has one: where a session is kept. */
   redis: RedisConnection | null;
   peers: PresencePeers;
-  /** The process's shutdown scope; the fabric is started and drained with it. */
-  resources: ResourceOwnership;
 }): Promise<ComposedPresenceFeature> {
-  const broadcast = BroadcastAdapter.create(options.redis);
-  options.resources.own("API presence broadcast", () => broadcast.close());
-  options.resources.ownService({
-    name: "API presence broadcast",
-    start: () => broadcast.start(),
-    stop: () => broadcast.close(),
-  });
-
+  const { broadcast } = options;
   const infrastructure: PresenceInfrastructure = {
     broadcast,
     emitters: broadcast,

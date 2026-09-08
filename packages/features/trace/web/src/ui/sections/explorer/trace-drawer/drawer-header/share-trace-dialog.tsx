@@ -1,6 +1,6 @@
 import { VStack } from "@chakra-ui/react";
-import { ShareTraceDialogBody } from "@langwatch/share-web/surfaces/share-link-views";
-import { copyShareLink } from "@langwatch/share-web/surfaces/share-links";
+import { ShareTraceDialogBody } from "@langwatch/share-web/share-link-views";
+import { copyShareLink } from "@langwatch/share-web/share-links";
 import { useRef } from "react";
 import { Dialog } from "../../../dialog.tsx";
 import { toaster } from "@langwatch/design-system/toaster";

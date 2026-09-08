@@ -13,7 +13,7 @@ import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
@@ -175,7 +175,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
     peers: {
       projects,
       apiKeys: {} as unknown as ApiKeyService,
-      share: {} as unknown as ShareService,
+      share: {} as unknown as ShareApi,
       topics: {
         getClusteringStatus: vi.fn(async () => ({ isRunInFlight: false })),
       } as unknown as TopicService,

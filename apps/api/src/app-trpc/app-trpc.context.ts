@@ -28,14 +28,14 @@ import type { DatasetApp } from "@langwatch/dataset-server";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { OrganizationApp } from "@langwatch/organization-server";
-import type { PresenceService } from "@langwatch/presence-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ModelProviderApp } from "@langwatch/model-provider-server";
 import type { MonitorApp } from "@langwatch/monitor-server";
 import type { StoredObjectApp } from "@langwatch/stored-object-server";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { TraceApp } from "@langwatch/trace-server";
 import type { ProjectApp } from "@langwatch/project-server";
@@ -136,7 +136,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * a flag read resolves the organization behind a project id and asks once.
    */
   permissions: Pick<AuthzService, "hasPermission">;
-  presence: PresenceService;
+  presence: PresenceApi;
   /**
    * The project application, as `project.*` writes through it and every other surface
    * reads a project's organization off it. The WHOLE application rather than the single
@@ -174,7 +174,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    */
   planProvider: Pick<PlanProvider, "getActivePlan">;
   /** The share ledger behind a link, a pin, and the anonymous trace read. */
-  share: ShareService;
+  share: ShareApi;
   /** The clusters a project's traces were grouped into. */
   topics: TopicService;
   /**

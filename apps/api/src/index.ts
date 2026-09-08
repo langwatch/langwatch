@@ -40,18 +40,16 @@ export {
 export { ApiTraceReadStackPort } from "./features/trace/trace-read-stack.port.ts";
 export type { ApiTracePorts, ComposedTraceFeature } from "./features/trace/trace.composition.types.ts";
 /** The links a project shares outside itself, and the topics its traces carry. */
-export { composeShareFeature, refusingShareFeature } from "./features/share/share.composition.ts";
+export { installApiShare } from "./features/share/share.composition.ts";
 export type { ComposedShareFeature } from "./features/share/share.composition.types.ts";
 export { composeTopicFeature, refusingTopicFeature } from "./features/topic/topic.composition.ts";
 export type { ComposedTopicFeature } from "./features/topic/topic.composition.types.ts";
-/** An organization's spend, and the allowance it is taken against. */
+/** An organization's plan, its allowance, and the spend taken against it. */
 export {
-  ApiUsageStatsPort,
-  composeSpendFeature,
-  refusingSpendFeature,
-  type ApiProjectSpendRollup,
-} from "./features/entitlement/spend.composition.ts";
-export type { ComposedSpendFeature } from "./features/entitlement/spend.composition.types.ts";
+  installApiEntitlement,
+  type EntitlementPeers,
+} from "./features/entitlement/entitlement.composition.ts";
+export type { ComposedEntitlementFeature } from "./features/entitlement/entitlement.composition.types.ts";
 /** The studio's outbound dispatch and the agent test's own trace write. */
 export {
   ApiStudioHostPort,

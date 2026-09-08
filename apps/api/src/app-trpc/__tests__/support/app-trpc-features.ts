@@ -19,7 +19,11 @@ import { createTrpcRoot, type ApiTrpcContext } from "../../../api.application.ts
 import { composeGatewayFeature } from "../../../features/gateway/gateway.composition.ts";
 import { refusingAuthFeature } from "../../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
-import { refusingPresenceFeature } from "../../../features/presence/presence.composition.ts";
+import {
+  stubEntitlementFeature,
+  stubPresenceFeature,
+  stubShareFeature,
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../../features/api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../../features/langy/langy.composition.ts";
 import { refusingDataRetentionFeature } from "../../../features/data-retention/data-retention.composition.ts";
@@ -38,10 +42,8 @@ import { refusingDataPrivacyFeature } from "../../../features/data-privacy/data-
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
 import { refusingSavedViewFeature } from "../../../features/dashboard/saved-view.composition.ts";
-import { refusingSpendFeature } from "../../../features/entitlement/spend.composition.ts";
 import { refusingHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../../features/model-provider/model-provider.composition.ts";
-import { refusingShareFeature } from "../../../features/share/share.composition.ts";
 import { refusingTopicFeature } from "../../../features/topic/topic.composition.ts";
 import { refusingTraceFeature } from "../../../features/trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../../features/workflow/workflow.composition.ts";
@@ -168,7 +170,7 @@ export function buildAppTrpcFeatures(
       }),
       auth: refusingAuthFeature("langwatch-api"),
       user: refusingUserFeature("langwatch-api"),
-      presence: refusingPresenceFeature(),
+      presence: stubPresenceFeature(),
       apiKey: refusingApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
@@ -188,10 +190,10 @@ export function buildAppTrpcFeatures(
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),
       savedView: refusingSavedViewFeature(),
-      spend: refusingSpendFeature(),
+      entitlement: stubEntitlementFeature(),
       httpProxy: refusingHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
-      share: refusingShareFeature(),
+      share: stubShareFeature(),
       topic: refusingTopicFeature(),
       trace: refusingTraceFeature(),
       workflow: refusingWorkflowFeature(),

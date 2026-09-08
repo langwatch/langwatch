@@ -29,23 +29,24 @@ import {
 import type {
   PlanProvider,
   PricingModel as EntitlementPricingModel,
+  SendUsageLimitWarningInput,
+  UsageLimitWarning,
   UsageUnit,
 } from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
   InProcessUsageCache,
-  PrismaUsageMembershipRepository,
   UsageMeterPolicyService,
   USAGE_UNKNOWN,
   UsageCounterPort,
   UsageOrganizationPort,
   UsageService,
-  UsageStatsService,
   UsageVolumeCounterPort,
+  UsageWarningPort,
   PlanCataloguePort,
   PlanNextStepService,
   type CataloguePlan,
-  type LimitsTrpcPorts,
+  type EntitlementServiceOptions,
   type ProjectUsageCounts,
   type UsageCount,
 } from "@langwatch/entitlement-server";
@@ -55,7 +56,6 @@ import type { NotificationApi } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PricingModel, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ApiMailComposition } from "./api-mail.composition.ts";
-import { ApiUsageStatsPort } from "../features/entitlement/spend.composition.ts";
 import { fromDate, toDate } from "@langwatch/time";
 
 /** What the plan provider is composed from. */
@@ -125,6 +125,16 @@ const ENTITLEMENT_CONSEQUENCE = {
  * source is consulted over it and what that source is built from come from
  */
 export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanProvider {
+  return EntitlementService.create(composeApiPlanSources(options));
+}
+
+/**
+ * The same resolution as a value, for the installed entitlement feature: it builds
+ * its own resolver over these sources rather than being handed a second provider.
+ */
+export function composeApiPlanSources(
+  options: ApiPlanProviderOptions,
+): EntitlementServiceOptions {
   // Built here rather than inside the shared policy: verification lives in the
   // Licensing feature, and a feature package may not import another feature's
   // implementation — the same boundary that keeps `EntitlementService.create`
@@ -149,7 +159,7 @@ export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanPro
   }).sources();
   if (options.isSaas && !sources.subscription) options.report?.absent("subscription");
 
-  return EntitlementService.create(sources);
+  return sources;
 }
 
 /**
@@ -244,8 +254,14 @@ export type ApiUsageStatsOptions = Readonly<{
   report?: ApiEntitlementAbsenceReport;
 }>;
 
-/** Composes the usage reading over this process's own rows and rollups. */
-export function composeApiUsageStats(options: ApiUsageStatsOptions): ApiUsageStatsPort {
+/**
+ * Composes the two readings the entitlement feature is installed over: the
+ * month's volume, and the approaching-limit mail. The reading itself is the
+ * feature's, built from this counter.
+ */
+export function composeApiUsageStats(
+  options: ApiUsageStatsOptions,
+): Readonly<{ counter: UsageCounterPort; warnings: UsageWarningPort }> {
   if (!options.mail) options.report?.absent("usage-mail");
 
   // ONE counter, read by both halves. The panel's total and the warning's
@@ -253,17 +269,14 @@ export function composeApiUsageStats(options: ApiUsageStatsOptions): ApiUsageSta
   // adapter would open a second ClickHouse billing graph over the same
   // connection to answer them differently.
   const counter = ApiUsageCounterAdapter.create(options);
-  const stats = UsageStatsService.create({
-    membership: PrismaUsageMembershipRepository.create(options.prisma),
-    counter,
-    plans: options.plans,
-  });
 
-  return ApiComposedUsageStats.create({
-    stats,
-    warnings: composeApiUsageWarnings(options, counter),
-    processName: options.processName,
-  });
+  return {
+    counter,
+    warnings: ApiComposedUsageWarnings.create({
+      warnings: composeApiUsageWarnings(options, counter),
+      processName: options.processName,
+    }),
+  };
 }
 
 /**
@@ -401,36 +414,31 @@ class ApiUsageNextStepResolver implements BillingNextStepResolver {
   }
 }
 
-class ApiComposedUsageStats extends ApiUsageStatsPort {
+/**
+ * The approaching-limit mail as the feature asks for it. Absent on a deployment
+ * that composed no gateway, and then the send refuses by name rather than
+ * reporting that it sent something.
+ */
+class ApiComposedUsageWarnings extends UsageWarningPort {
   static create(options: {
-    stats: UsageStatsService;
     warnings: UsageWarningService | undefined;
     processName: string;
-  }): ApiComposedUsageStats {
-    return new ApiComposedUsageStats(options.stats, options.warnings, options.processName);
+  }): ApiComposedUsageWarnings {
+    return new ApiComposedUsageWarnings(options.warnings, options.processName);
   }
 
   private constructor(
-    private readonly stats: UsageStatsService,
     private readonly warnings: UsageWarningService | undefined,
     private readonly processName: string,
   ) {
     super();
   }
 
-  ports(): LimitsTrpcPorts {
-    const warnings = this.warnings;
-    return {
-      getUsageStats: (_ctx, input) => this.stats.getUsageStats(input.organizationId, input.user),
-      tryCheckAndSendWarning: (_ctx, input) =>
-        warnings
-          ? warnings.tryCheckAndSendWarning({
-              organizationId: input.organizationId,
-              currentMonthMessagesCount: input.currentMonthMessagesCount,
-              maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
-            })
-          : Promise.reject(new ApiUsageNotifierUnavailableError(this.processName)),
-    };
+  async sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
+    if (!this.warnings) throw new ApiUsageNotifierUnavailableError(this.processName);
+    const notification = await this.warnings.tryCheckAndSendWarning(input);
+    if (!notification) return { sent: false };
+    return { sent: true, notificationId: notification.id, sentAt: notification.sentAt };
   }
 }
 

@@ -20,11 +20,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 // so cursors render anywhere a peer's cursor lands in the drawer — the
 // previous scope hid peers as soon as they hovered out of the
 // viz pane.
-import { PresenceMarker } from "@langwatch/presence-web/surfaces/presence-indicators";
-import {
-  selectPeersMatching,
-  usePresenceStore,
-} from "@langwatch/presence-web/surfaces/presence-state";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import type { VizTab } from "../../../../behavior/drawer.store.ts";

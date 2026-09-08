@@ -9,7 +9,7 @@ import type { ComposedBugReportFeature } from "../features/bug-report/bug-report
 import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition.types.ts";
 import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types.ts";
 import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types.ts";
-import type { ComposedSpendFeature } from "../features/entitlement/spend.composition.types.ts";
+import type { ComposedEntitlementFeature } from "../features/entitlement/entitlement.composition.types.ts";
 import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types.ts";
 import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types.ts";
 import type { ComposedShareFeature } from "../features/share/share.composition.types.ts";
@@ -103,8 +103,11 @@ export type ComposedApiFeatures = Readonly<{
   annotation: ComposedAnnotationFeature;
   /** One namespace: the stored filter sets the explorer offers. */
   savedView: ComposedSavedViewFeature;
-  /** Two namespaces: an organization's spend, and the allowance it is taken against. */
-  spend: ComposedSpendFeature;
+  /**
+   * Three namespaces over one application: what the plan allows, what has been
+   * used against it, and what it has cost.
+   */
+  entitlement: ComposedEntitlementFeature;
   /** One namespace: the studio's outbound dispatch and the agent test's trace write. */
   httpProxy: ComposedHttpProxyFeature;
   /**

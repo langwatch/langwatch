@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { PromptRestService } from "@langwatch/prompt-server";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -274,7 +274,7 @@ function mount(options: MountOptions) {
                 ({
                   getActivePlan: async () => ({ type: management.planType }),
                 }) as unknown as PlanProvider,
-              shares: () => ({}) as ShareService,
+              shares: () => ({}) as ShareApi,
               projects: () => ({}) as ProjectService,
               audit: () => {},
               ...(management.invites

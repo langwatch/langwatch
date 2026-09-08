@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { usePresencePreferencesStore } from "@langwatch/presence-web/surfaces/presence-state";
+import { usePresencePreferencesStore } from "@langwatch/presence-web";
 
 import { PresenceMenuItem, type PresenceMenuItemProps } from "../presence-menu-item.tsx";
 

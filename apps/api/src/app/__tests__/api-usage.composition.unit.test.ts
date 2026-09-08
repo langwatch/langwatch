@@ -6,7 +6,13 @@ import {
   TEST_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-server/testing";
 import { describe, expect, it } from "vitest";
-import { OrganizationNotFoundForTeamError } from "@langwatch/entitlement-server";
+import {
+  OrganizationNotFoundForTeamError,
+  PrismaUsageMembershipRepository,
+  UsageStatsService,
+  type UsageCounterPort,
+} from "@langwatch/entitlement-server";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   ApiEntitlementAbsenceReport,
   composeApiPlanProvider,
@@ -271,9 +277,9 @@ describe("composeApiPlanProvider", () => {
 /**
  * The reading, taken through the REAL composed stack.
  *
- * `composeApiUsageStats` builds `UsageStatsService` over the packaged
- * membership repository, the packaged `BillableEventsQueryService` and the plan
- * provider above; nothing below the ports is a stub. What the two suites pin is
+ * `composeApiUsageStats` builds the counter over the packaged
+ * `BillableEventsQueryService` and the plan provider above, and the reading is
+ * taken over it exactly as the feature takes it; nothing below is a stub. What the two suites pin is
  * which ClickHouse accessor each metering unit lands on, because that is the
  * wiring the process gets wrong: the events rollup is keyed by ORGANIZATION and
  * the trace rollup by PROJECT, and a tenant-keyed resolver handed an
@@ -309,6 +315,22 @@ function usagePrisma(pricingModel: string | null) {
 
 const CALLER = { id: "user-1", email: "member@acme.test" } as never;
 
+/**
+ * The reading the entitlement feature builds, over the counter this root
+ * composed: the same three collaborators `EntitlementApp` wires it from.
+ */
+function readUsageStats(options: {
+  prisma: ApiUsageStatsOptions["prisma"];
+  plans: PlanProvider;
+  counter: UsageCounterPort;
+}) {
+  return UsageStatsService.create({
+    membership: PrismaUsageMembershipRepository.create(options.prisma),
+    counter: options.counter,
+    plans: options.plans,
+  }).getUsageStats("org-1", CALLER);
+}
+
 describe("composeApiUsageStats", () => {
   describe("given an organization metered in events", () => {
     /** @scenario "The month's events are read off the organization-keyed rollup" */
@@ -317,11 +339,12 @@ describe("composeApiUsageStats", () => {
       const tenantsAsked: string[] = [];
 
       const prisma = usagePrisma(null);
+      // Free tier, which is the branch that meters in EVENTS.
+      const plans = composeApiPlanProvider({ isSaas: true });
       const usage = composeApiUsageStats({
         prisma,
         notifications: await notificationsOver(prisma),
-        // Free tier, which is the branch that meters in EVENTS.
-        plans: composeApiPlanProvider({ isSaas: true }),
+        plans,
         clickhouse: {
           resolveClient: async (tenantId) => {
             tenantsAsked.push(tenantId);
@@ -335,9 +358,7 @@ describe("composeApiUsageStats", () => {
         processName: "langwatch-api-test",
       });
 
-      const stats = await usage
-        .ports()
-        .getUsageStats(undefined as never, { organizationId: "org-1", user: CALLER });
+      const stats = await readUsageStats({ prisma, plans, counter: usage.counter });
 
       expect(stats.usageUnit).toBe("events");
       // The number, not `null`: null is what an unread rollup renders as, and
@@ -351,10 +372,11 @@ describe("composeApiUsageStats", () => {
       const tenantsAsked: string[] = [];
 
       const prisma = usagePrisma(null);
+      const plans = composeApiPlanProvider({ isSaas: true });
       const usage = composeApiUsageStats({
         prisma,
         notifications: await notificationsOver(prisma),
-        plans: composeApiPlanProvider({ isSaas: true }),
+        plans,
         clickhouse: {
           resolveClient: async (tenantId) => {
             tenantsAsked.push(tenantId);
@@ -368,9 +390,7 @@ describe("composeApiUsageStats", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage
-        .ports()
-        .getUsageStats(undefined as never, { organizationId: "org-1", user: CALLER });
+      await readUsageStats({ prisma, plans, counter: usage.counter });
 
       // The routing fact: an organization id reaching the tenant resolver is
       // the `UnknownTenantError` this absence was named for.
@@ -383,10 +403,11 @@ describe("composeApiUsageStats", () => {
       const asked: string[] = [];
 
       const prisma = usagePrisma(null);
+      const plans = composeApiPlanProvider({ isSaas: true });
       const usage = composeApiUsageStats({
         prisma,
         notifications: await notificationsOver(prisma),
-        plans: composeApiPlanProvider({ isSaas: true }),
+        plans,
         clickhouse: {
           resolveClient: async () => countingClient(0, asked) as never,
           resolveOrganizationClient: async () => countingClient(4210, asked) as never,
@@ -394,9 +415,7 @@ describe("composeApiUsageStats", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage
-        .ports()
-        .getUsageStats(undefined as never, { organizationId: "org-1", user: CALLER });
+      await readUsageStats({ prisma, plans, counter: usage.counter });
 
       expect(asked).toHaveLength(1);
       expect(asked[0]).toContain("FROM billable_events");
@@ -408,19 +427,18 @@ describe("composeApiUsageStats", () => {
     /** @scenario "A deployment with no ClickHouse reads the volume as unknown, not as zero" */
     it("reads the events volume as unknown rather than as zero", async () => {
       const prisma = usagePrisma(null);
+      const plans = composeApiPlanProvider({ isSaas: true });
       const usage = composeApiUsageStats({
         prisma,
         notifications: await notificationsOver(prisma),
-        plans: composeApiPlanProvider({ isSaas: true }),
+        plans,
         // The two accessors travel together — a process either opened the
         // connection or did not — so there is no half-composed state to test.
         clickhouse: null,
         processName: "langwatch-api-test",
       });
 
-      const stats = await usage
-        .ports()
-        .getUsageStats(undefined as never, { organizationId: "org-1", user: CALLER });
+      const stats = await readUsageStats({ prisma, plans, counter: usage.counter });
 
       // Null, not 0: an unread rollup and an organization that sent nothing
       // are different facts, and the panel says so.

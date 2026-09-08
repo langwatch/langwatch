@@ -10,7 +10,7 @@ import {
   type MountableRestApp,
   type PlatformUrlBuilder,
 } from "@langwatch/api/rest";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { TraceApp } from "@langwatch/trace-server";
 import {
   createCollectorRestApp,
@@ -128,7 +128,7 @@ export type ApiTraceLegacyRestCollaborators = Readonly<{
   /** The one application the browser's trace surfaces read. */
   traces: () => TraceApp;
   /** The one share ledger a project's links live in. */
-  shares: () => ShareService;
+  shares: () => ShareApi;
   /** The read stack, for the API key's redactions. */
   reads: ApiTraceReadStackPort;
   /** The process's one handler-managed credential resolution. */

@@ -20,8 +20,8 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   MemberClassificationService,
   PrismaUsageMembershipRepository,
-  UsageMembershipPort,
   type RoleChangeType,
+  type UsageMembershipRepository,
 } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -922,7 +922,7 @@ export type ApiOrganizationSeatAnswer = Readonly<{
 export class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
   static create(options: {
     plans: Pick<PlanProvider, "getActivePlan">;
-    memberships: UsageMembershipPort;
+    memberships: UsageMembershipRepository;
   }): ApiOrganizationSeatLicense {
     return new ApiOrganizationSeatLicense(options);
   }
@@ -930,7 +930,7 @@ export class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
   private constructor(
     private readonly options: {
       plans: Pick<PlanProvider, "getActivePlan">;
-      memberships: UsageMembershipPort;
+      memberships: UsageMembershipRepository;
     },
   ) {
     super();

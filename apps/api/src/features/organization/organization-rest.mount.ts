@@ -38,7 +38,7 @@ import {
 } from "@langwatch/organization-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 
 import { ApiRestCapabilityUnavailableError } from "../../app/api-rest-ports.ts";
 import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "./organization-settings.effects.ts";
@@ -49,7 +49,7 @@ export function mountOrganizationRest(options: {
   organizations: () => OrganizationRestService;
   permissions: () => AuthzService;
   plans: () => PlanProvider;
-  shares: () => ShareService;
+  shares: () => ShareApi;
   projects: () => ProjectService;
   audit: AppRestManagementAuditPort;
   /** Where the deployment composed an invitation service; absent refuses by name. */

@@ -36,6 +36,7 @@ import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.comp
 import { TestDataPrivacyService } from "./support/test-data-privacy.service.ts";
 import {
   composeApiPlanProvider,
+  composeApiPlanSources,
   composeApiUsageStats,
 } from "../../../app/api-usage.composition.ts";
 import { composeSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
@@ -46,8 +47,10 @@ import {
   createTracesTrpcRouter,
 } from "../trace-trpc.mount.ts";
 import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount.ts";
-import { ApiUsageStatsPort, composeSpendFeature } from "../../entitlement/spend.composition.ts";
-import type { LimitsTrpcPorts } from "@langwatch/entitlement-server";
+import { installApiEntitlement } from "../../entitlement/entitlement.composition.ts";
+import { UsageCounterPort, type UsageWarningPort } from "@langwatch/entitlement-server";
+import type { UsageUnit } from "@langwatch/entitlement-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { ComposedTraceFeature } from "../trace.composition.types.ts";
 
 /**
@@ -90,6 +93,18 @@ function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
     },
     has: () => true,
   }) as T;
+}
+
+/** The month's volume, as the installed reading asks for it. */
+function testUsageCounter(count: number): UsageCounterPort {
+  return new (class extends UsageCounterPort {
+    async getCurrentMonthCountForDisplay(): Promise<number> {
+      return count;
+    }
+    async getResolvedUsageUnit(): Promise<UsageUnit> {
+      return "traces";
+    }
+  })();
 }
 
 const trace = {
@@ -246,7 +261,7 @@ function subscriptionSecurity() {
   } as never);
 }
 
-function composeApplication() {
+async function composeApplication() {
   const { broadcast, emitterFor } = testBroadcast();
   // The two features that left this half and now compose themselves, over the
   // same doubles the ports used to carry: one saved view, and one project's
@@ -269,6 +284,13 @@ function composeApplication() {
       ),
       project: { findMany: async () => [{ id: "project-1" }] },
       cost: { groupBy: async () => [{ projectId: "project-1", costType: "TRACE_CHECK" }] },
+      // The membership counts the installed reading takes beside the counter.
+      organization: { findUnique: async () => ({ pricingModel: null }) },
+      organizationUser: { findMany: async () => [] },
+      organizationInvite: { findMany: async () => [] },
+      customRole: { findMany: async () => [] },
+      team: { findMany: async () => [] },
+      roleBinding: { findMany: async () => [] },
     } as unknown as PrismaClient,
     authz: testAuthz(),
     audit: undefined,
@@ -278,15 +300,14 @@ function composeApplication() {
       ...stubComposedFeatures(),
       trace: testTraceGroupHalf(broadcast),
       savedView: composeSavedViewFeature({ infrastructure }),
-      spend: composeSpendFeature({
+      entitlement: await installApiEntitlement({
         infrastructure,
-        usage: new (class extends ApiUsageStatsPort {
-          ports() {
-            return stub<LimitsTrpcPorts>("limits", {
-              getUsageStats: async () => ({ currentMonthMessagesCount: 3 }),
-            });
-          }
-        })(),
+        entitlement: {
+          ...composeApiPlanSources({ isSaas: false }),
+          counter: testUsageCounter(3),
+          warnings: stub<UsageWarningPort>("warnings"),
+        },
+        peers: { users: createApiFixture<UserApi>({ tryFindById: async () => null }) },
       }),
     },
     infrastructure,
@@ -394,8 +415,8 @@ async function watchSse(options: {
 }
 
 describe("given an API process composed with the observability collaborators", () => {
-  it("mounts all sixteen of its namespaces beside the rest of the record", () => {
-    const { application } = composeApplication();
+  it("mounts all sixteen of its namespaces beside the rest of the record", async () => {
+    const { application } = await composeApplication();
 
     const mounted = Object.keys(
       (application.trpc as unknown as { _def: { record: Record<string, unknown> } })._def.record,
@@ -460,7 +481,7 @@ describe("given an API process composed with the observability collaborators", (
 
     for (const [path, input, assertBody] of calls) {
       it(`answers ${path}`, async () => {
-        const { application } = composeApplication();
+        const { application } = await composeApplication();
 
         const { status, body } = await callTrpc(application, path, input);
 
@@ -472,7 +493,7 @@ describe("given an API process composed with the observability collaborators", (
 
   describe("when the anonymous share read is called with no session at all", () => {
     it("still resolves it on the public procedure, and refuses the token", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       // The token is rejected by the share ledger the stub refuses on, which is
       // the point: what is under test is that ADR-057's public surface is
@@ -486,7 +507,7 @@ describe("given an API process composed with the observability collaborators", (
 
   describe("when the two live-update subscriptions are watched over /api/sse", () => {
     it("streams a trace update on the same root the tRPC endpoint serves", async () => {
-      const { application, emitterFor } = composeApplication();
+      const { application, emitterFor } = await composeApplication();
 
       const watched = await watchSse({
         application,
@@ -504,7 +525,7 @@ describe("given an API process composed with the observability collaborators", (
     });
 
     it("streams a facet recomputation the same way", async () => {
-      const { application, emitterFor } = composeApplication();
+      const { application, emitterFor } = await composeApplication();
 
       const watched = await watchSse({
         application,
@@ -713,13 +734,15 @@ describe("given an API process that composed the real observability collaborator
       authz: testAuthz(),
       audit: undefined,
     };
+    const usage = await composeRealUsage(clickHouse);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       composed: {
         ...stubComposedFeatures(),
         trace: group,
-        spend: composeSpendFeature({
+        entitlement: await installApiEntitlement({
           infrastructure,
-          usage: await composeRealUsage(clickHouse),
+          entitlement: { ...composeApiPlanSources({ isSaas: false }), ...usage },
+          peers: { users: createApiFixture<UserApi>({ tryFindById: async () => null }) },
         }),
       },
       infrastructure,

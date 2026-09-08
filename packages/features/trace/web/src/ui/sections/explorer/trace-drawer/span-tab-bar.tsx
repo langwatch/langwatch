@@ -13,11 +13,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { PresenceMarker } from "@langwatch/presence-web/surfaces/presence-indicators";
-import {
-  selectPeersMatching,
-  usePresenceStore,
-} from "@langwatch/presence-web/surfaces/presence-state";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";

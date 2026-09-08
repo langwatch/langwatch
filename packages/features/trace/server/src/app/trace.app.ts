@@ -218,7 +218,7 @@ export type TraceShareReader = Readonly<{
     viewer: ShareViewer;
     viewerKey?: string;
   }): Promise<ResolvedShare>;
-  tryGetCachedPayload(input: { token: string; protections: Protections }): Promise<unknown>;
+  findCachedPayload(input: { token: string; protections: Protections }): Promise<unknown>;
   cachePayload(input: {
     token: string;
     protections: Protections;
@@ -927,7 +927,7 @@ export class TraceApp {
 
   /** The cached share payload for this token AND these redactions, if any. */
   readCachedSharePayload(input: { token: string; protections: Protections }): Promise<unknown> {
-    return this.dependencies.share.tryGetCachedPayload(input);
+    return this.dependencies.share.findCachedPayload(input);
   }
 
   /** Caches the share payload against this token and these redactions. */

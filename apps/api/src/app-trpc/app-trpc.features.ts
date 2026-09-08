@@ -16,7 +16,6 @@ import { composeGithubTrpcRouter } from "../features/github/github.composition.t
 import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount.ts";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition.ts";
-import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.mount.ts";
 
 /**
  * Builds every tRPC surface this package owns against one process's mount.
@@ -37,7 +36,7 @@ export function createAppTrpcFeatures(options: {
   const langyRouters = composed.langy.routers(mount);
   const scenarioRouters = composed.scenario.routers(mount);
   const annotationRouters = composed.annotation.routers(mount);
-  const spendRouters = composed.spend.routers(mount);
+  const entitlementRouters = composed.entitlement.routers(mount);
   const modelProviderRouters = composed.modelProvider.routers(mount);
   const workflowRouters = composed.workflow.routers(mount);
   const traceRouters = composed.trace.routers(mount);
@@ -60,18 +59,18 @@ export function createAppTrpcFeatures(options: {
   const { personalDashboard } = governance;
 
   return {
-    costs: spendRouters.costs,
+    costs: entitlementRouters.costs,
     httpProxy: composed.httpProxy.router(mount),
-    limits: spendRouters.limits,
+    limits: entitlementRouters.limits,
     llmModelCost: modelProviderRouters.llmModelCost,
     modelProvider: modelProviderRouters.modelProvider,
     // Both share surfaces take no ports: a link and a pin are rows this
     // deployment owns outright, reached through `ctx.app.share`.
     pinnedTrace: shareRouters.pinnedTrace,
     // What this organization is on. No ports either — the plan is resolved off
-    // the application slice, because ONE answer to "which plan" is the whole
-    // point of a plan provider.
-    plan: createPlanTrpcRouter(mount),
+    // the one entitlement application, because ONE answer to "which plan" is
+    // the whole point of a plan provider.
+    plan: entitlementRouters.plan,
     savedViews: composed.savedView.router(mount),
     share: shareRouters.share,
     // ADR-057's single anonymous trace read. It takes the process's PUBLIC

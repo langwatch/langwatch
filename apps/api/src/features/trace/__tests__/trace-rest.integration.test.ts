@@ -4,7 +4,7 @@
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { RecordSpanCommandData, Trace } from "@langwatch/trace-contract";
 import type { TraceApp } from "@langwatch/trace-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
@@ -322,7 +322,7 @@ function mount(overrides: MountOverrides) {
     createShare: async () => ({ id: "share-1" }),
     unshare: async () => undefined,
     ...overrides.share,
-  } as unknown as ShareService;
+  } as unknown as ShareApi;
 
   const hono = new Hono();
   for (const app of createApiProcessRestFeatures({

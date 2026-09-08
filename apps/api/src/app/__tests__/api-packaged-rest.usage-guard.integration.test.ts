@@ -15,7 +15,7 @@ import { refusingMonitorFeature } from "../../features/monitor/monitor.compositi
 import { refusingRoleFeature } from "../../features/role/role.composition.ts";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition.ts";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
-import { refusingPresenceFeature } from "../../features/presence/presence.composition.ts";
+import { stubPresenceFeature } from "./api-trpc-record.test-doubles.ts";
 import { refusingOrganizationFeature } from "../../features/organization/organization.composition.ts";
 import { refusingAutomationFeature } from "../../features/automation/automation.composition.ts";
 import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
@@ -54,7 +54,7 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     experiment: refusingExperimentFeature(),
     workflow: refusingWorkflowFeature(),
     enterpriseGovernance: composeEnterpriseGovernanceApplication(undefined),
-    presence: refusingPresenceFeature(),
+    presence: stubPresenceFeature(),
     organization: refusingOrganizationFeature(),
     automation: refusingAutomationFeature(),
     codingAgent: refusingCodingAgentFeature(),

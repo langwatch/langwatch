@@ -25,10 +25,19 @@ import { refusingStoredObjectFeature } from "../../features/stored-object/stored
 import { refusingBugReportFeature } from "../../features/bug-report/bug-report.composition.ts";
 import { refusingAnnotationFeature } from "../../features/annotation/annotation.composition.ts";
 import { refusingSavedViewFeature } from "../../features/dashboard/saved-view.composition.ts";
-import { refusingSpendFeature } from "../../features/entitlement/spend.composition.ts";
+import {
+  createOrganizationSpendTrpcRouter,
+  createPlanTrpcRouter,
+  createUsageLimitsTrpcRouter,
+} from "../../features/entitlement/entitlement-trpc.mount.ts";
+import type { ComposedEntitlementFeature } from "../../features/entitlement/entitlement.composition.types.ts";
 import { refusingHttpProxyFeature } from "../../features/agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../features/model-provider/model-provider.composition.ts";
-import { refusingShareFeature } from "../../features/share/share.composition.ts";
+import {
+  createPinnedTraceTrpcRouter,
+  createShareTrpcRouter,
+} from "../../features/share/share-trpc.mount.ts";
+import type { ComposedShareFeature } from "../../features/share/share.composition.types.ts";
 import { refusingTopicFeature } from "../../features/topic/topic.composition.ts";
 import { refusingTraceFeature } from "../../features/trace/trace.composition.ts";
 import { refusingDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition.ts";
@@ -43,7 +52,8 @@ import { refusingAutomationFeature } from "../../features/automation/automation.
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
 import { refusingAuthFeature } from "../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../features/user/user.composition.ts";
-import { refusingPresenceFeature } from "../../features/presence/presence.composition.ts";
+import { createPresenceTrpcRouter } from "../../features/presence/presence-trpc.mount.ts";
+import type { ComposedPresenceFeature } from "../../features/presence/presence.composition.types.ts";
 import { refusingApiKeyFeature } from "../../features/api-key/api-key.composition.ts";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed.ts";
 
@@ -145,6 +155,42 @@ export function stubApplicationSlices(
 }
 
 /**
+ * The three features with no refusing twin. Each mounts its real parsers over a
+ * stub application, which is what a refusal used to be: the namespace is on the
+ * record and every call through it refuses by name.
+ */
+export function stubEntitlementFeature(): ComposedEntitlementFeature {
+  const app = stub<ComposedEntitlementFeature["app"]>("entitlement");
+  return {
+    app,
+    routers: (mount) => ({
+      plan: createPlanTrpcRouter(mount.runtime, app),
+      limits: createUsageLimitsTrpcRouter(mount.runtime, app),
+      costs: createOrganizationSpendTrpcRouter(mount.runtime, app),
+    }),
+  };
+}
+
+export function stubShareFeature(): ComposedShareFeature {
+  return {
+    app: stub("share"),
+    routers: (mount) => ({
+      share: createShareTrpcRouter(mount.runtime),
+      pinnedTrace: createPinnedTraceTrpcRouter(mount.runtime),
+    }),
+  };
+}
+
+export function stubPresenceFeature(): ComposedPresenceFeature {
+  return {
+    app: stub("presence"),
+    emitter: stub("presence.emitter"),
+    broadcast: stub("presence.broadcast"),
+    router: (mount) => createPresenceTrpcRouter(mount.runtime),
+  };
+}
+
+/**
  * The record's collaborators: the whole stubbed application, with the slices a suite
  * actually drives passed as overrides.
  * @param broadcast see {@link stubApplicationSlices}.
@@ -191,10 +237,10 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     bugReport: refusingBugReportFeature(),
     annotation: refusingAnnotationFeature(),
     savedView: refusingSavedViewFeature(),
-    spend: refusingSpendFeature(),
+    entitlement: stubEntitlementFeature(),
     httpProxy: refusingHttpProxyFeature(),
     modelProvider: refusingModelProviderFeature(),
-    share: refusingShareFeature(),
+    share: stubShareFeature(),
     topic: refusingTopicFeature(),
     trace: refusingTraceFeature(),
     dataPrivacy: refusingDataPrivacyFeature(),
@@ -206,7 +252,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     enterprise: refusingEnterpriseFeature(),
     auth: refusingAuthFeature("langwatch-api"),
     user: refusingUserFeature("langwatch-api"),
-    presence: refusingPresenceFeature(),
+    presence: stubPresenceFeature(),
     apiKey: refusingApiKeyFeature(),
   };
 }

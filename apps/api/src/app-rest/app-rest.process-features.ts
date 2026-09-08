@@ -59,7 +59,7 @@ import type {
   OrganizationRestService,
 } from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 
 import type { DashboardApp } from "@langwatch/dashboard-server";
 
@@ -222,7 +222,7 @@ export type ApiProcessRestServices = Readonly<{
         organizations: () => OrganizationRestService;
         permissions: () => AuthzService;
         plans: () => PlanProvider;
-        shares: () => ShareService;
+        shares: () => ShareApi;
         projects: () => ProjectService;
         audit: AppRestManagementAuditPort;
         /**

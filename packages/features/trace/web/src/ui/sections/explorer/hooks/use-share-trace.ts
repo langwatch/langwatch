@@ -1,8 +1,8 @@
 import {
   type CreateShareLinkDraft,
   type ShareLinkView,
-} from "@langwatch/share-web/surfaces/share-link-views";
-import { expiryToInstant } from "@langwatch/share-web/surfaces/share-links";
+} from "@langwatch/share-web/share-link-views";
+import { expiryToInstant } from "@langwatch/share-web/share-links";
 import { toDate } from "@langwatch/time";
 import { useCallback } from "react";
 import { showErrorToast } from "../../errors/index.ts";

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import {
   resolvePresenceAvailability,
   type PresenceAvailability,
-} from "@langwatch/presence-web/surfaces/presence-state";
+} from "@langwatch/presence-web";
 
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 

@@ -24,7 +24,11 @@ import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterpr
 import { composeGatewayFeature } from "../gateway.composition.ts";
 import { refusingAuthFeature } from "../../auth/auth.composition.ts";
 import { refusingUserFeature } from "../../user/user.composition.ts";
-import { refusingPresenceFeature } from "../../presence/presence.composition.ts";
+import {
+  stubEntitlementFeature,
+  stubPresenceFeature,
+  stubShareFeature,
+} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../langy/langy.composition.ts";
 import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition.ts";
@@ -41,10 +45,8 @@ import { refusingDataPrivacyFeature } from "../../data-privacy/data-privacy.comp
 import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../annotation/annotation.composition.ts";
 import { refusingSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
-import { refusingSpendFeature } from "../../entitlement/spend.composition.ts";
 import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition.ts";
-import { refusingShareFeature } from "../../share/share.composition.ts";
 import { refusingTopicFeature } from "../../topic/topic.composition.ts";
 import { refusingTraceFeature } from "../../trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../workflow/workflow.composition.ts";
@@ -204,7 +206,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       gateway,
       auth: refusingAuthFeature("langwatch-api"),
       user: refusingUserFeature("langwatch-api"),
-      presence: refusingPresenceFeature(),
+      presence: stubPresenceFeature(),
       apiKey: refusingApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
@@ -224,10 +226,10 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),
       savedView: refusingSavedViewFeature(),
-      spend: refusingSpendFeature(),
+      entitlement: stubEntitlementFeature(),
       httpProxy: refusingHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
-      share: refusingShareFeature(),
+      share: stubShareFeature(),
       topic: refusingTopicFeature(),
       trace: refusingTraceFeature(),
       workflow: refusingWorkflowFeature(),

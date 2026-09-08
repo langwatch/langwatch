@@ -159,7 +159,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      const notification = await usage.ports().tryCheckAndSendWarning(undefined as never, {
+      const notification = await usage.warnings.sendWarning({
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -167,7 +167,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       expect(gateway.sent).toHaveLength(1);
       expect(gateway.sent[0]?.to).toBe("admin@acme.test");
       expect(gateway.sent[0]?.subject).toBe("Usage Limit Critical - 95% of limit reached");
-      expect(notification).toMatchObject({ id: "notification-written" });
+      expect(notification).toMatchObject({ sent: true, notificationId: "notification-written" });
     });
 
     it("renders the organization, the projects and the counts a person reads", async () => {
@@ -186,7 +186,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage.ports().tryCheckAndSendWarning(undefined as never, {
+      await usage.warnings.sendWarning({
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -216,7 +216,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage.ports().tryCheckAndSendWarning(undefined as never, {
+      await usage.warnings.sendWarning({
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -245,12 +245,12 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      const notification = await usage.ports().tryCheckAndSendWarning(undefined as never, {
+      const notification = await usage.warnings.sendWarning({
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
 
-      expect(notification).toBeNull();
+      expect(notification).toEqual({ sent: false });
       expect(gateway.sent).toEqual([]);
     });
 
@@ -299,7 +299,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage.ports().tryCheckAndSendWarning(undefined as never, {
+      await usage.warnings.sendWarning({
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -331,13 +331,13 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      const notification = await usage.ports().tryCheckAndSendWarning(undefined as never, {
+      const notification = await usage.warnings.sendWarning({
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
 
       expect(gateway.sent).toEqual([]);
-      expect(notification).toBeNull();
+      expect(notification).toEqual({ sent: false });
       // Nothing recorded either: a row written after nothing was delivered
       // would suppress the retry that could still reach somebody.
       expect(written).toEqual([]);
@@ -359,7 +359,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       });
 
       await expect(
-        usage.ports().tryCheckAndSendWarning(undefined as never, {
+        usage.warnings.sendWarning({
           organizationId: "org-1",
           ...CROSSED_95_PERCENT,
         }),

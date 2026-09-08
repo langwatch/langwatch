@@ -11,7 +11,7 @@ import { type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import {
   TraceApp,
@@ -74,7 +74,7 @@ export type TraceFeatureOptions = Readonly<{
   /** The other features' services the trace application is built over. */
   peers: Readonly<{
     /** The one ledger an anonymous read redeems its token against. */
-    share: ShareService;
+    share: ShareApi;
     /** The one tree the grid labels its rows from. */
     topics: TopicService;
   }>;

@@ -10,7 +10,7 @@ import { Eye, EyeOff } from "lucide-react";
 import {
   resolvePresenceAvailability,
   usePresencePreferencesStore,
-} from "@langwatch/presence-web/surfaces/presence-state";
+} from "@langwatch/presence-web";
 
 /**
  * The two switches the row reads, in the shape the application's own workspace

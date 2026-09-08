@@ -5,7 +5,7 @@ import {
   usePresencePreferencesStore,
   usePresenceStore,
   useTabSessionId,
-} from "@langwatch/presence-web/surfaces/presence-state";
+} from "@langwatch/presence-web";
 import { api } from "../../../../behavior/trace-api.ts";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;

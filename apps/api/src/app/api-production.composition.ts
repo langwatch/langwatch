@@ -103,10 +103,8 @@ import {
   type ApiPersonDeploymentFacts,
 } from "../features/auth/auth.composition.ts";
 import { composeUserFeature, refusingUserFeature } from "../features/user/user.composition.ts";
-import {
-  composePresenceFeature,
-  refusingPresenceFeature,
-} from "../features/presence/presence.composition.ts";
+import { installApiPresence } from "../features/presence/presence.composition.ts";
+import { BroadcastAdapter } from "@langwatch/presence-server";
 import {
   composeApiKeyFeature,
   refusingApiKeyFeature,
@@ -144,10 +142,16 @@ import {
   refusingTraceFeature,
 } from "../features/trace/trace.composition.ts";
 import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
-import { composeShareFeature, refusingShareFeature } from "../features/share/share.composition.ts";
+import { installApiShare } from "../features/share/share.composition.ts";
 import { composeTopicFeature, refusingTopicFeature } from "../features/topic/topic.composition.ts";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { PrismaUsageMembershipRepository, type UsageService } from "@langwatch/entitlement-server";
+import {
+  EntitlementService,
+  PrismaUsageMembershipRepository,
+  type EntitlementServiceOptions,
+  type UsageService,
+  type UsageWarningPort,
+} from "@langwatch/entitlement-server";
 
 import {
   composeApiModelProviders,
@@ -257,12 +261,7 @@ import {
   composeSavedViewFeature,
   refusingSavedViewFeature,
 } from "../features/dashboard/saved-view.composition.ts";
-import {
-  composeSpendFeature,
-  LoggedApiSpendAbsence,
-  refusingSpendFeature,
-  type ApiUsageStatsPort,
-} from "../features/entitlement/spend.composition.ts";
+import { installApiEntitlement } from "../features/entitlement/entitlement.composition.ts";
 import { refusingAnnotationFeature } from "../features/annotation/annotation-absence.ts";
 import { installApiAnnotation } from "../features/annotation/annotation.composition.ts";
 import {
@@ -302,7 +301,7 @@ import { composeApiTraceReadStack } from "./api-trace-read-stack.composition.ts"
 import { composeApiEvaluationReads } from "./api-evaluation-read.composition.ts";
 import {
   apiEntitlementAbsenceReport,
-  composeApiPlanProvider,
+  composeApiPlanSources,
   composeApiUsageEnforcement,
   composeApiUsageStats,
   type LoggedApiEntitlementAbsence,
@@ -476,7 +475,7 @@ import type { ComposedGatewayFeature } from "../features/gateway/gateway.composi
 import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition.types.ts";
 import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition.types.ts";
 import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition.types.ts";
-import type { ComposedSpendFeature } from "../features/entitlement/spend.composition.types.ts";
+import type { ComposedEntitlementFeature } from "../features/entitlement/entitlement.composition.types.ts";
 import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types.ts";
 import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types.ts";
 import type { ComposedLangyFeature } from "../features/langy/langy.composition.types.ts";
@@ -579,11 +578,10 @@ export type ApiProductionCompositionOptions = {
    */
   studioDispatch?: WorkflowStudioDispatchService;
   /**
-   * The usage reading and the approaching-limit mail, over the deployment's
-   * billing store. Absent, both refuse rather than reporting zero of an
-   * allowance, which would be a wrong answer rather than a smaller one.
+   * The approaching-limit mail, over the deployment's own gateway. Absent, the
+   * send refuses rather than reporting a message it never delivered.
    */
-  usage?: ApiUsageStatsPort;
+  usage?: UsageWarningPort;
   /** Which plan an organization is on. Absent, the plan read refuses. */
   plans?: PlanProvider;
   /**
@@ -671,6 +669,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAuthFeature!: ComposedAuthFeature;
   private composedUser!: ComposedUserFeature;
   private composedPresence!: ComposedPresenceFeature;
+  /**
+   * The process's ONE tenant fan-out. Created here rather than inside the
+   * presence install because four halves ride it and three of them compose
+   * before presence can: a second fabric would leave a browser watching a
+   * channel nothing writes to.
+   */
+  private composedBroadcast!: BroadcastAdapter;
   private composedApiKey!: ComposedApiKeyFeature;
   /**
    * The identity ledgers' event stack. Always composed — a process with no queue gets one
@@ -693,7 +698,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedTrace!: ComposedTraceFeature;
   /** The seat gate `licenseEnforcement.*` answers from; see {@link optionalPorts}. */
   private composedSeatAllowances: ApiSeatAllowancePort | undefined;
-  private composedShare!: ComposedShareFeature;
+  /**
+   * The share ledger, or none. There is no refusing twin: a process that opened
+   * no database mounts neither share namespace.
+   */
+  private composedShare: ComposedShareFeature | undefined;
   private composedTopic!: ComposedTopicFeature;
   private composedRole!: ComposedRoleFeature;
   private composedHome!: ComposedHomeFeature;
@@ -713,7 +722,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAnnotation!: ComposedAnnotationFeature;
   private composedNotification: ComposedNotificationFeature | undefined;
   private composedSavedView!: ComposedSavedViewFeature;
-  private composedSpend!: ComposedSpendFeature;
+  private composedEntitlement: ComposedEntitlementFeature | undefined;
   private composedHttpProxy!: ComposedHttpProxyFeature;
   private composedStudioDispatch: WorkflowStudioDispatchService | undefined;
   private composedModelProvider!: ComposedModelProviderFeature;
@@ -764,6 +773,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedMonitors: MonitorService | undefined;
   private composedModelProviders: ModelProviderService | undefined;
   private composedPlanProvider: PlanProvider | undefined;
+  private composedPlanSources: EntitlementServiceOptions | undefined;
   private composedEntitlementAbsence: LoggedApiEntitlementAbsence | undefined;
   /**
    * The one shared counter.
@@ -950,7 +960,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // sign-up and presence. Composed over the SAME user directory the browser-session boundary
     // resolves through and the SAME organization service the REST doors serve from — a second
     // of either would be a second answer to who somebody is.
-    this.composePersonFeatures(options, auth, tenancy, queueInfrastructure);
+    this.composePersonFeatures(options, auth, tenancy);
     // The product half: a reviewer's annotations, the support inbox, the project's privacy
     // rules and its setup checklist. It composes FIRST because it is the one half that cannot
     // be missing on a process holding a database, which is what makes it the seed the other
@@ -979,6 +989,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           auditLog: this.resolveAuditLog(),
         }
       : undefined;
+    // The tenant fan-out every live surface on this process rides: presence,
+    // both trace subscriptions, the simulation feed, the workbench cell and the
+    // two bulk exports. Created HERE because it is the process's rather than
+    // any one feature's, and before the four halves that take it. Over the SAME
+    // Redis the queue owns, so a replica publishes where the others subscribe.
+    this.composedBroadcast = BroadcastAdapter.create(queueInfrastructure?.redis ?? null);
+    options.resources.own("api presence broadcast", () => this.composedBroadcast.close());
+    options.resources.ownService({
+      name: "api presence broadcast",
+      start: () => this.composedBroadcast.start(),
+      stop: () => this.composedBroadcast.close(),
+    });
     // The execution features: the studio's own lifecycle, the optimization
     // panel, the experiment wizard and its run loop, and the re-score. One
     // workflow service serves all of them plus the evaluator service built
@@ -1013,18 +1035,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       : refusingTopicFeature();
     this.composedShare =
       infrastructure && this.composedTenancy && this.composedAuthz
-        ? composeShareFeature({
+        ? await installApiShare({
             infrastructure,
             peers: {
               dataRetention: this.composedDataRetention.service,
-              projects: this.composedTenancy.projects,
-              grants: this.composedAuthz.grants,
+              permissions: this.composedAuthz.app,
             },
             // The SAME Redis the queue owns, which presence and the broadcast
             // fan-out already ride.
             redis: queueInfrastructure?.redis ?? null,
           })
-        : refusingShareFeature();
+        : undefined;
     // A project's captured traffic: the trace itself and the five surfaces it
     // is read and corrected through. It composes after those three because it
     // reads all of them, and after the analytics half because its ClickHouse is
@@ -1088,6 +1109,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // seeding, because every one of them resolves an organization or a project through the
     // tenancy graph.
     this.composeTenantFeatures(options, encryption, queueInfrastructure, infrastructure);
+    // Who else is looking at this project. Installed HERE because this is the
+    // first line at which the project directory it resolves a project's
+    // presence policy through is open, over the fan-out the process created
+    // above and the halves before it already publish on.
+    this.composedPresence = await installApiPresence({
+      broadcast: this.composedBroadcast,
+      // The SAME Redis the queue owns: a session is kept where the fan-out
+      // rides rather than on a second connection.
+      redis: queueInfrastructure?.redis ?? null,
+      peers: { projects: this.composedProject.app, users: this.composedUser.app },
+    });
     // A project's own object store and the monitors running beside it. They compose after the
     // execution and product-group halves because the monitor surface takes their monitor
     // service, evaluator service and evaluator replication — one graph per answer, rather than
@@ -1177,7 +1209,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedNotification = infrastructure
       ? await installApiNotification({ infrastructure })
       : undefined;
-    this.composedSpend = this.composeSpend(options, infrastructure);
+    this.composedEntitlement = await this.composeEntitlement(options, infrastructure);
     // The studio's dispatch and the provider surfaces. Both used to ride inside
     // the observability half, so a process missing the trace read stack lost
     // the studio and every stored credential with it. The provider feature
@@ -1239,103 +1271,118 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       dataRetention: this.composedDataRetention.service,
       ...(this.composedMail ? { mail: this.composedMail } : {}),
     });
-    const features = ApiTrpcFeaturesComposition.tryCompose({
-      // What a feature composes ITSELF out of, built once above and handed to
-      // every `compose<Feature>()` the record's literal names.
-      infrastructure,
-      // The features whose doors are not only tRPC, composed before the mount
-      // existed. Absent infrastructure there is no record either, so the
-      // refusing gateway stands in rather than a second condition here.
-      composed: {
-        analytics: this.composedAnalytics,
-        featureFlag: this.composedFeatureFlag,
-        dataset: this.composedDataset,
-        evaluator: this.composedEvaluator,
-        prompt: this.composedPrompt,
-        gateway: this.composedGateway,
-        langy: this.composedLangy,
-        ops: this.composedOps,
-        scenario: this.composedScenario,
-        dataRetention: this.composedDataRetention,
-        home: this.composedHome,
-        role: this.composedRole,
-        monitor: this.composedMonitor,
-        storedObject: this.composedStoredObject,
-        bugReport: this.composedBugReport,
-        dataPrivacy: this.composedDataPrivacy,
-        integrationsChecks: this.composedIntegrationsChecks,
-        annotation: this.composedAnnotation,
-        savedView: this.composedSavedView,
-        spend: this.composedSpend,
-        httpProxy: this.composedHttpProxy,
-        modelProvider: this.composedModelProvider,
-        share: this.composedShare,
-        topic: this.composedTopic,
-        trace: this.composedTrace,
-        workflow: this.composedWorkflow,
-        experiment: this.composedExperiment,
-        evaluation: this.composedEvaluation,
-        organization: this.composedOrganization,
-        project: this.composedProject,
-        codingAgent: this.composedCodingAgent,
-        automation: this.composedAutomation,
-        enterprise: this.composedEnterprise,
-        auth: this.composedAuthFeature,
-        user: this.composedUser,
-        presence: this.composedPresence,
-        apiKey: this.composedApiKey,
-      },
-      // The ONE application every packaged surface reads off `ctx.app`. One
-      // literal, and every slice on it is contributed by the feature that
-      // composed it, or by that feature's named refusal.
-      collaborators: {
-        application: {
-          apiKeys: this.composedApiKey.app,
-          broadcast: this.composedPresence.emitter,
-          config: this.composedUser.config,
-          organizations: this.composedOrganization.app,
-          presence: this.composedPresence.app,
-          users: this.composedUser.app,
-          analytics: this.composedAnalytics.analytics,
-          annotation: this.composedAnnotation.app,
-          modelProviders: this.composedModelProvider.app,
-          dataRetention: this.composedDataRetention.service,
-          planProvider: this.resolvePlanProvider(options),
-          share: this.composedShare.service,
-          topics: this.composedTopic.service,
-          traces: this.composedTrace.traces,
-          workflows: this.composedWorkflow.app,
-          experiments: this.composedExperiment.app,
-          evaluations: this.composedEvaluation.app,
-          automation: this.composedAutomation.app,
-          codingAgentApp: this.composedCodingAgent.app,
-          projects: this.composedProject.app,
-          ...this.composedEnterprise.application,
-          // The checkout, portal, invoice and seat-change half of
-          // `subscription.*`. Empty off Stripe, which is what makes the
-          // surface report that this deployment does not bill.
-          ...this.composedBillingWebhook.application,
-          authzApp: this.composedRole.authzApp,
-          dashboard: this.composedAnalytics.dashboard,
-          dataset: this.composedDataset.app,
-          evaluatorApp: this.composedEvaluator.app,
-          featureFlag: this.composedFeatureFlag.app,
-          prompts: this.composedPrompt.app,
-          gateway: this.composedGateway.app,
-          github,
-          langy: this.composedLangy.app,
-          ops: this.composedOps.app,
-          monitors: this.composedMonitor.app,
-          permissions: authz,
-          roles: this.composedRole.app,
-          scenarios: this.composedScenario.scenarios,
-          storedObjectApp: this.composedStoredObject.app,
-          suites: this.composedScenario.suites,
-          ...composeEnterpriseGovernanceApplication(this.resolveEnterprise()),
-        },
-      },
-      report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
-    });
+    // The two features with no refusing twin. Neither mounts without its own
+    // application — `ctx.app.share` and the one plan answer are read by
+    // surfaces those features do not own — so the record refuses whole rather
+    // than serving slices with nothing behind them.
+    const share = this.composedShare;
+    const entitlement = this.composedEntitlement;
+    const trpcAbsence = LoggedApiTrpcFeaturesAbsence.create(
+      createLogger(options.config.serviceName),
+    );
+    if (infrastructure && (!share || !entitlement)) trpcAbsence.absent("no-collaborators");
+    const features =
+      share && entitlement
+        ? ApiTrpcFeaturesComposition.tryCompose({
+            // What a feature composes ITSELF out of, built once above and handed to
+            // every `compose<Feature>()` the record's literal names.
+            infrastructure,
+            // The features whose doors are not only tRPC, composed before the mount
+            // existed. Absent infrastructure there is no record either, so the
+            // refusing gateway stands in rather than a second condition here.
+            composed: {
+              analytics: this.composedAnalytics,
+              featureFlag: this.composedFeatureFlag,
+              dataset: this.composedDataset,
+              evaluator: this.composedEvaluator,
+              prompt: this.composedPrompt,
+              gateway: this.composedGateway,
+              langy: this.composedLangy,
+              ops: this.composedOps,
+              scenario: this.composedScenario,
+              dataRetention: this.composedDataRetention,
+              home: this.composedHome,
+              role: this.composedRole,
+              monitor: this.composedMonitor,
+              storedObject: this.composedStoredObject,
+              bugReport: this.composedBugReport,
+              dataPrivacy: this.composedDataPrivacy,
+              integrationsChecks: this.composedIntegrationsChecks,
+              annotation: this.composedAnnotation,
+              savedView: this.composedSavedView,
+              entitlement,
+              httpProxy: this.composedHttpProxy,
+              modelProvider: this.composedModelProvider,
+              share,
+              topic: this.composedTopic,
+              trace: this.composedTrace,
+              workflow: this.composedWorkflow,
+              experiment: this.composedExperiment,
+              evaluation: this.composedEvaluation,
+              organization: this.composedOrganization,
+              project: this.composedProject,
+              codingAgent: this.composedCodingAgent,
+              automation: this.composedAutomation,
+              enterprise: this.composedEnterprise,
+              auth: this.composedAuthFeature,
+              user: this.composedUser,
+              presence: this.composedPresence,
+              apiKey: this.composedApiKey,
+            },
+            // The ONE application every packaged surface reads off `ctx.app`. One
+            // literal, and every slice on it is contributed by the feature that
+            // composed it, or by that feature's named refusal.
+            collaborators: {
+              application: {
+                apiKeys: this.composedApiKey.app,
+                broadcast: this.composedPresence.emitter,
+                config: this.composedUser.config,
+                organizations: this.composedOrganization.app,
+                presence: this.composedPresence.app,
+                users: this.composedUser.app,
+                analytics: this.composedAnalytics.analytics,
+                annotation: this.composedAnnotation.app,
+                modelProviders: this.composedModelProvider.app,
+                dataRetention: this.composedDataRetention.service,
+                // The booted entitlement application, which resolves the plan off
+                // the SAME sources this process's own provider does.
+                planProvider: entitlement.app,
+                share: share.app,
+                topics: this.composedTopic.service,
+                traces: this.composedTrace.traces,
+                workflows: this.composedWorkflow.app,
+                experiments: this.composedExperiment.app,
+                evaluations: this.composedEvaluation.app,
+                automation: this.composedAutomation.app,
+                codingAgentApp: this.composedCodingAgent.app,
+                projects: this.composedProject.app,
+                ...this.composedEnterprise.application,
+                // The checkout, portal, invoice and seat-change half of
+                // `subscription.*`. Empty off Stripe, which is what makes the
+                // surface report that this deployment does not bill.
+                ...this.composedBillingWebhook.application,
+                authzApp: this.composedRole.authzApp,
+                dashboard: this.composedAnalytics.dashboard,
+                dataset: this.composedDataset.app,
+                evaluatorApp: this.composedEvaluator.app,
+                featureFlag: this.composedFeatureFlag.app,
+                prompts: this.composedPrompt.app,
+                gateway: this.composedGateway.app,
+                github,
+                langy: this.composedLangy.app,
+                ops: this.composedOps.app,
+                monitors: this.composedMonitor.app,
+                permissions: authz,
+                roles: this.composedRole.app,
+                scenarios: this.composedScenario.scenarios,
+                storedObjectApp: this.composedStoredObject.app,
+                suites: this.composedScenario.suites,
+                ...composeEnterpriseGovernanceApplication(this.resolveEnterprise()),
+              },
+            },
+            report: trpcAbsence,
+          })
+        : undefined;
     // The hosted Model Context Protocol endpoint, served off the Node server ahead of the Hono
     // application because its Streamable HTTP and Server-Sent Events transports hold the raw
     // response for a session's life.
@@ -1757,7 +1804,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // answer from one service. The share ledger and the plan provider are TAKEN from the halves
     // that composed them for the same reason.
     const organizationRest = this.composedOrganization.rest;
-    const shares = this.composedShare.service;
+    const shares = this.composedShare?.app;
     const plans = this.composedPlanProvider;
     // The bulk run export. Composed only where this process holds BOTH a
     // browser-session transport and the simulation store: the session is what
@@ -1947,10 +1994,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         }
       : undefined;
     const traceLegacy =
-      traceGroup && traceStack
+      traceGroup && traceStack && shares
         ? {
             traces: () => traceGroup.traces,
-            shares: () => this.composedShare.service,
+            shares: () => shares,
             reads: traceStack,
             credential: (input: { request: Request; permission: AuthzPermission }) =>
               handlerManagedCredentials.authenticate(input),
@@ -3001,14 +3048,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * Composes the four person-shaped features: the two signed-out doors, the signed-in person's
-   * account, presence and the tenant fan-out it publishes on, and the project's credentials.
+   * Composes the three person-shaped features: the two signed-out doors, the signed-in person's
+   * account, and the project's credentials.
    */
   private composePersonFeatures(
     options: ApiRuntimeCompositionOptions,
     auth: ApiAuthSessionCompositionPort,
     tenancy: ApiResolvedTenancy,
-    queueInfrastructure: ApiQueueInfrastructure | undefined,
   ): void {
     const database = this.composedDatabase?.connection;
     const projects = this.composedTenancy?.projects;
@@ -3020,7 +3066,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     if (!database || !projects) {
       this.composedAuthFeature = refusingAuthFeature(processName);
       this.composedUser = refusingUserFeature(processName);
-      this.composedPresence = refusingPresenceFeature();
       this.composedApiKey = refusingApiKeyFeature();
       return;
     }
@@ -3061,14 +3106,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       deployment: this.personDeployment(options),
       ...(personMail ? { mail: personMail } : {}),
       processName,
-    });
-
-    this.composedPresence = composePresenceFeature({
-      // The SAME Redis the queue owns: presence and the broadcast fan-out ride
-      // the process's one connection rather than opening a second.
-      redis: queueInfrastructure?.redis ?? null,
-      projects,
-      resources: options.resources,
     });
 
     this.composedApiKey = composeApiKeyFeature({
@@ -3191,12 +3228,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const agents = this.agentApi;
-    // The broadcast fabric presence publishes on. Read off the presence feature
-    // rather than composed again: this half's subscription and every presence
-    // event ride ONE emitter per tenant.
-    const broadcast = this.composedPresence.broadcast;
+    // The process's ONE fan-out: this half's subscription and every presence
+    // event ride one emitter per tenant.
     const auth = this.composedAuth?.compose();
-    if (!database || !tenancy || !agents || !broadcast || !auth) {
+    if (!database || !tenancy || !agents || !auth) {
       return refusingScenarioFeature();
     }
 
@@ -3241,7 +3276,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // author and the person the session names must be one answer.
       users: this.composedUser.app,
       projects: tenancy.projects,
-      broadcast: this.composedPresence.emitter,
+      broadcast: this.composedBroadcast,
       encryption,
       // The SAME routed ClickHouse the charted reads and the trace half use.
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
@@ -3266,12 +3301,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const grants = this.composedAuthz?.grants;
-    // The broadcast fabric presence already publishes on. Read off the identity
-    // half rather than composed again: both trace subscriptions and every
-    // presence event ride ONE emitter per tenant, and two would leave a browser
-    // watching a channel nothing writes to.
-    const broadcast = this.composedPresence.emitter;
-    if (!database || !tenancy || !grants || !broadcast) return refusingTraceFeature();
+    // The process's ONE fan-out, taken rather than composed again: both trace
+    // subscriptions and every presence event ride one emitter per tenant, and
+    // two would leave a browser watching a channel nothing writes to.
+    const broadcast = this.composedBroadcast;
+    const share = this.composedShare;
+    if (!database || !tenancy || !grants || !share) return refusingTraceFeature();
 
     return composeTraceFeature({
       prisma: database.client,
@@ -3281,7 +3316,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The share ledger and the topic tree, taken rather than built: the same
       // ledger the settings form administers redeems an anonymous read's token,
       // and the same tree `topics.*` answers labels the grid's rows.
-      peers: { share: this.composedShare.service, topics: this.composedTopic.service },
+      peers: { share: share.app, topics: this.composedTopic.service },
       // The SAME ClickHouse the charted reads run on, opened once by
       // `composeAnalytics`: a trace and its chart are rows in one routed
       // instance, and a second connection would be a second pool.
@@ -3368,18 +3403,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * Composes an organization's spend and the allowance it is taken against. ONE plan provider
-   * serves both, because the panel and every banner that quotes an allowance must agree about
-   * which plan an organization is on.
+   * Installs what an organization's plan allows, what has been used against it and what it
+   * has cost. ONE application serves all three, because the panel and every banner that
+   * quotes an allowance must agree about which plan an organization is on.
    */
-  private composeSpend(
+  private async composeEntitlement(
     options: ApiRuntimeCompositionOptions,
     infrastructure: ApiTrpcInfrastructure | undefined,
-  ): ComposedSpendFeature {
+  ): Promise<ComposedEntitlementFeature | undefined> {
     const notifications = this.composedNotification;
-    if (!infrastructure || !notifications) return refusingSpendFeature();
+    if (!infrastructure || !notifications) return undefined;
     const usage =
-      this.options.usage ??
       composeApiUsageStats({
         prisma: infrastructure.prisma,
         plans: this.resolvePlanProvider(options),
@@ -3401,10 +3435,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         report: this.entitlementAbsence(options),
       });
 
-    return composeSpendFeature({
+    return await installApiEntitlement({
       infrastructure,
-      usage,
-      report: LoggedApiSpendAbsence.create(createLogger(options.config.serviceName)),
+      // The SAME sources the process's plan provider resolves through, so a
+      // banner and the surface beside it cannot disagree about which plan.
+      entitlement: {
+        ...this.resolvePlanSources(options),
+        counter: usage.counter,
+        // A host's own gateway wins; otherwise this deployment's.
+        warnings: this.options.usage ?? usage.warnings,
+      },
+      // The SAME user directory the /me screens answer from: the operator a
+      // plan is enriched for and the person a session names are one answer.
+      peers: { users: this.composedUser.app },
     });
   }
 
@@ -3423,7 +3466,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // directory below: taken rather than built so a monitor's evaluator and
     // the `evaluators.*` surface cannot disagree about what one runs.
     const evaluators = this.composedEvaluators;
-    if (!infrastructure || !database || !tenancy || !evaluators) {
+    // The share ledger the project settings form administers. There is no
+    // refusing twin to stand in for it, and a project surface that cannot say
+    // what a project shares is not a narrower answer but a wrong one.
+    const share = this.composedShare;
+    if (!infrastructure || !database || !tenancy || !evaluators || !share) {
       this.composedOrganization = refusingOrganizationFeature();
       this.composedProject = refusingProjectFeature();
       this.composedCodingAgent = refusingCodingAgentFeature();
@@ -3522,7 +3569,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // Taken rather than built: a second share ledger or topic tree would
         // let the settings form and the explorer disagree about what a
         // project holds.
-        share: this.composedShare.service,
+        share: share.app,
         topics: this.composedTopic.service,
         encryption,
         ...(viewerProtections ? { viewerProtections } : {}),
@@ -3977,9 +4024,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   private resolvePlanProvider(options: ApiRuntimeCompositionOptions): PlanProvider {
-    if (this.composedPlanProvider) return this.composedPlanProvider;
+    this.composedPlanProvider ??= EntitlementService.create(this.resolvePlanSources(options));
+    return this.composedPlanProvider;
+  }
+
+  /**
+   * The deployment's plan sources, resolved once: the installed entitlement feature
+   * builds its own resolver over these rather than being handed a second provider,
+   * and each absent source is named once rather than once per reader.
+   */
+  private resolvePlanSources(options: ApiRuntimeCompositionOptions): EntitlementServiceOptions {
+    if (this.composedPlanSources) return this.composedPlanSources;
     const database = this.composedDatabase?.connection;
-    this.composedPlanProvider = composeApiPlanProvider({
+    this.composedPlanSources = composeApiPlanSources({
       isSaas: options.config.infrastructure.modelProvider.isSaas,
       // The subscription rows the hosted deployment's paid plans live in, and the licence row a
       // self-hosted deployment's Enterprise tier lives in, on the SAME guarded client every
@@ -4000,7 +4057,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       adminEmails: AdminAccessService.parseEmails(this.personDeployment(options).adminEmails ?? []),
       report: this.entitlementAbsence(options),
     });
-    return this.composedPlanProvider;
+    return this.composedPlanSources;
   }
 
   /** One report for every entitlement absence, named once per process. */
@@ -4215,7 +4272,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME fabric presence and the agent pipelines publish on: a
       // workbench cell saved on one replica has to reach the editor tab
       // subscribed on another, which a per-process emitter never does.
-      broadcast: this.composedPresence.emitter,
+      broadcast: this.composedBroadcast,
       runReport: LoggedApiExperimentRunAbsence.create(createLogger(options.config.serviceName)),
     });
   }
