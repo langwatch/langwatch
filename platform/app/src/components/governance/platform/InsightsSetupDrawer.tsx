@@ -4,6 +4,7 @@ import {
   Field,
   HStack,
   Input,
+  type ListCollection,
   Separator,
   Spacer,
   Text,
@@ -137,30 +138,9 @@ export function InsightsSetupDrawer({
   }, [open, settings]);
   const patch = (next: Partial<InsightsSettings>) =>
     setDraft((current) => ({ ...current, ...next }));
-
-  // Same two queries the Langy panel seeds its own picker from: the model
-  // Langy's gate resolves for this project, and the models it may use.
-  // Governance is org-level and may have no project; like costs.tsx, never
-  // let this hook bounce the reader to onboarding on its own.
-  const { project } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
+  const { langyDefaultModel, modelOptions } = useLangyModelChoice({
+    enabled: open,
   });
-  const projectId = project?.id ?? "";
-  const langyDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId, featureKey: LANGY_CHAT_FEATURE_KEY },
-    { enabled: !!projectId && open, staleTime: 300_000 },
-  );
-  const modelsAllowedQuery = api.langy.modelsAllowed.useQuery(
-    { projectId },
-    { enabled: !!projectId && open, staleTime: 300_000 },
-  );
-  const modelOptions = useMemo(
-    () => modelsAllowedQuery.data?.modelsAllowed ?? allModelOptions,
-    [modelsAllowedQuery.data?.modelsAllowed],
-  );
-  const langyDefaultModel = langyDefaultQuery.data?.model ?? "";
-  const shownModel = draft.model ?? langyDefaultModel;
 
   return (
     <Drawer.Root
@@ -183,66 +163,7 @@ export function InsightsSetupDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={0} separator={<Separator />}>
-            <SettingRow
-              label="Runs"
-              hint="How often the background job messages Langy"
-            >
-              <Select.Root
-                collection={RUNS_OPTIONS}
-                size="sm"
-                value={[draft.runs]}
-                onValueChange={({ value }) => {
-                  const runs = value[0] as InsightsSettings["runs"] | undefined;
-                  if (runs) patch({ runs });
-                }}
-              >
-                <Select.Trigger>
-                  <Select.ValueText />
-                </Select.Trigger>
-                <Select.Content>
-                  {RUNS_OPTIONS.items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </SettingRow>
-            <SettingRow label="At" hint="Europe/Amsterdam">
-              <Input
-                type="time"
-                size="sm"
-                value={draft.at}
-                onChange={(event) => patch({ at: event.target.value })}
-              />
-            </SettingRow>
-            <SettingRow
-              label="Volume"
-              hint="Few insights that matter beat fifteen that don't"
-            >
-              <Select.Root
-                collection={VOLUME_OPTIONS}
-                size="sm"
-                value={[draft.volume]}
-                onValueChange={({ value }) => {
-                  const volume = value[0] as
-                    | InsightsSettings["volume"]
-                    | undefined;
-                  if (volume) patch({ volume });
-                }}
-              >
-                <Select.Trigger>
-                  <Select.ValueText />
-                </Select.Trigger>
-                <Select.Content>
-                  {VOLUME_OPTIONS.items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </SettingRow>
+            <ScheduleRows draft={draft} patch={patch} />
             <SettingRow
               label="Model"
               hint={
@@ -252,7 +173,7 @@ export function InsightsSetupDrawer({
               }
             >
               <ModelSelector
-                model={shownModel}
+                model={draft.model ?? langyDefaultModel}
                 options={modelOptions}
                 onChange={(model) => patch({ model })}
                 size="full"
@@ -265,64 +186,8 @@ export function InsightsSetupDrawer({
                 featureKey={LANGY_CHAT_FEATURE_KEY}
               />
             </SettingRow>
-            <SettingRow
-              label="Session"
-              hint="One eternal conversation: every run appends, and your feedback steers it"
-            >
-              <HStack gap={2}>
-                <Button variant="outline" size="xs">
-                  Open session
-                </Button>
-                <Button variant="ghost" size="xs" color="fg.muted">
-                  Clear session…
-                </Button>
-              </HStack>
-            </SettingRow>
-            <SettingRow
-              label="Skill instructions"
-              hint="What the daily job tells Langy. Edit it and the next run obeys."
-            >
-              <Textarea
-                value={draft.skillInstructions}
-                onChange={(event) =>
-                  patch({ skillInstructions: event.target.value })
-                }
-                rows={10}
-                fontSize="sm"
-                lineHeight="1.6"
-              />
-            </SettingRow>
-            <VStack align="stretch" gap={2} paddingY={4}>
-              <HStack gap={2}>
-                <UserRoundCog size={14} />
-                <Text fontSize="sm" fontWeight="medium">
-                  Learned preferences
-                </Text>
-              </HStack>
-              <Text fontSize="xs" color="fg.muted">
-                What steering left behind. Complain about an insight and the
-                correction lands here.
-              </Text>
-              <VStack
-                align="stretch"
-                gap={0}
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                separator={<Separator />}
-              >
-                {LEARNED_PREFERENCES.map((preference) => (
-                  <Text
-                    key={preference}
-                    fontSize="sm"
-                    paddingX={3}
-                    paddingY={2}
-                  >
-                    {preference}
-                  </Text>
-                ))}
-              </VStack>
-            </VStack>
+            <SessionRows draft={draft} patch={patch} />
+            <LearnedPreferences />
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -338,5 +203,174 @@ export function InsightsSetupDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * Same two queries the Langy panel seeds its own picker from: the model
+ * Langy's gate resolves for this project, and the models it may use.
+ * Governance is org-level and may have no project; like costs.tsx, never
+ * let this hook bounce the reader to onboarding on its own.
+ */
+function useLangyModelChoice({ enabled }: { enabled: boolean }) {
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const projectId = project?.id ?? "";
+  const langyDefaultQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId, featureKey: LANGY_CHAT_FEATURE_KEY },
+    { enabled: !!projectId && enabled, staleTime: 300_000 },
+  );
+  const modelsAllowedQuery = api.langy.modelsAllowed.useQuery(
+    { projectId },
+    { enabled: !!projectId && enabled, staleTime: 300_000 },
+  );
+  const modelOptions = useMemo(
+    () => modelsAllowedQuery.data?.modelsAllowed ?? allModelOptions,
+    [modelsAllowedQuery.data?.modelsAllowed],
+  );
+  return {
+    langyDefaultModel: langyDefaultQuery.data?.model ?? "",
+    modelOptions,
+  };
+}
+
+type DraftProps = {
+  draft: InsightsSettings;
+  patch: (next: Partial<InsightsSettings>) => void;
+};
+
+/** When the job runs and how much it may file. */
+function ScheduleRows({ draft, patch }: DraftProps) {
+  return (
+    <>
+      <SettingRow
+        label="Runs"
+        hint="How often the background job messages Langy"
+      >
+        <ChoiceSelect
+          collection={RUNS_OPTIONS}
+          value={draft.runs}
+          onChange={(runs) => patch({ runs })}
+        />
+      </SettingRow>
+      <SettingRow label="At" hint="Europe/Amsterdam">
+        <Input
+          type="time"
+          size="sm"
+          value={draft.at}
+          onChange={(event) => patch({ at: event.target.value })}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Volume"
+        hint="Few insights that matter beat fifteen that don't"
+      >
+        <ChoiceSelect
+          collection={VOLUME_OPTIONS}
+          value={draft.volume}
+          onChange={(volume) => patch({ volume })}
+        />
+      </SettingRow>
+    </>
+  );
+}
+
+/** The eternal session and the skill it runs. */
+function SessionRows({ draft, patch }: DraftProps) {
+  return (
+    <>
+      <SettingRow
+        label="Session"
+        hint="One eternal conversation: every run appends, and your feedback steers it"
+      >
+        <HStack gap={2}>
+          <Button variant="outline" size="xs">
+            Open session
+          </Button>
+          <Button variant="ghost" size="xs" color="fg.muted">
+            Clear session…
+          </Button>
+        </HStack>
+      </SettingRow>
+      <SettingRow
+        label="Skill instructions"
+        hint="What the daily job tells Langy. Edit it and the next run obeys."
+      >
+        <Textarea
+          value={draft.skillInstructions}
+          onChange={(event) => patch({ skillInstructions: event.target.value })}
+          rows={10}
+          fontSize="sm"
+          lineHeight="1.6"
+        />
+      </SettingRow>
+    </>
+  );
+}
+
+/** A single-value pick from a fixed list; the repo Select under the row's Field. */
+function ChoiceSelect<T extends string>({
+  collection,
+  value,
+  onChange,
+}: {
+  collection: ListCollection<{ value: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <Select.Root
+      collection={collection}
+      size="sm"
+      value={[value]}
+      onValueChange={({ value: next }) => {
+        const picked = next[0] as T | undefined;
+        if (picked) onChange(picked);
+      }}
+    >
+      <Select.Trigger>
+        <Select.ValueText />
+      </Select.Trigger>
+      <Select.Content>
+        {collection.items.map((item) => (
+          <Select.Item key={item.value} item={item}>
+            {item.label}
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
+  );
+}
+
+function LearnedPreferences() {
+  return (
+    <VStack align="stretch" gap={2} paddingY={4}>
+      <HStack gap={2}>
+        <UserRoundCog size={14} />
+        <Text fontSize="sm" fontWeight="medium">
+          Learned preferences
+        </Text>
+      </HStack>
+      <Text fontSize="xs" color="fg.muted">
+        What steering left behind. Complain about an insight and the correction
+        lands here.
+      </Text>
+      <VStack
+        align="stretch"
+        gap={0}
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        separator={<Separator />}
+      >
+        {LEARNED_PREFERENCES.map((preference) => (
+          <Text key={preference} fontSize="sm" paddingX={3} paddingY={2}>
+            {preference}
+          </Text>
+        ))}
+      </VStack>
+    </VStack>
   );
 }
