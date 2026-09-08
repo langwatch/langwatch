@@ -40,9 +40,9 @@ import {
   isContentVisible,
   isContentVisibleToPublic,
   type ContentCategory,
+  type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { PrismaDataPrivacyResolutionAdapter } from "@langwatch/data-privacy-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -73,6 +73,12 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   authz: AuthzService;
   /** Resolves a project's organization, for the rollout gate's targeting. */
   projects: ProjectService;
+  /**
+   * The SAME resolved privacy policy the trace read stack redacts by, taken
+   * rather than built: a chart and the traces behind it must not disagree about
+   * which fields a project keeps.
+   */
+  dataPrivacy: DataPrivacyApi;
   /**
    * The process's ONE rollout store, composed by the feature-flag feature.
    */
@@ -182,10 +188,7 @@ export function composeAnalyticsFeature(
 
   const protections = ApiAnalyticsProtections.create({
     authz: options.authz,
-    dataPrivacy: PrismaDataPrivacyResolutionAdapter.create({
-      prisma: options.prisma,
-      projects: options.projects,
-    }),
+    dataPrivacy: options.dataPrivacy,
   });
 
   const workbenchEnabled = (projectId: string): Promise<boolean> =>

@@ -29,7 +29,7 @@ import {
 import { ApiRateLimitInfrastructure } from "../../../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition.ts";
-import { TestDataPrivacyService } from "./support/test-data-privacy.service.ts";
+import { testDataPrivacyApi } from "./support/test-data-privacy.service.ts";
 import {
   composeApiPlanProvider,
   composeApiPlanSources,
@@ -668,7 +668,7 @@ describe("given an API process that composed the real observability collaborator
           // The PLATFORM's own default policy, resolved by the real resolver
           // against an empty rule set: a hand-written policy shape here would
           // be a second declaration of Data Privacy's own contract.
-          dataPrivacy: new TestDataPrivacyService(
+          dataPrivacy: testDataPrivacyApi(
             resolveDataPrivacy({
               rows: [],
               facts: {
@@ -1168,7 +1168,7 @@ function realTraceReadMappers() {
       tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
       tryGetById: async () => ({ id: "project-1" }),
     } as unknown as ProjectService,
-    dataPrivacy: new TestDataPrivacyService(
+    dataPrivacy: testDataPrivacyApi(
       resolveDataPrivacy({
         rows: [],
         facts: {

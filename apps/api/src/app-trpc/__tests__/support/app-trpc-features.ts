@@ -20,12 +20,14 @@ import { composeGatewayFeature } from "../../../features/gateway/gateway.composi
 import { refusingAuthFeature } from "../../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
 import {
+  stubDataPrivacyFeature,
   stubDataRetentionFeature,
   stubEntitlementFeature,
   stubFeatureFlagFeature,
   stubPresenceFeature,
   stubSecretFeature,
   stubShareFeature,
+  stubTopicFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../../features/api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../../features/langy/langy.composition.ts";
@@ -39,13 +41,11 @@ import { refusingRoleFeature } from "../../../features/role/role.composition.ts"
 import { refusingScenarioFeature } from "../../../features/scenario/scenario.composition.ts";
 import { refusingStoredObjectFeature } from "../../../features/stored-object/stored-object.composition.ts";
 import { refusingBugReportFeature } from "../../../features/bug-report/bug-report.composition.ts";
-import { refusingDataPrivacyFeature } from "../../../features/data-privacy/data-privacy.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
 import { refusingSavedViewFeature } from "../../../features/dashboard/saved-view.composition.ts";
 import { refusingHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../../features/model-provider/model-provider.composition.ts";
-import { refusingTopicFeature } from "../../../features/topic/topic.composition.ts";
 import { refusingTraceFeature } from "../../../features/trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../../features/workflow/workflow.composition.ts";
 import { refusingExperimentFeature } from "../../../features/experiment/experiment.composition.ts";
@@ -187,7 +187,7 @@ export function buildAppTrpcFeatures(
       role: refusingRoleFeature(),
       storedObject: refusingStoredObjectFeature(),
       bugReport: refusingBugReportFeature(),
-      dataPrivacy: refusingDataPrivacyFeature(),
+      dataPrivacy: stubDataPrivacyFeature(),
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),
       savedView: refusingSavedViewFeature(),
@@ -195,7 +195,7 @@ export function buildAppTrpcFeatures(
       httpProxy: refusingHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
       share: stubShareFeature(),
-      topic: refusingTopicFeature(),
+      topic: stubTopicFeature(),
       trace: refusingTraceFeature(),
       workflow: refusingWorkflowFeature(),
       experiment: refusingExperimentFeature(),

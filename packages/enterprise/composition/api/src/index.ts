@@ -1,7 +1,6 @@
 import { EnterpriseCatalogue } from "@langwatch/enterprise";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
-import type { SsoGate } from "@langwatch/enterprise-sso-contract";
 
 export {
   EnterpriseGatewayTrpcComposition,
@@ -12,8 +11,6 @@ export {
   type EnterpriseGovernanceTrpcContext,
 } from "./trpc/enterprise-governance-trpc.composition.ts";
 export {
-  BACK_OFFICE_NO_PERMISSION,
-  BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION,
   CURRENCY_NO_PERMISSION,
   EnterpriseTrpcComposition,
   INSTANCE_LICENSE_NO_PERMISSION,
@@ -57,7 +54,6 @@ export {
 
 export type EnterpriseApiCompositionOptions = {
   licensing?: LicensingService;
-  sso?: SsoGate;
   scim?: ScimService;
 };
 
@@ -66,7 +62,6 @@ export class EnterpriseApiComposition {
   private constructor(
     readonly catalogue: EnterpriseCatalogue,
     readonly licensing: LicensingService | undefined,
-    readonly sso: SsoGate | undefined,
     readonly scim: ScimService | undefined,
   ) {}
 
@@ -74,7 +69,6 @@ export class EnterpriseApiComposition {
     return new EnterpriseApiComposition(
       EnterpriseCatalogue.create(),
       options.licensing,
-      options.sso,
       options.scim,
     );
   }
@@ -120,3 +114,22 @@ export {
  */
 export { auditLogServer } from "@langwatch/enterprise-audit-log-server";
 export { EnterpriseApiAuditLog } from "./audit-log.composition.ts";
+
+/**
+ * Single sign-on: the licence gate a sign-in page asks which provider to offer,
+ * and the operator's connection ledger behind `ssoConnections.*`. Reached
+ * through this composition for the same reason the governance family is — an
+ * API-role process may depend on it and on no Enterprise feature server below.
+ */
+export { EnterpriseApiSso, type EnterpriseApiSsoPeers } from "./sso.composition.ts";
+export {
+  ssoConnectionTrpcTransport,
+  SsoConnectionLedgerPort,
+  SsoGateLoggerPort,
+  type SsoInfrastructure,
+} from "@langwatch/enterprise-sso-server";
+export {
+  SsoApi,
+  ssoConfigurationSchema,
+  type SsoConfiguration,
+} from "@langwatch/enterprise-sso-contract";

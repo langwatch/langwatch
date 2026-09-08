@@ -41,9 +41,11 @@ import {
   createShareTrpcRouter,
 } from "../../features/share/share-trpc.mount.ts";
 import type { ComposedShareFeature } from "../../features/share/share.composition.types.ts";
-import { refusingTopicFeature } from "../../features/topic/topic.composition.ts";
+import { createTopicTrpcRouter } from "../../features/topic/topic-trpc.mount.ts";
+import type { ComposedTopicFeature } from "../../features/topic/topic.composition.types.ts";
 import { refusingTraceFeature } from "../../features/trace/trace.composition.ts";
-import { refusingDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition.ts";
+import { createDataPrivacyTrpcRouter } from "../../features/data-privacy/data-privacy-trpc.mount.ts";
+import type { ComposedDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition.types.ts";
 import { refusingIntegrationsChecksFeature } from "../../features/project/integrations-checks.composition.ts";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition.ts";
@@ -125,6 +127,8 @@ export function stubApplicationSlices(
     planProvider: stub("app.planProvider", { getActivePlan: async () => ({ type: "FREE" }) }),
     share: stub("app.share"),
     topics: stub("app.topics"),
+    dataPrivacy: stub("app.dataPrivacy"),
+    sso: stub("app.sso"),
     traces: stub("app.traces"),
     workflows: stub("app.workflows"),
     experiments: stub("app.experiments"),
@@ -217,6 +221,20 @@ export function stubDataRetentionFeature(): ComposedDataRetentionFeature {
   };
 }
 
+export function stubTopicFeature(): ComposedTopicFeature {
+  return {
+    app: stub("topic"),
+    router: (mount) => createTopicTrpcRouter(mount.runtime),
+  };
+}
+
+export function stubDataPrivacyFeature(): ComposedDataPrivacyFeature {
+  return {
+    app: stub("dataPrivacy"),
+    router: (mount) => createDataPrivacyTrpcRouter(mount.runtime),
+  };
+}
+
 export function stubSecretFeature(): ComposedSecretFeature {
   return {
     app: createApiFixture<ComposedSecretFeature["app"]>({}, "secrets"),
@@ -276,9 +294,9 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     httpProxy: refusingHttpProxyFeature(),
     modelProvider: refusingModelProviderFeature(),
     share: stubShareFeature(),
-    topic: refusingTopicFeature(),
+    topic: stubTopicFeature(),
     trace: refusingTraceFeature(),
-    dataPrivacy: refusingDataPrivacyFeature(),
+    dataPrivacy: stubDataPrivacyFeature(),
     integrationsChecks: refusingIntegrationsChecksFeature(),
     organization: refusingOrganizationFeature(),
     project: refusingProjectFeature(),

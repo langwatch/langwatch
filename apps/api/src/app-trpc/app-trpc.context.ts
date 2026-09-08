@@ -12,8 +12,10 @@ import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApp } from "@langwatch/api-key-server";
 import type { AutomationApp } from "@langwatch/automation-server";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type {
   EnterpriseTrpcContext,
+  SsoApi,
   GovernanceApp,
   GovernanceService,
   OrganizationSessionPolicyService,
@@ -37,7 +39,7 @@ import type { MonitorApp } from "@langwatch/monitor-server";
 import type { StoredObjectApp } from "@langwatch/stored-object-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { ShareApi } from "@langwatch/share-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceApp } from "@langwatch/trace-server";
 import type { ProjectApp } from "@langwatch/project-server";
 import type { PromptApp } from "@langwatch/prompt-server";
@@ -182,7 +184,18 @@ export type ApiTrpcFeatureApplication = Readonly<{
   /** The share ledger behind a link, a pin, and the anonymous trace read. */
   share: ShareApi;
   /** The clusters a project's traces were grouped into. */
-  topics: TopicService;
+  topics: TopicApi;
+  /**
+   * A project's scoped privacy rules, as the settings screen renders them and
+   * as every read redacted under them resolves one.
+   */
+  dataPrivacy: DataPrivacyApi;
+  /**
+   * Single sign-on, as the back office reads and commands a connection. One
+   * application for the gate and the ledger, because whether federation is
+   * licensed and which connections exist are the same question.
+   */
+  sso: SsoApi;
   /**
    * The trace application all five trace doors read through — the explorer, the legacy
    * grid, one trace's spans, the reviewer's correction, and the anonymous share page. One

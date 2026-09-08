@@ -1,7 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
+import {
+  PLATFORM_DEFAULT_DATA_PRIVACY,
+  resolveDataPrivacy,
+  type DataPrivacyRow,
+} from "@langwatch/data-privacy-contract";
+import type { DataPrivacyResolutionPort } from "@langwatch/data-privacy-server";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -84,6 +89,8 @@ function teamRow() {
 
 type FakeDatabase = {
   database: WorkerTraceCapabilityDatabase;
+  /** The resolution the process hands the record path, over the same rows. */
+  dataPrivacy: DataPrivacyResolutionPort;
   projectFindUnique: ReturnType<typeof vi.fn>;
   projectUpdate: ReturnType<typeof vi.fn>;
   policyFindMany: ReturnType<typeof vi.fn>;
@@ -130,6 +137,19 @@ function fakeDatabase(
       customLLMModelCost: { findMany: costFindMany },
       monitor: { findMany: monitorFindMany },
     } as unknown as WorkerTraceCapabilityDatabase,
+    dataPrivacy: {
+      getResolvedForProject: async () =>
+        resolveDataPrivacy({
+          rows: (options.policies ?? []) as DataPrivacyRow[],
+          facts: {
+            organizationId: "organization-1",
+            teamId: "team-1",
+            projectId: "project-1",
+            departmentId: null,
+            isPersonal: false,
+          },
+        }),
+    },
     projectFindUnique,
     projectUpdate,
     policyFindMany,
@@ -174,9 +194,9 @@ describe("createWorkerTraceCapabilityServices", () => {
     describe("when the four capability services are composed", () => {
       /** @scenario "The record path's capability services compose from a database alone" */
       it("builds all four without an organization, authz, evaluator or credentials collaborator", () => {
-        const { database } = fakeDatabase();
+        const { database, dataPrivacy } = fakeDatabase();
 
-        const services = createWorkerTraceCapabilityServices({ database });
+        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy });
 
         expect(Object.keys(services).sort()).toEqual([
           "dataPrivacy",
@@ -191,7 +211,10 @@ describe("createWorkerTraceCapabilityServices", () => {
       /** @scenario "The project reads answer through the port the subscribers name" */
       it("reads the project, stamps its metadata and resolves the organization admin", async () => {
         const fake = fakeDatabase();
-        const services = createWorkerTraceCapabilityServices({ database: fake.database });
+        const services = createWorkerTraceCapabilityServices({
+          database: fake.database,
+          dataPrivacy: fake.dataPrivacy,
+        });
         const ports = createWorkerTraceNarrowPorts({
           projects: services.projects,
           monitors: services.monitors,
@@ -226,6 +249,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const captured: Array<Record<string, unknown>> = [];
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
+          dataPrivacy: fake.dataPrivacy,
           diagnostics: {
             error: (context: Record<string, unknown>) => captured.push(context),
             capture: () => void 0,
@@ -258,7 +282,10 @@ describe("createWorkerTraceCapabilityServices", () => {
             },
           ],
         });
-        const services = createWorkerTraceCapabilityServices({ database: fake.database });
+        const services = createWorkerTraceCapabilityServices({
+          database: fake.database,
+          dataPrivacy: fake.dataPrivacy,
+        });
 
         const drop = createWorkerTraceContentDrop({
           dataPrivacy: services.dataPrivacy,
@@ -269,18 +296,15 @@ describe("createWorkerTraceCapabilityServices", () => {
 
         expect(result.droppedCategories).toEqual(["input"]);
         expect(target.attributes.map((attribute) => attribute.key)).not.toContain("gen_ai.prompt");
-        expect(fake.policyFindMany).toHaveBeenCalledWith({
-          where: {
-            organizationId: "organization-1",
-            OR: expect.arrayContaining([{ scopeType: "PROJECT", scopeId: "project-1" }]),
-          },
-        });
+        // The port the process handed in, and not a second resolution built
+        // here: the record path reads the SAME policy the privacy surface does.
+        expect(services.dataPrivacy).toBe(fake.dataPrivacy);
       });
 
       /** @scenario "A project with no stored policy keeps its content" */
       it("keeps the input when no policy row asks for a drop", async () => {
-        const { database } = fakeDatabase();
-        const services = createWorkerTraceCapabilityServices({ database });
+        const { database, dataPrivacy } = fakeDatabase();
+        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy });
 
         const drop = createWorkerTraceContentDrop({
           dataPrivacy: services.dataPrivacy,
@@ -318,7 +342,10 @@ describe("createWorkerTraceCapabilityServices", () => {
             },
           ],
         });
-        const services = createWorkerTraceCapabilityServices({ database: fake.database });
+        const services = createWorkerTraceCapabilityServices({
+          database: fake.database,
+          dataPrivacy: fake.dataPrivacy,
+        });
 
         const enrichment = createWorkerTraceCostEnrichment({
           modelCosts: createWorkerTraceModelCostCatalogPort(services.modelCosts),
@@ -351,7 +378,10 @@ describe("createWorkerTraceCapabilityServices", () => {
       it("lists no costs when the project is gone", async () => {
         const fake = fakeDatabase();
         fake.projectFindUnique.mockResolvedValue(null);
-        const services = createWorkerTraceCapabilityServices({ database: fake.database });
+        const services = createWorkerTraceCapabilityServices({
+          database: fake.database,
+          dataPrivacy: fake.dataPrivacy,
+        });
 
         await expect(services.modelCosts.listCosts({ projectId: "project-1" })).resolves.toEqual(
           [],
@@ -423,7 +453,10 @@ describe("createWorkerTraceCapabilityServices", () => {
             },
           ],
         });
-        const services = createWorkerTraceCapabilityServices({ database: fake.database });
+        const services = createWorkerTraceCapabilityServices({
+          database: fake.database,
+          dataPrivacy: fake.dataPrivacy,
+        });
 
         const monitors = createWorkerTraceEvaluationMonitorPort(services.monitors);
 

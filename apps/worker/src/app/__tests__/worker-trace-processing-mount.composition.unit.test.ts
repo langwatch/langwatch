@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { AutomationTriggerMatchRecorderPort } from "@langwatch/automation-server";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { CodingAgentTraceProcessingPort } from "@langwatch/coding-agent-server";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
@@ -194,7 +195,10 @@ function composePipeline() {
 
   const pipeline = WorkerTraceProcessingPipeline.create({
     config: resolveWorkerConfig({ NODE_ENV: "test" }),
-    services: createWorkerTraceCapabilityServices({ database: database as never }),
+    services: createWorkerTraceCapabilityServices({
+      database: database as never,
+      dataPrivacy: { getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY },
+    }),
     featureFlags: {
       isEnabled: async () => false,
       isEnabledForProject: async () => false,

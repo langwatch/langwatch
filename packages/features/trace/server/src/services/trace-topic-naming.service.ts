@@ -5,12 +5,12 @@
  */
 
 import type { CategoricalFacetResult } from "@langwatch/trace-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 
 export class TraceTopicNamingService {
-  private constructor(private readonly topicService: TopicService) {}
+  private constructor(private readonly topicService: TopicApi) {}
 
-  static create({ topicService }: { topicService: TopicService }): TraceTopicNamingService {
+  static create({ topicService }: { topicService: TopicApi }): TraceTopicNamingService {
     return new TraceTopicNamingService(topicService);
   }
 

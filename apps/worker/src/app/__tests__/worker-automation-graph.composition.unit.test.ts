@@ -1,4 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -317,6 +318,7 @@ describe("resolveWorkerConfig automation leaves", () => {
                 customLLMModelCost: { findMany: async () => [] },
                 monitor: { findMany: async () => [] },
               } as never,
+              dataPrivacy: { getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY },
             }).projects,
             analytics: new BreachingAnalytics() as unknown as AnalyticsService,
           },

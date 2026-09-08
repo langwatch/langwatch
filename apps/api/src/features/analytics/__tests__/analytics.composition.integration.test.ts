@@ -3,6 +3,10 @@
  * the real `/api/trpc` handler.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  PLATFORM_DEFAULT_DATA_PRIVACY,
+  type DataPrivacyApi,
+} from "@langwatch/data-privacy-contract";
 import type {
   AuthzGetDecisionInput,
   AuthzScopeLineageResult,
@@ -124,6 +128,13 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
     prisma: prisma.client,
     authz: testAuthz(),
     projects: testProjects(),
+    // The resolved policy the read protections redact by, as the root installs
+    // it and hands it in. This suite drives the permission half, so the policy
+    // answers the platform default and every other operation refuses by name.
+    dataPrivacy: createApiFixture<DataPrivacyApi>(
+      { getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY },
+      "analytics data privacy",
+    ),
     // The process's ONE rollout store, as the root installs it and hands it in.
     // One flag decides this surface, so the world answers that one and refuses
     // every other operation by name.

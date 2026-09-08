@@ -12,7 +12,7 @@ import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceApp,
   type SharedTraceTrpcPorts,
@@ -76,7 +76,7 @@ export type TraceFeatureOptions = Readonly<{
     /** The one ledger an anonymous read redeems its token against. */
     share: ShareApi;
     /** The one tree the grid labels its rows from. */
-    topics: TopicService;
+    topics: TopicApi;
   }>;
 
   /** The ClickHouse trace read stack; absent refuses every trace read. */

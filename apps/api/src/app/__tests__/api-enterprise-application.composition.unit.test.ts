@@ -23,9 +23,9 @@ import { describe, expect, it, vi } from "vitest";
 import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition.ts";
 import {
   composeEnterpriseFeature,
-  composeEnterpriseMountPorts,
   type ApiEnterpriseApplicationPort,
 } from "../../features/enterprise/enterprise.composition.ts";
+import { ApiUnavailableSsoConnectionLedger } from "../../features/sso/sso-process.ports.ts";
 import { composeApiEnterpriseApplication } from "../api-enterprise-application.composition.ts";
 
 /**
@@ -118,7 +118,7 @@ describe("the API's Enterprise application slot", () => {
       const backoffice = compose().backoffice?.();
 
       expect(backoffice?.list).toBeTypeOf("function");
-      expect(backoffice?.getById).toBeTypeOf("function");
+      expect(backoffice?.findById).toBeTypeOf("function");
       expect(backoffice?.requestTeardown).toBeTypeOf("function");
     });
 
@@ -198,18 +198,16 @@ describe("the API's Enterprise application slot", () => {
 
     /** @scenario "The single sign-on back office refuses by name with no ledger composed" */
     it("refuses the back office by name when only that member is absent", async () => {
-      const ports = composeEnterpriseMountPorts(
-        { audit: undefined, enterprise: compose({ eventSourcing: undefined }) },
-        { debug: vi.fn() },
-      );
+      const application = compose({ eventSourcing: undefined });
+      const connections = application.backoffice?.() ?? ApiUnavailableSsoConnectionLedger.create();
 
-      const message = await refusalFrom(() => ports.ssoConnections.backoffice().list({} as never));
+      const message = await refusalFrom(() => connections.list({} as never));
 
       expect(message).toContain("Enterprise single sign-on ledger");
     });
 
     it("refuses the SCIM application by name", async () => {
-      const feature = composeEnterpriseFeature({ audit: undefined, enterprise: compose() });
+      const feature = composeEnterpriseFeature({ enterprise: compose() });
 
       const message = await refusalFrom(() =>
         feature.application.scimApp.listTokens({ organizationId: "organization_acme" }),
@@ -227,7 +225,7 @@ describe("the API's Enterprise application slot", () => {
      * @scenario "An absent usage-limit store rejects rather than throwing at the caller"
      */
     it("rejects the usage-limit notification rather than throwing into the caller", async () => {
-      const feature = composeEnterpriseFeature({ audit: undefined, enterprise: compose() });
+      const feature = composeEnterpriseFeature({ enterprise: compose() });
 
       const pending = feature.application.usageLimits.notifyResourceLimitReached({
         organizationId: "organization_acme",

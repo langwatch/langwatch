@@ -81,6 +81,9 @@
       "path": "../../../observability/tsconfig.build.json"
     },
     {
+      "path": "../../../features/ops/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../features/organization/contract/tsconfig.build.json"
     },
     {
@@ -94,6 +97,9 @@
     },
     {
       "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/user/contract/tsconfig.build.json"
     }
   ]
 }

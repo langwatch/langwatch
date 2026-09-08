@@ -8,7 +8,7 @@ import {
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../rules/trace-list-row.rules.ts";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -85,7 +85,7 @@ export class TraceListService {
   }: {
     repository: TraceListReadPort;
     evaluations: EvaluationService;
-    topicService: TopicService;
+    topicService: TopicApi;
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicService });
 

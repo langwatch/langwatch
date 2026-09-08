@@ -1,7 +1,7 @@
 /**
- * The four Enterprise tenant namespaces, composed as their own feature. license.* /
- * licenseEnforcement.*   what this instance is licensed for scimToken.*
- * the directory-sync credentials ssoConnections.*                   the back office's
+ * The three Enterprise tenant namespaces, composed as their own feature.
+ * license.* / licenseEnforcement.*   what this instance is licensed for
+ * scimToken.*                        the directory-sync credentials
  */
 import type { LimitCheckResult, LimitType } from "@langwatch/enterprise-licensing-contract";
 import { LicensingApp, type LicensingCaller } from "@langwatch/enterprise-licensing-server";
@@ -11,8 +11,7 @@ import {
 } from "@langwatch/enterprise-plan-gate";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-
-import type { ApiAuditPort } from "../../api-request.policy.ts";
+import type { SsoConnectionLedgerPort } from "@langwatch/enterprise-api";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import {
@@ -64,17 +63,13 @@ export abstract class ApiEnterpriseApplicationPort {
   /** Where a spend event is delivered, as the endpoint surface registers and lists them. */
   abstract readonly webhooks?: ApiTrpcFeatureApplication["webhooks"] | undefined;
   /** The back office's single sign-on connection ledger. */
-  abstract readonly backoffice?:
-    | (() => ReturnType<EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]>)
-    | undefined;
+  abstract readonly backoffice?: (() => SsoConnectionLedgerPort) | undefined;
 }
 
 import type { ComposedEnterpriseFeature } from "./enterprise.composition.types.ts";
 
-/** Composes the four Enterprise tenant surfaces over this deployment's graph. */
+/** Composes the three Enterprise tenant surfaces over this deployment's graph. */
 export function composeEnterpriseFeature(options: {
-  /** The audit trail a back-office command is written to. */
-  audit: ApiAuditPort | undefined;
   /** The Enterprise application, where the deployment composed one. */
   enterprise?: ApiEnterpriseApplicationPort | undefined;
   /** The seat allowances this deployment answers without an Enterprise application. */
@@ -82,7 +77,7 @@ export function composeEnterpriseFeature(options: {
 }): ComposedEnterpriseFeature {
   const logger = createLogger("langwatch:api:enterprise");
   const application = enterpriseApplication(options.enterprise, options.seats, logger);
-  const ports = composeEnterpriseMountPorts(options, logger);
+  const ports = composeEnterpriseMountPorts();
 
   return {
     application,
@@ -115,29 +110,19 @@ export function refusingEnterpriseFeature(): ComposedEnterpriseFeature {
                 ),
               ),
           },
-          ssoConnections: {
-            backoffice: () => unavailableSsoBackoffice(),
-            recordAudit: () => Promise.resolve(),
-          },
         } as EnterpriseTrpcMountPorts,
       }),
   };
 }
 
 /**
- * The two Enterprise ports, and the refusal that stands in for one of them.
+ * The one Enterprise mount port: the plan gate a SCIM token is minted behind.
  *
- * Exported because the refusal is the part worth pinning: the back office reads a MEMBER of
- * the application, so a deployment that composed seven of the eight must still refuse this
- * one by name rather than reach into a half-built object.
+ * Exported because the gate is the part worth pinning — the refusal a
+ * deployment on a lesser plan reads is this one, and it is the SCIM
+ * application's own plan provider rather than the process-wide one.
  */
-export function composeEnterpriseMountPorts(
-  options: Readonly<{
-    audit: ApiAuditPort | undefined;
-    enterprise?: ApiEnterpriseApplicationPort | undefined;
-  }>,
-  logger: Pick<Logger, "debug">,
-): EnterpriseTrpcMountPorts {
+export function composeEnterpriseMountPorts(): EnterpriseTrpcMountPorts {
   return {
     scimToken: {
       requireEnterprisePlan: async ({ planProvider, organizationId }) => {
@@ -148,46 +133,7 @@ export function composeEnterpriseMountPorts(
         });
       },
     },
-    ssoConnections: {
-      backoffice: () => {
-        // The MEMBER, not the application: a deployment that composed a
-        // session-policy store and no connection ledger still refuses here by
-        // name rather than answering off a half-built object.
-        const backoffice = options.enterprise?.backoffice;
-        if (!backoffice) {
-          return unavailableSsoBackoffice();
-        }
-        return backoffice();
-      },
-      recordAudit: async (entry) => {
-        await options.audit?.record({
-          actorId: entry.userId,
-          path: entry.action,
-          input: {
-            ...entry.args,
-            targetKind: entry.targetKind,
-            ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
-          },
-          error: null,
-        });
-        logger.debug({ action: entry.action }, "recorded a single sign-on back-office command");
-      },
-    },
   } as EnterpriseTrpcMountPorts;
-}
-
-/**
- * The single sign-on ledger, absent.
- */
-function unavailableSsoBackoffice(): ReturnType<
-  EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]
-> {
-  const refuse = (): never => {
-    throw new ApiEnterpriseUnavailableError(
-      "Enterprise single sign-on ledger, so it can neither read nor command a connection",
-    );
-  };
-  return new Proxy({} as never, { get: () => refuse, has: () => true });
 }
 
 /**

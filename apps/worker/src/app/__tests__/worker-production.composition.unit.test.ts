@@ -19,7 +19,7 @@ import {
   PrismaProcessStore,
 } from "@langwatch/eventing/server";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "./metric-point.fixture.ts";
 import { EmailDeliveryAdapter } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { ProjectService } from "@langwatch/project-contract";

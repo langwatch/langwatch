@@ -30,7 +30,7 @@ import {
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceListClickHouseRepository,
   TraceListService,
@@ -150,7 +150,7 @@ export function createWorkerReportTraceList(options: {
           ) => evaluations.findSummariesByTraceIds(input),
         },
       ),
-      topicService: refuseReportRead<TopicService>("the topic names a facet is labelled with"),
+      topicService: refuseReportRead<TopicApi>("the topic names a facet is labelled with"),
     }),
     translateFilter: (query, projectId, window) =>
       TraceQueryClickHouseAdapter.translateFilter(query, projectId, window),

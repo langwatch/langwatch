@@ -1,7 +1,7 @@
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
-  type DataPrivacyService,
+  type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
@@ -53,13 +53,13 @@ function policy(over: Partial<ResolvedDataPrivacy> = {}): ResolvedDataPrivacy {
   };
 }
 
-const dataPrivacyFor = (resolved: ResolvedDataPrivacy | null): DataPrivacyService =>
+const dataPrivacyFor = (resolved: ResolvedDataPrivacy | null): DataPrivacyApi =>
   ({
     getResolvedForProject: async () => {
       if (!resolved) throw new Error("no policy for this scope");
       return resolved;
     },
-  }) as unknown as DataPrivacyService;
+  }) as unknown as DataPrivacyApi;
 
 const flags: FeatureFlagApi = { isEnabled: async () => false } as unknown as FeatureFlagApi;
 

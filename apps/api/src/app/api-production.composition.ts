@@ -1,4 +1,4 @@
-import { EnterpriseApiAuditLog } from "@langwatch/enterprise-api";
+import { EnterpriseApiAuditLog, EnterpriseApiSso } from "@langwatch/enterprise-api";
 import { EvaluatorApp } from "@langwatch/evaluator-server";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
@@ -140,7 +140,11 @@ import {
 } from "../features/trace/trace.composition.ts";
 import type { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
 import { installApiShare } from "../features/share/share.composition.ts";
-import { composeTopicFeature, refusingTopicFeature } from "../features/topic/topic.composition.ts";
+import { installApiTopic } from "../features/topic/topic.composition.ts";
+import {
+  ApiSsoGateLogger,
+  ApiUnavailableSsoConnectionLedger,
+} from "../features/sso/sso-process.ports.ts";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
@@ -402,10 +406,7 @@ import {
 } from "./api-agent-pipelines.composition.ts";
 import { composeLangyFeature, refusingLangyFeature } from "../features/langy/langy.composition.ts";
 import { ApiLangyNavigateResourceAdapter } from "../features/langy/langy-navigate-resource.adapter.ts";
-import {
-  composeDataPrivacyFeature,
-  refusingDataPrivacyFeature,
-} from "../features/data-privacy/data-privacy.composition.ts";
+import { installApiDataPrivacy } from "../features/data-privacy/data-privacy.composition.ts";
 import {
   composeBugReportFeature,
   refusingBugReportFeature,
@@ -711,7 +712,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * no database mounts neither share namespace.
    */
   private composedShare: ComposedShareFeature | undefined;
-  private composedTopic!: ComposedTopicFeature;
+  /**
+   * The topic tree a project's traces are labelled by, or none. There is no
+   * refusing twin: a process that opened no database has no tree to label from.
+   */
+  private composedTopic: ComposedTopicFeature | undefined;
   private composedRole!: ComposedRoleFeature;
   private composedHome!: ComposedHomeFeature;
 
@@ -729,7 +734,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private azureSpoolRetentionConfirmed = false;
   private composedBugReport!: ComposedBugReportFeature;
-  private composedDataPrivacy!: ComposedDataPrivacyFeature;
+  /**
+   * A project's scoped privacy rules, or none. There is no refusing twin: a
+   * process that opened no database resolves no policy.
+   */
+  private composedDataPrivacy: ComposedDataPrivacyFeature | undefined;
   private composedIntegrationsChecks!: ComposedIntegrationsChecksFeature;
   private composedAnnotation!: ComposedAnnotationFeature;
   private composedNotification: ComposedNotificationFeature | undefined;
@@ -1002,22 +1011,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       audit: this.resolveAudit(),
     });
     const agents = this.allocateAgent(options);
-    this.composedAnalytics = this.composeAnalytics(options, authz);
-    // The person half of the same record: the two signed-out doors, the signed-in person's
-    // account and credentials, their organization's membership and groups, join requests,
-    // sign-up and presence. Composed over the SAME user directory the browser-session boundary
-    // resolves through and the SAME organization service the REST doors serve from — a second
-    // of either would be a second answer to who somebody is.
-    this.composePersonFeatures(options, auth, tenancy);
-    // The product half: a reviewer's annotations, the support inbox, the project's privacy
-    // rules and its setup checklist. It composes FIRST because it is the one half that cannot
-    // be missing on a process holding a database, which is what makes it the seed the other
-    // three fold onto. The trace-side senders, registered once and handed to everything that
-    // writes on the lane.
-    this.composedTraceCommands = composeApiTraceProducerCommands({
-      eventing: this.composedEventing?.eventSourcing,
-      processName: options.config.serviceName,
-    });
     const database = this.composedDatabase?.connection;
     const infrastructure = database
       ? {
@@ -1037,6 +1030,38 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           auditLog: this.resolveAuditLog(),
         }
       : undefined;
+    // A project's scoped privacy rules, composed HERE because the charted reads
+    // redact by the SAME resolved policy the trace read stack does: a chart and
+    // the traces behind it must not disagree about which fields a project keeps.
+    this.composedDataPrivacy =
+      infrastructure && this.composedAuthz
+        ? await installApiDataPrivacy({
+            infrastructure,
+            peers: {
+              projects: tenancy.projects,
+              organizations: tenancy.organizations,
+              // The SAME permission answers the declared check on the same
+              // procedure asks; a second AuthZ here would be a second answer.
+              permissions: this.composedAuthz.app,
+            },
+          })
+        : undefined;
+    this.composedAnalytics = this.composeAnalytics(options, authz);
+    // The person half of the same record: the two signed-out doors, the signed-in person's
+    // account and credentials, their organization's membership and groups, join requests,
+    // sign-up and presence. Composed over the SAME user directory the browser-session boundary
+    // resolves through and the SAME organization service the REST doors serve from — a second
+    // of either would be a second answer to who somebody is.
+    this.composePersonFeatures(options, auth, tenancy);
+    // The product half: a reviewer's annotations, the support inbox, the project's privacy
+    // rules and its setup checklist. It composes FIRST because it is the one half that cannot
+    // be missing on a process holding a database, which is what makes it the seed the other
+    // three fold onto. The trace-side senders, registered once and handed to everything that
+    // writes on the lane.
+    this.composedTraceCommands = composeApiTraceProducerCommands({
+      eventing: this.composedEventing?.eventSourcing,
+      processName: options.config.serviceName,
+    });
     // The tenant fan-out every live surface on this process rides: presence,
     // both trace subscriptions, the simulation feed, the workbench cell and the
     // two bulk exports. Created HERE because it is the process's rather than
@@ -1070,15 +1095,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedDataRetention = infrastructure
       ? await this.composeDataRetention(options, infrastructure, queueInfrastructure)
       : undefined;
-    this.composedDataPrivacy = infrastructure
-      ? composeDataPrivacyFeature({
-          infrastructure,
-          peers: { projects: tenancy.projects, organizations: tenancy.organizations },
-        })
-      : refusingDataPrivacyFeature();
-    this.composedTopic = infrastructure
-      ? composeTopicFeature({ infrastructure })
-      : refusingTopicFeature();
+    this.composedTopic = infrastructure ? await installApiTopic({ infrastructure }) : undefined;
     const retention = this.composedDataRetention;
     this.composedShare =
       infrastructure && this.composedTenancy && this.composedAuthz && retention
@@ -1328,27 +1345,43 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       dataRetention: this.composedDataRetention?.service,
       ...(this.composedMail ? { mail: this.composedMail } : {}),
     });
-    // The five features with no refusing twin. None mounts without its own
-    // application — `ctx.app.share`, `ctx.app.secrets`, the retention window
-    // and the one plan answer are all read by surfaces those features do not
-    // own — so the record refuses whole rather than serving slices with
-    // nothing behind them.
+    // Single sign-on, booted over this deployment's own ledger and licence.
+    // HERE because it stands on four peers the halves above opened: the licence
+    // surfaces, the ADMIN_EMAILS staff list, the user directory the staff list
+    // resolves an address through, and the audit trail every back-office
+    // command is recorded on before it runs.
+    const sso = await this.composeSso(options);
+    if (sso) options.resources.own("api single sign-on", () => sso.stop());
+    // The eight features with no refusing twin. None mounts without its own
+    // application — `ctx.app.share`, `ctx.app.secrets`, `ctx.app.topics`,
+    // `ctx.app.sso`, the resolved privacy policy, the retention window and the
+    // one plan answer are all read by surfaces those features do not own — so
+    // the record refuses whole rather than serving slices with nothing behind.
     const share = this.composedShare;
     const entitlement = this.composedEntitlement;
     const dataRetention = this.composedDataRetention;
     const featureFlag = this.composedFeatureFlag;
     const secret = this.composedSecret;
+    const topic = this.composedTopic;
+    const dataPrivacy = this.composedDataPrivacy;
     const trpcAbsence = LoggedApiTrpcFeaturesAbsence.create(
       createLogger(options.config.serviceName),
     );
     if (
       infrastructure &&
-      (!share || !entitlement || !dataRetention || !featureFlag || !secret)
+      (!share ||
+        !entitlement ||
+        !dataRetention ||
+        !featureFlag ||
+        !secret ||
+        !topic ||
+        !dataPrivacy ||
+        !sso)
     ) {
       trpcAbsence.absent("no-collaborators");
     }
     const features =
-      share && entitlement && dataRetention && featureFlag && secret
+      share && entitlement && dataRetention && featureFlag && secret && topic && dataPrivacy && sso
         ? ApiTrpcFeaturesComposition.tryCompose({
             // What a feature composes ITSELF out of, built once above and handed to
             // every `compose<Feature>()` the record's literal names.
@@ -1372,7 +1405,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               monitor: this.composedMonitor,
               storedObject: this.composedStoredObject,
               bugReport: this.composedBugReport,
-              dataPrivacy: this.composedDataPrivacy,
+              dataPrivacy,
               integrationsChecks: this.composedIntegrationsChecks,
               annotation: this.composedAnnotation,
               savedView: this.composedSavedView,
@@ -1380,7 +1413,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               httpProxy: this.composedHttpProxy,
               modelProvider: this.composedModelProvider,
               share,
-              topic: this.composedTopic,
+              topic,
               trace: this.composedTrace,
               workflow: this.composedWorkflow,
               experiment: this.composedExperiment,
@@ -1416,7 +1449,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
                 planProvider: entitlement.app,
                 secrets: secret.app,
                 share: share.app,
-                topics: this.composedTopic.service,
+                topics: topic.app,
+                dataPrivacy: dataPrivacy.app,
+                sso: sso.sso(),
                 traces: this.composedTrace.traces,
                 workflows: this.composedWorkflow.app,
                 experiments: this.composedExperiment.app,
@@ -1745,7 +1780,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // it is not stored at all for a project whose policy discards it.
       media: {
         featureFlags: this.composedFeatureFlagApi,
-        hasContentDropRules: (projectId) => this.composedDataPrivacy.dropsAnyContent(projectId),
+        // Absent privacy rules fail CLOSED: with no policy to consult, the edge
+        // externalizes no content it might have been told to discard.
+        hasContentDropRules: (projectId) =>
+          this.composedDataPrivacy?.app.dropsAnyContent({ projectId }) ?? Promise.resolve(true),
         ...(this.composedStoredObject.bytes
           ? { service: ApiTraceMediaStore.create(this.composedStoredObject.bytes) }
           : {}),
@@ -3007,6 +3045,45 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return this.options.enterprise ?? this.composedEnterpriseApplication;
   }
 
+  /**
+   * Single sign-on, over this deployment's own connection ledger and licence.
+   *
+   * No credential reads: this process mounts no provider — see
+   * `api-better-auth.composition.ts` — so `providerIsMounted()` stays false and
+   * `resolveProvider()` answers `"email"` whatever `NEXTAUTH_PROVIDER` names.
+   */
+  private async composeSso(
+    options: ApiRuntimeCompositionOptions,
+  ): Promise<EnterpriseApiSso | undefined> {
+    const auditLog = this.composedAuditLog;
+    if (!auditLog) return undefined;
+
+    return EnterpriseApiSso.create({
+      configuration: {
+        isSaas: this.composedIsSaas,
+        provider: this.options.identity?.authProvider ?? "email",
+        // The origin the browser session is issued for, else the deployment's
+        // own public host. Inert on this process, which mounts no provider.
+        baseUrl:
+          options.config.browserSession?.baseUrl ??
+          options.config.infrastructure.execution.publicBaseUrl ??
+          "https://app.langwatch.ai",
+      },
+      // The MEMBER, not the application: a deployment that composed a
+      // session-policy store and no connection ledger refuses here by name.
+      connections: this.resolveEnterprise()?.backoffice?.() ?? ApiUnavailableSsoConnectionLedger.create(),
+      logger: ApiSsoGateLogger.create(createLogger("langwatch:api:sso")),
+      peers: {
+        licensing: this.composedEnterprise.application.licensing,
+        // The SAME ADMIN_EMAILS staff list every other back-office gate on this
+        // process reads, deliberately not `ops:*`.
+        operators: this.composedOps.app,
+        users: this.composedUser.app,
+        auditLog,
+      },
+    });
+  }
+
   /** Who this deployment counts as a platform operator, by address, composed once. */
   private platformOperators(options: ApiRuntimeCompositionOptions): PlatformOperatorPort {
     this.composedPlatformOperators ??= (() => {
@@ -3100,12 +3177,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // injected its own api-key and organization pair composed no tenancy here, so it holds the
     // collaborator set whole and hands it in rather than having this half built for it.
     const projects = this.composedTenancy?.projects;
-    if (!database || !projects) return refusingAnalyticsFeature();
+    // The resolved privacy policy the charted reads redact by. Taken rather
+    // than built: a second resolution would let a chart and the traces behind
+    // it disagree about which fields a project keeps.
+    const dataPrivacy = this.composedDataPrivacy;
+    if (!database || !projects || !dataPrivacy) return refusingAnalyticsFeature();
 
     return composeAnalyticsFeature({
       prisma: database.client,
       authz,
       projects,
+      dataPrivacy: dataPrivacy.app,
       featureFlags: this.composedFeatureFlagApi,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       langWatchQL: options.config.infrastructure.clickhouse.langwatchQl,
@@ -3383,7 +3465,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // refusing twin: a read stack that cannot say how far back a project keeps
     // its traffic would answer a wrong window rather than a narrower one.
     const retention = this.composedDataRetention;
-    if (!database || !tenancy || !grants || !share || !retention) return refusingTraceFeature();
+    // The tree the grid labels its rows from and the policy every read is
+    // redacted under. Neither has a refusing twin, for the same reason the
+    // retention window does not: a wrong label or an unredacted span is not a
+    // narrower answer.
+    const topic = this.composedTopic;
+    const dataPrivacy = this.composedDataPrivacy;
+    if (!database || !tenancy || !grants || !share || !retention || !topic || !dataPrivacy) {
+      return refusingTraceFeature();
+    }
 
     return composeTraceFeature({
       prisma: database.client,
@@ -3393,7 +3483,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The share ledger and the topic tree, taken rather than built: the same
       // ledger the settings form administers redeems an anonymous read's token,
       // and the same tree `topics.*` answers labels the grid's rows.
-      peers: { share: share.app, topics: this.composedTopic.service },
+      peers: { share: share.app, topics: topic.app },
       // The SAME ClickHouse the charted reads run on, opened once by
       // `composeAnalytics`: a trace and its chart are rows in one routed
       // instance, and a second connection would be a second pool.
@@ -3418,11 +3508,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
           defaultRetentionDays: options.config.platformDefaultRetentionDays,
           authz,
-          dataPrivacy: this.composedDataPrivacy.service,
+          dataPrivacy: dataPrivacy.app,
           projects: tenancy.projects,
           plans: this.resolvePlanProvider(options),
           dataRetention: retention.service,
-          topics: this.composedTopic.service,
+          topics: topic.app,
           // The evaluations behind a trace, on the SAME ClickHouse and the
           // SAME retention cascade the trace itself is read through. Every
           // single-trace read asks for them, so a stack composed without one
@@ -3547,7 +3637,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // refusing twin to stand in for it, and a project surface that cannot say
     // what a project shares is not a narrower answer but a wrong one.
     const share = this.composedShare;
-    if (!infrastructure || !database || !tenancy || !evaluators || !share) {
+    // The topic tree the project explorer labels from, taken for the same
+    // reason the share ledger is: a second tree would let the settings form and
+    // the explorer disagree about what a project holds.
+    const topic = this.composedTopic;
+    if (!infrastructure || !database || !tenancy || !evaluators || !share || !topic) {
       this.composedOrganization = refusingOrganizationFeature();
       this.composedProject = refusingProjectFeature();
       this.composedCodingAgent = refusingCodingAgentFeature();
@@ -3647,7 +3741,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // let the settings form and the explorer disagree about what a
         // project holds.
         share: share.app,
-        topics: this.composedTopic.service,
+        topics: topic.app,
         encryption,
         ...(viewerProtections ? { viewerProtections } : {}),
       },
@@ -3690,7 +3784,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       }),
     );
     this.composedEnterprise = composeEnterpriseFeature({
-      audit: this.resolveAudit(),
       ...(enterprise ? { enterprise } : {}),
       // The seat allowances `/settings/members` asks about on every open. Answered whether or
       // not this deployment composed an Enterprise application, over the SAME plan provider and

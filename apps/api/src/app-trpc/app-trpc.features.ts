@@ -12,6 +12,7 @@ import { createExportTrpcRouter } from "../features/export/export-trpc.mount.ts"
 import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organization/organization-trpc.mount.ts";
 import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount.ts";
 import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount.ts";
+import { createSsoConnectionTrpcRouter } from "../features/sso/sso-trpc.mount.ts";
 import { composeGithubTrpcRouter } from "../features/github/github.composition.ts";
 import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount.ts";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
@@ -106,7 +107,10 @@ export function createAppTrpcFeatures(options: {
     organization: composed.organization.router(mount),
     project: composed.project.router(mount),
     scimToken: enterprise.scimToken,
-    ssoConnections: enterprise.ssoConnections,
+    // The back office's connection ledger. Mounted by the process rather than
+    // forwarded from the Enterprise composition: the procedures are declared in
+    // the feature's own contract, and `ctx.app.sso` is what answers them.
+    ssoConnections: createSsoConnectionTrpcRouter(mount.runtime),
     // Carries `onConversationUpdate` and `onTurnStream`. In the record rather
     // than beside it: a subscription mounted beside the record would be
     // callable over `/api/trpc` and un-watchable over `/api/sse`.

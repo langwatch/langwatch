@@ -13,7 +13,6 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/webhooks.ts",
     "./src/governance/admin-workspace-view-audit.adapter.ts",
     "./src/governance/cli-session-inventory.adapter.ts",
     "./src/governance/cli-token-revocation.adapter.ts",
@@ -116,6 +115,9 @@
       "path": "../../../observability/tsconfig.build.json"
     },
     {
+      "path": "../../../features/ops/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../features/organization/contract/tsconfig.build.json"
     },
     {
@@ -129,6 +131,9 @@
     },
     {
       "path": "../../../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../features/user/contract/tsconfig.build.json"
     }
   ]
 }

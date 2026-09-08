@@ -29,6 +29,7 @@
  * stage-only connection ledger, which the identity package owes and does not yet have.
  */
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { SsoConnectionLedgerPort } from "@langwatch/enterprise-api";
 import {
   WebhookAccessService,
   WebhookApp,
@@ -48,16 +49,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
 import type { ApiEnterpriseApplicationPort } from "../features/enterprise/enterprise.composition.ts";
-import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount.ts";
 import {
   composeApiWebhookPlatform,
   type ApiWebhookClickHouseResolver,
 } from "./api-gateway-webhooks.composition.ts";
-
-/** The back office's connection ledger, in the shape the tRPC mount port asks for. */
-type ApiSsoConnectionBackoffice = ReturnType<
-  EnterpriseTrpcMountPorts["ssoConnections"]["backoffice"]
->;
 
 /** Reports the composition decisions an absent collaborator would otherwise hide. */
 export abstract class ApiEnterpriseApplicationAbsenceReport {
@@ -172,7 +167,7 @@ function composeWebhooks(
  */
 function composeBackoffice(
   options: ApiEnterpriseApplicationOptions & { prisma: PrismaClient },
-): (() => ApiSsoConnectionBackoffice) | undefined {
+): (() => SsoConnectionLedgerPort) | undefined {
   const { prisma, eventSourcing, operators } = options;
   if (!eventSourcing) return undefined;
 
@@ -191,13 +186,13 @@ function composeBackoffice(
 }
 
 /**
- * The service, under the names the transport reads. One verb differs: the transport asks
- * `getById` for a read that answers `null`, and the service names that read `tryGetById`.
+ * The service, under the names the ledger port reads. One verb differs: the port asks
+ * `findById` for a read that answers `null`, and the service names that read `tryGetById`.
  */
-function asBackofficePort(service: SsoConnectionBackofficeService): ApiSsoConnectionBackoffice {
+function asBackofficePort(service: SsoConnectionBackofficeService): SsoConnectionLedgerPort {
   return {
     list: (input) => service.list(input),
-    getById: (input) => service.tryGetById(input),
+    findById: (input) => service.tryGetById(input),
     registerConnection: (input) => service.registerConnection(input),
     claimDomain: (input) => service.claimDomain(input),
     approveDomainClaim: (input) => service.approveDomainClaim(input),

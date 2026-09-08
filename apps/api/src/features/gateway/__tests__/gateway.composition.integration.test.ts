@@ -24,12 +24,14 @@ import { composeGatewayFeature } from "../gateway.composition.ts";
 import { refusingAuthFeature } from "../../auth/auth.composition.ts";
 import { refusingUserFeature } from "../../user/user.composition.ts";
 import {
+  stubDataPrivacyFeature,
   stubEntitlementFeature,
   stubPresenceFeature,
   stubShareFeature,
   stubDataRetentionFeature,
   stubFeatureFlagFeature,
   stubSecretFeature,
+  stubTopicFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../langy/langy.composition.ts";
@@ -41,13 +43,11 @@ import { refusingMonitorFeature } from "../../monitor/monitor.composition.ts";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
 import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition.ts";
 import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
-import { refusingDataPrivacyFeature } from "../../data-privacy/data-privacy.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../annotation/annotation.composition.ts";
 import { refusingSavedViewFeature } from "../../dashboard/saved-view.composition.ts";
 import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition.ts";
-import { refusingTopicFeature } from "../../topic/topic.composition.ts";
 import { refusingTraceFeature } from "../../trace/trace.composition.ts";
 import { refusingWorkflowFeature } from "../../workflow/workflow.composition.ts";
 import { refusingExperimentFeature } from "../../experiment/experiment.composition.ts";
@@ -223,7 +223,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       role: refusingRoleFeature(),
       storedObject: refusingStoredObjectFeature(),
       bugReport: refusingBugReportFeature(),
-      dataPrivacy: refusingDataPrivacyFeature(),
+      dataPrivacy: stubDataPrivacyFeature(),
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),
       savedView: refusingSavedViewFeature(),
@@ -231,7 +231,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       httpProxy: refusingHttpProxyFeature(),
       modelProvider: refusingModelProviderFeature(),
       share: stubShareFeature(),
-      topic: refusingTopicFeature(),
+      topic: stubTopicFeature(),
       trace: refusingTraceFeature(),
       workflow: refusingWorkflowFeature(),
       experiment: refusingExperimentFeature(),

@@ -14,7 +14,7 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -177,7 +177,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
       share: {} as unknown as ShareApi,
       topics: {
         getClusteringStatus: vi.fn(async () => ({ isRunInFlight: false })),
-      } as unknown as TopicService,
+      } as unknown as TopicApi,
       encryption,
     },
   });
@@ -208,7 +208,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
     processName: "langwatch-api-test",
   });
 
-  const enterpriseFeature = composeEnterpriseFeature({ audit });
+  const enterpriseFeature = composeEnterpriseFeature({});
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: {

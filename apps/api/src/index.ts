@@ -43,7 +43,7 @@ export type { ApiTracePorts, ComposedTraceFeature } from "./features/trace/trace
 /** The links a project shares outside itself, and the topics its traces carry. */
 export { installApiShare } from "./features/share/share.composition.ts";
 export type { ComposedShareFeature } from "./features/share/share.composition.types.ts";
-export { composeTopicFeature, refusingTopicFeature } from "./features/topic/topic.composition.ts";
+export { installApiTopic } from "./features/topic/topic.composition.ts";
 export type { ComposedTopicFeature } from "./features/topic/topic.composition.types.ts";
 /** An organization's plan, its allowance, and the spend taken against it. */
 export {

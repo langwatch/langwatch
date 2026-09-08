@@ -1,3 +1,4 @@
+import { resolveDataPrivacy, type DataPrivacyRow } from "@langwatch/data-privacy-contract";
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { OtlpSpan, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -171,7 +172,24 @@ function recordSpan(): Command<RecordSpanCommandData> {
 function composeCommand(options: { policies?: unknown[]; costs?: unknown[] } = {}) {
   const config = resolveWorkerConfig({});
   const prisma = database(options);
-  const services = createWorkerTraceCapabilityServices({ database: prisma });
+  const services = createWorkerTraceCapabilityServices({
+    database: prisma,
+    // The resolution the process hands in, over the SAME rows the fake
+    // database holds: the record path reads a policy, it does not query one.
+    dataPrivacy: {
+      getResolvedForProject: async () =>
+        resolveDataPrivacy({
+          rows: (options.policies ?? []) as DataPrivacyRow[],
+          facts: {
+            organizationId: "organization-1",
+            teamId: "team-1",
+            projectId: "project-1",
+            departmentId: null,
+            isPersonal: false,
+          },
+        }),
+    },
+  });
 
   return {
     prisma,
@@ -221,19 +239,13 @@ describe("createWorkerRecordSpanCommand", () => {
 
       /** @scenario "A folded span honours a stored drop policy" */
       it("removes the content the customer asked to be dropped", async () => {
-        const { prisma, command } = composeCommand({ policies: [dropInputPolicy()] });
+        const { command } = composeCommand({ policies: [dropInputPolicy()] });
 
         const [event] = await command.handle(recordSpan());
 
         expect(event?.data.span.attributes.map((attribute) => attribute.key)).not.toContain(
           "gen_ai.prompt",
         );
-        const policies = prisma.dataPrivacyPolicy as unknown as {
-          findMany: ReturnType<typeof vi.fn>;
-        };
-        for (const call of policies.findMany.mock.calls) {
-          expect(call[0].where.organizationId).toBe("organization-1");
-        }
       });
 
       /** @scenario "The fold reads the tenant's own project and nothing wider" */

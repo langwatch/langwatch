@@ -91,7 +91,7 @@ export function createWorkerTenancyInfrastructure(
   const project: Omit<ProjectInfrastructure, "database"> = {
     topicClustering: options.topicClustering,
   };
-  const topics: Omit<TopicInfrastructure, "database"> = {
+  const topics: TopicInfrastructure = {
     schedule: options.topicSchedule,
   };
   const share: Omit<ShareInfrastructure, "database" | "redis"> = {};

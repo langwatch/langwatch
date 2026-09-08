@@ -242,7 +242,6 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     emailSuppression: stub("emailSuppression"),
     enterprise: {
       scimToken: stub("enterprise.scimToken"),
-      ssoConnections: stub("enterprise.ssoConnections"),
     },
     traces: stub("traces", {
       listInputSchema: anySchema,

@@ -17,7 +17,7 @@ import {
   isContentVisibleToPublic,
   type ResolvedCategory,
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyResolutionService } from "@langwatch/data-privacy-server";
+import type { DataPrivacyResolutionPort } from "@langwatch/data-privacy-server";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
@@ -135,7 +135,7 @@ export class WorkerTraceRecordReader {
     connection: PrismaConnection;
     resolveClickHouseClient: TraceClickHouseWriteResolver;
     /** The project's resolved content policy, from this process's own graph. */
-    dataPrivacy: DataPrivacyResolutionService;
+    dataPrivacy: DataPrivacyResolutionPort;
     /**
      * Which plan the project's organization is on, and the directory that answers which
      * organization that is.
@@ -163,7 +163,7 @@ export class WorkerTraceRecordReader {
 
   private constructor(
     private readonly reads: TraceLegacyReadClickHouseRepository,
-    private readonly dataPrivacy: DataPrivacyResolutionService,
+    private readonly dataPrivacy: DataPrivacyResolutionPort,
     private readonly window: VisibilityWindowService,
     private readonly projects: Pick<ProjectService, "getOrganizationId">,
     private readonly logger: Logger,

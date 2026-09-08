@@ -1,8 +1,4 @@
-import {
-  PrismaDataPrivacyResolutionAdapter,
-  type DataPrivacyResolutionDatabase,
-  type DataPrivacyResolutionService,
-} from "@langwatch/data-privacy-server";
+import type { DataPrivacyResolutionPort } from "@langwatch/data-privacy-server";
 import {
   PostgresModelCostCatalogAdapter,
   type ModelCostCatalogDatabase,
@@ -22,7 +18,8 @@ import {
 
 /**
  * The four capability services `command:recordSpan` and its subscribers read
- * through, composed from the one Prisma client this process opened.
+ * through: three composed from the one Prisma client this process opened, and
+ * the privacy resolution taken from the Data Privacy application it booted.
  *
  * STAGED, NOT MOUNTED. Trace has not converted — the application still owns
  * `RecordSpanCommand` and all fifteen subscribers — so nothing in this process
@@ -34,8 +31,8 @@ import {
  * WHAT CHANGED, AND WHY IT IS NOT A LOOPHOLE. The wall was never the reads —
  * it was the writes standing behind them. `ProjectService` requires a
  * credentials port and an `OrganizationService` because `create` mints an
- * ingestion key and `ensureInternal` resolves a team; `DataPrivacyService`
- * requires an `OrganizationService` because `setForScope` has to decide which
+ * ingestion key and `ensureInternal` resolves a team; `DataPrivacyApi`
+ * requires an organization directory because `setForScope` has to decide which
  * organization a team scope belongs to; `ModelProviderService` requires nine
  * collaborators including an `AuthzService` because writing a cost authorizes
  * a scope; `MonitorService` requires an `EvaluatorService` because creating a
@@ -50,12 +47,12 @@ import {
  *
  *     ProjectMetadataService        tryGetById, tryGetWithTeam, getWithTeam,
  *                                   updateMetadata, resolveOrgAdmin
- *     DataPrivacyResolutionService  getResolvedForProject
+ *     DataPrivacyResolutionPort     getResolvedForProject
  *     ModelCostCatalogService       listCosts
  *     MonitorCatalogService         getEnabledOnMessageMonitors
  *
- * Eight operations over four Prisma models. Nothing here opens a connection,
- * reads an environment or chooses a gateway.
+ * Eight operations over three Prisma models and one booted application. Nothing
+ * here opens a connection, reads an environment or chooses a gateway.
  *
  * WHAT IS DELIBERATELY NOT HERE. `FeatureFlagApi` and `AnalyticsService`
  * are the other two services the record path names, and neither was ever the
@@ -74,8 +71,12 @@ export function createWorkerTraceCapabilityServices(options: {
    * first-trace notification that silently never goes out.
    */
   diagnostics?: ProjectDiagnosticsPort;
-  /** How long a resolved privacy policy is reused for. Defaults to the service's own minute. */
-  dataPrivacyTtlMs?: number;
+  /**
+   * The resolved privacy policy the record path redacts by. Taken rather than
+   * built: the booted Data Privacy application is the one resolution this
+   * process has, and a second would answer a different policy for one project.
+   */
+  dataPrivacy: DataPrivacyResolutionPort;
 }): WorkerTraceCapabilityServices {
   const projects = PostgresProjectMetadataAdapter.create({
     database: options.database,
@@ -84,11 +85,7 @@ export function createWorkerTraceCapabilityServices(options: {
 
   return {
     projects,
-    dataPrivacy: PrismaDataPrivacyResolutionAdapter.create({
-      prisma: options.database,
-      projects,
-      ...(options.dataPrivacyTtlMs === undefined ? {} : { ttlMs: options.dataPrivacyTtlMs }),
-    }),
+    dataPrivacy: options.dataPrivacy,
     modelCosts: PostgresModelCostCatalogAdapter.create({
       database: options.database,
       projects,
@@ -107,14 +104,13 @@ export function createWorkerTraceCapabilityServices(options: {
  * than by review.
  */
 export type WorkerTraceCapabilityDatabase = ProjectMetadataDatabase &
-  DataPrivacyResolutionDatabase &
   ModelCostCatalogDatabase &
   MonitorCatalogDatabase;
 
 /** The four read-side capability services, each the feature's own. */
 export type WorkerTraceCapabilityServices = Readonly<{
   projects: ProjectMetadataService;
-  dataPrivacy: DataPrivacyResolutionService;
+  dataPrivacy: DataPrivacyResolutionPort;
   modelCosts: ModelCostCatalogService;
   monitors: MonitorCatalogService;
 }>;

@@ -1,7 +1,7 @@
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   PRIVACY_DROPPED_MARKER_ATTR,
-  type DataPrivacyService,
+  type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
@@ -53,12 +53,12 @@ function span(): OtlpSpan {
 }
 
 function dataPrivacy(): {
-  service: DataPrivacyService;
+  service: DataPrivacyApi;
   getResolvedForProject: ReturnType<typeof vi.fn>;
 } {
   const getResolvedForProject = vi.fn(async () => dropInput());
   return {
-    service: { getResolvedForProject } as unknown as DataPrivacyService,
+    service: { getResolvedForProject } as unknown as DataPrivacyApi,
     getResolvedForProject,
   };
 }
