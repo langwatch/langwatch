@@ -59,14 +59,29 @@ function hashLabel(label: string): number {
   return hash >>> 0;
 }
 
+/**
+ * The section's agent names, spelled bare.
+ *
+ * NO ENVIRONMENT SUFFIX. ADR-128 keys an agent on name AND environment, so
+ * "checkout-agent-prod" is two fields glued into one string: a reader who saw
+ * that name here and went looking for it on the Agents screen would not find
+ * it, because the agent there is called "checkout-agent" and runs in
+ * production. If a cost row ever needs to say where an agent ran, it gets an
+ * environment badge of its own, the way Agents does — never a longer name.
+ *
+ * This list is a subset of the section's canonical roster and every entry has
+ * to stay one, including the two nothing renders today: `slice(0, 6)` on the
+ * consumer side is a slice, not a boundary, and widening it must not be able
+ * to surface a name the Agents screen has never heard of.
+ */
 export const SAMPLE_AGENTS = [
-  "support-copilot-prod",
-  "checkout-agent-prod",
-  "fraud-triage-prod",
+  "support-copilot",
+  "checkout-agent",
+  "fraud-triage",
   "churn-predictor",
-  "docs-rag-prod",
-  "revenue-forecaster",
-  "etl-doctor",
+  "docs-rag",
+  "genie-revenue-analyst",
+  "genie-supply-planner",
   "hr-helpdesk",
 ] as const;
 

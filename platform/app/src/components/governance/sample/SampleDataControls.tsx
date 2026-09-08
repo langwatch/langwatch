@@ -95,8 +95,13 @@ export const SampleDataBanner: React.FC<{ children?: ReactNode }> = ({
       <Sparkles />
     </Icon>
     <Text textStyle="sm" fontWeight={600}>
+      {/* The default no longer points at the per-panel badges. A page whose
+          panels are ALL invented drops those badges, because this banner has
+          already said it once and sixteen repetitions of it say nothing more
+          — which left the old copy naming marks the reader could not see.
+          This wording stands on its own and stays true either way. */}
       {children ??
-        "Panels marked sample are illustrations of measurements we do not take yet — nothing here is real."}
+        "Nothing here is real — every figure is an illustration of a measurement we do not take yet."}
     </Text>
   </Flex>
 );

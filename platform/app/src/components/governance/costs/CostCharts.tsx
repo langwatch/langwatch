@@ -187,7 +187,7 @@ export function CostRankList({
       {shown.map((row) => (
         <HStack key={row.key} gap={3} fontSize="sm">
           {/* Half the row, because these labels are agent slugs and email
-              addresses — `support-copilot-prod` and `checkout-agent-prod`
+              addresses — `genie-revenue-analyst` and `genie-supply-planner`
               share a prefix long enough that a third of the row truncated
               them to the same string, and two rows that read alike are worse
               than a shorter bar. The full value is on hover either way. */}
