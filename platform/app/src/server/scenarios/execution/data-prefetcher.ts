@@ -55,6 +55,7 @@ import {
 import { parseVoiceAgentConfig } from "../../agents/voice/voice-agent.config";
 import {
   getProjectModelProviders,
+  prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
@@ -1052,6 +1053,26 @@ async function fetchVoiceAgentData({
     ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
     : null;
 
+  // The SDK builds its own OpenAI / ElevenLabs clients from the child's process
+  // env for the caller's TTS and for the transcription the judge uses. The
+  // platform's guardrail is that credentials come from the project's model
+  // provider rows only, so resolve them the same way the model params are:
+  // `prepareEnvKeys` maps the OpenAI provider's customKeys / env fallbacks onto
+  // `OPENAI_API_KEY`. Only these two keys travel; nothing else from the
+  // operator env reaches the child.
+  const providers = await getProjectModelProviders(projectId);
+  const openaiProvider = providers.openai;
+  const callerEnv: Record<string, string> = {};
+  const openaiApiKey = openaiProvider?.enabled
+    ? prepareEnvKeys(openaiProvider).OPENAI_API_KEY
+    : undefined;
+  if (openaiApiKey) callerEnv.OPENAI_API_KEY = openaiApiKey;
+  // Carried for a caller voice that speaks through ElevenLabs. Caller voices are
+  // OpenAI-only today (see `CALLER_VOICES`), so this is a forward-looking
+  // passthrough of the same key the transport already holds; the SDK reads it
+  // from env only when a caller voice is `elevenlabs/...`.
+  if (credential?.apiKey) callerEnv.ELEVENLABS_API_KEY = credential.apiKey;
+
   return {
     type: "voice",
     agentId: agent.id,
@@ -1060,6 +1081,7 @@ async function fetchVoiceAgentData({
       agentId: config.agentId,
       credential,
     },
+    callerEnv,
     // The whole-call budget the child enforces and the transport clamps a turn
     // to. Read here (not in the child) so a run records the limit it started
     // under even if the env changes mid-flight.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  callerVoiceConfigSchema,
   DEFAULT_CALLER_VOICE,
-  isSelectableVoiceModel,
   parseCallerVoiceConfig,
 } from "../caller-voice.config";
 
@@ -44,25 +44,35 @@ describe("parseCallerVoiceConfig", () => {
   });
 });
 
-describe("isSelectableVoiceModel", () => {
-  describe("given audio, realtime and chat models with credentials", () => {
-    /** @scenario The voice model filter predicate keeps only credentialed audio or realtime models */
-    it("keeps only the audio-tagged and realtime-tagged models", () => {
-      const audio = { mode: "audio", hasCredentials: true };
-      const realtime = { mode: "realtime", hasCredentials: true };
-      const chat = { mode: "chat", hasCredentials: true };
-
-      expect(isSelectableVoiceModel(audio)).toBe(true);
-      expect(isSelectableVoiceModel(realtime)).toBe(true);
-      expect(isSelectableVoiceModel(chat)).toBe(false);
+describe("callerVoiceConfigSchema voiceModel shape", () => {
+  describe("given a well-formed provider slash voice string", () => {
+    /** @scenario The caller voice value validates the provider slash voice shape */
+    it("accepts it and leaves it unchanged", () => {
+      const result = callerVoiceConfigSchema.safeParse({
+        voiceModel: "openai/nova",
+      });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.voiceModel).toBe("openai/nova");
     });
   });
 
-  describe("when an audio model has no credentials", () => {
-    it("is not selectable", () => {
+  describe("when the value is not a provider slash voice string", () => {
+    /** @scenario The caller voice value validates the provider slash voice shape */
+    it("rejects a bare name and a value with no voice segment", () => {
       expect(
-        isSelectableVoiceModel({ mode: "audio", hasCredentials: false }),
+        callerVoiceConfigSchema.safeParse({ voiceModel: "nova" }).success,
       ).toBe(false);
+      expect(
+        callerVoiceConfigSchema.safeParse({ voiceModel: "openai/" }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("when the value is null", () => {
+    it("accepts it as the project default", () => {
+      const result = callerVoiceConfigSchema.safeParse({ voiceModel: null });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.voiceModel).toBeNull();
     });
   });
 });

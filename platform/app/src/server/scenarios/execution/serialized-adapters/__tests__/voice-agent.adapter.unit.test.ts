@@ -2,7 +2,10 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
 import type { voiceTransportRegistry } from "../../../voice/voice-transport.registry";
 import type { VoiceAgentData } from "../../types";
-import { createSerializedVoiceAgentAdapter } from "../voice-agent.adapter";
+import {
+  createSerializedVoiceAgentAdapter,
+  NO_OPENAI_KEY_MESSAGE,
+} from "../voice-agent.adapter";
 
 const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;
 
@@ -22,6 +25,7 @@ function fakeRegistry(
 
 function voiceData(
   credential: { apiKey: string; baseUrl: string } | null,
+  callerEnv: Record<string, string> = { OPENAI_API_KEY: "sk-openai" },
 ): VoiceAgentData {
   return {
     type: "voice",
@@ -31,6 +35,7 @@ function voiceData(
       agentId: "el-agent-abc",
       credential,
     },
+    callerEnv,
     maxCallSeconds: 90,
   };
 }
@@ -45,6 +50,21 @@ describe("createSerializedVoiceAgentAdapter", () => {
           registry: fakeRegistry(),
         }),
       ).toThrow("No ElevenLabs key in this project");
+    });
+  });
+
+  describe("when the project has an ElevenLabs key but no OpenAI key", () => {
+    /** @scenario A voice run with no OpenAI key fails early with a named message */
+    it("fails with the named no-OpenAI-key message before connecting", () => {
+      expect(() =>
+        createSerializedVoiceAgentAdapter({
+          data: voiceData(
+            { apiKey: "xi-key", baseUrl: "https://api.elevenlabs.io" },
+            {},
+          ),
+          registry: fakeRegistry(),
+        }),
+      ).toThrow(NO_OPENAI_KEY_MESSAGE);
     });
   });
 

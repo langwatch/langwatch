@@ -26,9 +26,18 @@ export const CALLER_VOICE_EFFECTS = [
 ] as const;
 export type CallerVoiceEffect = (typeof CALLER_VOICE_EFFECTS)[number];
 
+/**
+ * The shape a caller `voiceModel` must take: `"provider/voice"`, one non-empty
+ * segment each side of a single slash (e.g. `"openai/nova"`). Validated by
+ * shape, NOT against a catalog — the SDK reads the second segment as its TTS
+ * voice name, so any well-formed `provider/voice` string is acceptable and the
+ * offered set is a UI concern (`CALLER_VOICES`), not a schema one.
+ */
+export const CALLER_VOICE_PATTERN = /^[^/\s]+\/[^/\s]+$/;
+
 export const callerVoiceConfigSchema = z.object({
-  /** litellm-style `"provider/voice"`; null means the project default voice. */
-  voiceModel: z.string().min(1).nullable().default(null),
+  /** `"provider/voice"` TTS voice; null means the project default voice. */
+  voiceModel: z.string().regex(CALLER_VOICE_PATTERN).nullable().default(null),
   /** [0, 1] probability the caller interrupts each agent turn. UI shows a
    *  percent in steps of 5. */
   interruptProbability: z.number().min(0).max(1).default(0),
@@ -63,20 +72,43 @@ export const parseCallerVoiceConfig = (raw: unknown): CallerVoiceConfig => {
  */
 export const DEFAULT_CALLER_VOICE_MODEL = "openai/nova";
 
-/**
- * Whether a model may be offered in the caller Voice picker: it must be one the
- * project has credentials for AND tagged for spoken audio (`audio`, or
- * `realtime` once the catalog carries it). The chat/embedding pickers use their
- * own modes and are unaffected.
- */
-export interface VoiceModelCandidate {
-  mode: string;
-  hasCredentials: boolean;
+/** A caller voice the picker may offer: its `"provider/voice"` value and the
+ *  words a person reads for it. */
+export interface CallerVoiceOption {
+  provider: string;
+  value: string;
+  label: string;
 }
-export const VOICE_MODEL_MODES: ReadonlySet<string> = new Set([
-  "audio",
-  "realtime",
-]);
-export const isSelectableVoiceModel = (
-  candidate: VoiceModelCandidate,
-): boolean => candidate.hasCredentials && VOICE_MODEL_MODES.has(candidate.mode);
+
+/** The OpenAI TTS voice names the SDK's user simulator accepts. */
+const OPENAI_CALLER_VOICE_NAMES = [
+  "alloy",
+  "ash",
+  "ballad",
+  "coral",
+  "echo",
+  "fable",
+  "nova",
+  "onyx",
+  "sage",
+  "shimmer",
+  "verse",
+] as const;
+
+/**
+ * The caller voices offered in the Voice picker, listed explicitly rather than
+ * derived from the model catalog: the SDK maps a caller voice to a fixed TTS
+ * model and reads only the voice name, so a catalog model id (e.g.
+ * `openai/tts-1`) is the wrong shape and would be sent as a nonexistent voice.
+ *
+ * ElevenLabs caller voices are per-account voice ids, so they are not listed
+ * here; offering them is a follow-up that resolves them from the project's
+ * ElevenLabs account.
+ */
+export const CALLER_VOICES: CallerVoiceOption[] = OPENAI_CALLER_VOICE_NAMES.map(
+  (name) => ({
+    provider: "openai",
+    value: `openai/${name}`,
+    label: name.charAt(0).toUpperCase() + name.slice(1),
+  }),
+);

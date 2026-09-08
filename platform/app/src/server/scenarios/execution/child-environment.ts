@@ -125,10 +125,18 @@ export function buildChildEnvironment({
   jobData,
   labels,
   telemetry,
+  callerEnv,
 }: {
   jobData: ExecutionJobData;
   labels: string[];
   telemetry: ChildEnvInputs["telemetry"];
+  /**
+   * The caller's OpenAI / ElevenLabs keys, for a VOICE target only — the SDK
+   * builds its TTS and transcription clients from the child's env. The caller
+   * passes it only for a voice run; it is never set for any other target, so a
+   * caller credential can never leak into an unrelated child. Never logged.
+   */
+  callerEnv?: Record<string, string>;
 }): NodeJS.ProcessEnv {
   // TLS for the runner's own fetch stack (EventReporter → platform, and the
   // model API call). Forwards haven's trusted local CA when present; only in
@@ -152,5 +160,9 @@ export function buildChildEnvironment({
       setId: jobData.setId,
     }),
     ...tlsEnv,
+    // Voice-only, and only the two keys the prefetcher resolved. The caller
+    // narrows to a voice target before passing this, so it is absent for every
+    // other run.
+    ...(callerEnv ?? {}),
   });
 }

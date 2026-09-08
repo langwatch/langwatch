@@ -53,6 +53,23 @@ vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
     getElevenLabsApiCredential(...args),
 }));
 
+// The voice branch also resolves the caller's OpenAI key from the project's
+// model providers; mock it so the prefetch needs no database. Default: no
+// OpenAI provider, so callerEnv comes out empty.
+const getProjectModelProviders = vi.fn().mockResolvedValue({});
+const prepareEnvKeys = vi.fn().mockReturnValue({});
+vi.mock(
+  "~/server/api/routers/modelProviders.utils",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("~/server/api/routers/modelProviders.utils")
+    >()),
+    getProjectModelProviders: (...args: unknown[]) =>
+      getProjectModelProviders(...args),
+    prepareEnvKeys: (...args: unknown[]) => prepareEnvKeys(...args),
+  }),
+);
+
 describe("prefetchScenarioData", () => {
   const defaultContext: ExecutionContext = {
     projectId: "proj_123",
@@ -2687,6 +2704,8 @@ describe("prefetchScenarioData", () => {
     beforeEach(() => {
       findElevenLabsProviderForProject.mockReset().mockResolvedValue(null);
       getElevenLabsApiCredential.mockReset().mockResolvedValue(null);
+      getProjectModelProviders.mockReset().mockResolvedValue({});
+      prepareEnvKeys.mockReset().mockReturnValue({});
     });
 
     describe("given the project has an enabled ElevenLabs provider", () => {
@@ -2777,6 +2796,53 @@ describe("prefetchScenarioData", () => {
         expect(result.data.callerVoice).toMatchObject({
           interruptProbability: 0.3,
           effects: "phone_line",
+        });
+      });
+    });
+
+    describe("given the project has an enabled OpenAI provider", () => {
+      /** @scenario A voice target carries the caller OpenAI key to the child */
+      it("carries the project's OpenAI key as caller env", async () => {
+        getProjectModelProviders.mockResolvedValueOnce({
+          openai: { provider: "openai", enabled: true },
+        });
+        prepareEnvKeys.mockReturnValueOnce({ OPENAI_API_KEY: "sk-openai" });
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.adapterData).toMatchObject({
+          type: "voice",
+          callerEnv: { OPENAI_API_KEY: "sk-openai" },
+        });
+      });
+    });
+
+    describe("given the project has no OpenAI provider", () => {
+      it("carries an empty caller env", async () => {
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        });
+
+        const result = await prefetchScenarioData({
+          context: defaultContext,
+          target: voiceTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.adapterData).toMatchObject({
+          type: "voice",
+          callerEnv: {},
         });
       });
     });

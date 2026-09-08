@@ -194,11 +194,11 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # AC18
   @integration
-  Scenario: The Voice picker lists only audio and realtime models the project has credentials for
-    Given the project has credentials for one audio-tagged model and one chat-only model
+  Scenario: The Voice picker lists the OpenAI caller voices when the project has an OpenAI provider
+    Given the project has an enabled OpenAI provider
     When the Voice picker of the Caller voice group is opened
-    Then only the audio-tagged model is offered
-    And a chat model picker elsewhere in the project is unchanged
+    Then the OpenAI caller voices are offered, each labelled by its capitalised name
+    And a project with no OpenAI provider shows the add-a-provider state instead
 
   # AC21
   @integration
@@ -335,6 +335,27 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When the run data is prefetched
     Then the scenario's caller voice is carried on the prepared data
 
+  # AC19, AC20
+  @unit
+  Scenario: A voice target carries the caller OpenAI key to the child
+    Given a voice agent and a project with an enabled OpenAI provider
+    When the run data is prefetched for that voice target
+    Then the prepared voice data carries the project's OpenAI key as caller env
+
+  # AC19, AC20
+  @unit
+  Scenario: The caller voice keys reach the child env only for a voice target
+    Given a prepared voice run with caller env keys and a prepared non-voice run
+    When each child environment is built
+    Then the voice child receives the caller OpenAI key and the non-voice child does not
+
+  # AC19, AC21
+  @unit
+  Scenario: A voice run with no OpenAI key fails early with a named message
+    Given a prepared voice run whose project has no OpenAI key
+    When the voice adapter is created for the run
+    Then it fails before connecting with the add-an-OpenAI-key message
+
   # AC19
   @unit
   Scenario: A voice agent is refused by the agent-test path
@@ -383,10 +404,10 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
 
   # AC18
   @unit
-  Scenario: The voice model filter predicate keeps only credentialed audio or realtime models
-    Given a model tagged audio with project credentials, a model tagged realtime with project credentials, and a chat model with credentials
-    When the voice model filter predicate runs over the list
-    Then only the audio-tagged and realtime-tagged models pass
+  Scenario: The caller voice value validates the provider slash voice shape
+    Given a caller voice value
+    When the caller voice config is validated
+    Then a well-formed "provider/voice" string is accepted and a value of the wrong shape is rejected
 
   # AC14
   @unit
