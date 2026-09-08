@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { connectedAgentSelectability } from "@langwatch/agent-contract";
 import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 import {
   InvalidTargetReferencesError,
@@ -161,7 +161,7 @@ function buildService(agents: AgentApi) {
     repository,
     scenarios,
     agents,
-    prompts: {} as PromptService,
+    prompts: {} as PromptApi,
     execution,
     runRepository: {} as SuiteRunReadRepository,
     generateId: () => "suite_generated",

@@ -12,8 +12,8 @@ import { MessagePreview } from "./message-preview.tsx";
 import { SimulationCard } from "./simulation-card.tsx";
 import { Square } from "lucide-react";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "./run-history-transforms.ts";
-import { isCancellableStatus } from "./run-status.ts";
+import { buildDisplayTitle } from "../../../model/run-history-transforms.ts";
+import { isCancellableStatus } from "../../../model/run-status.ts";
 
 type ScenarioGridCardProps = {
   scenarioRun: ScenarioRunData;

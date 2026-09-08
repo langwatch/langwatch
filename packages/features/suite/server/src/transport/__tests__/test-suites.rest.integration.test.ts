@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { errorCodeOf, mountSuiteFamilies } from "./support/suite-family.harness.ts";
+import { errorCodeOf, mountSuiteFamilies } from "./suite-rest.harness.ts";
 
 const BASE = "/api/v1/test-suites";
 

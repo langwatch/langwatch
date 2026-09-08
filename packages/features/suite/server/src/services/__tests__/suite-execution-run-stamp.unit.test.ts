@@ -3,7 +3,7 @@
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ScenarioService } from "@langwatch/scenario-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { targetKeyOf } from "@langwatch/suite-contract";
 
 import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
@@ -17,7 +17,7 @@ const noopScenarios = {
       secretParameters: {},
       scenarioVersion: 1,
     })),
-} as unknown as ScenarioService;
+} as unknown as ScenarioApi;
 
 async function queueOne(input: {
   scenarioId: string;
@@ -133,7 +133,7 @@ describe("given a batch run against one agent twice, once with an override", () 
             secretParameters: {},
             scenarioVersion: 1,
           })),
-      } as unknown as ScenarioService,
+      } as unknown as ScenarioApi,
     });
 
     await service.execute({

@@ -13,7 +13,7 @@ import {
   groupRunsByTarget,
   groupRunsByTargetKey,
   resolveOriginLabel,
-} from "../run-history-transforms.ts";
+} from "../model/run-history-transforms.ts";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers.ts";
 
 describe("groupRunsByTargetKey()", () => {

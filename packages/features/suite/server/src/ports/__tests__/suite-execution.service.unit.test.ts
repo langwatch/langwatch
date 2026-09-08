@@ -1,4 +1,5 @@
-import { ScenarioService } from "@langwatch/scenario-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { SuiteRunCommandsPort, SuiteRunIdPort } from "../suite-execution.port.ts";
 import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
@@ -22,10 +23,8 @@ function scenarios(
     .mockResolvedValue([
       { scenarioId: "scenario_1", parameters: { tier: "gold" }, secretParameters: {} },
     ]),
-): ScenarioService {
-  return Object.assign(Object.create(ScenarioService.prototype), {
-    resolveRunParametersForScenarios: resolve,
-  });
+): ScenarioApi {
+  return createApiFixture<ScenarioApi>({ resolveRunParametersForScenarios: resolve });
 }
 
 type ExecuteInput = Parameters<SuiteExecutionService["execute"]>[0];

@@ -12,9 +12,9 @@ import { Grid, VStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { ScenarioGridCard } from "./scenario-grid-card.tsx";
-import { type ScenarioRunContextRenderer, ScenarioTargetRow } from "./scenario-target-row.tsx";
-import type { ViewMode } from "./use-run-history-store.ts";
+import { ScenarioGridCard } from "../elements/runs/scenario-grid-card.tsx";
+import { type ScenarioRunContextRenderer, ScenarioTargetRow } from "../elements/runs/scenario-target-row.tsx";
+import type { ViewMode } from "../../behavior/use-run-history-store.ts";
 
 const VIRTUALIZE_THRESHOLD = 30;
 const GRID_CARD_HEIGHT = 200;

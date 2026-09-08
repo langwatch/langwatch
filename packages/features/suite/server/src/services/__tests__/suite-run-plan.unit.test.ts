@@ -4,8 +4,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { PromptService } from "@langwatch/prompt-contract";
-import type { ScenarioService } from "@langwatch/scenario-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
@@ -44,7 +44,7 @@ function baseSuite(overrides: Partial<Suite> = {}): Suite {
 
 function buildService(overrides: {
   repository?: Partial<SuiteRepository>;
-  scenarios?: Partial<ScenarioService>;
+  scenarios?: Partial<ScenarioApi>;
   agents?: Partial<AgentApi>;
   execution?: SuiteExecutionPort;
 }) {
@@ -64,7 +64,7 @@ function buildService(overrides: {
     findOrCreatePlanByName,
   } as SuiteRepository;
 
-  const scenarios: ScenarioService = {
+  const scenarios: ScenarioApi = {
     resolveRunParametersForScenarios: async () => undefined,
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({ id, archivedAt: null })),
@@ -78,7 +78,7 @@ function buildService(overrides: {
         parameters: {},
       })),
     ...overrides.scenarios,
-  } as ScenarioService;
+  } as ScenarioApi;
 
   const execution: SuiteExecutionPort =
     overrides.execution ??
@@ -103,7 +103,7 @@ function buildService(overrides: {
     repository,
     scenarios,
     agents,
-    prompts: {} as PromptService,
+    prompts: {} as PromptApi,
     execution,
     runRepository: {} as SuiteRunReadRepository,
     generateId: () => "suite-generated-1",
@@ -301,7 +301,7 @@ describe("given a scenario declaring a secret parameter", () => {
           { name: "api_token", secret: true },
         ],
       })),
-  } as unknown as Partial<ScenarioService>;
+  } as unknown as Partial<ScenarioApi>;
 
   describe("when a target carries an override naming that secret", () => {
     /** @scenario A target override naming a secret parameter is refused */

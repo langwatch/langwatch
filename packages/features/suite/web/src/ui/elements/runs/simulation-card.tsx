@@ -4,7 +4,7 @@ import { SimulationStatusOverlay } from "./simulation-status-overlay.tsx";
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
-} from "./scenario-run-status-config.ts";
+} from "../../../model/scenario-run-status-config.ts";
 
 export interface SimulationCardMessage {
   role: "agent" | "user";

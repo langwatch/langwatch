@@ -252,8 +252,6 @@
     {"feature":"stored-object","kind":"refusing-composition"},
     {"feature":"stored-object","kind":"testing-entry"},
     {"feature":"stored-object","kind":"unregistered-repositories"},
-    {"feature":"suite","kind":"legacy-transport-runtime"},
-    {"feature":"suite","kind":"nested-transport"},
     {"feature":"trace","kind":"contract-service"},
     {"feature":"trace","kind":"legacy-transport-runtime"},
     {"feature":"trace","kind":"nested-transport"},

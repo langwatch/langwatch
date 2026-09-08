@@ -7,7 +7,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   JUDGE_MODEL_FEATURE_KEY,
   SIMULATOR_MODEL_FEATURE_KEY,
-  type ScenarioService,
+  type ScenarioApi,
 } from "@langwatch/scenario-contract";
 import { SuiteRunModelsService } from "../suite-run-models.service.ts";
 
@@ -20,7 +20,7 @@ function buildScenarios(
     getModelChoices: vi.fn(async ({ ids }: { ids: string[] }) =>
       rows.filter((row) => ids.includes(row.id)),
     ),
-  } as unknown as ScenarioService;
+  } as unknown as ScenarioApi;
 }
 
 function buildModelProviders(defaults: Record<string, string>) {

@@ -6,7 +6,7 @@ import {
   type OutputFieldState,
   resolveOutputField,
   toOutputFieldState,
-} from "../output-field-state.ts";
+} from "../model/output-field-state.ts";
 
 describe("toOutputFieldState", () => {
   describe("given the value stored on the agent config", () => {

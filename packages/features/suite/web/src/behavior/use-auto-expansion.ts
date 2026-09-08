@@ -14,6 +14,7 @@
  * @see specs/suites/simulations-performance.feature
  */
 
+import { readUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseAutoExpansionOptions {
@@ -31,48 +32,50 @@ type PanelState = { expanded: Set<string>; seen: Set<string> };
 /**
  * Module-level cache of expanded/seen state per panel+groupBy.
  * Preserves the user's manual collapse/expand across panel switches and
- * navigation. Synced to localStorage so state persists across page loads.
+ * navigation. Remembered on the device so state persists across page loads.
  */
 const panelStateCache = new Map<string, PanelState>();
 
-// Hydrate from localStorage on module load. Supports the legacy format where
-// each entry was a plain array of expanded ids (treated as both expanded and
-// seen, matching the old expand-all behavior those entries were saved under).
-try {
-  const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-  if (stored) {
+let hydrated = false;
+
+/**
+ * Read back what this device remembers, the first time a panel asks. Read on
+ * first use rather than at module load, because the shell installs the store
+ * it is remembered in while it mounts. Supports the legacy format where each
+ * entry was a plain array of expanded ids (treated as both expanded and seen,
+ * matching the old expand-all behavior those entries were saved under).
+ */
+function hydrateFromStorage(): void {
+  if (hydrated) return;
+
+  hydrated = true;
+  try {
+    const stored = readUiStorage(STORAGE_KEY);
+    if (!stored) return;
+
     const parsed = JSON.parse(stored) as Record<
       string,
       string[] | { expanded: string[]; seen: string[] }
     >;
     for (const [k, value] of Object.entries(parsed)) {
-      if (Array.isArray(value)) {
-        panelStateCache.set(k, {
-          expanded: new Set(value),
-          seen: new Set(value),
-        });
-      } else {
-        panelStateCache.set(k, {
-          expanded: new Set(value.expanded),
-          seen: new Set(value.seen),
-        });
-      }
+      panelStateCache.set(
+        k,
+        Array.isArray(value)
+          ? { expanded: new Set(value), seen: new Set(value) }
+          : { expanded: new Set(value.expanded), seen: new Set(value.seen) },
+      );
     }
+  } catch {
+    // Ignore parse errors
   }
-} catch {
-  // Ignore parse errors
 }
 
 function persistToStorage() {
-  try {
-    const obj: Record<string, { expanded: string[]; seen: string[] }> = {};
-    for (const [k, state] of panelStateCache) {
-      obj[k] = { expanded: [...state.expanded], seen: [...state.seen] };
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-  } catch {
-    // localStorage full or unavailable
+  const obj: Record<string, { expanded: string[]; seen: string[] }> = {};
+  for (const [k, state] of panelStateCache) {
+    obj[k] = { expanded: [...state.expanded], seen: [...state.seen] };
   }
+  writeUiStorage(STORAGE_KEY, JSON.stringify(obj));
 }
 
 function cacheKey(panelKey: string, groupBy: string): string {
@@ -85,6 +88,7 @@ export function useAutoExpansion({
   batchRuns,
   groups,
 }: UseAutoExpansionOptions) {
+  hydrateFromStorage();
   const key = cacheKey(panelKey, groupBy);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => panelStateCache.get(key)?.expanded ?? new Set(),

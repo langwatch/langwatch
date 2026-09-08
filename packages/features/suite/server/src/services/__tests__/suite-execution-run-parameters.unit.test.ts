@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see specs/scenarios/scenario-run-parameters.feature
  */
-import { resolveRunParameters, type ScenarioService } from "@langwatch/scenario-contract";
+import { resolveRunParameters, type ScenarioApi } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
@@ -30,7 +30,7 @@ const declaringScenarios = {
       scenarioVersion: 1,
     }));
   },
-} as unknown as ScenarioService;
+} as unknown as ScenarioApi;
 
 function execute(
   runParameters: Record<string, unknown>,

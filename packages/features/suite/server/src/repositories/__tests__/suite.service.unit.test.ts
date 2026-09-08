@@ -15,12 +15,12 @@ import {
 } from "@langwatch/suite-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   ScenarioTestSuiteNotFoundError,
-  ScenarioService,
   scenarioSchema,
   type Scenario,
+  type ScenarioApi,
 } from "@langwatch/scenario-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -109,15 +109,15 @@ function serviceOptions(
     repository: repo,
     scenarios: mockScenarioService({ tryGetTestSuite: vi.fn().mockResolvedValue(null) }),
     agents: createApiFixture<AgentApi>(),
-    prompts: {} as PromptService,
+    prompts: createApiFixture<PromptApi>(),
     execution: new UnusedExecutionPort(),
     runRepository: MemorySuiteRunRepository.create(),
     ...overrides,
   };
 }
 
-function mockScenarioService(methods: object): ScenarioService {
-  return Object.assign(Object.create(ScenarioService.prototype), methods);
+function mockScenarioService(methods: object): ScenarioApi {
+  return createApiFixture<ScenarioApi>(methods as Partial<ScenarioApi>);
 }
 
 function mockAgentService(methods: Partial<AgentApi>): AgentApi {
@@ -127,8 +127,8 @@ function mockAgentService(methods: Partial<AgentApi>): AgentApi {
   });
 }
 
-function mockPromptService(methods: object): PromptService {
-  return Object.assign(Object.create(PromptService.prototype), methods);
+function mockPromptService(methods: object): PromptApi {
+  return createApiFixture<PromptApi>(methods as Partial<PromptApi>);
 }
 
 describe("SuiteService", () => {

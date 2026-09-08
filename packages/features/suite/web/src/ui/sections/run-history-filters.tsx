@@ -7,8 +7,8 @@
 
 import { Button, HStack, IconButton, NativeSelect, Spinner, Text } from "@chakra-ui/react";
 import { Download, LayoutGrid, List, X } from "lucide-react";
-import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms.ts";
-import type { ViewMode } from "./use-run-history-store.ts";
+import { RUN_GROUP_TYPES, type RunGroupType } from "../../model/run-history-transforms.ts";
+import type { ViewMode } from "../../behavior/use-run-history-store.ts";
 
 /** Display labels for each group-by option. */
 const GROUP_BY_LABELS: Record<RunGroupType, string> = {

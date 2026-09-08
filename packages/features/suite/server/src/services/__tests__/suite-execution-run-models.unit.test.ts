@@ -8,7 +8,7 @@
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ScenarioService } from "@langwatch/scenario-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 
 import type { QueueSimulationRunCommandData } from "../../ports/suite-execution.port.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
@@ -24,7 +24,7 @@ const noopScenarios = {
       secretParameters: {},
       scenarioVersion: 1,
     })),
-} as unknown as ScenarioService;
+} as unknown as ScenarioApi;
 
 /** Starts a run of one case and returns the queued command it dispatched. */
 async function queuedCommandFor(params: {

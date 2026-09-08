@@ -5,6 +5,7 @@
  * memory.
  */
 import { AgentApi, type AgentApi as AgentApiContract } from "@langwatch/agent-contract";
+import type { PlatformUrlBuilder, RestErrorHandler } from "@langwatch/api/rest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiContract } from "@langwatch/prompt-contract";
@@ -16,6 +17,8 @@ import {
   type SuiteAppInfrastructure,
 } from "@langwatch/suite-server";
 
+import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features.ts";
+import { mountSuiteRest } from "./suite-rest.mount.ts";
 import { createSuiteTrpcRouter } from "./suite-trpc.mount.ts";
 import type { ComposedSuiteFeature } from "./suite.composition.types.ts";
 
@@ -37,11 +40,19 @@ export type SuiteInfrastructure = Readonly<{
   connectedPresence?: ConnectedPresenceReader;
 }>;
 
+/** What the REST families answer through: the door, its envelope and the platform's URLs. */
+export type SuiteRestPorts = Readonly<{
+  credential: ApiHandlerManagedCredentialPort;
+  platformUrl: PlatformUrlBuilder;
+  errors: RestErrorHandler;
+}>;
+
 /** Installs the suite surfaces over this process's own graph. */
 export async function installApiSuite(options: {
   prisma: PrismaClient;
   peers: SuitePeers;
   infrastructure: SuiteInfrastructure;
+  rest: SuiteRestPorts;
 }): Promise<ComposedSuiteFeature> {
   const { peers, infrastructure } = options;
 
@@ -70,5 +81,6 @@ export async function installApiSuite(options: {
   return {
     routers: (mount) => ({ suites: createSuiteTrpcRouter(mount) }),
     app,
+    rest: mountSuiteRest({ suites: () => app, ...options.rest }),
   };
 }

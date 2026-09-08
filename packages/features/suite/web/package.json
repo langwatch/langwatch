@@ -7,13 +7,9 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
+  "main": "./src/run-formatters.ts",
+  "types": "./dist/run-formatters.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
     "./testing": {
       "types": "./dist/__tests__/test-helpers.d.ts",
       "default": "./src/__tests__/test-helpers.ts"

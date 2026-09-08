@@ -3,6 +3,7 @@
  * Speaks the domain's own scope vocabulary (all/test_suites/labels/scenarios) — unlike the
  * deprecated `/api/suites` alias, which remaps to folders/cases.
  */
+import { defineRestMiddleware } from "@langwatch/api/rest";
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
 import {
@@ -13,6 +14,13 @@ import {
   type SuiteTarget,
 } from "@langwatch/suite-contract";
 import { z } from "zod";
+
+/**
+ * Which surface started a run, as `X-LangWatch-Surface` spells it. Declared
+ * here because all three suite families record it on the runs they queue, and
+ * bound once by the process that reads the header.
+ */
+export const suiteSurfaceFact = defineRestMiddleware("suiteSurface", z.string().nullable());
 
 /** What a query string may say for yes and for no. Compared case-folded. */
 const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];

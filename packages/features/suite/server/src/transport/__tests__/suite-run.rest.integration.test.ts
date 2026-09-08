@@ -3,16 +3,19 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type RestApiServicePorts,
+  bindRestHeader,
+  bindRestMiddleware,
+  createRestRuntime,
+  projectRestFacts,
+  type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import type { SuiteRunResult } from "@langwatch/suite-contract";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import type { SuiteApp } from "#app/suite.app";
-import { createSuiteRestApp } from "../suite.api.ts";
+
+import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
+import { createSuitesAliasRest, suitesAliasErrorHandler } from "../suites-alias.rest.ts";
 
 class ScenarioParameterUnknownTestError extends HandledError {
   constructor() {
@@ -24,61 +27,66 @@ class ScenarioParameterUnknownTestError extends HandledError {
   }
 }
 
-const boundaryErrorHandler: ErrorHandler = (error, c) => {
+const boundaryErrorHandler: RestErrorHandler = (error, c) => {
   const handled = error as Error & { code?: string; httpStatus?: number };
   if (typeof handled.code === "string" && typeof handled.httpStatus === "number") {
     return c.json({ error: handled.code, message: handled.message }, handled.httpStatus as 400);
   }
+
   return c.json({ error: "internal_server_error", message: String(error) }, 500);
 };
 
-function testSecurity(): AppRestSecurity {
-  const pass: MiddlewareHandler = async (_c, next) => next();
-  const authenticateProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", {
-      id: "project-1",
-      name: "Project One",
-      slug: "project-one",
-      teamId: "team-1",
-      organizationId: "organization-1",
-      isPersonal: false,
-      ownerUserId: null,
-    });
-    await next();
-  };
+const NOW = new Date("2026-01-01T00:00:00.000Z");
 
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => authenticateProject,
-    authorizeProjectPermission: () => pass,
-    authorizeApiKeyCeiling: () => pass,
-    authenticateOrganization: () => pass,
-    authorizeOrganizationPermission: () => pass,
-    authorizeRouteTeamPermission: () => pass,
-    authorizeRouteProjectPermission: () => pass,
-    authenticateOrganizationThrowing: pass,
-    authorizeOrganizationPermissionThrowing: () => pass,
-  };
-
-  return createAppRestSecurity(ports);
-}
+/** The stored plan the door reads before it runs anything. */
+const storedPlan = suiteSchema.parse({
+  id: "suite_1",
+  projectId: "project-1",
+  name: "Nightly",
+  slug: "nightly",
+  kind: "run_plan",
+  description: null,
+  scenarioIds: ["scenario_1"],
+  scope: null,
+  targets: [{ type: "http", referenceId: "agent_1" }],
+  repeatCount: 1,
+  labels: [],
+  simulatorModel: null,
+  judgeModel: null,
+  archivedAt: null,
+  createdAt: NOW,
+  updatedAt: NOW,
+});
 
 function buildApi(run: (...args: never[]) => unknown) {
   // The door asks which kind the id names before it runs anything: a run plan
   // runs the targets it stores, a test suite takes them from the body.
-  const suites = {
-    run,
-    getByIdOrTestSuite: async () => ({ kind: "suite", suite: { kind: "run_plan" } }),
-  } as unknown as SuiteApp;
-  const app = createSuiteRestApp({
-    security: testSecurity(),
-    suites: () => suites,
-    platformUrl: () => "https://app.test/x",
+  const suites = createApiFixture<SuiteApi>({
+    run: run as SuiteApi["run"],
+    getByIdOrTestSuite: async () => ({ kind: "suite", suite: storedPlan }),
   });
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    },
+  });
+  const app = runtime.mount(
+    createSuitesAliasRest(({ projectSlug, path }) => `https://app.test/${projectSlug}${path}`)
+      .router(),
+    {
+      app: () => suites,
+      credential: "projectKey",
+      onError: suitesAliasErrorHandler(boundaryErrorHandler),
+      facts: [
+        bindRestMiddleware(projectRestFacts, () => ({
+          projectSlug: "project-one",
+          viewerUserId: null,
+          actorId: "project-key-1",
+        })),
+        bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
+      ],
+    },
+  );
 
   return {
     fetch: (path: string, body: unknown) =>

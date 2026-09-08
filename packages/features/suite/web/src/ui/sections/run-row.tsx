@@ -7,17 +7,17 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNow } from "./now-provider.tsx";
+import { useNow } from "../elements/runs/now-provider.tsx";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
-import { RunMetricsSummary } from "./run-metrics-summary.tsx";
+import { RunMetricsSummary } from "../elements/runs/run-metrics-summary.tsx";
 import { Dialog } from "@langwatch/design-system/dialog";
-import type { BatchRun, BatchRunSummary } from "./run-history-transforms.ts";
-import { computeIterationMap } from "./run-history-transforms.ts";
+import type { BatchRun, BatchRunSummary } from "../../model/run-history-transforms.ts";
+import { computeIterationMap } from "../../model/run-history-transforms.ts";
 import { ScenarioRunContent } from "./scenario-run-content.tsx";
-import type { ScenarioRunContextRenderer } from "./scenario-target-row.tsx";
-import { isCancellableStatus } from "./run-status.ts";
-import type { ViewMode } from "./use-run-history-store.ts";
+import type { ScenarioRunContextRenderer } from "../elements/runs/scenario-target-row.tsx";
+import { isCancellableStatus } from "../../model/run-status.ts";
+import type { ViewMode } from "../../behavior/use-run-history-store.ts";
 
 type RunRowLoadingProps = {
   loading: true;

@@ -22,16 +22,16 @@ import {
   getAvailableTargets,
   isSameTarget,
   withTargetMapping,
-} from "./suite-form-derivations.ts";
+} from "../model/suite-form-derivations.ts";
 import {
   planFormSchema,
   suiteFormDefaultValues,
   suiteFormSchema,
   type SuiteFormData,
   type UseSuiteFormParams,
-} from "./suite-form.types.ts";
+} from "../model/suite-form.types.ts";
 
-export { MAX_REPEAT_COUNT, planFormSchema, suiteFormSchema } from "./suite-form.types.ts";
+export { MAX_REPEAT_COUNT, planFormSchema, suiteFormSchema } from "../model/suite-form.types.ts";
 export type {
   SuiteFormAgent,
   SuiteFormAvailableTarget,
@@ -41,7 +41,7 @@ export type {
   SuiteFormScenario,
   SuiteFormSuite,
   UseSuiteFormParams,
-} from "./suite-form.types.ts";
+} from "../model/suite-form.types.ts";
 
 export function useSuiteForm({
   suite,

@@ -318,9 +318,10 @@ export class SuiteApp implements SuiteApi {
    * The organization behind a project, refusing when there is none to resolve.
    */
   async getOrganizationId(projectId: string): Promise<string> {
-    const project = await this.#dependencies.projects.tryGetWithTeam(projectId);
-    if (!project) throw new OrganizationNotFoundForProjectError(projectId);
-    return project.team.organizationId;
+    const organizationId = await this.#dependencies.projects.tryGetOrganizationId(projectId);
+    if (!organizationId) throw new OrganizationNotFoundForProjectError(projectId);
+
+    return organizationId;
   }
 }
 

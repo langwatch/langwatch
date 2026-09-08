@@ -1,2 +1,2 @@
-export * from "./scenario-picker.tsx";
-export * from "./target-picker.tsx";
+export * from "./ui/elements/pickers/scenario-picker.tsx";
+export * from "./ui/elements/pickers/target-picker.tsx";

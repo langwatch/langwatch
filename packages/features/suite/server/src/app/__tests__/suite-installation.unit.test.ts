@@ -26,12 +26,7 @@ function process() {
     .withProvided(PromptApiToken, createApiFixture<PromptApi>({}))
     .withProvided(
       ProjectApiToken,
-      createApiFixture<ProjectApi>({
-        tryGetWithTeam: async (projectId: string) => ({
-          id: projectId,
-          team: { organizationId: "organization-1" },
-        }),
-      }),
+      createApiFixture<ProjectApi>({ tryGetOrganizationId: async () => "organization-1" }),
     )
     .withFeature(suiteServer, {
       infrastructure: {

@@ -15,11 +15,11 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { BatchSection } from "./batch-section.tsx";
-import { RunMetricsSummary } from "./run-metrics-summary.tsx";
-import type { ScenarioRunContextRenderer } from "./scenario-target-row.tsx";
-import type { RunGroup, RunGroupSummary } from "./run-history-transforms.ts";
-import { groupRunsByBatchId } from "./run-history-transforms.ts";
-import type { ViewMode } from "./use-run-history-store.ts";
+import { RunMetricsSummary } from "../elements/runs/run-metrics-summary.tsx";
+import type { ScenarioRunContextRenderer } from "../elements/runs/scenario-target-row.tsx";
+import type { RunGroup, RunGroupSummary } from "../../model/run-history-transforms.ts";
+import { groupRunsByBatchId } from "../../model/run-history-transforms.ts";
+import type { ViewMode } from "../../behavior/use-run-history-store.ts";
 
 type GroupRowProps = {
   group: RunGroup;

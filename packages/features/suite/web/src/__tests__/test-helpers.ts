@@ -9,7 +9,7 @@ import {
   SimulationVerdict as Verdict,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
-import type { BatchRun, BatchRunSummary } from "../run-history-transforms.ts";
+import type { BatchRun, BatchRunSummary } from "../model/run-history-transforms.ts";
 
 export function makeScenarioRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {

@@ -13,12 +13,12 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   resolveRunParameters,
   scenarioRunConfigSchema,
   ScenarioSecretParameterMissingError,
-  type ScenarioService,
+  type ScenarioApi,
   type ScenarioRunConfig,
   type ScenarioTestSuite,
 } from "@langwatch/scenario-contract";
@@ -82,16 +82,16 @@ function fakeAgentApi(agents: Map<string, FakeAgent>): AgentApi {
   });
 }
 
-function fakePromptService(): PromptService {
+function fakePromptService(): PromptApi {
   return {
     getExistingIds: async () => [],
     getNamesByIds: async () => [],
-  } as unknown as PromptService;
+  } as unknown as PromptApi;
 }
 
 /** Backed by the same database the repository reads: scope resolution and
  * test-suite/scenario references are real, not re-implemented. */
-function fakeScenarioService(): ScenarioService {
+function fakeScenarioService(): ScenarioApi {
   return {
     tryGetTestSuite: async ({
       testSuiteId,
@@ -165,7 +165,7 @@ function fakeScenarioService(): ScenarioService {
         scenarioVersion: scenarios.find((s) => s.id === scenarioId)?.version ?? 1,
       }));
     },
-  } as unknown as ScenarioService;
+  } as unknown as ScenarioApi;
 }
 
 function capturingExecution(started: Array<Record<string, unknown>>): SuiteExecutionPort {

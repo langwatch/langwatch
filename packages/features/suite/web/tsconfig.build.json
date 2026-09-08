@@ -12,7 +12,6 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/index.ts",
     "./src/__tests__/test-helpers.ts",
     "./src/run-cards.ts",
     "./src/run-dialogs.ts",

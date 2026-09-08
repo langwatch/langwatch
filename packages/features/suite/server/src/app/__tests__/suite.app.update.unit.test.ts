@@ -8,6 +8,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
 import { SuiteScopeNotAllowedError } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SuiteExecutionPort } from "../../ports/suite-execution.port.ts";
 import { SuiteApp } from "../suite.app.ts";
 import { createSuiteTestRepositories } from "./suite.fixture.ts";
@@ -38,7 +39,7 @@ function mockMethod<T extends (...args: never[]) => unknown>(): T {
   return vi.fn<T>();
 }
 
-const agentApi: AgentApi = {
+const agentApi = createApiFixture<AgentApi>({
   getAll: mockMethod(),
   getById: mockMethod(),
   list: mockMethod(),
@@ -60,9 +61,9 @@ const agentApi: AgentApi = {
   getConnectedByName: mockMethod(),
   testTurn: mockMethod(),
   testRun: mockMethod(),
-};
+});
 
-const promptApi: PromptApi = {
+const promptApi = createApiFixture<PromptApi>({
   getAllPrompts: mockMethod(),
   tryGetPromptByIdOrHandle: mockMethod(),
   getAllVersions: mockMethod(),
@@ -100,9 +101,9 @@ const promptApi: PromptApi = {
   assertMayManageTagCatalog: mockMethod(),
   renameTagForProject: mockMethod(),
   deleteTagForProject: mockMethod(),
-};
+});
 
-const projectApi: ProjectApi = {
+const projectApi = createApiFixture<ProjectApi>({
   tryGetById: mockMethod(),
   getOrganizationId: mockMethod(),
   getWithTeam: mockMethod(),
@@ -115,11 +116,11 @@ const projectApi: ProjectApi = {
   regenerateLegacyProjectKey: mockMethod(),
   requestTopicClustering: mockMethod(),
   touchCodingAgentPullRequestSeen: mockMethod(),
-};
+});
 
 function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
   const updateTestSuite = vi.fn<ScenarioApi["updateTestSuite"]>().mockResolvedValue(testSuite());
-  const scenarios: ScenarioApi = {
+  const scenarios = createApiFixture<ScenarioApi>({
     list: mockMethod(),
     listTestSuites: mockMethod(),
     getReferenceStates: mockMethod(),
@@ -136,7 +137,7 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
     renameTestSuite: mockMethod(),
     getInternalSuiteSummaries: mockMethod(),
     ...overrides.scenarios,
-  };
+  });
 
   const execution = new (class extends SuiteExecutionPort {
     execute = vi.fn<SuiteExecutionPort["execute"]>();

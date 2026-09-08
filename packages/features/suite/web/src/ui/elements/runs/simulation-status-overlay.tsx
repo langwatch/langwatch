@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../model/scenario-run-status-config.ts";
 
 const LIGHT_MODE_GRADIENTS = {
   pass: `

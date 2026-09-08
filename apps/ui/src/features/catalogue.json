@@ -32,6 +32,7 @@
     "@langwatch/prompt-web",
     "@langwatch/scenario-web",
     "@langwatch/secret-web",
+    "@langwatch/suite-web",
     "@langwatch/topic-web",
     "@langwatch/trace-web",
     "@langwatch/user-web",

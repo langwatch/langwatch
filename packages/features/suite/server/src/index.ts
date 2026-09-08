@@ -70,15 +70,14 @@ export { PostgresSuiteRepositories } from "./repositories/prisma/prisma.suite.re
 export type { SuiteRepositories } from "./repositories/suite.repositories.ts";
 
 /**
- * The app-process REST family this feature owns. The process supplies the bound REST
- * security service, a resolver for the application and its own platform-URL builder; the
- * base path, access declarations, schemas and delegation are the feature's.
+ * The three REST families this feature declares, each taking the process's own
+ * platform-URL builder: the two published v1 families — a run plan is what you
+ * run, a test suite is what it runs against — and the deprecated `/api/suites`
+ * alias that predates the split. All three are served from the same
+ * {@link SuiteApp} the tRPC surface is.
  */
-export { createSuiteRestApp } from "./transport/api-rest/suite.api.ts";
-/**
- * The two v1 REST families, split by what they publish: a run plan is what
- * you run, a test suite is what it runs against. Both are served from the
- * same {@link SuiteApp} the tRPC surface and `/api/suites` are.
- */
-export { createRunPlansV1RestApp } from "./transport/api-rest/run-plans-v1.api.ts";
-export { createTestSuitesV1RestApp } from "./transport/api-rest/test-suites-v1.api.ts";
+export { createRunPlansRest } from "./transport/run-plans.rest.ts";
+export { createTestSuitesRest } from "./transport/test-suites.rest.ts";
+export { createSuitesAliasRest, suitesAliasErrorHandler } from "./transport/suites-alias.rest.ts";
+/** The header every suite family records the surface of a run from. */
+export { suiteSurfaceFact } from "./rules/suite-wire-v1.rules.ts";

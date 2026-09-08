@@ -1,3 +1,3 @@
-export * from "./use-suite-form.ts";
-export * from "./suite-form.types.ts";
-export * from "./suite-form-derivations.ts";
+export * from "./behavior/use-suite-form.ts";
+export * from "./model/suite-form.types.ts";
+export * from "./model/suite-form-derivations.ts";

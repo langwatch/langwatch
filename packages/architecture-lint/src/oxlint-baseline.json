@@ -2622,47 +2622,39 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/server/src/transport/api-rest/suite.api.ts",
+      "key": "cognitive-complexity|packages/features/suite/web/src/behavior/use-auto-expansion.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/server/src/transport/api-trpc/suite.api.ts",
+      "key": "cognitive-complexity|packages/features/suite/web/src/behavior/use-run-history-store.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/message-preview.tsx",
+      "key": "cognitive-complexity|packages/features/suite/web/src/behavior/use-scroll-to-batch.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/run-history-transforms.ts",
+      "key": "cognitive-complexity|packages/features/suite/web/src/behavior/use-suite-form.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/run-row.tsx",
+      "key": "cognitive-complexity|packages/features/suite/web/src/model/run-history-transforms.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/scenario-run-content.tsx",
+      "key": "cognitive-complexity|packages/features/suite/web/src/ui/elements/runs/message-preview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/scenario-target-row.tsx",
+      "key": "cognitive-complexity|packages/features/suite/web/src/ui/elements/runs/scenario-target-row.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/use-auto-expansion.ts",
+      "key": "cognitive-complexity|packages/features/suite/web/src/ui/sections/run-row.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/suite/web/src/use-run-history-store.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/suite/web/src/use-scroll-to-batch.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/suite/web/src/use-suite-form.ts",
+      "key": "cognitive-complexity|packages/features/suite/web/src/ui/sections/scenario-run-content.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -7334,14 +7326,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|packages/features/suite/server/src/transport/api-rest/run-plans-v1.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "id-generation-origin|packages/features/suite/server/src/transport/api-rest/test-suites-v1.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "id-generation-origin|packages/features/topic/server/src/repositories/prisma/prisma.topic-clustering.repository.ts",
       "measured": "2026-09-08"
     },
@@ -8994,23 +8978,23 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/suite/web/src/message-preview.tsx",
+      "key": "nested-ternary|packages/features/suite/web/src/model/run-history-transforms.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/suite/web/src/run-history-transforms.ts",
+      "key": "nested-ternary|packages/features/suite/web/src/ui/elements/pickers/target-picker.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/suite/web/src/run-metrics-summary.tsx",
+      "key": "nested-ternary|packages/features/suite/web/src/ui/elements/runs/message-preview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/suite/web/src/simulation-card.tsx",
+      "key": "nested-ternary|packages/features/suite/web/src/ui/elements/runs/run-metrics-summary.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/suite/web/src/target-picker.tsx",
+      "key": "nested-ternary|packages/features/suite/web/src/ui/elements/runs/simulation-card.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9862,19 +9846,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/suite/server/src/transport/api-rest/suite.api.ts",
+      "key": "temporal-only|packages/features/suite/web/src/model/suite-form.types.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|packages/features/suite/server/src/transport/api-trpc/suite.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/suite/web/src/now-provider.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|packages/features/suite/web/src/suite-form.types.ts",
+      "key": "temporal-only|packages/features/suite/web/src/ui/elements/runs/now-provider.tsx",
       "measured": "2026-09-06"
     },
     {
