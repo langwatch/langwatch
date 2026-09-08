@@ -1,5 +1,5 @@
 import {
-  AlertTriangle,
+  Bot,
   Brain,
   Coins,
   Eye,
@@ -122,10 +122,13 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: PackageOpen,
   },
   {
-    label: "Anomaly Rules",
-    href: "/governance/anomaly-rules",
-    includePath: "/governance/anomaly-rules",
-    icon: AlertTriangle,
+    // Anomaly Rules left the rail for a tab inside Inventory, and Billed
+    // left it for this entry. The /governance/billed page stays reachable
+    // by address behind its flag; it is only no longer listed.
+    label: "Agents",
+    href: "/governance/agents",
+    includePath: "/governance/agents",
+    icon: Bot,
   },
   {
     label: "People",

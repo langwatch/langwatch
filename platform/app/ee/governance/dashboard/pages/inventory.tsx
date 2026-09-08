@@ -18,16 +18,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
+import { AnomalyRulesTab } from "@ee/governance/dashboard/components/AnomalyRulesTab";
 import {
-  groupForMode,
-  modeForSourceType,
-  needsIngestSecret,
-  PROTOCOL_LABEL,
+  ConnectorsHeader,
+  IngestionSourcesTable,
+} from "@ee/governance/dashboard/components/IngestionSourcesTable";
+import {
+  gatedSourceTypeOptions,
   routesConversations,
-  SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
-  type SourceGroup,
   type SourceType,
   SourceTypeIconGlyph,
 } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
@@ -40,19 +40,17 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
 } from "@ee/governance/dashboard/logic/pullCadence";
-import { sourceBadge } from "@ee/governance/dashboard/logic/sourceHealthDisplay";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+import { ChevronRight, Copy, KeyRound, Plus } from "lucide-react";
 import {
-  ChevronRight,
-  Copy,
-  KeyRound,
-  Pencil,
-  Plus,
-  RotateCw,
-  Trash2,
-} from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ToolCatalogPanel } from "~/components/governance/ToolCatalogPanel";
@@ -139,31 +137,6 @@ const blankComposer = (): ComposerState => ({
   pullSchedule: "",
   traceProjectId: null,
 });
-
-/**
- * How long ago, in words.
- *
- * Units are spelled out. "23m ago" saves a few pixels and costs the reader a
- * guess — minutes or months — on a line whose whole job is to say whether
- * anything is still coming in.
- */
-export function fmtRelative(date: Date | string | null): string {
-  if (!date) return "-";
-  const d = typeof date === "string" ? new Date(date) : date;
-  const diffMs = Date.now() - d.getTime();
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${plural(sec, "second")} ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${plural(min, "minute")} ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${plural(hr, "hour")} ago`;
-  const days = Math.floor(hr / 24);
-  return `${plural(days, "day")} ago`;
-}
-
-function plural(count: number, unit: string): string {
-  return `${count} ${unit}${count === 1 ? "" : "s"}`;
-}
 
 /**
  * The pull config the create call should carry, or `null` when the form is not
@@ -282,80 +255,18 @@ function pendingId(mutation: {
   return mutation.isPending ? (mutation.variables?.id ?? null) : null;
 }
 
-function SourceGroupSection({
-  group,
-  sources,
-  knowsFleetIsEmpty,
-  rotatingId,
-  archivingId,
-  canManage,
-  onEdit,
-  onRotate,
-  onArchive,
-}: {
-  group: SourceGroup;
-  sources: Source[];
-  knowsFleetIsEmpty: boolean;
-  rotatingId: string | null;
-  archivingId: string | null;
-  canManage: boolean;
-  onEdit: (id: string) => void;
-  onRotate: (id: string) => void;
-  onArchive: (id: string) => void;
-}) {
-  const { title, blurb } = SOURCE_GROUP_META[group];
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
-      <HStack alignItems="start" marginBottom={3}>
-        <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="semibold">
-            {title}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {blurb}
-          </Text>
-        </VStack>
-        <Spacer />
-      </HStack>
-      <VStack align="stretch" gap={2}>
-        {sources.length === 0 && knowsFleetIsEmpty && (
-          <Text fontSize="sm" color="fg.muted">
-            No sources configured here yet.
-          </Text>
-        )}
-        {sources.map((source) => (
-          <SourceRow
-            key={source.id}
-            source={source}
-            isPendingRotate={rotatingId === source.id}
-            isPendingArchive={archivingId === source.id}
-            canManage={canManage}
-            onEdit={() => onEdit(source.id)}
-            onRotate={() => onRotate(source.id)}
-            onArchive={() => onArchive(source.id)}
-          />
-        ))}
-      </VStack>
-    </Box>
-  );
-}
-
 /**
  * The source list: what the viewer may read, what went wrong when it could
- * not be read, the two delivery-group sections, and the note naming the
- * grant that unlocks the writes.
+ * not be read, the connectors header with its add control, the table, and
+ * the note naming the grant that unlocks the writes.
  */
 function IngestionSourceList({
   canRead,
   canManage,
   isLoading,
   error,
-  grouped,
+  sources,
+  addControl,
   rotatingId,
   archivingId,
   onEdit,
@@ -366,13 +277,19 @@ function IngestionSourceList({
   canManage: boolean;
   isLoading: boolean;
   error: unknown;
-  grouped: Record<SourceGroup, Source[]>;
+  sources: Source[] | undefined;
+  addControl?: ReactNode;
   rotatingId: string | null;
   archivingId: string | null;
   onEdit: (id: string) => void;
   onRotate: (id: string) => void;
   onArchive: (id: string) => void;
 }) {
+  // Only claim "none connected" (and only count) when we actually know: on
+  // a load failure the alert below says what went wrong instead, and a
+  // header reading "0 sources" off an empty `?? []` would tell an admin
+  // their entire ingest fleet is gone when all that happened was a 403.
+  const knowsFleet = !error && !isLoading && sources !== undefined;
   return (
     <>
       {!canRead && (
@@ -382,34 +299,37 @@ function IngestionSourceList({
         />
       )}
 
+      {canRead && (
+        <ConnectorsHeader
+          sources={knowsFleet ? sources : undefined}
+          action={addControl}
+        />
+      )}
+
       {isLoading && <Spinner size="sm" />}
 
-      {/* The list is the page. Without this the group sections below
-          render "No sources configured here yet." off an empty `?? []`,
-          which tells an admin their entire ingest fleet is gone when all
-          that actually happened was a 403 or a DB blip. */}
       <HandledErrorAlert
         error={error}
         fallbackTitle="Couldn't load ingestion sources"
       />
 
-      {canRead &&
-        (["realtime", "scheduled"] as const).map((group) => (
-          <SourceGroupSection
-            key={group}
-            group={group}
-            sources={grouped[group]}
-            // Only claim "none configured" when we actually know: on a load
-            // failure the alert above says what went wrong instead.
-            knowsFleetIsEmpty={!error}
-            rotatingId={rotatingId}
-            archivingId={archivingId}
-            canManage={canManage}
-            onEdit={onEdit}
-            onRotate={onRotate}
-            onArchive={onArchive}
-          />
-        ))}
+      {canRead && knowsFleet && sources.length === 0 && (
+        <Text fontSize="sm" color="fg.muted">
+          No sources connected yet.
+        </Text>
+      )}
+
+      {canRead && knowsFleet && sources.length > 0 && (
+        <IngestionSourcesTable
+          sources={sources}
+          canManage={canManage}
+          rotatingId={rotatingId}
+          archivingId={archivingId}
+          onEdit={onEdit}
+          onRotate={onRotate}
+          onArchive={onArchive}
+        />
+      )}
 
       {canRead && !canManage && (
         <PermissionRequiredNotice
@@ -457,26 +377,6 @@ export function buildCreateInput({
       ? composer.traceProjectId
       : null,
   };
-}
-
-/** Sources split into the two group sections the page renders. */
-function useGroupedSources(sources: Source[] | undefined) {
-  return useMemo(() => {
-    const out: Record<SourceGroup, Source[]> = {
-      realtime: [],
-      scheduled: [],
-    };
-    for (const s of sources ?? []) {
-      out[
-        groupForMode(
-          modeForSourceType({
-            sourceType: (s.sourceType ?? "otel_generic") as SourceType,
-          }),
-        )
-      ].push(s);
-    }
-    return out;
-  }, [sources]);
 }
 
 /** The four mutations the page drives, with their toasts and cache busting. */
@@ -564,7 +464,7 @@ function useIngestionSourcesPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { isEnterprise } = useActivePlan();
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const canRead = hasAnyPermission("ingestionSources:view");
   const canManage = hasAnyPermission("ingestionSources:manage");
   // The Catalog pane's own grant — decides the inventory default tab.
@@ -606,10 +506,12 @@ function useIngestionSourcesPage() {
    * over from a different type must never leak its parser or OTTL state
    * into this one.
    */
-  const startComposer = (sourceType: SourceType) => {
+  const startComposer = useCallback((sourceType: SourceType) => {
     setComposer({ ...blankComposer(), sourceType });
     setComposing(true);
-  };
+  }, []);
+
+  useAddSourceParam({ isEnterprise, isPlanLoading, canManage, startComposer });
 
   /** Close the composer and drop the draft. */
   const closeComposer = () => {
@@ -627,7 +529,6 @@ function useIngestionSourcesPage() {
     startComposer,
     closeComposer,
     sourcesQuery,
-    grouped: useGroupedSources(sourcesQuery.data),
     composing,
     setComposing,
     composer,
@@ -642,10 +543,59 @@ function useIngestionSourcesPage() {
 }
 
 /**
- * The inventory's tabs: Catalog (the tool-tiles editor, formerly
- * /governance/tool-catalog) and Sources (the ingestion-sources table).
+ * `?add=<sourceType>` opens the composer on that type once, then leaves the
+ * address — the deep link the overview and the docs hand out. A value the
+ * Add source menu would not offer (unknown, retired, or locked on this plan)
+ * is dropped silently, and so is one arriving for a viewer without the
+ * manage grant. The plan gate is the same `gatedSourceTypeOptions` the menu
+ * reads, so a locked type can no more slip in through the address than
+ * through a click. Nothing is decided until the plan is known: an
+ * Enterprise link must not be thrown away because the plan query was a
+ * tick behind the page.
  */
-const INVENTORY_TABS = ["catalog", "sources"] as const;
+function useAddSourceParam({
+  isEnterprise,
+  isPlanLoading,
+  canManage,
+  startComposer,
+}: {
+  isEnterprise: boolean;
+  isPlanLoading: boolean;
+  canManage: boolean;
+  startComposer: (sourceType: SourceType) => void;
+}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("add");
+  useEffect(() => {
+    if (requested === null || isPlanLoading) return;
+    const option = gatedSourceTypeOptions({ isEnterprise }).find(
+      (candidate) => candidate.value === requested,
+    );
+    if (option && !option.locked && canManage) startComposer(option.value);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("add");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [
+    requested,
+    isPlanLoading,
+    isEnterprise,
+    canManage,
+    startComposer,
+    setSearchParams,
+  ]);
+}
+
+/**
+ * The inventory's tabs: Catalog (the tool-tiles editor, formerly
+ * /governance/tool-catalog), Sources (the ingestion-sources table) and
+ * Anomaly rules (formerly /governance/anomaly-rules).
+ */
+const INVENTORY_TABS = ["catalog", "sources", "anomaly-rules"] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
 
 const isInventoryTab = (value: string | null): value is InventoryTab =>
@@ -677,19 +627,41 @@ function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
   return { inventoryTab, selectInventoryTab };
 }
 
+/** A tab label with the count beside it, once the count is known. */
+function InventoryTabLabel({
+  label,
+  count,
+}: {
+  label: string;
+  count?: number;
+}) {
+  return (
+    <HStack gap={2}>
+      <Text as="span">{label}</Text>
+      {count !== undefined && (
+        <Badge size="sm" variant="surface" colorPalette="gray">
+          {count}
+        </Badge>
+      )}
+    </HStack>
+  );
+}
+
 /**
  * The inventory's tab shell. The Catalog pane mounts the tool-tiles
- * editor; the Sources pane renders the children (the sources table) under
- * an optional actions row (the add-source control, which belongs beside
- * the list it adds to).
+ * editor; the Sources pane renders the children (the connectors table);
+ * the Anomaly rules pane mounts the rules editor. Counts sit on a tab only
+ * when the pane's own list is already loaded — Sources reads the list the
+ * page holds anyway; Anomaly rules would need a query of its own, so it
+ * carries none.
  */
 function InventoryTabs({
   defaultTab,
-  sourcesActions,
+  sourceCount,
   children,
 }: {
   defaultTab: InventoryTab;
-  sourcesActions?: ReactNode;
+  sourceCount?: number;
   children: ReactNode;
 }) {
   const { inventoryTab, selectInventoryTab } = useInventoryTab({ defaultTab });
@@ -713,7 +685,14 @@ function InventoryTabs({
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          Sources
+          <InventoryTabLabel label="Sources" count={sourceCount} />
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="anomaly-rules"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          Anomaly rules
         </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="catalog" paddingTop={4}>
@@ -721,17 +700,20 @@ function InventoryTabs({
       </Tabs.Content>
       <Tabs.Content value="sources" paddingTop={4}>
         <VStack align="stretch" gap={4} width="full">
-          {sourcesActions}
           {children}
         </VStack>
+      </Tabs.Content>
+      <Tabs.Content value="anomaly-rules" paddingTop={4}>
+        <AnomalyRulesTab />
       </Tabs.Content>
     </Tabs.Root>
   );
 }
 
 /**
- * The two tabs and everything under the sources one: the actions row an admin
- * only sees with the manage grant, and the list itself.
+ * The three tabs and everything under the sources one: the connectors
+ * header with the add control an admin only sees with the manage grant,
+ * and the table itself.
  */
 function InventorySourcesTab({
   page,
@@ -742,22 +724,23 @@ function InventorySourcesTab({
   return (
     <InventoryTabs
       defaultTab={page.canManageCatalog ? "catalog" : "sources"}
-      sourcesActions={
-        page.canManage ? (
-          <SourcesActionsRow
-            isEnterprise={page.isEnterprise}
-            sourceCount={sourcesQuery.data?.length ?? 0}
-            onAdd={page.startComposer}
-          />
-        ) : undefined
-      }
+      sourceCount={sourcesQuery.data?.length}
     >
       <IngestionSourceList
         canRead={page.canRead}
         canManage={page.canManage}
         isLoading={sourcesQuery.isLoading}
         error={sourcesQuery.error}
-        grouped={page.grouped}
+        sources={sourcesQuery.data}
+        addControl={
+          page.canManage ? (
+            <AddSourceControl
+              isEnterprise={page.isEnterprise}
+              sourceCount={sourcesQuery.data?.length ?? 0}
+              onAdd={page.startComposer}
+            />
+          ) : undefined
+        }
         rotatingId={pendingId(mutations.rotate)}
         archivingId={pendingId(mutations.archive)}
         onEdit={page.setEditingSourceId}
@@ -843,32 +826,6 @@ function EditingSourceDrawer({
   );
 }
 
-/**
- * The right-aligned add-source row at the top of the Sources pane.
- * Mounted only for `ingestionSources:manage` holders — a viewer who only
- * reads is not offered a composer the server refuses.
- */
-function SourcesActionsRow({
-  isEnterprise,
-  sourceCount,
-  onAdd,
-}: {
-  isEnterprise: boolean;
-  sourceCount: number;
-  onAdd: (sourceType: SourceType) => void;
-}) {
-  return (
-    <HStack>
-      <Spacer />
-      <AddSourceControl
-        isEnterprise={isEnterprise}
-        sourceCount={sourceCount}
-        onAdd={onAdd}
-      />
-    </HStack>
-  );
-}
-
 /** Mounted only for a viewer holding `ingestionSources:manage`. */
 function AddSourceControl({
   isEnterprise,
@@ -900,135 +857,6 @@ function AddSourceControl({
         <Plus size={14} /> Add source
       </Button>
     </AddIngestionSourceMenu>
-  );
-}
-
-/**
- * One source in the list. Exported so a test can read the line it renders
- * about arrival times against the source page's own tile — the two used to say
- * "last event" and mean different things, and only rendering both catches them
- * drifting back together.
- */
-export function SourceRow({
-  source,
-  isPendingRotate,
-  isPendingArchive,
-  onEdit,
-  onRotate,
-  onArchive,
-  canManage,
-}: {
-  source: Source;
-  isPendingRotate: boolean;
-  isPendingArchive: boolean;
-  onEdit: () => void;
-  onRotate: () => void;
-  onArchive: () => void;
-  canManage: boolean;
-}) {
-  const status = sourceBadge({
-    status: source.status,
-    errorCount: source.errorCount,
-  });
-  const StatusIcon = status.icon;
-  const typeLabel =
-    SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
-  const mode = modeForSourceType({
-    sourceType: source.sourceType as SourceType,
-  });
-  const hasSecret = needsIngestSecret({
-    sourceType: source.sourceType as SourceType,
-  });
-  return (
-    <HStack
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="sm"
-      padding={3}
-      gap={3}
-    >
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <HStack gap={2}>
-          <SourceTypeIconGlyph
-            sourceType={source.sourceType as SourceType}
-            size="16px"
-          />
-          <Link
-            href={`/governance/inventory/${source.id}`}
-            color="fg"
-            _hover={{ color: "orange.600" }}
-          >
-            <Text fontSize="sm" fontWeight="medium">
-              {source.name}
-            </Text>
-          </Link>
-          <Badge size="sm" variant="surface">
-            {typeLabel}
-          </Badge>
-          <Badge size="sm" variant="outline">
-            {PROTOCOL_LABEL[mode]}
-          </Badge>
-        </HStack>
-        {source.description && (
-          <Text fontSize="xs" color="fg.muted">
-            {source.description}
-          </Text>
-        )}
-        <HStack gap={2} marginTop={1}>
-          <HStack gap={1}>
-            <Box color={status.color} display="flex">
-              <StatusIcon size={12} />
-            </Box>
-            <Text fontSize="xs" color="fg.muted">
-              {status.label}
-            </Text>
-          </HStack>
-          {/* "Data last arrived", not "last event". `lastEventAt` is stamped
-              when a pull DELIVERED something, so this answers "is anything
-              still coming in" — the question a list of sources is read for.
-              The source's own page shows the other number, the time written on
-              the newest event, and the two are routinely hours apart because a
-              daily report is stamped at the start of its day. One label for
-              both was the whole confusion. */}
-          <Text fontSize="xs" color="fg.muted">
-            · data last arrived {fmtRelative(source.lastEventAt ?? null)}
-          </Text>
-        </HStack>
-      </VStack>
-      {canManage && (
-        <>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onEdit}
-            title="Edit source - name, description, OTTL statements"
-          >
-            <Pencil size={14} /> Edit
-          </Button>
-          {hasSecret && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onRotate}
-              loading={isPendingRotate}
-              title="Mint a new ingestSecret (24h grace on the old one)"
-            >
-              <RotateCw size={14} /> Rotate secret
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            colorPalette="red"
-            onClick={onArchive}
-            loading={isPendingArchive}
-            title="Archive (preserves history)"
-          >
-            <Trash2 size={14} />
-          </Button>
-        </>
-      )}
-    </HStack>
   );
 }
 

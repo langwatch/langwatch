@@ -235,12 +235,16 @@ const routes: RouteObject[] = [
         ),
       },
       {
-        path: "/governance/anomaly-rules",
-        ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
-      },
-      {
+        // Anomaly rules moved into the inventory as a tab; the retired
+        // /governance/anomaly-rules address redirects via legacyRedirectRoutes.
         path: "/governance/people",
         ...page(() => import("./pages/governance/people")),
+      },
+      {
+        // Agents and Applications detected across the organization, as two
+        // tabs (?tab=agents|applications).
+        path: "/governance/agents",
+        ...page(() => import("./pages/governance/agents")),
       },
       {
         // Behind release_ui_governance_billed_cost_enabled (the pages
@@ -297,11 +301,8 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/teams/[id]")),
       },
       {
-        // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/governance/users",
-        ...page(() => import("./pages/governance/users")),
-      },
-      {
+        // The bare users listing folded into the People page (?tab=people);
+        // /governance/users redirects there via legacyRedirectRoutes.
         // Per-user detail - single-row scoped view keyed off the
         // URL-encoded actor id (email / sub claim).
         path: "/governance/users/:id",

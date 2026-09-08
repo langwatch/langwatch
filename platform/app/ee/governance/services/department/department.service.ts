@@ -51,8 +51,18 @@ export interface DepartmentAssignableEntity {
   departmentId: string | null;
 }
 
+/**
+ * A member row carries the email the gateway's activity events name a person
+ * by, so a client can join a spend row (whose `actor` is that email, or the
+ * user id when there is none) to the member's department without guessing.
+ * The same join `spendByDepartment` makes server-side.
+ */
+export interface DepartmentAssignableUser extends DepartmentAssignableEntity {
+  email: string | null;
+}
+
 export interface DepartmentAssignments {
-  users: DepartmentAssignableEntity[];
+  users: DepartmentAssignableUser[];
   teams: DepartmentAssignableEntity[];
   projects: DepartmentAssignableEntity[];
 }
@@ -127,6 +137,7 @@ export class DepartmentService {
         .map((m) => ({
           id: m.userId,
           name: m.user.name ?? m.user.email ?? m.userId,
+          email: m.user.email,
           departmentId: m.departmentId,
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),

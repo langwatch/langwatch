@@ -116,14 +116,21 @@ const discovered = (over: Record<string, unknown>) => ({
   ...over,
 });
 
-const renderPage = () =>
+/**
+ * The page is two tabs. The people the providers named sit on the People
+ * tab (the default address); the departments their directories named sit
+ * on the Departments tab, beside the list the administrator keeps.
+ */
+const renderPage = (entry = "/governance/people") =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={["/governance/people"]}>
+      <MemoryRouter initialEntries={[entry]}>
         <PeoplePage />
       </MemoryRouter>
     </ChakraProvider>,
   );
+
+const DEPARTMENTS_TAB = "/governance/people?tab=departments";
 
 afterEach(() => {
   cleanup();
@@ -154,7 +161,7 @@ describe("given people the providers named", () => {
         discovered({ displayText: "C", directoryDepartment: "GTM" }),
         discovered({ displayText: "D" }),
       ];
-      renderPage();
+      renderPage(DEPARTMENTS_TAB);
 
       expect(screen.getByText("Departments the providers see")).toBeVisible();
       expect(screen.getByText("2 people")).toBeVisible();
@@ -168,11 +175,11 @@ describe("given people the providers named", () => {
       harness.people = [
         discovered({ displayText: "A", directoryDepartment: "Engineering" }),
       ];
-      renderPage();
+      renderPage(DEPARTMENTS_TAB);
 
       expect(
         screen.getByText(
-          "No departments yet. Create one above to start attributing spend.",
+          "No departments yet. Create one to start attributing spend.",
         ),
       ).toBeVisible();
     });
@@ -181,7 +188,7 @@ describe("given people the providers named", () => {
   describe("when no directory named a department for anybody", () => {
     it("offers no departments panel rather than an empty one", () => {
       harness.people = [discovered({ displayText: "Maria Silva" })];
-      renderPage();
+      renderPage(DEPARTMENTS_TAB);
 
       expect(
         screen.queryByText("Departments the providers see"),

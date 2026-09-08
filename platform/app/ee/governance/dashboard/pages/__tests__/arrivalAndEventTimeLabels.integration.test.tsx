@@ -45,8 +45,8 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
+import { IngestionSourcesTable } from "../../components/IngestionSourcesTable";
 import { SourceHealthCards } from "../ingestion-source-detail";
-import { SourceRow } from "../inventory";
 
 /**
  * A source whose last pull landed twenty-three minutes ago and whose newest
@@ -62,7 +62,7 @@ const sourceThatJustDelivered = {
   status: "active",
   errorCount: 0,
   lastEventAt: new Date(Date.now() - ARRIVED_MINUTES_AGO * 60 * 1000),
-} as unknown as Parameters<typeof SourceRow>[0]["source"];
+} as unknown as Parameters<typeof IngestionSourcesTable>[0]["sources"][number];
 
 /** Midnight of a day whose report arrived hours later. */
 const newestEventStampedAtMidnight = {
@@ -77,14 +77,14 @@ const newestEventStampedAtMidnight = {
 function renderRow() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SourceRow
-        source={sourceThatJustDelivered}
-        isPendingRotate={false}
-        isPendingArchive={false}
+      <IngestionSourcesTable
+        sources={[sourceThatJustDelivered]}
+        canManage={false}
+        rotatingId={null}
+        archivingId={null}
         onEdit={vi.fn()}
         onRotate={vi.fn()}
         onArchive={vi.fn()}
-        canManage={false}
       />
     </ChakraProvider>,
   );
@@ -108,10 +108,10 @@ describe("given a source whose data arrives long after the day it covers", () =>
     it("says when data last arrived, spelling the unit out", () => {
       renderRow();
 
+      // The list is a table: the column is named for what the cell holds.
+      expect(screen.getByText("Data last arrived")).toBeDefined();
       expect(
-        screen.getByText(
-          `· data last arrived ${ARRIVED_MINUTES_AGO} minutes ago`,
-        ),
+        screen.getByText(`${ARRIVED_MINUTES_AGO} minutes ago`),
       ).toBeDefined();
     });
 

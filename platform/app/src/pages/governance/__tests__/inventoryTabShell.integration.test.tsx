@@ -34,6 +34,8 @@ const harness = vi.hoisted(() => ({
   requested: [] as string[],
   /** The persona under test; beforeEach resets to the delegated viewer. */
   permissions: [] as string[],
+  /** The plan under test; beforeEach resets to Enterprise. */
+  isEnterprise: true,
 }));
 
 /** The org-member floor plus the governance product grant and sources read. */
@@ -45,6 +47,12 @@ const VIEWER_PERMISSIONS = [
 
 /** The viewer set plus the catalog's own grant. */
 const CATALOG_ADMIN_PERMISSIONS = [...VIEWER_PERMISSIONS, "aiTools:manage"];
+
+/** The catalog admin plus the sources write grant. */
+const SOURCES_ADMIN_PERMISSIONS = [
+  ...CATALOG_ADMIN_PERMISSIONS,
+  "ingestionSources:manage",
+];
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const rbac =
@@ -71,7 +79,11 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 }));
 
 vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({ isEnterprise: true, activePlan: undefined }),
+  useActivePlan: () => ({
+    isEnterprise: harness.isEnterprise,
+    isLoading: false,
+    activePlan: undefined,
+  }),
 }));
 
 vi.mock("~/components/governance/GovernanceLayout", () => ({
@@ -158,6 +170,7 @@ function renderInventoryAt(initialEntries: string[]) {
 beforeEach(() => {
   harness.requested = [];
   harness.permissions = VIEWER_PERMISSIONS;
+  harness.isEnterprise = true;
 });
 
 afterEach(() => cleanup());
@@ -186,7 +199,7 @@ describe("the inventory tab shell", () => {
       harness.permissions = CATALOG_ADMIN_PERMISSIONS;
       renderInventoryAt(["/governance/inventory?tab=sources"]);
 
-      expect(screen.getByRole("tab", { name: "Sources" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: /^Sources/ })).toHaveAttribute(
         "aria-selected",
         "true",
       );
@@ -199,7 +212,7 @@ describe("the inventory tab shell", () => {
     it("selects Sources, mounts the table, and writes no tab parameter", () => {
       const router = renderInventoryAt(["/governance/inventory"]);
 
-      expect(screen.getByRole("tab", { name: "Sources" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: /^Sources/ })).toHaveAttribute(
         "aria-selected",
         "true",
       );
@@ -220,6 +233,56 @@ describe("the inventory tab shell", () => {
         expect(catalogTab).toHaveAttribute("aria-selected", "true"),
       );
       expect(await screen.findByText(/aiTools:manage/)).toBeVisible();
+    });
+  });
+
+  describe("when an admin addresses the Anomaly rules tab", () => {
+    /** @scenario "The Anomaly rules tab is addressable" */
+    it("selects Anomaly rules and mounts the rules editor under its own grants", () => {
+      harness.permissions = [...CATALOG_ADMIN_PERMISSIONS, "anomalyRules:view"];
+      renderInventoryAt(["/governance/inventory?tab=anomaly-rules"]);
+
+      expect(
+        screen.getByRole("tab", { name: "Anomaly rules" }),
+      ).toHaveAttribute("aria-selected", "true");
+      expect(harness.requested).toContain("anomalyRules.list");
+      // The editor's own write gate, unchanged from the standalone page.
+      expect(screen.getByText(/anomalyRules:manage/)).toBeVisible();
+    });
+  });
+
+  describe("when the address carries an add parameter for an offered type", () => {
+    /** @scenario "An add parameter opens the composer on that source type and leaves the address" */
+    it("opens the composer on that type and strips the parameter", async () => {
+      harness.permissions = SOURCES_ADMIN_PERMISSIONS;
+      const router = renderInventoryAt([
+        "/governance/inventory?tab=sources&add=claude_code",
+      ]);
+
+      expect(
+        await screen.findByRole("heading", { name: /Add Claude Code/ }),
+      ).toBeVisible();
+      await waitFor(() =>
+        expect(router.state.location.search).toBe("?tab=sources"),
+      );
+    });
+  });
+
+  describe("when the address carries an add parameter for a plan-locked type", () => {
+    /** @scenario "A locked add parameter is ignored and leaves the address" */
+    it("opens nothing and still strips the parameter", async () => {
+      harness.permissions = SOURCES_ADMIN_PERMISSIONS;
+      harness.isEnterprise = false;
+      const router = renderInventoryAt([
+        "/governance/inventory?tab=sources&add=claude_code",
+      ]);
+
+      await waitFor(() =>
+        expect(router.state.location.search).toBe("?tab=sources"),
+      );
+      expect(
+        screen.queryByRole("heading", { name: /Add Claude Code/ }),
+      ).not.toBeInTheDocument();
     });
   });
 

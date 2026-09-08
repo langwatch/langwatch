@@ -39,6 +39,7 @@ describe("the no-organization bouncer exemption list", () => {
       expect(noOrgBouncerRoutes).toContain("/governance/insights");
       expect(noOrgBouncerRoutes).toContain("/governance/analytics");
       expect(noOrgBouncerRoutes).toContain("/governance/signals");
+      expect(noOrgBouncerRoutes).toContain("/governance/agents");
 
       // ...and ROUTE_PATTERNS must resolve a concrete detail address to the
       // exact pattern the list holds, or the `.includes` match misses.
@@ -58,6 +59,7 @@ describe("the no-organization bouncer exemption list", () => {
       expect(resolvePathname("/governance/signals")).toBe(
         "/governance/signals",
       );
+      expect(resolvePathname("/governance/agents")).toBe("/governance/agents");
     });
 
     /** @scenario The inventory family is exempt from the no-organization onboarding bouncer */

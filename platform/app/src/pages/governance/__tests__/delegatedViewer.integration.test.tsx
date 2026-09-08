@@ -31,6 +31,8 @@ const harness = vi.hoisted(() => ({
   permissions: [] as string[],
   /** Every procedure path whose `useQuery` was NOT disabled. */
   requested: [] as string[],
+  /** Per-procedure answers, keyed by dotted path; undefined otherwise. */
+  data: {} as Record<string, unknown>,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
@@ -78,6 +80,25 @@ vi.mock("~/components/me/InstallCliCard", () => ({
   InstallCliCard: () => null,
 }));
 
+// The overview's hero mounts the inline command palette and the greeting;
+// neither is what this test is about, and both reach providers it does not
+// stand up (specs/ai-governance/dashboard/governance-overview-hero.feature).
+vi.mock("~/features/command-bar/CommandPalette", () => ({
+  CommandPalette: ({ placeholder }: { placeholder: string }) => (
+    <input placeholder={placeholder} />
+  ),
+}));
+vi.mock("~/features/command-bar/CommandBarContext", () => ({
+  useCommandBar: () => ({ registerInlinePalette: () => () => undefined }),
+}));
+vi.mock("~/features/langy/stores/langyStore", () => ({
+  useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
+    selector({ askLangy: vi.fn() }),
+}));
+vi.mock("~/components/home/WelcomeHeader", () => ({
+  WelcomeHeader: () => <h1>Good morning</h1>,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { id: "src-1" },
@@ -88,8 +109,8 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 vi.mock("~/utils/api", () => {
-  const queryResult = () => ({
-    data: undefined,
+  const queryResult = (path: string) => ({
+    data: harness.data[path],
     isLoading: false,
     isFetching: false,
     isError: false,
@@ -113,7 +134,7 @@ vi.mock("~/utils/api", () => {
             return (_input: unknown, options?: { enabled?: boolean }) => {
               if (options?.enabled !== false)
                 harness.requested.push(path.join("."));
-              return queryResult();
+              return queryResult(path.join("."));
             };
           }
           if (property === "useMutation") return mutationResult;
@@ -131,6 +152,7 @@ import AnomalyRulesPage from "@ee/governance/dashboard/pages/anomaly-rules";
 import IngestionSourceDetailPage from "@ee/governance/dashboard/pages/ingestion-source-detail";
 import InventoryPage from "@ee/governance/dashboard/pages/inventory";
 
+import AgentsPage from "../agents";
 import GovernanceOverviewPage from "../index";
 import PeoplePage from "../people";
 import TeamsListPage from "../teams";
@@ -145,8 +167,12 @@ const GOVERNANCE_PAGES: Array<[string, React.ComponentType]> = [
   // the Catalog tab (the old tool-catalog page) — one entry covers both.
   ["/governance/inventory", InventoryPage],
   ["/governance/inventory/:id", IngestionSourceDetailPage],
+  // Anomaly rules and the users listing no longer have their own routes
+  // (they redirect to a tab), but the page modules still mount for anyone
+  // who reaches them, so they stay covered.
   ["/governance/anomaly-rules", AnomalyRulesPage],
   ["/governance/people", PeoplePage],
+  ["/governance/agents", AgentsPage],
   ["/governance/teams", TeamsListPage],
   ["/governance/teams/:id", TeamDetailPage],
   ["/governance/users", UsersListPage],
@@ -205,6 +231,7 @@ function renderPage({
 beforeEach(() => {
   harness.permissions = [...DELEGATED_VIEWER];
   harness.requested = [];
+  harness.data = {};
 });
 
 afterEach(() => cleanup());
@@ -245,11 +272,17 @@ describe("governance pages for a delegated viewer", () => {
 
     /** @scenario "Departments offers no controls a viewer cannot use" */
     it("offers no department controls without governance:manage", () => {
-      renderPage({ Page: PeoplePage });
+      // Departments live on the People page's second tab.
+      renderPage({
+        Page: PeoplePage,
+        initialEntry: "/governance/people?tab=departments",
+      });
 
-      expect(screen.queryByText("Create a department")).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Actions" }),
+        screen.queryByRole("textbox", { name: "Create a department" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Actions for/ }),
       ).not.toBeInTheDocument();
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
@@ -301,12 +334,23 @@ describe("governance pages for a delegated viewer", () => {
     /** @scenario "An org admin still sees every panel on the overview" */
     it("renders every panel and names no missing grant", () => {
       harness.permissions = ORGANIZATION_ADMIN;
+      // The spend panels wait for traffic; give the organization some.
+      harness.data["activityMonitor.summary"] = {
+        spentThisWindowUsd: 42,
+        activeUsersThisWindow: 3,
+        newUsersThisWindow: 1,
+        openAnomalyCount: 0,
+        anomalyBreakdown: { critical: 0, warning: 0, info: 0 },
+        hasPriorBaseline: false,
+        windowOverPreviousPct: 0,
+      };
       renderPage({ Page: GovernanceOverviewPage });
 
+      expect(screen.getByText("Add an ingestion source")).toBeInTheDocument();
+      expect(screen.getByText("Recent anomalies")).toBeInTheDocument();
       expect(screen.getByText("Top teams by spend")).toBeInTheDocument();
       expect(screen.getByText("Top users by spend")).toBeInTheDocument();
       expect(screen.getByText("Spend by department")).toBeInTheDocument();
-      expect(screen.getByText("Recent anomalies")).toBeInTheDocument();
       expect(screen.getByText("Ingestion sources")).toBeInTheDocument();
       expect(screen.getByText("CLI session policy")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
@@ -314,21 +358,27 @@ describe("governance pages for a delegated viewer", () => {
         screen.queryByText(/Ask an organization admin to grant you/),
       ).not.toBeInTheDocument();
 
-      // Every panel's read is actually issued for an admin.
+      // Every panel's read is actually issued for an admin, and nothing is
+      // read that no panel draws from any more.
       expect(harness.requested).toContain("activityMonitor.summary");
-      expect(harness.requested).toContain("ingestionSources.list");
-      expect(harness.requested).toContain("routingPolicy.list");
-      expect(harness.requested).toContain("anomalyRules.list");
-      expect(harness.requested).toContain("aiTools.adminList");
+      expect(harness.requested).toContain("activityMonitor.recentAnomalies");
       expect(harness.requested).toContain("sessionPolicy.get");
+      expect(harness.requested).not.toContain("routingPolicy.list");
+      expect(harness.requested).not.toContain("anomalyRules.list");
+      expect(harness.requested).not.toContain("aiTools.adminList");
     });
 
     /** @scenario "An org admin still sees the department write controls" */
     it("offers the department write controls", () => {
       harness.permissions = ORGANIZATION_ADMIN;
-      renderPage({ Page: PeoplePage });
+      renderPage({
+        Page: PeoplePage,
+        initialEntry: "/governance/people?tab=departments",
+      });
 
-      expect(screen.getByText("Create a department")).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: "Create a department" }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByText(/Ask an organization admin to grant you/),
       ).not.toBeInTheDocument();
