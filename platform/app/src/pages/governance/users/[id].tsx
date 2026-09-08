@@ -69,7 +69,14 @@ function GovernanceUserDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
-              backgroundColor={actor ? getHexColorForString(actor) : "fg.muted"}
+              // The filled state is a palette hue keyed off the name. The empty
+              // state was `fg.muted`, a text token, which painted the swatch at
+              // reading contrast — a near-black dot louder than the heading
+              // beside it. A swatch with no name behind it is a surface, so it
+              // takes a surface token.
+              backgroundColor={
+                actor ? getHexColorForString(actor) : "bg.emphasized"
+              }
             />
             <Heading size="md">
               {user?.actor ?? actor ?? "User not found"}
