@@ -49,16 +49,8 @@ export function restRouteDocumentation({
   suffix?: string | undefined;
   deprecated?: RestDeprecation | undefined;
 }): DescribeRouteOptions {
-  const status = String(route.status ?? 200);
-
   const options: DescribeRouteOptions = {
-    responses: {
-      [status]: {
-        description: "Success",
-        content: { "application/json": { schema: resolver(route.output) } },
-      },
-      ...route.docs?.responses,
-    },
+    responses: { ...declaredAnswers(route), ...route.docs?.responses },
     operationId: operationIdOf({ operation: route.operation, suffix }),
   };
 
@@ -70,8 +62,9 @@ export function restRouteDocumentation({
 
   // An empty requirement list is the document's way of saying "no credential",
   // which is exactly what a public route is; it also overrides the document's
-  // own default requirement, which every other operation inherits.
-  if (route.access) options.security = [];
+  // own default requirement, which every other operation inherits. A route the
+  // door still authenticates keeps its family's scheme.
+  if (route.access?.kind === "public") options.security = [];
 
   if (deprecated) {
     options.deprecated = true;
@@ -93,6 +86,31 @@ export function documentRoute(input: {
 }
 
 /**
+ * Every answer the DECLARATION named: the one success a route declares with
+ * `withOutput`, or each status of a route that declared several with
+ * `responds`. Both are published the same way, so a caller reading the
+ * document sees exactly the statuses the handler is typed to return.
+ */
+function declaredAnswers(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
+  const answers = route.answers ?? { [route.status ?? 200]: route.output };
+  const published: Record<string, RouteResponse> = {};
+
+  for (const [status, schema] of Object.entries(answers)) {
+    published[status] = {
+      description: answerDescription(Number(status)),
+      content: { "application/json": { schema: resolver(schema) } },
+    };
+  }
+
+  return published;
+}
+
+/** The reason phrase a declared answer publishes; every 2xx is a success. */
+function answerDescription(status: number): string {
+  return RESPONSE_DESCRIPTIONS[status] ?? (status < 300 ? "Success" : `Response ${status}`);
+}
+
+/**
  * The answers an operation documents beyond its declared success, as the
  * declaration writes them: `documentedResponses({ 404: apiErrorSchema })`.
  */
@@ -103,7 +121,7 @@ export function documentedResponses(
 
   for (const [status, schema] of Object.entries(bodies)) {
     responses[Number(status)] = {
-      description: RESPONSE_DESCRIPTIONS[Number(status)] ?? `Response ${status}`,
+      description: answerDescription(Number(status)),
       content: { "application/json": { schema: resolver(schema) } },
     };
   }
@@ -123,6 +141,7 @@ const RESPONSE_DESCRIPTIONS: Readonly<Record<number, string>> = {
   422: "Unprocessable Entity",
   429: "Too Many Requests",
   500: "Internal Server Error",
+  503: "Service Unavailable",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -170,6 +189,7 @@ const SECURITY_BY_CREDENTIAL_CLASS = {
   organization_api_key: [{ admin_api_key: [] }],
   instance_admin_api_key: [{ instance_admin_key: [] }],
   scim_token: [{ scim_bearer: [] }],
+  internal_secret: [{ internal_secret: [] }],
   none: [],
 } as const satisfies Record<
   Exclude<CredentialClass, "session" | "internal">,

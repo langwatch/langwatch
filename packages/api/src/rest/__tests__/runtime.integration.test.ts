@@ -6,13 +6,14 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
+import { createLogger } from "@langwatch/observability";
 import { featureApi } from "@langwatch/runtime-composition";
 import type { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { publicRoute, securityRequirement } from "../../access/access.ts";
+import { anyAuthenticated, publicRoute, securityRequirement } from "../../access/access.ts";
 import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
@@ -840,5 +841,498 @@ describe("a v1-only family on the organization door", () => {
     expect(getRoutePolicy("get", "/api/v1/coding-agent/usage")).toMatchObject({
       credentialClass: "organization_api_key",
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A family shaped like `/api/projects`: an organization key at the door, a
+// listing the key's own ceiling answers, a by-id route checked at the project
+// its path names, and no `/api/v1` twin the family ever served.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ProjectApi {
+  visible(input: { organizationId: string }): Promise<{ id: string }[]>;
+  read(input: { projectId: string }): Promise<{ id: string }>;
+}
+
+const ProjectApi = featureApi<ProjectApi>("project");
+const PROJECT_ID = "project-7";
+
+const LISTING_IS_THE_GATE =
+  "the listing answers exactly the projects this key already holds, so authentication is the whole gate";
+
+const projects = defineRestRouter(ProjectApi)
+  .withNamespace("projects")
+  .withVersion(VERSION)
+  .withAddressing("dated", { v1Twin: false })
+  .withCredential("organizationKey")
+
+  .get("/", "listProjects")
+  .withAccess(anyAuthenticated({ reason: LISTING_IS_THE_GATE }))
+  .withOutput(z.array(z.string()))
+  .withDocs({ summary: "List the projects this credential reaches" })
+  .handle(async ({ app, scope }) =>
+    (await app.visible({ organizationId: scope.id })).map((project) => project.id),
+  )
+
+  .get("/:projectId", "getProject")
+  .withParams(z.object({ projectId: z.string() }))
+  .withPermission("project:view", { at: "route", param: "projectId" })
+  .withOutput(
+    z.object({ id: z.string(), scopeId: z.string(), targetTier: z.string(), targetId: z.string() }),
+  )
+  .handle(async ({ app, input, scope, target }) => ({
+    id: (await app.read({ projectId: input.projectId })).id,
+    scopeId: scope.id,
+    targetTier: target?.tier ?? "none",
+    targetId: target?.id ?? "none",
+  }))
+  .build();
+
+const projectApplication: ProjectApi = {
+  visible: async ({ organizationId }) => [{ id: `project-in-${organizationId}` }],
+  read: async ({ projectId }) => ({ id: projectId }),
+};
+
+function projectsApp(permitted = true): {
+  app: Hono;
+  identify: ReturnType<typeof vi.fn>;
+  authenticate: ReturnType<typeof vi.fn>;
+  authorize: ReturnType<typeof vi.fn>;
+} {
+  const scope = { tier: "organization", id: ORGANIZATION_ID } as const;
+  const identify = vi.fn(() => ({ actor: null, scope }));
+  const authenticate = vi.fn(() => ({
+    actor: { type: "api_key", id: "key-1" } as const,
+    scope,
+  }));
+  const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
+
+  const runtime = createRestRuntime({ identity: { authenticate, identify, authorize } });
+
+  const app = runtime.mount(projects.router(), {
+    app: () => projectApplication,
+    onError: createErrorHandler(),
+  });
+
+  return { app, identify, authenticate, authorize };
+}
+
+describe("a route the family's own door alone gates", () => {
+  /** @scenario "A route the family's own door alone gates asks no permission of it" */
+  it("resolves the credential and its scope, and asks no permission of it", async () => {
+    const { app, identify, authenticate } = projectsApp();
+
+    const response = await app.request(`/api/projects/${VERSION}`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual([`project-in-${ORGANIZATION_ID}`]);
+    expect(identify).toHaveBeenCalledTimes(1);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A route the family's own door alone gates asks no permission of it" */
+  it("records the family's credential class and the reason the route gave", () => {
+    projectsApp();
+
+    expect(getRoutePolicy("get", `/api/projects/${VERSION}`)).toMatchObject({
+      credentialClass: "organization_api_key",
+      policy: { kind: "handlerManaged", reason: LISTING_IS_THE_GATE, permissions: [] },
+    });
+  });
+
+  /** @scenario "A route the family's own door alone gates asks no permission of it" */
+  it("keeps the family's security scheme, unlike a public route", async () => {
+    const published = await generateSpecs(projectsApp().app, SPEC_OPTIONS);
+    const item = published.paths?.["/api/projects"] as { get?: { security?: unknown[] } } | undefined;
+
+    expect(item?.get?.security).toBeUndefined();
+  });
+});
+
+describe("a route whose permission is checked at the scope its path names", () => {
+  /** @scenario "A route checks its permission at the scope its own path names" */
+  it("asks about the project the path named, and hands the handler both scopes", async () => {
+    const { app, authorize } = projectsApp();
+
+    const response = await app.request(`/api/projects/${VERSION}/${PROJECT_ID}`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      id: PROJECT_ID,
+      scopeId: ORGANIZATION_ID,
+      targetTier: "project",
+      targetId: PROJECT_ID,
+    });
+
+    expect(authorize).toHaveBeenCalledWith({
+      caller: expect.objectContaining({ scope: { tier: "organization", id: ORGANIZATION_ID } }),
+      permission: "project:view",
+      target: { tier: "project", id: PROJECT_ID },
+    });
+  });
+
+  /** @scenario "A route checks its permission at the scope its own path names" */
+  it("denies a caller the process refused at that scope", async () => {
+    const response = await projectsApp(false).app.request(`/api/projects/${PROJECT_ID}`);
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "permission_denied" });
+  });
+});
+
+describe("a dated family that declares no /api/v1 twin", () => {
+  /** @scenario "A family whose paths were never aliased declares no twin" */
+  it("answers at its dated, latest and bare paths, and at no /api/v1 address", async () => {
+    const { app } = projectsApp();
+
+    for (const path of [
+      `/api/projects/${VERSION}/${PROJECT_ID}`,
+      `/api/projects/latest/${PROJECT_ID}`,
+      `/api/projects/${PROJECT_ID}`,
+    ]) {
+      expect((await app.request(path)).status).toBe(200);
+    }
+
+    expect((await app.request(`/api/v1/projects/${PROJECT_ID}`)).status).toBe(404);
+    expect(addresses(app).some((address) => address.includes("/api/v1/"))).toBe(false);
+    expect(getRoutePolicy("get", `/api/projects/${VERSION}`)?.canonicalPath).toBeUndefined();
+  });
+
+  /** @scenario "A family whose paths were never aliased declares no twin" */
+  it("publishes exactly the addresses it serves, and no twin among them", async () => {
+    const published = await generateSpecs(projectsApp().app, SPEC_OPTIONS);
+
+    expect(Object.keys(published.paths ?? {}).sort()).toEqual([
+      "/api/projects",
+      `/api/projects/${VERSION}`,
+      `/api/projects/${VERSION}/{projectId}`,
+      "/api/projects/latest",
+      "/api/projects/latest/{projectId}",
+      "/api/projects/{projectId}",
+    ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A family shaped like `/api/webhooks/v1`: the generation is a segment of the
+// namespace's own path rather than a prefix in front of it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const webhooks = defineRestRouter(ProjectApi)
+  .withNamespace("webhooks")
+  .withVersion(VERSION)
+  .withAddressing("v1-in-path")
+  .get("/endpoints/:projectId", "listWebhookEndpoints")
+  .withParams(z.object({ projectId: z.string() }))
+  .withPermission("webhookEndpoints:view")
+  .withOutput(z.object({ id: z.string() }))
+  .handle(async ({ app, input }) => app.read({ projectId: input.projectId }))
+  .build();
+
+function webhooksApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: PROJECT_ID } }),
+    },
+  });
+
+  return runtime.mount(webhooks.router(), {
+    app: () => projectApplication,
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a family that names its generation inside its own path", () => {
+  /** @scenario "A family serves one static generation instead of dated namespaces" */
+  it("answers once, at that path, with no dated namespace or latest alias beside it", async () => {
+    const app = webhooksApp();
+
+    const answered = await app.request(`/api/webhooks/v1/endpoints/${PROJECT_ID}`);
+
+    expect(answered.status).toBe(200);
+    await expect(answered.json()).resolves.toEqual({ id: PROJECT_ID });
+
+    expect(addresses(app).filter((address) => address.startsWith("GET "))).toEqual([
+      "GET /api/webhooks/v1/endpoints/:projectId",
+    ]);
+
+    for (const path of [
+      `/api/webhooks/endpoints/${PROJECT_ID}`,
+      `/api/webhooks/${VERSION}/endpoints/${PROJECT_ID}`,
+      `/api/webhooks/v1/latest/endpoints/${PROJECT_ID}`,
+      `/api/v1/webhooks/endpoints/${PROJECT_ID}`,
+    ]) {
+      expect((await app.request(path)).status).toBe(404);
+    }
+  });
+
+  /** @scenario "A family serves one static generation instead of dated namespaces" */
+  it("publishes exactly the address it serves", async () => {
+    const published = await generateSpecs(webhooksApp(), SPEC_OPTIONS);
+
+    expect(Object.keys(published.paths ?? {})).toEqual([
+      "/api/webhooks/v1/endpoints/{projectId}",
+    ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A family shaped like `/api/v1/platform-health`: a deployment's own secret at
+// the door, and a report that is an answer at 503 as much as at 200.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PlatformHealthApi {
+  check(): Promise<{ status: "healthy" | "unhealthy" }>;
+}
+
+const PlatformHealthApi = featureApi<PlatformHealthApi>("platform-health");
+const healthReport = z.object({ status: z.enum(["healthy", "unhealthy"]) });
+
+const MONITORED =
+  "the deployment's own monitoring key is compared by the door; a monitor is not a tenant, so there is no permission to ask of it";
+
+const platformHealth = defineRestRouter(PlatformHealthApi)
+  .withNamespace("platform-health")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .withCredential("internalSecret")
+  .get("/", "getPlatformHealth")
+  .withAccess(anyAuthenticated({ reason: MONITORED }))
+  .responds({ 200: healthReport, 503: healthReport })
+  .withDocs({ summary: "Report whether the platform is working" })
+  .handle(async ({ app, actor, scope }) => {
+    const report = await app.check();
+
+    // The literals are the proof the door named no tenant: a handler on a
+    // scoped door could not answer these.
+    expect(actor).toBeNull();
+    expect(scope).toBeNull();
+
+    return report.status === "healthy"
+      ? ({ status: 200, body: report } as const)
+      : ({ status: 503, body: report } as const);
+  })
+  .build();
+
+function platformHealthApp(
+  options: { status?: "healthy" | "unhealthy"; tenanted?: boolean } = {},
+): { app: Hono; identify: ReturnType<typeof vi.fn> } {
+  // The door compares this deployment's monitoring key and names it; it
+  // resolves no tenant, and no permission is asked of what it resolved.
+  const identify = vi.fn(() =>
+    options.tenanted
+      ? { actor: null, scope: { tier: "organization", id: ORGANIZATION_ID } as const }
+      : {
+          actor: { type: "api_key", id: "monitor" } as const,
+          scope: null,
+          internal: { type: "internalSecret", secretName: "PLATFORM_HEALTH_API_KEY" } as const,
+        },
+  );
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("A platform-health route asks no permission of its credential.");
+      },
+      identify,
+    },
+  });
+
+  const app = runtime.mount(platformHealth.router(), {
+    app: () => ({ check: async () => ({ status: options.status ?? "healthy" }) }),
+    onError: createErrorHandler(),
+  });
+
+  return { app, identify };
+}
+
+describe("a family behind a deployment's own secret", () => {
+  /** @scenario "A family behind a deployment secret names no tenant" */
+  it("hands the handler no actor and no scope once the door accepted the secret", async () => {
+    const { app, identify } = platformHealthApp();
+
+    const response = await app.request("/api/v1/platform-health");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: "healthy" });
+    expect(identify).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A family behind a deployment secret names no tenant" */
+  it("records the internal-secret credential class rather than a public route", () => {
+    platformHealthApp();
+
+    const route = getRoutePolicy("get", "/api/v1/platform-health");
+
+    expect(route).toMatchObject({ credentialClass: "internal_secret" });
+    expect(route?.policy.kind).not.toBe("public");
+  });
+
+  /** @scenario "A family behind a deployment secret publishes the secret's own scheme" */
+  it("publishes the scheme its holder presents, not an empty requirement", () => {
+    expect(
+      securityForCredentialClass({
+        operationKey: "GET /api/v1/platform-health",
+        credentialClass: "internal_secret",
+      }),
+    ).toEqual([{ internal_secret: [] }]);
+
+    expect(securityRequirement("internalSecret")).toEqual([{ internal_secret: [] }]);
+  });
+
+  /** @scenario "A family behind a deployment secret names no tenant" */
+  it("fails rather than answering when the door resolved a tenant scope for it", async () => {
+    const response = await platformHealthApp({ tenanted: true }).app.request(
+      "/api/v1/platform-health",
+    );
+
+    expect(response.status).toBe(500);
+  });
+});
+
+describe("a route that declares the several answers it may give", () => {
+  /** @scenario "An endpoint declares the several answers it may give" */
+  it("answers a declared non-success with the body that status names", async () => {
+    const response = await platformHealthApp({ status: "unhealthy" }).app.request(
+      "/api/v1/platform-health",
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ status: "unhealthy" });
+  });
+
+  /** @scenario "An endpoint declares the several answers it may give" */
+  it("lists every declared status in the published document", async () => {
+    const published = await generateSpecs(platformHealthApp().app, SPEC_OPTIONS);
+    const item = published.paths?.["/api/v1/platform-health"] as
+      | { get?: { responses?: Record<string, { description?: string }> } }
+      | undefined;
+
+    expect(Object.keys(item?.get?.responses ?? {}).sort()).toEqual(["200", "503"]);
+    expect(item?.get?.responses?.["503"]?.description).toBe("Service Unavailable");
+  });
+
+  /** @scenario "An endpoint declares the several answers it may give" */
+  it("records the request as handled rather than as a server fault", async () => {
+    // The family's request logger, by the name the runtime builds it under and
+    // the factory caches it by: this IS the instance the middleware writes to.
+    const logger = createLogger("langwatch:api:platform-health");
+    const info = vi.spyOn(logger, "info");
+    const error = vi.spyOn(logger, "error");
+
+    try {
+      await platformHealthApp({ status: "unhealthy" }).app.request("/api/v1/platform-health");
+
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 503 }),
+        "request handled",
+      );
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      info.mockRestore();
+      error.mockRestore();
+    }
+  });
+
+  /** @scenario "An endpoint that declares several answers may not also declare one" */
+  it("fails rather than serving a status the declaration never named", async () => {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({
+          actor: null,
+          scope: null,
+          internal: { type: "internalSecret", secretName: "PLATFORM_HEALTH_API_KEY" } as const,
+        }),
+      },
+    });
+
+    // The other door on the same credential: this one IS asked a permission,
+    // so the runtime resolves it through `authenticate` rather than `identify`.
+    const undeclared = defineRestRouter(PlatformHealthApi)
+      .withNamespace("platform-health-undeclared")
+      .withVersion(VERSION)
+      .withAddressing("v1-only")
+      .withCredential("internalSecret")
+      .get("/", "getUndeclaredPlatformHealth")
+      .withPermission("activityMonitor:view")
+      .responds({ 200: healthReport, 503: healthReport })
+      .handle(() => ({ status: 200, body: { status: "healthy" } }) as never)
+      .build();
+
+    const app = runtime.mount(undeclared.router(), {
+      app: () => ({ check: async () => ({ status: "healthy" }) as const }),
+      onError: createErrorHandler(),
+    });
+
+    // The handler is typed to the map, so answering off-contract takes a cast;
+    // what is pinned here is what the runtime does when one gets through.
+    Reflect.set(undeclared.router().routes[0]!, "handler", () => ({
+      status: 418,
+      body: { status: "healthy" },
+    }));
+
+    expect((await app.request("/api/v1/platform-health-undeclared")).status).toBe(500);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A family behind one directory connection's own SCIM token.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const scimUsers = defineRestRouter(RoleApi)
+  .withNamespace("scim")
+  .withVersion(VERSION)
+  .withAddressing("v1-in-path")
+  .withCredential("scimToken")
+  .get("/Users", "listScimUsers")
+  .withPermission("organization:manage")
+  .withOutput(z.object({ tier: z.literal("organization"), organizationId: z.string() }))
+  .handle(({ scope }) => ({ tier: scope.tier, organizationId: scope.id }))
+  .build();
+
+function scimApp(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({
+        actor: null,
+        scope: { tier: "organization", id: ORGANIZATION_ID } as const,
+      }),
+    },
+  });
+
+  return runtime.mount(scimUsers.router(), {
+    app: () => roleApplication,
+    onError: createErrorHandler(),
+  });
+}
+
+describe("a family behind one directory connection's SCIM token", () => {
+  /** @scenario "A declaration may name the SCIM token as its door" */
+  it("hands the handler the organization the token resolved", async () => {
+    const response = await scimApp().request("/api/scim/v1/Users");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      tier: "organization",
+      organizationId: ORGANIZATION_ID,
+    });
+  });
+
+  /** @scenario "A declaration may name the SCIM token as its door" */
+  it("records the SCIM credential class, which publishes the SCIM bearer scheme", () => {
+    scimApp();
+
+    const route = getRoutePolicy("get", "/api/scim/v1/Users");
+
+    expect(route).toMatchObject({ credentialClass: "scim_token" });
+    expect(
+      securityForCredentialClass({
+        operationKey: "GET /api/scim/v1/Users",
+        credentialClass: route!.credentialClass,
+      }),
+    ).toEqual([{ scim_bearer: [] }]);
+
+    expect(securityRequirement("scimToken")).toEqual([{ scim_bearer: [] }]);
   });
 });

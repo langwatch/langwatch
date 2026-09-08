@@ -70,6 +70,18 @@ export type RestResolvedOrganizationCredential = {
   organizationId: string;
 };
 
+/**
+ * The credential a deployment-secret door resolved. It names no tenant — the
+ * secret belongs to the deployment rather than to a customer — so a family
+ * behind it is handed no scope and no actor. All it carries is WHICH of this
+ * deployment's secrets admitted the request, by name and never by value, so a
+ * door that admitted one is reviewable.
+ */
+export type RestResolvedInternalCredential = Readonly<{
+  type: "internalSecret";
+  secretName: string;
+}>;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The request context a scoped family sees, written by the process's own
 // authentication.

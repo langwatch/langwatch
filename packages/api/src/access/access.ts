@@ -11,6 +11,7 @@ import {
   BlankScopeIdError,
   PermissionDeniedError,
   resolveDeclaredScope,
+  SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
   type AuthzDeclaration,
   type AuthzDeclaredScopeId,
@@ -36,7 +37,13 @@ const logger = createLogger("langwatch:authz");
 export type AccessDeclaration = Exclude<AuthzDeclaration, { kind: "custom" }>;
 
 /** Which credential reaches a REST route, as the document names it. */
-export type Credential = "session" | "projectKey" | "organizationKey" | "internalSecret" | "public";
+export type Credential =
+  | "session"
+  | "projectKey"
+  | "organizationKey"
+  | "scimToken"
+  | "internalSecret"
+  | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
 export type AccessActor = Actor & Readonly<{ id: string }>;
@@ -90,6 +97,75 @@ export function publicRoute({ reason }: { reason: string }): PublicRouteAccess {
   }
 
   return Object.freeze({ kind: "public", reason });
+}
+
+/**
+ * A route the family's own door still answers: the credential is resolved and
+ * its scope established, and no permission is asked of it. `reason` is the
+ * reviewable justification that authentication alone is the whole gate.
+ */
+export type AuthenticatedRouteAccess = Readonly<{ kind: "authenticated"; reason: string }>;
+
+/** Declares one route gated by the door alone, with the reason that suffices. */
+export function anyAuthenticated({ reason }: { reason: string }): AuthenticatedRouteAccess {
+  if (reason.trim() === "") {
+    throw new Error("anyAuthenticated needs a written reason for asking no permission");
+  }
+
+  return Object.freeze({ kind: "authenticated", reason });
+}
+
+/** What a route may declare instead of a permission. */
+export type RouteAccess = PublicRouteAccess | AuthenticatedRouteAccess;
+
+/**
+ * The scope a route's own path named, read off the parsed input. The parameter
+ * is the field its tier is spelled with, so the tier comes from the name and a
+ * route cannot check a project permission against a team id.
+ */
+export function routeScopeOf({
+  param,
+  input,
+}: {
+  param: ScopeTierField;
+  input: unknown;
+}): DeclaredScopeId {
+  const named = typeof input === "object" && input !== null
+    ? (input as Record<string, unknown>)[param]
+    : undefined;
+
+  // Present and empty is something the caller sent; absent is a declaration
+  // whose path parameter and permission target disagree, which is ours.
+  if (typeof named === "string" && named.trim() !== "") {
+    return { tier: SCOPE_TIER_BY_FIELD[param], id: named };
+  }
+
+  if (typeof named === "string") throw new BlankScopeIdError({ field: param });
+
+  logger.error({ param }, "a route-scoped permission named an input field the route never parsed");
+
+  throw new AccessWiringError();
+}
+
+/**
+ * The check a route asks at the scope its own path named, rather than at the
+ * one its credential resolved. The decision is the process's to make; the
+ * refusal is the one every other denial in the transport answers with.
+ */
+export function assertRouteScopePermission({
+  permission,
+  target,
+  decision,
+  denials,
+}: {
+  permission: AuthzGetDecisionInput["permission"];
+  target: DeclaredScopeId;
+  decision: PermissionDecision;
+  denials?: AccessDenialPort;
+}): void {
+  if (decision.permitted) return;
+
+  throw denied({ permission, scope: target, decision, denials });
 }
 
 /** An anonymous caller on a declaration that needs one. */
@@ -166,10 +242,15 @@ export function securityRequirement(credential: Credential): readonly Record<str
       return [{ project_api_key: [] }];
     case "organizationKey":
       return [{ admin_api_key: [] }];
+    case "scimToken":
+      return [{ scim_bearer: [] }];
+    // A deployment secret is held by an operator's own monitor rather than by
+    // us, so it has a scheme for the same reason the SCIM token does.
+    case "internalSecret":
+      return [{ internal_secret: [] }];
     case "public":
       return [];
     case "session":
-    case "internalSecret":
       throw new Error(
         `a "${credential}" route has no security scheme an API client can satisfy, ` +
           "so it cannot be advertised in the published document",

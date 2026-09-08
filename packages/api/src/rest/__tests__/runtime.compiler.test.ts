@@ -176,6 +176,14 @@ defineRestRouter(api).withNamespace("secrets").withVersion("2026-09-08")
   .handle(({ scope }) => ({ tier: scope.tier }));
 defineRestRouter(api).withNamespace("admin").withVersion("2026-09-08")
   .withCredential("session");
+defineRestRouter(api).withNamespace("scim").withVersion("2026-09-08")
+  .withCredential("scimToken")
+  .get("/Users", "listScimUsers").withPermission("organization:manage").withOutput(tier)
+  .handle(({ scope }) => ({ tier: scope.tier }));
+defineRestRouter(api).withNamespace("platform-health").withVersion("2026-09-08")
+  .withCredential("internalSecret")
+  .get("/", "getPlatformHealth").withPermission("project:view").withOutput(tier)
+  .handle(({ scope }) => ({ tier: scope.tier }));
 `,
   );
 
@@ -184,12 +192,52 @@ defineRestRouter(api).withNamespace("admin").withVersion("2026-09-08")
       .split("\n")
       .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
 
-    expect(errors).toHaveLength(2);
+    expect(errors).toHaveLength(3);
     // The project door's own scope: `"project"` where the route promised
     // `"organization"`, which is the credential typing the handler.
     expect(errors[0]).toContain('"project"');
     expect(errors[0]).toContain('"organization"');
     expect(errors[1]).toContain('"session"');
+    // The deployment-secret door resolves no tenant at all, so its handler has
+    // no tier to read; the SCIM door above it compiles, because it does.
+    expect(errors[2]).toContain("null");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+/** @scenario "An endpoint declares the several answers it may give" */
+it("types the handler's answer from the statuses the declaration named", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-answers-"));
+  const fixture = join(directory, "fixture.ts");
+
+  writeFileSync(
+    fixture,
+    `import { z } from "zod";
+import { featureApi } from "@langwatch/runtime-composition";
+import { defineRestRouter } from "../src/rest/runtime.ts";
+const api = featureApi<object>("platform-health");
+const report = z.object({ status: z.string() });
+const route = () => defineRestRouter(api).withNamespace("platform-health").withVersion("2026-09-08")
+  .get("/", "getPlatformHealth").withPermission("project:view")
+  .responds({ 200: report, 503: report });
+route().handle(() => ({ status: 200, body: { status: "healthy" } }));
+route().handle(() => ({ status: 503, body: { status: "unhealthy" } }));
+route().handle(() => ({ status: 418, body: { status: "teapot" } }));
+route().handle(() => ({ status: 200, body: { status: 1 } }));
+route().handle(() => ({ status: "healthy" }));
+`,
+  );
+
+  try {
+    const errors = compile(fixture)
+      .split("\n")
+      .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
+
+    expect(errors).toHaveLength(3);
+    expect(errors[0]).toContain("418");
+    expect(errors[1]).toContain("number");
+    expect(errors[2]).toContain("503");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

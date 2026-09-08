@@ -12,6 +12,8 @@ import {
   createLogger,
   getStatusCodeFromError,
   logHttpRequest,
+  type Logger,
+  type RequestLogData,
 } from "@langwatch/observability";
 import { runWithContext, updateCurrentContext } from "@langwatch/observability/context";
 import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
@@ -32,6 +34,7 @@ import type { z, ZodIssue, ZodSchema } from "zod";
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import {
+  DECLARED_ANSWER,
   ENDPOINT_ROUTE,
   REQUEST_FAMILY,
   REQUEST_LOG_CLAIM,
@@ -565,7 +568,7 @@ export function loggerMiddleware(options?: { name?: string }) {
           // logger claimed the record when several share a base path.
           const family = (c.get(REQUEST_FAMILY) as string | undefined) ?? options?.name;
 
-          logHttpRequest(logger, {
+          const record: RequestLogData = {
             method: c.req.method,
             url: c.req.path,
             statusCode,
@@ -577,7 +580,15 @@ export function loggerMiddleware(options?: { name?: string }) {
               ...(family ? { family } : {}),
               ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
             },
-          });
+          };
+
+          // A status the route DECLARED is an answer, not a fault.
+          if (!requestError && c.get(DECLARED_ANSWER) === true) {
+            logDeclaredAnswer(logger, record);
+            return;
+          }
+
+          logHttpRequest(logger, record);
         };
 
         runAfterSSECompletion({
@@ -590,6 +601,18 @@ export function loggerMiddleware(options?: { name?: string }) {
       }
     });
   };
+}
+
+/**
+ * The record for an answer the route DECLARED. `logHttpRequest` reads the level
+ * off the status alone, which would file an unhealthy platform report as an
+ * uncaused 5xx; the fields are the ones it writes, and nothing carries a cause
+ * because there is none.
+ */
+function logDeclaredAnswer(logger: Logger, data: RequestLogData): void {
+  const { extra, error: _cause, ...request } = data;
+
+  logger.info({ ...extra, ...request }, "request handled");
 }
 
 function runAfterSSECompletion({

@@ -61,6 +61,13 @@ export type CredentialClass =
    * document declares a scheme for it too.
    */
   | "scim_token"
+  /**
+   * A deployment-wide shared secret an OPERATOR configures and an external
+   * monitor presents. Distinct from `internal`, which is one of our own
+   * processes calling another: this one is held by somebody outside the
+   * deployment, so the published document has a scheme for it.
+   */
+  | "internal_secret"
   | "session"
   | "internal"
   | "none";

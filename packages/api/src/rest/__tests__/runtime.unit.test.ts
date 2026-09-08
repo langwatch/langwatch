@@ -8,7 +8,7 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { publicRoute } from "../../access/access.ts";
+import { anyAuthenticated, publicRoute } from "../../access/access.ts";
 import { ApiVersionConflictError, InvalidApiVersionError } from "../../errors.ts";
 import {
   bindRestHeader,
@@ -160,6 +160,144 @@ describe("defineRestRouter", () => {
     });
   });
 
+  describe("when a route is gated by the family's door alone", () => {
+    const OpsApi = featureApi<{ ping(): Promise<void> }>("ops");
+
+    /** @scenario "A route the family's own door alone gates asks no permission of it" */
+    it("refuses a route that declares both a permission and authenticated access", () => {
+      expect(() =>
+        defineRestRouter(OpsApi)
+          .withNamespace("projects")
+          .withVersion("2026-08-07")
+          .post("/", "createProject")
+          .withInput(z.object({ name: z.string() }))
+          .withPermission("project:create")
+          .withAccess(anyAuthenticated({ reason: "the key's own ceiling is the whole gate" }))
+          .handle(() => {}),
+      ).toThrow(/declares both a permission and authenticated access/);
+    });
+
+    /** @scenario "A route the family's own door alone gates asks no permission of it" */
+    it("refuses a mount that cannot open the door without a permission, naming the route", () => {
+      const declaration = defineRestRouter(OpsApi)
+        .withNamespace("projects")
+        .withVersion("2026-08-07")
+        .withCredential("organizationKey")
+        .get("/", "listProjects")
+        .withAccess(anyAuthenticated({ reason: "the listing answers exactly what the key holds" }))
+        .handle(() => {})
+        .build()
+        .router();
+
+      const runtime = createRestRuntime({
+        identity: {
+          authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+        },
+      });
+
+      expect(() =>
+        runtime.mount(declaration, {
+          app: () => ({ ping: async () => {} }),
+          onError: (error) => {
+            throw error;
+          },
+        }),
+      ).toThrow(/GET \/api\/projects\/ .*supplied no identity\.identify/s);
+    });
+
+    it("refuses an access kind with no written reason", () => {
+      expect(() => anyAuthenticated({ reason: "  " })).toThrow(/needs a written reason/);
+    });
+  });
+
+  describe("when a route checks its permission at the scope its path names", () => {
+    const ProjectApi = featureApi<{ ping(): Promise<void> }>("project");
+
+    /** @scenario "A route checks its permission at the scope its own path names" */
+    it("refuses a route whose sources parse no such field", () => {
+      expect(() =>
+        defineRestRouter(ProjectApi)
+          .withNamespace("projects")
+          .withVersion("2026-08-07")
+          .withCredential("organizationKey")
+          .get("/:id", "getProject")
+          .withParams(z.object({ id: z.string() }))
+          .withPermission("project:view", { at: "route", param: "projectId" })
+          .handle(() => {}),
+      ).toThrow(/declares no source that parses "projectId"/);
+    });
+
+    /** @scenario "A route checks its permission at the scope its own path names" */
+    it("refuses a mount that cannot ask the question, naming the route", () => {
+      const declaration = defineRestRouter(ProjectApi)
+        .withNamespace("projects")
+        .withVersion("2026-08-07")
+        .withCredential("organizationKey")
+        .get("/:projectId", "getProject")
+        .withParams(z.object({ projectId: z.string() }))
+        .withPermission("project:view", { at: "route", param: "projectId" })
+        .handle(() => {})
+        .build()
+        .router();
+
+      const runtime = createRestRuntime({
+        identity: {
+          authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+        },
+      });
+
+      expect(() =>
+        runtime.mount(declaration, {
+          app: () => ({ ping: async () => {} }),
+          onError: (error) => {
+            throw error;
+          },
+        }),
+      ).toThrow(/GET \/api\/projects\/:projectId checks "project:view".*no identity\.authorize/s);
+    });
+  });
+
+  describe("when a route declares the several answers it may give", () => {
+    const HealthApi = featureApi<{ ping(): Promise<void> }>("platform-health");
+    const report = z.object({ status: z.string() });
+
+    function route() {
+      return defineRestRouter(HealthApi)
+        .withNamespace("platform-health")
+        .withVersion("2026-08-07")
+        .get("/", "getPlatformHealth")
+        .withPermission("project:view");
+    }
+
+    /** @scenario "An endpoint that declares several answers may not also declare one" */
+    it("refuses a second answer declaration, and a fixed success status beside it", () => {
+      expect(() => route().withOutput(report).responds({ 200: report, 503: report })).toThrow(
+        /already declared withOutput/,
+      );
+
+      expect(() => route().responds({ 200: report, 503: report }).withOutput(report)).toThrow(
+        /already declared withOutput/,
+      );
+
+      expect(() =>
+        route()
+          .responds({ 200: report, 503: report })
+          .withStatus(200)
+          .handle(() => ({ status: 200, body: { status: "healthy" } })),
+      ).toThrow(/its status is the answer's own/);
+    });
+
+    /** @scenario "An endpoint that declares several answers may not also declare one" */
+    it("refuses a map with no success status, or with more than one", () => {
+      expect(() => route().responds({ 503: report })).toThrow(/exactly one 2xx answer/);
+      expect(() => route().responds({ 200: report, 201: report })).toThrow(
+        /exactly one 2xx answer/,
+      );
+      expect(() => route().responds({})).toThrow(/no answers/);
+      expect(() => route().responds({ 700: report })).toThrow(/outside 200–599/);
+    });
+  });
+
   describe("when a family declares the door it answers behind", () => {
     const OrganizationApi = featureApi<{ listRoles(): Promise<void> }>("role");
 
@@ -262,6 +400,20 @@ describe("defineRestRouter", () => {
       expect(() => router.withAddressing("v1-only")).toThrow(
         /must declare its addressing before its routes/,
       );
+    });
+
+    /** @scenario "A family whose paths were never aliased declares no twin" */
+    it("refuses a twin declared by a family that names its generation in the path", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      const router = () =>
+        defineRestRouter(api).withNamespace("webhooks").withVersion("2026-08-07");
+
+      expect(() => router().withAddressing("v1-in-path", { v1Twin: false })).toThrow(
+        /has no \/api\/v1 twin to declare/,
+      );
+
+      expect(router().withAddressing("dated", { v1Twin: false })).toBeDefined();
     });
   });
 });

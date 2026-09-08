@@ -235,8 +235,13 @@ describe("the security requirement one credential publishes", () => {
     expect(securityRequirement("public")).toEqual([]);
   });
 
+  /** @scenario "A family behind a deployment secret publishes the secret's own scheme" */
+  it("names the scheme for a credential held outside the deployment", () => {
+    expect(securityRequirement("scimToken")).toEqual([{ scim_bearer: [] }]);
+    expect(securityRequirement("internalSecret")).toEqual([{ internal_secret: [] }]);
+  });
+
   it("refuses a credential no API client can present", () => {
     expect(() => securityRequirement("session")).toThrow(/no security scheme/);
-    expect(() => securityRequirement("internalSecret")).toThrow(/no security scheme/);
   });
 });

@@ -189,6 +189,49 @@ Feature: Transport declaration split
     Then the route records the organization credential class
     And the class publishes the organization API key scheme in the document
 
+  @unit
+  Scenario: A route the family's own door alone gates asks no permission of it
+    Given a declaration whose door resolves a credential
+    When one of its routes declares authenticated access, with the written reason that suffices
+    Then the door still resolves the credential and the scope it names, and asks no permission
+    And the registry records the family's own credential class and the reason the route gave
+    And the document keeps the family's security scheme for it
+    And a route naming both a permission and authenticated access is refused at declaration
+    And a mount that cannot open the door without a permission is refused, naming the route
+
+  @unit
+  Scenario: A route checks its permission at the scope its own path names
+    Given a family behind an organization key whose routes each address one project
+    When a route declares its permission at the scope its path names
+    Then the credential is authenticated as ever, and the permission is asked about that project
+    And the handler is handed the credential's scope and the route's target both
+    And a caller the process refuses at that scope is denied, naming neither
+    And a route whose sources parse no such field is refused at declaration
+    And a mount that cannot ask the question is refused, naming the route
+
+  @unit
+  Scenario: A family behind a deployment secret names no tenant
+    Given a declaration that names the deployment-secret door
+    When the process's door accepts the secret and resolves no scope
+    Then the handler is handed no actor and no scope
+    And the registry records the internal-secret credential class, not a public route
+    And a door that resolved a tenant scope for it fails rather than answering
+
+  @unit
+  Scenario: A family behind a deployment secret publishes the secret's own scheme
+    Given the deployment-secret and SCIM-token credentials
+    When the document asks what each of them publishes
+    Then each names the scheme its holder presents
+    And neither is published as an operation needing no credential
+
+  @unit
+  Scenario: A declaration may name the SCIM token as its door
+    Given a family provisioned through one directory connection's own token
+    When it names that door
+    Then its handlers are handed the organization the token resolved
+    And the registry records the SCIM credential class, which publishes the SCIM bearer scheme
+    And the instance administrator key stays out, because no door resolves a scope for it
+
   @unimplemented
   Scenario: A project key presented to an organization route is refused with the body the family already publishes
     Given a family declared behind the organization door

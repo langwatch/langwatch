@@ -36,6 +36,13 @@ export const REQUEST_FAMILY = "requestFamily" as const;
  */
 export const REQUEST_LOG_CLAIM = "requestLogClaim" as const;
 
+/**
+ * Context key marking that the status on the wire is one the route DECLARED as
+ * an answer. An unhealthy platform report is the endpoint working, so the
+ * request record says `info` rather than counting a 503 as a server fault.
+ */
+export const DECLARED_ANSWER = "declaredAnswer" as const;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The handler's own context, and the documentation shape a family hands over.
 // ─────────────────────────────────────────────────────────────────────────────

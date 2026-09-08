@@ -109,12 +109,19 @@ Feature: Explicit compatibility version namespaces
     And the latest namespace's operation id is suffixed "latest"
     And no /api/v1 twin appears as a second operation
 
-  @unimplemented
+  @integration
   Scenario: A family serves one static generation instead of dated namespaces
-    Given a family declares the generation its base path already names
+    Given a family declares the generation its own namespace path already names
     When it is built
     Then its routes answer once, at that path
     And no dated namespace or latest alias is mounted beside them
+
+  @integration
+  Scenario: A family whose paths were never aliased declares no twin
+    Given a dated family that declares it has no /api/v1 twin
+    When its routes are mounted
+    Then each route answers at its dated, its latest and its bare path
+    And no /api/v1 address is registered for it, nor a version guard under one
 
   @unimplemented
   Scenario: A family at a shared prefix mounts its own paths and their canonical address

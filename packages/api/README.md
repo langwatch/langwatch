@@ -111,13 +111,15 @@ const annotations = rest.mount(annotationRest.router(), {
 });
 ```
 
-The declaration names its own door, and the handler's `scope` follows it. Two
-doors exist: `projectKey`, which every declaration gets without asking and which
-resolves `{ tier: "project", id }`, and `organizationKey`, declared with
-`.withCredential("organizationKey")` before the family's first route, which
-resolves `{ tier: "organization", id }`. A mount that names the other one is
-refused; `public`, `session` and `internalSecret` are still named on the mount,
-because no door resolves a declared scope for them yet.
+The declaration names its own door, and the handler's `scope` follows it. Four
+doors exist, each declared with `.withCredential(...)` before the family's first
+route: `projectKey`, which every declaration gets without asking and which
+resolves `{ tier: "project", id }`; `organizationKey` and `scimToken`, which
+resolve `{ tier: "organization", id }`; and `internalSecret`, a deployment's own
+shared secret, which names no tenant at all and hands its handlers
+`scope: null` and `actor: null`. A mount that names a different door is refused.
+`public` and `session` are still named on the mount, because no door resolves a
+declared scope for them.
 
 ```ts
 const roleRest = defineRestRouter(RoleApi)
@@ -152,14 +154,29 @@ it is handed `undefined` and authorizes nothing. On REST the request is parsed
 **before** the credential is resolved, so a malformed body is refused without
 ever touching the caller's key.
 
-What a handler is handed never changes: `{ app, input, actor, scope, signal }`.
-No `ctx`, no request, no response, no framework type. The access step writes
-those facts onto the request context through tRPC's own `next({ ctx })`, and a
-procedure that somehow reached its handler without them refuses by name.
+What a handler is handed never changes: `{ app, input, actor, scope, signal }`,
+plus `target` on REST, which is the scope a route's own path named when its
+permission was checked there. No `ctx`, no request, no response, no framework
+type. The access step writes those facts onto the request context through
+tRPC's own `next({ ctx })`, and a procedure that somehow reached its handler
+without them refuses by name.
 
 A declared REST route answers at three addresses — its dated namespace,
 `latest`, and the family's bare path — plus the `/api/v1` twin of each, and any
 real date the caller pins is served by the latest registration on or before it.
+`.withAddressing(...)` before the first route says otherwise: `"v1-only"` serves
+`/api/v1/<namespace>/...` alone, `"v1-in-path"` serves `/api/<namespace>/v1/...`
+alone, and `("dated", { v1Twin: false })` keeps the three dated addresses with
+no twin beside them.
+
+A route names either a permission or an access kind. `.withPermission(p)` asks
+`p` at the scope the credential resolved; `.withPermission(p, { at: "route",
+param: "projectId" })` asks it at the scope the route's own path names, through
+`identity.authorize`. `.withAccess(publicRoute({ reason }))` resolves no
+credential at all; `.withAccess(anyAuthenticated({ reason }))` opens the
+family's door through `identity.identify` and asks no permission of it. A route
+may also declare several answers — `.responds({ 200: report, 503: report })` —
+and then returns `{ status, body }` typed by that map.
 
 ### Deprecated, and what replaces it
 

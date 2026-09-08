@@ -6,7 +6,12 @@
  * answer, respond.
  */
 import { actorSchema, type Actor } from "@langwatch/actor";
-import type { AuthzDeclaredScopeId, AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  AuthzDeclaredScopeId,
+  AuthzPermission,
+  PermissionDecision,
+  ScopeTierField,
+} from "@langwatch/authz-contract";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { FeatureApiToken } from "@langwatch/runtime-composition";
 import { Temporal } from "@langwatch/time";
@@ -25,15 +30,18 @@ import {
   type HandlerCredential,
 } from "../access-policy.ts";
 import {
+  assertRouteScopePermission,
   decide,
+  routeScopeOf,
   SCOPE_INPUT_FIELDS,
   type AccessDenialPort,
   type AuthorizePort,
   type Credential,
-  type PublicRouteAccess,
+  type RouteAccess,
 } from "../access/access.ts";
 import { ApiVersionConflictError, InvalidApiVersionError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import type { RestResolvedInternalCredential } from "./credential.ts";
 import { deprecatedAlias, deprecationNotice, documentRoute } from "./openapi.ts";
 import {
   bodyLimit,
@@ -44,7 +52,12 @@ import {
   type RestTransportMiddleware,
   type RestTransportMiddlewareBinding,
 } from "./request.ts";
-import { ENDPOINT_ROUTE, REQUEST_FAMILY, type RouteResponse } from "./response.ts";
+import {
+  DECLARED_ANSWER,
+  ENDPOINT_ROUTE,
+  REQUEST_FAMILY,
+  type RouteResponse,
+} from "./response.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
@@ -378,10 +391,17 @@ export type RestTransportDocs = Readonly<{
 /**
  * How a family is addressed. `dated` publishes the namespace's dated, latest
  * and bare paths with their `/api/v1` twins; `v1-only` publishes exactly
- * `/api/v1/<namespace>/...` and nothing else, for a surface whose published
- * generation is its whole contract.
+ * `/api/v1/<namespace>/...` and `v1-in-path` exactly `/api/<namespace>/v1/...`,
+ * both for a surface whose published generation is its whole contract.
  */
-export type RestAddressing = "dated" | "v1-only";
+export type RestAddressing = "dated" | "v1-only" | "v1-in-path";
+
+/**
+ * What a `dated` family may say about its twin. A family whose published paths
+ * were never aliased sets `v1Twin: false` and answers at its own addresses
+ * alone; the two generation-in-the-path addressings have no twin to speak of.
+ */
+export type RestAddressingOptions = Readonly<{ v1Twin?: boolean }>;
 
 /**
  * What a project-scoped door knows about the caller beyond the request's own
@@ -406,34 +426,43 @@ export type RestDeprecation = Readonly<{
 }>;
 
 /**
- * The credentials a declaration may choose a door for. `session`,
- * `internalSecret` and `public` are absent on purpose: no door resolves a
- * declared scope for them yet, so a declaration naming one would type its
- * handler's scope as a value nothing establishes. Those arrive with their own
- * doors; until then a family serving one names it on the mount instead.
+ * The credentials a declaration may choose a door for. `session` and `public`
+ * are absent on purpose: no door resolves either, so a declaration naming one
+ * would type its handler's scope as a value nothing establishes. A family
+ * serving a session names it on the mount instead.
  */
-export type RestDoorCredential = Extract<Credential, "projectKey" | "organizationKey">;
+export type RestDoorCredential = Extract<
+  Credential,
+  "projectKey" | "organizationKey" | "scimToken" | "internalSecret"
+>;
 
 /**
- * Which scope tier each door's credential resolves. The one table: the type
- * a handler reads and the tier the runtime asserts both come from here, so a
- * door cannot promise one tier and hand over another.
+ * Which scope tier each door's credential resolves. The one table: the type a
+ * handler reads and the tier the runtime asserts both come from here, so a door
+ * cannot promise one tier and hand over another. `null` is a door whose
+ * credential names no tenant at all — a deployment's own shared secret.
  */
 const DOOR_SCOPE_TIER = {
   projectKey: "project",
   organizationKey: "organization",
-} as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"]>;
+  scimToken: "organization",
+  internalSecret: null,
+} as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */
-type DoorScope<Door extends RestDoorCredential> = Extract<
-  AuthzDeclaredScopeId,
-  { tier: (typeof DOOR_SCOPE_TIER)[Door] }
->;
+type DoorScope<Door extends RestDoorCredential> = (typeof DOOR_SCOPE_TIER)[Door] extends null
+  ? null
+  : Extract<AuthzDeclaredScopeId, { tier: (typeof DOOR_SCOPE_TIER)[Door] }>;
 type ScopedHandlerArguments<Input, App, Door extends RestDoorCredential> = Omit<
   ApiHandlerArguments<Input, App>,
   "scope"
 > & {
   readonly scope: DoorScope<Door>;
+  /**
+   * The scope this route's own path named, when its permission was checked
+   * there; `null` on every route checked at the credential's own scope.
+   */
+  readonly target: AuthzDeclaredScopeId | null;
 };
 /** A public route resolves no credential, so it knows neither actor nor scope. */
 type PublicHandlerArguments<Input, App> = Omit<
@@ -442,6 +471,7 @@ type PublicHandlerArguments<Input, App> = Omit<
 > & {
   readonly actor: null;
   readonly scope: null;
+  readonly target: null;
 };
 type HandlerArgumentsFor<
   Access extends RouteAccessKind,
@@ -451,21 +481,54 @@ type HandlerArgumentsFor<
 > = Access extends "public"
   ? PublicHandlerArguments<Input, App>
   : ScopedHandlerArguments<Input, App, Door>;
-type RouteAccessKind = "scoped" | "public";
+type RouteAccessKind = "scoped" | "public" | "authenticated";
+/**
+ * What a stored handler is invoked with, once the declaration's own types are
+ * gone: every door's arguments widened to one shape. The `handle` signature is
+ * where a handler's real types are enforced; this is only what the runtime
+ * calls, declared as a method so the parameter stays bivariant.
+ */
+type StoredHandlerArguments<Api> = Readonly<{
+  app: Api;
+  input: unknown;
+  actor: Actor | null;
+  scope: AuthzDeclaredScopeId | null;
+  target: AuthzDeclaredScopeId | null;
+  signal: AbortSignal | undefined;
+}>;
 type StoredHandler<Api> = {
-  invoke(
-    args:
-      | ScopedHandlerArguments<unknown, Api, RestDoorCredential>
-      | PublicHandlerArguments<unknown, Api>,
-    ...facts: unknown[]
-  ): unknown;
+  invoke(args: StoredHandlerArguments<Api>, ...facts: unknown[]): unknown;
 }["invoke"];
 type MiddlewareFacts<Middleware extends readonly RestTransportMiddleware[]> = {
   [Index in keyof Middleware]: z.output<Middleware[Index]["schema"]>;
 };
-type RouteResult<Output extends OutputSchema | Missing> = Output extends OutputSchema
+/** The statuses a route declares answers for, each with the body it carries. */
+export type RestRouteAnswers = Readonly<Record<number, OutputSchema>>;
+type AnswerResult<Answers extends RestRouteAnswers> = {
+  [Status in keyof Answers]: Readonly<{
+    status: Status & ContentfulStatusCode;
+    body: z.input<Answers[Status] & OutputSchema>;
+  }>;
+}[keyof Answers];
+/**
+ * What the handler returns: the one declared body, one `{ status, body }` of
+ * the several a route declared, or nothing. The answer slot holds either one
+ * schema or the map, so a route states its answers in exactly one place.
+ */
+type RouteResult<Output extends RouteAnswer> = Output extends OutputSchema
   ? z.input<Output> | Promise<z.input<Output>>
-  : void | Promise<void>;
+  : Output extends RestRouteAnswers
+    ? AnswerResult<Output> | Promise<AnswerResult<Output>>
+    : void | Promise<void>;
+type RouteAnswer = OutputSchema | RestRouteAnswers | Missing;
+
+/**
+ * Where a route's permission is checked. `route` asks it at the scope the
+ * route's own path names — the project or the team it addresses — rather than
+ * at the one the credential resolved. The parameter is the field that tier is
+ * spelled with, so the tier follows the name.
+ */
+export type RestPermissionTarget = Readonly<{ at: "route"; param: ScopeTierField }>;
 
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
@@ -475,13 +538,17 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly docs?: RestTransportDocs;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
-  /** Absent exactly when the route declared public access instead. */
+  /** Absent exactly when the route declared an access kind instead. */
   readonly permission?: AuthzPermission;
-  /** Present exactly when the route answers with no credential. */
-  readonly access?: PublicRouteAccess;
+  /** Where that permission is asked; absent means at the credential's scope. */
+  readonly permissionTarget?: RestPermissionTarget;
+  /** Present exactly when the route named an access kind instead. */
+  readonly access?: RouteAccess;
   readonly permissionScope?: string;
   readonly query?: z.ZodObject;
   readonly output: OutputSchema;
+  /** Present exactly when the route declared several answers with `responds`. */
+  readonly answers?: RestRouteAnswers;
   readonly status?: ContentfulStatusCode;
   readonly middleware?: readonly RestTransportMiddleware[];
   readonly bodyLimit?: Readonly<{ maxBytes: number; onExceeded(): Error }>;
@@ -497,6 +564,8 @@ export type RestTransportDeclaration<Api> = Readonly<{
   readonly namespace: string;
   readonly version: DateVersion;
   readonly addressing: RestAddressing;
+  /** Whether the family's `dated` addresses also answer under `/api/v1`. */
+  readonly v1Twin: boolean;
   /**
    * The door these routes are answered behind, and so the scope every handler
    * is handed. Declared, not mounted: the handler's own type follows it.
@@ -526,7 +595,7 @@ class RouteBuilder<
   Params extends RouteSource = Missing,
   Body extends RouteSource = Missing,
   Query extends RouteSource = Missing,
-  Output extends OutputSchema | Missing = Missing,
+  Output extends RouteAnswer = Missing,
   Permission extends boolean = false,
   Middleware extends readonly RestTransportMiddleware[] = [],
   Access extends RouteAccessKind = "scoped",
@@ -542,8 +611,10 @@ class RouteBuilder<
       input?: SourceSchema;
       query?: z.ZodObject;
       output?: OutputSchema;
+      answers?: RestRouteAnswers;
       permission?: AuthzPermission;
-      access?: PublicRouteAccess;
+      permissionTarget?: RestPermissionTarget;
+      access?: RouteAccess;
       version?: DateVersion;
       docs?: RestTransportDocs;
       status?: ContentfulStatusCode;
@@ -645,8 +716,14 @@ class RouteBuilder<
     });
   }
 
+  /**
+   * The permission this route demands, and where it is asked. `{ at: "route",
+   * param }` asks it at the scope the route's own path names, for a family
+   * whose credential is one tier wider than the resource it addresses.
+   */
   withPermission(
     permission: AuthzPermission,
+    target?: RestPermissionTarget,
   ): RouteBuilder<
     Api,
     Method,
@@ -663,16 +740,18 @@ class RouteBuilder<
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       permission,
+      ...(target ? { permissionTarget: target } : {}),
     });
   }
 
   /**
-   * Declares the route unauthenticated. It resolves no credential and no
-   * scope, so its handler is handed a null actor and a null scope, and the
-   * document publishes it with no security requirement.
+   * Declares how the route is reached instead of naming a permission:
+   * `publicRoute` resolves no credential at all, so its handler is handed a
+   * null actor and a null scope and the document publishes no security
+   * requirement; `anyAuthenticated` still opens the family's own door.
    */
-  withAccess(
-    access: PublicRouteAccess,
+  withAccess<Kind extends RouteAccess>(
+    access: Kind,
   ): RouteBuilder<
     Api,
     Method,
@@ -683,7 +762,7 @@ class RouteBuilder<
     Output,
     true,
     Middleware,
-    "public",
+    Kind["kind"],
     Door
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
@@ -773,11 +852,41 @@ class RouteBuilder<
     Access,
     Door
   > {
-    assertSourceUnset("output", this.state.output);
+    assertSourceUnset("output", this.state.output ?? this.state.answers);
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       output: schema,
+    });
+  }
+
+  /**
+   * The several answers this route may give, each with the body it carries:
+   * `responds({ 200: report, 503: report })`. An unhealthy platform report is
+   * an answer, not a failure, so the handler returns `{ status, body }` typed
+   * by this declaration and the document lists every status.
+   */
+  responds<const Answers extends RestRouteAnswers>(
+    answers: Answers,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Answers,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertSourceUnset("output", this.state.output ?? this.state.answers);
+    assertDeclaredAnswers({ operation: this.operation, answers });
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      answers,
     });
   }
 
@@ -822,8 +931,14 @@ class RouteBuilder<
       ...(this.state.query ? { query: this.state.query } : {}),
       ...(this.state.access
         ? { access: this.state.access }
-        : { permission: permissionOf(this.state.permission) }),
-      output: this.state.output ?? z.void(),
+        : {
+            permission: permissionOf(this.state.permission),
+            ...(this.state.permissionTarget
+              ? { permissionTarget: this.state.permissionTarget }
+              : {}),
+          }),
+      output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
+      ...(this.state.answers ? { answers: this.state.answers } : {}),
       ...(this.state.status === void 0 ? {} : { status: this.state.status }),
       ...(this.state.middleware ? { middleware: this.state.middleware } : {}),
       ...(this.state.bodyLimit ? { bodyLimit: this.state.bodyLimit } : {}),
@@ -918,6 +1033,7 @@ type OpenRoute<
 class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
+  private v1Twin = true;
   private deprecated: RestDeprecation | undefined;
 
   constructor(
@@ -947,6 +1063,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
     );
 
     router.addressing = this.addressing;
+    router.v1Twin = this.v1Twin;
     router.deprecated = this.deprecated;
 
     return router;
@@ -954,14 +1071,26 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
 
   /**
    * How the family is addressed. Declared before the first route, because it
-   * decides which paths every route in the family answers at.
+   * decides which paths every route in the family answers at. `v1Twin: false`
+   * is for a `dated` family whose paths were never aliased under `/api/v1`.
    */
-  withAddressing(addressing: RestAddressing): RestTransportRouter<Api, Door> {
+  withAddressing(
+    addressing: RestAddressing,
+    options: RestAddressingOptions = {},
+  ): RestTransportRouter<Api, Door> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
     }
 
+    if (options.v1Twin !== void 0 && addressing !== "dated") {
+      throw new Error(
+        `REST "${this.namespace}" addresses itself "${addressing}", which names its ` +
+          "generation in the path and so has no /api/v1 twin to declare",
+      );
+    }
+
     this.addressing = addressing;
+    this.v1Twin = options.v1Twin ?? true;
 
     return this;
   }
@@ -985,6 +1114,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
       namespace: this.namespace,
       version: this.version,
       addressing: this.addressing,
+      v1Twin: this.v1Twin,
       credential: this.credential,
       ...(this.deprecated ? { deprecated: this.deprecated } : {}),
       routes: this.routes,
@@ -1128,10 +1258,13 @@ function assertRouteReady({
   state: Readonly<{
     params?: z.ZodObject;
     permission?: AuthzPermission;
-    access?: PublicRouteAccess;
+    permissionTarget?: RestPermissionTarget;
+    access?: RouteAccess;
     query?: z.ZodObject;
     input?: SourceSchema;
     output?: OutputSchema;
+    answers?: RestRouteAnswers;
+    status?: ContentfulStatusCode;
   }>;
 }): void {
   if (!state.permission && !state.access) {
@@ -1139,14 +1272,92 @@ function assertRouteReady({
   }
 
   if (state.permission && state.access) {
-    throw new Error(`REST ${operation} declares both a permission and public access`);
+    throw new Error(`REST ${operation} declares both a permission and ${state.access.kind} access`);
   }
 
-  if (state.access) assertNoScopeInput({ operation, state });
+  if (state.access?.kind === "public") assertNoScopeInput({ operation, state });
+
+  if (state.answers && state.status !== void 0) {
+    throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);
+  }
+
+  if (state.permissionTarget) assertPermissionTarget({ operation, state });
 
   if (/:([A-Za-z0-9_]+)/.test(path) && !state.params) {
     throw new Error(`REST ${method.toUpperCase()} ${path} must declare withParams()`);
   }
+}
+
+/**
+ * A route checked at the scope its own path names has to parse that scope: the
+ * parameter is a field of the route's own input, not a value the runtime could
+ * find anywhere else.
+ */
+function assertPermissionTarget({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: Readonly<{
+    params?: z.ZodObject;
+    query?: z.ZodObject;
+    input?: SourceSchema;
+    permissionTarget?: RestPermissionTarget;
+  }>;
+}): void {
+  const param = state.permissionTarget!.param;
+
+  const declared = [state.params, state.query, state.input]
+    .filter((schema): schema is SourceSchema => schema !== void 0)
+    .flatMap((schema) => sourceKeys(schema));
+
+  if (!declared.includes(param)) {
+    throw new Error(
+      `REST ${operation} checks its permission at the scope "${param}" names, and declares no ` +
+        `source that parses "${param}"`,
+    );
+  }
+}
+
+/** The several answers a route declared: at least one, and exactly one success. */
+function assertDeclaredAnswers({
+  operation,
+  answers,
+}: {
+  operation: string;
+  answers: RestRouteAnswers;
+}): void {
+  const statuses = Object.keys(answers).map(Number);
+
+  if (statuses.length === 0) {
+    throw new Error(`REST ${operation} declared responds() with no answers`);
+  }
+
+  const servable = statuses.every(isServableStatus);
+
+  if (!servable) {
+    throw new Error(`REST ${operation} declared an answer outside 200–599`);
+  }
+
+  if (statuses.filter((status) => status < 300).length !== 1) {
+    throw new Error(`REST ${operation} must declare exactly one 2xx answer in responds()`);
+  }
+}
+
+/** A status a handler may answer with: a real response class, not a redirect. */
+function isServableStatus(status: number): boolean {
+  return Number.isInteger(status) && status >= 200 && status <= 599;
+}
+
+/** The one 2xx of a `responds` map: what the route answers when it worked. */
+function successAnswerOf(answers: RestRouteAnswers | undefined): OutputSchema | undefined {
+  if (!answers) return undefined;
+
+  for (const [status, schema] of Object.entries(answers)) {
+    if (Number(status) < 300) return schema;
+  }
+
+  return undefined;
 }
 
 /**
@@ -1196,7 +1407,10 @@ const ROUTE_INPUT = "endpointInput" as const;
 /** Who the family's own door authenticated, and what its credential resolved. */
 export type RestCaller = Readonly<{
   actor: Actor | null;
-  scope: AuthzDeclaredScopeId;
+  /** Null exactly on a door whose credential names no tenant. */
+  scope: AuthzDeclaredScopeId | null;
+  /** What a deployment-secret door resolved; absent on every tenant door. */
+  internal?: RestResolvedInternalCredential;
   /** Called only after the handler answered, for a credential that records use. */
   markUsed?: () => void;
 }>;
@@ -1208,6 +1422,22 @@ export type RestRuntimePorts = Readonly<{
       request: Request;
       permission: AuthzPermission;
     }): Promise<RestCaller> | RestCaller;
+    /**
+     * The family's own door, opened with no permission asked of it. Only a
+     * declaration carrying an `anyAuthenticated` route needs it, and a mount
+     * that supplies none is refused by name.
+     */
+    identify?(input: { request: Request }): Promise<RestCaller> | RestCaller;
+    /**
+     * Whether the caller holds `permission` at the scope a route's own path
+     * named. Only a declaration carrying such a route needs it, and a mount
+     * that supplies none is refused by name.
+     */
+    authorize?(input: {
+      caller: RestCaller;
+      permission: AuthzPermission;
+      target: AuthzDeclaredScopeId;
+    }): Promise<PermissionDecision> | PermissionDecision;
   }>;
   /** Only a family whose routes carry a check of their own supplies these. */
   authorization?: Readonly<{ forRequest(request: Request): AuthorizePort }>;
@@ -1264,15 +1494,15 @@ const HOST_ENFORCED = "project credential and permission enforced by the transpo
 export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
   return {
     mount: (declaration, options) => {
-      const v1Only = declaration.addressing === "v1-only";
-      const basePath = v1Only
-        ? `${V1_PREFIX}/${declaration.namespace}`
-        : `/api/${declaration.namespace}`;
+      const dated = declaration.addressing === "dated";
+      const basePath = basePathOf(declaration);
       const app = new Hono();
-      const aliasPath = canonicalV1Path(basePath);
+      const aliasPath = declaration.v1Twin ? canonicalV1Path(basePath) : null;
       const scopes = aliasPath ? [`${basePath}/*`, `${aliasPath}/*`] : [`${basePath}/*`];
       const facts = factBindings({ declaration, options });
       const credential = mountCredential({ declaration, options });
+
+      assertPortsBound({ declaration, ports });
 
       for (const middleware of [
         tracerMiddleware({ name: declaration.namespace }),
@@ -1289,6 +1519,7 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
             basePath,
             method: route.method,
             path: mount.path,
+            v1Twin: declaration.v1Twin,
             stack: routeStack({
               route,
               declaration,
@@ -1298,18 +1529,64 @@ export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
               ...mount.context,
             }),
             policy: registryPolicy({ route, options, credential }),
-            credentialClass: route.access ? "none" : CREDENTIAL_CLASS[credential],
+            credentialClass:
+              route.access?.kind === "public" ? "none" : CREDENTIAL_CLASS[credential],
             family: declaration.namespace,
           });
         }
       }
 
-      if (!v1Only) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
+      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
       app.onError(options.onError);
 
       return app;
     },
   };
+}
+
+/** Where the family's routes hang, by the way it addresses itself. */
+function basePathOf(declaration: RestTransportDeclaration<unknown>): string {
+  switch (declaration.addressing) {
+    case "v1-only":
+      return `${V1_PREFIX}/${declaration.namespace}`;
+    case "v1-in-path":
+      return `/api/${declaration.namespace}/v1`;
+    case "dated":
+      return `/api/${declaration.namespace}`;
+  }
+}
+
+/**
+ * Every optional port the declaration's routes ask for, checked once at mount.
+ * A route whose check the process cannot run is refused here, by name, rather
+ * than at the first request that reaches it.
+ */
+function assertPortsBound<Api>({
+  declaration,
+  ports,
+}: {
+  declaration: RestTransportDeclaration<Api>;
+  ports: RestRuntimePorts;
+}): void {
+  const base = basePathOf(declaration);
+
+  for (const route of declaration.routes) {
+    const address = `${route.method.toUpperCase()} ${base}${route.path}`;
+
+    if (route.permissionTarget && !ports.identity.authorize) {
+      throw new Error(
+        `REST ${address} checks "${route.permission}" at the scope its path names, and this ` +
+          "runtime supplied no identity.authorize",
+      );
+    }
+
+    if (route.access?.kind === "authenticated" && !ports.identity.identify) {
+      throw new Error(
+        `REST ${address} answers behind the family's door with no permission, and this runtime ` +
+          "supplied no identity.identify",
+      );
+    }
+  }
 }
 
 /**
@@ -1359,9 +1636,10 @@ function addressesOf({
   // which no caller sends and a sibling `/:id` answers instead.
   const suffix = route.path === "/" ? "" : route.path;
 
-  // A v1-only family's published generation IS its contract: one address, no
-  // dated namespace, no latest alias, and nothing for a date to fall back to.
-  if (declaration.addressing === "v1-only") {
+  // A family that names its generation in the path has that generation as its
+  // whole contract: one address, no dated namespace, no latest alias, and
+  // nothing for a date to fall back to.
+  if (declaration.addressing !== "dated") {
     return [{ path: suffix || "/", context: { version, status: "stable" } }];
   }
 
@@ -1639,27 +1917,33 @@ function handlerMiddleware<Api>({
 
     // A public route resolves nothing: no credential is read, no scope is
     // established, and the handler is told so rather than handed a guess.
-    if (route.access) {
+    if (route.access?.kind === "public") {
       const result = await route.handler(
-        { app: options.app(), input, actor: null, scope: null, signal: context.req.raw.signal },
+        {
+          app: options.app(),
+          input,
+          actor: null,
+          scope: null,
+          target: null,
+          signal: context.req.raw.signal,
+        },
         ...(await resolveFacts({ route, facts, context })),
       );
 
       return respond({ context, route, result });
     }
 
-    const permission = permissionOf(route.permission);
+    const permission = route.access ? void 0 : permissionOf(route.permission);
 
-    const caller = await ports.identity.authenticate({
-      request: context.req.raw,
-      permission,
-    });
+    const caller = await (permission === void 0
+      ? requireIdentify(ports)({ request: context.req.raw })
+      : ports.identity.authenticate({ request: context.req.raw, permission }));
 
     const decision = await decide({
       declaration: {
         kind: "service-authorized",
-        reason: options.reason ?? HOST_ENFORCED,
-        permissions: [permission],
+        reason: route.access?.reason ?? options.reason ?? HOST_ENFORCED,
+        permissions: permission === void 0 ? [] : [permission],
       },
       caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
       input,
@@ -1669,12 +1953,15 @@ function handlerMiddleware<Api>({
       ...(ports.denials ? { denials: ports.denials } : {}),
     });
 
+    const target = await checkRouteScope({ route, caller, ports, input });
+
     const result = await route.handler(
       {
         app: options.app(),
         input,
-        actor: decision.actor,
-        scope: doorScopeOf({ credential, scope: caller.scope }),
+        actor: doorActorOf({ credential, actor: decision.actor }),
+        scope: doorScopeOf({ credential, caller }),
+        target,
         signal: context.req.raw.signal,
       },
       ...(await resolveFacts({ route, facts, context })),
@@ -1684,6 +1971,60 @@ function handlerMiddleware<Api>({
 
     return respond({ context, route, result });
   };
+}
+
+/**
+ * The permission a route asks at the scope its own path named, and the target
+ * it was asked about. Null for every route checked at the credential's scope.
+ */
+async function checkRouteScope({
+  route,
+  caller,
+  ports,
+  input,
+}: {
+  route: RestTransportRoute<unknown>;
+  caller: RestCaller;
+  ports: RestRuntimePorts;
+  input: unknown;
+}): Promise<AuthzDeclaredScopeId | null> {
+  if (!route.permissionTarget) return null;
+
+  const permission = permissionOf(route.permission);
+  const target = routeScopeOf({ param: route.permissionTarget.param, input });
+
+  const decision = await requireAuthorize(ports)({ caller, permission, target });
+
+  assertRouteScopePermission({
+    permission,
+    target,
+    decision,
+    ...(ports.denials ? { denials: ports.denials } : {}),
+  });
+
+  return target;
+}
+
+/** @see assertPortsBound, which refuses these before a request arrives. */
+function requireIdentify(
+  ports: RestRuntimePorts,
+): NonNullable<RestRuntimePorts["identity"]["identify"]> {
+  const identify = ports.identity.identify;
+
+  if (!identify) throw new Error("REST runtime supplied no identity.identify");
+
+  return identify.bind(ports.identity);
+}
+
+/** @see assertPortsBound, which refuses these before a request arrives. */
+function requireAuthorize(
+  ports: RestRuntimePorts,
+): NonNullable<RestRuntimePorts["identity"]["authorize"]> {
+  const authorize = ports.identity.authorize;
+
+  if (!authorize) throw new Error("REST runtime supplied no identity.authorize");
+
+  return authorize.bind(ports.identity);
 }
 
 /**
@@ -1735,21 +2076,46 @@ function normalizedActor(actor: Actor | null): (Actor & { id: string }) | null {
  */
 function doorScopeOf({
   credential,
-  scope,
+  caller,
 }: {
   credential: RestDoorCredential;
-  scope: AuthzDeclaredScopeId;
+  caller: RestCaller;
 }) {
   const tier = DOOR_SCOPE_TIER[credential];
+  const scope = caller.scope;
 
-  if (scope.tier !== tier) {
+  // A deployment's own secret names no tenant, so the door has to prove it
+  // resolved none — and to name which secret let the request in.
+  if (tier === null) {
+    if (scope !== null || !caller.internal) {
+      throw new Error(
+        `REST transport authorization established a tenant scope for a "${credential}" door, ` +
+          "which names no tenant and must resolve a named deployment secret instead",
+      );
+    }
+
+    return null;
+  }
+
+  if (scope === null || scope.tier !== tier) {
     throw new Error(
-      `REST transport authorization established a "${scope.tier}" scope for a "${credential}" ` +
-        `door, which resolves a "${tier}" scope`,
+      `REST transport authorization established a "${scope?.tier ?? "null"}" scope for a ` +
+        `"${credential}" door, which resolves a "${tier}" scope`,
     );
   }
 
   return scope;
+}
+
+/** A door that names no tenant identifies no person either. */
+function doorActorOf({
+  credential,
+  actor,
+}: {
+  credential: RestDoorCredential;
+  actor: Actor | null;
+}): Actor | null {
+  return DOOR_SCOPE_TIER[credential] === null ? null : actor;
 }
 
 /**
@@ -1766,6 +2132,8 @@ function respond({
   route: RestTransportRoute<unknown>;
   result: unknown;
 }): Response {
+  if (route.answers) return respondDeclared({ context, route, answers: route.answers, result });
+
   const validation = route.output.safeParse(result);
 
   if (!validation.success) {
@@ -1787,6 +2155,57 @@ function respond({
   if (validation.data === undefined) return context.body(null, route.status ?? 204);
 
   return context.json(validation.data as never, route.status ?? 200);
+}
+
+/**
+ * One of the several answers a route declared. The status comes from the
+ * handler, but only the declared ones are servable — an undeclared status is a
+ * plain `Error`, because no caller can act on a route answering off-contract.
+ */
+function respondDeclared({
+  context,
+  route,
+  answers,
+  result,
+}: {
+  context: Context;
+  route: RestTransportRoute<unknown>;
+  answers: RestRouteAnswers;
+  result: unknown;
+}): Response {
+  const answer = result as { status?: unknown; body?: unknown };
+  const status = typeof answer?.status === "number" ? answer.status : undefined;
+  const schema = status === undefined ? undefined : answers[status];
+
+  if (!schema || status === undefined) {
+    throw new Error(
+      `REST ${route.operation} answered with the status ${String(status)}, which it did not ` +
+        `declare; responds() named ${Object.keys(answers).join(", ")}`,
+    );
+  }
+
+  const validation = schema.safeParse(answer.body);
+
+  // The declared status IS the answer, whatever its class, so the request
+  // record reads as one rather than as a server fault.
+  context.set(DECLARED_ANSWER, true);
+
+  if (!validation.success) {
+    outputLogger.error(
+      {
+        endpoint: context.get(ENDPOINT_ROUTE) ?? "<unregistered>",
+        method: context.req.method,
+        path: context.req.path,
+        status,
+        validation: validationMeta(validation.error, { privacy: "schema-only" }),
+      },
+      "REST handler response did not match the answer its declaration named",
+    );
+
+    return context.json(answer.body as never, status as ContentfulStatusCode);
+  }
+
+  return context.json(validation.data as never, status as ContentfulStatusCode);
 }
 
 /**
@@ -1816,7 +2235,7 @@ function mountVersionGuards<Api>({
   for (const guard of [namespace, `${namespace}/*`]) {
     const handlers: [MiddlewareHandler, ...MiddlewareHandler[]] = [fallback, notFound];
     const absolute = mergePath(basePath, guard);
-    const alias = canonicalV1Path(absolute);
+    const alias = declaration.v1Twin ? canonicalV1Path(absolute) : null;
 
     app.all(absolute, ...handlers);
     if (alias) app.all(alias, ...handlers);
@@ -1987,6 +2406,7 @@ function mountRoute({
   basePath,
   method,
   path,
+  v1Twin,
   stack,
   policy,
   credentialClass,
@@ -1996,13 +2416,14 @@ function mountRoute({
   basePath: string;
   method: HttpMethod;
   path: string;
+  v1Twin: boolean;
   stack: MiddlewareHandler[];
   policy: AccessPolicy;
   credentialClass: CredentialClass;
   family: string;
 }): void {
   const absolute = mergePath(basePath, path);
-  const alias = canonicalV1Path(absolute);
+  const alias = v1Twin ? canonicalV1Path(absolute) : null;
 
   register({ app, method, path: absolute, stack });
   if (alias) register({ app, method, path: alias, stack: undescribedStack(stack) });
@@ -2039,6 +2460,7 @@ function register({
 const HANDLER_CREDENTIAL = {
   projectKey: "apiKey",
   organizationKey: "apiKey",
+  scimToken: "apiKey",
   session: "session",
   internalSecret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;
@@ -2047,8 +2469,9 @@ const HANDLER_CREDENTIAL = {
 const CREDENTIAL_CLASS = {
   projectKey: "project_api_key",
   organizationKey: "organization_api_key",
+  scimToken: "scim_token",
   session: "session",
-  internalSecret: "internal",
+  internalSecret: "internal_secret",
   public: "none",
 } as const satisfies Record<Credential, CredentialClass>;
 
@@ -2068,14 +2491,16 @@ function registryPolicy<Api>({
 }): AccessPolicy {
   const reason = options.reason ?? HOST_ENFORCED;
 
-  if (route.access) return publicEndpoint(route.access.reason);
+  if (route.access?.kind === "public") return publicEndpoint(route.access.reason);
 
   if (credential === "public") return publicEndpoint(reason);
 
+  // A route the door alone gates enforces no RBAC permission, which is exactly
+  // what the empty list on a handler-managed policy states.
   return handlerManagedAuth({
-    reason,
+    reason: route.access?.reason ?? reason,
     credential: HANDLER_CREDENTIAL[credential],
-    permissions: [permissionOf(route.permission)],
+    permissions: route.access ? [] : [permissionOf(route.permission)],
   });
 }
 

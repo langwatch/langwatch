@@ -76,6 +76,22 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     When a call fails validation
     Then the error response still carries the deprecation headers
 
+  @integration
+  Scenario: An endpoint declares the several answers it may give
+    Given an endpoint declaring each status it answers with and the body that status carries
+    When it answers with one of them that is not a success
+    Then the caller receives that status, with the body the declaration named for it
+    And the published document lists every declared status beside the success
+    And the request is recorded as handled rather than as a server fault
+
+  @unit
+  Scenario: An endpoint that declares several answers may not also declare one
+    Given an endpoint declaring the statuses it answers with
+    When it also declares a single output, or a fixed success status
+    Then the declaration is refused
+    And a map with no success status, or with more than one, is refused too
+    And a handler answering a status the map never named fails rather than reaching the caller
+
   @unimplemented
   Scenario: A service-level default applies until re-declared or opted out
     Given withRateLimit on the service builder
