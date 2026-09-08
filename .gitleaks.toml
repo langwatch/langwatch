@@ -316,3 +316,23 @@ regexes = [
 description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway docs, not a credential"
 targetRules = ["curl-auth-header"]
 regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
+
+# `conversations30Days`, one entry in the governance tool card's row list
+# (`TOOL_CARD_ROWS`). The list names the rows a card prints — seats, licence per
+# month, tokens over thirty days, and so on — and every entry is a plain string
+# identifier the UI keys its labels off.
+#
+# gitleaks reads the pair as `tokens30Days": "conversations30Days"`: the
+# `generic-api-key` rule fires on a `...token...": "<high-entropy value>"`
+# shape, and two adjacent camel-case identifiers in a string array are exactly
+# that shape. Reordering the list to separate them would silence this by
+# accident and re-break the moment anyone sorted it.
+#
+# Nobody issued this value, it authenticates against nothing, and there is
+# nothing to revoke. Scoped by VALUE and ANCHORED, for the reason given above
+# the block before it: a substring allowlist would also permit a real token
+# that merely starts with it.
+[[allowlists]]
+description = "Governance tool-card row identifier `conversations30Days`, not a credential"
+targetRules = ["generic-api-key"]
+regexes = ['''^conversations30Days$''']
