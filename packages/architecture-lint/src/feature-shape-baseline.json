@@ -691,42 +691,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "monitor|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "monitor|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "navigation|nested-web-entry",
       "measured": "2026-09-08"
     },

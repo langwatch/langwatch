@@ -114,9 +114,9 @@ Where an ADR states one, the ADR is the authority and this list is the index.
 
 | Counter | Command | Value 2026-09-06 | Value 2026-09-08 23:30 | Target |
 | --- | --- | --- | --- | --- |
-| Feature-shape rows | `node -e` over `packages/architecture-lint/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **280 rows, 41 features, 30 on the legacy transport** (user's three closed rows, platform-health's and evaluation's four are still listed: baseline edits paused while lint L2 migrates the shape) | 0 |
+| Feature-shape rows | `node -e` over `packages/architecture-lint/src/feature-shape-baseline.json` (key `<feature>\|<kind>` after lint L2) | 392 rows, 47 features | **261 rows, 40 features, 29 on the legacy transport** (09-09 00:4x, after lint L2: evaluation, stored-object and monitor rows removed; agent's six and api-key's one read stale against uncommitted work that is not mine) | 0 |
 | Fully converted features | rows = 0 | 1 (annotation) | **14**: annotation, api-key (Kimi), dashboard, data-privacy, data-retention, entitlement, feature-flag, notification, platform-health, secret, share, sso, suite, topic | every feature |
-| Source-folder-shape rows | same file family | 431 (09-08 17:50) | **360** | 0 |
+| Source-folder-shape rows | same file family | 431 (09-08 17:50) | **357** | 0 |
 | Unbound scenarios | `pnpm --filter @langwatch/architecture-lint check:feature-parity`, read `THIS RUN FAILS: N unbound` | 1 | **140** (rose with the restored legacy specs and the lanes' new scenarios; every converted feature's own specs are `✓ all bound`) | 0 |
 | `apps/api` typecheck | `tsc --noEmit -p apps/api/tsconfig.test.json`, colour stripped | not clean | **1,432 errors, red by design** until every family converts | prints nothing |
 | `apps/worker` typecheck | same for the worker | not clean | **742** | prints nothing |
@@ -187,8 +187,8 @@ when its row reads 0.
 | dataset | RUNNING | | 9 | |
 | evaluation | 4 of 7 | `ccf912e810` | `contract-service`, `nested-transport` (REST half), `legacy-transport-runtime` | legacy REST family needs the shared-prefix addressing mode (round three); `EvaluationService` typed in six packages outside the lane, incl. `tryGetRunByEvaluationId`/`tryGetInputs` callers in trace; `listCustomEvaluators` wants a `WorkflowApi` operation; process wiring in wave 4 |
 | evaluator | RUNNING | | 9 | |
-| monitor | RUNNING | | 9 | |
-| stored-object | RUNNING | | 8 | |
+| monitor | DONE bar wiring | `b93fb67ed4` | 0 | process wiring in wave 4; tRPC AND-permission gap (round three C); evaluator peer once evaluator lands |
+| stored-object | 6 of 8 | `edee46b6e1` | `legacy-transport-runtime`, `nested-transport` | the `/api/files` byte family: raw responses, HEAD twin, in-handler owner resolution (round three A/B); `createUpload` needs a union output (A5); process wiring + tasks inventory port in wave 4 |
 | hosted-mcp | BLOCKED | | 3 | OPTIONS preflight, raw OAuth bodies |
 | webhook | BLOCKED | | 6 | `v1-in-path` addressing (round two), raw request bytes for signatures |
 | gateway | BLOCKED | | 9 | `v1-in-path`, raw bytes (elevenlabs webhook) |
@@ -227,20 +227,24 @@ Landed tonight:
 | Bound facts on `rest.mount` (`projectRestFacts`, `bindRestHeader`), `.withAddressing("v1-only")`, `withDeprecated` + `documentedResponses` + `RestDeprecationLogPort`, `publicRoute({ reason })` | `864a7151df` |
 | Organization door: `.withCredential("organizationKey")`, `DoorScope`, `doorScopeOf`, mount refuses the other door by name | `5080220f88` |
 
-Running: **round two** (`api-rest-runtime-gaps-2.md`): `anyAuthenticated`
-door (coding-agent, `POST /api/projects`), route-scoped permission
-(projects, teams), `v1-in-path` and `dated { v1Twin: false }` addressing
-(webhooks, gateway, projects), `internalSecret` door (platform-health),
-declared non-2xx statuses, `scimToken` door.
+| Round two: `anyAuthenticated({ reason })` door via `identity.identify`, `.withPermission(p, { at: "route", param })` via `identity.authorize`, `v1-in-path` and `dated { v1Twin: false }`, `internalSecret` door (scope `null`, by name never by value), `.responds({ 200, 503 })`, `scimToken` door | `0bbce5b9c0` |
 
-Still open after round two (round three, QUEUED): raw request bytes
-(github and elevenlabs webhooks), any-method pass-through (trace OTLP alias,
-experiment v3, BetterAuth), raw responses (image-proxy, rum), an optional
-credential (ops bug-report), the 405 method guard (automation), rate limit and
-response cache (2 users), `registerJsonProtocol` (1), `assertEveryRouteDeclared`
-wired; and for tRPC: an anonymous procedure kind, the browser session's row id
-on the Actor or as a fact, the caller's address as a fact (user's `user.*`
-family). `packages/api/README.md` still documents the deleted builders.
+`runtime.ts` is now 2,520 lines. Round two's cut for the split: `declaration.ts`
+(builder, declaration-time asserts, generic vocabulary; no Hono), `runtime.ts`
+(mount and execution), `addressing.ts` (every "which URL" question), the
+registry into `security.ts`, idempotency out of `request.ts`. That is ten files
+where the fold promised nine: **DECISION D-o.**
+
+Running: **round three, part A** (`api-rest-runtime-gaps-3.md`): raw request
+bytes, raw responses, HEAD twin and any-method routes, the 405 guard, a union
+output. Parts B (optional credential, instance-admin door, shared-prefix family
+for evaluation's legacy paths, `v2` in path, rate limit and cache,
+`registerJsonProtocol`, `assertEveryRouteDeclared`, in-handler owner
+resolution) and C (tRPC: anonymous procedure, session row id, caller address,
+AND-composed permission) follow one at a time. `anyAuthenticated` exists twice
+until coding-agent and project convert: the old no-argument `AccessPolicy` from
+`@langwatch/api` and the new door from `@langwatch/api/access`.
+`packages/api/README.md` still documents the deleted builders.
 `apps/api/src/features/discovery/openapi-document.json` and
 `docs/api-reference/openapiLangWatch.json` regenerate once `apps/api` compiles.
 
@@ -280,8 +284,8 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | --- | --- | --- |
 | fixes | `memory-twin-untested` kind; `*.server.ts` and `*.mount.ts` exempt from the fragment rule; type-only imports no longer make a reader; `.d.ts` package exports are not runtime entrypoints | DONE `a3a8f40a92`, `c1363cbb99`, `f6ea1c26f1` |
 | L1 report and CLI | summary first, 25 per policy, `--all`, `--review-comment-blocks`, exit 0/1/2 pinned, lint queue removed | DONE `111eb16bf2` |
-| L2 one baseline shape | `{ version, policy, entries[{ key, measured, expires? }] }`, stale rows everywhere, six empty baselines deleted; D2 kept per policy behind a flag | RUNNING (root session pauses its own baseline edits meanwhile) |
-| L3 workspace snapshot | one tree walk, module graph through the TS AST, under 10 s | QUEUED |
+| L2 one baseline shape | `{ version: 1, policy, entries[{ key, measured, expires?, count? }] }`, `readBaseline`/`formatBaseline`/`shrinkCheck` in `baseline.ts`, stale rows from one code path, six empty baselines and 277 lines of their plumbing deleted, 18 stale composed-exports rows removed; D2 kept per policy behind `enforceExpiry`; `README.md` lists the files | DONE `6a643f6527` |
+| L3 workspace snapshot | one tree walk, module graph through the TS AST, under 10 s | RUNNING |
 | L4 frontend grammar | governed = discovered, flat entries the only spelling, `frontend-ui-boundaries.ts` split four ways | QUEUED (D7) |
 | L5 registry and folders | `policies/index.ts` with `definePolicy`, package passes its own folder rule | QUEUED |
 | L6 parity out | own tool; `@inert` tag replaces `LEGACY_INERT` | QUEUED (D1) |
@@ -292,15 +296,14 @@ guarding things outside the package, 29 failing, 17 policies untested).
 
 | Lane | Brief | Started |
 | --- | --- | --- |
-| stored-object conversion | feature-convert skill | 22:4x |
-| monitor conversion | feature-convert skill | 23:0x |
-| dataset conversion | feature-convert skill | 23:1x |
-| evaluator conversion | feature-convert skill | 23:2x |
-| lint L2 | `architecture-lint-review-2026-09-08.md` §Lanes | 23:2x |
-| REST runtime round two | `api-rest-runtime-gaps-2.md` | 23:2x |
+| dataset conversion | feature-convert skill | 09-08 23:1x |
+| evaluator conversion | feature-convert skill | 09-08 23:2x |
+| REST runtime round three A | `api-rest-runtime-gaps-3.md` | 09-09 00:5x |
+| lint L3 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 00:5x |
+| wave-4 process wiring | `wave4-process-wiring.md` (dashboard, platform-health, role, suite, authz, user, evaluation, stored-object, monitor) | 09-09 00:5x |
 
-Live briefs kept as work orders: `wave4-process-wiring.md` (QUEUED),
-`api-rest-runtime-gaps-2.md` (RUNNING), `api-package-rebuild.md` (phase 3
+Live briefs kept as work orders: `wave4-process-wiring.md` (RUNNING),
+`api-rest-runtime-gaps-3.md` (part A RUNNING, B and C QUEUED), `api-package-rebuild.md` (phase 3
 deletion list, QUEUED for after the last family converts),
 `modules-rename.md` (DECISION then QUEUED), `agent-server-cleanup.md` (QUEUED
 with the agent conversion), `architecture-lint-review-2026-09-08.md` (L3 to
@@ -331,6 +334,7 @@ Ordered by what they unblock.
 - **D-l. Better Auth's user directory** is typed `UserService` and calls operations `UserApi` does not offer. `UserApi` grows them, or auth owns a port.
 - **D-m. Role behaviour changes to confirm.** Custom-role create/update/assign answered 503 on every deployment (no plan gate was ever composed) and now work under the Enterprise gate; `removeExclusiveApiKeyRoles` deleted as uncalled (Kimi's api-key retirement may want it).
 - **D-n. `AuditLogApi` widening, OSS audit log, ClickHouse persistence, the feature-catalogue split, org-door and agent-server brief pastes** (the five from 09-08 morning, still open).
+- **D-o. `packages/api/src/rest` at ten files, not nine.** Round two's cut splits `runtime.ts` (2,520 lines) into declaration, runtime and addressing and moves the registry into `security.ts` and idempotency out of `request.ts`. Either the nine-file promise moves to ten, or `request.ts` and `response.ts` merge to pay for it. Round three grows the file further until this is decided.
 - **Lint D1 to D7** (section 7's review): parity tool Go or TS; `expires` enforced or shrink-only; the 26 web-package cycles; comment-block ratchet beside the oxlint rule; the 17 untested policies; where the oxlint baseline check lives; refuse `screens/*` spellings now or after the drive.
 
 ## 10. Open items carried from 2026-09-06
@@ -652,3 +656,5 @@ holds nineteen per-feature cleanup reviews and a README whose working rules (the
 fold procedure, the six rewrite hazards, the divergence pattern) still apply;
 its status table now points here. Neither is empty and neither holds only
 retired documents, so both stay.
+
+Retired 2026-09-09: `api-rest-runtime-gaps-2.md` (round two of the REST runtime; landed `0bbce5b9c0`, every item and its consumer lines are in section 5 and `api-rest-runtime-gaps-3.md`).

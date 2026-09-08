@@ -239,3 +239,42 @@ tables (tasks catalogue) and is not a user repository.
   for `/api/files`.
 - `StoredObjectApi.readById`, `resolveOwner` and `StoredObjectFileReadPort.tryGetById` keep their HEAD names until the user
   feature's process adapters (`apps/api/src/features/user/user-avatar-{objects,storage}.adapter.ts`) are in a lane.
+
+## monitor (door landed `b93fb67ed4`; nothing left in the feature)
+
+- `apps/api/src/app/api-production.composition.ts:170-174`: import `installApiMonitor` only (drop `composeMonitorFeature`,
+  `composeMonitorService`, `LoggedApiMonitorAbsence`, `refusingMonitorFeature`); `:240` delete the `PostgresMonitorAdapter`
+  import; `:242` `MonitorService` → `MonitorApi`; `:703`/`:794` collapse `composedExecutionMonitors` and `composedMonitors`
+  into one `composedMonitors: MonitorApi | undefined`; `:3318-3334` `composeMonitor` becomes
+  `async … Promise<ComposedMonitorFeature>` calling `await installApiMonitor({ infrastructure, peers: { permissions,
+  evaluators, workflowReplication }, resolveClickHouseClient })` and setting `this.composedMonitors = composed.app`;
+  `:1262` awaits it; `:4071-4083` `resolveMonitors` (which built a Postgres adapter on demand) is deleted and `:3768`,
+  `:3832`, `:4040` read `this.composedMonitor.app`; `:4354-4355` `composeMonitorService(...)` → `this.composedMonitor.app`,
+  which means monitor composes BEFORE the execution half (today's order is the reverse; evaluators and workflow
+  replication both exist earlier). `:1405`, `:2281`, `:1477` stand.
+- `apps/api/src/app-trpc/app-trpc.context.ts:38,166`: `MonitorApp` (server) → `MonitorApi` (contract).
+- `apps/api/src/app-trpc/app-trpc.features.ts:129`: `composed.monitor.router(mount)` → `composed.monitor.routers(mount).monitors`.
+- `apps/api/src/app-rest/app-rest.packaged-families.ts:46-47,148,226-230,528-537`: `createMonitorRestApp` → `mountMonitorRest({
+  monitors, credential, platformUrl, errors })` from `apps/api/src/features/monitor/monitor-rest.mount.ts`; the
+  `monitorMappingsSchema` port goes (the declaration carries the contract's own schema); `MonitorApp` → `MonitorApi`.
+- `apps/api/src/index.ts:250`: delete `export { createMonitorRestApp }`; nothing outside apps/api imports it.
+- `apps/worker/src/app/worker-evaluation-execution.composition.ts:23,70-77`: `PostgresMonitorAdapter.create` → boot
+  `monitorServer` over `withPersistence("postgres", { prisma })` with `AuthzApi` provided and refusing trend/replication
+  ports (`UncomposedMonitorPerformance` is the pattern; the worker reads `getById`, `getAllByIds`,
+  `getEnabledOnMessageMonitors` only). `worker-trace-capability-services.composition.ts:8-11,93,108,115`:
+  `PostgresMonitorCatalogAdapter`, `MonitorCatalogDatabase`, `MonitorCatalogService` no longer exist; the worker's one
+  `MonitorApi` fills `monitors`. Both files are in the 09-07 pile (the first is untracked on disk).
+- Type swaps `MonitorService` → `MonitorApi` (`@langwatch/monitor-contract`), verbatim: `packages/features/gateway/server/src/adapters/prisma.gateway.adapter.ts:2,38`,
+  `services/gateway-guardrail.service.ts:16,26,42`, `services/gateway-guardrail-evaluation.service.ts:8,71,77`,
+  `__tests__/gateway.service.unit.test.ts:13,207,272,308` and `__tests__/gateway-guardrail-evaluation.integration.test.ts:13,43`
+  (the `class … extends MonitorService` doubles become object literals: `MonitorApi` is an interface).
+  `packages/features/automation/server/src/app/__tests__/automation-app.fixture.ts:138` stubs `tryGetById`; it is `findById`.
+- `packages/handled-error/src/remediation.ts`: entries for `monitor_check_settings_invalid`, `monitor_check_type_unknown`,
+  `monitor_evaluator_required`, `monitor_not_found`, `monitor_source_project_forbidden` (codes and presentation landed).
+- Published documents regenerate once apps/api compiles: monitor operation ids become `listMonitors`, `getMonitor`,
+  `createMonitor`, `updateMonitor`, `toggleMonitor`, `deleteMonitor` (+ `_2026_08_07`/`_latest` twins) and the collection's
+  `latest`/dated addresses lose their trailing slash.
+- Runtime gap carried: the tRPC runtime has no AND-composed permission; `monitors.getPerformanceForProject` is
+  `serviceAuthorized` with the app checking `evaluations:view` and `analytics:view` both (round three C).
+- Peer gap closing: once evaluator lands `EvaluatorApi.getById`, `MonitorEvaluatorPort` and `ProcessMonitorEvaluators` delete
+  and `MonitorApp.dependencies` gains `evaluators: EvaluatorApi`.

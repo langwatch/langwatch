@@ -1107,14 +1107,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/monitor/contract/src/monitor.commands.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/features/monitor/contract/src/monitor.errors.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "fragment-file|packages/features/notification/contract/src/notification.api.ts",
       "measured": "2026-09-08"
     },
