@@ -112,6 +112,7 @@ class RecordedRequest:
     trace_id: Optional[str] = None
     provider: Optional[str] = None
     error: Optional[str] = None
+    body: Optional[str] = None
 
     def is_audio(self) -> bool:
         return self.path.endswith(SPEECH_ROUTE) or self.path.endswith(
@@ -151,6 +152,14 @@ class RequestRecorder:
             record.gateway_version = response.headers.get("X-LangWatch-Gateway-Version")
             record.trace_id = response.headers.get("X-LangWatch-Trace-Id")
             record.provider = response.headers.get("X-LangWatch-Provider")
+            if response.status_code >= 300:
+                try:
+                    body_bytes = await response.aread()
+                    body_text = body_bytes.decode("utf-8", errors="replace")
+                    body_collapsed = " ".join(body_text.split())
+                    record.body = body_collapsed[:300]
+                except Exception:
+                    pass
             return response
 
         httpx.AsyncClient.send = send  # type: ignore[assignment,method-assign]
@@ -166,11 +175,14 @@ class RequestRecorder:
         lines: List[str] = []
         for r in self.requests:
             status = f"{r.status}" if r.status is not None else f"ERR:{r.error}"
-            lines.append(
+            line = (
                 f"{r.method} {r.host} {r.path} -> {status} "
                 f"gateway={r.gateway_version} trace={r.trace_id} "
                 f"provider={r.provider} bytes={r.content_length}"
             )
+            if r.body is not None:
+                line += f" body={r.body!r}"
+            lines.append(line)
         return "\n".join(lines) if lines else "(no requests recorded)"
 
 
@@ -310,7 +322,7 @@ async def test_scenario_voice_runs_through_the_gateway(
     assert not bad_speech, (
         f"POST {bad_speech[0].path} returned "
         f"{[r.status or r.error for r in bad_speech]} from {gateway_host} "
-        "(expected 200)"
+        f"(expected 200) first error body: {bad_speech[0].body!r}"
     )
 
     # (b) STT route reached the gateway and returned 200.
@@ -322,7 +334,7 @@ async def test_scenario_voice_runs_through_the_gateway(
     assert not bad_stt, (
         f"POST {bad_stt[0].path} returned "
         f"{[r.status or r.error for r in bad_stt]} from {gateway_host} "
-        "(expected 200)"
+        f"(expected 200) first error body: {bad_stt[0].body!r}"
     )
 
     # (c) every audio call went to the gateway host and none to the provider.
