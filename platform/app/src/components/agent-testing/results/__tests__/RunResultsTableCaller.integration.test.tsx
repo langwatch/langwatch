@@ -79,7 +79,7 @@ describe("RunResultsTable Caller column", () => {
     });
   });
 
-  describe("when no run has a caller", () => {
+  describe("given no run has a caller", () => {
     it("hides the Caller column", () => {
       renderTable([run({ scenarioRunId: "text", callerKind: undefined })]);
       const header = screen.getByTestId("run-results-table-header");

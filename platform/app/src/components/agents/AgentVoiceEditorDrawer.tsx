@@ -478,7 +478,7 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
   // The card menu's Talk to it action opens the drawer straight onto the call
   // panel via ?drawer.talk=1, rather than making the user click Talk to it
   // again once the editor has loaded (#23).
-  const [talkOpen, setTalkOpen] = useState(drawerParams.talk === "1");
+  const [isTalkOpen, setIsTalkOpen] = useState(drawerParams.talk === "1");
   const [createdAgentRowId, setCreatedAgentRowId] = useState<string>();
 
   const { agentQuery, hasElevenLabsKey } = useVoiceAgentData({
@@ -531,8 +531,8 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
     isValid,
     hasAttemptedSubmit,
     isLoading: agentQuery.isLoading,
-    talkOpen,
-    setTalkOpen,
+    isTalkOpen,
+    setIsTalkOpen,
     createdAgentRowId,
     setCreatedAgentRowId,
     handleSave,
@@ -614,7 +614,7 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
           overflow="hidden"
           padding={0}
         >
-          {editor.talkOpen ? (
+          {editor.isTalkOpen ? (
             <VoiceAgentTalkView
               project={editor.project}
               projectId={editor.projectId}
@@ -625,7 +625,7 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
               createdAgentRowId={editor.createdAgentRowId}
               setCreatedAgentRowId={editor.setCreatedAgentRowId}
               utils={editor.utils}
-              onBack={() => editor.setTalkOpen(false)}
+              onBack={() => editor.setIsTalkOpen(false)}
             />
           ) : editor.agentId && editor.isLoading ? (
             <HStack justify="center" paddingY={8}>
@@ -651,7 +651,7 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
           hasElevenLabsKey={editor.hasElevenLabsKey}
           isSaving={editor.isSaving}
           onCancel={editor.handleClose}
-          onTalk={() => editor.setTalkOpen(true)}
+          onTalk={() => editor.setIsTalkOpen(true)}
           onSave={editor.handleSave}
         />
       </Drawer.Content>

@@ -85,10 +85,13 @@ function sign(body: string, secret: string): string {
  * Encode and sign a payload as `<base64url(json)>.<base64url(hmac)>`. The
  * secret defaults to the app secret; tests pass their own.
  */
-export function signVoiceSessionToken(
-  payload: VoiceSessionTokenPayload,
-  secret: string = signingSecret(),
-): string {
+export function signVoiceSessionToken({
+  payload,
+  secret = signingSecret(),
+}: {
+  payload: VoiceSessionTokenPayload;
+  secret?: string;
+}): string {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
     "base64url",
   );
@@ -100,11 +103,15 @@ export function signVoiceSessionToken(
  * a malformed token, a bad signature, an unparsable or wrong-shaped payload, or
  * an expired one. Signature comparison is constant-time.
  */
-export function verifyVoiceSessionToken(
-  token: string,
-  now: number,
-  secret: string = signingSecret(),
-): VoiceSessionTokenPayload | null {
+export function verifyVoiceSessionToken({
+  token,
+  now,
+  secret = signingSecret(),
+}: {
+  token: string;
+  now: number;
+  secret?: string;
+}): VoiceSessionTokenPayload | null {
   const dot = token.indexOf(".");
   if (dot <= 0 || dot === token.length - 1) return null;
   const body = token.slice(0, dot);

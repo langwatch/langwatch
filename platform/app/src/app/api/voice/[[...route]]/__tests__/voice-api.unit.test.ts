@@ -280,12 +280,14 @@ describe("Feature: Voice session HTTP door", () => {
       /** @scenario "A session minted for one project cannot finish a call in another project" */
       it("refuses with the session-invalid code and writes nothing", async () => {
         const token = signVoiceSessionToken({
-          sessionId: "sess_1",
-          projectId: PROJECT_ID,
-          agentId: "agent_row",
-          agentExternalId: "el_agent_mine",
-          transport: "elevenlabs_convai",
-          exp: Date.now() + 60_000,
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent_mine",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
         });
 
         const res = await post("/api/voice/session/conv_1/finish", {
@@ -308,12 +310,14 @@ describe("Feature: Voice session HTTP door", () => {
       /** @scenario "A finish whose conversation ran against another agent is refused" */
       it("refuses with the conversation-mismatch code and writes nothing", async () => {
         const token = signVoiceSessionToken({
-          sessionId: "sess_1",
-          projectId: PROJECT_ID,
-          agentId: "agent_row",
-          agentExternalId: "el_agent_mine",
-          transport: "elevenlabs_convai",
-          exp: Date.now() + 60_000,
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent_mine",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
         });
         fetchCallRecord.mockResolvedValue({
           conversationId: "conv_1",
@@ -469,12 +473,14 @@ describe("Feature: Voice session HTTP door", () => {
       /** @scenario "A finish request is refused with a 404 while the voice flag is off" */
       it("refuses the finish with the disabled code, as a 404", async () => {
         const token = signVoiceSessionToken({
-          sessionId: "sess_1",
-          projectId: PROJECT_ID,
-          agentId: "agent_row",
-          agentExternalId: "el_agent_mine",
-          transport: "elevenlabs_convai",
-          exp: Date.now() + 60_000,
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent_mine",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
         });
         const res = await post("/api/voice/session/conv_1/finish", {
           projectId: PROJECT_ID,

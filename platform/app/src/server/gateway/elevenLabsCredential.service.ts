@@ -81,9 +81,11 @@ export async function getElevenLabsWebhookSecret({
  * used, and the lookup uses the same scope chain (org, team, project) every
  * other provider read does.
  */
-export async function findElevenLabsProviderForProject(
-  projectId: string,
-): Promise<{ id: string } | null> {
+export async function findElevenLabsProviderForProject({
+  projectId,
+}: {
+  projectId: string;
+}): Promise<{ id: string } | null> {
   const repository = new ModelProviderRepository(prisma);
   const rows = await repository.findAllAccessibleForProject(projectId);
   const row = rows.find((r) => r.provider === "elevenlabs" && r.enabled);

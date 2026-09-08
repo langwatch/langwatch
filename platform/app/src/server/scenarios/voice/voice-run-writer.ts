@@ -101,7 +101,7 @@ export async function writeVoiceCallRun({
       targetType: "voice" as const,
       targetReferenceId: agentRowId,
       callerKind: HUMAN_CALLER_KIND,
-      cutAtLimit: record.isCutAtLimit,
+      isCutAtLimit: record.isCutAtLimit,
     },
     callerKind: HUMAN_CALLER_KIND,
     source: record.source,

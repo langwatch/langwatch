@@ -33,7 +33,9 @@ describe("findElevenLabsProviderForProject", () => {
         { id: "prov_el", provider: "elevenlabs", enabled: true },
       ]);
 
-      const result = await findElevenLabsProviderForProject("proj_1");
+      const result = await findElevenLabsProviderForProject({
+        projectId: "proj_1",
+      });
 
       expect(result).toEqual({ id: "prov_el" });
     });
@@ -47,7 +49,9 @@ describe("findElevenLabsProviderForProject", () => {
         { id: "prov_openai", provider: "openai", enabled: true },
       ]);
 
-      const result = await findElevenLabsProviderForProject("proj_1");
+      const result = await findElevenLabsProviderForProject({
+        projectId: "proj_1",
+      });
 
       expect(result).toBeNull();
     });

@@ -69,7 +69,7 @@ export function createVoiceSessionPortsFromServices({
       transport,
     }): Promise<VoiceTransportCredential | null> {
       if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
-      const provider = await findElevenLabsProviderForProject(projectId);
+      const provider = await findElevenLabsProviderForProject({ projectId });
       if (!provider) return null;
       return getElevenLabsApiCredential({ modelProviderId: provider.id });
     },
@@ -130,7 +130,7 @@ export function createVoiceSessionPortsFromServices({
       `/api/voice/session/${encodeURIComponent(
         conversationId,
       )}/audio?projectId=${encodeURIComponent(projectId)}`,
-    signSessionToken: signVoiceSessionToken,
+    signSessionToken: (payload) => signVoiceSessionToken({ payload }),
     now: () => Date.now(),
     newSessionId: () => nanoid(),
   };

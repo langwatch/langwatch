@@ -56,7 +56,7 @@ describe("writeVoiceCallRun", () => {
     });
 
     describe("when the call was cut at the limit", () => {
-      it("nests cutAtLimit under metadata.langwatch", async () => {
+      it("nests isCutAtLimit under metadata.langwatch", async () => {
         await writeVoiceCallRun({
           projectId: "project_1",
           scenarioRunId: "run_1",
@@ -67,12 +67,12 @@ describe("writeVoiceCallRun", () => {
 
         const { metadata } = mockStartRun.mock.calls[0]?.[0] as {
           metadata: {
-            langwatch: { cutAtLimit?: boolean };
-            cutAtLimit?: unknown;
+            langwatch: { isCutAtLimit?: boolean };
+            isCutAtLimit?: unknown;
           };
         };
-        expect(metadata.langwatch.cutAtLimit).toBe(true);
-        expect(metadata.cutAtLimit).toBeUndefined();
+        expect(metadata.langwatch.isCutAtLimit).toBe(true);
+        expect(metadata.isCutAtLimit).toBeUndefined();
       });
     });
   });

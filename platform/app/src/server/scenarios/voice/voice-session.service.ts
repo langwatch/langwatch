@@ -244,25 +244,24 @@ export interface MintResult {
  * voice agent, {@link VoiceKeyMissingError} when the project has no key, or
  * {@link VoiceMintFailedError} when the provider refuses.
  */
-export async function mintVoiceSession(
-  ports: VoiceSessionPorts,
-  {
-    projectId,
-    transport,
-    agentId: bodyAgentId,
-    agentRowId,
-    maxDurationSeconds,
-  }: {
-    projectId: string;
-    transport: VoiceTransport;
-    /** The vendor agent id from the form. Used only when there is no saved
-     *  row yet — a saved row's own vendor id always wins. */
-    agentId: string;
-    /** The saved agent row id, when the drawer already has one. */
-    agentRowId?: string;
-    maxDurationSeconds: number;
-  },
-): Promise<MintResult> {
+export async function mintVoiceSession({
+  ports,
+  projectId,
+  transport,
+  agentId: bodyAgentId,
+  agentRowId,
+  maxDurationSeconds,
+}: {
+  ports: VoiceSessionPorts;
+  projectId: string;
+  transport: VoiceTransport;
+  /** The vendor agent id from the form. Used only when there is no saved
+   *  row yet — a saved row's own vendor id always wins. */
+  agentId: string;
+  /** The saved agent row id, when the drawer already has one. */
+  agentRowId?: string;
+  maxDurationSeconds: number;
+}): Promise<MintResult> {
   const row = agentRowId
     ? await ports.resolveVoiceAgentRow({ projectId, agentRowId })
     : null;
@@ -408,25 +407,23 @@ async function resolveScenarioContext(
  * to the live transcript when the provider record is not ready or the fetch
  * fails, marking the latter so the panel can say so (AC15).
  */
-export async function finishVoiceSession(
-  ports: VoiceSessionPorts,
-  input: {
-    /** The verified session token: the project, transport, agent row and
-     *  vendor agent id are read from here, never from the request body. */
-    token: VoiceSessionTokenPayload;
-    projectId: string;
-    name?: string;
-    transcript: BrowserTranscriptTurn[];
-    startedAt: number;
-    endedAt: number;
-    isCutAtLimit: boolean;
-    conversationId?: string;
-    /** Set for a "Call it myself" run: the scenario the call is scored under
-     *  (AC23). Absent for a drawer call. */
-    scenarioId?: string;
-  },
-): Promise<FinishResult> {
-  const { token } = input;
+export async function finishVoiceSession(input: {
+  ports: VoiceSessionPorts;
+  /** The verified session token: the project, transport, agent row and
+   *  vendor agent id are read from here, never from the request body. */
+  token: VoiceSessionTokenPayload;
+  projectId: string;
+  name?: string;
+  transcript: BrowserTranscriptTurn[];
+  startedAt: number;
+  endedAt: number;
+  isCutAtLimit: boolean;
+  conversationId?: string;
+  /** Set for a "Call it myself" run: the scenario the call is scored under
+   *  (AC23). Absent for a drawer call. */
+  scenarioId?: string;
+}): Promise<FinishResult> {
+  const { ports, token } = input;
   const transport = token.transport;
   const conversationId = input.conversationId?.trim() || token.sessionId;
   const scenarioRunId = scenarioRunIdForConversation(conversationId);

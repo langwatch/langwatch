@@ -36,7 +36,8 @@ export function CallerVoiceModelSelect({
     );
 
   const { options, displayNames } = useMemo(
-    () => callerVoiceOptions(projectProviders.data?.providers ?? []),
+    () =>
+      callerVoiceOptions({ providers: projectProviders.data?.providers ?? [] }),
     [projectProviders.data],
   );
 

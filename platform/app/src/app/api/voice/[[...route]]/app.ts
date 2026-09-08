@@ -105,7 +105,8 @@ secured
       const { projectId, transport, agentId, agentRowId } = c.req.valid("json");
       await requireProject(c.req.raw, projectId, "scenarios:create");
 
-      const result = await mintVoiceSession(ports, {
+      const result = await mintVoiceSession({
+        ports,
         projectId,
         transport,
         agentId,
@@ -158,12 +159,16 @@ secured
 
       // The token must verify, and its project must be the authorised one, or
       // the finish is refused before anything is read or written.
-      const token = verifyVoiceSessionToken(body.sessionToken, Date.now());
+      const token = verifyVoiceSessionToken({
+        token: body.sessionToken,
+        now: Date.now(),
+      });
       if (!token || token.projectId !== body.projectId) {
         throw new VoiceSessionInvalidError();
       }
 
-      const result = await finishVoiceSession(ports, {
+      const result = await finishVoiceSession({
+        ports,
         token,
         projectId: body.projectId,
         name: body.name,
