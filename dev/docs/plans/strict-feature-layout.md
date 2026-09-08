@@ -184,10 +184,10 @@ when its row reads 0.
 | topic | DONE | `a8508cf3c7` | 0 | |
 | authz | 3 of 8 | `7540100bd5` | `contract-service`, `persistence-adapter`, `postgres-without-memory`, `unregistered-repositories`, `nested-web-entry` (scope-picker) | `AuthzService` rename across ~150 files + `PostgresAuthzAdapter` in three processes: QUEUED for a quiet tree; vocabulary package cycle: DECISION D-k |
 | user | 3 of 8 | `1c795cfe76` | `contract-service`, `persistence-adapter`, `nested-transport`, `legacy-transport-runtime`, `refusing-composition` | tRPC runtime: anonymous procedure, session row id, caller address (runtime round three); Better Auth directory typed `UserService`: DECISION D-l |
-| dataset | DONE bar wiring | `bce3912c7e` | 0 | nine routes undeclared: multipart, session door, raw bytes, 201-or-200, streamed generator (round three A/B); `dataset-table` surface key + experiment imports in wave 4; `handled-error-surfaces.feature` has four dead scenarios |
+| dataset | DONE bar wiring | `bce3912c7e` | 0 | api wiring landed `9697edd1f5`; nine routes undeclared: multipart, session door, raw bytes, 201-or-200, streamed generator (round three A/B); `dataset-table` surface key + experiment imports in wave 4; `handled-error-surfaces.feature` has four dead scenarios |
 | evaluation | 4 of 7 | `ccf912e810` | `contract-service`, `nested-transport` (REST half), `legacy-transport-runtime` | legacy REST family needs the shared-prefix addressing mode (round three); `EvaluationService` typed in six packages outside the lane, incl. `tryGetRunByEvaluationId`/`tryGetInputs` callers in trace; `listCustomEvaluators` wants a `WorkflowApi` operation; process wiring in wave 4 |
 | evaluator | 6 of 9 | `80ac67f8a4` | `contract-service`, `no-installer`, `persistence-adapter` | ~15 packages type against `EvaluatorService`; `WorkflowApp` peer to narrow to five operations; process wiring in wave 4 |
-| monitor | DONE bar wiring | `b93fb67ed4` | 0 | process wiring in wave 4; tRPC AND-permission gap (round three C); evaluator peer once evaluator lands |
+| monitor | DONE bar install | `b93fb67ed4` + `9697edd1f5` | 0 | api install blocked on the replication peer (wave 5); tRPC AND-permission gap (round three C); evaluator peer once evaluator lands |
 | stored-object | 6 of 8 | `edee46b6e1` | `legacy-transport-runtime`, `nested-transport` | the `/api/files` byte family: raw responses, HEAD twin, in-handler owner resolution (round three A/B); `createUpload` needs a union output (A5); process wiring + tasks inventory port in wave 4 |
 | hosted-mcp | BLOCKED | | 3 | OPTIONS preflight, raw OAuth bodies |
 | webhook | BLOCKED | | 6 | `v1-in-path` addressing (round two), raw request bytes for signatures |
@@ -260,7 +260,8 @@ lanes' hunks.
 | 1 | entitlement, presence, share | DONE `f445a8a470` (one broadcast fabric composed first, no proxy) |
 | 2 | secret, feature-flag, data-retention | DONE `94513f717e` (deferred `LocalFeatureApis` references break the flag → eventing → authz → tenancy ring; secret slice moves onto the feature record; nobody-key write refusal restored as `authenticated_actor_required`) |
 | 3 | topic, data-privacy, sso, metric | DONE `882ebfa479` (enterprise-api resolves from source; stale `dist/` deleted) |
-| 4 | dashboard, platform-health, role (incl. REST mount + `ApiOrganizationDoorPort`), suite, authz, user | QUEUED, brief `wave4-process-wiring.md`; run when the wave-2 style HEAD-variant technique still fits |
+| 4 | dashboard, platform-health, role (incl. REST mount), suite, authz, user, evaluation, stored-object (api + tasks), monitor (types, remediation) | DONE `9697edd1f5`, 40 files, 17 HEAD-variant blobs |
+| 5 | monitor's production install (replication peer stranded on the evaluator graph), twelve untracked worker compositions (D-b), scenario composition (needs the uncommitted ScenarioApi/PromptApi rework), evaluation-read composing the installed feature, dataset content backfill task, OpenAPI regeneration | QUEUED, `wave4-process-wiring.md` §Wave 5 |
 
 **BLOCKED by the 09-07 pile.** Six wiring files could not be committed
 because their changed blocks exist only in about 1,400 uncommitted paths left
@@ -298,9 +299,8 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | --- | --- | --- |
 | REST runtime round three B | `api-rest-runtime-gaps-3.md` | 09-09 01:3x |
 | lint L5 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 02:0x |
-| wave-4 process wiring | `wave4-process-wiring.md` (dashboard, platform-health, role, suite, authz, user, evaluation, stored-object, monitor) | 09-09 00:5x |
 
-Live briefs kept as work orders: `wave4-process-wiring.md` (RUNNING),
+Live briefs kept as work orders: `wave4-process-wiring.md` (landed `9697edd1f5`; its Wave 5 section is the open work order),
 `api-rest-runtime-gaps-3.md` (part A RUNNING, B and C QUEUED), `api-package-rebuild.md` (phase 3
 deletion list, QUEUED for after the last family converts),
 `modules-rename.md` (DECISION then QUEUED), `agent-server-cleanup.md` (QUEUED

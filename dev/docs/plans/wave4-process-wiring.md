@@ -1,5 +1,37 @@
 # Wave-4 process wiring: dashboard, then platform-health, role, suite REST, authz, user and evaluation
 
+**Landed `9697edd1f5` (2026-09-09).** Every section below is done except the items in "Wave 5" here; the section text stays as the record
+of the lines that changed.
+
+## Wave 5: what wave 4 could not land
+
+- **Monitor's production install.** `installApiMonitor` wants `workflowReplication: MonitorWorkflowReplication`
+  (`replicateEvaluatorWorkflow`, `deleteReplicatedWorkflow`), which lived on `ComposedEvaluatorFeature.ports`; the evaluator
+  conversion dropped `ports` and the two methods sit on the private `ProcessEvaluatorGraph`. Either the evaluator composition
+  publishes them (`apps/api/src/features/evaluator/evaluator.composition.ts`) or the monitor door takes a different peer.
+  Until then `api-production.composition.ts:167-170,236-238` stay red on the five deleted monitor names.
+- **The worker.** Twelve `apps/worker/src/app/worker-*.composition.ts` are untracked (someone else's working copy):
+  `worker-evaluation-execution`, `worker-evaluation-server`, `worker-evaluation-app`, `worker-user-app` and eight more. The
+  evaluator, evaluation, dataset and monitor worker lines in this brief land only when those files have an owner (D-b).
+  `worker-trace-capability-services.composition.ts` is clean but its monitor swap needs the worker's one `MonitorApi`.
+- **`apps/api/src/features/scenario/scenario.composition.ts`** (manual pick; exact lines in the wave-4 report, task ab901e24932f7b62f):
+  the suite install needs `peers.scenarios: ScenarioApi` and `peers.prompts: PromptApi`, which exist only in the uncommitted
+  `LocalFeatureApis`/`ScenarioApi`/`PromptApp` rework. Apply on top of that working copy when it lands.
+- **`apps/api/src/app/api-evaluation-read.composition.ts:52`** supplies ten operations against an `EvaluationApi` of fourteen;
+  the "verbatim" `EvaluationService` → `EvaluationApi` sweep (trace, automation, evaluation-read, worker-report-schedule)
+  is not verbatim. Compose the installed evaluation feature there instead of a hand-built partial.
+- **`apps/tasks/src/platform/dataset-content-backfill.composition.ts:6`** imports `PostgresDatasetMigrationAdapter`, gone; the
+  tasks process implements the surviving port itself, as `object-storage-migrate` now does.
+- **Analytics** (`analytics.composition.ts:89,110,112,116,203,259`): `AnalyticsApp` → `AnalyticsApi` is mid-rename in someone's
+  working copy with a different dependency shape. Not wave work until it lands.
+- **`langwatch-ql-rest.mount.ts`**: the two saved-chart surfaces disagree only on `unplaceSavedWorkbenchChart`'s return; the
+  explicit adapter is a workaround, align the contract at the source.
+- **OpenAPI regeneration** (`apps/api/src/features/discovery/openapi-document.json`, `docs/api-reference/openapiLangWatch.json`)
+  once `apps/api` compiles.
+- Correction: `apps/tasks/src/platform/object-storage-migrate.composition.ts` and `api-production.composition.ts` were clean at
+  HEAD, not in the 09-07 pile; the pile's wiring core is the twelve untracked worker files.
+
+
 **Date:** 2026-09-08 · **Owner lane:** one Opus agent after the wave-3 lane (`882ebfa479`) · **Reviewed by:** Fable
 
 Same rules as waves 1 to 3 (`strict-feature-layout.md` section 8: Read/Edit/Write only, no git writes, no baselines, HEAD-variant blobs for
