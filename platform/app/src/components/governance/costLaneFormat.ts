@@ -3,20 +3,143 @@ import type { GovernanceAzureBillingNote } from "@ee/governance/services/azureBi
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 
 /**
+ * Thousands separators, which a lane total needs and a per-request cost does
+ * not. Built once: constructing an `Intl` formatter is not free, and this runs
+ * per lane per render.
+ *
+ * Two of them, because the cents stop being information somewhere along the
+ * scale. On a four-figure bill the last two digits are below anything a reader
+ * acts on, and printing them costs three characters on the largest number on
+ * the screen. Under a thousand they still separate one figure from another.
+ */
+const GROUPED_USD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const GROUPED_USD_WHOLE = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+/** Above this, cents are noise; below it, they are the figure. */
+const CENTS_STOP_MATTERING_AT = 1000;
+
+/**
  * A cost lane's amount, or an em dash when no figure is held.
  *
- * Every digit decision is delegated to `formatBudgetUsd`; this only moves the
- * sign. That function's magnitude branches all test `>=`, so a negative falls
- * through to the six-decimal tail and renders as `$-12.5`. A refund-heavy
- * billed day is a real case on this screen, and `-$12.50` is the same number
- * read the way a bill reads it.
+ * The digits come from `formatBudgetUsd` below a dollar, where its whole
+ * reason for existing applies: gateway costs land in the $0.0001 range and
+ * rounding them to `$0.00` loses the difference between "nearly nothing" and
+ * "nothing". A LANE total is the other end of that scale — a provider's bill
+ * for a quarter — and that function has no thousands separators, so a real
+ * headline came out as `$227999.00`. Six unbroken digits is a number the
+ * reader has to count with a finger, on the largest figure on the screen.
+ *
+ * So the split is by magnitude, not by caller: three bands, each printing what
+ * carries information at that size. Sub-cent precision below a dollar, cents
+ * and grouping in the middle, grouped whole dollars once the cents are smaller
+ * than anything the figure is used to decide. All three stay in one function
+ * because the boundaries are the interesting part, and a caller choosing a
+ * formatter per amount is how they drift apart.
+ *
+ * Rounding to the dollar is a display choice, not a claim: the underlying
+ * figure is untouched, and every trust note that qualifies it — revised,
+ * provisional, unpriced — renders beside it unchanged.
+ *
+ * The sign is moved out front either way. `formatBudgetUsd`'s magnitude
+ * branches all test `>=`, so a negative falls through to the six-decimal tail
+ * and renders as `$-12.5`. A refund-heavy billed day is a real case here, and
+ * `-$12.50` is the same number read the way a bill reads it.
  *
  * Null stays null all the way to the string: `formatBudgetUsd` answers an em
  * dash, never `$0.00`. A zero here would be a claim that nothing was spent.
  */
 export function formatLaneUsd(amountUsd: number | null): string {
-  if (amountUsd === null || amountUsd >= 0) return formatBudgetUsd(amountUsd);
-  return `-${formatBudgetUsd(Math.abs(amountUsd))}`;
+  if (amountUsd === null) return formatBudgetUsd(amountUsd);
+  const magnitude = Math.abs(amountUsd);
+  const digits = laneDigits(magnitude);
+  return amountUsd < 0 ? `-${digits}` : digits;
+}
+
+function laneDigits(magnitude: number): string {
+  if (magnitude >= CENTS_STOP_MATTERING_AT)
+    return GROUPED_USD_WHOLE.format(magnitude);
+  if (magnitude >= 1) return GROUPED_USD.format(magnitude);
+  return formatBudgetUsd(magnitude);
+}
+
+/**
+ * Product names for the SKU part numbers we have seen, keyed exactly as the
+ * provider reports them.
+ *
+ * Deliberately short. A provider invents SKUs faster than anyone maintains a
+ * table of them, so this covers the ones in front of us today and the fallback
+ * below carries everything else — a mapping that has to be exhaustive to work
+ * is a mapping that stops working.
+ */
+const SEAT_POOL_NAMES: Readonly<Record<string, string>> = {
+  GITHUB_COPILOT_BUSINESS: "GitHub Copilot Business",
+  GITHUB_COPILOT_ENTERPRISE: "GitHub Copilot Enterprise",
+  COPILOT_STUDIO_PRO: "Copilot Studio Pro",
+  MICROSOFT_365_COPILOT: "Microsoft 365 Copilot",
+  VIRTUAL_AGENT_USL: "Virtual Agent USL",
+};
+
+/**
+ * Fragments that are initialisms, not words, and stay upper case through the
+ * fallback. Title-casing these produces "Usl" and "Api", which read as
+ * misspellings rather than as the acronyms they are.
+ */
+const SEAT_POOL_INITIALISMS = new Set([
+  "AI",
+  "API",
+  "CRM",
+  "ERP",
+  "GPT",
+  "IDE",
+  "ML",
+  "RPA",
+  "SDK",
+  "USL",
+  "VM",
+]);
+
+/**
+ * A seat pool's name, as a person would write it.
+ *
+ * Providers report SKUs in screaming snake case — `GITHUB_COPILOT_BUSINESS` —
+ * and the seat tile was printing them raw, which reads as a database key that
+ * escaped onto a page rather than as the product somebody is paying for.
+ *
+ * Known SKUs get their real product name, capitalised the way the vendor
+ * capitalises it ("GitHub", not "Github"), because that is the string a reader
+ * will match against their invoice. Everything else is de-underscored and
+ * title-cased so an unknown SKU still arrives as words, with initialisms left
+ * alone. An unrecognised pool is the normal case, not the exception.
+ */
+export function seatPoolName(skuPartNumber: string): string {
+  const known = SEAT_POOL_NAMES[skuPartNumber];
+  if (known !== undefined) return known;
+  const words = skuPartNumber
+    .split(/[_\s]+/)
+    .filter((part) => part !== "")
+    .map(titleCaseFragment);
+  // Nothing to show is worse than the raw key: a pool with no name at all
+  // cannot be told from the one below it.
+  return words.length === 0 ? skuPartNumber : words.join(" ");
+}
+
+function titleCaseFragment(fragment: string): string {
+  const upper = fragment.toUpperCase();
+  if (SEAT_POOL_INITIALISMS.has(upper)) return upper;
+  // Digits and mixed forms ("365", "M365") are left as the provider wrote
+  // them; only an all-alphabetic fragment is re-cased.
+  if (!/^[A-Za-z]+$/.test(fragment)) return fragment;
+  return upper.charAt(0) + fragment.slice(1).toLowerCase();
 }
 
 /** "EUR", "EUR and JPY", "EUR, JPY and GBP". */

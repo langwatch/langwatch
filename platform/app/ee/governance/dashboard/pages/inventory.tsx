@@ -9,7 +9,6 @@ import {
   Heading,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Tabs,
@@ -19,6 +18,13 @@ import {
 } from "@chakra-ui/react";
 import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
 import { AnomalyRulesTab } from "@ee/governance/dashboard/components/AnomalyRulesTab";
+import { DashboardSelect } from "@ee/governance/dashboard/components/DashboardSelect";
+import type { EnvironmentRow } from "@ee/governance/dashboard/components/environments/discoveredEnvironments";
+import {
+  AddEnvironmentDialog,
+  EnvironmentsTab,
+  environmentRows,
+} from "@ee/governance/dashboard/components/environments/EnvironmentsTab";
 import {
   ConnectorsHeader,
   IngestionSourcesTable,
@@ -34,6 +40,9 @@ import {
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { PullCadenceField } from "@ee/governance/dashboard/components/PullCadenceField";
 import { TraceDestinationField } from "@ee/governance/dashboard/components/TraceDestinationField";
+import type { ToolCatalogLayout } from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogCards";
+import { ToolCatalogTab } from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogTab";
+import { SAMPLE_TOOL_CARDS } from "@ee/governance/dashboard/components/toolCatalog/toolCards";
 import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
@@ -42,7 +51,14 @@ import {
 } from "@ee/governance/dashboard/logic/pullCadence";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
-import { ChevronRight, Copy, KeyRound, Plus } from "lucide-react";
+import {
+  ChevronRight,
+  Copy,
+  KeyRound,
+  LayoutGrid,
+  List as ListIcon,
+  Plus,
+} from "lucide-react";
 import {
   Fragment,
   type ReactNode,
@@ -53,7 +69,12 @@ import {
 } from "react";
 import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { ToolCatalogPanel } from "~/components/governance/ToolCatalogPanel";
+import {
+  SampleDataBanner,
+  SampleDataToggle,
+  useSampleMode,
+  useSettledRealDataState,
+} from "~/components/governance/sample";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
@@ -67,6 +88,7 @@ import {
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Link } from "~/components/ui/link";
+import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
@@ -455,9 +477,98 @@ function useIngestionSourceMutations({
 }
 
 /**
+ * What the Catalog and Environments panes need, and nothing the source
+ * composer does.
+ *
+ * Its own hook because it is a different concern from the source CRUD below:
+ * this is how the page is being READ — which layout, which samples, which
+ * environments the reader typed in — while the other is what is being written.
+ * Keeping them apart also keeps either one small enough to follow.
+ */
+function useInventoryPanes({
+  orgId,
+  canRead,
+  canReadActivity,
+  sourcesQuery,
+}: {
+  orgId: string;
+  canRead: boolean;
+  canReadActivity: boolean;
+  sourcesQuery: { data: Source[] | undefined };
+}) {
+  /**
+   * Per-source volume for the catalog cards' one measured row.
+   *
+   * Its own grant and its own plan gate, so it is asked for separately and its
+   * failure is never surfaced: a viewer who may read the catalog but not the
+   * activity monitor gets cards with one more empty row, which is exactly what
+   * the empty row already says. Nothing else on the page depends on it.
+   */
+  const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
+    { organizationId: orgId },
+    {
+      enabled: !!orgId && canRead && canReadActivity,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  );
+
+  /**
+   * Sample mode for the whole page. The source list is the only read that
+   * decides it: it is what both the Catalog and the Environments panes are
+   * derived from, so a page with sources on it is a page with something real
+   * to show, and the samples step aside.
+   */
+  const realData = useSettledRealDataState([sourcesQuery.data ?? null]);
+  const sample = useSampleMode({
+    realData,
+  });
+
+  const [catalogLayout, setCatalogLayout] = useState<ToolCatalogLayout>("grid");
+  const [addingEnvironment, setAddingEnvironment] = useState(false);
+  /**
+   * Environments the reader added by hand this sitting. Component state on
+   * purpose: nothing persists an environment yet, and the add dialog says so
+   * rather than letting a row look saved.
+   */
+  const [addedEnvironments, setAddedEnvironments] = useState<EnvironmentRow[]>(
+    [],
+  );
+
+  /** Add a hand-entered environment for this sitting only. */
+  const addEnvironment = useCallback(
+    ({ name, description }: { name: string; description: string }) => {
+      setAddedEnvironments((previous) => [
+        ...previous,
+        {
+          id: `added:${name}:${previous.length}`,
+          name,
+          description,
+          createdIso: new Date().toISOString(),
+          createdBy: "You, this session",
+        },
+      ]);
+    },
+    [],
+  );
+
+  return {
+    healthQuery,
+    sample,
+    catalogLayout,
+    setCatalogLayout,
+    addingEnvironment,
+    setAddingEnvironment,
+    addedEnvironments,
+    addEnvironment,
+  };
+}
+
+/**
  * Everything the page needs: the org it is scoped to, the source list, the
- * composer/edit/secret state and the mutations that drive them. State and
- * callbacks only — the component owns the markup.
+ * composer/edit/secret state and the mutations that drive them, plus the pane
+ * state from {@link useInventoryPanes}. State and callbacks only — the
+ * component owns the markup.
  */
 function useIngestionSourcesPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
@@ -467,8 +578,7 @@ function useIngestionSourcesPage() {
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const canRead = hasAnyPermission("ingestionSources:view");
   const canManage = hasAnyPermission("ingestionSources:manage");
-  // The Catalog pane's own grant — decides the inventory default tab.
-  const canManageCatalog = hasAnyPermission("aiTools:manage");
+  const canReadActivity = hasAnyPermission("activityMonitor:view");
 
   const destinationCtx = useDestinationContext(organization);
 
@@ -476,6 +586,14 @@ function useIngestionSourcesPage() {
     { organizationId: orgId },
     { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
   );
+
+  const panes = useInventoryPanes({
+    orgId,
+    canRead,
+    canReadActivity,
+    sourcesQuery,
+  });
+
   const utils = api.useUtils();
   const refetch = () =>
     utils.ingestionSources.list.invalidate({ organizationId: orgId });
@@ -520,12 +638,12 @@ function useIngestionSourcesPage() {
   };
 
   return {
+    ...panes,
     orgId,
     destinationCtx,
     isEnterprise,
     canRead,
     canManage,
-    canManageCatalog,
     startComposer,
     closeComposer,
     sourcesQuery,
@@ -591,34 +709,52 @@ function useAddSourceParam({
 }
 
 /**
- * The inventory's tabs: Catalog (the tool-tiles editor, formerly
- * /governance/tool-catalog), Sources (the ingestion-sources table) and
- * Anomaly rules (formerly /governance/anomaly-rules).
+ * The inventory's tabs: Catalog (the registered tools, as cards),
+ * Environments (where those tools run), Sources (the ingestion-sources table)
+ * and Anomaly rules (formerly /governance/anomaly-rules).
+ *
+ * The tool-tiles editor used to be the Catalog pane. It moved off this page
+ * entirely: tiles are the launcher grid on the personal AI-tools portal and
+ * the CLI's tool-path policy, neither of which is an inventory of what the
+ * organization runs. See `~/components/governance/ToolCatalogPanel` for where
+ * that composition now waits for a home.
  */
-const INVENTORY_TABS = ["catalog", "sources", "anomaly-rules"] as const;
+const INVENTORY_TABS = [
+  "catalog",
+  "environments",
+  "sources",
+  "anomaly-rules",
+] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
 
 const isInventoryTab = (value: string | null): value is InventoryTab =>
   INVENTORY_TABS.some((tab) => tab === value);
 
+/** The pane a bare address opens on. */
+const DEFAULT_INVENTORY_TAB: InventoryTab = "catalog";
+
 /**
- * A selected non-default tab is part of the address (?tab=); the default
- * stays out of it, and an unknown or stale value degrades to the default
- * instead of a blank pane. The default is permission-sensitive — Catalog
- * for aiTools:manage holders, Sources otherwise — so the BARE address
- * means "your default pane" and can resolve differently for different
- * recipients of the same link. Accepted deliberately (see the spec): the
- * ?tab= form is the stable shareable address.
+ * A selected non-default tab is part of the address (?tab=); the default stays
+ * out of it, and an unknown or stale value degrades to the default instead of
+ * a blank pane.
+ *
+ * The default used to depend on the reader's grants, so the bare address meant
+ * "your default pane" and could open differently for two recipients of one
+ * link. It no longer does: the Catalog pane is built from the source list
+ * every reader of this page can already see, so the bare address is the same
+ * screen for everyone.
  */
-function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
+function useInventoryTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const inventoryTab = isInventoryTab(requestedTab) ? requestedTab : defaultTab;
+  const inventoryTab = isInventoryTab(requestedTab)
+    ? requestedTab
+    : DEFAULT_INVENTORY_TAB;
   const selectInventoryTab = (tab: string) =>
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (tab === defaultTab) next.delete("tab");
+        if (tab === DEFAULT_INVENTORY_TAB) next.delete("tab");
         else next.set("tab", tab);
         return next;
       },
@@ -648,23 +784,32 @@ function InventoryTabLabel({
 }
 
 /**
- * The inventory's tab shell. The Catalog pane mounts the tool-tiles
- * editor; the Sources pane renders the children (the connectors table);
- * the Anomaly rules pane mounts the rules editor. Counts sit on a tab only
- * when the pane's own list is already loaded — Sources reads the list the
- * page holds anyway; Anomaly rules would need a query of its own, so it
- * carries none.
+ * The inventory's tab shell.
+ *
+ * Counts sit on a tab only where the pane's own list is already loaded, which
+ * is Catalog and Sources — both read the source list the page holds anyway.
+ * Environments is derived from that same list, so it counts too; Anomaly rules
+ * would need a query of its own and carries none.
  */
 function InventoryTabs({
-  defaultTab,
+  inventoryTab,
+  selectInventoryTab,
+  catalogCount,
+  environmentCount,
   sourceCount,
-  children,
+  catalog,
+  environments,
+  sources,
 }: {
-  defaultTab: InventoryTab;
+  inventoryTab: InventoryTab;
+  selectInventoryTab: (tab: string) => void;
+  catalogCount?: number;
+  environmentCount?: number;
   sourceCount?: number;
-  children: ReactNode;
+  catalog: ReactNode;
+  environments: ReactNode;
+  sources: ReactNode;
 }) {
-  const { inventoryTab, selectInventoryTab } = useInventoryTab({ defaultTab });
   return (
     <Tabs.Root
       value={inventoryTab}
@@ -678,7 +823,14 @@ function InventoryTabs({
           color="fg.muted"
           _selected={{ color: "fg", fontWeight: "semibold" }}
         >
-          Catalog
+          <InventoryTabLabel label="Catalog" count={catalogCount} />
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="environments"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          <InventoryTabLabel label="Environments" count={environmentCount} />
         </Tabs.Trigger>
         <Tabs.Trigger
           value="sources"
@@ -696,11 +848,14 @@ function InventoryTabs({
         </Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value="catalog" paddingTop={4}>
-        <ToolCatalogPanel />
+        {catalog}
+      </Tabs.Content>
+      <Tabs.Content value="environments" paddingTop={4}>
+        {environments}
       </Tabs.Content>
       <Tabs.Content value="sources" paddingTop={4}>
         <VStack align="stretch" gap={4} width="full">
-          {children}
+          {sources}
         </VStack>
       </Tabs.Content>
       <Tabs.Content value="anomaly-rules" paddingTop={4}>
@@ -711,58 +866,167 @@ function InventoryTabs({
 }
 
 /**
- * The three tabs and everything under the sources one: the connectors
- * header with the add control an admin only sees with the manage grant,
- * and the table itself.
+ * Everything under the Sources tab: the connectors header with the add control
+ * an admin only sees with the manage grant, and the table itself.
+ *
+ * The load error is withheld while sample mode is on. A page showing invented
+ * figures has already told the reader that nothing on it is real; an alert
+ * about a read that failed underneath them is then noise about data they are
+ * not looking at, and the banner above already says the screen is a mock-up.
  */
-function InventorySourcesTab({
+function InventorySourcesPane({
   page,
 }: {
   page: ReturnType<typeof useIngestionSourcesPage>;
 }) {
   const { orgId, sourcesQuery, mutations } = page;
   return (
-    <InventoryTabs
-      defaultTab={page.canManageCatalog ? "catalog" : "sources"}
-      sourceCount={sourcesQuery.data?.length}
-    >
-      <IngestionSourceList
-        canRead={page.canRead}
-        canManage={page.canManage}
-        isLoading={sourcesQuery.isLoading}
-        error={sourcesQuery.error}
-        sources={sourcesQuery.data}
-        addControl={
-          page.canManage ? (
-            <AddSourceControl
-              isEnterprise={page.isEnterprise}
-              sourceCount={sourcesQuery.data?.length ?? 0}
-              onAdd={page.startComposer}
-            />
-          ) : undefined
-        }
-        rotatingId={pendingId(mutations.rotate)}
-        archivingId={pendingId(mutations.archive)}
-        onEdit={page.setEditingSourceId}
-        onRotate={(id) =>
-          mutations.rotate.mutate({ organizationId: orgId, id })
-        }
-        onArchive={(id) =>
-          mutations.archive.mutate({ organizationId: orgId, id })
-        }
+    <IngestionSourceList
+      canRead={page.canRead}
+      canManage={page.canManage}
+      isLoading={sourcesQuery.isLoading}
+      error={page.sample.active ? null : sourcesQuery.error}
+      sources={sourcesQuery.data}
+      addControl={
+        page.canManage ? (
+          <AddSourceControl
+            isEnterprise={page.isEnterprise}
+            sourceCount={sourcesQuery.data?.length ?? 0}
+            onAdd={page.startComposer}
+          />
+        ) : undefined
+      }
+      rotatingId={pendingId(mutations.rotate)}
+      archivingId={pendingId(mutations.archive)}
+      onEdit={page.setEditingSourceId}
+      onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
+      onArchive={(id) =>
+        mutations.archive.mutate({ organizationId: orgId, id })
+      }
+    />
+  );
+}
+
+/** The grid/list switch for the Catalog pane. Never a native select. */
+function CatalogLayoutControl({
+  layout,
+  onChange,
+}: {
+  layout: ToolCatalogLayout;
+  onChange: (layout: ToolCatalogLayout) => void;
+}) {
+  return (
+    <SegmentedControl
+      size="sm"
+      value={layout}
+      onValueChange={({ value }) => onChange(value as ToolCatalogLayout)}
+      aria-label="Catalog layout"
+      items={[
+        {
+          value: "grid",
+          label: (
+            <HStack gap={1.5}>
+              <LayoutGrid size={13} />
+              <Text as="span">Grid</Text>
+            </HStack>
+          ),
+        },
+        {
+          value: "list",
+          label: (
+            <HStack gap={1.5}>
+              <ListIcon size={13} />
+              <Text as="span">List</Text>
+            </HStack>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * The actions at the top right of the page header, for the pane in view.
+ *
+ * They live in the header rather than inside each pane because they are page
+ * actions — the section's rulebook puts every one of them in the same corner
+ * on every screen, so a reader who found "See sample data" on Costs finds it
+ * here without looking. At most one is solid: the single thing this pane is
+ * for adding.
+ */
+function InventoryHeaderActions({
+  page,
+  inventoryTab,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+  inventoryTab: InventoryTab;
+}) {
+  return (
+    <HStack gap={2} flexShrink={0}>
+      {inventoryTab === "catalog" && (
+        <CatalogLayoutControl
+          layout={page.catalogLayout}
+          onChange={page.setCatalogLayout}
+        />
+      )}
+      <SampleDataToggle
+        active={page.sample.active}
+        onToggle={page.sample.toggle}
+        size="sm"
       />
-    </InventoryTabs>
+      {inventoryTab === "catalog" && page.canManage && (
+        <AddIngestionSourceMenu
+          isEnterprise={page.isEnterprise}
+          hint="A tool joins the catalog when you connect it as a source."
+          onPick={page.startComposer}
+        >
+          <Button size="sm" colorPalette="orange">
+            <Plus size={14} /> Add tool
+          </Button>
+        </AddIngestionSourceMenu>
+      )}
+      {inventoryTab === "environments" && (
+        <Button
+          size="sm"
+          colorPalette="orange"
+          onClick={() => page.setAddingEnvironment(true)}
+        >
+          <Plus size={14} /> Add environment
+        </Button>
+      )}
+    </HStack>
   );
 }
 
 function InventoryPage() {
   const page = useIngestionSourcesPage();
   const { orgId, destinationCtx, sourcesQuery, mutations } = page;
+  const { inventoryTab, selectInventoryTab } = useInventoryTab();
+
+  const catalogCount = page.sample.active
+    ? SAMPLE_TOOL_CARDS.length
+    : sourcesQuery.data?.length;
+  const environments = environmentRows({
+    sources: sourcesQuery.data,
+    sampleActive: page.sample.active,
+    added: page.addedEnvironments,
+  });
 
   return (
     <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <InventoryHeader />
+        <HStack justify="space-between" align="center" gap={4} width="full">
+          <InventoryHeader />
+          <InventoryHeaderActions page={page} inventoryTab={inventoryTab} />
+        </HStack>
+
+        {page.sample.active && (
+          <SampleDataBanner>
+            These tools, figures and environments are an illustration of what
+            the inventory holds once your tools report. Nothing here is real.
+          </SampleDataBanner>
+        )}
+
         <SourceComposerDrawer
           isOpen={page.composing}
           organizationId={orgId}
@@ -774,8 +1038,38 @@ function InventoryPage() {
           onClose={page.closeComposer}
         />
 
-        <InventorySourcesTab page={page} />
+        <InventoryTabs
+          inventoryTab={inventoryTab}
+          selectInventoryTab={selectInventoryTab}
+          catalogCount={catalogCount}
+          environmentCount={environments.length}
+          sourceCount={sourcesQuery.data?.length}
+          catalog={
+            <ToolCatalogTab
+              canRead={page.canRead}
+              sources={sourcesQuery.data}
+              health={page.healthQuery.data}
+              sampleActive={page.sample.active}
+              layout={page.catalogLayout}
+            />
+          }
+          environments={
+            <EnvironmentsTab
+              canRead={page.canRead}
+              sources={sourcesQuery.data}
+              sampleActive={page.sample.active}
+              added={page.addedEnvironments}
+            />
+          }
+          sources={<InventorySourcesPane page={page} />}
+        />
       </VStack>
+
+      <AddEnvironmentDialog
+        isOpen={page.addingEnvironment}
+        onClose={() => page.setAddingEnvironment(false)}
+        onAdd={page.addEnvironment}
+      />
 
       <SecretModal
         details={page.secretModal}
@@ -2892,29 +3186,22 @@ function ParserFieldInput({
   }
 
   if (control.kind === "select") {
-    // A native select has no readOnly — HTML ignores the attribute there, and
-    // `disabled` is the only thing that would stop the change, at the cost of
-    // dropping the field out of the tab order. So a locked choice is shown as
-    // its own label in a readOnly input instead: genuinely unchangeable, and
+    // A select has no readOnly — HTML ignores the attribute on the native one,
+    // and `disabled` is the only thing that would stop the change, at the cost
+    // of dropping the field out of the tab order. So a locked choice is shown
+    // as its own label in a readOnly input instead: genuinely unchangeable, and
     // still reachable and readable, which is the rule the branches below keep.
     if (readOnly) {
       const chosen = control.options.find((option) => option.value === value);
       return <Input size="sm" value={chosen?.label ?? value} readOnly />;
     }
     return (
-      <NativeSelect.Root size="sm">
-        <NativeSelect.Field
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {control.options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      <DashboardSelect
+        ariaLabel={ariaLabel}
+        options={control.options}
+        value={value}
+        onChange={onChange}
+      />
     );
   }
 

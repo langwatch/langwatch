@@ -1,0 +1,222 @@
+/**
+ * The folds that turn what the reads answer into the buckets the chips asked
+ * for, and the ceiling that keeps a two-year frame from being served as one
+ * year without saying so.
+ *
+ * Spec: specs/governance/governance-cost-screen.feature
+ */
+import { describe, expect, it } from "vitest";
+
+import {
+  aggregateBuckets,
+  aggregateLaneSeries,
+  aggregateSeatCounts,
+  bucketStartOf,
+  formatBucketTick,
+  frameExceedsReadCeiling,
+  READ_WINDOW_DAY_CEILING,
+  windowDaysForFrame,
+} from "../costsWindow";
+
+/** A lane day with every honesty field at its quiet default. */
+const laneDay = (
+  day: string,
+  overrides: Partial<{
+    billedUsd: number | null;
+    gatewayUsd: number | null;
+    billedCellsWithoutAmount: number;
+    gatewayCellsWithoutAmount: number;
+    billedRevisedAt: number | null;
+    billedPreviousUsd: number | null;
+    billedProvisional: boolean;
+  }> = {},
+) => ({
+  day,
+  billedUsd: 100,
+  gatewayUsd: 80,
+  billedCellsWithoutAmount: 0,
+  gatewayCellsWithoutAmount: 0,
+  billedRevisedAt: null,
+  billedPreviousUsd: null,
+  billedProvisional: false,
+  ...overrides,
+});
+
+describe("bucketStartOf", () => {
+  describe("when the interval is quarter", () => {
+    it("puts every month of a quarter on the same start", () => {
+      expect(bucketStartOf("2026-07-14", "quarter")).toBe("2026-07-01");
+      expect(bucketStartOf("2026-08-01", "quarter")).toBe("2026-07-01");
+      expect(bucketStartOf("2026-09-30", "quarter")).toBe("2026-07-01");
+    });
+  });
+
+  describe("when the interval is year", () => {
+    it("puts every day of a year on January the first", () => {
+      expect(bucketStartOf("2026-11-30", "year")).toBe("2026-01-01");
+    });
+  });
+});
+
+describe("formatBucketTick", () => {
+  describe("when the interval is quarter", () => {
+    it("names the quarter rather than its first month", () => {
+      // "Jul 2026" on a quarterly axis reads as July, which is a third of
+      // what the bar covers.
+      expect(formatBucketTick("2026-07-01", "quarter")).toBe("Q3 2026");
+    });
+  });
+
+  describe("when the interval is year", () => {
+    it("reads as the year alone", () => {
+      expect(formatBucketTick("2026-01-01", "year")).toBe("2026");
+    });
+  });
+});
+
+describe("windowDaysForFrame", () => {
+  describe("when the frame reaches past what the reads answer", () => {
+    it("asks for the ceiling rather than a window the read would refuse", () => {
+      // Every governance cost input caps windowDays at 365. Asking for 730
+      // fails validation, and the reader lands on an error alert instead of
+      // a screen.
+      expect(windowDaysForFrame({ frame: "last_2_years" })).toBe(
+        READ_WINDOW_DAY_CEILING,
+      );
+      expect(frameExceedsReadCeiling({ frame: "last_2_years" })).toBe(true);
+    });
+  });
+
+  describe("when the frame fits", () => {
+    it("asks for the frame's own span and reports no shortfall", () => {
+      expect(windowDaysForFrame({ frame: "last_3_months" })).toBe(90);
+      expect(frameExceedsReadCeiling({ frame: "last_3_months" })).toBe(false);
+    });
+  });
+});
+
+describe("aggregateBuckets", () => {
+  describe("when days inside one quarter carry the same series", () => {
+    it("sums the series across the quarter", () => {
+      const folded = aggregateBuckets(
+        [
+          { day: "2026-07-04", points: [{ key: "a", label: "A", value: 10 }] },
+          { day: "2026-08-09", points: [{ key: "a", label: "A", value: 5 }] },
+        ],
+        "quarter",
+      );
+
+      expect(folded).toEqual([
+        { day: "2026-07-01", points: [{ key: "a", label: "A", value: 15 }] },
+      ]);
+    });
+  });
+});
+
+describe("aggregateSeatCounts", () => {
+  describe("when three months inside one quarter each report a count", () => {
+    /** @scenario "Seat counts fold to the last period in the bucket, never the sum" */
+    it("reports the last month's count, not the three added together", () => {
+      const months = ["2026-07-01", "2026-08-01", "2026-09-01"].map(
+        (day, index) => ({
+          day,
+          points: [
+            { key: "bought", label: "Seats bought", value: 420 },
+            { key: "assigned", label: "Seats assigned", value: 300 + index },
+          ],
+        }),
+      );
+
+      const folded = aggregateSeatCounts(months, "quarter");
+
+      expect(folded).toHaveLength(1);
+      expect(folded[0]?.day).toBe("2026-07-01");
+      // 1,260 is what the money fold would say, and nobody holds 1,260 seats.
+      expect(folded[0]?.points).toEqual([
+        { key: "bought", label: "Seats bought", value: 420 },
+        { key: "assigned", label: "Seats assigned", value: 302 },
+      ]);
+    });
+  });
+});
+
+describe("aggregateLaneSeries", () => {
+  describe("when every day in the period holds a figure", () => {
+    it("sums them onto the period's own start", () => {
+      const folded = aggregateLaneSeries(
+        [laneDay("2026-07-04"), laneDay("2026-08-09")],
+        "quarter",
+      );
+
+      expect(folded).toHaveLength(1);
+      expect(folded[0]?.day).toBe("2026-07-01");
+      expect(folded[0]?.billedUsd).toBe(200);
+      expect(folded[0]?.gatewayUsd).toBe(160);
+    });
+  });
+
+  describe("when one day in the period holds no figure", () => {
+    /** @scenario "A period containing a day with no figure holds no figure either" */
+    it("withholds the period's figure rather than summing what is left", () => {
+      const folded = aggregateLaneSeries(
+        [
+          laneDay("2026-07-04"),
+          laneDay("2026-07-09", {
+            billedUsd: null,
+            billedCellsWithoutAmount: 3,
+          }),
+        ],
+        "month",
+      );
+
+      // 100 would be a total lower than the month cost, with nothing on the
+      // chart saying so — the lie the per-day figure already refuses to tell.
+      expect(folded[0]?.billedUsd).toBeNull();
+      expect(folded[0]?.billedCellsWithoutAmount).toBe(3);
+      // The other lane answered in full, so it keeps its figure.
+      expect(folded[0]?.gatewayUsd).toBe(160);
+    });
+  });
+
+  describe("when one day in the period was restated", () => {
+    /** @scenario "A period containing a restated day is itself marked restated" */
+    it("marks the period restated and keeps the most recent date", () => {
+      const folded = aggregateLaneSeries(
+        [
+          laneDay("2026-07-04", {
+            billedRevisedAt: 1_000,
+            billedPreviousUsd: 90,
+          }),
+          laneDay("2026-08-09", {
+            billedRevisedAt: 9_000,
+            billedPreviousUsd: 70,
+            billedProvisional: true,
+          }),
+        ],
+        "quarter",
+      );
+
+      expect(folded[0]?.billedRevisedAt).toBe(9_000);
+      expect(folded[0]?.billedPreviousUsd).toBe(160);
+      expect(folded[0]?.billedProvisional).toBe(true);
+    });
+  });
+
+  describe("when only one day of the period carries a prior figure", () => {
+    it("withholds the prior figure, because a partial one reads as the whole", () => {
+      const folded = aggregateLaneSeries(
+        [
+          laneDay("2026-07-04", {
+            billedRevisedAt: 1_000,
+            billedPreviousUsd: 90,
+          }),
+          laneDay("2026-07-09"),
+        ],
+        "month",
+      );
+
+      expect(folded[0]?.billedRevisedAt).toBe(1_000);
+      expect(folded[0]?.billedPreviousUsd).toBeNull();
+    });
+  });
+});

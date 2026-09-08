@@ -25,7 +25,6 @@ import {
   CostLanePanel,
   SeatLanePanel,
 } from "~/components/governance/CostLanePanel";
-import { CostLanesChart } from "~/components/governance/CostLanesChart";
 import { azureBillingNoteSentence } from "~/components/governance/costLaneFormat";
 import {
   CostDonut,
@@ -38,40 +37,63 @@ import {
 import { CostFilterBar } from "~/components/governance/costs/CostFilterBar";
 import { CostPanel } from "~/components/governance/costs/CostPanel";
 import {
-  CostSampleBanner,
-  CostSampleToggle,
-} from "~/components/governance/costs/CostSampleControls";
+  CostPanelEmpty,
+  costPanelEmpty,
+} from "~/components/governance/costs/CostPanelEmpty";
 import {
   CostSpenderError,
   CostSpenderList,
   type SpenderRow,
 } from "~/components/governance/costs/CostSpenderPanel";
 import {
-  sampleModeActive,
+  declinedAsEmpty,
+  isRefusedRead,
+  refusedAsEmpty,
   summaryAsRead,
-  useSettledRealDataState,
 } from "~/components/governance/costs/costSampleMode";
 import {
   ALL_DEPARTMENTS,
   aggregateBuckets,
   aggregateLine,
-  type GroupBy,
-  type TimeInterval,
+  aggregateSeatCounts,
+  frameExceedsReadCeiling,
+  windowDaysForFrame,
 } from "~/components/governance/costs/costsWindow";
+import {
+  sampleCostSummary,
+  sampleSpenderRows,
+} from "~/components/governance/costs/sampleLanes";
 import {
   type DailyBucket,
   type RankRow,
-  recentDays,
+  recentMonths,
   SAMPLE_AGENTS,
   SAMPLE_DEPARTMENTS,
+  sampleAdoption,
   sampleDaily,
   sampleForecast,
   sampleLine,
   sampleRanked,
+  sampleSeats,
 } from "~/components/governance/costs/sampleSeries";
+import {
+  coerceInterval,
+  DEFAULT_TIME_FRAME,
+  DEFAULT_TIME_INTERVAL,
+  frameSpanDays,
+  type TimeFrame,
+  type TimeInterval,
+} from "~/components/governance/filters";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  SampleDataBanner,
+  SampleDataToggle,
+  useSampleMode as useGovernanceSampleMode,
+  useSettledRealDataState,
+} from "~/components/governance/sample";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -89,17 +111,30 @@ import { api } from "~/utils/api";
  * deployment without a cost store, and a lane with no figure all render as
  * such; `$0.00` is reserved for a lane that really did report no spend.
  *
- * The breakdowns below the lanes are a mix. Cost over time, cost by
- * department, cost by model and cost by user are real reads. Agents, prepaid
- * seats, forecasts, token counts and Genie questions have no backing read yet
- * and are drawn from `sampleSeries`, each badged `sample`.
+ * ONE TIME AXIS. Two chips set the window: Time Frame (how far back) and Time
+ * Interval (how wide each bucket is), the section-wide pair from
+ * `~/components/governance/filters`, opening on Quarter over the last twelve
+ * months. Every chart on the page is bucketed and ticked by that interval,
+ * because a screen set to Quarter that still draws one chart by day puts two
+ * axes side by side that look alike and are not the same span — the one chart
+ * mistake a reader has no way to catch. The reads answer in days and take no
+ * bucket parameter, so the fold happens on the client; `costsWindow.ts` says
+ * why, and why the frame is clamped to the reads' 365-day ceiling.
  *
- * Those invented panels do not render unconditionally. They fill a screen with
+ * SAMPLE MODE SUPPRESSES FAILURE. With sample data on, no error alert renders
+ * and no panel says "not available": the lanes, the breakdowns and the spender
+ * list all draw invented figures under the sample badge instead. The screen's
+ * job in that mode is to show what a filled-in Costs page looks like, and a
+ * red alert across the top of it does not. Everything real comes straight back
+ * the moment the reader turns sample data off — that toggle is the exit, and
+ * it is always on screen.
+ *
+ * The invented panels do not render unconditionally. They fill a screen with
  * nothing measured on it, step aside once real figures arrive, and the reader
  * can overrule either default from the toggle in the header — the same
  * arrangement the trace explorer uses for its sample traces. See
- * `costSampleMode.ts` for why an unanswered read is not treated as an empty
- * one.
+ * `~/components/governance/sample` for why an unanswered read is not
+ * treated as an empty one.
  *
  * Spec: specs/governance/governance-cost-screen.feature (ADR-128)
  */
@@ -113,9 +148,8 @@ interface CostFilters {
    * screen is no longer filtering by — or worse, name all of them.
    */
   departmentName: string | null;
-  windowDays: number;
+  frame: TimeFrame;
   interval: TimeInterval;
-  groupBy: GroupBy;
 }
 
 /**
@@ -130,19 +164,27 @@ interface CostFilters {
  * Only an answered read counts. A read still in flight is not evidence that the
  * department is gone, and resetting on one would throw the reader's choice away
  * on every refetch.
+ *
+ * Sample mode is exempt: the sample departments are a fixed list that never
+ * drops a name, and running the reset against the real reads while the reader
+ * is looking at invented departments would clear a selection that is still on
+ * screen.
  */
 function useDepartmentSelectionReset({
   filters,
   breakdowns,
   setFilters,
+  showSample,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
   setFilters: Dispatch<SetStateAction<CostFilters>>;
+  showSample: boolean;
 }) {
   const { departmentRows, departments } = breakdowns;
   const selected = filters.department;
   useEffect(() => {
+    if (showSample) return;
     if (selected === ALL_DEPARTMENTS) return;
     if (departmentRows === null) return;
     if (departments.some((d) => d.id === selected)) return;
@@ -151,7 +193,7 @@ function useDepartmentSelectionReset({
       department: ALL_DEPARTMENTS,
       departmentName: null,
     }));
-  }, [selected, departmentRows, departments, setFilters]);
+  }, [selected, departmentRows, departments, setFilters, showSample]);
 }
 
 /**
@@ -179,6 +221,9 @@ function useSpenderRows({
     // screen's word for "unanswered or absent", and a failed read is neither
     // — hiding the panel on an outage would claim nobody spent anything.
     isError: spenders.isError,
+    // A decline is not an outage. Carried apart from `isError` so the panel can
+    // show what it holds instead of accusing the read of breaking.
+    refused: isRefusedRead(spenders.error),
     retry: () => void spenders.refetch(),
   };
 }
@@ -198,23 +243,42 @@ function useSpenderRows({
  */
 function useSampleMode(
   breakdowns: ReturnType<typeof useBreakdownQueries>,
-  summaryData: GovernanceCostSummaryDto | undefined,
+  // The read itself, not its data: whether it was DECLINED is half the answer
+  // here, and that only lives on the error.
+  summary: {
+    data: GovernanceCostSummaryDto | undefined;
+    error: { data?: { code?: string | null } | null } | null;
+  },
 ) {
-  const [optIn, setOptIn] = useState<boolean | null>(null);
-  const showSample = sampleModeActive({
-    optIn,
+  const summaryData = summary.data;
+  const summaryError = summary.error;
+  // The choice itself is the section's, not this page's: whichever governance
+  // screen the reader last pressed the toggle on is the answer here too. Only
+  // the reads below are the page's own.
+  const { active, toggle } = useGovernanceSampleMode({
     realData: useSettledRealDataState([
-      summaryAsRead(summaryData),
-      breakdowns.departmentRows,
-      breakdowns.userRows,
-      breakdowns.overTime,
-      breakdowns.modelOverTime,
-      breakdowns.activeUsers === null
-        ? null
-        : { length: breakdowns.activeUsers },
+      // A refused read has answered — with nothing. Left as `null` it read as
+      // "still unknown", which held the sample panels off the one screen they
+      // are for: an organization whose plan or grants do not open this page at
+      // all, which is every organization on its first visit. See
+      // `isRefusedRead`.
+      refusedAsEmpty(summaryAsRead(summaryData), summaryError),
+      // The same treatment for the activity reads, which are refused by the
+      // same gate. A first visit has every one of these declined at once, and
+      // it was that whole-screen silence that kept the invented panels off.
+      declinedAsEmpty(breakdowns.departmentRows, breakdowns.refused),
+      declinedAsEmpty(breakdowns.userRows, breakdowns.refused),
+      declinedAsEmpty(breakdowns.overTime, breakdowns.refused),
+      declinedAsEmpty(breakdowns.modelOverTime, breakdowns.refused),
+      declinedAsEmpty(
+        breakdowns.activeUsers === null
+          ? null
+          : { length: breakdowns.activeUsers },
+        breakdowns.refused,
+      ),
     ]),
   });
-  return { showSample, toggleSample: () => setOptIn(!showSample) };
+  return { showSample: active, toggleSample: toggle };
 }
 
 function CostsPage() {
@@ -226,21 +290,33 @@ function CostsPage() {
   const [filters, setFilters] = useState<CostFilters>({
     department: ALL_DEPARTMENTS,
     departmentName: null,
-    windowDays: 30,
-    interval: "day",
-    groupBy: "team",
+    frame: DEFAULT_TIME_FRAME,
+    interval: DEFAULT_TIME_INTERVAL,
   });
   const patch = (next: Partial<CostFilters>) =>
     setFilters((current) => ({ ...current, ...next }));
 
+  /**
+   * Narrowing the frame can leave the reader on an interval the new frame
+   * cannot draw — a quarter over three months is one bar wearing a chart's
+   * clothes. The section-wide rule steps down to the widest that still fits,
+   * in one place so every governance page answers alike.
+   */
+  const chooseFrame = (frame: TimeFrame) =>
+    patch({
+      frame,
+      interval: coerceInterval({ interval: filters.interval, frame }),
+    });
+
+  const windowDays = windowDaysForFrame({ frame: filters.frame });
+
   const summary = api.governanceCost.summary.useQuery(
-    { organizationId, windowDays: filters.windowDays },
+    { organizationId, windowDays },
     { enabled: !!organizationId },
   );
   const breakdowns = useBreakdownQueries({
     organizationId,
-    windowDays: filters.windowDays,
-    groupBy: filters.groupBy,
+    windowDays,
     // The page opens on `governanceCost:view`, but the breakdowns read the
     // activity monitor, which is its own grant. A viewer holding one and not
     // the other gets the lanes and no failed queries underneath them.
@@ -248,45 +324,54 @@ function CostsPage() {
   });
   const spenders = useSpenderRows({
     organizationId,
-    windowDays: filters.windowDays,
+    windowDays,
     enabled: !!organizationId && hasAnyPermission("governance:view"),
   });
 
-  useDepartmentSelectionReset({ filters, breakdowns, setFilters });
+  const { showSample, toggleSample } = useSampleMode(breakdowns, summary);
+  const samplePeriods = useSamplePeriods(filters.frame);
 
-  const { showSample, toggleSample } = useSampleMode(breakdowns, summary.data);
+  useDepartmentSelectionReset({ filters, breakdowns, setFilters, showSample });
+
+  const departmentOptions = showSample
+    ? SAMPLE_DEPARTMENTS.map((name) => ({ id: name, name }))
+    : breakdowns.departments;
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={5} width="full">
         <HStack justify="space-between" align="center">
           <Heading size="md">Costs</Heading>
-          <CostSampleToggle active={showSample} onToggle={toggleSample} />
+          <SampleDataToggle active={showSample} onToggle={toggleSample} />
         </HStack>
-        {showSample && <CostSampleBanner />}
+        {showSample && <SampleDataBanner />}
         <CostFilterBar
           departmentName={filters.departmentName}
-          departments={breakdowns.departments}
+          departments={departmentOptions}
           onDepartmentChange={(department, departmentName) =>
             patch({ department, departmentName })
           }
-          windowDays={filters.windowDays}
-          onWindowDaysChange={(windowDays) => patch({ windowDays })}
+          frame={filters.frame}
+          onFrameChange={chooseFrame}
           interval={filters.interval}
           onIntervalChange={(interval) => patch({ interval })}
-          groupBy={filters.groupBy}
-          onGroupByChange={(groupBy) => patch({ groupBy })}
         />
+        <ReadCeilingNotice frame={filters.frame} showSample={showSample} />
 
         <CostsBody
           isLoading={summary.isLoading && !!organizationId}
           isError={summary.isError}
+          refused={isRefusedRead(summary.error)}
           data={summary.data}
+          interval={filters.interval}
+          showSample={showSample}
+          samplePeriods={samplePeriods}
         />
 
         <CostBreakdowns
           filters={filters}
           breakdowns={breakdowns}
+          periods={samplePeriods}
           showSample={showSample}
           spenders={spenders}
         />
@@ -296,16 +381,140 @@ function CostsPage() {
 }
 
 /**
- * The body's four states, kept in one place so no branch can quietly acquire a
- * zero: loading, failed read, unavailable, and figures.
+ * Said out loud when the frame asks for more history than the reads answer.
+ *
+ * The Time Frame chip offers Last 2 years because every governance page offers
+ * the same four spans, and the cost reads cap their window at a year. Silently
+ * serving twelve months under a two-year label is the shape of mistake this
+ * whole screen is built to avoid, so the shortfall is stated where the figures
+ * are read. Nothing is stated in sample mode: the invented series are not a
+ * read and are not clamped.
+ */
+function ReadCeilingNotice({
+  frame,
+  showSample,
+}: {
+  frame: TimeFrame;
+  showSample: boolean;
+}) {
+  if (showSample || !frameExceedsReadCeiling({ frame })) return null;
+  return (
+    <Text fontSize="xs" color="fg.muted" data-testid="cost-read-ceiling-note">
+      Figures cover the last 12 months. Cost history does not go back further
+      than that yet.
+    </Text>
+  );
+}
+
+/**
+ * What a reader sees when the server declined the read.
+ *
+ * Two causes reach the client as the same tRPC FORBIDDEN, and prose is not
+ * evidence — the message is copy and will be rewritten. The plan is, so the
+ * live plan tells the two apart: an organization off the Enterprise tier was
+ * refused by the gate, and one on it was refused by its own grants. Naming the
+ * wrong one sends a customer to the wrong place, so neither sentence guesses.
+ *
+ * Status `info`, never `error`. Nothing failed, nothing needs retrying, and
+ * this is not a state support can fix.
+ */
+function CostsRefused() {
+  const { isEnterprise } = useActivePlan();
+  return (
+    <Alert.Root status="info" data-testid="cost-lanes-refused">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {isEnterprise
+            ? "You do not have access to cost data"
+            : "Cost data comes with the Enterprise plan"}
+        </Alert.Title>
+        <Alert.Description>
+          {isEnterprise
+            ? "Your role does not open the cost views for this organization. An organization admin can grant it."
+            : "This organization's plan does not include the cost views, so no figures were read. Nothing is wrong with your setup."}{" "}
+          {/* Phrased as an invitation, not a statement of fact: this notice is
+              only ever on screen with the samples turned OFF, so telling the
+              reader they are on would be wrong at the exact moment it is read. */}
+          Sample data shows what this screen holds once it opens.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/**
+ * The body's states, kept in one place so no branch can quietly acquire a zero:
+ * sample, loading, refused read, failed read, unavailable, and figures.
+ *
+ * Sample comes first on purpose. It is the reader's explicit "show me what
+ * this looks like", and the three states below it are all ways of saying we
+ * have nothing to show — exactly what sample mode is there to answer.
  */
 function CostsBody({
   isLoading,
   isError,
+  refused,
+  data,
+  interval,
+  showSample,
+  samplePeriods,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  /** The read was declined, not broken. See `isRefusedRead`. */
+  refused: boolean;
+  data: GovernanceCostSummaryDto | undefined;
+  interval: TimeInterval;
+  showSample: boolean;
+  samplePeriods: string[];
+}) {
+  // "Holds figures", not merely "answered". A read that came back with every
+  // lane empty leaves the same blank screen a failed one does, and sample mode
+  // exists to fill a blank screen — the same test the panels below apply to
+  // themselves, asked once for all three lanes.
+  const holdsFigures =
+    data &&
+    !isError &&
+    data.unavailableReason === null &&
+    (summaryAsRead(data)?.length ?? 0) > 0;
+  if (showSample && !holdsFigures) {
+    return <CostLanes data={sampleCostSummary(samplePeriods)} sample />;
+  }
+
+  if (holdsFigures) {
+    return <CostLanes data={data} sample={false} />;
+  }
+
+  return (
+    <CostsWithoutFigures
+      isLoading={isLoading}
+      isError={isError}
+      refused={refused}
+      data={data}
+    />
+  );
+}
+
+/**
+ * Every state that is not a chart, in the order they answer: still reading,
+ * declined, broken, and an account with nothing recorded against it.
+ *
+ * Split out so the one branch that draws money is a single line, and so the
+ * four ways of having nothing to show sit together where the difference
+ * between them is easy to read. That difference is the whole point — each says
+ * something different about whose problem it is, and the page used to answer
+ * three of them with the same red alert.
+ */
+function CostsWithoutFigures({
+  isLoading,
+  isError,
+  refused,
   data,
 }: {
   isLoading: boolean;
   isError: boolean;
+  refused: boolean;
   data: GovernanceCostSummaryDto | undefined;
 }) {
   if (isLoading) {
@@ -315,6 +524,15 @@ function CostsBody({
         <Skeleton height="260px" />
       </VStack>
     );
+  }
+
+  // A declined read is not a broken one. The plan gate and the permission
+  // check both answer before any cost is read, so nothing was attempted and
+  // nothing failed — telling the reader something went wrong would send them
+  // to support over an account setting. Named ahead of the outage branch
+  // because "we refused" is the more specific answer wherever both are true.
+  if (refused) {
+    return <CostsRefused />;
   }
 
   // A failed read is an outage, not an empty account. Rendering the lanes with
@@ -334,27 +552,42 @@ function CostsBody({
     );
   }
 
-  if (data.unavailableReason !== null) {
-    return (
-      <Alert.Root status="info" data-testid="cost-lanes-unavailable">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Cost data is unavailable</Alert.Title>
-          <Alert.Description>
-            {data.unavailableReason === "no_cost_store"
-              ? "This deployment does not have cost storage configured, so no cost has been recorded."
-              : "No cost has been recorded for this organization yet."}
-          </Alert.Description>
-        </Alert.Content>
-      </Alert.Root>
-    );
-  }
+  return (
+    <Alert.Root status="info" data-testid="cost-lanes-unavailable">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Cost data is unavailable</Alert.Title>
+        <Alert.Description>
+          {data.unavailableReason === "no_cost_store"
+            ? "This deployment does not have cost storage configured, so no cost has been recorded."
+            : "No cost has been recorded for this organization yet."}
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
 
+/**
+ * The three lanes, in the same panel shell as everything below them.
+ *
+ * `alignItems="start"` rather than a stretched row: the seats lane lists a
+ * line per licence pool and the money lanes hold one figure each, so stretching
+ * them to a common height left the two money lanes mostly empty box. A card
+ * that ends where its content ends reads as deliberate; one padded out to match
+ * its tallest neighbour reads as missing something.
+ */
+function CostLanes({
+  data,
+  sample,
+}: {
+  data: GovernanceCostSummaryDto;
+  sample: boolean;
+}) {
   return (
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
       <UnpricedWindowNotice unpricedWindow={data.unpricedWindow} />
-      <HStack align="stretch" gap={4} flexWrap="wrap">
+      <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} alignItems="start">
         <CostLanePanel
           testId="cost-lane-billed"
           label="Billed by provider"
@@ -367,6 +600,7 @@ function CostsBody({
               ? azureBillingNoteSentence(data.azureBilling)
               : null
           }
+          sample={sample}
         />
         <CostLanePanel
           testId="cost-lane-gateway"
@@ -375,10 +609,14 @@ function CostsBody({
           amountUsd={data.gateway.amountUsd}
           cellsWithoutAmount={data.gateway.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.gateway.currenciesWithoutUsdAmount}
+          sample={sample}
         />
-        <SeatLanePanel testId="cost-lane-seats" seats={data.seats} />
-      </HStack>
-      <CostLanesChart series={data.series} />
+        <SeatLanePanel
+          testId="cost-lane-seats"
+          seats={data.seats}
+          sample={sample}
+        />
+      </SimpleGrid>
     </VStack>
   );
 }
@@ -499,6 +737,12 @@ interface Breakdowns {
   activeUsers: number | null;
   overTime: DailyBucket[] | null;
   modelOverTime: DailyBucket[] | null;
+  /**
+   * The activity reads were declined rather than broken — the plan gate or a
+   * missing `activityMonitor:view`. Distinct from the rows being null, which
+   * on its own cannot tell a refusal from a read still in flight.
+   */
+  refused: boolean;
 }
 
 /** Wire buckets carry money as strings; the charts want numbers. */
@@ -521,15 +765,21 @@ function toDailyBuckets(
   }));
 }
 
+/**
+ * The reads under the breakdown panels.
+ *
+ * The over-time read is grouped by team and nothing chooses otherwise any
+ * more. Group By was a chip that renamed one chart's series while every panel
+ * around it ignored it; the chart says "by team" in its own title instead,
+ * where the reader looking at it will see it.
+ */
 function useBreakdownQueries({
   organizationId,
   windowDays,
-  groupBy,
   enabled,
 }: {
   organizationId: string;
   windowDays: number;
-  groupBy: GroupBy;
   enabled: boolean;
 }): Breakdowns {
   const args = { organizationId, windowDays };
@@ -545,7 +795,7 @@ function useBreakdownQueries({
     options,
   );
   const overTime = api.activityMonitor.spendOverTime.useQuery(
-    { ...args, groupBy },
+    { ...args, groupBy: "team" as const },
     options,
   );
   const byModel = api.activityMonitor.spendOverTime.useQuery(
@@ -571,6 +821,16 @@ function useBreakdownQueries({
     departments,
     userRows: byUser.data ?? null,
     activeUsers: summary.data?.activeUsersThisWindow ?? null,
+    // One flag for the group: the activity monitor sits behind a single plan
+    // gate and a single grant, so these five reads are refused together or not
+    // at all. The sample decision needs it because a declined read is an
+    // answer of nothing, and left as `null` it read as "still waiting".
+    refused:
+      isRefusedRead(summary.error) ||
+      isRefusedRead(byDepartment.error) ||
+      isRefusedRead(byUser.error) ||
+      isRefusedRead(overTime.error) ||
+      isRefusedRead(byModel.error),
     // `.buckets`, not the result object: the read answers a wrapper, and
     // handing the wrapper to a function that maps over an array throws the
     // moment a real answer arrives.
@@ -596,194 +856,476 @@ function totalPerSeries(buckets: DailyBucket[]): RankRow[] {
 }
 
 /**
+ * What the invented money adds up to, and why these three numbers.
+ *
+ * Every sample figure on the screen is scaled from `SAMPLE_MONTHLY_TOP`, so
+ * the lanes, the time charts and the ranked panels all describe one imaginary
+ * organization rather than five. They were generated independently before,
+ * which is how the department panel came to read $10.2k under a chart of the
+ * same money drawing $280k a quarter — a screen that does not add up teaches a
+ * reader to distrust the real one.
+ *
+ * `sampleDaily` decays each series by half, so five of them sum to about 1.94
+ * times the leader; that is where the window total comes from.
+ */
+const SAMPLE_MONTHLY_TOP = 7_400;
+const SAMPLE_SERIES_DECAY_SUM = 1.94;
+/** Roughly what a twelve-month window holds, for the panels with no series. */
+const SAMPLE_WINDOW_TOTAL = SAMPLE_MONTHLY_TOP * SAMPLE_SERIES_DECAY_SUM * 12;
+
+/** The models and people the ranked sample panels name. */
+const SAMPLE_MODELS = [
+  "gpt-5-mini",
+  "gpt-5",
+  "claude-sonnet-5",
+  "claude-haiku-4-5",
+];
+const SAMPLE_PEOPLE = [
+  "ada@acme.test",
+  "grace@acme.test",
+  "alan@acme.test",
+  "edsger@acme.test",
+  "barbara@acme.test",
+];
+
+/** Every invented series the breakdowns draw from, already folded. */
+type SampleSeries = ReturnType<typeof useSampleSeries>;
+
+/**
+ * The pulled lane's spender read. `rows` is null while unanswered — the read
+ * is refused without the People screen's permission — and a failure is carried
+ * separately, because hiding the panel on an outage would claim nobody spent
+ * anything.
+ */
+interface SpenderReadState {
+  rows: SpenderRow[] | null;
+  isError: boolean;
+  /** Declined by the plan gate or a missing grant, rather than broken. */
+  refused: boolean;
+  retry: () => void;
+}
+
+/** Where a reader goes to make an empty panel stop being empty. */
+const ADD_A_SOURCE = {
+  label: "Add a source",
+  to: "/governance/inventory?tab=sources",
+} as const;
+const MANAGE_DEPARTMENTS = {
+  label: "Manage departments",
+  to: "/governance/people?tab=departments",
+} as const;
+
+/**
  * The billed-spend-by-person panel's slot in the grid.
  *
- * Different money from "Cost by user" on purpose: that panel is the cost
+ * Different money from "Metered spend by person" on purpose: that panel is the cost
  * recorded on traces, this one is what the provider's BILL said each person
  * spent (the pulled lane). They disagree legitimately and are never
- * reconciled — each is labeled for its lane. Absent, not zero-filled, when
- * the breakdown holds no rows or the viewer lacks the People screen's
- * permission. A failed read is neither empty nor refused, so it says so
- * instead of vanishing.
+ * reconciled — each is labeled for its lane.
+ *
+ * The panel used to disappear when the read answered with nothing or was
+ * refused, which left a hole in the grid that said neither. It now states what
+ * it holds and what fills it, and in sample mode it shows an invented list
+ * rather than the read's failure.
  */
 function SpenderPanelSlot({
   spenders,
+  showSample,
 }: {
-  spenders: { rows: SpenderRow[] | null; isError: boolean; retry: () => void };
+  spenders: SpenderReadState;
+  showSample: boolean;
 }) {
-  if (spenders.isError) {
+  const hasRows = spenders.rows !== null && spenders.rows.length > 0;
+
+  if (showSample && !hasRows) {
+    return (
+      <CostPanel title="Billed spend by person" sample>
+        <CostSpenderList rows={sampleSpenderRows()} />
+      </CostPanel>
+    );
+  }
+  // Only a real failure gets the failure panel. A refusal falls through to the
+  // empty state below, which says what the panel holds and what would fill it —
+  // true of a declined read, where "try again" is advice that cannot work.
+  if (spenders.isError && !spenders.refused) {
     return (
       <CostPanel title="Billed spend by person">
         <CostSpenderError onRetry={spenders.retry} />
       </CostPanel>
     );
   }
-  if (spenders.rows === null || spenders.rows.length === 0) return null;
+  if (!hasRows) {
+    return (
+      <CostPanel title="Billed spend by person">
+        <CostPanelEmpty
+          unanswered={spenders.rows === null}
+          what="What the provider's own bill attributed to each person."
+          source="Fills once a billing source is pulling and its rows carry an actor."
+          action={ADD_A_SOURCE}
+        />
+      </CostPanel>
+    );
+  }
   return (
     <CostPanel title="Billed spend by person">
-      <CostSpenderList rows={spenders.rows} />
+      <CostSpenderList rows={spenders.rows ?? []} />
     </CostPanel>
   );
 }
 
+/**
+ * The two wide panels that only exist in sample mode.
+ *
+ * Both illustrate a measurement the platform does not take yet, so neither has
+ * a real counterpart to stand aside for — they are simply absent when sample
+ * mode is off, rather than rendering empty.
+ */
+function SampleHeadlinePanels({
+  sample,
+  interval,
+}: {
+  sample: SampleSeries;
+  interval: TimeInterval;
+}) {
+  return (
+    <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
+      {/*
+        "Metered spend", not "consumption": the gateway lane above is labelled
+        "Metered by gateway" and ADR-128 §2 calls this money gateway metering
+        throughout. A screen that names the same money two ways teaches the
+        reader they are two things.
+      */}
+      <CostPanel title="Metered spend forecast · by agent" sample>
+        <CostForecastArea
+          buckets={sample.forecast.buckets}
+          projectedFromDay={sample.forecast.projectedFromDay}
+          interval={interval}
+        />
+      </CostPanel>
+      {/*
+        Seats are COUNTS (ADR-128 §6, and §16's wave-1 aggregate: "you pay for
+        N seats, M are assigned"). This panel used to draw them as daily
+        dollars, which is wrong twice over — nobody is charged for a
+        subscription daily, and §6's reversal note says seat money is not
+        something this product holds at all. Bought and assigned are drawn side
+        by side rather than stacked; the gap between them is the idle seats the
+        panel exists to show.
+
+        Per licence pool rather than per department: the wave-1 seat read is
+        the provider's own SKU/roster count, and per-person assignment facts —
+        the only thing that could attribute a seat to a department — are named
+        in §16 as wave 2.
+      */}
+      <CostPanel title="Seats · bought against assigned" sample>
+        <CostStackedBars
+          buckets={sample.seats}
+          format={fmtCount}
+          interval={interval}
+          grouped
+        />
+      </CostPanel>
+    </SimpleGrid>
+  );
+}
+
+/**
+ * The breakdown grid: four measured panels, the spender list, and the invented
+ * ones interleaved in the prototype's order.
+ *
+ * `fillWithSample` is the one rule the grid applies throughout — sample mode
+ * fills a panel that has nothing and never displaces one holding real figures,
+ * so a badge on this grid always means the panel beneath it is invented.
+ */
+function BreakdownGrid({
+  interval,
+  rows,
+  sample,
+  showSample,
+  spenders,
+}: {
+  interval: TimeInterval;
+  /** Every measured series, already folded and filtered. Null is unanswered. */
+  rows: MeasuredRows;
+  sample: SampleSeries;
+  showSample: boolean;
+  spenders: SpenderReadState;
+}) {
+  /** Whether sample figures stand in for this panel's own. */
+  const invented = (measured: unknown[] | null) =>
+    showSample && (measured === null || measured.length === 0);
+  /** Those sample figures, or the measured ones when there are any. */
+  const orSample = <T,>(measured: T[] | null, invented_: T[]): T[] | null =>
+    invented(measured) ? invented_ : measured;
+
+  return (
+    <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
+      {showSample && (
+        <CostPanel title="Share of cost by agent" sample>
+          <CostDonut rows={sample.agents} />
+        </CostPanel>
+      )}
+      <CostPanel
+        title="Cost over time · by team"
+        sample={invented(rows.byTeam)}
+      >
+        <CostStackedBars
+          buckets={orSample(rows.byTeam, sample.overTime)}
+          interval={interval}
+          empty={costPanelEmpty({
+            what: "Spend per team, one bar per period.",
+            source:
+              "Fills from gateway traffic and from usage a connected source reports.",
+            action: ADD_A_SOURCE,
+          })}
+        />
+      </CostPanel>
+      <CostPanel
+        title="Cost by department"
+        sample={invented(rows.byDepartment)}
+      >
+        <CostRankList
+          rows={orSample(rows.byDepartment, sample.departments)}
+          empty={costPanelEmpty({
+            what: "Spend split across the departments people belong to.",
+            source:
+              "Fills once people who are spending are assigned to a department.",
+            action: MANAGE_DEPARTMENTS,
+          })}
+        />
+      </CostPanel>
+
+      {showSample && (
+        <CostPanel title="Cost by agent" sample>
+          <CostRankList rows={sample.agents} />
+        </CostPanel>
+      )}
+      <CostPanel title="Cost by model" sample={invented(rows.byModel)}>
+        <CostRankList
+          rows={orSample(rows.byModel, sample.models)}
+          empty={costPanelEmpty({
+            what: "Spend per model, largest first.",
+            source:
+              "Fills from gateway traffic and from usage rows that name a model.",
+            action: ADD_A_SOURCE,
+          })}
+        />
+      </CostPanel>
+      {/* "Metered", not "Cost", because the panel below it also ranks people
+          by money and the two figures are different money — this one is what
+          the traffic measured as it was served, that one is what the provider
+          put on the invoice. They disagree routinely, so each title has to
+          name its lane or the pair reads as the same list rendered twice. */}
+      <CostPanel title="Metered spend by person" sample={invented(rows.byUser)}>
+        <CostRankList
+          rows={orSample(rows.byUser, sample.users)}
+          empty={costPanelEmpty({
+            what: "Spend recorded against each person as their traffic was served.",
+            source:
+              "Fills from gateway traffic and from usage rows that name an actor.",
+            action: ADD_A_SOURCE,
+          })}
+        />
+      </CostPanel>
+      <SpenderPanelSlot spenders={spenders} showSample={showSample} />
+
+      {showSample && <SampleTailPanels sample={sample} interval={interval} />}
+    </SimpleGrid>
+  );
+}
+
+/**
+ * The two count panels that close the grid, both invented.
+ *
+ * "Conversations", not "Genie questions". Genie is one of eight ingestion
+ * sources (docs/ai-governance/overview.mdx) and no metric in the ADR or the
+ * product docs is named after it; a panel named for one provider reads as
+ * empty to every customer using another.
+ */
+function SampleTailPanels({
+  sample,
+  interval,
+}: {
+  sample: SampleSeries;
+  interval: TimeInterval;
+}) {
+  return (
+    <>
+      <CostPanel title="Conversations over time" sample>
+        <CostStackedBars
+          buckets={sample.conversations}
+          format={fmtCount}
+          interval={interval}
+          showLegend={false}
+        />
+      </CostPanel>
+      <CostPanel title="Tokens over time" sample>
+        <CostLine points={sample.tokens} interval={interval} />
+      </CostPanel>
+    </>
+  );
+}
+
+/**
+ * Everything below the lanes: the adoption strip, the sample-only headline
+ * pair, and the breakdown grid.
+ *
+ * The wire rows are mapped to chart rows here rather than in the grid because
+ * this is where the department filter applies, and the mapping has to carry
+ * null through: an unanswered read stays unanswered all the way to the panel
+ * rather than turning into an empty list, which would read as a measurement.
+ */
 function CostBreakdowns({
   filters,
   breakdowns,
+  periods,
   showSample,
   spenders,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
+  /** The bucket starts the sample series are drawn on. */
+  periods: string[];
   showSample: boolean;
-  /**
-   * The pulled lane's spender breakdown. Rows are null while unanswered — the
-   * read is refused without the People screen's permission, and the panel is
-   * then simply absent. Null and empty both render nothing: an absent panel,
-   * never a zero-filled one. A failed read renders as a failure instead.
-   */
-  spenders: {
-    rows: SpenderRow[] | null;
-    isError: boolean;
-    retry: () => void;
-  };
+  spenders: SpenderReadState;
 }) {
-  const days = useMemo(
-    () => recentDays(filters.windowDays),
-    [filters.windowDays],
-  );
-  const sample = useSampleSeries(days, filters.interval);
-
-  // Null in, null out — an unanswered read stays unanswered all the way to the
-  // panel rather than turning into an empty list that reads as a measurement.
-  const departmentRows =
-    breakdowns.departmentRows === null
-      ? null
-      : breakdowns.departmentRows
-          .filter(
-            (row) =>
-              filters.department === ALL_DEPARTMENTS ||
-              (row.departmentId ?? "unassigned") === filters.department,
-          )
-          .map((row) => ({
-            key: row.departmentId ?? "unassigned",
-            label: row.departmentName,
-            value: Number(row.spendUsd),
-          }));
-  const userRows =
-    breakdowns.userRows === null
-      ? null
-      : breakdowns.userRows.map((row) => ({
-          key: row.actor,
-          label: row.actor,
-          value: Number(row.spendUsd),
-        }));
+  const sample = useSampleSeries(periods, filters.interval, filters.department);
+  const rows = measuredRows({ breakdowns, filters });
 
   return (
     <VStack align="stretch" gap={4}>
-      <AdoptionRow breakdowns={breakdowns} />
+      <AdoptionRow breakdowns={breakdowns} showSample={showSample} />
       {showSample && (
-        <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4}>
-          <CostPanel title="Consumption forecast · by agent" sample>
-            <CostForecastArea
-              buckets={sample.forecast.buckets}
-              projectedFromDay={sample.forecast.projectedFromDay}
-            />
-          </CostPanel>
-          <CostPanel title="Subscriptions · by department" sample>
-            <CostStackedBars buckets={sample.subscriptions} />
-          </CostPanel>
-        </SimpleGrid>
+        <SampleHeadlinePanels sample={sample} interval={filters.interval} />
       )}
-
-      {/* One grid, in the prototype's order. With samples off the four
-          measured panels close ranks and the grid reflows around them. */}
-      <SimpleGrid columns={{ base: 1, xl: 3 }} gap={4}>
-        {/* The placeholder series is agents whatever Group By says, so this
-            title does not follow it — a chart labelled by model showing agent
-            names would be worse than a fixed label. */}
-        {showSample && (
-          <CostPanel title="% cost by agent" sample>
-            <CostDonut rows={sample.agents} />
-          </CostPanel>
-        )}
-        <CostPanel title={`Cost evolution by ${filters.groupBy}`}>
-          <CostStackedBars
-            buckets={
-              breakdowns.overTime === null
-                ? null
-                : aggregateBuckets(breakdowns.overTime, filters.interval)
-            }
-          />
-        </CostPanel>
-        <CostPanel title="Cost by department">
-          <CostRankList rows={departmentRows} />
-        </CostPanel>
-
-        {showSample && (
-          <CostPanel title="Cost by agent" sample>
-            <CostRankList rows={sample.agents} />
-          </CostPanel>
-        )}
-        <CostPanel title="Cost by model">
-          <CostRankList
-            rows={
-              breakdowns.modelOverTime === null
-                ? null
-                : totalPerSeries(breakdowns.modelOverTime)
-            }
-          />
-        </CostPanel>
-        <CostPanel title="Cost by user">
-          <CostRankList rows={userRows} />
-        </CostPanel>
-        <SpenderPanelSlot spenders={spenders} />
-
-        {showSample && (
-          <>
-            <CostPanel title="Genie questions over time" sample>
-              <CostStackedBars
-                buckets={sample.genie}
-                format={fmtCount}
-                showLegend={false}
-              />
-            </CostPanel>
-            <CostPanel title="Tokens over time" sample>
-              <CostLine points={sample.tokens} />
-            </CostPanel>
-            <CostPanel title="Subscriptions vs consumption" sample>
-              <CostStackedBars
-                buckets={sample.seatsVsUsage}
-                showLegend={false}
-              />
-            </CostPanel>
-          </>
-        )}
-      </SimpleGrid>
+      <BreakdownGrid
+        interval={filters.interval}
+        rows={rows}
+        sample={sample}
+        showSample={showSample}
+        spenders={spenders}
+      />
     </VStack>
   );
 }
 
+/** The four measured series the grid draws. Null is an unanswered read. */
+interface MeasuredRows {
+  byTeam: DailyBucket[] | null;
+  byDepartment: RankRow[] | null;
+  byModel: RankRow[] | null;
+  byUser: RankRow[] | null;
+}
+
 /**
- * Active users for the window, and only that.
+ * The wire rows, folded to the interval and narrowed by the department chip.
  *
- * An interaction count used to sit beside it, summed from the ranked user
- * rows — but that read is a top-8, so the sum was the leaders' share wearing
- * the name of an organization-wide total. There is no whole-window
- * interaction count to put there instead, so the figure is gone rather than
+ * Null carries all the way through: an unanswered read stays unanswered rather
+ * than turning into an empty list, which the panel would report as a
+ * measurement of an empty window.
+ */
+function measuredRows({
+  breakdowns,
+  filters,
+}: {
+  breakdowns: Breakdowns;
+  filters: CostFilters;
+}): MeasuredRows {
+  return {
+    byTeam:
+      breakdowns.overTime === null
+        ? null
+        : aggregateBuckets(breakdowns.overTime, filters.interval),
+    byDepartment:
+      breakdowns.departmentRows === null
+        ? null
+        : breakdowns.departmentRows
+            .filter(
+              (row) =>
+                filters.department === ALL_DEPARTMENTS ||
+                (row.departmentId ?? "unassigned") === filters.department,
+            )
+            .map((row) => ({
+              key: row.departmentId ?? "unassigned",
+              label: row.departmentName,
+              value: Number(row.spendUsd),
+            })),
+    byModel:
+      breakdowns.modelOverTime === null
+        ? null
+        : totalPerSeries(breakdowns.modelOverTime),
+    byUser:
+      breakdowns.userRows === null
+        ? null
+        : breakdowns.userRows.map((row) => ({
+            key: row.actor,
+            label: row.actor,
+            value: Number(row.spendUsd),
+          })),
+  };
+}
+
+/**
+ * Adoption: how far AI tools have reached into the organization.
+ *
+ * Only the active-user count is measured today. In sample mode the panel shows
+ * the four figures it is meant to hold rather than the word "Not available",
+ * which named nothing and told the reader nothing about what would fill it.
+ *
+ * An interaction count used to sit beside the user count, summed from the
+ * ranked user rows — but that read is a top-8, so the sum was the leaders'
+ * share wearing the name of an organization-wide total. It is gone rather than
  * quietly wrong.
  */
-function AdoptionRow({ breakdowns }: { breakdowns: Breakdowns }) {
+function AdoptionRow({
+  breakdowns,
+  showSample,
+}: {
+  breakdowns: Breakdowns;
+  showSample: boolean;
+}) {
+  const measured = breakdowns.activeUsers;
+
+  if (showSample && measured === null) {
+    const adoption = sampleAdoption();
+    return (
+      <CostPanel title="Adoption" sample>
+        <HStack gap={10} align="flex-end" flexWrap="wrap">
+          <Stat
+            label="People using AI tools"
+            value={numeral(adoption.peopleUsingAiTools).format("0,0")}
+          />
+          <Stat
+            label="Active seats"
+            value={numeral(adoption.activeSeats).format("0,0")}
+          />
+          <Stat
+            label="Tools adopted"
+            value={numeral(adoption.toolsAdopted).format("0,0")}
+          />
+          <Stat
+            label="Change against previous period"
+            value={`+${adoption.trendPct}%`}
+          />
+        </HStack>
+      </CostPanel>
+    );
+  }
+
   return (
     <CostPanel title="Adoption">
-      {breakdowns.activeUsers === null ? (
-        <Text fontSize="sm" color="fg.muted">
-          Not available.
-        </Text>
+      {measured === null ? (
+        <CostPanelEmpty
+          unanswered
+          height="72px"
+          what="How many people used an AI tool in this period."
+          source="Fills from the activity a connected source reports."
+          action={ADD_A_SOURCE}
+        />
       ) : (
         <HStack gap={10} align="flex-end">
           <Stat
-            label="Users"
-            value={numeral(breakdowns.activeUsers).format("0,0")}
+            label="People using AI tools"
+            value={numeral(measured).format("0,0")}
           />
         </HStack>
       )}
@@ -791,37 +1333,84 @@ function AdoptionRow({ breakdowns }: { breakdowns: Breakdowns }) {
   );
 }
 
-/** Every placeholder series the page needs, folded to the chosen interval. */
-function useSampleSeries(days: string[], interval: TimeInterval) {
+/**
+ * The bucket starts the sample series are drawn on.
+ *
+ * Months, because the finest interval any chip offers is a month, so a year of
+ * invented days would be folded away before anything drew it. The frame's full
+ * span is used rather than the clamped one: nothing here is a read, so the
+ * ceiling that applies to reads does not apply, and a two-year frame shows two
+ * years of sample.
+ */
+function useSamplePeriods(frame: TimeFrame): string[] {
+  return useMemo(
+    () => recentMonths(Math.max(1, Math.round(frameSpanDays({ frame }) / 30))),
+    [frame],
+  );
+}
+
+/**
+ * Every placeholder series the page needs, folded to the chosen interval and
+ * narrowed to the chosen department.
+ *
+ * The department chip filters the invented series exactly as it filters the
+ * real ones: a chip that changed nothing while the reader watched would be a
+ * demonstration of a control that does not work.
+ */
+function useSampleSeries(
+  periods: string[],
+  interval: TimeInterval,
+  department: string,
+) {
   return useMemo(() => {
-    const forecast = sampleForecast(days, SAMPLE_AGENTS.slice(0, 5), 2200);
+    const departments =
+      department === ALL_DEPARTMENTS
+        ? [...SAMPLE_DEPARTMENTS]
+        : SAMPLE_DEPARTMENTS.filter((name) => name === department);
+
+    // The two series every ranked panel is derived from, so a reader who adds
+    // up the department bars gets the same figure the chart above them draws.
+    const byDepartment = sampleDaily(periods, departments, SAMPLE_MONTHLY_TOP);
+    const forecast = sampleForecast(
+      periods,
+      SAMPLE_AGENTS.slice(0, 5),
+      SAMPLE_MONTHLY_TOP,
+    );
+
     return {
-      agents: sampleRanked(SAMPLE_AGENTS, 2296),
+      // Ranked FROM the series rather than beside it. Generating both
+      // independently is what made the old screen incoherent: the department
+      // panel read $10.2k under a chart of the same money drawing $280k a
+      // quarter, and a reader who noticed had learned only that the screen
+      // does not add up.
+      departments: totalPerSeries(byDepartment),
+      agents: totalPerSeries(forecast.buckets),
+      // These two have no series of their own on the page, so they are scaled
+      // to the same window total by hand: a 0.42 decay sums to about 1.72x its
+      // leader, which puts the leader near sixty per cent of the year.
+      models: sampleRanked(SAMPLE_MODELS, SAMPLE_WINDOW_TOTAL * 0.58),
+      users: sampleRanked(SAMPLE_PEOPLE, SAMPLE_WINDOW_TOTAL * 0.4),
       forecast: {
         buckets: aggregateBuckets(forecast.buckets, interval),
-        // The projection marker sits on a specific day, so it only lines up
-        // with the axis while the axis is days. Weekly and monthly folds drop
-        // it rather than point it at a bucket boundary it does not fall on.
-        projectedFromDay: interval === "day" ? forecast.projectedFromDay : null,
+        // The projection marker sits on one bucket start, so it only lines up
+        // with the axis while the axis is drawn on those starts. A fold to a
+        // wider interval drops it rather than pointing it at a boundary it
+        // does not fall on.
+        projectedFromDay:
+          interval === "month" ? forecast.projectedFromDay : null,
       },
-      subscriptions: aggregateBuckets(
-        sampleDaily(days, SAMPLE_DEPARTMENTS, 3600),
-        interval,
-      ),
-      genie: aggregateBuckets(
-        sampleDaily(days, SAMPLE_AGENTS.slice(0, 6), 26),
+      overTime: aggregateBuckets(byDepartment, interval),
+      seats: aggregateSeatCounts(sampleSeats(periods), interval),
+      conversations: aggregateBuckets(
+        sampleDaily(periods, SAMPLE_AGENTS.slice(0, 6), 780),
         interval,
       ),
       tokens: aggregateLine(
-        sampleLine(days, "tokens", 3_000_000_000),
-        interval,
-      ),
-      seatsVsUsage: aggregateBuckets(
-        sampleDaily(days, ["Usage", "Seat", "Cloud", "Activity"], 2400),
+        sampleLine(periods, "tokens", 3_000_000_000),
         interval,
       ),
     };
-  }, [days, interval]);
+  }, [periods, interval, department]);
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

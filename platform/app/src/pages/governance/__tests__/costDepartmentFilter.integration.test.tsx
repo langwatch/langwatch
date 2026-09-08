@@ -153,10 +153,12 @@ const pickFilter = async (chipLabel: string, option: string) => {
 };
 
 beforeEach(() => {
+  // Keyed by the window each frame asks for: Last 12 months is the page's
+  // default (clamped to the reads' 365-day ceiling), Last 3 months is 90.
   harness.departmentsByWindow = {
-    30: [ENGINEERING, SUPPORT],
-    // Engineering spent nothing in the last seven days, so it is not here.
-    7: [SUPPORT],
+    365: [ENGINEERING, SUPPORT],
+    // Engineering spent nothing in the last three months, so it is not here.
+    90: [SUPPORT],
   };
 });
 
@@ -164,12 +166,13 @@ afterEach(() => cleanup());
 
 describe("the department filter", () => {
   describe("given real totals and activity in two departments", () => {
-    /** @scenario "The department filter explains that it changes only the department chart" */
+    /** @scenario "The department filter explains that it changes only the department breakdown" */
     it("names its panel-only scope and leaves totals and user costs unchanged", async () => {
       renderScreen();
       const userPanel = () =>
-        screen.getByText("Cost by user").closest('[data-testid="cost-panel"]')
-          ?.textContent;
+        screen
+          .getByText("Metered spend by person")
+          .closest('[data-testid="cost-panel"]')?.textContent;
       const originalUserPanel = userPanel();
       expect(originalUserPanel).toContain("ada@acme.test");
       expect(screen.getByText("$123.45")).toBeInTheDocument();
@@ -177,11 +180,11 @@ describe("the department filter", () => {
 
       await pickFilter("Department", "Engineering");
 
-      expect(
-        screen.getByText(
-          "Department filters only the Cost by department chart.",
-        ),
-      ).toBeInTheDocument();
+      // The caption also states the chart bucket, so match the department
+      // half of it rather than the whole sentence.
+      expect(screen.getByTestId("cost-bucket-note")).toHaveTextContent(
+        /Department filters only the department breakdown\./,
+      );
       const departmentPanel = screen
         .getByText("Cost by department")
         .closest('[data-testid="cost-panel"]');
@@ -201,7 +204,7 @@ describe("the department filter", () => {
         expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0),
       );
 
-      await pickFilter("Time Frame", "Last 7 days");
+      await pickFilter("Time Frame", "Last 3 months");
 
       // Whatever the fix does, these two have to agree. Today the chip says
       // "All departments" and the panel shows no department at all, because
@@ -222,12 +225,12 @@ describe("the department filter", () => {
 
   describe("given a department is selected and the window keeps it", () => {
     it("keeps filtering to that department", async () => {
-      harness.departmentsByWindow[7] = [ENGINEERING, SUPPORT];
+      harness.departmentsByWindow[90] = [ENGINEERING, SUPPORT];
 
       renderScreen();
 
       await pickFilter("Department", "Engineering");
-      await pickFilter("Time Frame", "Last 7 days");
+      await pickFilter("Time Frame", "Last 3 months");
 
       await waitFor(() =>
         expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0),
@@ -243,12 +246,12 @@ describe("the department filter", () => {
 
   describe("given a department is selected and the next read has not answered", () => {
     it("keeps naming the selection instead of claiming all departments", async () => {
-      harness.departmentsByWindow[7] = undefined;
+      harness.departmentsByWindow[90] = undefined;
 
       renderScreen();
 
       await pickFilter("Department", "Engineering");
-      await pickFilter("Time Frame", "Last 7 days");
+      await pickFilter("Time Frame", "Last 3 months");
 
       // An unanswered read is not evidence the department disappeared, so
       // resetting here would throw away the reader's choice on every refetch.

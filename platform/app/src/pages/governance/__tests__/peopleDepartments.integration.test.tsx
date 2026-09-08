@@ -1,18 +1,20 @@
 /**
  * @vitest-environment jsdom
  *
- * What the People screen does with the two departments a person can carry:
- * the one their provider's directory named, and the one their linked member
- * is assigned to.
+ * What the People screen does with the two departments a person can carry —
+ * the one their provider's directory named, and the one their linked member is
+ * assigned to — and the invariants the merged table has to keep: two providers
+ * naming one address stay two rows, money nobody can be proven to own is shown
+ * once, and an erased person is described by their stand-in and nothing else.
  *
  * The real page renders, with only its boundaries mocked - the layout chrome,
- * the feature flag, the permission hook and the tRPC client. The department
- * decisions are the page's own.
+ * the feature flag, the plan, the permission hook and the tRPC client. The
+ * department and merge decisions are the page's own.
  *
  * Spec: specs/governance/governance-people-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { MemoryRouter } from "react-router";
@@ -21,6 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const harness = vi.hoisted(() => ({
   people: [] as unknown[],
   departments: [] as unknown[],
+  spend: [] as unknown[],
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -40,7 +43,11 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 }));
 
 vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({ isEnterprise: true, activePlan: undefined }),
+  useActivePlan: () => ({
+    isEnterprise: true,
+    isLoading: false,
+    activePlan: undefined,
+  }),
 }));
 
 vi.mock("~/components/governance/GovernanceLayout", () => ({
@@ -61,6 +68,7 @@ vi.mock("~/utils/api", () => {
     if (path === "governancePeople.list") return harness.people;
     if (path === "governancePeople.suggestions") return [];
     if (path === "departments.list") return harness.departments;
+    if (path === "activityMonitor.spendByUser") return harness.spend;
     return undefined;
   };
   const node = (path: string[]): unknown =>
@@ -101,7 +109,7 @@ import PeoplePage from "../people";
 const seenAt = new Date("2026-08-01T00:00:00.000Z");
 
 const discovered = (over: Record<string, unknown>) => ({
-  id: `person_${String(over.displayText ?? "x")}`,
+  id: `person_${String(over.id ?? over.displayText ?? "x")}`,
   provider: "copilot_studio_dataverse",
   kind: "person",
   displayText: "Someone",
@@ -117,9 +125,9 @@ const discovered = (over: Record<string, unknown>) => ({
 });
 
 /**
- * The page is two tabs. The people the providers named sit on the People
- * tab (the default address); the departments their directories named sit
- * on the Departments tab, beside the list the administrator keeps.
+ * The page is two tabs. Everyone the providers named sits on the merged table
+ * on the People tab (the default address); the departments their directories
+ * named sit on the Departments tab, beside the list the administrator keeps.
  */
 const renderPage = (entry = "/governance/people") =>
   render(
@@ -136,6 +144,8 @@ afterEach(() => {
   cleanup();
   harness.people = [];
   harness.departments = [];
+  harness.spend = [];
+  window.sessionStorage.clear();
 });
 
 describe("given people the providers named", () => {
@@ -150,16 +160,24 @@ describe("given people the providers named", () => {
       ];
       renderPage();
 
-      expect(screen.getByText("Maria Silva")).toBeInTheDocument();
-      expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0);
+      const row = screen.getByRole("row", { name: /Maria Silva/ });
+      expect(within(row).getByText("Engineering")).toBeInTheDocument();
     });
 
     it("lists the departments the providers see with a headcount each", () => {
       harness.people = [
-        discovered({ displayText: "A", directoryDepartment: "Engineering" }),
-        discovered({ displayText: "B", directoryDepartment: "Engineering" }),
-        discovered({ displayText: "C", directoryDepartment: "GTM" }),
-        discovered({ displayText: "D" }),
+        discovered({
+          id: "a",
+          displayText: "A",
+          directoryDepartment: "Engineering",
+        }),
+        discovered({
+          id: "b",
+          displayText: "B",
+          directoryDepartment: "Engineering",
+        }),
+        discovered({ id: "c", displayText: "C", directoryDepartment: "GTM" }),
+        discovered({ id: "d", displayText: "D" }),
       ];
       renderPage(DEPARTMENTS_TAB);
 
@@ -211,7 +229,9 @@ describe("given people the providers named", () => {
       ];
       renderPage();
 
-      expect(screen.getByText("Maria Silva · Finance")).toBeVisible();
+      const row = screen.getByRole("row", { name: /Maria Silva/ });
+      expect(within(row).getByText("Finance")).toBeInTheDocument();
+      expect(within(row).getByText("Matched")).toBeInTheDocument();
     });
 
     /** @scenario "The directory's department wins over the linked member's" */
@@ -230,12 +250,15 @@ describe("given people the providers named", () => {
       ];
       renderPage();
 
-      expect(screen.getByText("Maria Silva · Engineering")).toBeVisible();
+      const row = screen.getByRole("row", { name: /Maria Silva/ });
+      expect(within(row).getByText("Engineering")).toBeInTheDocument();
+      expect(within(row).queryByText("Finance")).not.toBeInTheDocument();
     });
   });
 
   describe("when a person has been erased", () => {
-    it("shows no department beside the stand-in they now wear", () => {
+    /** @scenario "An erased person's row names nobody it should not" */
+    it("shows the stand-in and nothing else about them", () => {
       harness.people = [
         discovered({
           displayText: "pseudonym_abc",
@@ -248,8 +271,74 @@ describe("given people the providers named", () => {
       ];
       renderPage();
 
-      expect(screen.getByText("pseudonym_abc")).toBeVisible();
+      const row = screen.getByRole("row", { name: /pseudonym_abc/ });
+      expect(within(row).getByText("Erased")).toBeInTheDocument();
       expect(screen.queryByText("Engineering")).not.toBeInTheDocument();
+      expect(within(row).queryByText(/Seen at/)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given two providers that named the same address", () => {
+  const AT_TWO_PROVIDERS = [
+    {
+      ...discovered({
+        id: "copilot",
+        displayText: "M Silva",
+        rawActorId: "m.silva@example.com",
+      }),
+      provider: "copilot_studio_dataverse",
+    },
+    {
+      ...discovered({
+        id: "openai",
+        displayText: "M Silva",
+        rawActorId: "m.silva@example.com",
+      }),
+      provider: "openai_admin",
+    },
+  ];
+
+  describe("when the merged table renders", () => {
+    /** @scenario "The same identifier at two providers stays two rows" */
+    it("keeps them two rows, one per provider", () => {
+      harness.people = AT_TWO_PROVIDERS;
+      renderPage();
+
+      const rows = screen.getAllByRole("row", { name: /M Silva/ });
+      expect(rows).toHaveLength(2);
+      expect(
+        rows.filter((row) => within(row).queryByText(/Copilot/)).length,
+      ).toBe(1);
+      expect(
+        rows.filter((row) => within(row).queryByText(/OpenAI/)).length,
+      ).toBe(1);
+    });
+
+    /** @scenario "Spend claimed by two providers is shown once, on neither of them" */
+    it("leaves the money they both claim on a row of its own", () => {
+      harness.people = AT_TWO_PROVIDERS;
+      harness.spend = [
+        {
+          actor: "m.silva@example.com",
+          spendUsd: "42",
+          requests: 100,
+          lastActivityIso: seenAt.toISOString(),
+          trendVsPreviousPct: 0,
+          hasPriorBaseline: false,
+          mostUsedTarget: null,
+        },
+      ];
+      renderPage();
+
+      // Exactly one row shows the figure, and it is not either provider's.
+      const spendCells = screen.getAllByText("$42.00");
+      expect(spendCells).toHaveLength(1);
+      const providerRows = screen.getAllByRole("row", { name: /M Silva/ });
+      expect(providerRows).toHaveLength(2);
+      for (const row of providerRows) {
+        expect(within(row).queryByText("$42.00")).not.toBeInTheDocument();
+      }
     });
   });
 });

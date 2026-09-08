@@ -1,107 +1,66 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
-import {
-  Building2,
-  CalendarDays,
-  ChevronDown,
-  Clock,
-  Layers,
-} from "lucide-react";
-import type { ReactNode } from "react";
+import { Text } from "@chakra-ui/react";
+import { Building2, CalendarDays, Clock } from "lucide-react";
 
 import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from "~/components/ui/menu";
-
-import {
-  ALL_DEPARTMENTS,
-  GROUP_BYS,
-  type GroupBy,
+  FilterChip,
+  FilterChipRow,
+  isIntervalCoarserThanFrame,
   TIME_FRAMES,
   TIME_INTERVALS,
+  type TimeFrame,
   type TimeInterval,
-} from "./costsWindow";
+  timeFrameLabel,
+  timeIntervalLabel,
+} from "~/components/governance/filters";
+import { MenuItem } from "~/components/ui/menu";
+
+import { ALL_DEPARTMENTS } from "./costsWindow";
 
 /**
  * The filter row: one pill per choice, each showing its own name and the value
- * currently picked. Every chip here changes what the page renders — a chip
- * that only looked like a filter would be worse than no chip at all.
+ * currently picked. The pill itself is the section-wide `FilterChip`; every
+ * chip here changes what the page renders — a chip that only looked like a
+ * filter would be worse than no chip at all.
+ *
+ * Three chips, not four. Group By went: it named the series of exactly one
+ * chart while sitting in a row that reads as filtering the page, and the chart
+ * beside it ignored it, so the one lesson it taught was that a chip on this
+ * page may or may not do anything. That chart is grouped by team and says so
+ * in its own title, where a reader looking at it will actually see it.
+ *
+ * An interval wider than the frame is offered as disabled rather than removed
+ * — the section-wide rule, so a reader learns why a choice is unavailable
+ * instead of watching options appear and vanish under them.
+ *
+ * Spec: specs/governance/governance-cost-screen.feature
+ *       specs/ai-governance/dashboard/governance-ui-controls.feature
  */
-function FilterChip({
-  icon,
-  label,
-  value,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  children: ReactNode;
-}) {
-  return (
-    <MenuRoot>
-      <MenuTrigger asChild>
-        <Button
-          size="xs"
-          variant="outline"
-          borderRadius="full"
-          paddingX={3}
-          fontWeight="normal"
-          colorPalette="purple"
-        >
-          <HStack gap={1.5}>
-            {icon}
-            <Text color="fg.muted">{label}</Text>
-            <Text color="fg.muted">·</Text>
-            <Text fontWeight="medium">{value}</Text>
-            <ChevronDown size={12} />
-          </HStack>
-        </Button>
-      </MenuTrigger>
-      <MenuContent minWidth="180px">{children}</MenuContent>
-    </MenuRoot>
-  );
-}
-
 export function CostFilterBar({
   departmentName,
   departments,
   onDepartmentChange,
-  windowDays,
-  onWindowDaysChange,
+  frame,
+  onFrameChange,
   interval,
   onIntervalChange,
-  groupBy,
-  onGroupByChange,
 }: {
   /** `null` when no single department is selected. */
   departmentName: string | null;
   departments: Array<{ id: string; name: string }>;
   onDepartmentChange: (value: string, name: string | null) => void;
-  windowDays: number;
-  onWindowDaysChange: (value: number) => void;
+  frame: TimeFrame;
+  onFrameChange: (value: TimeFrame) => void;
   interval: TimeInterval;
   onIntervalChange: (value: TimeInterval) => void;
-  groupBy: GroupBy;
-  onGroupByChange: (value: GroupBy) => void;
 }) {
   // The selected name, not a lookup against the current window's options. A
   // department the reader picked can drop out of those options, and falling
   // back to "All departments" there would label a filtered panel as the whole
   // organisation's spend.
   const departmentLabel = departmentName ?? "All departments";
-  const timeFrameLabel =
-    TIME_FRAMES.find((f) => f.value === windowDays)?.label ??
-    `Last ${windowDays} days`;
-  const intervalLabel =
-    TIME_INTERVALS.find((i) => i.value === interval)?.label ?? "Day";
-  const groupByLabel =
-    GROUP_BYS.find((g) => g.value === groupBy)?.label ?? "Team";
 
   return (
-    <HStack gap={2} wrap="wrap">
+    <FilterChipRow>
       <FilterChip
         icon={<Building2 size={12} />}
         label="Department"
@@ -127,15 +86,15 @@ export function CostFilterBar({
       <FilterChip
         icon={<CalendarDays size={12} />}
         label="Time Frame"
-        value={timeFrameLabel}
+        value={timeFrameLabel(frame)}
       >
-        {TIME_FRAMES.map((frame) => (
+        {TIME_FRAMES.map((option) => (
           <MenuItem
-            key={frame.value}
-            value={String(frame.value)}
-            onClick={() => onWindowDaysChange(frame.value)}
+            key={option.value}
+            value={option.value}
+            onClick={() => onFrameChange(option.value)}
           >
-            {frame.label}
+            {option.label}
           </MenuItem>
         ))}
       </FilterChip>
@@ -143,37 +102,40 @@ export function CostFilterBar({
       <FilterChip
         icon={<Clock size={12} />}
         label="Time Interval"
-        value={intervalLabel}
+        value={timeIntervalLabel(interval)}
       >
-        {TIME_INTERVALS.map((option) => (
-          <MenuItem
-            key={option.value}
-            value={option.value}
-            onClick={() => onIntervalChange(option.value)}
-          >
-            {option.label}
-          </MenuItem>
-        ))}
+        {TIME_INTERVALS.map((option) => {
+          const tooWide = isIntervalCoarserThanFrame({
+            interval: option.value,
+            frame,
+          });
+          return (
+            <MenuItem
+              key={option.value}
+              value={option.value}
+              disabled={tooWide}
+              onClick={
+                tooWide ? undefined : () => onIntervalChange(option.value)
+              }
+            >
+              {option.label}
+            </MenuItem>
+          );
+        })}
       </FilterChip>
-
-      <FilterChip
-        icon={<Layers size={12} />}
-        label="Group By"
-        value={groupByLabel}
+      {/* The bucket is stated once, for every chart, rather than inside one
+          chart's heading. It used to live in the lane chart's title, which
+          could only ever speak for that chart — and the rule is that every
+          chart on the screen shares this axis. */}
+      <Text
+        width="full"
+        fontSize="xs"
+        color="fg.muted"
+        data-testid="cost-bucket-note"
       >
-        {GROUP_BYS.map((option) => (
-          <MenuItem
-            key={option.value}
-            value={option.value}
-            onClick={() => onGroupByChange(option.value)}
-          >
-            {option.label}
-          </MenuItem>
-        ))}
-      </FilterChip>
-      <Text width="full" fontSize="xs" color="fg.muted">
-        Department filters only the Cost by department chart.
+        Department filters only the department breakdown. Every chart is
+        bucketed by {timeIntervalLabel(interval).toLowerCase()}.
       </Text>
-    </HStack>
+    </FilterChipRow>
   );
 }

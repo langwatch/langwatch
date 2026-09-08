@@ -114,3 +114,41 @@ Feature: The People screen shows who the providers named
   Scenario: Confirming requires the governance manage grant
     When someone with only governance view tries to confirm a suggestion
     Then the request is refused
+
+  # ── One table on the screen ───────────────────────────────────────────────
+  # The screen used to render the people the providers named as a list of its
+  # own, below the spend ranking. They are one population read two ways, so
+  # they are now one table (people-tabs.feature). Merging two lists is where a
+  # screen can quietly decide that two identifiers are the same human, which is
+  # the match engine's decision and not a table's — these scenarios are the
+  # invariants that survive the merge.
+
+  @integration
+  Scenario: The same identifier at two providers stays two rows
+    Given two providers that both named the same address
+    When the merged table renders
+    Then there are two rows, one per provider
+    And neither row shows the other's provider
+    # The data keeps them apart (governance-people-discovery.feature) and so
+    # must the screen. Collapsing them by string equality would be the table
+    # asserting a match nothing proved.
+
+  @integration
+  Scenario: Spend claimed by two providers is shown once, on neither of them
+    Given a spend row for an address
+    And two discovered people carrying that same address
+    When the merged table renders
+    Then the spend appears once, on a row of its own
+    And neither provider's row claims it
+    # One measurement, two claimants, no way to choose: showing it twice would
+    # double the organization's spend on screen, and choosing one would be the
+    # same unproven match by another route.
+
+  @integration
+  Scenario: An erased person's row names nobody it should not
+    Given a person who has been erased
+    When the merged table renders
+    Then their row shows the pseudonym
+    And it shows no identifier, no provider identity and no department
+    # Erasure already blanks the stored fields; the row is built so that a
+    # value surviving somewhere upstream still cannot reach the screen.

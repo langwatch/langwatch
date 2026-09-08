@@ -201,6 +201,14 @@ const renderEditDrawer = (source = editableSource) =>
     </ChakraProvider>,
   );
 
+/**
+ * The cadence frequency control, addressed as a reader meets it. It is the
+ * app's select now rather than the browser's, so it is a combobox button
+ * reading its choice in words, with no `value` and no options until opened.
+ */
+const frequencyPicker = () =>
+  screen.queryByRole("combobox", { name: "Frequency" });
+
 describe("given the create drawer for a pull-mode conversation source", () => {
   describe("when it first opens", () => {
     /** @scenario "Cadence and destination both sit behind Advanced" */
@@ -208,7 +216,7 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       renderComposer();
 
       expect(screen.queryByText("Cadence")).toBeNull();
-      expect(screen.queryByLabelText("Frequency")).toBeNull();
+      expect(frequencyPicker()).toBeNull();
       expect(screen.queryByTestId("ingestion-trace-destination")).toBeNull();
     });
 
@@ -220,9 +228,7 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       await openAdvanced({ user, awaiting: "destination" });
 
       expect(screen.getByText("Cadence")).toBeTruthy();
-      expect(screen.getByLabelText<HTMLSelectElement>("Frequency").value).toBe(
-        "m15",
-      );
+      expect(frequencyPicker()).toHaveTextContent("Every 15 minutes");
     });
 
     /**
@@ -265,17 +271,20 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       renderComposer();
 
       await openAdvanced({ user, awaiting: "cadence" });
-      await user.selectOptions(screen.getByLabelText("Frequency"), "hourly");
+      const picker = frequencyPicker();
+      if (!picker) throw new Error("the cadence picker did not open");
+      await user.click(picker);
+      await user.click(
+        await screen.findByRole("option", { name: "Every hour" }),
+      );
 
       await user.click(screen.getByText("Advanced"));
       await waitFor(() => {
-        expect(screen.queryByLabelText("Frequency")).toBeNull();
+        expect(frequencyPicker()).toBeNull();
       });
       await openAdvanced({ user, awaiting: "cadence" });
 
-      expect(screen.getByLabelText<HTMLSelectElement>("Frequency").value).toBe(
-        "hourly",
-      );
+      expect(frequencyPicker()).toHaveTextContent("Every hour");
     });
 
     /** @scenario "Cadence and destination both sit behind Advanced" */

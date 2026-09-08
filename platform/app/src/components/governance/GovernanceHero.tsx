@@ -1,7 +1,8 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import { SourceTypeIconGlyph } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import type { SourceType } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { LuLayers, LuTriangleAlert, LuUsers } from "react-icons/lu";
+import type React from "react";
+import { LuBot, LuTriangleAlert, LuUsers } from "react-icons/lu";
 import { AskChip } from "~/components/home/AskChip";
 import { HeroAskField } from "~/components/home/HeroAskField";
 import { HeroLeadPill } from "~/components/home/HeroLeadPill";
@@ -14,22 +15,30 @@ import { useRouter } from "~/utils/compat/next-router";
  * The governance overview's opening, the same shape the project home opens
  * with: a greeting, one field, and the short ways in. The field is the
  * command palette mounted inline, the pill is the one action a governance
- * admin takes first (connect a vendor), and the chips are the next two.
+ * admin takes first (connect a vendor), and the chips under it are the three
+ * things they add next — people, an agent, a rule.
  *
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 
-/** The field's reading measure, shared with the home so the two agree. */
-const ASK_MEASURE = "680px";
+/**
+ * The reading measure the whole overview is set to: the field, the ways in
+ * under it, and the two lists below all take this width and centre on it, so
+ * the sections' outer edges land on the field's own. Exported for the page,
+ * which wraps hero and sections in one column of it.
+ */
+export const HOME_MEASURE = "900px";
 
 export const INVENTORY_SOURCES_HREF = "/governance/inventory?tab=sources";
+export const PEOPLE_HREF = "/governance/people?tab=people";
+export const ADD_AGENT_HREF = "/governance/agents?tab=agents&add=1";
 export const INVENTORY_ANOMALY_RULES_HREF =
   "/governance/inventory?tab=anomaly-rules";
-export const PEOPLE_HREF = "/governance/people";
 
 /**
  * The vendors the pill leads with, in the order the menu offers them. Each
- * hands the inventory's Sources tab a source type to open its add flow on.
+ * hands the inventory's Sources tab a source type to open its add flow on,
+ * through the `?add=` deep link that page already honours.
  */
 export const LEAD_SOURCE_VENDORS: ReadonlyArray<{
   sourceType: SourceType;
@@ -42,6 +51,38 @@ export const LEAD_SOURCE_VENDORS: ReadonlyArray<{
 
 export const addSourceHref = (sourceType: SourceType) =>
   `${INVENTORY_SOURCES_HREF}&add=${sourceType}`;
+
+/**
+ * The three ways in under the pill, in the order they are offered: add
+ * someone, then give them an agent, then say what counts as odd. That is the
+ * order a surface is set up in, rather than the order the pages sit in the
+ * rail.
+ */
+const LEAD_CHIPS: ReadonlyArray<{
+  key: string;
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    key: "people",
+    label: "Add people",
+    href: PEOPLE_HREF,
+    icon: <LuUsers size={12} />,
+  },
+  {
+    key: "agent",
+    label: "Add agent",
+    href: ADD_AGENT_HREF,
+    icon: <LuBot size={12} />,
+  },
+  {
+    key: "anomaly-rule",
+    label: "Add anomaly rule",
+    href: INVENTORY_ANOMALY_RULES_HREF,
+    icon: <LuTriangleAlert size={12} />,
+  },
+];
 
 export function GovernanceHero({
   canManageSources,
@@ -60,7 +101,7 @@ export function GovernanceHero({
         </Text>
       </VStack>
 
-      <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
+      <VStack align="center" gap={3} width="full" maxWidth={HOME_MEASURE}>
         <HeroAskField
           placeholder={
             canAsk
@@ -72,16 +113,14 @@ export function GovernanceHero({
         <VStack width="full" gap={2.5} align="center">
           {canManageSources ? <AddSourcePill /> : null}
           <HStack gap={2} flexWrap="wrap" justify="center">
-            <AskChip
-              icon={<LuTriangleAlert size={12} />}
-              label="Add an anomaly rule"
-              href={INVENTORY_ANOMALY_RULES_HREF}
-            />
-            <AskChip
-              icon={<LuUsers size={12} />}
-              label="Add people"
-              href={PEOPLE_HREF}
-            />
+            {LEAD_CHIPS.map((chip) => (
+              <AskChip
+                key={chip.key}
+                icon={chip.icon}
+                label={chip.label}
+                href={chip.href}
+              />
+            ))}
           </HStack>
         </VStack>
       </VStack>
@@ -90,9 +129,15 @@ export function GovernanceHero({
 }
 
 /**
- * The lead action: connect a vendor. Three vendors up front, each opening
- * the inventory on that vendor's add flow, and the full list behind a
- * quieter fourth item for the reader whose vendor is not one of the three.
+ * The lead action: connect a vendor. The three vendors a governance admin
+ * arrives with are named up front, each opening the inventory's Sources tab
+ * on that vendor's add flow. The rest of the catalog is not repeated here —
+ * the Sources tab's own Add source menu is the full list, and a hero that
+ * offered both would be asking the reader to choose between two menus.
+ *
+ * Only drawn for a reader holding `ingestionSources:manage`, because the
+ * inventory drops an `?add=` it arrives without that grant: an ungated pill
+ * would be a door that opens onto nothing.
  */
 function AddSourcePill() {
   const router = useRouter();
@@ -101,7 +146,7 @@ function AddSourcePill() {
       <Menu.Trigger asChild>
         <HeroLeadPill
           prominent
-          label="Add an ingestion source"
+          label="Add Source"
           glyphs={LEAD_SOURCE_VENDORS.map((vendor) => ({
             key: vendor.sourceType,
             icon: (
@@ -126,19 +171,6 @@ function AddSourcePill() {
             </HStack>
           </Menu.Item>
         ))}
-        <Menu.Separator />
-        <Menu.Item
-          value="all-sources"
-          paddingY={2}
-          onClick={() => void router.push(INVENTORY_SOURCES_HREF)}
-        >
-          <HStack gap={2.5} color="fg.muted">
-            <Box display="grid">
-              <LuLayers size={13} />
-            </Box>
-            <Text textStyle="xs">All sources…</Text>
-          </HStack>
-        </Menu.Item>
       </Menu.Content>
     </Menu.Root>
   );
