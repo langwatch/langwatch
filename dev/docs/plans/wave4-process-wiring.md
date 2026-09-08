@@ -1,4 +1,4 @@
-# Wave-4 process wiring: dashboard, then platform-health, role and suite REST
+# Wave-4 process wiring: dashboard, then platform-health, role, suite REST, authz, user and evaluation
 
 **Date:** 2026-09-08 · **Owner lane:** one Opus agent after the wave-3 lane (`882ebfa479`) · **Reviewed by:** Fable
 
@@ -168,3 +168,44 @@ Auth's directory is typed `UserService` and calls `tryFindByEmail`/`create`/`cre
 — decide whether it becomes `UserApi` operations or an auth-owned port; `GdprUserDataEraseRepository` walks other features'
 tables (tasks catalogue) and is not a user repository.
 
+
+## evaluation (door landed `ccf912e810`; legacy REST family still on the deleted builders)
+
+- `apps/api/src/app/api-production.composition.ts:127-130`: import `installApiEvaluation` in place of `composeEvaluationFeature`
+  and `refusingEvaluationFeature`. Line ~4326 `this.composedEvaluation = refusingEvaluationFeature()` goes with its branch: a
+  process installs the feature or leaves `composedEvaluation` unset. Line ~4389 becomes
+  `this.composedEvaluation = await installApiEvaluation({ infrastructure, peers: { workflows, traces, modelProviders },
+  collaborators: { runTraceEvaluation: (input) => this.requireEvaluatorExecution().runEvaluationForTrace(input),
+  probeEvaluatorRuntime, trackEvaluationRan, environment }, processName, eventing, resolveClickHouse, dataRetention })`.
+  `runEvaluationForTrace` no longer takes a `ctx` first argument; the probe and the analytics callback are required.
+  `~1420`/`~1458` (`evaluation: this.composedEvaluation`, `evaluations: this.composedEvaluation.app`) and `~2116`/`~4419`
+  (`reportEvaluation`) stand; `.app` is now the whole `EvaluationApi`.
+- `apps/api/src/app-trpc/app-trpc.features.ts:201`: `evaluations: composed.evaluation.router(mount)` →
+  `...composed.evaluation.routers(mount)`.
+- `apps/api/src/app-trpc/app-trpc.context.ts:80`: `evaluations: Readonly<{ reportEvaluation(...) }>` → `evaluations: EvaluationApi`
+  (`@langwatch/evaluation-contract`).
+- `apps/api/src/app/api-evaluator-execution.composition.ts:20`: `type EvaluationRunOutcome` now comes from
+  `@langwatch/evaluation-contract`.
+- `apps/worker/src/app/worker-evaluation-execution.composition.ts:14,86`: `PrismaEvaluationCostRecorderAdapter.create(database)`
+  → `EvaluationCostService.create({ repository: repositories.costs })`, with `worker-evaluation-server.composition.ts:130`
+  gaining `.withRepositories(evaluationRepositories)`. That file's `workerEvaluationApp` declares a second app for the
+  `EvaluationApi` token and returns an `EvaluationService`, which no longer satisfies the four new operations: the end state
+  boots `evaluationServer` with worker-side infrastructure instead.
+- Test doubles building the refusing twin: `apps/api/src/app/__tests__/api-trpc-record.test-doubles.ts:290`,
+  `apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts:236`,
+  `apps/api/src/app-trpc/__tests__/support/app-trpc-features.ts:202` → an `EvaluationApi` fixture and a `routers` that
+  mounts nothing. `api-experiment-run.composition.integration.test.ts:321` and
+  `workflow/__tests__/execution-features.composition.integration.test.ts:366`: `await installApiEvaluation(...)`.
+- `EvaluationService` → `EvaluationApi` (type position, verbatim) in `apps/api/src/app/{api-trace-read-stack,api-evaluation-read}.composition.ts`,
+  `apps/worker/src/app/worker-report-schedule.composition.ts`, `packages/features/monitor/server/src/app/monitor.app.ts`,
+  `packages/features/trace/server/src/services/{trace-list-read,trace-legacy-read}.service.ts` and their tests;
+  `automation-settlement-match-confirmation.service.unit.test.ts` `extends` it → `implements EvaluationApi`. That unblocks
+  `contract-service` and the `tryGetRunByEvaluationId` → `findRunByEvaluationId`, `tryGetInputs` → `findInputs` renames
+  (`trace-legacy-read.service.ts:338` calls the latter).
+- Baseline rows to delete (root session, after lint L2): `evaluation/persistence-adapter`, `evaluation/refusing-composition`,
+  `evaluation/testing-entry`, `evaluation/unregistered-repositories`.
+- Not wave 4: the legacy REST family (`/api/evaluations/*`, `/api/guardrails/:evaluator/evaluate`, `/api/dataset/evaluate`) is
+  bare-mounted with a `/api/v1` twin and no dated namespace. Neither `dated` nor `v1-only` fits; it needs the shared-prefix
+  mode in `packages/api/specs/versioned-routing.feature` (round three). Its evaluate doors answer `400 { error }` from an
+  in-handler parse and write raw bodies; `observePayloadSize` and `reportError` are ports no process supplies and should be
+  deleted, not ported.
