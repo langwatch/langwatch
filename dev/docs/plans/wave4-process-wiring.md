@@ -131,3 +131,20 @@ server transport for now) — split the vocabulary out of authz-contract; `Authz
 features wearing one door). `@langwatch/authz-web/surfaces/scope-picker` → `./scope-picker` has ~40 importers across
 five feature webs plus tsconfig/vitest aliases (gateway, governance) — same lane.
 
+## role REST mount (door landed `5080220f88`; declaration `cccfe396b0`)
+
+- New `apps/api/src/app-rest/app-rest.process-features.ts` port beside `handlerManagedCredential` (~line 153):
+  `export type ApiOrganizationDoorPort = (input: { request: Request; permission: AuthzPermission }) => Promise<Readonly<{
+  organizationId: string; apiKeyId: string; userId: string | null; markUsed: () => void }>>;` built where `ApiRestSecurity`
+  is built from `authenticateOrganizationThrowing` + `authorizeOrganizationPermissionThrowing` + the class-mismatch refusal
+  (`apps/api/src/api-rest.security.ts:54-130`, all four errors already exist; it throws, never returns `{ ok }`).
+- New `apps/api/src/features/role/role-rest.mount.ts`: `mountRoleRest({ roles, door, enterpriseGate, errors })` →
+  `createRestRuntime({ identity: { authenticate: door → { actor: userId ? { type: "user", id } : null, scope: { tier:
+  "organization", id: organizationId }, markUsed } } })`, a `WeakMap<Request, string>` carrying the organization to
+  `facts: [bindRestMiddleware(roleRestFacts, ctx => ({ organizationId }))]` (suite's mount is the pattern), `middleware:
+  [enterpriseGate]`, `onError: errors`. Mount it where `app-rest.packaged-families.ts` used to mount `roles`; re-point
+  `api-rest.roles-family.integration.test.ts`; bind the `@unimplemented` scenario "A project key presented to an
+  organization route is refused with the body the family already publishes" in `packages/api/specs/transport-declaration-split.feature`
+  from that test. authz's `authzRoleBindingRest` mounts the same way once its declaration gains `.withCredential("organizationKey")`
+  and its API-key-ceiling check is answered by the door port (`hasApiKeyPermission`).
+
