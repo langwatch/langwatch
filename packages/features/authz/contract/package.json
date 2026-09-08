@@ -23,10 +23,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/config": "workspace:*",
-    "@langwatch/time": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/actor": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

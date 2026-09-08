@@ -4,7 +4,7 @@
  * feedback. Plan comes off `useUiOrganizationFacts` — `react-query` is sealed off from features.
  */
 
-import { AuthzHostProvider, type AuthzHostPort } from "@langwatch/authz-web/screens/authz";
+import { AuthzHostProvider, type AuthzHostPort } from "@langwatch/authz-web/authz";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";

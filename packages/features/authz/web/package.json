@@ -8,9 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/authz": {
-      "types": "./dist/screens/authz/index.d.ts",
-      "default": "./src/screens/authz/index.ts"
+    "./authz": {
+      "langwatch-declaration-source": "./src/authz.ts",
+      "types": "./dist/authz.d.ts",
+      "default": "./src/authz.ts"
     },
     "./surfaces/scope-picker": {
       "types": "./dist/surfaces/scope-picker/index.d.ts",

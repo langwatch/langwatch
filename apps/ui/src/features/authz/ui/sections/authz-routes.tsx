@@ -4,7 +4,7 @@
  * regression let a member session read the whole organization.
  */
 
-import { AUTHZ_MANAGE_PERMISSION, authzScreens } from "@langwatch/authz-web/screens/authz";
+import { AUTHZ_MANAGE_PERMISSION, authzScreens } from "@langwatch/authz-web/authz";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

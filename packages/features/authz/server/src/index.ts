@@ -45,11 +45,10 @@ export {
   type AuthzCutoverCounter,
 } from "./adapters/observability.authz-cutover.adapter.ts";
 export { EventingAuthzGrantAdapter } from "./adapters/eventing.authz-grant.adapter.ts";
+export { AuthzApp } from "./app/authz.app.ts";
+export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
 export {
-  AuthzApp,
-  type AuthzAppDependencies,
-  type AuthzCaller,
-  type EffectivePermissions,
-} from "./app/authz.app.ts";
-export { createRoleBindingsRestApp } from "./transport/api-rest/role-binding.api.ts";
-export { AuthzTrpcApi, type AuthzTrpcContext } from "./transport/api-trpc/authz.api.ts";
+  authzRoleBindingRest,
+  roleBindingRestFacts,
+} from "./transport/authz-role-binding.rest.ts";
+export { authzTrpc, authzTrpcTransport } from "./transport/authz.trpc.ts";

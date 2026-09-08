@@ -419,3 +419,14 @@ export const authzOwnStandingSchema = z
   })
   .strict();
 export type AuthzOwnStanding = z.infer<typeof authzOwnStandingSchema>;
+
+/**
+ * Which scope the standing is asked about. Both ids are optional and neither
+ * is checked: a scope the caller holds nothing in resolves to the empty set
+ * rather than to anything about it.
+ */
+export const authzOwnStandingInputSchema = z.object({
+  projectId: z.string().optional(),
+  organizationId: z.string().optional(),
+});
+export type AuthzOwnStandingInput = z.infer<typeof authzOwnStandingInputSchema>;

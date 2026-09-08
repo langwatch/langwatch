@@ -34,9 +34,9 @@ const { apiNode } = vi.hoisted(() => {
   return { apiNode: node };
 });
 
-vi.mock("@langwatch/authz-web/screens/authz", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-web/screens/authz")>(
-    "@langwatch/authz-web/screens/authz",
+vi.mock("@langwatch/authz-web/authz", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-web/authz")>(
+    "@langwatch/authz-web/authz",
   );
   return {
     ...actual,

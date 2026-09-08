@@ -20,10 +20,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -32,6 +28,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",

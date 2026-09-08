@@ -8298,10 +8298,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/authz/web/src/screens/authz/role-bindings.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/authz/web/src/surfaces/scope-picker/provider-scope-chips.tsx",
       "measured": "2026-09-06"
     },

@@ -1,20 +1,27 @@
 /**
- * App-process transport mount for the "what may I do here" read.
+ * Binds the feature's declared procedures to this process's execution path.
  *
- * Behaviour is package-owned (`@langwatch/authz-server`); this supplies the
- * process's root, authenticated procedure and policy chain. There are no
- * ports: the answer comes from the authz service the request context already
- * carries.
+ * There are no ports: the answer comes from the AuthZ application the request
+ * context already carries, so a second one here would be a second answer to
+ * one question.
  */
-import { AuthzTrpcApi, type AuthzTrpcContext } from "@langwatch/authz-server";
-import { createTrpcApiService, type TrpcApiMount } from "@langwatch/api/trpc";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { authzTrpcTransport } from "@langwatch/authz-server";
+
+/**
+ * The one slice of the process context the `authz` namespace reads.
+ *
+ * `authz` is also the wire namespace the browser calls and the key tRPC hashes
+ * into its query cache, so the two spellings are the same on purpose.
+ */
+export interface AuthzHostContext {
+  app: Readonly<{ authzApp: AuthzApi }>;
+}
 
 /** Mounts `authz.*` on the app process's tRPC root. */
-export function createAuthzTrpcRouter<
-  TContext extends AuthzTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
-  return AuthzTrpcApi.create(mount.root, createTrpcApiService(mount));
+export function createAuthzTrpcRouter<TContext extends AuthzHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(authzTrpcTransport, (ctx) => ctx.app.authzApp);
 }

@@ -108,7 +108,7 @@
       "id": "authz",
       "root": "authz",
       "uses": {
-        "screens": ["@langwatch/authz-web/screens/authz"],
+        "screens": ["@langwatch/authz-web/authz"],
         "surfaces": []
       }
     },

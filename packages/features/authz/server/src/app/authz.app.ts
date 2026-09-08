@@ -1,80 +1,133 @@
-/**
- * The authz feature's application: what its door calls.
- *
- * It holds the service the feature's api file reaches, and it is the one typed
- * thing a transport is given. Before it, `authz.api.ts` declared its own
- * private `Readonly<{ permissions: AuthzService }>` — a description of the
- * process's composition that agreed with the process by attention rather than
- * by construction.
- *
- * What lives here as a method is the one question this feature answers: "what
- * may I do here". Resolving which scope "here" means — a project id names a
- * project scope even when an organization id rides along — is a decision about
- * the domain, not about transport, so it is here and not in a handler.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
- */
 import type {
-  AuthzEffectivePermissionsOutput,
-  AuthzScopeRef,
+  AuthzApi,
+  AuthzCaller,
+  AuthzGrantsService,
+  AuthzPermission,
   AuthzService,
+  EffectivePermissions,
 } from "@langwatch/authz-contract";
+import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import {
+  PostgresAuthzAdapter,
+  type PostgresAuthzAdapterOptions,
+} from "../adapters/postgres.authz.adapter.ts";
 
-/** Whose standing is being resolved. */
-export interface AuthzCaller {
-  readonly id: string;
-}
+export type AuthzInfrastructure = PostgresAuthzAdapterOptions;
+export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzInfrastructure, undefined>;
 
-/** What the process composes this feature's application from. */
-export interface AuthzAppDependencies {
-  permissions: AuthzService;
-}
-
-/**
- * The caller's own standing at one scope. A scope they have no standing in —
- * or one that does not resolve at all — answers the empty set rather than
- * anything about the scope itself.
- */
-export type EffectivePermissions =
-  | Readonly<{ scope: null; permissions: string[] }>
-  | Readonly<{
-      scope: Readonly<{ type: AuthzScopeRef["type"]; id: string }>;
-      permissions: AuthzEffectivePermissionsOutput;
-    }>;
-
-export class AuthzApp {
-  static create(dependencies: AuthzAppDependencies): AuthzApp {
-    return new AuthzApp(dependencies);
+/** The composed callable authorization boundary. */
+export class AuthzApp implements AuthzApi {
+  static readonly contract = AuthzApiToken;
+  static readonly dependencies = {} as const;
+  #permissions: AuthzService;
+  #grants: AuthzGrantsService;
+  private constructor(permissions: AuthzService, grants: AuthzGrantsService) {
+    this.#permissions = permissions;
+    this.#grants = grants;
+  }
+  static create(setup: AuthzSetup): AuthzApp {
+    const built = PostgresAuthzAdapter.create(setup.infrastructure).build();
+    return new AuthzApp(built.authz, built.grants);
   }
 
-  private constructor(private readonly dependencies: AuthzAppDependencies) {}
-
   /**
-   * What the caller may do at the scope they named.
-   *
-   * It never answers for another principal, so membership itself is the only
-   * requirement: a non-member resolves to the empty set, which is the engine's
-   * no-default-access answering rather than a special case here.
+   * Binds the callable boundary to services already constructed by a process
+   * composition root. This keeps every API client on the same authorization
+   * and grants graph as the legacy transport collaborators.
    */
+  static fromServices(input: { permissions: AuthzService; grants: AuthzGrantsService }): AuthzApp {
+    return new AuthzApp(input.permissions, input.grants);
+  }
   async effectivePermissionsFor(
-    input: Readonly<{ projectId?: string | undefined; organizationId?: string | undefined }>,
+    input: Readonly<{ projectId?: string; organizationId?: string }>,
     by: AuthzCaller,
   ): Promise<EffectivePermissions> {
-    // The narrower id wins: a project id names a project scope even when an
-    // organization id rides along.
-    const scope = await this.dependencies.permissions.tryResolveScope({
+    const scope = await this.tryResolveScope({
       projectId: input.projectId,
       organizationId: input.projectId ? undefined : input.organizationId,
     });
     if (!scope) return { scope: null, permissions: [] };
-
-    const permissions = await this.dependencies.permissions.effectivePermissions({
-      principal: { type: "user", id: by.id },
-      scope,
-    });
-
-    return { scope: { type: scope.type, id: scope.id }, permissions };
+    return {
+      scope: { type: scope.type, id: scope.id },
+      permissions: await this.effectivePermissions({
+        principal: { type: "user", id: by.id },
+        scope,
+      }),
+    };
   }
+  check: AuthzApi["check"] = (a) => this.#permissions.check(a);
+  checkDetailed: AuthzApi["checkDetailed"] = (a) => this.#permissions.checkDetailed(a);
+  can: AuthzApi["can"] = (a) => this.#permissions.can(a);
+  authorize: AuthzApi["authorize"] = (a) => this.#permissions.authorize(a);
+  effectivePermissions: AuthzApi["effectivePermissions"] = (a) =>
+    this.#permissions.effectivePermissions(a);
+  checkByIds: AuthzApi["checkByIds"] = (a) => this.#permissions.checkByIds(a);
+  canAnyByIds: AuthzApi["canAnyByIds"] = (a) => this.#permissions.canAnyByIds(a);
+  canBatchByIds: AuthzApi["canBatchByIds"] = (a) => this.#permissions.canBatchByIds(a);
+  canBatchPermissionsByIds: AuthzApi["canBatchPermissionsByIds"] = (a) =>
+    this.#permissions.canBatchPermissionsByIds(a);
+  tryResolveScope: AuthzApi["tryResolveScope"] = (a) => this.#permissions.tryResolveScope(a);
+  checkScopeLineage: AuthzApi["checkScopeLineage"] = (a) => this.#permissions.checkScopeLineage(a);
+  explainDecision: AuthzApi["explainDecision"] = (a) => this.#permissions.explainDecision(a);
+  getDecision: AuthzApi["getDecision"] = (a) => this.#permissions.getDecision(a);
+  getProjectAnyDecision: AuthzApi["getProjectAnyDecision"] = (a) =>
+    this.#permissions.getProjectAnyDecision(a);
+  hasPermission: AuthzApi["hasPermission"] = (a) => this.#permissions.hasPermission(a);
+  authorizePermission: AuthzApi["authorizePermission"] = (a) =>
+    this.#permissions.authorizePermission(a);
+  authorizeProjectPermission: AuthzApi["authorizeProjectPermission"] = (a) =>
+    this.#permissions.authorizeProjectPermission(a);
+  hasApiKeyPermission: AuthzApi["hasApiKeyPermission"] = (a) =>
+    this.#permissions.hasApiKeyPermission(a);
+  getApiKeyProjectDecision: AuthzApi["getApiKeyProjectDecision"] = (a) =>
+    this.#permissions.getApiKeyProjectDecision(a);
+  listUserBindings: AuthzApi["listUserBindings"] = (a) => this.#permissions.listUserBindings(a);
+  listOrganizationBindings: AuthzApi["listOrganizationBindings"] = (a) =>
+    this.#permissions.listOrganizationBindings(a);
+  listUserAndGroupBindings: AuthzApi["listUserAndGroupBindings"] = (a) =>
+    this.#permissions.listUserAndGroupBindings(a);
+  listScopeBindings: AuthzApi["listScopeBindings"] = (a) => this.#permissions.listScopeBindings(a);
+  listGroupBindings: AuthzApi["listGroupBindings"] = (a) => this.#permissions.listGroupBindings(a);
+  listTeamMemberBindings: AuthzApi["listTeamMemberBindings"] = (a) =>
+    this.#permissions.listTeamMemberBindings(a);
+  listBindingsForSynthesis: AuthzApi["listBindingsForSynthesis"] = (a) =>
+    this.#permissions.listBindingsForSynthesis(a);
+  listUserCreatedRoles: AuthzApi["listUserCreatedRoles"] = (a) =>
+    this.#permissions.listUserCreatedRoles(a);
+  wouldFirstBindingDisableLegacyAccess: AuthzApi["wouldFirstBindingDisableLegacyAccess"] = (a) =>
+    this.#permissions.wouldFirstBindingDisableLegacyAccess(a);
+  listManagedBindingsForUser: AuthzApi["listManagedBindingsForUser"] = (a) =>
+    this.#permissions.listManagedBindingsForUser(a);
+  listManagedBindingsForOrganization: AuthzApi["listManagedBindingsForOrganization"] = (a) =>
+    this.#permissions.listManagedBindingsForOrganization(a);
+  getAccessBreakdown: AuthzApi["getAccessBreakdown"] = (a) =>
+    this.#permissions.getAccessBreakdown(a);
+  isOnEngine: AuthzApi["isOnEngine"] = (a) => this.#permissions.isOnEngine(a);
+  tryGetEngineCutoverAt: AuthzApi["tryGetEngineCutoverAt"] = (a) =>
+    this.#permissions.tryGetEngineCutoverAt(a);
+  hasProjectPermission(a: { userId: string; projectId: string; permission: AuthzPermission }) {
+    return this.#permissions.hasPermission(a);
+  }
+  attach: AuthzApi["attach"] = (a) => this.#grants.attach(a);
+  update: AuthzApi["update"] = (a) => this.#grants.update(a);
+  revoke: AuthzApi["revoke"] = (a) => this.#grants.revoke(a);
+  replace: AuthzApi["replace"] = (a) => this.#grants.replace(a);
+  offboard: AuthzApi["offboard"] = (a) => this.#grants.offboard(a);
+  invalidateOrganization: AuthzApi["invalidateOrganization"] = (a) =>
+    this.#grants.invalidateOrganization(a);
+  attachBindings: AuthzApi["attachBindings"] = (a) => this.#grants.attachBindings(a);
+  attachResourceGrant: AuthzApi["attachResourceGrant"] = (a) => this.#grants.attachResourceGrant(a);
+  revokeResourceGrants: AuthzApi["revokeResourceGrants"] = (a) =>
+    this.#grants.revokeResourceGrants(a);
+  changeBindingRole: AuthzApi["changeBindingRole"] = (a) => this.#grants.changeBindingRole(a);
+  revokeBindings: AuthzApi["revokeBindings"] = (a) => this.#grants.revokeBindings(a);
+  revokeBindingsWhere: AuthzApi["revokeBindingsWhere"] = (a) => this.#grants.revokeBindingsWhere(a);
+  offboardMember: AuthzApi["offboardMember"] = (a) => this.#grants.offboardMember(a);
+  defineRole: AuthzApi["defineRole"] = (a) => this.#grants.defineRole(a);
+  deleteRole: AuthzApi["deleteRole"] = (a) => this.#grants.deleteRole(a);
+  createBinding: AuthzApi["createBinding"] = (a) => this.#grants.createBinding(a);
+  updateBinding: AuthzApi["updateBinding"] = (a) => this.#grants.updateBinding(a);
+  deleteBinding: AuthzApi["deleteBinding"] = (a) => this.#grants.deleteBinding(a);
+  applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
 }

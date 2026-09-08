@@ -48,8 +48,8 @@ import {
   scopePalette,
   scopePillText,
 } from "../../model/role-binding-principals.ts";
-import { EnterpriseUpsell } from "../../ui/elements/enterprise-upsell.tsx";
-import { PrincipalAvatar } from "../../ui/elements/principal-avatar.tsx";
+import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
+import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
 
 const SCOPE_TIERS = roleBindingScopeTypeSchema.enum;
 
@@ -112,39 +112,58 @@ export default function RoleBindingsScreen() {
 
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          {isLoading ? (
-            <Box padding={8} display="flex" justifyContent="center">
-              <Spinner />
-            </Box>
-          ) : principals.length === 0 ? (
-            <Box padding={8} textAlign="center">
-              <Text color="fg.muted">No role bindings found.</Text>
-            </Box>
-          ) : (
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="240px">Who</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {principals.map((principal) => (
-                  <Table.Row key={principal.key}>
-                    <Table.Cell>
-                      <PrincipalCell principal={principal} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <BindingsCell bindings={principal.bindings} />
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-          )}
+          <BindingsTable isLoading={isLoading} principals={principals} />
         </Card.Body>
       </Card.Root>
     </VStack>
+  );
+}
+
+/** The three states of the list: still reading, nothing to show, the rows. */
+function BindingsTable({
+  isLoading,
+  principals,
+}: {
+  isLoading: boolean;
+  principals: readonly BindingPrincipal[];
+}) {
+  if (isLoading) {
+    return (
+      <Box padding={8} display="flex" justifyContent="center">
+        <Spinner />
+      </Box>
+    );
+  }
+
+  if (principals.length === 0) {
+    return (
+      <Box padding={8} textAlign="center">
+        <Text color="fg.muted">No role bindings found.</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Table.Root variant="line" size="md" width="full">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader width="240px">Who</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {principals.map((principal) => (
+          <Table.Row key={principal.key}>
+            <Table.Cell>
+              <PrincipalCell principal={principal} />
+            </Table.Cell>
+            <Table.Cell>
+              <BindingsCell bindings={principal.bindings} />
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </Table.Root>
   );
 }
 
