@@ -1883,7 +1883,7 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
-- **v3.3 (2026-09-08, captain: Sergio Esteban).** Two internal-consistency
+- **v3.12 (2026-09-08, captain: Sergio Esteban).** Two internal-consistency
   findings from review, both about wave assignment being readable from the
   document rather than inferred. No design reversal:
   - **§9 is split across the waves, and now says so** (Decision intro,
@@ -1901,6 +1901,11 @@ money tables, only the identity tables and read paths.
     it could not be the rollup, and the §4 diagram did not show roster
     events entering anything. The diagram now carries that lane, and the
     thin service still never reads the event log at request time.
+  - *Numbered v3.12 on rebase: it merged to `main` as v3.3 while this branch
+    had already used v3.3–v3.11. Its §16 seat-aggregate text (the
+    `countDistinct(RawActorId)` active count and `governance_seat_count_1d`)
+    lost the merge to the shipped bought/assigned lane, which moves the
+    active count to wave 2; the §9 wave-split paragraph is kept.*
 - **v3.11 (2026-09-06, captain: Sergio Esteban).** Documentation caught up with
   what actually shipped. No decision is taken here; five statements the ADR made
   are corrected or marked as reversed, and the prose they correct is left
