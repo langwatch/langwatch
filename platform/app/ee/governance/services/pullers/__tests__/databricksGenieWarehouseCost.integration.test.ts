@@ -555,10 +555,10 @@ describe("a source that names a warehouse", () => {
     );
   });
 
-  /**
-   * @scenario "A question is priced by the warehouse that answered it, not the
-   * one the connector signs in to"
-   */
+  // Keep this annotation on ONE line. The parity checker's title group cannot
+  // span a newline, so a wrapped title binds a phantom that matches no
+  // scenario and reports nothing — which is how this test went unbound.
+  /** @scenario "A question is priced by the warehouse that answered it, not the one the connector signs in to" */
   it("runs the billing query on the configured warehouse without restricting the answer to it", async () => {
     costPlan = { rows: [] };
 
@@ -924,10 +924,8 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(second).costUsd).toBe("6");
   });
 
-  /**
-   * @scenario "A question seen before its bill has landed is asked about again,
-   * however far back it sits"
-   */
+  // One line, for the reason given on the annotation above.
+  /** @scenario "A question held for its missing bill is priced when the bill lands" */
   it("holds the watermark for a question seen but not billed yet, past the settling window", async () => {
     // The defect this whole change exists to stop. The billing query SUCCEEDS
     // and answers about the statement — the LEFT JOIN keeps it — but its hour
