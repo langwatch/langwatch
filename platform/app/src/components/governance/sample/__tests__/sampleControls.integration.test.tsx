@@ -1,15 +1,4 @@
-/**
- * @vitest-environment jsdom
- *
- * The sample toggle and banner as the rest of the section will see them, and
- * the per-page memory behind them.
- *
- * The memory is the part worth mounting a component for: it reads and writes
- * session storage, and the failure it guards against is one page's choice
- * turning the samples on for a page the reader never touched.
- *
- * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
- */
+/** @vitest-environment jsdom */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -17,20 +6,14 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SampleDataBanner, SampleDataToggle } from "../SampleDataControls";
-import { type RealDataState, useSampleMode } from "../sampleMode";
+import { useSampleMode } from "../sampleMode";
 
 const withChakra = (ui: ReactNode) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
-/** A page reduced to the two things the kit gives it. */
-function SamplePage({
-  realData,
-  storageKey,
-}: {
-  realData: RealDataState;
-  storageKey?: string;
-}) {
-  const sample = useSampleMode({ realData, storageKey });
+/** The shared controls mounted without page-specific data decisions. */
+function SamplePage() {
+  const sample = useSampleMode();
   return (
     <>
       <SampleDataToggle active={sample.active} onToggle={sample.toggle} />
@@ -45,21 +28,21 @@ afterEach(() => cleanup());
 
 describe("the governance sample toggle", () => {
   describe("given the page measured nothing", () => {
-    /** @scenario "Sample panels fill a page with nothing measured on it" */
-    it("shows the sample panels and the banner without being asked", () => {
-      withChakra(<SamplePage realData="absent" />);
+    /** @scenario "An empty page waits for an explicit sample choice" */
+    it("keeps samples off until the reader asks", () => {
+      withChakra(<SamplePage />);
 
+      expect(screen.queryByText("a sample panel")).not.toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
       expect(screen.getByText("a sample panel")).toBeInTheDocument();
-      expect(screen.getByRole("status")).toHaveTextContent(
-        /nothing here is real/i,
-      );
     });
   });
 
   describe("given the page has real figures", () => {
     /** @scenario "Sample panels step aside once the page has real figures" */
     it("keeps the sample panels off and still offers them", () => {
-      withChakra(<SamplePage realData="present" />);
+      withChakra(<SamplePage />);
 
       expect(screen.queryByText("a sample panel")).not.toBeInTheDocument();
       expect(
@@ -71,7 +54,7 @@ describe("the governance sample toggle", () => {
   describe("given a read has not answered yet", () => {
     /** @scenario "An unanswered read shows no sample panels rather than flashing them" */
     it("shows nothing rather than flashing the samples up", () => {
-      withChakra(<SamplePage realData="unknown" />);
+      withChakra(<SamplePage />);
 
       expect(screen.queryByText("a sample panel")).not.toBeInTheDocument();
     });
@@ -80,7 +63,7 @@ describe("the governance sample toggle", () => {
   describe("when the reader turns the samples on", () => {
     /** @scenario "The reader's own choice outlives the data underneath it" */
     it("keeps them on even though the page has real figures", () => {
-      withChakra(<SamplePage realData="present" />);
+      withChakra(<SamplePage />);
 
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
 
@@ -111,34 +94,34 @@ describe("the remembered choice", () => {
   describe("given the reader chose on one page", () => {
     /** @scenario "One sample choice governs every governance page" */
     it("carries to the next governance page they open", () => {
-      const first = withChakra(<SamplePage realData="present" />);
+      const first = withChakra(<SamplePage />);
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
       first.unmount();
 
-      withChakra(<SamplePage realData="present" />);
+      withChakra(<SamplePage />);
 
       expect(screen.getByText("a sample panel")).toBeInTheDocument();
     });
 
     /** @scenario "Turning the samples off on one page turns them off everywhere" */
     it("takes the panels off a page that has nothing of its own to show", () => {
-      const first = withChakra(<SamplePage realData="present" />);
+      const first = withChakra(<SamplePage />);
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
       fireEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
       first.unmount();
 
-      withChakra(<SamplePage realData="absent" />);
+      withChakra(<SamplePage />);
 
       expect(screen.queryByText("a sample panel")).not.toBeInTheDocument();
     });
 
     /** @scenario "A remembered sample choice survives leaving the page and coming back" */
     it("survives a remount of the same page", () => {
-      const first = withChakra(<SamplePage realData="present" />);
+      const first = withChakra(<SamplePage />);
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
       first.unmount();
 
-      withChakra(<SamplePage realData="present" />);
+      withChakra(<SamplePage />);
 
       expect(screen.getByText("a sample panel")).toBeInTheDocument();
     });
@@ -149,8 +132,8 @@ describe("the remembered choice", () => {
     it("moves both without waiting for a remount", () => {
       withChakra(
         <>
-          <SamplePage realData="present" />
-          <SamplePage realData="present" />
+          <SamplePage />
+          <SamplePage />
         </>,
       );
 

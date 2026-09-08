@@ -35,6 +35,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   summaryFails: false,
+  realFigures: false,
   spendersFail: false,
   /**
    * The over-time read answering a row per day with nothing spent on any of
@@ -73,14 +74,6 @@ vi.mock("~/components/LoadingScreen", () => ({
 }));
 
 vi.mock("~/utils/api", () => {
-  // The activity reads never answer, which is the shape a viewer holding
-  // `governanceCost:view` and not `activityMonitor:view` actually sees: the
-  // page never runs those queries at all. That leaves the sample decision
-  // "unknown", so nothing turns itself on and every test below asks for
-  // sample data the way the reader does — by pressing the button.
-  const unanswered = () => ({
-    useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
-  });
   return {
     api: {
       governanceCost: {
@@ -90,7 +83,11 @@ vi.mock("~/utils/api", () => {
               ? undefined
               : {
                   unavailableReason: null,
-                  billed: { amountUsd: null, cellsWithoutAmount: 0 },
+                  billed: {
+                    amountUsd: harness.realFigures ? 987654 : null,
+                    cellsWithoutAmount: 0,
+                    currenciesWithoutUsdAmount: [],
+                  },
                   gateway: { amountUsd: null, cellsWithoutAmount: 0 },
                   seats: { status: "awaiting_data" },
                   series: [],
@@ -105,16 +102,62 @@ vi.mock("~/utils/api", () => {
         },
         spenders: {
           useQuery: () => ({
-            data: undefined,
+            data: harness.realFigures
+              ? {
+                  rows: [
+                    {
+                      provider: "openai",
+                      rawActorId: "real-key",
+                      label: "Real billing key",
+                      agentId: "",
+                      amountUsd: 987654,
+                      cellsWithoutAmount: 0,
+                    },
+                  ],
+                }
+              : undefined,
             isError: harness.spendersFail,
             refetch: () => undefined,
           }),
         },
       },
       activityMonitor: {
-        summary: unanswered(),
-        spendByDepartment: unanswered(),
-        spendByUser: unanswered(),
+        summary: {
+          useQuery: () => ({
+            data: harness.realFigures
+              ? { activeUsersThisWindow: 9876 }
+              : undefined,
+            isLoading: false,
+            isError: false,
+          }),
+        },
+        spendByDepartment: {
+          useQuery: () => ({
+            data: harness.realFigures
+              ? [
+                  {
+                    departmentId: "real-department",
+                    departmentName: "Real department",
+                    spendUsd: "54321",
+                    requests: 10,
+                  },
+                ]
+              : undefined,
+          }),
+        },
+        spendByUser: {
+          useQuery: () => ({
+            data: harness.realFigures
+              ? [
+                  {
+                    actor: "real.person@example.test",
+                    spendUsd: "54321",
+                    requests: 10,
+                  },
+                ]
+              : undefined,
+          }),
+        },
         spendOverTime: {
           useQuery: () =>
             harness.overTimeAnswersEmptyDays
@@ -161,6 +204,7 @@ const renderInSampleMode = async () => {
 
 beforeEach(() => {
   harness.summaryFails = false;
+  harness.realFigures = false;
   harness.spendersFail = false;
   harness.overTimeAnswersEmptyDays = false;
   // The section keeps ONE sample choice for the whole sitting, in session
@@ -400,5 +444,38 @@ describe("the cost screen in sample mode", () => {
 
       expect(screen.queryByText("sample")).toBeNull();
     });
+  });
+});
+
+describe("given Costs has real figures", () => {
+  /** @scenario "Sample mode replaces real cost figures and restores them when disabled" */
+  it("replaces real spend and adoption until samples are disabled", async () => {
+    harness.realFigures = true;
+    renderScreen();
+    const billed = screen.getByTestId("cost-lane-billed").textContent;
+    const adoption = panelFor("Adoption").textContent;
+    const realLabels = [
+      "Real billing key",
+      "Real department",
+      "real.person@example.test",
+    ];
+    for (const label of realLabels)
+      expect(screen.getByText(label)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "See sample data" }),
+    );
+    expect(screen.getByTestId("cost-lane-billed").textContent).not.toEqual(
+      billed,
+    );
+    expect(panelFor("Adoption").textContent).not.toEqual(adoption);
+    for (const label of realLabels)
+      expect(screen.queryByText(label)).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Hide sample data" }),
+    );
+    expect(screen.getByTestId("cost-lane-billed").textContent).toEqual(billed);
+    expect(panelFor("Adoption").textContent).toEqual(adoption);
+    for (const label of realLabels)
+      expect(screen.getByText(label)).toBeInTheDocument();
   });
 });

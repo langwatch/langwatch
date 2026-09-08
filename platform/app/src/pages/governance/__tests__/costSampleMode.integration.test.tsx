@@ -228,8 +228,11 @@ describe("the sample panels on the cost screen", () => {
     });
   });
 
-  describe("given the reads answered and measured nothing", () => {
-    beforeEach(withNothingMeasured);
+  describe("given the reader enabled samples on an empty page", () => {
+    beforeEach(() => {
+      withNothingMeasured();
+      window.sessionStorage.setItem("governance.sample", "true");
+    });
 
     it("fills the empty screen with the sample panels", () => {
       renderScreen();
@@ -285,7 +288,10 @@ describe("the sample panels on the cost screen", () => {
   });
 
   describe("given the reader turns the sample panels off on an empty screen", () => {
-    beforeEach(withNothingMeasured);
+    beforeEach(() => {
+      withNothingMeasured();
+      window.sessionStorage.setItem("governance.sample", "true");
+    });
 
     it("does not put them back", () => {
       renderScreen();

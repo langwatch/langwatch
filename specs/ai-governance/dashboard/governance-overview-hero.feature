@@ -82,13 +82,12 @@ Feature: The governance overview opens with a hero and nothing else
     And a section named "Recent activity" is shown beside it
     And it says recent screens will show up there
 
-  # The overview measures nothing, so it is the emptiest page in the section
-  # and the one the sample rule was written for: it opens filled in, and says
-  # in both lists that what fills it is not real.
+  # The overview starts empty. Both lists fill only after samples are enabled.
 
   @integration
-  Scenario: The two lists open filled with samples
-    When the overview renders and I have made no sample choice
+  Scenario: The two lists fill when samples are enabled
+    Given I have enabled sample data
+    When the overview renders
     Then both lists carry sample rows rather than their empty lines
     And each list says "sample" beside its own name
 

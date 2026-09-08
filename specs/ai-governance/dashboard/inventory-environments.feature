@@ -84,14 +84,14 @@ Feature: The Inventory lists the environments the tools run in
     And each carries the sample badge
 
   @integration
-  Scenario: Sample rows never push a discovered environment off the screen
+  Scenario: Sample environments replace discovered environments until disabled
     Given a source names an environment
     And sample data is on
     When the Environments pane renders
-    Then the discovered environment is still listed
+    Then only sample environments are listed
+    When sample data is disabled
+    Then the discovered environment returns
     And no sample row is shown
-    # Discovered rows are derived from real configuration, so samples have
-    # nothing to add to them.
 
   # ===========================================================================
   # Adding one

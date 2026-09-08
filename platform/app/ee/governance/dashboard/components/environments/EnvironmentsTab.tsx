@@ -144,14 +144,7 @@ export function AddEnvironmentDialog({
   );
 }
 
-/**
- * Which rows the table shows.
- *
- * Discovered rows always render — they are derived from real configuration, so
- * sample mode has nothing to add to them and must not push them off the
- * screen. Sample rows only join an otherwise empty table, which is the one
- * case where the reader would otherwise be looking at nothing.
- */
+/** Samples replace discovered and locally added environments until disabled. */
 export function environmentRows({
   sources,
   sampleActive,
@@ -161,10 +154,9 @@ export function environmentRows({
   sampleActive: boolean;
   added: readonly EnvironmentRow[];
 }): EnvironmentRow[] {
+  if (sampleActive) return SAMPLE_ENVIRONMENTS;
   const discovered = discoverEnvironments({ sources: sources ?? [] });
-  const real = [...discovered, ...added];
-  if (real.length > 0) return real;
-  return sampleActive ? SAMPLE_ENVIRONMENTS : [];
+  return [...discovered, ...added];
 }
 
 export function EnvironmentsTab({

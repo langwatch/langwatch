@@ -54,7 +54,6 @@ import {
   SampleDataBanner,
   SampleDataToggle,
   useSampleMode,
-  useSettledRealDataState,
 } from "~/components/governance/sample";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
@@ -204,8 +203,16 @@ function usePeopleReads({
   };
 }
 
-function PeoplePage() {
-  const { tab, selectTab } = usePeopleTab();
+/**
+ * Everything the page has to settle before it can render anything: which
+ * organization is being read, what the reader is allowed to see of it, what
+ * they have filtered and sorted to, and the reads that all of that decides.
+ *
+ * Gathered here because the answers depend on one another — the window comes
+ * from the frame, the reads come from the window and the grants — and reading
+ * the page body should not mean reading that chain first.
+ */
+function usePeopleScreen() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -214,19 +221,177 @@ function PeoplePage() {
   const canReadSources = hasAnyPermission("ingestionSources:view");
   const canManage = hasAnyPermission("governance:manage");
 
-  const { sortBy, setSortBy } = useSpendSortParam();
-  const { frame, department, setFrame, setDepartment } = usePeopleFilters();
-  const windowDays = spendWindowDays({ frame });
+  // Handed back whole rather than spread out, so that a caller passing the sort
+  // or the filters straight through to a child says so in one line.
+  const spendSort = useSpendSortParam();
+  const filters = usePeopleFilters();
 
   const reads = usePeopleReads({
     orgId,
-    windowDays,
-    sortBy,
+    windowDays: spendWindowDays({ frame: filters.frame }),
+    sortBy: spendSort.sortBy,
     canReadActivity,
     canReadSources,
   });
 
+  return { orgId, canReadActivity, canManage, spendSort, filters, reads };
+}
+
+function PeoplePage() {
+  const { tab, selectTab } = usePeopleTab();
+  const { orgId, canReadActivity, canManage, spendSort, filters, reads } =
+    usePeopleScreen();
+
+  const { refreshDepartments, refreshIdentity, refreshAssignments } =
+    usePeopleRefreshers({ orgId });
+
+  const runMatch = useRunMatchPass({ orgId, onFinished: refreshIdentity });
+  const sample = useSampleMode();
+
+  const [addingDepartment, setAddingDepartment] = useState(false);
+  const [assigning, setAssigning] = useState<PeopleRow | null>(null);
+
+  const departmentTab = departmentTabRows({
+    sampleActive: sample.active,
+    reads,
+  });
+
+  return (
+    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
+      <VStack align="stretch" gap={4} width="full" maxW="container.xl">
+        <PeoplePageHeader
+          sampleActive={sample.active}
+          onToggleSample={sample.toggle}
+          canManage={canManage}
+          isRunningMatch={runMatch.isRunning}
+          onRunMatch={runMatch.run}
+          onAddDepartment={() => setAddingDepartment(true)}
+        />
+
+        <PeopleSampleBanner active={sample.active} />
+
+        <Tabs.Root
+          value={tab}
+          onValueChange={({ value }) => selectTab(value)}
+          variant="line"
+          lazyMount
+        >
+          <PeopleTabsList />
+          <Tabs.Content value="people" paddingTop={4}>
+            <PeopleTabPane
+              orgId={orgId}
+              reads={reads}
+              sampleActive={sample.active}
+              canReadActivity={canReadActivity}
+              canManage={canManage}
+              frame={filters.frame}
+              onFrameChange={filters.setFrame}
+              department={filters.department}
+              onDepartmentChange={filters.setDepartment}
+              sortBy={spendSort.sortBy}
+              onSortChange={spendSort.setSortBy}
+              onAssignDepartment={setAssigning}
+              onSuggestionsChanged={refreshIdentity}
+            />
+          </Tabs.Content>
+          <Tabs.Content value="departments" paddingTop={4}>
+            <DepartmentsTabPane
+              orgId={orgId}
+              departments={departmentTab.departments}
+              observed={departmentTab.observed}
+              isLoading={!sample.active && reads.departments.isLoading}
+              error={sample.active ? null : reads.departments.error}
+              // Invented rows carry no record to rename or archive.
+              canManage={canManage && !sample.active}
+              canManageGrant={canManage}
+              onChanged={refreshDepartments}
+            />
+          </Tabs.Content>
+        </Tabs.Root>
+      </VStack>
+
+      <PeopleDialogs
+        orgId={orgId}
+        addingDepartment={addingDepartment}
+        onCloseAddDepartment={() => setAddingDepartment(false)}
+        onDepartmentCreated={refreshDepartments}
+        assigning={assigning}
+        onCloseAssign={() => setAssigning(null)}
+        onAssigned={refreshAssignments}
+        departments={reads.departments.data ?? []}
+      />
+    </GovernanceLayout>
+  );
+}
+
+/**
+ * Running a match pass over the people the providers named.
+ *
+ * The header only needs to know whether one is in flight and how to start it,
+ * so what it gets back is those two things rather than the mutation. What the
+ * pass found is reported as a toast, since nothing on the screen changes until
+ * the identity reads come back.
+ */
+function useRunMatchPass({
+  orgId,
+  onFinished,
+}: {
+  orgId: string;
+  onFinished: () => Promise<void>;
+}) {
+  const mutation = api.governancePeople.runMatch.useMutation({
+    onSuccess: async (outcome) => {
+      toaster.create({
+        title: "Match pass finished",
+        description: `${outcome.linked} linked, ${outcome.unproven} unproven. Suggestions refresh as pull sources deliver people.`,
+        type: "success",
+      });
+      await onFinished();
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't run the match pass" }),
+  });
+
+  return {
+    isRunning: mutation.isPending,
+    run: () => mutation.mutate({ organizationId: orgId }),
+  };
+}
+
+/**
+ * The two tab triggers. Their own component because the styling repeats and the
+ * page body reads better with the tabs named once than with fourteen lines of
+ * identical trigger markup between the header and the panes.
+ */
+function PeopleTabsList() {
+  return (
+    <Tabs.List>
+      <Tabs.Trigger
+        value="people"
+        color="fg.muted"
+        _selected={{ color: "fg", fontWeight: "semibold" }}
+      >
+        People
+      </Tabs.Trigger>
+      <Tabs.Trigger
+        value="departments"
+        color="fg.muted"
+        _selected={{ color: "fg", fontWeight: "semibold" }}
+      >
+        Departments
+      </Tabs.Trigger>
+    </Tabs.List>
+  );
+}
+
+/**
+ * Every read the page invalidates after a write, gathered because three of them
+ * are needed in three different places and each one is a different set of
+ * queries. A caller says what changed, not which queries that touches.
+ */
+function usePeopleRefreshers({ orgId }: { orgId: string }) {
   const utils = api.useUtils();
+
   const refreshDepartments = async () => {
     await utils.departments.list.invalidate({ organizationId: orgId });
   };
@@ -240,174 +405,177 @@ function PeoplePage() {
     await utils.departments.assignments.invalidate({ organizationId: orgId });
   };
 
-  const runMatch = api.governancePeople.runMatch.useMutation({
-    onSuccess: async (outcome) => {
-      toaster.create({
-        title: "Match pass finished",
-        description: `${outcome.linked} linked, ${outcome.unproven} unproven. Suggestions refresh as pull sources deliver people.`,
-        type: "success",
-      });
-      await refreshIdentity();
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't run the match pass" }),
-  });
+  return { refreshDepartments, refreshIdentity, refreshAssignments };
+}
 
-  /**
-   * Sample data fills a page with nothing on it. The three reads that decide
-   * are the ones a reader would call "something to look at": the money, the
-   * people the providers named, and the departments the organization keeps.
-   */
-  const sample = useSampleMode({
-    realData: useSettledRealDataState([
-      reads.spend.data ?? null,
-      reads.people.data ?? null,
-      reads.departments.data ?? null,
-    ]),
-  });
+/**
+ * Both lists the Departments tab shows: the organization's own departments, and
+ * the ones the connected providers name.
+ *
+ * The two are worked out together because sample mode has to answer for both at
+ * once — a screen showing invented departments alongside a real observed list,
+ * or the reverse, would be telling the reader two different stories. The
+ * invented shapes are built by hand: a sample department is a name with nothing
+ * behind it, so the identifiers are made up here to give the list something to
+ * key rows by, and the observed counts descend so the panel reads like a real
+ * directory rather than a row of identical numbers.
+ */
+function departmentTabRows({
+  sampleActive,
+  reads,
+}: {
+  sampleActive: boolean;
+  reads: ReturnType<typeof usePeopleReads>;
+}): {
+  departments: readonly DepartmentListItem[];
+  observed: ObservedDepartment[];
+} {
+  if (!sampleActive) {
+    return {
+      departments: reads.departments.data ?? [],
+      observed: groupObservedDepartments(reads.people.data ?? []),
+    };
+  }
 
-  const [addingDepartment, setAddingDepartment] = useState(false);
-  const [assigning, setAssigning] = useState<PeopleRow | null>(null);
+  return {
+    departments: SAMPLE_DEPARTMENTS.map((name, index) => ({
+      id: `sample-department-${index}`,
+      name,
+    })),
+    observed: SAMPLE_DEPARTMENTS.map((name, index) => ({
+      name,
+      peopleCount: 4 - index,
+    })),
+  };
+}
 
-  const departmentsList: DepartmentListItem[] = sample.active
-    ? SAMPLE_DEPARTMENTS.map((name, index) => ({
-        id: `sample-department-${index}`,
-        name,
-      }))
-    : (reads.departments.data ?? []);
-
-  const observed: ObservedDepartment[] = sample.active
-    ? SAMPLE_DEPARTMENTS.map((name, index) => ({
-        name,
-        peopleCount: 4 - index,
-      }))
-    : groupObservedDepartments(reads.people.data ?? []);
+/**
+ * The line that says the figures below are invented. Its own component only so
+ * that the page body names the banner once instead of carrying six lines of
+ * copy in the middle of the layout.
+ */
+function PeopleSampleBanner({ active }: { active: boolean }) {
+  if (!active) return null;
 
   return (
-    <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
-      <VStack align="stretch" gap={4} width="full" maxW="container.xl">
-        <HStack
-          data-testid="people-page-header"
-          justify="space-between"
-          align="center"
-          flexWrap="wrap"
-          gap={2}
-        >
-          <Heading size="md">People</Heading>
-          <HStack gap={2}>
-            <SampleDataToggle
-              active={sample.active}
-              onToggle={sample.toggle}
+    <SampleDataBanner>
+      These people and departments are illustrations of what this page shows
+      once a source has delivered rows — nothing here is real.
+    </SampleDataBanner>
+  );
+}
+
+/**
+ * The page title and the actions that belong to the whole screen rather than to
+ * either tab, so that switching tabs never moves them.
+ *
+ * The match pass and Add department appear only for a manager: the identity
+ * half of this page is read on `governance:view` and written on
+ * `governance:manage`.
+ */
+function PeoplePageHeader({
+  sampleActive,
+  onToggleSample,
+  canManage,
+  isRunningMatch,
+  onRunMatch,
+  onAddDepartment,
+}: {
+  sampleActive: boolean;
+  onToggleSample: () => void;
+  canManage: boolean;
+  isRunningMatch: boolean;
+  onRunMatch: () => void;
+  onAddDepartment: () => void;
+}) {
+  return (
+    <HStack
+      data-testid="people-page-header"
+      justify="space-between"
+      align="center"
+      flexWrap="wrap"
+      gap={2}
+    >
+      <Heading size="md">People</Heading>
+      <HStack gap={2}>
+        <SampleDataToggle
+          active={sampleActive}
+          onToggle={onToggleSample}
+          size="sm"
+        />
+        {canManage && (
+          <>
+            <Button
               size="sm"
-            />
-            {canManage && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={runMatch.isPending}
-                  onClick={() => runMatch.mutate({ organizationId: orgId })}
-                >
-                  Run match pass
-                </Button>
-                {/* Solid, because it is the one action here that creates
-                    something of the organization's own. A person arrives on
-                    this page because a provider named them and a match pass
-                    recomputes over what is already there; a department exists
-                    only because somebody made it. Orange rather than the
-                    default grey, matching Inventory's Add tool, so the
-                    section's create actions look like one another. */}
-                <Button
-                  size="sm"
-                  colorPalette="orange"
-                  onClick={() => setAddingDepartment(true)}
-                >
-                  <Plus size={14} /> Add department
-                </Button>
-              </>
-            )}
-          </HStack>
-        </HStack>
-
-        {sample.active && (
-          <SampleDataBanner>
-            These people and departments are illustrations of what this page
-            shows once a source has delivered rows — nothing here is real.
-          </SampleDataBanner>
+              variant="outline"
+              loading={isRunningMatch}
+              onClick={onRunMatch}
+            >
+              Run match pass
+            </Button>
+            {/* Solid, because it is the one action here that creates
+                something of the organization's own. A person arrives on
+                this page because a provider named them and a match pass
+                recomputes over what is already there; a department exists
+                only because somebody made it. Orange rather than the
+                default grey, matching Inventory's Add tool, so the
+                section's create actions look like one another. */}
+            <Button size="sm" colorPalette="orange" onClick={onAddDepartment}>
+              <Plus size={14} /> Add department
+            </Button>
+          </>
         )}
+      </HStack>
+    </HStack>
+  );
+}
 
-        <Tabs.Root
-          value={tab}
-          onValueChange={({ value }) => selectTab(value)}
-          variant="line"
-          lazyMount
-        >
-          <Tabs.List>
-            <Tabs.Trigger
-              value="people"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              People
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="departments"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              Departments
-            </Tabs.Trigger>
-          </Tabs.List>
-          <Tabs.Content value="people" paddingTop={4}>
-            <PeopleTabPane
-              orgId={orgId}
-              reads={reads}
-              sampleActive={sample.active}
-              canReadActivity={canReadActivity}
-              canManage={canManage}
-              frame={frame}
-              onFrameChange={setFrame}
-              department={department}
-              onDepartmentChange={setDepartment}
-              sortBy={sortBy}
-              onSortChange={setSortBy}
-              onAssignDepartment={setAssigning}
-              onSuggestionsChanged={refreshIdentity}
-            />
-          </Tabs.Content>
-          <Tabs.Content value="departments" paddingTop={4}>
-            <DepartmentsTabPane
-              orgId={orgId}
-              departments={departmentsList}
-              observed={observed}
-              isLoading={!sample.active && reads.departments.isLoading}
-              error={sample.active ? null : reads.departments.error}
-              // Invented rows carry no record to rename or archive.
-              canManage={canManage && !sample.active}
-              canManageGrant={canManage}
-              onChanged={refreshDepartments}
-            />
-          </Tabs.Content>
-        </Tabs.Root>
-      </VStack>
-
+/**
+ * The two dialogs the header and the table open. They live outside the tabs,
+ * because a dialog mounted inside a tab pane would be torn down the moment the
+ * reader switched tabs underneath it.
+ *
+ * Which person is being assigned is the open/closed state as well: a row picked
+ * means the dialog is open, and no row means it is not.
+ */
+function PeopleDialogs({
+  orgId,
+  addingDepartment,
+  onCloseAddDepartment,
+  onDepartmentCreated,
+  assigning,
+  onCloseAssign,
+  onAssigned,
+  departments,
+}: {
+  orgId: string;
+  addingDepartment: boolean;
+  onCloseAddDepartment: () => void;
+  onDepartmentCreated: () => Promise<void>;
+  assigning: PeopleRow | null;
+  onCloseAssign: () => void;
+  onAssigned: () => Promise<void>;
+  departments: Department[];
+}) {
+  return (
+    <>
       <AddDepartmentDialog
         orgId={orgId}
         open={addingDepartment}
-        onClose={() => setAddingDepartment(false)}
-        onCreated={refreshDepartments}
+        onClose={onCloseAddDepartment}
+        onCreated={onDepartmentCreated}
       />
       <AssignDepartmentDialog
         orgId={orgId}
         personName={assigning?.displayName ?? ""}
         userId={assigning?.linkedUserId ?? null}
         currentDepartmentId={null}
-        departments={reads.departments.data ?? []}
+        departments={departments}
         open={assigning !== null}
-        onClose={() => setAssigning(null)}
-        onAssigned={refreshAssignments}
+        onClose={onCloseAssign}
+        onAssigned={onAssigned}
       />
-    </GovernanceLayout>
+    </>
   );
 }
 
@@ -444,7 +612,76 @@ function PeopleTabPane({
   onAssignDepartment: (row: PeopleRow) => void;
   onSuggestionsChanged: () => Promise<void>;
 }) {
-  const allRows = useMemo(
+  const allRows = usePeopleTableRows({ sampleActive, reads });
+
+  const departments = departmentsPresent(allRows);
+  const rows = filterByDepartment({ rows: allRows, department });
+  const suggestions = sampleActive ? [] : (reads.suggestions.data ?? []);
+  const isLoading =
+    !sampleActive && (reads.spend.isLoading || reads.people.isLoading);
+
+  if (!canReadActivity && !sampleActive) {
+    return (
+      <PermissionRequiredNotice
+        permission="activityMonitor:view"
+        detail="Spend and activity per person stay hidden until then."
+      />
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={4} width="full">
+      <PeopleFilterBar
+        frame={frame}
+        onFrameChange={onFrameChange}
+        department={department}
+        departments={departments}
+        onDepartmentChange={onDepartmentChange}
+        sortBy={sortBy}
+        onSortChange={onSortChange}
+      />
+
+      <PeopleReadIssues sampleActive={sampleActive} reads={reads} />
+
+      <PeopleTableSection
+        rows={rows}
+        isLoading={isLoading}
+        frame={frame}
+        department={department}
+        sources={sampleActive ? undefined : reads.sources.data}
+        canManage={canManage}
+        onAssignDepartment={onAssignDepartment}
+      />
+
+      {suggestions.length > 0 && (
+        <SuggestionsPanel
+          orgId={orgId}
+          suggestions={suggestions}
+          canManage={canManage}
+          onChanged={onSuggestionsChanged}
+        />
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The one table's rows: the invented ones in sample mode, and otherwise the
+ * spend ranking joined to the people the providers named.
+ *
+ * A hook rather than a few lines in the pane because the join needs four reads
+ * and two lookups written inline, and reading the pane should not mean reading
+ * the join first. Memoised on the reads it uses, so a re-render for an
+ * unrelated reason does not rebuild the whole table.
+ */
+function usePeopleTableRows({
+  sampleActive,
+  reads,
+}: {
+  sampleActive: boolean;
+  reads: ReturnType<typeof usePeopleReads>;
+}) {
+  return useMemo(
     () =>
       sampleActive
         ? samplePeopleRows()
@@ -470,98 +707,125 @@ function PeopleTabPane({
       reads.departments.data,
     ],
   );
+}
 
-  const departments = departmentsPresent(allRows);
-  const rows = filterByDepartment({ rows: allRows, department });
-  const suggestions = sampleActive ? [] : (reads.suggestions.data ?? []);
-  const isLoading =
-    !sampleActive && (reads.spend.isLoading || reads.people.isLoading);
+/**
+ * What the page says when a read did not answer: the locked line for an
+ * organization whose plan does not carry spend, and otherwise whichever of the
+ * two reads failed.
+ *
+ * Sample mode advertises invented figures; reporting that a read of the real
+ * ones failed on the same screen leaves the reader unable to act on either
+ * half. So sample mode says nothing here, and that one decision is the whole
+ * reason this is its own component rather than three conditions in the middle
+ * of the pane.
+ */
+function PeopleReadIssues({
+  sampleActive,
+  reads,
+}: {
+  sampleActive: boolean;
+  reads: ReturnType<typeof usePeopleReads>;
+}) {
+  if (sampleActive) return null;
+  if (reads.lockedByPlan) return <EnterpriseLockedLine />;
 
-  if (!canReadActivity && !sampleActive) {
-    return (
-      <PermissionRequiredNotice
-        permission="activityMonitor:view"
-        detail="Spend and activity per person stay hidden until then."
+  return (
+    <>
+      <HandledErrorAlert
+        error={reads.spend.error}
+        fallbackTitle="Couldn't load people"
       />
+      <HandledErrorAlert
+        error={reads.people.error}
+        fallbackTitle="Couldn't load the people the providers named"
+      />
+    </>
+  );
+}
+
+/**
+ * The table and the three things that can stand in for it: a spinner while the
+ * reads are in flight, a line explaining an empty result, or the table itself
+ * with a count under it.
+ *
+ * Separate from the pane because those three are one decision about the same
+ * piece of the screen, and the pane's job is the arrangement of the pieces
+ * rather than what any one of them turns out to be.
+ */
+function PeopleTableSection({
+  rows,
+  isLoading,
+  frame,
+  department,
+  sources,
+  canManage,
+  onAssignDepartment,
+}: {
+  rows: PeopleRow[];
+  isLoading: boolean;
+  frame: Parameters<typeof timeFrameLabel>[0];
+  department: string | null;
+  sources: Parameters<typeof sourceForTarget>[0]["sources"];
+  canManage: boolean;
+  onAssignDepartment: (row: PeopleRow) => void;
+}) {
+  if (isLoading) {
+    return (
+      <Box padding={6}>
+        <Spinner />
+      </Box>
     );
   }
 
-  const frameLabel = timeFrameLabel(frame).toLowerCase();
+  if (rows.length === 0) {
+    return (
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        padding={6}
+        color="fg.muted"
+        fontSize="sm"
+      >
+        {emptyPeopleLine({ frame, department })}
+      </Box>
+    );
+  }
 
   return (
-    <VStack align="stretch" gap={4} width="full">
-      <PeopleFilterBar
-        frame={frame}
-        onFrameChange={onFrameChange}
-        department={department}
-        departments={departments}
-        onDepartmentChange={onDepartmentChange}
-        sortBy={sortBy}
-        onSortChange={onSortChange}
+    <>
+      <UnifiedPeopleTable
+        rows={rows}
+        sourceFor={(target) => sourceForTarget({ target, sources })}
+        onAssignDepartment={canManage ? onAssignDepartment : undefined}
       />
-
-      {/* Sample mode advertises invented figures; reporting that a read of the
-          real ones failed on the same screen leaves the reader unable to act on
-          either half. */}
-      {!sampleActive && reads.lockedByPlan && <EnterpriseLockedLine />}
-      {!sampleActive && !reads.lockedByPlan && (
-        <>
-          <HandledErrorAlert
-            error={reads.spend.error}
-            fallbackTitle="Couldn't load people"
-          />
-          <HandledErrorAlert
-            error={reads.people.error}
-            fallbackTitle="Couldn't load the people the providers named"
-          />
-        </>
-      )}
-
-      {isLoading ? (
-        <Box padding={6}>
-          <Spinner />
-        </Box>
-      ) : rows.length === 0 ? (
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={6}
-          color="fg.muted"
-          fontSize="sm"
-        >
-          {department !== null
-            ? `Nobody in ${department} used AI through a connected source in the ${frameLabel}.`
-            : `No one has used AI through a connected source in the ${frameLabel}.`}
-        </Box>
-      ) : (
-        <>
-          <UnifiedPeopleTable
-            rows={rows}
-            sourceFor={(target) =>
-              sourceForTarget({ target, sources: reads.sources.data })
-            }
-            onAssignDepartment={canManage ? onAssignDepartment : undefined}
-          />
-          <Text fontSize="xs" color="fg.muted">
-            {rows.length} {rows.length === 1 ? "person" : "people"} shown.
-            {isFrameClamped({ frame })
-              ? " Spend and requests are measured over the last 365 days, the longest window this read answers."
-              : ""}
-          </Text>
-        </>
-      )}
-
-      {suggestions.length > 0 && (
-        <SuggestionsPanel
-          orgId={orgId}
-          suggestions={suggestions}
-          canManage={canManage}
-          onChanged={onSuggestionsChanged}
-        />
-      )}
-    </VStack>
+      <Text fontSize="xs" color="fg.muted">
+        {rows.length} {rows.length === 1 ? "person" : "people"} shown.
+        {isFrameClamped({ frame })
+          ? " Spend and requests are measured over the last 365 days, the longest window this read answers."
+          : ""}
+      </Text>
+    </>
   );
+}
+
+/**
+ * Why the table is empty, said in the reader's own terms: a filtered view names
+ * the department it filtered by, because "nobody used AI" is alarming and wrong
+ * when the truth is that nobody in Finance did.
+ */
+function emptyPeopleLine({
+  frame,
+  department,
+}: {
+  frame: Parameters<typeof timeFrameLabel>[0];
+  department: string | null;
+}) {
+  const frameLabel = timeFrameLabel(frame).toLowerCase();
+  return department !== null
+    ? `Nobody in ${department} used AI through a connected source in the ${frameLabel}.`
+    : `No one has used AI through a connected source in the ${frameLabel}.`;
 }
 
 /*
@@ -922,60 +1186,13 @@ function DepartmentList({
 
   return (
     <>
-      <VStack
-        align="stretch"
-        gap={0}
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        overflow="hidden"
-      >
-        <HStack
-          paddingY={2}
-          paddingX={3}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-          backgroundColor="bg.subtle"
-          fontSize="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-          justifyContent="space-between"
-        >
-          <Text>Departments</Text>
-          {!isLoading && (
-            <Text
-              fontWeight="normal"
-              textTransform="none"
-              letterSpacing="normal"
-            >
-              {departments.length}
-            </Text>
-          )}
-        </HStack>
-        {isLoading ? (
-          <Box padding={4}>
-            <Spinner />
-          </Box>
-        ) : departments.length === 0 ? (
-          <Box padding={4} color="fg.muted" fontSize="sm">
-            {canManage
-              ? "No departments yet. Create one to start attributing spend."
-              : "No departments yet."}
-          </Box>
-        ) : (
-          departments.map((dept) => (
-            <DepartmentRow
-              key={dept.id}
-              department={dept}
-              onRename={() => setEditing(dept)}
-              onArchive={() => setArchiving(dept)}
-              canManage={canManage}
-            />
-          ))
-        )}
-      </VStack>
+      <DepartmentListPanel
+        departments={departments}
+        isLoading={isLoading}
+        canManage={canManage}
+        onRename={setEditing}
+        onArchive={setArchiving}
+      />
 
       <DepartmentEditDrawer
         organizationId={orgId}
@@ -1005,6 +1222,83 @@ function DepartmentList({
         }}
       />
     </>
+  );
+}
+
+/**
+ * The bordered list itself: a header carrying the count, and a row per
+ * department.
+ *
+ * Separate from the component above only because that one also owns the rename
+ * drawer and the archive confirmation, and holding a list, a drawer and a
+ * dialog in one body made the list hard to find among them. Nothing here
+ * decides anything — it renders what it is handed and reports which row the
+ * reader picked.
+ */
+function DepartmentListPanel({
+  departments,
+  isLoading,
+  canManage,
+  onRename,
+  onArchive,
+}: {
+  departments: readonly DepartmentListItem[];
+  isLoading: boolean;
+  canManage: boolean;
+  onRename: (department: DepartmentListItem) => void;
+  onArchive: (department: DepartmentListItem) => void;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      overflow="hidden"
+    >
+      <HStack
+        paddingY={2}
+        paddingX={3}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        backgroundColor="bg.subtle"
+        fontSize="xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="wider"
+        justifyContent="space-between"
+      >
+        <Text>Departments</Text>
+        {!isLoading && (
+          <Text fontWeight="normal" textTransform="none" letterSpacing="normal">
+            {departments.length}
+          </Text>
+        )}
+      </HStack>
+      {isLoading ? (
+        <Box padding={4}>
+          <Spinner />
+        </Box>
+      ) : departments.length === 0 ? (
+        <Box padding={4} color="fg.muted" fontSize="sm">
+          {canManage
+            ? "No departments yet. Create one to start attributing spend."
+            : "No departments yet."}
+        </Box>
+      ) : (
+        departments.map((dept) => (
+          <DepartmentRow
+            key={dept.id}
+            department={dept}
+            onRename={() => onRename(dept)}
+            onArchive={() => onArchive(dept)}
+            canManage={canManage}
+          />
+        ))
+      )}
+    </VStack>
   );
 }
 

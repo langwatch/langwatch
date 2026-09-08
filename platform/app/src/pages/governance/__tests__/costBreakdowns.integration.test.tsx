@@ -22,7 +22,6 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -310,12 +309,6 @@ describe("the cost breakdown panels", () => {
       harness.lanesReport = false;
 
       renderScreen();
-      // An organization with nothing connected comes up in sample mode, so the
-      // real screen is the one BEHIND the toggle — which is where the zero was
-      // printed, under the page's own banner saying nothing had been recorded.
-      await userEvent
-        .setup()
-        .click(screen.getByRole("button", { name: "Hide sample data" }));
 
       const adoption = screen
         .getByText("Adoption")

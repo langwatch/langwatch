@@ -339,9 +339,11 @@ Feature: The controls every AI Governance page renders the same way
   # ===========================================================================
 
   @unit
-  Scenario: Sample panels fill a page with nothing measured on it
+  Scenario: An empty page waits for an explicit sample choice
     Given every read on the page has answered and none of them holds a row
     When the page renders
+    Then the sample panels are off screen
+    When the reader chooses to see sample data
     Then the sample panels are on screen
     And the banner says nothing on the page is real
 
@@ -376,8 +378,8 @@ Feature: The controls every AI Governance page renders the same way
   # One answer for the whole section, not one per page. A reader who turns the
   # samples off is saying they want their own screens, and being asked again on
   # each of the six pages — then again on the way back — reads as the product
-  # not listening. Only the reader's answer is shared: each page still decides
-  # from its own reads what to show before they have given one.
+  # not listening. The default is always the organization's own data.
+  # Samples replace every displayed dataset only after an explicit choice.
 
   @unit
   Scenario: One sample choice governs every governance page
@@ -734,3 +736,20 @@ Feature: The controls every AI Governance page renders the same way
     When both meters are drawn
     Then the two fills differ in length
     And the two fills are drawn in the same colour
+
+  @integration @regression
+  Scenario: Sample mode replaces real cost figures and restores them when disabled
+    Given Costs has real billed spend and active users
+    When the reader enables sample data
+    Then every cost panel shows sample figures instead of real figures
+    When the reader disables sample data
+    Then the real figures return
+
+  @integration @regression
+  Scenario: Sample sources replace real sources without offering real actions
+    Given Inventory has connected sources
+    When the reader enables sample data and opens Sources
+    Then only sample sources and their counts are shown
+    And sample sources offer no detail links or mutation actions
+    When the reader disables sample data
+    Then the connected sources return

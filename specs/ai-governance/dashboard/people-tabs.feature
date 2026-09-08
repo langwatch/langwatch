@@ -149,8 +149,9 @@ Feature: The People page is two tabs, People and Departments
   # ── Sample data ───────────────────────────────────────────────────────────
 
   @integration
-  Scenario: A page with nobody on it opens on sample people
+  Scenario: An empty People page shows samples only when requested
     Given every read has answered and none of them holds a row
+    And sam has enabled sample data
     When sam opens the People page
     Then sample people fill the table
     And the banner says nothing on the page is real

@@ -216,9 +216,8 @@ Feature: One cost screen, three honest lanes
   # =========================================================================
   # Sample mode on this screen.
   #
-  # The section-wide rule — samples fill an empty screen, step aside once
-  # something real arrives, and an explicit choice by the reader beats
-  # both — lives in the UI controls spec. Two things are specific here.
+  # The section-wide rule lives in the UI controls spec: real data by default,
+  # samples replacing every dataset only after an explicit choice.
   #
   # First, sample mode suppresses FAILURE, not just emptiness. A reader
   # who has asked to see what a filled-in Costs page looks like is not
@@ -1054,11 +1053,8 @@ Feature: One cost screen, three honest lanes
   #
   # Two things follow. The page names the real cause, using the live plan to
   # tell "your plan does not cover this" from "your role does not open this",
-  # because the server's own wording is copy and cannot be relied on. And it
-  # treats the decline as a settled answer of nothing, which is what finally
-  # lets the invented panels fill the one screen they were built for. A genuine
-  # fault keeps its red alert and keeps the samples off: we know what a refusal
-  # means, and we do not know what a 500 means.
+  # because the server's own wording is copy and cannot be relied on.
+  # Samples remain an explicit choice for both refused and failed reads.
 
   Rule: A read the server declined is reported as a decline, not as a fault
 
@@ -1070,11 +1066,11 @@ Feature: One cost screen, three honest lanes
       And nothing on the screen says something went wrong
 
     @integration
-    Scenario: A declined read fills the screen with sample data by default
+    Scenario: A declined read offers samples without enabling them
       Given a reader whose cost read is declined by the plan gate
       When the cost screen is drawn
-      Then the invented panels are shown without the reader asking for them
-      And the control to turn them off is on the screen
+      Then the refusal is shown without invented figures
+      And the control to show sample data is on the screen
 
     @integration
     Scenario: A declined read names the plan when the plan is what declined
