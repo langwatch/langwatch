@@ -8,7 +8,7 @@ sidebarTitle: RBAC
 
 The LangWatch AI Gateway uses the LangWatch permission model: a permission is `<resource>:<action>`, a role is a set of permissions, and a role binding gives a person a role on an organization, a team or a project. A grant at a higher scope covers the scopes below it: `virtualKeys:manage` on the organization covers every team and project in it.
 
-The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model and role bindings.
+The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Access Control (RBAC)](/platform/rbac) for the model and role bindings.
 
 ## Resources
 
@@ -99,5 +99,5 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 ```
 
 <Note>
-**Also check:** [Roles and permissions](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
+**Also check:** [Access Control (RBAC)](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
 </Note>

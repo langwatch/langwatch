@@ -212,6 +212,44 @@ else
   echo "Output: $TABLE_OUTPUT"
 fi
 
+# A fence indented four spaces inside a JSX component is still a code fence.
+# The scanner reads .mdx only, and MDX has no indented-code-block construct:
+# under <Tab> and friends the indentation is formatting, and an indented fence
+# is parsed as a fence. So the code inside must never count as a paragraph.
+#
+# The page carries a long paragraph after the closing fence as well, and the
+# run has to report that one. Blanking the code is only half the contract: a
+# scanner that opened the fence and never closed it would also come back
+# quiet, and would silently stop reading the rest of every page that nests a
+# fence this way.
+rm -f "$TABLE_PAGE"
+INDENTED_PAGE="$WORK/docs/indented.mdx"
+{
+  printf -- '---\ntitle: Indented\n---\n\n'
+  printf '<Tabs>\n  <Tab title="Python">\n'
+  printf '    ```python\n'
+  printf '    # one two three four five six seven eight nine ten eleven twelve\n'
+  printf '    ```\n'
+  printf '  </Tab>\n</Tabs>\n\n'
+  printf 'one two three four five six seven eight nine ten eleven twelve\n'
+} > "$INDENTED_PAGE"
+
+INDENTED_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+
+if ! printf '%s\n' "$INDENTED_OUTPUT" | grep -qE 'indented.mdx,line=([5-9]|1[012])::'; then
+  check "a fence indented four spaces inside a JSX component stays a code block" yes
+else
+  check "a fence indented four spaces inside a JSX component stays a code block" no
+  echo "Output: $INDENTED_OUTPUT"
+fi
+
+if printf '%s\n' "$INDENTED_OUTPUT" | grep -q 'indented.mdx,line=13::'; then
+  check "prose after an indented fence block is still read" yes
+else
+  check "prose after an indented fence block is still read" no
+  echo "Output: $INDENTED_OUTPUT"
+fi
+
 if [[ $FAILURES -gt 0 ]]; then
   echo ""
   echo "Annotation: $ANNOTATION"
