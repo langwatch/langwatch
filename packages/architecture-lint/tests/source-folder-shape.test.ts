@@ -122,6 +122,18 @@ describe("source folder shape", () => {
     });
   });
 
+  describe("given a small file its neighbour reads only for types", () => {
+    it("leaves it alone, since a type import reads nothing at runtime", () => {
+      write("packages/widget/src/rules/shapes.ts", "export type Shape = { id: string };\n");
+      write(
+        "packages/widget/src/rules/table.ts",
+        'import type { Shape } from "./shapes.ts";\nexport const rows: Shape[] = [];\n'.repeat(12),
+      );
+
+      expect(collectSourceFolderShapeFindings(root)).toEqual([]);
+    });
+  });
+
   describe("given a small file that another folder or nobody reads", () => {
     it("leaves a file read from another folder alone", () => {
       write("packages/widget/src/rules/rate.ts", "export const rate = 3;\n");

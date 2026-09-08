@@ -67,7 +67,8 @@ function sourceFiles(root: string): string[] {
   );
 }
 
-const RELATIVE_IMPORT = /from\s+["'](\.{1,2}\/[^"']+)["']/g;
+/** A value import of a neighbour. `import type` is erased at build and reads nothing at runtime. */
+const RELATIVE_IMPORT = /(?<!import\s+type\s[^;]*)from\s+["'](\.{1,2}\/[^"']+)["']/g;
 
 function resolveImport(from: string, specifier: string, known: ReadonlySet<string>): string | null {
   const base = resolve(dirname(from), specifier);

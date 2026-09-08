@@ -305,6 +305,9 @@ function manifestTargets(value: unknown): string[] {
 function packageEntrypoints(pkg: ClassifiedPackage): string[] {
   const targets = new Set<string>(["src/index.ts"]);
   for (const target of manifestTargets(pkg.manifest.exports)) {
+    const isDeclaration = target.endsWith(".d.ts");
+    if (isDeclaration) continue;
+
     if (SOURCE_FILE_EXTENSIONS.some((extension) => target.endsWith(extension))) {
       targets.add(target.replace(/^\.\//, ""));
     }

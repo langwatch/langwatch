@@ -154,16 +154,8 @@
       "path": "packages/design-system/src/system/create-system.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/design-system/src/type-utils.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/enterprise/composition/api/src/governance"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/enterprise/composition/api/src/governance/clickhouse-client.port.ts"
     },
     {
       "kind": "crowded-folder",
@@ -278,10 +270,6 @@
       "path": "packages/eventing/src/replay"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/eventing/src/server/schedule/scheduler-wake.repository.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/agent/contract/src"
     },
@@ -392,10 +380,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/api-key/web/src/model"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/api-key/web/src/model/api-key-scope.ts"
     },
     {
       "kind": "fragment-file",
@@ -1064,10 +1048,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/scenario/web/src/ui/sections/agent-testing/results"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/scenario/web/src/ui/sections/agent-testing/results/period-controls.ts"
     },
     {
       "kind": "crowded-folder",
