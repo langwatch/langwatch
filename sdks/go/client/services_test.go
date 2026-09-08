@@ -120,8 +120,40 @@ func TestTraces(t *testing.T) {
 }
 
 func TestAnnotations(t *testing.T) {
-	t.Run("given a trace", func(t *testing.T) {
-		t.Run("when creating an annotation", func(t *testing.T) {
+	t.Run("given the API wraps annotations in a data envelope", func(t *testing.T) {
+		t.Run("when listing every annotation", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/api/annotations", r.URL.Path)
+				_, _ = w.Write([]byte(`{"data":[{"id":"ann_1"},{"id":"ann_2"}]}`))
+			})
+			list, err := c.Annotations.List(context.Background())
+			require.NoError(t, err)
+			require.Len(t, list, 2)
+			assert.Equal(t, "ann_1", list[0].Id)
+		})
+
+		t.Run("when fetching one annotation by id", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/api/annotations/ann_1", r.URL.Path)
+				_, _ = w.Write([]byte(`{"data":{"id":"ann_1","comment":"Great"}}`))
+			})
+			a, err := c.Annotations.Get(context.Background(), "ann_1")
+			require.NoError(t, err)
+			assert.Equal(t, "ann_1", a.Id)
+		})
+
+		t.Run("when listing the annotations on a trace", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/api/annotations/trace/trace_1", r.URL.Path)
+				_, _ = w.Write([]byte(`{"data":[{"id":"ann_1"}]}`))
+			})
+			list, err := c.Annotations.ListByTrace(context.Background(), "trace_1")
+			require.NoError(t, err)
+			require.Len(t, list, 1)
+			assert.Equal(t, "ann_1", list[0].Id)
+		})
+
+		t.Run("when attaching an annotation to a trace", func(t *testing.T) {
 			var mu sync.Mutex
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +163,7 @@ func TestAnnotations(t *testing.T) {
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
 				mu.Unlock()
-				_, _ = w.Write([]byte(`{"id":"ann_1","traceId":"trace_1","comment":"Great","isThumbsUp":true}`))
+				_, _ = w.Write([]byte(`{"data":{"id":"ann_1","traceId":"trace_1","comment":"Great","isThumbsUp":true}}`))
 			})
 
 			up := true
@@ -144,18 +176,99 @@ func TestAnnotations(t *testing.T) {
 			defer mu.Unlock()
 			assert.Equal(t, "Great", gotBody["comment"])
 			assert.Equal(t, true, gotBody["isThumbsUp"])
-			require.NotNil(t, a.Id)
-			assert.Equal(t, "ann_1", *a.Id)
+			assert.Equal(t, "ann_1", a.Id)
 		})
 
-		t.Run("when listing by trace", func(t *testing.T) {
+		t.Run("when updating an annotation", func(t *testing.T) {
+			var mu sync.Mutex
+			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/annotations/trace/trace_1", r.URL.Path)
-				_, _ = w.Write([]byte(`[{"id":"ann_1"}]`))
+				assert.Equal(t, http.MethodPatch, r.Method)
+				assert.Equal(t, "/api/annotations/ann_1", r.URL.Path)
+				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
+				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
+				_, _ = w.Write([]byte(`{"data":{"id":"ann_1","comment":"Edited","isThumbsUp":false}}`))
 			})
-			list, err := c.Annotations.ListByTrace(context.Background(), "trace_1")
+
+			down := false
+			a, err := c.Annotations.Update(context.Background(), "ann_1", AnnotationParams{
+				Comment:    "Edited",
+				IsThumbsUp: &down,
+			})
 			require.NoError(t, err)
-			require.Len(t, list, 1)
+			mu.Lock()
+			defer mu.Unlock()
+			// The API requires both fields on a patch, so both must reach the wire.
+			assert.Equal(t, "Edited", gotBody["comment"])
+			assert.Equal(t, false, gotBody["isThumbsUp"])
+			require.NotNil(t, a.Comment)
+			assert.Equal(t, "Edited", *a.Comment)
+		})
+	})
+
+	t.Run("given a project with no annotations", func(t *testing.T) {
+		t.Run("when listing annotations", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, "/api/annotations", r.URL.Path)
+				_, _ = w.Write([]byte(`{"data":[]}`))
+			})
+			list, err := c.Annotations.List(context.Background())
+			require.NoError(t, err)
+			assert.Empty(t, list)
+		})
+	})
+
+	t.Run("given a server that answers without the envelope", func(t *testing.T) {
+		// A 2xx in some other shape decodes cleanly, because JSON ignores keys it
+		// was not asked for. Without the nil check in decodeAnnotationEnvelope
+		// every one of these would hand back a zero-valued Annotation and no
+		// error, which is the failure the envelope handling exists to prevent.
+		t.Run("when a read returns the bare value", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"id":"ann_1","comment":"Great"}`))
+			})
+			a, err := c.Annotations.Get(context.Background(), "ann_1")
+			require.Error(t, err)
+			assert.Nil(t, a)
+			assert.Contains(t, err.Error(), "data")
+		})
+
+		t.Run("when a list returns an unrelated object", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"annotations":[{"id":"ann_1"}]}`))
+			})
+			list, err := c.Annotations.List(context.Background())
+			require.Error(t, err)
+			assert.Nil(t, list)
+		})
+
+		t.Run("when a write returns an empty body", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+			up := true
+			a, err := c.Annotations.CreateForTrace(context.Background(), "trace_1", AnnotationParams{
+				Comment:    "Great",
+				IsThumbsUp: &up,
+			})
+			require.Error(t, err)
+			assert.Nil(t, a)
+		})
+	})
+
+	t.Run("given the API rejects the request", func(t *testing.T) {
+		t.Run("when the annotation does not exist", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"message":"not found"}`))
+			})
+			a, err := c.Annotations.Get(context.Background(), "ann_missing")
+			require.Error(t, err)
+			assert.Nil(t, a)
+			assert.True(t, IsNotFound(err))
 		})
 	})
 }
