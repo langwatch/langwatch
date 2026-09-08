@@ -53,8 +53,8 @@ import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
 import { useDataPrivacyHost, type DataPrivacyHostPort } from "../../model/data-privacy-host.ts";
 import { SCOPE_ICON } from "../../model/data-privacy-labels.ts";
 import { ruleSummary } from "../../model/data-privacy-rule-config.ts";
-import { EffectiveSummary } from "../../ui/blocks/effective-summary.tsx";
-import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../../ui/blocks/privacy-rule-drawer.tsx";
+import { EffectiveSummary } from "../blocks/effective-summary.tsx";
+import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 
 /** The query parameter the scope filter lives in. Unchanged from the page. */
 export const PRIVACY_SCOPE_QUERY_KEY = "scope";

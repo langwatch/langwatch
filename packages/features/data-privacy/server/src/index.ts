@@ -1,26 +1,26 @@
-export { PrismaDataPrivacyAdapter } from "./adapters/prisma.data-privacy.adapter.ts";
-export {
-  PrismaDataPrivacyResolutionAdapter,
-  type DataPrivacyResolutionDatabase,
-} from "./adapters/prisma.data-privacy-resolution.adapter.ts";
-export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port.ts";
-export { DataPrivacyResolutionService } from "./services/data-privacy-resolution.service.ts";
+export { dataPrivacyServer } from "./data-privacy.server.ts";
+export { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
+export type { DataPrivacyInfrastructure } from "./app/data-privacy.app.ts";
+/**
+ * The lineage a rule is placed and named against, and the analysis capability
+ * the redaction calls out to. Both read stores this feature does not own, so
+ * the process that owns them supplies them.
+ */
 export {
   DataPrivacyDirectoryPort,
   type DataPrivacyOrganizationDirectory,
   type DataPrivacyProjectLineage,
 } from "./ports/data-privacy-directory.port.ts";
-export { DataPrivacyPermissionsPort } from "./ports/data-privacy-permissions.port.ts";
+export { DataPrivacyProjectPort, DataPrivacyResolutionPort } from "./ports/data-privacy.port.ts";
+export {
+  PiiAnalysisMetricsPort,
+  type PiiAnalysisOutcome,
+} from "./ports/pii-analysis-metrics.port.ts";
+export { type PIICheckOptions, PiiAnalysisPort } from "./ports/pii-analysis.port.ts";
 export {
   PrismaDataPrivacyDirectoryRepository,
   type DataPrivacyDirectoryDatabase,
 } from "./repositories/prisma/prisma.data-privacy-directory.repository.ts";
-export {
-  DataPrivacySnapshotService,
-  type DataPrivacySnapshotPolicies,
-} from "./services/data-privacy-snapshot.service.ts";
-export { DataPrivacyScopeAuthorizationService } from "./services/data-privacy-scope-authorization.service.ts";
-export { DataPrivacyService } from "./services/data-privacy.service.ts";
 export {
   OtelPiiAnalysisMetricsAdapter,
   PII_ANALYSIS_DURATION_METRIC_NAME,
@@ -28,9 +28,13 @@ export {
   PII_ANALYSIS_STATUS_METRIC_NAME,
   PII_CHECKS_METRIC_NAME,
 } from "./adapters/otel.pii-analysis-metrics.adapter.ts";
-export { PiiAnalysisMetricsPort, type PiiAnalysisOutcome } from "./ports/pii-analysis-metrics.port.ts";
-export { type PIICheckOptions, PiiAnalysisPort } from "./ports/pii-analysis.port.ts";
+/**
+ * The ingestion halves the trace conversion composes directly, over a policy
+ * source that resolves but does not write. They stay reachable until the trace
+ * ports take a `DataPrivacyApi` instead.
+ */
 export { ContentDropPolicyService } from "./services/content-drop-policy.service.ts";
+export { DataPrivacyResolutionService } from "./services/data-privacy-resolution.service.ts";
 export {
   OtlpSpanContentDropService,
   type OtlpSpanContentDropServiceOptions,
@@ -43,11 +47,3 @@ export {
   type OtlpSpanPiiRedactionServiceDependencies,
   PiiRedactionPolicyService,
 } from "./services/pii-redaction-policy.service.ts";
-export {
-  DataPrivacyTrpcApi,
-  type DataPrivacyTrpcContext,
-  type DataPrivacyTrpcPorts,
-} from "./transport/api-trpc/data-privacy.api.ts";
-
-/** The in-memory policy source the ingestion collections drive their PII cases over. */
-export { DataPrivacyServiceFake } from "./fixtures/data-privacy.fixture.ts";

@@ -1,26 +1,26 @@
 import type {
+  DataPrivacyConfig,
   DataPrivacyPolicy,
   DataPrivacyRow,
   DataPrivacyScope,
-  DataPrivacyConfig,
 } from "@langwatch/data-privacy-contract";
 
-export abstract class DataPrivacyPolicyRepository {
-  abstract findForProjectChain(input: {
+/** The stored privacy rules, as the cascade and the settings page read them. */
+export interface DataPrivacyPolicyRepository {
+  findForProjectChain(input: {
     organizationId: string;
     scopes: Array<Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">>;
   }): Promise<DataPrivacyRow[]>;
-  abstract findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
-  abstract upsertForScope(input: {
+  findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
+  upsertForScope(input: {
     organizationId: string;
     scope: DataPrivacyScope;
     personalOnly: boolean;
     config: DataPrivacyConfig;
   }): Promise<DataPrivacyPolicy>;
-  abstract deleteForScope(input: {
+  deleteForScope(input: {
     organizationId: string;
     scope: DataPrivacyScope;
     personalOnly: boolean;
   }): Promise<void>;
-  abstract tryFindById(input: { id: string }): Promise<DataPrivacyPolicy | null>;
 }

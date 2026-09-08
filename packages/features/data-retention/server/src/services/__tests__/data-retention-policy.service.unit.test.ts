@@ -69,6 +69,17 @@ function policy(options: {
   });
 }
 
+/** The refusal a synchronous gate threw, so the case can assert on its code. */
+function refusalOf(run: () => void): { code?: unknown; httpStatus?: unknown } {
+  try {
+    run();
+  } catch (error) {
+    return error as { code?: unknown; httpStatus?: unknown };
+  }
+
+  throw new Error("expected the gate to refuse, but it returned");
+}
+
 describe("given the permission a scope write demands", () => {
   it("asks a project for project:update rather than project:manage", () => {
     expect(DataRetentionPolicyService.requiredWritePermission("PROJECT")).toBe("project:update");
@@ -92,13 +103,18 @@ describe("given a caller writing a retention override", () => {
   });
 
   describe("when they do not", () => {
-    it("refuses, naming the permission the scope needs", async () => {
+    /** @scenario "A retention rule a caller has no standing to write is refused by name" */
+    it("refuses by name, carrying the permission the scope needs", async () => {
       await expect(
         policy({ allow: false }).assertCanWriteScope({
           actor: ACTOR,
           scope: { scopeType: "TEAM", scopeId: "team_1" },
         }),
-      ).rejects.toThrow(/team:manage/);
+      ).rejects.toMatchObject({
+        code: "data_retention_scope_write_forbidden",
+        httpStatus: 403,
+        meta: { requiredPermission: "team:manage" },
+      });
     });
   });
 });
@@ -113,23 +129,40 @@ describe("given a plan-gated write", () => {
           scope: { scopeType: "TEAM", scopeId: "team_elsewhere" },
           retentionDays: 63,
         }),
-      ).rejects.toThrow(/was not found/);
+      ).rejects.toMatchObject({
+        code: "data_retention_scope_target_not_found",
+        httpStatus: 404,
+      });
     });
   });
 
   describe("when the organization is on a free plan", () => {
-    it("refuses", async () => {
+    /** @scenario "A retention rule saved on a free plan is refused by name" */
+    it("refuses by name", async () => {
       await expect(
         policy({ plan: { free: true, uncapped: false } }).assertPlanForProject({
           actor: ACTOR,
           projectId: "proj_a",
         }),
-      ).rejects.toThrow(/paid-plan feature/);
+      ).rejects.toMatchObject({ code: "data_retention_not_on_plan", httpStatus: 403 });
+    });
+  });
+
+  describe("when the project no longer sits in an organization", () => {
+    /** @scenario "A retention rule saved from a project with no organization is refused by name" */
+    it("refuses by name rather than gating on a plan it cannot resolve", async () => {
+      await expect(
+        policy({ organizationId: null }).assertPlanForProject({
+          actor: ACTOR,
+          projectId: "proj_a",
+        }),
+      ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
     });
   });
 });
 
 describe("given a value a plan may or may not persist", () => {
+  /** @scenario "A retention length the plan does not offer is refused by name" */
   it("allows only the fixed presets on a capped plan", () => {
     const capped = { free: false, uncapped: false };
     expect(() =>
@@ -138,11 +171,12 @@ describe("given a value a plan may or may not persist", () => {
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 63),
     ).not.toThrow();
-    expect(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 98)).toThrow(
-      /isn't available on your plan/,
-    );
+    expect(
+      refusalOf(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 98)),
+    ).toMatchObject({ code: "data_retention_length_not_on_plan", httpStatus: 403 });
   });
 
+  /** @scenario "A retention length under the plan's floor is told the floor" */
   it("allows any whole-week value at or above the floor on an uncapped plan", () => {
     const uncapped = { free: false, uncapped: true };
     expect(() =>
@@ -155,9 +189,12 @@ describe("given a value a plan may or may not persist", () => {
     expect(() =>
       DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 35),
     ).not.toThrow();
-    expect(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 42)).toThrow(
-      /at least 49 days/,
-    );
+    expect(
+      refusalOf(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 42)),
+    ).toMatchObject({
+      code: "data_retention_length_below_plan_minimum",
+      meta: { minimumDays: 49 },
+    });
   });
 
   it("leaves the indefinite sentinel to the platform-administrator gate", () => {
@@ -172,10 +209,11 @@ describe("given a value a plan may or may not persist", () => {
 
 describe("given a request to disable retention entirely", () => {
   describe("when the caller is not a platform administrator", () => {
-    it("refuses", () => {
-      expect(() => policy({ admin: false }).assertCanDisableRetention({ actor: ACTOR })).toThrow(
-        /platform administrators/,
-      );
+    /** @scenario "A request to keep data forever is refused by name" */
+    it("refuses by name", () => {
+      expect(
+        refusalOf(() => policy({ admin: false }).assertCanDisableRetention({ actor: ACTOR })),
+      ).toMatchObject({ code: "data_retention_disable_forbidden", httpStatus: 403 });
     });
   });
 

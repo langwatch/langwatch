@@ -101,29 +101,55 @@ export const dataPrivacyConfigSchema = z
   .strict();
 export type DataPrivacyConfig = z.infer<typeof dataPrivacyConfigSchema>;
 
-export interface ResolvedAudience {
-  admins: boolean;
-  allMembers: boolean;
-  members: boolean;
-  viewers: boolean;
-  projectOwner: boolean;
-  groupIds: string[];
-}
-export interface ResolvedCategory {
-  disposition: Disposition;
-  audience: ResolvedAudience;
-}
-export interface ResolvedCustomAttributeRule {
-  pattern: string;
-  disposition: CustomAttributeDisposition;
-  audience: ResolvedAudience;
-}
-export interface ResolvedDataPrivacy {
-  categories: Record<ContentCategory, ResolvedCategory>;
-  pii: { level: PiiLevel; entities: string[]; exceptPatterns: string[] };
-  secrets: { enabled: boolean; customPatterns: string[] };
-  customAttributes: ResolvedCustomAttributeRule[];
-}
+export const resolvedAudienceSchema = z
+  .object({
+    admins: z.boolean(),
+    allMembers: z.boolean(),
+    members: z.boolean(),
+    viewers: z.boolean(),
+    projectOwner: z.boolean(),
+    groupIds: z.array(z.string()),
+  })
+  .strict();
+export type ResolvedAudience = z.infer<typeof resolvedAudienceSchema>;
+
+export const resolvedCategorySchema = z
+  .object({ disposition: z.enum(DISPOSITIONS), audience: resolvedAudienceSchema })
+  .strict();
+export type ResolvedCategory = z.infer<typeof resolvedCategorySchema>;
+
+export const resolvedCustomAttributeRuleSchema = z
+  .object({
+    pattern: z.string(),
+    disposition: z.enum(CUSTOM_ATTRIBUTE_DISPOSITIONS),
+    audience: resolvedAudienceSchema,
+  })
+  .strict();
+export type ResolvedCustomAttributeRule = z.infer<typeof resolvedCustomAttributeRuleSchema>;
+
+/** Every field populated: the cascade's answer, never a partial rule. */
+export const resolvedDataPrivacySchema = z
+  .object({
+    categories: z
+      .object({
+        input: resolvedCategorySchema,
+        output: resolvedCategorySchema,
+        system: resolvedCategorySchema,
+        tools: resolvedCategorySchema,
+      })
+      .strict(),
+    pii: z
+      .object({
+        level: z.enum(PII_LEVELS),
+        entities: z.array(z.string()),
+        exceptPatterns: z.array(z.string()),
+      })
+      .strict(),
+    secrets: z.object({ enabled: z.boolean(), customPatterns: z.array(z.string()) }).strict(),
+    customAttributes: z.array(resolvedCustomAttributeRuleSchema),
+  })
+  .strict();
+export type ResolvedDataPrivacy = z.infer<typeof resolvedDataPrivacySchema>;
 
 export const EMPTY_AUDIENCE: ResolvedAudience = {
   admins: false,

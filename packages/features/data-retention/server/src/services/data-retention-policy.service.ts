@@ -8,9 +8,15 @@ import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
   PAID_RETENTION_PRESET_DAYS,
+  RetentionDisableForbiddenError,
+  RetentionLengthBelowPlanMinimumError,
+  RetentionLengthNotOnPlanError,
+  RetentionNotOnPlanError,
+  ScopeTargetNotFoundError,
+  ScopeWriteForbiddenError,
 } from "@langwatch/data-retention-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import { TRPCError } from "@trpc/server";
 import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
 import type {
   DataRetentionPlan,
@@ -63,25 +69,20 @@ export class DataRetentionPolicyService {
   }
 
   /**
-   * Throws FORBIDDEN if the plan is free. Pure — the single source of the
-   * free-tier gate, over an already-resolved plan, so a caller that has the plan
-   * in hand doesn't refetch it.
+   * Refuses a free plan by name. Pure — the single source of the free-tier
+   * gate, over an already-resolved plan, so a caller that has the plan in hand
+   * doesn't refetch it.
    */
   static assertPlanConfigurable(plan: DataRetentionPlan): void {
     if (!plan.free) {
       return;
     }
 
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "Configuring data retention is a paid-plan feature. " +
-        "All projects use the platform default until the organization upgrades.",
-    });
+    throw new RetentionNotOnPlanError();
   }
 
   /**
-   * Throws FORBIDDEN if `plan` may not persist `retentionDays`.
+   * Refuses by name when `plan` may not persist `retentionDays`.
    */
   static assertPlanAllowsRetentionValue(plan: DataRetentionPlan, retentionDays: number): void {
     if (retentionDays === INDEFINITE_RETENTION_DAYS) {
@@ -103,22 +104,14 @@ export class DataRetentionPolicyService {
       }
 
       if (retentionDays < rule.customMin) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Retention must be at least ${rule.customMin} days on your plan.`,
-        });
+        throw new RetentionLengthBelowPlanMinimumError(rule.customMin);
       }
 
       return;
     }
 
     if (!rule.presetDays.includes(retentionDays)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message:
-          "That retention length isn't available on your plan. " +
-          "Choose one of the offered options, or contact us to unlock more.",
-      });
+      throw new RetentionLengthNotOnPlanError();
     }
   }
 
@@ -162,12 +155,10 @@ export class DataRetentionPolicyService {
       return;
     }
 
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `You need ${DataRetentionPolicyService.requiredWritePermission(
-        input.scope.scopeType,
-      )} on this ${input.scope.scopeType.toLowerCase()} to change its data retention.`,
-    });
+    throw new ScopeWriteForbiddenError(
+      input.scope.scopeType,
+      DataRetentionPolicyService.requiredWritePermission(input.scope.scopeType),
+    );
   }
 
   /**
@@ -180,11 +171,7 @@ export class DataRetentionPolicyService {
       return;
     }
 
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message:
-        "Only platform administrators can disable data retention " + "(keep data indefinitely).",
-    });
+    throw new RetentionDisableForbiddenError();
   }
 
   /**
@@ -206,10 +193,7 @@ export class DataRetentionPolicyService {
     });
     const organizationId = lineage?.organizationId;
     if (!organizationId) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Project does not belong to any organization.",
-      });
+      throw new ProjectNotFoundError("That project is no longer in an organization.");
     }
 
     const plan = await this.options.plans.getPlan({
@@ -285,10 +269,7 @@ export class DataRetentionPolicyService {
       scope: input.scope,
     });
     if (!organizationId) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `${input.scope.scopeType.toLowerCase()} ${input.scope.scopeId} was not found.`,
-      });
+      throw new ScopeTargetNotFoundError();
     }
 
     const plan = await this.options.plans.getPlan({

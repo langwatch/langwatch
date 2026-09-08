@@ -11,11 +11,23 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ],
   "references": [
     {
       "path": "../../../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../handled-error/tsconfig.build.json"
     },
     {
       "path": "../../../runtime-composition/tsconfig.build.json"

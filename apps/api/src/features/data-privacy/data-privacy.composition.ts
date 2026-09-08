@@ -3,272 +3,62 @@
  * snapshot the settings screen renders, and the two writes that set and clear a rule at a
  * scope.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
-import type {
-  DataPrivacyConfig,
-  DataPrivacyPolicy,
-  DataPrivacyScope,
-  DataPrivacySnapshot,
-} from "@langwatch/data-privacy-contract";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import {
-  ContentDropPolicyService,
-  DataPrivacyPermissionsPort,
-  DataPrivacyScopeAuthorizationService,
-  DataPrivacySnapshotService,
-  PrismaDataPrivacyAdapter,
+  dataPrivacyServer,
   PrismaDataPrivacyDirectoryRepository,
-  type DataPrivacyTrpcPorts,
 } from "@langwatch/data-privacy-server";
-import { HandledError } from "@langwatch/handled-error";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  OrganizationApi,
+  type OrganizationApi as OrganizationApiContract,
+} from "@langwatch/organization-contract";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
+import { createApp } from "@langwatch/runtime-composition";
 
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import { createDataPrivacyTrpcRouter, type DataPrivacyTrpcChecks } from "./data-privacy-trpc.mount.ts";
-
-/** The two directories the privacy cascade is resolved through. */
-export type DataPrivacyPeers = Readonly<{
-  /** Resolves a project's organization, team and department. */
-  projects: ProjectService;
-  /** Resolves a team's organization, for a TEAM-scoped rule. */
-  organizations: OrganizationService;
-}>;
-
+import { createDataPrivacyTrpcRouter } from "./data-privacy-trpc.mount.ts";
 import type { ComposedDataPrivacyFeature } from "./data-privacy.composition.types.ts";
 
-/** The three answers the privacy surface needs from this deployment. */
-type ApiDataPrivacyPorts = DataPrivacyTrpcPorts<DataPrivacySnapshot, DataPrivacyPolicy>;
+/** The other features' apps the privacy cascade is resolved and authorized through. */
+export type DataPrivacyPeers = Readonly<{
+  /** Resolves a project's organization, team and department. */
+  projects: ProjectApiContract;
+  /** Resolves a team's organization, for a TEAM-scoped rule. */
+  organizations: OrganizationApiContract;
+  /** The SAME permission answers the declared check on the same procedure asks. */
+  permissions: AuthzApiContract;
+}>;
 
-/** Composes the privacy surface over this process's own graph. */
-export function composeDataPrivacyFeature(options: {
+/** Installs the privacy surface over this process's own graph. */
+export async function installApiDataPrivacy(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: DataPrivacyPeers;
-}): ComposedDataPrivacyFeature {
-  const { prisma, authz } = options.infrastructure;
-  const { projects, organizations } = options.peers;
+}): Promise<ComposedDataPrivacyFeature> {
+  const { prisma, featureFlags } = options.infrastructure;
+  const { projects, organizations, permissions } = options.peers;
 
-  const directory = PrismaDataPrivacyDirectoryRepository.create(prisma);
-  const permissions = ApiDataPrivacyPermissions.create({ authz });
-  const policies = PrismaDataPrivacyAdapter.create({ prisma, projects, organizations });
-  const snapshots = DataPrivacySnapshotService.create({ policies, directory, permissions });
-  const scopeAuthorization = DataPrivacyScopeAuthorizationService.create({
-    directory,
-    permissions,
-  });
-
-  const ports: ApiDataPrivacyPorts = {
-    getSnapshot: (ctx, input): Promise<DataPrivacySnapshot> =>
-      snapshots.getSnapshot({ userId: actorId(ctx), projectId: input.projectId }),
-
-    setForScope: async (
-      ctx,
-      input: Readonly<{
-        projectId: string;
-        scope: DataPrivacyScope;
-        personalOnly: boolean;
-        config: DataPrivacyConfig;
-      }>,
-    ): Promise<DataPrivacyPolicy> => {
-      const organizationId = await authorizeScopeWrite({
-        scopeAuthorization,
-        projects,
-        userId: actorId(ctx),
-        projectId: input.projectId,
-        scope: input.scope,
-      });
-      return policies.setForScope({
-        organizationId,
-        scope: input.scope,
-        personalOnly: input.personalOnly,
-        config: input.config,
-      });
-    },
-
-    removeForScope: async (
-      ctx,
-      input: Readonly<{ projectId: string; scope: DataPrivacyScope; personalOnly: boolean }>,
-    ): Promise<void> => {
-      const organizationId = await authorizeScopeWrite({
-        scopeAuthorization,
-        projects,
-        userId: actorId(ctx),
-        projectId: input.projectId,
-        scope: input.scope,
-      });
-      await policies.removeForScope({
-        organizationId,
-        scope: input.scope,
-        personalOnly: input.personalOnly,
-      });
-    },
-  };
-
-  const contentDrop = ContentDropPolicyService.create();
-
-  return {
-    router: (mount) => createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
-    dropsAnyContent: async (projectId) =>
-      contentDrop.dropsAnyContent(await policies.getResolvedForProject({ projectId })),
-  };
-}
-
-/**
- * The privacy surface on a process that composed no database or no project directory.
- */
-export function refusingDataPrivacyFeature(): ComposedDataPrivacyFeature {
-  const refuse = (): never => {
-    throw new ApiDataPrivacyUnavailableError("The privacy rules");
-  };
-  const ports = new Proxy({}, { get: () => refuse, has: () => true }) as ApiDataPrivacyPorts;
-
-  return {
-    router: (mount) => createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
-    // No rules can be read, so none can be shown to drop anything. The
-    // interlock fails CLOSED: without a policy to consult, the edge stores no
-    // content it might have been told to discard.
-    dropsAnyContent: async () => true,
-  };
-}
-
-/**
- * What each rule write claims about the project id it accepts, written where the
- * enforcement is.
- */
-function scopeChecks(mount: ApiTrpcFeatureMount): DataPrivacyTrpcChecks {
-  return {
-    write: mount.middlewares.declaredCheck({
-      kind: "service-authorized",
-      reason:
-        "the data-privacy port anchors the scope to this project's organization and then authorizes the write at the target scope's own tier",
-      permissions: ["project:update"],
-      enforces: {
-        projectId:
-          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the write",
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withProvided(ProjectApi, projects)
+    .withProvided(OrganizationApi, organizations)
+    .withProvided(AuthzApi, permissions)
+    .withProvided(FeatureFlagApi, featureFlags)
+    .withFeature(dataPrivacyServer, {
+      infrastructure: {
+        directory: PrismaDataPrivacyDirectoryRepository.create(prisma),
+        // This process composes no PII analysis transport: the log and metric
+        // doors that redact records are installed in the worker, beside one.
+        redaction: null,
       },
-    }),
-    removal: mount.middlewares.declaredCheck({
-      kind: "service-authorized",
-      reason:
-        "the data-privacy port anchors the scope to this project's organization and then authorizes the removal at the target scope's own tier",
-      permissions: ["project:update"],
-      enforces: {
-        projectId:
-          "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the removal",
-      },
-    }),
+    })
+    .boot({ role: "api" });
+
+  const app = runtime.feature(dataPrivacyServer).provided;
+
+  return {
+    router: (mount) => createDataPrivacyTrpcRouter(mount.runtime),
+    app,
   };
 }
-
-/**
- * Anchors a rule write to the acting project's organization and authorizes it at the
- * TARGET scope's own tier, then answers which organization the write lands in.
- */
-async function authorizeScopeWrite(input: {
-  scopeAuthorization: DataPrivacyScopeAuthorizationService;
-  projects: ProjectService;
-  userId: string;
-  projectId: string;
-  scope: DataPrivacyScope;
-}): Promise<string> {
-  await input.scopeAuthorization.assertScopeBelongsToProjectOrganization({
-    projectId: input.projectId,
-    scope: input.scope,
-  });
-  await input.scopeAuthorization.assertCanWriteScope({
-    userId: input.userId,
-    scope: input.scope,
-  });
-  const project = await input.projects.getWithTeam(input.projectId);
-  return project.team.organizationId;
-}
-
-/**
- * The privacy tiers' permission answers, over the SAME AuthZ service the declared check
- * on the same procedure asks.
- */
-class ApiDataPrivacyPermissions extends DataPrivacyPermissionsPort {
-  static create(dependencies: { authz: AuthzService }): ApiDataPrivacyPermissions {
-    return new ApiDataPrivacyPermissions(dependencies.authz);
-  }
-
-  private constructor(private readonly authz: AuthzService) {
-    super();
-  }
-
-  canManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean> {
-    return this.authz.hasPermission({
-      userId: input.userId,
-      permission: "organization:manage",
-      organizationId: input.organizationId,
-    });
-  }
-
-  async canManageTeams(input: {
-    userId: string;
-    organizationId: string;
-    teamIds: readonly string[];
-  }): Promise<ReadonlyMap<string, boolean>> {
-    if (input.teamIds.length === 0) return new Map();
-    const decided = await this.authz.canBatchByIds({
-      principal: { type: "user", id: input.userId },
-      permission: "team:manage",
-      organizationId: input.organizationId,
-      teams: input.teamIds.map((teamId) => ({ teamId })),
-      projects: [],
-    });
-    return decided.teams;
-  }
-
-  async canUpdateProjects(input: {
-    userId: string;
-    organizationId: string | null;
-    projectIds: readonly string[];
-  }): Promise<ReadonlyMap<string, boolean>> {
-    if (input.projectIds.length === 0) return new Map();
-    // A personal-account project has no organization, and the batched read is
-    // organization-shaped. One probe per id is exact there, and the list is
-    // never longer than one.
-    if (!input.organizationId) {
-      const decided = await Promise.all(
-        input.projectIds.map(
-          async (projectId) =>
-            [
-              projectId,
-              await this.authz.hasPermission({
-                userId: input.userId,
-                permission: "project:update",
-                projectId,
-              }),
-            ] as const,
-        ),
-      );
-      return new Map(decided);
-    }
-    const decided = await this.authz.canBatchByIds({
-      principal: { type: "user", id: input.userId },
-      permission: "project:update",
-      organizationId: input.organizationId,
-      teams: [],
-      projects: input.projectIds.map((projectId) => ({ projectId })),
-    });
-    return decided.projects;
-  }
-}
-
-/** A capability this deployment did not compose, refused by name. */
-class ApiDataPrivacyUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} are not available on this deployment.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiDataPrivacyUnavailableError";
-  }
-}
-
-/** The caller of one request, as the ports above read it. */
-const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().id;

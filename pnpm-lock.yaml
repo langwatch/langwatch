@@ -3024,6 +3024,12 @@ importers:
 
   packages/enterprise/features/sso/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../../api
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3040,6 +3046,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../../../features/audit-log/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -3052,6 +3061,12 @@ importers:
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../features/ops/contract
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../features/user/contract
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)
@@ -3065,6 +3080,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../features/auth/contract
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -4831,12 +4849,18 @@ importers:
 
   packages/features/data-privacy/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../eventing
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../redaction
@@ -4871,6 +4895,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -4895,9 +4922,6 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
-      '@trpc/server':
-        specifier: ^11.18.0
-        version: 11.18.0(typescript@7.0.2)
       safe-regex2:
         specifier: ^5.1.1
         version: 5.1.1
@@ -4905,6 +4929,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -4981,6 +5008,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
@@ -5033,9 +5063,6 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
-      '@trpc/server':
-        specifier: ^11.18.0
-        version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -9789,6 +9816,9 @@ importers:
 
   packages/features/topic/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition

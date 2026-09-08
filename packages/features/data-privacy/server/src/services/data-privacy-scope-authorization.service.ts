@@ -3,10 +3,16 @@
  * out of `platform/app`'s `server/data-privacy/dataPrivacyPolicy.authz.ts` unchanged in
  * behaviour.
  */
-import type { DataPrivacyScope, DataPrivacyScopeType } from "@langwatch/data-privacy-contract";
-import { TRPCError } from "@trpc/server";
+import {
+  ScopeOutsideOrganizationError,
+  ScopeTargetNotFoundError,
+  ScopeWriteForbiddenError,
+  type DataPrivacyScope,
+  type DataPrivacyScopeType,
+} from "@langwatch/data-privacy-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
-import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port.ts";
+import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 
 export class DataPrivacyScopeAuthorizationService {
   /** The permission a rule write at one tier demands. */
@@ -30,14 +36,14 @@ export class DataPrivacyScopeAuthorizationService {
 
   static create(options: {
     directory: DataPrivacyDirectoryPort;
-    permissions: DataPrivacyPermissionsPort;
+    permissions: DataPrivacyPermissionsService;
   }): DataPrivacyScopeAuthorizationService {
     return new DataPrivacyScopeAuthorizationService(options.directory, options.permissions);
   }
 
   private constructor(
     private readonly directory: DataPrivacyDirectoryPort,
-    private readonly permissions: DataPrivacyPermissionsPort,
+    private readonly permissions: DataPrivacyPermissionsService,
   ) {}
 
   async assertCanWriteScope(input: { userId: string; scope: DataPrivacyScope }): Promise<void> {
@@ -45,16 +51,10 @@ export class DataPrivacyScopeAuthorizationService {
       return;
     }
 
-    // The transport codes the platform surface has always answered with, raised
-    // here rather than as a handled error: a new `code` needs an entry in the
-    // client presentation registry, and that registry still lives in a tree
-    // this migration only deletes from.
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `You need ${DataPrivacyScopeAuthorizationService.requiredWritePermission(
-        input.scope.scopeType,
-      )} on this ${input.scope.scopeType.toLowerCase()} to change its data privacy.`,
-    });
+    throw new ScopeWriteForbiddenError(
+      input.scope.scopeType,
+      DataPrivacyScopeAuthorizationService.requiredWritePermission(input.scope.scopeType),
+    );
   }
 
   async assertScopeBelongsToProjectOrganization(input: {
@@ -66,22 +66,16 @@ export class DataPrivacyScopeAuthorizationService {
       this.directory.tryGetProjectLineage({ projectId: input.projectId }),
     ]);
     if (!scopeOrganizationId) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "The data privacy scope target does not exist.",
-      });
+      throw new ScopeTargetNotFoundError();
     }
 
     const projectOrganizationId = project?.organizationId ?? null;
     if (!projectOrganizationId) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "The project does not exist." });
+      throw new ProjectNotFoundError();
     }
 
     if (projectOrganizationId !== scopeOrganizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "The data privacy scope must belong to the same organization as the project.",
-      });
+      throw new ScopeOutsideOrganizationError();
     }
   }
 

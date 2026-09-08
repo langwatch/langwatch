@@ -23,6 +23,13 @@ Feature: A folder is one concept and a file is one readable part
     And the remedy says to move the code into that file and delete the fragment
 
   @unit @architecture
+  Scenario: A mount file the feature grammar requires is never a fragment
+    Given a process mount file that binds one transport declaration is shorter than the fragment floor
+    And only its own composition reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because the grammar asked for that file and the runtime set its size
+
+  @unit @architecture
   Scenario: A baselined finding is silent and a stale baseline entry is reported
     Given the source folder shape baseline lists a folder or file
     When the finding still holds

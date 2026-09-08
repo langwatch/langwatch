@@ -12,7 +12,7 @@ import {
   type DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
 import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port.ts";
-import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port.ts";
+import type { DataPrivacyPermissionsService } from "./data-privacy-permissions.service.ts";
 
 /**
  * The two policy reads the snapshot stands on. Named structurally rather than as
@@ -38,7 +38,7 @@ export class DataPrivacySnapshotService {
   static create(options: {
     policies: DataPrivacySnapshotPolicies;
     directory: DataPrivacyDirectoryPort;
-    permissions: DataPrivacyPermissionsPort;
+    permissions: DataPrivacyPermissionsService;
   }): DataPrivacySnapshotService {
     return new DataPrivacySnapshotService(options.policies, options.directory, options.permissions);
   }
@@ -46,7 +46,7 @@ export class DataPrivacySnapshotService {
   private constructor(
     private readonly policies: DataPrivacySnapshotPolicies,
     private readonly directory: DataPrivacyDirectoryPort,
-    private readonly permissions: DataPrivacyPermissionsPort,
+    private readonly permissions: DataPrivacyPermissionsService,
   ) {}
 
   async getSnapshot(input: { userId: string; projectId: string }): Promise<DataPrivacySnapshot> {

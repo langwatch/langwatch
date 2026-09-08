@@ -4,7 +4,7 @@
  * sibling, so a refusal is framed by the settings menu.
  */
 
-import { dataPrivacyScreens } from "@langwatch/data-privacy-web/screens/data-privacy";
+import { dataPrivacyScreens } from "@langwatch/data-privacy-web/data-privacy";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

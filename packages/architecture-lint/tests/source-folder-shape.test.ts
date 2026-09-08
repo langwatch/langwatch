@@ -101,6 +101,22 @@ describe("source folder shape", () => {
     });
   });
 
+  describe("given a small file the feature grammar requires", () => {
+    /** @scenario A mount file the feature grammar requires is never a fragment */
+    it("leaves a process mount alone however short it is", () => {
+      write(
+        "apps/api/src/features/widget/widget-trpc.mount.ts",
+        "export const createWidgetTrpcRouter = 1;\n",
+      );
+      write(
+        "apps/api/src/features/widget/widget.composition.ts",
+        'import { createWidgetTrpcRouter } from "./widget-trpc.mount.ts";\nexport const c = createWidgetTrpcRouter;\n',
+      );
+
+      expect(collectSourceFolderShapeFindings(root)).toEqual([]);
+    });
+  });
+
   describe("given a small file that another folder or nobody reads", () => {
     it("leaves a file read from another folder alone", () => {
       write("packages/widget/src/rules/rate.ts", "export const rate = 3;\n");

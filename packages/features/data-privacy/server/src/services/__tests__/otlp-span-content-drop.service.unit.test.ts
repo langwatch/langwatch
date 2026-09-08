@@ -4,13 +4,24 @@ import {
   PRIVACY_DROPPED_ATTRIBUTES_MARKER_ATTR,
   PRIVACY_DROPPED_MARKER_ATTR,
   type ContentCategory,
-  type DataPrivacyService,
   type Disposition,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
+import { DataPrivacyResolutionPort } from "../../ports/data-privacy.port.ts";
 import { OtlpSpanContentDropService } from "../otlp-span-content-drop.service.ts";
+
+/** A resolver built from one function, so a test states only what it answers. */
+function resolverOf(
+  resolve: (input: { projectId: string }) => Promise<ResolvedDataPrivacy> | ResolvedDataPrivacy,
+): DataPrivacyResolutionPort {
+  return new (class extends DataPrivacyResolutionPort {
+    async getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
+      return resolve(input);
+    }
+  })();
+}
 
 /**
  * Spec: packages/features/data-privacy/specs/span-content-drop.feature
@@ -73,11 +84,9 @@ const keys = (target: OtlpSpan): string[] => target.attributes.map((attr) => att
  */
 const pureDrop = (): OtlpSpanContentDropService =>
   OtlpSpanContentDropService.create({
-    dataPrivacy: {
-      getResolvedForProject: () => {
-        throw new Error("the strip must not resolve a policy");
-      },
-    } as unknown as DataPrivacyService,
+    dataPrivacy: resolverOf(() => {
+      throw new Error("the strip must not resolve a policy");
+    }),
     nativePolicyEnforced: true,
   });
 const marker = (target: OtlpSpan, key: string): string | null | undefined =>
@@ -396,13 +405,14 @@ describe("OtlpSpanContentDropService.dropSpanContent", () => {
     drop: OtlpSpanContentDropService;
     getResolvedForProject: ReturnType<typeof vi.fn>;
   } {
-    const getResolvedForProject = vi.fn(async () => {
+    const getResolvedForProject = vi.fn(async (input: { projectId: string }) => {
+      void input;
       if (options.throws) throw options.throws;
       return options.policy ?? policy({ input: "drop" });
     });
     return {
       drop: OtlpSpanContentDropService.create({
-        dataPrivacy: { getResolvedForProject } as unknown as DataPrivacyService,
+        dataPrivacy: resolverOf(getResolvedForProject),
         nativePolicyEnforced: options.nativePolicyEnforced ?? true,
       }),
       getResolvedForProject,

@@ -16,7 +16,6 @@ import {
   type RetentionStorageUsage,
   type RetroactiveMutationProgress,
   type RetroactiveMutationProjectInput,
-  ScopeTargetNotFoundError,
   type ScopeAssignment,
   type StorageMeterTenantInput,
   type StorageMeterTenantsInput,
@@ -26,7 +25,6 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
 import type { DataRetentionPlanPort } from "../ports/data-retention-plan.port.ts";
@@ -309,19 +307,13 @@ export class DataRetentionApp implements DataRetentionApiContract {
       this.#policy.assertCanDisableRetention({ actor });
     }
 
-    try {
-      return await this.#retention.setForScope({
-        scope: input.scope,
-        category: input.category,
-        retentionDays: input.retentionDays,
-      });
-    } catch (error) {
-      if (error instanceof ScopeTargetNotFoundError) {
-        throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-      }
-
-      throw error;
-    }
+    // `ScopeTargetNotFoundError` is a handled 404: the runtime maps its status
+    // to the door's code, so there is nothing to translate here.
+    return this.#retention.setForScope({
+      scope: input.scope,
+      category: input.category,
+      retentionDays: input.retentionDays,
+    });
   }
 
   async removeForScope(

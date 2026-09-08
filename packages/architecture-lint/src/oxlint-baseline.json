@@ -1062,11 +1062,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/data-privacy/web/src/screens/data-privacy/data-privacy.screen.tsx",
+      "key": "cognitive-complexity|packages/features/data-privacy/web/src/ui/blocks/privacy-rule-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/data-privacy/web/src/ui/blocks/privacy-rule-drawer.tsx",
+      "key": "cognitive-complexity|packages/features/data-privacy/web/src/ui/sections/data-privacy-screen.tsx",
       "measured": "2026-09-06"
     },
     {

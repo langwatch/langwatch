@@ -45,10 +45,10 @@ vi.mock("@langwatch/data-retention-web/screens/data-retention", async () => {
   };
 });
 
-vi.mock("@langwatch/data-privacy-web/screens/data-privacy", async () => {
+vi.mock("@langwatch/data-privacy-web/data-privacy", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/data-privacy-web/screens/data-privacy")
-  >("@langwatch/data-privacy-web/screens/data-privacy");
+    typeof import("@langwatch/data-privacy-web/data-privacy")
+  >("@langwatch/data-privacy-web/data-privacy");
   const Screen = () => <div>the data privacy page</div>;
   return {
     ...actual,

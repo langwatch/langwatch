@@ -15,7 +15,7 @@ import {
 import { type PIICheckOptions, PiiAnalysisPort } from "../ports/pii-analysis.port.ts";
 
 import { createLogger } from "@langwatch/observability";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 /**
@@ -50,7 +50,7 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
    * tenant (and most tests) don't need to provide it.
    */
   dataPrivacy: DataPrivacyResolutionPort;
-  featureFlags?: FeatureFlagService;
+  featureFlags?: FeatureFlagApi;
 }
 
 /**

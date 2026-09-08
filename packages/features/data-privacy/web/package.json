@@ -8,9 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/data-privacy": {
-      "types": "./dist/screens/data-privacy/index.d.ts",
-      "default": "./src/screens/data-privacy/index.ts"
+    "./data-privacy": {
+      "langwatch-declaration-source": "./src/data-privacy.ts",
+      "types": "./dist/data-privacy.d.ts",
+      "default": "./src/data-privacy.ts"
     }
   },
   "scripts": {

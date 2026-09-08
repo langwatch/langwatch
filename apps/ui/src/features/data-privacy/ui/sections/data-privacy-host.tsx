@@ -8,7 +8,7 @@ import {
   dataPrivacyApi,
   DataPrivacyHostProvider,
   type DataPrivacyHostPort,
-} from "@langwatch/data-privacy-web/screens/data-privacy";
+} from "@langwatch/data-privacy-web/data-privacy";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 

@@ -1,6 +1,6 @@
 /** Data Privacy: screen and its rule drawer, both in `@langwatch/data-privacy-web`. */
 
-import { dataPrivacyApi } from "@langwatch/data-privacy-web/screens/data-privacy";
+import { dataPrivacyApi } from "@langwatch/data-privacy-web/data-privacy";
 import { uiFeature } from "../../behavior/ui-feature";
 import { dataPrivacyPageLoaders } from "./ui/sections/data-privacy-routes";
 

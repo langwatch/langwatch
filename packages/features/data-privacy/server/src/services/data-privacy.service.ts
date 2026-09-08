@@ -1,6 +1,5 @@
 import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import {
-  DataPrivacyService as DataPrivacyServiceContract,
   DepartmentScopeOwnershipUnavailableError,
   dataPrivacyConfigSchema,
   InvalidDataPrivacyConfigError,
@@ -14,24 +13,22 @@ import safe from "safe-regex2";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
-export class DataPrivacyService extends DataPrivacyServiceContract {
+export class DataPrivacyService {
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
     private readonly cache: DataPrivacyPolicyCacheService,
     private readonly resolution: DataPrivacyResolutionService,
-    private readonly projects: ProjectService,
-    private readonly organizations: OrganizationService,
-  ) {
-    super();
-  }
+    private readonly projects: ProjectApi,
+    private readonly organizations: OrganizationApi,
+  ) {}
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
-    projects: ProjectService;
-    organizations: OrganizationService;
+    projects: ProjectApi;
+    organizations: OrganizationApi;
     ttlMs?: number;
     now?: () => number;
   }): DataPrivacyService {
@@ -60,10 +57,6 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
 
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {
     return this.resolution.listOrganizationRules(input);
-  }
-
-  tryGetById(input: { id: string }): Promise<DataPrivacyPolicy | null> {
-    return this.resolution.tryGetById(input);
   }
 
   async setForScope(input: {
@@ -108,7 +101,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   }): Promise<string> {
     if (input.scope.scopeType === "ORGANIZATION") {
       if (input.scope.scopeId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError("The policy organization does not match its scope.");
+        throw new ScopeTargetNotFoundError();
       }
 
       return input.organizationId;
@@ -117,7 +110,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     if (input.scope.scopeType === "TEAM") {
       const team = await this.organizations.getTeamById({ teamId: input.scope.scopeId });
       if (team.organizationId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError("The policy team does not belong to its organization.");
+        throw new ScopeTargetNotFoundError();
       }
 
       return team.organizationId;
@@ -126,9 +119,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     if (input.scope.scopeType === "PROJECT") {
       const project = await this.projects.getWithTeam(input.scope.scopeId);
       if (project.team.organizationId !== input.organizationId) {
-        throw new ScopeTargetNotFoundError(
-          "The policy project does not belong to its organization.",
-        );
+        throw new ScopeTargetNotFoundError();
       }
 
       return project.team.organizationId;

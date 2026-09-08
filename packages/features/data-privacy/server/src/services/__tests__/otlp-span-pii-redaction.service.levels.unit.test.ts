@@ -1,12 +1,12 @@
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PIICheckOptions } from "../../ports/pii-analysis.port.ts";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-policy.service.ts";
-import { DataPrivacyServiceFake } from "../../fixtures/data-privacy.fixture.ts";
+import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
 
 /**
  * The rollout switches this suite reads, held in memory. The packaged flag
@@ -89,8 +89,8 @@ describe("OtlpSpanPiiRedactionService", () => {
       isLangevalsConfigured: true,
       isProduction: false,
       nativePolicyEnforced: false,
-      dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
-      featureFlags: featureFlags as unknown as FeatureFlagService,
+      dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+      featureFlags: featureFlags as unknown as FeatureFlagApi,
       piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
     });
   });
@@ -418,7 +418,7 @@ describe("OtlpSpanPiiRedactionService", () => {
           isProduction: false,
           nativePolicyEnforced: false,
           piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
-          dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+          dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
         });
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
@@ -442,7 +442,7 @@ describe("OtlpSpanPiiRedactionService", () => {
         isLangevalsConfigured: true,
         isProduction: false,
         nativePolicyEnforced: false,
-        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+        dataPrivacy: new DataPrivacyResolutionFake(PLATFORM_DEFAULT_DATA_PRIVACY),
         piiRedactionMaxAttributeLength: MAX_LENGTH,
       });
     });

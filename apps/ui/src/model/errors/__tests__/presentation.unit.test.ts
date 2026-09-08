@@ -721,6 +721,10 @@ describe("explainHandledError", () => {
         // agents can be tested"). Authored in `agent-test-run.ts` and
         // `agent-test-prefetch.ts`, never relayed from an SDK or a customer.
         agent_test_refused: new Set(["reason"]),
+        // The service's own line about the pattern the reader just typed
+        // ("Custom secret pattern ".*" also matches ordinary text"). Ours,
+        // and the pattern inside it is the reader's own input.
+        data_privacy_config_invalid: new Set(["reason"]),
       };
 
       /**

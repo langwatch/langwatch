@@ -132,6 +132,25 @@ describe("DataRetentionService", () => {
     });
   });
 
+  describe("when a rule is written at a scope that no longer exists", () => {
+    /** @scenario "A retention rule aimed at a scope that no longer exists is refused by name" */
+    it("refuses by name rather than writing an unanchored rule", async () => {
+      const service = createService();
+
+      await expect(
+        service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: "missing" },
+          category: "traces",
+          retentionDays: 49,
+        }),
+      ).rejects.toMatchObject({
+        code: "data_retention_scope_target_not_found",
+        httpStatus: 404,
+        isHandled: true,
+      });
+    });
+  });
+
   describe("when the organization directory answers a team lookup", () => {
     /** @scenario "Resolve scope ownership through canonical services" */
     it("defaults a genuinely missing team but does not hide service failures", async () => {

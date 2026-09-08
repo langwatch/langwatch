@@ -1,28 +1,20 @@
 import {
   dataPrivacyPolicySchema,
   dataPrivacyRowSchema,
+  type DataPrivacyConfig,
   type DataPrivacyPolicy,
   type DataPrivacyRow,
   type DataPrivacyScope,
-  type DataPrivacyConfig,
 } from "@langwatch/data-privacy-contract";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
 
-/**
- * Only what this repository touches, so composition names the slice it needs
- * rather than the whole generated client.
- */
-export type DataPrivacyDatabase = Pick<PrismaClient, "dataPrivacyPolicy">;
-
-export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyRepository {
-  private constructor(private readonly database: DataPrivacyDatabase) {
-    super();
-  }
-
-  static create(database: DataPrivacyDatabase): PrismaDataPrivacyPolicyRepository {
-    return new PrismaDataPrivacyPolicyRepository(database);
-  }
+export class PrismaDataPrivacyPolicyRepository
+  extends PrismaRepository.for("DataPrivacyPolicy")
+  implements DataPrivacyPolicyRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaDataPrivacyPolicyRepository(prisma));
 
   async findForProjectChain(input: {
     organizationId: string;
@@ -36,12 +28,13 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
         ]),
       ).values(),
     ];
-    const rows = await this.database.dataPrivacyPolicy.findMany({
+    const rows = await this.prisma.dataPrivacyPolicy.findMany({
       where: {
         organizationId: input.organizationId,
         OR: pairs,
       },
     });
+
     return rows.map((row) =>
       dataPrivacyRowSchema.parse({
         scopeType: row.scopeType,
@@ -53,9 +46,10 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
   }
 
   async findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {
-    const rows = await this.database.dataPrivacyPolicy.findMany({
+    const rows = await this.prisma.dataPrivacyPolicy.findMany({
       where: { organizationId: input.organizationId },
     });
+
     return rows.map((row) => dataPrivacyPolicySchema.parse(row));
   }
 
@@ -66,7 +60,7 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
     config: DataPrivacyConfig;
   }): Promise<DataPrivacyPolicy> {
     const configJson = input.config as Prisma.InputJsonValue;
-    const row = await this.database.dataPrivacyPolicy.upsert({
+    const row = await this.prisma.dataPrivacyPolicy.upsert({
       where: {
         scopeType_scopeId_personalOnly: {
           scopeType: input.scope.scopeType,
@@ -83,6 +77,7 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
         config: configJson,
       },
     });
+
     return dataPrivacyPolicySchema.parse(row);
   }
 
@@ -91,7 +86,7 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
     scope: DataPrivacyScope;
     personalOnly: boolean;
   }): Promise<void> {
-    await this.database.dataPrivacyPolicy.deleteMany({
+    await this.prisma.dataPrivacyPolicy.deleteMany({
       where: {
         organizationId: input.organizationId,
         scopeType: input.scope.scopeType,
@@ -99,12 +94,5 @@ export class PrismaDataPrivacyPolicyRepository extends DataPrivacyPolicyReposito
         personalOnly: input.personalOnly,
       },
     });
-  }
-
-  async tryFindById(input: { id: string }): Promise<DataPrivacyPolicy | null> {
-    const row = await this.database.dataPrivacyPolicy.findUnique({
-      where: { id: input.id },
-    });
-    return row ? dataPrivacyPolicySchema.parse(row) : null;
   }
 }

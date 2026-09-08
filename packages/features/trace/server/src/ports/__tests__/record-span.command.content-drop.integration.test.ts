@@ -8,7 +8,7 @@ import {
   type Disposition,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { OtlpSpanContentDropService } from "@langwatch/data-privacy-server/testing";
+import { OtlpSpanContentDropService } from "@langwatch/data-privacy-server";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,

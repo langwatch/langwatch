@@ -33,7 +33,6 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
-    "@trpc/server": "^11.18.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

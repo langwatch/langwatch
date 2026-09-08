@@ -15,9 +15,9 @@ type BatchClearPIIFunction = (
   options: Record<string, unknown>,
 ) => Promise<(string | null)[]>;
 
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { DataPrivacyServiceFake } from "../../fixtures/data-privacy.fixture.ts";
+import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
 
 const TENANT = createTenantId("project-web-app");
 
@@ -65,7 +65,7 @@ function mkPolicy({
 }
 
 function resolverFor(policy: ResolvedDataPrivacy) {
-  return new DataPrivacyServiceFake(policy);
+  return new DataPrivacyResolutionFake(policy);
 }
 
 function transportFor(batch: BatchClearPIIFunction) {
@@ -454,7 +454,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       // The strict-PII analysis kill switch is on, so buildOptions returns null
       // even though langevals is configured. That is a deliberate opt-out, not an
       // outage, so the incomplete marker must NOT show.
-      const featureFlags = new FlagSwitches() as unknown as FeatureFlagService;
+      const featureFlags = new FlagSwitches() as unknown as FeatureFlagApi;
       (featureFlags as unknown as FlagSwitches).setFlag(
         "ops_pii_strict_presidio_redaction_disabled",
         true,

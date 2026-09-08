@@ -1,14 +1,17 @@
-/** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+/** Kept separate from the composition so importing the router type never pulls in the installer. */
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { createDataPrivacyTrpcRouter } from "./data-privacy-trpc.mount.ts";
 
-/** The one namespace, built over the composed rules. */
+/** The one namespace, and the policy every other surface is redacted under. */
 export type ComposedDataPrivacyFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createDataPrivacyTrpcRouter>;
-  // The interlock the ingest edge asks before it externalizes inline media:
-  // storing bytes for a project whose policy is about to discard them keeps
-  // exactly what the customer asked us not to.
-
-  /** True when this project's resolved policy drops any span content at all. */
-  dropsAnyContent(projectId: string): Promise<boolean>;
+  router(
+    mount: ApiTrpcFeatureMount,
+  ): ReturnType<typeof createDataPrivacyTrpcRouter<ApiTrpcContext>>;
+  /**
+   * For `ctx.app.dataPrivacy`, and for every other surface a resolved policy
+   * bounds: the trace read stack redacts by THIS app, and the ingest edge asks
+   * it whether a project's policy drops any content before it stores bytes.
+   */
+  app: DataPrivacyApi;
 }>;

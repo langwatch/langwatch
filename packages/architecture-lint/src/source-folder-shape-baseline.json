@@ -39,38 +39,6 @@
     },
     {
       "kind": "crowded-folder",
-      "path": "packages/api/src/rest"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/api/src/rest/create-rest-router.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/api/src/rest/management-version.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/api/src/rest/platform-url.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/api/src/rest/response-types.ts"
-    },
-    {
-      "kind": "crowded-folder",
-      "path": "packages/api/src/trpc"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/api/src/trpc/create-trpc-router.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/api/src/trpc/trpc-failure-trace.ts"
-    },
-    {
-      "kind": "crowded-folder",
       "path": "packages/architecture-lint/src"
     },
     {
@@ -616,10 +584,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/data-privacy/contract/src"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/data-privacy/contract/src/data-privacy.app.ts"
     },
     {
       "kind": "fragment-file",

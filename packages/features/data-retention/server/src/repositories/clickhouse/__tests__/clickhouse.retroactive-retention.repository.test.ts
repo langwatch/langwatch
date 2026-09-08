@@ -124,7 +124,8 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     );
   });
 
-  it("returns every blocking mutation with its id and table", async () => {
+  /** @scenario "A second retroactive update is refused while the first is still running" */
+  it("refuses by name and lists every blocking mutation with its id and table", async () => {
     const { commands, repository } = createRepository([
       {
         mutationId: "mut-1",
@@ -150,14 +151,18 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       })
       .catch((cause: unknown) => cause);
 
-    expect(error).toBeInstanceOf(RetroactiveMutationInProgressError);
+    // The code, not the class: this error crosses the tRPC boundary, where the
+    // browser keys its copy off `code` and `instanceof` no longer holds.
+    expect(error).toMatchObject({
+      code: "data_retention_mutation_in_progress",
+      httpStatus: 409,
+      isHandled: true,
+    });
     if (!(error instanceof RetroactiveMutationInProgressError)) {
       throw error;
     }
 
     expect(error.blocked.map((mutation) => mutation.mutationId)).toEqual(["mut-1", "mut-2"]);
-    expect(error.message).toContain("mut-1");
-    expect(error.message).toContain("mut-2");
 
     expect(commands).toHaveLength(0);
   });

@@ -18,6 +18,12 @@ export const FOLDER_BUDGET = 12;
 /** Below this many lines a file is suspected of being a paragraph of another file. */
 export const FRAGMENT_FLOOR = 20;
 
+/**
+ * Files the feature grammar requires one of per feature: the process mount that binds a
+ * transport declaration. Their size is set by the runtime's signature, not by the author.
+ */
+const GRAMMAR_REQUIRED_SUFFIXES = [".mount.ts"];
+
 export const SOURCE_FOLDER_SHAPE_KINDS = ["crowded-folder", "fragment-file"] as const;
 
 export type SourceFolderShapeKind = (typeof SOURCE_FOLDER_SHAPE_KINDS)[number];
@@ -169,6 +175,9 @@ export function collectSourceFolderShapeFindings(root: string): SourceFolderShap
   for (const file of files) {
     const isBarrel = basename(file).startsWith("index.");
     if (isBarrel) continue;
+
+    const grammarRequired = GRAMMAR_REQUIRED_SUFFIXES.some((suffix) => file.endsWith(suffix));
+    if (grammarRequired) continue;
 
     const readers = [...(importers.get(file) ?? [])];
     if (readers.length === 0) continue;

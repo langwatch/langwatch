@@ -27,7 +27,7 @@ import {
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../../../model/data-privacy-host.ts";
-import DataPrivacyScreen from "../data-privacy.screen.tsx";
+import DataPrivacyScreen from "../data-privacy-screen.tsx";
 
 const { snapshot, invalidate, removeForScope, setForScope } = vi.hoisted(() => {
   const category = { disposition: "capture" as const, audience: {} };

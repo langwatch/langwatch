@@ -2420,6 +2420,96 @@ const presentations = {
     },
   },
 
+  // ---- data privacy ----
+  // A rule hangs on a scope — an organization, department, team or project.
+  // All four can be renamed, archived or deleted while the settings page is
+  // open, and the page's own chip picker is the thing that goes stale, so the
+  // copy sends the reader back to it rather than leaving them to guess.
+  data_privacy_scope_target_not_found: {
+    title: "That scope is gone",
+    describe: () =>
+      "It was removed, or it moved to another organization. Reload the page and pick a scope that is still there.",
+  },
+  data_privacy_scope_outside_organization: {
+    title: "That scope belongs to another organization",
+    describe: () =>
+      "A privacy rule can only be set on scopes in the same organization as this project. Reload the page and pick one from this organization.",
+  },
+  data_privacy_scope_write_forbidden: {
+    // `meta.requiredPermission` is the exact permission the tier demands, so
+    // the reader can ask an admin for the right thing rather than "access".
+    title: "You can't change privacy at this level",
+    describe: (error) => {
+      const permission = str(error, "requiredPermission", "");
+      const need = permission ? `You need ${permission} here.` : "";
+      return `${need} Ask an administrator, or set the rule on a scope you manage.`.trim();
+    },
+  },
+  data_privacy_config_invalid: {
+    // `meta.reason` is the service's own line naming the offending pattern.
+    // It is the only part the reader can act on, so it is what they read.
+    title: "That privacy rule can't be saved",
+    describe: (error) =>
+      safeProse(str(error, "reason", "")) ||
+      "One of its patterns was rejected — it is unsafe, or it matches far more than it should. Check the custom patterns and exceptions, then try again.",
+  },
+  data_privacy_department_scope_unavailable: {
+    title: "Departments can't carry a privacy rule",
+    describe: () =>
+      "Set the rule on the organization, a team or a project instead — every project in the department will follow the one you pick.",
+  },
+
+  // ---- data retention ----
+  data_retention_not_on_plan: {
+    title: "Retention settings need a paid plan",
+    describe: () =>
+      "Every project keeps data for the platform default until the organization upgrades.",
+  },
+  data_retention_length_below_plan_minimum: {
+    // `meta.minimumDays` is the floor this plan sells, and it is the whole
+    // remediation: the reader raises the number and saves again.
+    title: "That retention length is too short",
+    describe: (error) => {
+      const minimum = str(error, "minimumDays", "");
+      return minimum
+        ? `The shortest length on this plan is ${minimum} days. Pick that or longer.`
+        : "Pick a longer retention length, or one of the offered options.";
+    },
+  },
+  data_retention_length_not_on_plan: {
+    title: "That retention length isn't on this plan",
+    describe: () =>
+      "Choose one of the offered lengths, or contact us to unlock more.",
+  },
+  data_retention_scope_write_forbidden: {
+    // `meta.requiredPermission` is the exact permission the tier asks for, so
+    // the reader can ask an administrator for the right thing.
+    title: "You can't change retention at this level",
+    describe: (error) => {
+      const permission = str(error, "requiredPermission", "");
+      const need = permission ? `You need ${permission} here.` : "";
+      return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
+    },
+  },
+  data_retention_disable_forbidden: {
+    title: "Keeping data forever isn't available",
+    describe: () =>
+      "Only platform administrators can turn retention off. Pick a retention length instead.",
+  },
+  data_retention_scope_target_not_found: {
+    title: "That scope is gone",
+    describe: () =>
+      "It was removed, or it moved to another organization. Reload the page and pick a scope that is still there.",
+  },
+  data_retention_mutation_in_progress: {
+    // A state, not a breakage: an earlier retroactive update is still
+    // rewriting rows. Waiting is a real action, and the page lists the running
+    // updates beside this message.
+    title: "An earlier retention update is still running",
+    describe: () =>
+      "Wait for it to finish, or stop it from the list of running updates, then start this one again.",
+  },
+
   // ---- datasets ----
   dataset_name_taken: {
     title: "That name is taken",

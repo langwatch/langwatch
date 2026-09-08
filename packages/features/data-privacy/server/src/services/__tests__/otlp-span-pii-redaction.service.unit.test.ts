@@ -1,14 +1,14 @@
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
-  type DataPrivacyService,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { DataPrivacyResolutionPort } from "../../ports/data-privacy.port.ts";
 import { PiiAnalysisPort } from "../../ports/pii-analysis.port.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 
@@ -70,17 +70,17 @@ function resolvedPolicy(over: Partial<ResolvedDataPrivacy> = {}): ResolvedDataPr
   };
 }
 
-function dataPrivacyReturning(policy: ResolvedDataPrivacy | Error): DataPrivacyService {
-  return {
-    getResolvedForProject: async () => {
+function dataPrivacyReturning(policy: ResolvedDataPrivacy | Error): DataPrivacyResolutionPort {
+  return new (class extends DataPrivacyResolutionPort {
+    async getResolvedForProject(): Promise<ResolvedDataPrivacy> {
       if (policy instanceof Error) throw policy;
       return policy;
-    },
-  } as unknown as DataPrivacyService;
+    }
+  })();
 }
 
-const flagsSaying = (disabled: boolean): FeatureFlagService =>
-  ({ isEnabled: async () => disabled }) as unknown as FeatureFlagService;
+const flagsSaying = (disabled: boolean): FeatureFlagApi =>
+  ({ isEnabled: async () => disabled }) as unknown as FeatureFlagApi;
 
 function spanWith(attributes: { key: string; value: { stringValue: string } }[]): OtlpSpan {
   return {

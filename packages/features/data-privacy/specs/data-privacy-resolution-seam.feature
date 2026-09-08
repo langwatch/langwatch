@@ -11,7 +11,7 @@ Feature: A project's privacy policy resolves without the write graph
 
     @unit
     Scenario: The policy resolution composes from a database and one project read
-      Given a Prisma client and a project read with its team
+      Given a policy store and a project read with its team
       When a project's policy is resolved
       Then the inheritance chain is read inside that project's own organization
 

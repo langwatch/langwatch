@@ -1,52 +1,15 @@
-/**
- * The two project-id checks pass as MIDDLEWARES, not declarations, so the
- * sweep counts coverage where enforcement actually runs.
- */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
-import {
-  DataPrivacyTrpcApi,
-  type DataPrivacyTrpcContext,
-  type DataPrivacyTrpcPorts,
-} from "@langwatch/data-privacy-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+/** Binds the feature's declared procedures to this process's execution path. */
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { dataPrivacyTrpcTransport } from "@langwatch/data-privacy-server";
 
-/**
- * The process's own authorization for the two rule writes, each already
- * carrying the declaration that names what enforces the project id.
- */
-export type DataPrivacyTrpcChecks = Readonly<{
-  /** Declared and enforced for `setForScope`. */
-  write: unknown;
-  /** Declared and enforced for `removeForScope`. */
-  removal: unknown;
-}>;
+/** The one slice of the process context this namespace reads. */
+export interface DataPrivacyHostContext {
+  app: Readonly<{ dataPrivacy: DataPrivacyApi }>;
+}
 
-/**
- * Mounts `dataPrivacy.*` on the tRPC root. `TSnapshot`/`TPolicy` are inferred
- * from the process's own readers so responses keep their real shapes.
- */
-export function createDataPrivacyTrpcRouter<
-  TContext extends DataPrivacyTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TSnapshot,
-  TPolicy,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<DataPrivacyTrpcPorts<TSnapshot, TPolicy>> &
-    Readonly<{ checks: DataPrivacyTrpcChecks }>,
+export function createDataPrivacyTrpcRouter<TContext extends DataPrivacyHostContext>(
+  runtime: TrpcRuntime<TContext>,
 ) {
-  const service = createTrpcApiService(mount);
-
-  return DataPrivacyTrpcApi.create(
-    mount.root,
-    {
-      protected: service.protected,
-      validateOutput: service.validateOutput,
-      policy: service.policy,
-      scopeWritePolicy: service.custom(mount.checks.write),
-      scopeRemovalPolicy: service.custom(mount.checks.removal),
-    },
-    mount.ports,
-  );
+  return runtime.mount(dataPrivacyTrpcTransport, (ctx) => ctx.app.dataPrivacy);
 }

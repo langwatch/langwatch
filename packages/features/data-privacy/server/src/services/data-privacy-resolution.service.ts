@@ -47,8 +47,4 @@ export class DataPrivacyResolutionService {
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]> {
     return this.repository.findAllInOrganization(input);
   }
-
-  tryGetById(input: { id: string }): Promise<DataPrivacyPolicy | null> {
-    return this.repository.tryFindById(input);
-  }
 }
