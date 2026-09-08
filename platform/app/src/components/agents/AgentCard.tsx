@@ -30,6 +30,7 @@ import type { AgentType, TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
 import { agentHasDevTunnel, LocalTunnelBadge } from "./LocalTunnelBadge";
+import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /**
  * The icon and the label per agent type. Both maps are keyed by the whole
@@ -196,6 +197,8 @@ export function AgentCard({
   onTalkToIt,
 }: AgentCardProps) {
   const typeLabel = agentTypeLabels[agent.type];
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const showTalkToIt = voiceAgentsEnabled && !!onTalkToIt;
 
   const isCopiedAgent = !!agent.copiedFromAgentId;
   const hasCopies = (agent._count?.copiedAgents ?? 0) > 0;
@@ -208,7 +211,7 @@ export function AgentCard({
       testId={`agent-card-${agent.id}`}
       leading={<AgentTypeIcon type={agent.type} />}
       menu={
-        (onEdit || onDelete || onTest || onTalkToIt) && (
+        (onEdit || onDelete || onTest || showTalkToIt) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
             <Menu.Content className={CARD_MENU_CLASS}>
@@ -237,12 +240,12 @@ export function AgentCard({
                   Test agent
                 </Menu.Item>
               )}
-              {onTalkToIt && (
+              {showTalkToIt && (
                 <Menu.Item
                   value="talk-to-it"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onTalkToIt();
+                    onTalkToIt?.();
                   }}
                   data-testid={`agent-talk-${agent.id}`}
                 >

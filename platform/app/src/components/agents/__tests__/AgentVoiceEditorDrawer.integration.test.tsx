@@ -45,6 +45,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+/** Overridden per test via `mockVoiceAgentsEnabled`; true by default so the
+ * editor's own behavior tests are unaffected by the flag gate. */
+let mockVoiceAgentsEnabled = true;
+vi.mock("../voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
+}));
+
 /** What `agents.getById` answers with, so a test can open a saved agent. */
 let mockAgentById: {
   id: string;
@@ -136,6 +143,7 @@ describe("AgentVoiceEditorDrawer", () => {
     vi.clearAllMocks();
     mockAgentById = null;
     mockProviders = [];
+    mockVoiceAgentsEnabled = true;
     try {
       sessionStorage.clear();
     } catch {
@@ -143,6 +151,20 @@ describe("AgentVoiceEditorDrawer", () => {
     }
   });
   afterEach(cleanup);
+
+  describe("given the release_voice_agents_enabled flag is off", () => {
+    /** @scenario "The voice agent editor shows a disabled message when opened with the flag off" */
+    it("shows a disabled message instead of the editor", async () => {
+      mockVoiceAgentsEnabled = false;
+      renderVoiceDrawer();
+      expect(
+        await screen.findByTestId("voice-agents-disabled-message"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("voice-agent-name-input"),
+      ).not.toBeInTheDocument();
+    });
+  });
 
   describe("when a new voice agent drawer is drawn", () => {
     it("renders Name, Reached via (transport preselected) and Agent id", async () => {

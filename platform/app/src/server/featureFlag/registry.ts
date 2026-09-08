@@ -185,6 +185,13 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
+  {
+    key: "release_voice_agents_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
+  },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
   // configured keeps oversized span content intact with no flag setup: a span

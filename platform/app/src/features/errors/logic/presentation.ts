@@ -3128,6 +3128,10 @@ const presentations = {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  voice_agents_disabled: {
+    title: "Voice agents are not enabled for this project",
+    describe: () => "Ask an admin to turn the feature on for this project.",
+  },
   gateway_budget_cycle_anchor_invalid: {
     // Names the window back, because the fix is to change one of the two:
     // drop the anchor, or pick a window that rolls.

@@ -19,6 +19,7 @@ import { Button, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useState } from "react";
 import { TalkToItPanel } from "~/components/agents/voice/TalkToItPanel";
+import { useVoiceAgentsEnabled } from "~/components/agents/voice/useVoiceAgentsEnabled";
 import { Dialog } from "~/components/ui/dialog";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { OpenListContext } from "../shared/OpenListContext";
@@ -258,7 +259,10 @@ function RunDialogContent({
   // The panel opens in place of the fields when the person calls the agent
   // themselves; leaving the call returns to the dialog it was opened from.
   const [calling, setCalling] = useState(false);
-  const voiceCall = voiceCallTargetOf({ form, subject });
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const voiceCall = voiceAgentsEnabled
+    ? voiceCallTargetOf({ form, subject })
+    : null;
 
   return (
     <Dialog.Root

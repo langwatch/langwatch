@@ -18,6 +18,13 @@ vi.mock("../CallerVoiceModelSelect", () => ({
   CallerVoiceModelSelect: () => <div data-testid="caller-voice-model" />,
 }));
 
+// The group is flag-gated (release_voice_agents_enabled). Default on, so its
+// own behavior tests are unaffected by the gate.
+let mockVoiceAgentsEnabled = true;
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
+}));
+
 import { ScenarioForm } from "../ScenarioForm";
 
 afterEach(cleanup);
@@ -60,6 +67,20 @@ describe("Caller voice group", () => {
       expect(screen.getByText("Voice")).toBeVisible();
       expect(screen.getByText("Interrupts: 20%")).toBeInTheDocument();
       expect(screen.getByLabelText("Effects")).toHaveValue("phone_line");
+    });
+  });
+
+  describe("given the release_voice_agents_enabled flag is off", () => {
+    /** @scenario "The Caller voice group is hidden while the project's flag is off" */
+    it("does not render the Caller voice group", async () => {
+      mockVoiceAgentsEnabled = false;
+      renderForm();
+
+      await userEvent.click(screen.getByText("Customize scenario"));
+
+      expect(
+        screen.queryByTestId("caller-voice-group"),
+      ).not.toBeInTheDocument();
     });
   });
 });

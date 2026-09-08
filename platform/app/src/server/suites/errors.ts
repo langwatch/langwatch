@@ -171,6 +171,16 @@ export class SuiteScopeNotAllowedError extends SuiteDomainError {
   }
 }
 
+/** Thrown when a run targets a voice agent but the project's flag is off. */
+export class VoiceAgentsDisabledError extends SuiteDomainError {
+  declare readonly code: "voice_agents_disabled";
+
+  constructor(message = "Voice agents are not enabled for this project") {
+    super(message, { code: "voice_agents_disabled", httpStatus: 403 });
+    this.name = "VoiceAgentsDisabledError";
+  }
+}
+
 /** Thrown when a suite name is already in use within the project */
 export class SuiteNameTakenError extends SuiteDomainError {
   declare readonly code: "suite_name_taken";

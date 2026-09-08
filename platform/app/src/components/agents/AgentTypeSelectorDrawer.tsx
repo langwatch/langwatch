@@ -4,6 +4,7 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /**
  * Agent types - code, workflow, or http.
@@ -60,6 +61,10 @@ const agentTypes: Array<{
 export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const visibleAgentTypes = voiceAgentsEnabled
+    ? agentTypes
+    : agentTypes.filter((agentType) => agentType.type !== "voice");
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
@@ -131,7 +136,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
               <ConnectFromCodeCard
                 onClick={() => openDrawer("agentConnectFromCode")}
               />
-              {agentTypes.map((agentType) => (
+              {visibleAgentTypes.map((agentType) => (
                 <AgentTypeCard
                   key={agentType.type}
                   {...agentType}

@@ -19,6 +19,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { z } from "zod";
+import { useVoiceAgentsEnabled } from "~/components/agents/voice/useVoiceAgentsEnabled";
 import { Slider } from "~/components/ui/slider";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import {
@@ -236,6 +237,9 @@ function CallerVoiceSection({
 }) {
   const [open, setOpen] = useState(false);
   const ChevronIcon = open ? ChevronDown : ChevronRight;
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+
+  if (!voiceAgentsEnabled) return null;
 
   return (
     <Collapsible.Root

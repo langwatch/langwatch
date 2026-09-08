@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useVoiceAgentsEnabled } from "~/components/agents/voice/useVoiceAgentsEnabled";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import type { CaseDraft } from "./useCaseEditor";
 
@@ -63,6 +64,7 @@ export function useCaseCustomizeBlocks({
   setDraft: (update: Partial<CaseDraft>) => void;
 }): CaseCustomizeBlocks {
   const [open, setOpen] = useState<OpenBlocks>(NONE_OPEN);
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
 
   useEffect(() => {
     setOpen(blocksOf(draft));
@@ -113,7 +115,7 @@ export function useCaseCustomizeBlocks({
       onAdd: () => setOpen((current) => ({ ...current, models: true })),
     });
   }
-  if (!open.callerVoice) {
+  if (!open.callerVoice && voiceAgentsEnabled) {
     chips.push({
       key: "case-caller-voice",
       label: "Caller voice",
@@ -125,7 +127,7 @@ export function useCaseCustomizeBlocks({
     showParameters: open.parameters,
     showTurns: open.turns,
     showModels: open.models,
-    showCallerVoice: open.callerVoice,
+    showCallerVoice: open.callerVoice && voiceAgentsEnabled,
     removeParameters,
     removeTurns,
     removeModels,

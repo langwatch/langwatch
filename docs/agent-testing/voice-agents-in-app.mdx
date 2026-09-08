@@ -96,6 +96,7 @@ Set these as app environment variables.
 - The browser needs HTTPS or localhost and microphone permission. Autoplay policy can keep the agent silent until the page has been clicked.
 - Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes and OpenAI audio tokens on your accounts.
 - Only one browser call per tab.
+- Self-hosted: voice turns carry audio, and audio is written to stored objects. If the stored-objects path is not writable (or no S3 bucket is configured), every voice message fails to ingest and the run shows "No response" even though the call happened. Check the api log for `EACCES` on the stored-objects directory.
 
 ## Troubleshooting
 
@@ -108,3 +109,4 @@ Set these as app environment variables.
 | "Recording unavailable" | ElevenLabs is still processing the recording | Reload the run after a short wait |
 | Run marked "Cut at the call limit" | The call reached `VOICE_CALL_MAX_SECONDS` | Raise the limit, or shorten the scenario |
 | Runs sit in queue | `VOICE_RUNS_MAX_CONCURRENT` is reached | Wait for a slot, or raise the limit |
+| "No response" after a call that clearly happened (self-hosted) | Audio could not be written to stored objects, so the voice messages were dropped | Make the stored-objects directory writable by the app user, or configure the S3 bucket |

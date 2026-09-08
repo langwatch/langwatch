@@ -10,6 +10,8 @@ import {
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
 import type { ConnectedAgentSelectability } from "~/server/connected-agents/selectable";
+import { featureFlagService } from "~/server/featureFlag";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
   type AgentComponentConfig,
@@ -31,6 +33,26 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
+
+/**
+ * Refuses a voice agent create/update while the project's flag is off, so
+ * the API cannot register a voice agent behind the UI's own gate.
+ */
+async function assertVoiceAgentsEnabled(projectId: string): Promise<void> {
+  const enabled = await featureFlagService.isEnabled(
+    "release_voice_agents_enabled",
+    {
+      projectId,
+      organizationId: await resolveOrganizationId(projectId),
+    },
+  );
+  if (!enabled) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Voice agents are not enabled for this project",
+    });
+  }
+}
 
 /**
  * What every agent read carries beside the row (ADR-128): the parameters a
@@ -156,6 +178,9 @@ export const agentsRouter = createTRPCRouter({
       // A connected agent is registered by the SDK from the process that runs
       // it; there is nothing a form could fill in for one.
       if (input.type === "connected") throw new AgentRegisterOnlyError();
+      if (input.type === "voice") {
+        await assertVoiceAgentsEnabled(input.projectId);
+      }
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
@@ -186,6 +211,9 @@ export const agentsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
+      if (input.type === "voice") {
+        await assertVoiceAgentsEnabled(input.projectId);
+      }
       const agentService = AgentService.create(ctx.prisma);
 
       // Repository will validate config against the type's DSL schema

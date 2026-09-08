@@ -32,6 +32,7 @@ import {
 } from "~/server/agents/voice/voice-agent.config";
 import { api } from "~/utils/api";
 import { TalkToItPanel } from "./voice/TalkToItPanel";
+import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 // ============================================================================
 // Constants
@@ -492,9 +493,47 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
  * project's ElevenLabs provider row — the agent stores no secret — so the drawer
  * only says whether that key is present.
  */
+/**
+ * What the drawer shows while the project's `release_voice_agents_enabled`
+ * flag is off (AC29): the same frame, one sentence, no form.
+ */
+function VoiceAgentsDisabledDrawer({
+  editor,
+}: {
+  editor: ReturnType<typeof useVoiceAgentEditor>;
+}) {
+  return (
+    <Drawer.Root
+      open={editor.isOpen}
+      onOpenChange={({ open }) => !open && editor.handleClose()}
+      size="lg"
+      modal={false}
+    >
+      <Drawer.Content bg="bg">
+        <Drawer.CloseTrigger />
+        <VoiceAgentHeader
+          canGoBack={editor.canGoBack}
+          goBack={editor.goBack}
+          agentId={editor.agentId}
+        />
+        <Drawer.Body padding={6}>
+          <Text data-testid="voice-agents-disabled-message">
+            Voice agents are not enabled for this project.
+          </Text>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
 export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
   const editor = useVoiceAgentEditor(props);
   const { form } = editor;
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+
+  if (!voiceAgentsEnabled) {
+    return <VoiceAgentsDisabledDrawer editor={editor} />;
+  }
 
   return (
     <Drawer.Root

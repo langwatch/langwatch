@@ -28,10 +28,12 @@ import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   findElevenLabsProviderForProject,
   getElevenLabsApiCredential,
 } from "~/server/gateway/elevenLabsCredential.service";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
 import { scenarioRunIdForConversation } from "~/server/scenarios/voice/call-record";
@@ -131,7 +133,11 @@ async function requireProject(
   req: Request,
   projectId: string,
   permission: "scenarios:create" | "scenarios:view",
-): Promise<{ ok: true } | { ok: false; status: 401 | 403 }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; status: 401 | 403 }
+  | { ok: false; status: 404; disabled: true }
+> {
   const session = await getServerAuthSession({ req });
   if (!session) return { ok: false, status: 401 };
   const allowed = await probeProjectPermission(
@@ -140,7 +146,28 @@ async function requireProject(
     permission,
   );
   if (!allowed) return { ok: false, status: 403 };
+  // The whole door is behind the product flag: a project without it turned
+  // on gets the same 404 the drawer and the run dialog render for, not a
+  // 403 that would leak that the door exists at all (AC29).
+  const voiceEnabled = await featureFlagService.isEnabled(
+    "release_voice_agents_enabled",
+    {
+      projectId,
+      organizationId: await resolveOrganizationId(projectId),
+    },
+  );
+  if (!voiceEnabled) return { ok: false, status: 404, disabled: true };
   return { ok: true };
+}
+
+/** The body/status pair for a failed {@link requireProject} gate. */
+function gateFailureResponse(
+  gate: Extract<Awaited<ReturnType<typeof requireProject>>, { ok: false }>,
+): [{ error: string }, 401 | 403 | 404] {
+  if ("disabled" in gate) {
+    return [{ error: "voice_agents_disabled" }, 404];
+  }
+  return [{ error: "Forbidden" }, gate.status];
 }
 
 // POST /api/voice/session — mint a signed-URL session from the form values.
@@ -170,7 +197,7 @@ secured
         projectId,
         "scenarios:create",
       );
-      if (!gate.ok) return c.json({ error: "Forbidden" }, gate.status);
+      if (!gate.ok) return c.json(...gateFailureResponse(gate));
 
       try {
         const result = await mintVoiceSession(ports, {
@@ -237,7 +264,7 @@ secured
         body.projectId,
         "scenarios:create",
       );
-      if (!gate.ok) return c.json({ error: "Forbidden" }, gate.status);
+      if (!gate.ok) return c.json(...gateFailureResponse(gate));
 
       // The token must verify, and its project must be the authorised one, or
       // the finish is refused before anything is read or written.
@@ -301,7 +328,7 @@ export const route = secured
       const { conversationId } = c.req.valid("param");
       const { projectId } = c.req.valid("query");
       const gate = await requireProject(c.req.raw, projectId, "scenarios:view");
-      if (!gate.ok) return c.json({ error: "Forbidden" }, gate.status);
+      if (!gate.ok) return c.json(...gateFailureResponse(gate));
 
       // Only proxy when a run for this conversation exists in the authorised
       // project — otherwise one project could stream another's recording.

@@ -426,3 +426,98 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given an elapsed time more than 60 seconds before the limit
     When the remaining time is computed
     Then it is not flagged
+
+  # ---------------------------------------------------------------------------
+  # AC29 — Voice is behind the release_voice_agents_enabled flag
+  # ---------------------------------------------------------------------------
+
+  # AC29
+  @integration
+  Scenario: The Voice Agent option is hidden while the project's flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When the agent type selector drawer is drawn
+    Then the Voice Agent option is not offered
+
+  # AC29
+  @integration
+  Scenario: Talk to it appears on a voice agent's card menu while the flag is on
+    Given a project with the release_voice_agents_enabled flag on
+    When a voice agent's card menu is opened
+    Then Talk to it is offered
+
+  # AC29
+  @integration
+  Scenario: Talk to it is hidden on a voice agent's card menu while the flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When a voice agent's card menu is opened
+    Then Talk to it is not offered
+
+  # AC29
+  @integration
+  Scenario: The Caller voice group is hidden while the project's flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When Customize scenario is opened on the scenario form
+    Then the Caller voice group is not offered
+
+  # AC29
+  @integration
+  Scenario: The Caller voice chip is hidden while the project's flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When the Agent Testing scenario editor is drawn
+    Then the Caller voice chip is not offered among the customize chips
+
+  # AC29
+  @integration
+  Scenario: The voice agent editor shows a disabled message when opened with the flag off
+    Given a project with the release_voice_agents_enabled flag off
+    When the voice agent editor drawer is drawn
+    Then it shows "Voice agents are not enabled for this project" instead of the editor
+
+  # AC29
+  @unit
+  Scenario: Creating a voice agent is refused while the flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When a create request names type "voice"
+    Then it is refused as forbidden and no agent is created
+
+  # AC29
+  @unit
+  Scenario: Updating an agent's type to voice is refused while the flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When an update request names type "voice"
+    Then it is refused as forbidden and no agent is updated
+
+  # AC29
+  @unit
+  Scenario: Updating a non-voice field does not check the voice flag
+    Given a project with the release_voice_agents_enabled flag off
+    When an update request names no type
+    Then the voice flag is never checked
+
+  # AC29
+  @integration
+  Scenario: A mint request is refused with a 404 while the voice flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When a voice session mint is requested
+    Then it is refused with the voice_agents_disabled code, as a 404
+
+  # AC29
+  @integration
+  Scenario: A finish request is refused with a 404 while the voice flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When a voice session finish is requested
+    Then it is refused with the voice_agents_disabled code, as a 404
+
+  # AC29
+  @integration
+  Scenario: The audio proxy is refused with a 404 while the voice flag is off
+    Given a project with the release_voice_agents_enabled flag off
+    When the recording audio proxy is requested
+    Then it is refused with the voice_agents_disabled code, as a 404
+
+  # AC29
+  @unit
+  Scenario: A run against a voice target is refused while the project's flag is off
+    Given a suite run whose target is a voice agent and the project's flag is off
+    When the run is prepared
+    Then it is refused before anything is resolved or queued

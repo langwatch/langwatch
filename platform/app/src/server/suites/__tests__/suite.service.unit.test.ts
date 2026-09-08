@@ -9,10 +9,22 @@ import {
   AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  VoiceAgentsDisabledError,
 } from "../errors";
 import type { SuiteRepository } from "../suite.repository";
 import { SuiteService, type SuiteTarget } from "../suite.service";
 import { targetKeyOf } from "../target-key";
+
+const isVoiceAgentsEnabled = vi.fn();
+vi.mock("~/server/featureFlag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/featureFlag")>();
+  return {
+    ...actual,
+    featureFlagService: {
+      isEnabled: (...args: unknown[]) => isVoiceAgentsEnabled(...args),
+    },
+  };
+});
 
 function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
@@ -217,6 +229,7 @@ const RUN_DEFAULTS = {
 describe("SuiteService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isVoiceAgentsEnabled.mockResolvedValue(true);
   });
 
   describe("calculateJobCount()", () => {
@@ -306,6 +319,31 @@ describe("SuiteService", () => {
             expect.objectContaining({ repeatCount: 3 }),
           );
         });
+      });
+    });
+
+    describe("given a target is a voice agent and the project's flag is off", () => {
+      /** @scenario "A run against a voice target is refused while the project's flag is off" */
+      it("refuses the run before resolving anything and never queues it", async () => {
+        isVoiceAgentsEnabled.mockResolvedValue(false);
+        const { service, suiteRunService } = createService();
+        const suite = makeSuite({
+          targets: [
+            { type: "voice", referenceId: "voice_agent_1" },
+          ] as SuiteTarget[],
+        });
+
+        await expect(
+          service.run({ suite, ...RUN_DEFAULTS }),
+        ).rejects.toBeInstanceOf(VoiceAgentsDisabledError);
+        expect(suiteRunService.startRun).not.toHaveBeenCalled();
+        expect(isVoiceAgentsEnabled).toHaveBeenCalledWith(
+          "release_voice_agents_enabled",
+          expect.objectContaining({
+            projectId: RUN_DEFAULTS.projectId,
+            organizationId: RUN_DEFAULTS.organizationId,
+          }),
+        );
       });
     });
 

@@ -155,6 +155,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// The caller-voice block is flag-gated (release_voice_agents_enabled).
+// Default on, so its own behavior tests are unaffected by the gate.
+let mockVoiceAgentsEnabled = true;
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
@@ -200,6 +207,7 @@ function openDrawerAs(params: {
 describe("the scenario dialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockVoiceAgentsEnabled = true;
     mockDrawerParams.current = {};
     mockDrawerOpenFor.current = "";
     mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
@@ -604,6 +612,20 @@ describe("the scenario dialog", () => {
       expect(
         within(chips).getByTestId("customize-chip-case-caller-voice"),
       ).toHaveTextContent("Caller voice");
+    });
+
+    describe("given the release_voice_agents_enabled flag is off", () => {
+      /** @scenario "The Caller voice chip is hidden while the project's flag is off" */
+      it("does not offer the Caller voice chip", async () => {
+        mockVoiceAgentsEnabled = false;
+        openNew();
+        await screen.findByTestId("case-modal");
+
+        const chips = screen.getByTestId("customize-case-chips");
+        expect(
+          within(chips).queryByTestId("customize-chip-case-caller-voice"),
+        ).not.toBeInTheDocument();
+      });
     });
 
     /** @scenario The caller voice is also offered in the Agent Testing scenario editor */

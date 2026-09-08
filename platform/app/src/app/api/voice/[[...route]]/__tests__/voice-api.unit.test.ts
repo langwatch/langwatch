@@ -32,6 +32,21 @@ vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
     getElevenLabsApiCredential(...args),
 }));
 
+const isEnabled = vi.fn();
+vi.mock("~/server/featureFlag", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/featureFlag")>();
+  return {
+    ...actual,
+    featureFlagService: {
+      isEnabled: (...args: unknown[]) => isEnabled(...args),
+    },
+  };
+});
+
+vi.mock("~/server/organizations/resolveOrganizationId", () => ({
+  resolveOrganizationId: vi.fn(async () => "org_1"),
+}));
+
 const getScenarioRunData = vi.fn();
 const appStub = {
   simulations: {
@@ -83,6 +98,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getServerAuthSession.mockResolvedValue({ user: { id: "user_1" } });
   probeProjectPermission.mockResolvedValue(true);
+  isEnabled.mockResolvedValue(true);
   getScenarioRunData.mockResolvedValue(null);
   findElevenLabsProviderForProject.mockResolvedValue({ id: "prov_1" });
   getElevenLabsApiCredential.mockResolvedValue({
@@ -210,6 +226,53 @@ describe("Feature: Voice session HTTP door", () => {
       );
       expect(res.status).toBe(404);
       expect((await res.json()).error).toBe("Recording unavailable");
+    });
+  });
+
+  describe("given the project's release_voice_agents_enabled flag is off", () => {
+    beforeEach(() => {
+      isEnabled.mockResolvedValue(false);
+    });
+
+    /** @scenario "A mint request is refused with a 404 while the voice flag is off" */
+    it("refuses the mint with the disabled code, as a 404", async () => {
+      const res = await post("/api/voice/session", MINT_BODY);
+      expect(res.status).toBe(404);
+      expect((await res.json()).error).toBe("voice_agents_disabled");
+      expect(mintSession).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A finish request is refused with a 404 while the voice flag is off" */
+    it("refuses the finish with the disabled code, as a 404", async () => {
+      const token = signVoiceSessionToken({
+        sessionId: "sess_1",
+        projectId: PROJECT_ID,
+        agentId: "agent_row",
+        agentExternalId: "el_agent_mine",
+        transport: "elevenlabs_convai",
+        exp: Date.now() + 60_000,
+      });
+      const res = await post("/api/voice/session/conv_1/finish", {
+        projectId: PROJECT_ID,
+        sessionToken: token,
+        conversationId: "conv_1",
+        transcript: [],
+        startedAt: 1,
+        endedAt: 2,
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json()).error).toBe("voice_agents_disabled");
+      expect(fetchCallRecord).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The audio proxy is refused with a 404 while the voice flag is off" */
+    it("refuses the audio proxy with the disabled code, as a 404", async () => {
+      const res = await app.request(
+        `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+      );
+      expect(res.status).toBe(404);
+      expect((await res.json()).error).toBe("voice_agents_disabled");
+      expect(getScenarioRunData).not.toHaveBeenCalled();
     });
   });
 });
