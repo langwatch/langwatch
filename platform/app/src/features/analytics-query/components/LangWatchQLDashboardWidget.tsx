@@ -36,6 +36,7 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
+import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { HandledErrorAlert } from "~/features/errors";
 import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
@@ -74,6 +75,7 @@ export function LangWatchQLDashboardWidget({
   name,
 }: LangWatchQLDashboardWidgetProps) {
   const { period } = usePeriodSelector();
+  const refreshedAt = useDashboardRefreshedAt();
 
   const chartQuery = api.analytics.savedWorkbenchCharts.getById.useQuery(
     { id: chartId, projectId },
@@ -91,6 +93,7 @@ export function LangWatchQLDashboardWidget({
     end: period.endDate.getTime(),
     granularitySeconds:
       granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+    ...(refreshedAt === undefined ? {} : { refreshedAt }),
   });
 
   const columns = useMemo(

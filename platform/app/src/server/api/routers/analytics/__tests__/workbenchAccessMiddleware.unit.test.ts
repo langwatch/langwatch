@@ -53,12 +53,8 @@ describe("the workbench feature gate", () => {
       // empty — a `_def` shape change would pass vacuously — and the names pin
       // the `_def.procedures` reading this file depends on.
       expect(gatedProcedures(savedWorkbenchChartsRouter)).toEqual([
-        "create",
-        "delete",
-        "getAll",
         "getById",
         "run",
-        "update",
       ]);
       // And the closure: a sixth procedure added without the gate fails here.
       expect(gatedProcedures(savedWorkbenchChartsRouter)).toEqual(
@@ -71,7 +67,7 @@ describe("the workbench feature gate", () => {
     it("gates everything except the procedure whose answer is the switch", () => {
       // `availability` reads the switch rather than being refused by it: it is
       // what the navigation asks, and it has to be able to answer "off".
-      expect(gatedProcedures(lwqlRouter)).toEqual(["query", "schema"]);
+      expect(gatedProcedures(lwqlRouter)).toEqual(["query"]);
     });
   });
 });

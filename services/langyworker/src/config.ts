@@ -32,6 +32,9 @@ const configSchema = z.object({
   agentsFilePath: z.string().min(1),
   skillsDir: z.string().optional(),
   sessionDir: z.string().min(1),
+  /** Skill ids the control plane has flag-gated off for this turn — hidden
+   * from both the model's skill inventory and execution (see skill.ts). */
+  disabledSkills: z.array(z.string()).optional(),
 });
 
 export type LangyWorkerModelConfig = z.infer<typeof modelConfigSchema>;

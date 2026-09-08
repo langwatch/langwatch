@@ -396,14 +396,19 @@ export async function startLangWatchQLClickHouse({
   }
 
   await applyAsAdmin(
+    // sourceDatabase mirrors provisionLwql.ts: production passes one
+    // sourceDatabase to both the setup and the view statements, so the key
+    // map (and its row policies) live in the facts database, not always
+    // names.database.
     lwqlClickHouseSetupStatements({
       names,
       password: RESTRICTED_PASSWORD,
       lwqlTables,
+      sourceDatabase: factDatabase,
     }),
   );
 
-  await seedKeyMap({ admin, names });
+  await seedKeyMap({ admin, names, keyMapDatabase: factDatabase });
   if (facts === "migrated") {
     await seedRealFactRows({ admin, database: factDatabase });
   } else {
@@ -453,12 +458,15 @@ export async function startLangWatchQLClickHouse({
 async function seedKeyMap({
   admin,
   names,
+  keyMapDatabase,
 }: {
   admin: ClickHouseClient;
   names: LangWatchQLNames;
+  /** Where the key map table was provisioned; see the sourceDatabase comment above. */
+  keyMapDatabase: string;
 }): Promise<void> {
   await admin.insert({
-    table: `${names.database}.${names.keyMapTable}`,
+    table: `${keyMapDatabase}.${names.keyMapTable}`,
     format: "JSONEachRow",
     values: [TENANT_A, TENANT_B].map((tenant) => ({
       KeyHash: tenant.keyHash,
