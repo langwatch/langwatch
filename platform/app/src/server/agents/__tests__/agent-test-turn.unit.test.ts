@@ -22,10 +22,13 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/server/connected-agents/runtime", () => ({
-  getConnectedAgentRuntime: () => {
+const { getConnectedAgentRuntime } = vi.hoisted(() => ({
+  getConnectedAgentRuntime: vi.fn(() => {
     throw new Error("no connected agent is reached in these tests");
-  },
+  }),
+}));
+vi.mock("~/server/connected-agents/runtime", () => ({
+  getConnectedAgentRuntime,
 }));
 
 vi.mock("~/server/suites/connected-targets", () => ({
@@ -116,7 +119,11 @@ function connectedAgent(): AgentWithFields {
   } as AgentWithFields;
 }
 
-function sendConnectedTurn(params: Record<string, string | number | boolean>) {
+function sendConnectedTurn({
+  params,
+}: {
+  params?: Record<string, string | number | boolean>;
+} = {}) {
   return sendAgentTestTurn({
     projectId: "proj_1",
     agentId: "agent_connected",
@@ -131,6 +138,7 @@ function sendConnectedTurn(params: Record<string, string | number | boolean>) {
 }
 
 beforeEach(() => {
+  getConnectedAgentRuntime.mockClear();
   prefetchScenarioData.mockResolvedValue({
     success: true,
     data: { adapterData: {}, nlpServiceUrl: "http://langwatch_nlp:5561" },
@@ -178,18 +186,22 @@ describe("given a connected agent that declares the parameter model", () => {
   describe("when a test turn names a parameter it does not declare", () => {
     /** @scenario "A test turn naming an undeclared parameter is refused" */
     it("is refused as scenario_parameter_unknown before any instance is reached", async () => {
-      await expect(sendConnectedTurn({ locale: "de" })).rejects.toMatchObject({
+      await expect(
+        sendConnectedTurn({ params: { locale: "de" } }),
+      ).rejects.toMatchObject({
         code: "scenario_parameter_unknown",
       });
+      expect(getConnectedAgentRuntime).not.toHaveBeenCalled();
     });
   });
 
   describe("when a test turn sets model outside its options", () => {
     /** @scenario "A test turn value outside the declared options is refused" */
     it("is refused as scenario_parameter_option_invalid before any instance is reached", async () => {
-      await expect(sendConnectedTurn({ model: "gpt-6" })).rejects.toMatchObject(
-        { code: "scenario_parameter_option_invalid" },
-      );
+      await expect(
+        sendConnectedTurn({ params: { model: "gpt-6" } }),
+      ).rejects.toMatchObject({ code: "scenario_parameter_option_invalid" });
+      expect(getConnectedAgentRuntime).not.toHaveBeenCalled();
     });
   });
 });
