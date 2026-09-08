@@ -101,6 +101,32 @@ const organizationsFixture = [
       },
     ],
   },
+  // A second organization, so the page renders its organization picker at all
+  // (it is hidden for a single-organization user). Its personal project is
+  // what a watcher reading the live selection instead of the approved
+  // organization would land on.
+  {
+    id: "org-2",
+    name: "Second Org",
+    teams: [
+      {
+        id: "team-personal-2",
+        slug: "personal-team-2",
+        name: "Personal",
+        isPersonal: true,
+        ownerUserId: "user-1",
+        projects: [
+          {
+            id: "proj-personal-2",
+            slug: "personal-proj-2",
+            name: "Personal project",
+            isPersonal: true,
+            kind: "application",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 vi.mock("~/utils/api", async () => {
@@ -308,5 +334,61 @@ describe("/cli/auth first-trace watch", () => {
 
     expect(screen.queryByText(/Waiting for your first trace/i)).toBeNull();
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  // The picker stays interactive while the approval request is in flight, so
+  // the organization the page shows can move after the request has gone out.
+  // The approval was granted against one organization: the card names it and
+  // the watcher must poll that organization's personal project, not whichever
+  // one the picker happens to be sitting on when the response lands.
+  describe("given the organization is changed while the approval is in flight", () => {
+    it("watches the approved organization, not the one now selected", async () => {
+      let releaseApproval = () => {};
+      const approvalSent = new Promise<void>((resolve) => {
+        releaseApproval = resolve;
+      });
+      const baseFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/api/auth/cli/approve")) {
+          await approvalSent;
+        }
+        return baseFetch(input);
+      });
+
+      const user = userEvent.setup();
+      renderPage();
+      await confirmCode();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Approve" })).toBeDefined(),
+      );
+
+      void user.click(screen.getByRole("button", { name: "Approve" }));
+      await waitFor(() =>
+        expect(
+          fetchMock.mock.calls.some(([input]) =>
+            String(input).includes("/api/auth/cli/approve"),
+          ),
+        ).toBe(true),
+      );
+
+      await user.click(screen.getByRole("button", { name: "Second Org" }));
+      releaseApproval();
+
+      await waitFor(() =>
+        expect(screen.getByText(/You're signed in!/i)).toBeDefined(),
+      );
+      expect(screen.getByText("Acme Org")).toBeDefined();
+
+      act(() => firstMessageState.set(true));
+
+      await waitFor(
+        () =>
+          expect(mockRouter.push).toHaveBeenCalledWith("/personal-proj/traces"),
+        { timeout: 4_000 },
+      );
+      expect(mockRouter.push).not.toHaveBeenCalledWith(
+        "/personal-proj-2/traces",
+      );
+    });
   });
 });

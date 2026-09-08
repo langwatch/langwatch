@@ -101,6 +101,14 @@ type ActionState =
   | { kind: "submitting" }
   | {
       kind: "success";
+      /**
+       * The organization the approval actually went out for, captured before
+       * the request rather than read back off `selectedOrgId`. The picker
+       * stays interactive while the request is in flight, so a selection
+       * changed in that window would otherwise rename the card and re-point
+       * the first-trace watcher at an organization nobody approved.
+       */
+      organizationId: string;
       organizationName: string;
       credentialType: CredentialType;
       projectName?: string;
@@ -546,6 +554,7 @@ export default function CliAuthPage() {
 
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
+    const approvedOrgId = selectedOrgId;
     if (requiresProject && !selectedProjectId) return;
     if (isDeviceSessionSelectionIncomplete) return;
     // Same binding as the render gates, restated on the action itself: the
@@ -559,7 +568,7 @@ export default function CliAuthPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_code: userCode,
-          organization_id: selectedOrgId,
+          organization_id: approvedOrgId,
           ...(requiresProject && selectedProjectId
             ? { project_id: selectedProjectId }
             : {}),
@@ -592,13 +601,14 @@ export default function CliAuthPage() {
         return;
       }
       const orgName =
-        organizations?.find((o) => o.id === selectedOrgId)?.name ??
+        organizations?.find((o) => o.id === approvedOrgId)?.name ??
         "your organization";
       const projectName = requiresProject
         ? offeredProjects.find((p) => p.id === selectedProjectId)?.name
         : undefined;
       setAction({
         kind: "success",
+        organizationId: approvedOrgId,
         organizationName: orgName,
         credentialType,
         projectName,
@@ -1011,7 +1021,7 @@ export default function CliAuthPage() {
                     <strong>{action.organizationName}</strong>. You can close
                     this tab and return to your terminal.
                   </StatusCard>
-                  <FirstTraceRedirect organizationId={selectedOrgId} />
+                  <FirstTraceRedirect organizationId={action.organizationId} />
                 </>
               )}
             </>

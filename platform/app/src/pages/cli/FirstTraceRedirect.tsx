@@ -99,9 +99,11 @@ type FirstTraceWatchState = "hidden" | "waiting" | "redirecting";
  * ambient organization: a user who picks a different organization in the
  * chooser would otherwise be watched against the one they navigated in with.
  */
-function useFirstTraceWatch(
-  organizationId: string | null | undefined,
-): FirstTraceWatchState {
+function useFirstTraceWatch({
+  organizationId,
+}: {
+  organizationId: string | null | undefined;
+}): FirstTraceWatchState {
   const router = useRouter();
   const { data: session } = useSession();
   const { organizations } = useOrganizationTeamProject({
@@ -188,7 +190,7 @@ export function FirstTraceRedirect({
   /** The organization the CLI approval was granted against. */
   organizationId: string | null | undefined;
 }) {
-  const watchState = useFirstTraceWatch(organizationId);
+  const watchState = useFirstTraceWatch({ organizationId });
 
   if (watchState === "redirecting") {
     return (
