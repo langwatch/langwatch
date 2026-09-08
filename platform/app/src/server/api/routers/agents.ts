@@ -11,6 +11,7 @@ import {
 } from "~/server/connected-agents/presence.read";
 import type { ConnectedAgentSelectability } from "~/server/connected-agents/selectable";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
@@ -42,8 +43,9 @@ async function assertVoiceAgentsEnabled(projectId: string): Promise<void> {
   const enabled = await featureFlagService.isEnabled(
     "release_voice_agents_enabled",
     {
+      distinctId: projectId,
       projectId,
-      organizationId: await resolveOrganizationId(projectId),
+      organizationId: (await resolveOrganizationId(projectId)) ?? NOT_TARGETED,
     },
   );
   if (!enabled) {

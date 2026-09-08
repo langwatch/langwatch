@@ -29,6 +29,7 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   findElevenLabsProviderForProject,
   getElevenLabsApiCredential,
@@ -152,8 +153,9 @@ async function requireProject(
   const voiceEnabled = await featureFlagService.isEnabled(
     "release_voice_agents_enabled",
     {
+      distinctId: projectId,
       projectId,
-      organizationId: await resolveOrganizationId(projectId),
+      organizationId: (await resolveOrganizationId(projectId)) ?? NOT_TARGETED,
     },
   );
   if (!voiceEnabled) return { ok: false, status: 404, disabled: true };

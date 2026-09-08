@@ -1379,6 +1379,7 @@ export class SuiteService {
     const voiceEnabled = await featureFlagService.isEnabled(
       "release_voice_agents_enabled",
       {
+        distinctId: params.projectId,
         projectId: params.projectId,
         organizationId: params.organizationId,
       },

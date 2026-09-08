@@ -108,6 +108,7 @@ describe("buildChildEnvironment", () => {
     scenarioRunId: "run_1",
     batchRunId: "batch_1",
     setId: "set_1",
+    target: { type: "voice", referenceId: "agent_1" },
   };
   const telemetry = { endpoint: "http://app:5560", apiKey: "lw-key" };
 
