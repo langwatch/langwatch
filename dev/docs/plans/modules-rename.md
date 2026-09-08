@@ -58,6 +58,25 @@ Machinery that hardcodes the layout:
 - CI: `.github/workflows` did not match the census grep; confirm with `grep -rn features .github`
   anyway, and check `charts/`, `infra/`, `apps/*/Dockerfile`, `dev/compose*.yml` for copy paths.
 
+## Vocabulary (Alex, 2026-09-08 17:1x: "featureApi is now module, no?")
+
+Rename the names a module author types, in the same commit as the directory move, with TS-LSP
+rename-symbol (not grep):
+
+| Today | New | Files |
+| --- | --- | --- |
+| `featureApi`, `FeatureApiToken`, `FeatureName` (runtime-composition) | `moduleApi`, `ModuleApiToken`, `ModuleName` | 62, 9, 8 |
+| `defineFeature`, `withFeature`, `runtime.feature()` | `defineModule`, `withModule`, `runtime.module()` | 55, 24, 15 |
+| `createFeatureApi`, `FeatureApi`, `FeatureApiMap`, `FeatureApiClient` (`@langwatch/api/web`) | `createModuleApi`, `ModuleApi`, `ModuleApiMap`, `ModuleApiClient` | 43, 3 |
+
+Source files named after the old word move with it: `feature-api-token.ts` → `module-api-token.ts`,
+`feature-namespace.ts` → `module-namespace.ts`, `feature-api.ts` → `module-api.ts`.
+
+Leave alone: runtime-composition's internal types (`ServerFeatureBuilder`, `InstalledFeature`,
+`FeatureTransportDescriptor`, ~20 names), lint policy ids (`feature-source-layout`,
+`feature-catalogue`, `feature-shape`; they are baseline keys), the seven `feature-*` skills, and
+every "feature" that means a feature flag or a `.feature` spec file.
+
 ## Method
 
 1. `git mv` the directories (this lane may run `git mv` and nothing else in git; Fable commits).
