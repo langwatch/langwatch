@@ -433,6 +433,11 @@ export const APP_ERROR_CODES = [
   "virtual_key_expiry_in_past",
   "virtual_key_not_found",
   "voice_agents_disabled",
+  "voice_conversation_mismatch",
+  "voice_key_missing",
+  "voice_mint_failed",
+  "voice_name_required",
+  "voice_session_invalid",
   // The webhook platform names its two endpoint failures itself, in
   // `~/app/api/webhooks/[[...route]]/error-handler`, rather than deriving
   // them from the status: `not_found` alone would not say WHICH lookup

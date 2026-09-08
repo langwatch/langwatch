@@ -18,6 +18,8 @@
  * over injected ports.
  */
 
+import { HandledError } from "@langwatch/handled-error";
+
 import { AgentRepository } from "~/server/agents/agent.repository";
 import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
@@ -33,10 +35,12 @@ export const HUMAN_CALLER_KIND = "human";
  * from the signed token, but it is still checked against the project before a
  * run is written under it, so a stale or forged row id cannot create a run.
  */
-export class VoiceAgentNotFoundError extends Error {
-  readonly code = "voice_agent_not_found" as const;
+export class VoiceAgentNotFoundError extends HandledError {
+  declare readonly code: "agent_not_found";
   constructor() {
-    super("The voice agent was not found in this project");
+    super("agent_not_found", "The voice agent was not found in this project", {
+      httpStatus: 404,
+    });
     this.name = "VoiceAgentNotFoundError";
   }
 }

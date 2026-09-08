@@ -149,7 +149,7 @@ function applyFinishFailure(
   dispatch: (event: TalkEvent) => void,
   data: Record<string, unknown>,
 ): void {
-  if (data.code === "voice_name_required") {
+  if ((data.code ?? data.error) === "voice_name_required") {
     dispatch({ type: "NAME_REQUIRED" });
     return;
   }
@@ -317,7 +317,10 @@ async function mintSession({
     if (!res.ok) {
       dispatch({
         type: "MINT_FAILED",
-        code: data.code === "voice_key_missing" ? "key_missing" : "mint_failed",
+        code:
+          (data.code ?? data.error) === "voice_key_missing"
+            ? "key_missing"
+            : "mint_failed",
         message: typeof data.message === "string" ? data.message : "Unknown",
       });
       return null;

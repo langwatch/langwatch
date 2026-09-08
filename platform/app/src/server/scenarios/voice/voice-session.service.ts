@@ -9,7 +9,10 @@
  * a vendor: the transport does, behind {@link voiceTransportRegistry}.
  */
 
+import { HandledError } from "@langwatch/handled-error";
+
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 import {
   type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,
@@ -24,29 +27,31 @@ import {
 } from "./voice-transport.registry";
 
 /** The project has no key for this transport, so no session can be minted. */
-export class VoiceKeyMissingError extends Error {
-  readonly code = "voice_key_missing" as const;
+export class VoiceKeyMissingError extends HandledError {
+  declare readonly code: "voice_key_missing";
   constructor(message: string) {
-    super(message);
+    super("voice_key_missing", message, { httpStatus: 400 });
     this.name = "VoiceKeyMissingError";
   }
 }
 
 /** A run cannot be created for an unsaved agent without a name to save it
  *  under. The panel collects one and retries. */
-export class VoiceNameRequiredError extends Error {
-  readonly code = "voice_name_required" as const;
+export class VoiceNameRequiredError extends HandledError {
+  declare readonly code: "voice_name_required";
   constructor() {
-    super("A name is required to save the agent");
+    super("voice_name_required", "A name is required to save the agent", {
+      httpStatus: 400,
+    });
     this.name = "VoiceNameRequiredError";
   }
 }
 
 /** The provider refused the mint (bad agent id, network, API error). */
-export class VoiceMintFailedError extends Error {
-  readonly code = "voice_mint_failed" as const;
+export class VoiceMintFailedError extends HandledError {
+  declare readonly code: "voice_mint_failed";
   constructor(message: string) {
-    super(message);
+    super("voice_mint_failed", message, { httpStatus: 400 });
     this.name = "VoiceMintFailedError";
   }
 }
@@ -56,10 +61,14 @@ export class VoiceMintFailedError extends Error {
  * session token was minted for. Reported without writing anything, so one
  * project cannot pull another's conversation into its runs.
  */
-export class VoiceConversationMismatchError extends Error {
-  readonly code = "voice_conversation_mismatch" as const;
+export class VoiceConversationMismatchError extends HandledError {
+  declare readonly code: "voice_conversation_mismatch";
   constructor() {
-    super("This conversation does not belong to the minted session");
+    super(
+      "voice_conversation_mismatch",
+      "This conversation does not belong to the minted session",
+      { httpStatus: 400 },
+    );
     this.name = "VoiceConversationMismatchError";
   }
 }
@@ -69,11 +78,48 @@ export class VoiceConversationMismatchError extends Error {
  * exists but is not a voice agent. Minting never trusts a client-supplied
  * vendor agent id (AC13/AC29) — the row is the only source of it.
  */
-export class VoiceAgentRowNotFoundError extends Error {
-  readonly code = "agent_not_found" as const;
+export class VoiceAgentRowNotFoundError extends HandledError {
+  declare readonly code: "agent_not_found";
   constructor() {
-    super("The voice agent was not found in this project");
+    super("agent_not_found", "The voice agent was not found in this project", {
+      httpStatus: 404,
+    });
     this.name = "VoiceAgentRowNotFoundError";
+  }
+}
+
+/** The session token failed verification, or was minted for another project. */
+export class VoiceSessionInvalidError extends HandledError {
+  declare readonly code: "voice_session_invalid";
+  constructor() {
+    super("voice_session_invalid", "The session is invalid or has expired", {
+      httpStatus: 400,
+    });
+    this.name = "VoiceSessionInvalidError";
+  }
+}
+
+/** No live auth session behind a voice request. */
+export class VoiceUnauthenticatedError extends HandledError {
+  declare readonly code: "unauthorized";
+  constructor() {
+    super("unauthorized", "Sign in to continue", { httpStatus: 401 });
+    this.name = "VoiceUnauthenticatedError";
+  }
+}
+
+/**
+ * The whole "Talk to it" door is behind the product flag: a project without it
+ * turned on gets the same 404 the drawer and the run dialog render for, not a
+ * 403 that would leak that the door exists at all (AC29).
+ */
+export class VoiceAgentsGateDisabledError extends HandledError {
+  declare readonly code: "voice_agents_disabled";
+  constructor() {
+    super("voice_agents_disabled", VOICE_AGENTS_DISABLED_MESSAGE, {
+      httpStatus: 404,
+    });
+    this.name = "VoiceAgentsGateDisabledError";
   }
 }
 

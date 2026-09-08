@@ -151,7 +151,7 @@ describe("Feature: Voice session HTTP door", () => {
       findElevenLabsProviderForProject.mockResolvedValue(null);
       const res = await post("/api/voice/session", MINT_BODY);
       expect(res.status).toBe(400);
-      expect((await res.json()).code).toBe("voice_key_missing");
+      expect((await res.json()).error).toBe("voice_key_missing");
       expect(mintSession).not.toHaveBeenCalled();
     });
   });
@@ -161,7 +161,7 @@ describe("Feature: Voice session HTTP door", () => {
       findById.mockResolvedValue(null);
       const res = await post("/api/voice/session", MINT_BODY);
       expect(res.status).toBe(404);
-      expect((await res.json()).code).toBe("agent_not_found");
+      expect((await res.json()).error).toBe("agent_not_found");
       expect(mintSession).not.toHaveBeenCalled();
     });
   });
@@ -176,7 +176,7 @@ describe("Feature: Voice session HTTP door", () => {
       });
       const res = await post("/api/voice/session", MINT_BODY);
       expect(res.status).toBe(404);
-      expect((await res.json()).code).toBe("agent_not_found");
+      expect((await res.json()).error).toBe("agent_not_found");
       expect(mintSession).not.toHaveBeenCalled();
     });
   });
@@ -247,7 +247,7 @@ describe("Feature: Voice session HTTP door", () => {
         endedAt: 2,
       });
       expect(res.status).toBe(400);
-      expect((await res.json()).code).toBe("voice_session_invalid");
+      expect((await res.json()).error).toBe("voice_session_invalid");
       expect(fetchCallRecord).not.toHaveBeenCalled();
     });
   });
@@ -273,7 +273,7 @@ describe("Feature: Voice session HTTP door", () => {
         endedAt: 2,
       });
       expect(res.status).toBe(400);
-      expect((await res.json()).code).toBe("voice_session_invalid");
+      expect((await res.json()).error).toBe("voice_session_invalid");
       expect(fetchCallRecord).not.toHaveBeenCalled();
     });
   });
@@ -310,7 +310,7 @@ describe("Feature: Voice session HTTP door", () => {
         endedAt: 2,
       });
       expect(res.status).toBe(400);
-      expect((await res.json()).code).toBe("voice_conversation_mismatch");
+      expect((await res.json()).error).toBe("voice_conversation_mismatch");
     });
   });
 
@@ -428,7 +428,7 @@ describe("Feature: Voice session HTTP door", () => {
     it("refuses the mint with the disabled code, as a 404", async () => {
       const res = await post("/api/voice/session", MINT_BODY);
       expect(res.status).toBe(404);
-      expect((await res.json()).code).toBe("voice_agents_disabled");
+      expect((await res.json()).error).toBe("voice_agents_disabled");
       expect(mintSession).not.toHaveBeenCalled();
     });
 
@@ -451,7 +451,7 @@ describe("Feature: Voice session HTTP door", () => {
         endedAt: 2,
       });
       expect(res.status).toBe(404);
-      expect((await res.json()).code).toBe("voice_agents_disabled");
+      expect((await res.json()).error).toBe("voice_agents_disabled");
       expect(fetchCallRecord).not.toHaveBeenCalled();
     });
 
@@ -461,7 +461,7 @@ describe("Feature: Voice session HTTP door", () => {
         `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
       );
       expect(res.status).toBe(404);
-      expect((await res.json()).code).toBe("voice_agents_disabled");
+      expect((await res.json()).error).toBe("voice_agents_disabled");
       expect(getScenarioRunData).not.toHaveBeenCalled();
     });
   });
