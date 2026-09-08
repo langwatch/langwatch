@@ -150,7 +150,7 @@
       "id": "data-retention",
       "root": "data-retention",
       "uses": {
-        "screens": ["@langwatch/data-retention-web/screens/data-retention"],
+        "screens": ["@langwatch/data-retention-web/data-retention"],
         "surfaces": []
       }
     },

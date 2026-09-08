@@ -3,25 +3,16 @@
  * may read. The Data Storage card uses this so the number tracks the page's scope selector
  * (organization / team / project) instead of only ever showing the project on the top nav.
  */
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
-import type {
-  DataRetentionDirectoryPort,
-  RetentionScopeTarget,
-} from "../ports/data-retention-directory.port.ts";
-import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port.ts";
+import type { RetentionStorageUsage, ScopeAssignment } from "@langwatch/data-retention-contract";
+import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
 import type { RetentionActor } from "./data-retention-policy.service.ts";
-
-export type StorageScopeUsage = Readonly<{
-  /** Total stored bytes across every in-scope project the caller can read. */
-  totalBytes: number;
-  /** How many projects contributed — lets the UI say "across N projects". */
-  projectCount: number;
-}>;
+import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
+import type { StorageMeterService } from "./storage-meter.service.ts";
 
 export type StorageMeterScopeServiceOptions = Readonly<{
-  retention: Pick<DataRetentionService, "getTotalStorageBytes" | "getTotalStorageBytesForTenants">;
+  meter: Pick<StorageMeterService, "getTotalStorageBytes" | "getTotalStorageBytesForTenants">;
   directory: DataRetentionDirectoryPort;
-  permissions: DataRetentionPermissionsPort;
+  permissions: RetentionPermissionsService;
 }>;
 
 export class StorageMeterScopeService {
@@ -33,19 +24,19 @@ export class StorageMeterScopeService {
 
   async getScopeUsage(input: {
     projectId: string;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
     actor: RetentionActor;
-  }): Promise<StorageScopeUsage> {
+  }): Promise<RetentionStorageUsage> {
     const { projectId, scope, actor } = input;
-    const { directory, permissions, retention } = this.options;
+    const { directory, permissions, meter } = this.options;
 
-    const lineage = await directory.tryGetProjectLineage({ projectId });
+    const lineage = await directory.findProjectLineage({ projectId });
     const organizationId = lineage?.organizationId ?? null;
 
     // Personal-account project (no organization): the scope can only be the
     // project itself, already authorized by the route's project:view guard.
     if (!organizationId) {
-      const totalBytes = await retention.getTotalStorageBytes({ tenantId: projectId });
+      const totalBytes = await meter.getTotalStorageBytes({ tenantId: projectId });
 
       return { totalBytes, projectCount: 1 };
     }
@@ -55,19 +46,17 @@ export class StorageMeterScopeService {
       return { totalBytes: 0, projectCount: 0 };
     }
 
-    const decided = actor.userId
-      ? await permissions.canViewTraces({
-          userId: actor.userId,
-          organizationId,
-          projectIds: candidates.map((project) => project.id),
-        })
-      : new Map<string, boolean>();
+    const decided = await permissions.canViewTraces({
+      userId: actor.userId,
+      organizationId,
+      projectIds: candidates.map((project) => project.id),
+    });
 
     const authorizedIds = candidates
       .map((project) => project.id)
       .filter((id) => decided.get(id) === true);
 
-    const totalBytes = await retention.getTotalStorageBytesForTenants({
+    const totalBytes = await meter.getTotalStorageBytesForTenants({
       tenantIds: authorizedIds,
     });
 

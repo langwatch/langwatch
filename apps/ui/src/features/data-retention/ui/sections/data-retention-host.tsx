@@ -9,7 +9,7 @@ import {
   DataRetentionHostProvider,
   type DataRetentionHostPort,
   type RetentionAvailableScopes,
-} from "@langwatch/data-retention-web/screens/data-retention";
+} from "@langwatch/data-retention-web/data-retention";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import {

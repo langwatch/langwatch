@@ -5,48 +5,44 @@ import {
   type PinnedTrace,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
-import { PinnedTraceRepository } from "../pinned-trace.repository.ts";
-import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port.ts";
-
-function mapPinnedTrace(row: unknown): PinnedTrace {
-  return pinnedTraceSchema.parse(row);
-}
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PinnedTraceRepository } from "../pinned-trace.repository.ts";
 
 /** Private persistence for trace pin annotations owned by Data Retention. */
-export class PrismaPinnedTraceRepository extends PinnedTraceRepository {
-  static create(options: { database: DataRetentionDatabasePort }): PrismaPinnedTraceRepository {
-    return new PrismaPinnedTraceRepository(options.database);
-  }
+export class PrismaPinnedTraceRepository
+  extends PrismaRepository.for("PinnedTrace")
+  implements PinnedTraceRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaPinnedTraceRepository(prisma));
 
-  private constructor(private readonly database: DataRetentionDatabasePort) {
-    super();
-  }
-
-  async tryFindByProjectAndTrace({
+  async findByProjectAndTrace({
     projectId,
     traceId,
   }: UnpinTraceInput): Promise<PinnedTrace | null> {
-    const row = await this.database.pinnedTrace.findUnique({
+    const row = await this.prisma.pinnedTrace.findUnique({
       where: { projectId_traceId: { projectId, traceId } },
     });
-    return row ? mapPinnedTrace(row) : null;
+
+    return row ? pinnedTraceSchema.parse(row) : null;
   }
 
   async findAllByProject({ projectId }: { projectId: string }): Promise<PinnedTrace[]> {
-    const rows = await this.database.pinnedTrace.findMany({ where: { projectId } });
-    return rows.map(mapPinnedTrace);
+    const rows = await this.prisma.pinnedTrace.findMany({ where: { projectId } });
+
+    return rows.map((row) => pinnedTraceSchema.parse(row));
   }
 
   async findAllTraceIds({ projectId }: { projectId: string }): Promise<string[]> {
-    const pins = await this.database.pinnedTrace.findMany({
+    const pins = await this.prisma.pinnedTrace.findMany({
       where: { projectId },
       select: { traceId: true },
     });
+
     return pins.map((pin) => pinnedTraceSchema.pick({ traceId: true }).parse(pin).traceId);
   }
 
   async create(params: PinTraceInput & { source: PinSource }): Promise<PinnedTrace> {
-    const row = await this.database.pinnedTrace.upsert({
+    const row = await this.prisma.pinnedTrace.upsert({
       where: {
         projectId_traceId: {
           projectId: params.projectId,
@@ -69,17 +65,19 @@ export class PrismaPinnedTraceRepository extends PinnedTraceRepository {
         reason: params.reason ?? null,
       },
     });
-    return mapPinnedTrace(row);
+
+    return pinnedTraceSchema.parse(row);
   }
 
   async delete({ projectId, traceId }: UnpinTraceInput): Promise<void> {
-    await this.database.pinnedTrace.deleteMany({
+    await this.prisma.pinnedTrace.deleteMany({
       where: { projectId, traceId },
     });
   }
 
   async hasManualPin({ projectId, traceId }: UnpinTraceInput): Promise<boolean> {
-    const pin = await this.tryFindByProjectAndTrace({ projectId, traceId });
+    const pin = await this.findByProjectAndTrace({ projectId, traceId });
+
     return pin != null && pin.source === "manual";
   }
 }

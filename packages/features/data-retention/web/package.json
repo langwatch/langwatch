@@ -8,9 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/data-retention": {
-      "types": "./dist/screens/data-retention/index.d.ts",
-      "default": "./src/screens/data-retention/index.ts"
+    "./data-retention": {
+      "langwatch-declaration-source": "./src/data-retention.ts",
+      "types": "./dist/data-retention.d.ts",
+      "default": "./src/data-retention.ts"
     }
   },
   "scripts": {

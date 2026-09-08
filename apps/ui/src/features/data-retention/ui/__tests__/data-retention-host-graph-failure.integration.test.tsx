@@ -11,10 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/data-retention-web/screens/data-retention", async () => {
+vi.mock("@langwatch/data-retention-web/data-retention", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/data-retention-web/screens/data-retention")
-  >("@langwatch/data-retention-web/screens/data-retention");
+    typeof import("@langwatch/data-retention-web/data-retention")
+  >("@langwatch/data-retention-web/data-retention");
   return {
     ...actual,
     dataRetentionApi: {

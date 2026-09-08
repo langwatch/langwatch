@@ -3,38 +3,40 @@
  * nothing: the service either returns, or it throws the answer the settings page has always
  * shown.
  */
+import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
   PAID_RETENTION_PRESET_DAYS,
 } from "@langwatch/data-retention-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { TRPCError } from "@trpc/server";
-import type { DataRetentionAdministratorPort } from "../ports/data-retention-administrator.port.ts";
+import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
 import type {
-  DataRetentionDirectoryPort,
-  RetentionScopeTarget,
-} from "../ports/data-retention-directory.port.ts";
-import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port.ts";
-import type { DataRetentionPlan, DataRetentionPlanPort } from "../ports/data-retention-plan.port.ts";
+  DataRetentionPlan,
+  DataRetentionPlanPort,
+} from "../ports/data-retention-plan.port.ts";
+import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 
-/** The caller a gate is decided for. */
-export type RetentionActor = Readonly<{ userId: string | null; email: string | null }>;
+/** The caller a gate is decided for, resolved once per request by the app. */
+export type RetentionActor = Readonly<{ userId: string; email: string | null }>;
 
 export type DataRetentionPolicyServiceOptions = Readonly<{
   directory: DataRetentionDirectoryPort;
-  permissions: DataRetentionPermissionsPort;
+  permissions: RetentionPermissionsService;
   plans: DataRetentionPlanPort;
-  administrators: DataRetentionAdministratorPort;
+  /** The platform-operator allow-list, which is an address list rather than a grant. */
+  administrators: Pick<UserApi, "isAdmin">;
 }>;
 
 /**
  * Which retention values a plan tier may persist.
  */
-type RetentionRule =
+type RetentionValueRule =
   | { kind: "fixed"; presetDays: readonly number[] }
   | { kind: "uncapped"; customMin: number };
 
-function ruleForPlan(plan: DataRetentionPlan): RetentionRule {
+function ruleForPlan(plan: DataRetentionPlan): RetentionValueRule {
   if (plan.uncapped) {
     return { kind: "uncapped", customMin: ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS };
   }
@@ -47,7 +49,7 @@ export class DataRetentionPolicyService {
    * Permission required to write a retention override at a given tier.
    */
   static requiredWritePermission(
-    scopeType: RetentionScopeTarget["scopeType"],
+    scopeType: ScopeAssignment["scopeType"],
   ): "organization:manage" | "team:manage" | "project:update" {
     if (scopeType === "ORGANIZATION") {
       return "organization:manage";
@@ -154,7 +156,7 @@ export class DataRetentionPolicyService {
    */
   async assertCanWriteScope(input: {
     actor: RetentionActor;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
   }): Promise<void> {
     if (await this.canWriteScope(input)) {
       return;
@@ -174,12 +176,7 @@ export class DataRetentionPolicyService {
    * from everyone else; this is the matching server-side enforcement.
    */
   assertCanDisableRetention(input: { actor: RetentionActor }): void {
-    if (
-      this.options.administrators.isPlatformAdministrator({
-        userId: input.actor.userId,
-        email: input.actor.email,
-      })
-    ) {
+    if (this.options.administrators.isAdmin({ email: input.actor.email })) {
       return;
     }
 
@@ -196,7 +193,7 @@ export class DataRetentionPolicyService {
    */
   async assertPlanForScope(input: {
     actor: RetentionActor;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
   }): Promise<void> {
     const { plan } = await this.resolveScopePlan(input);
     DataRetentionPolicyService.assertPlanConfigurable(plan);
@@ -204,7 +201,7 @@ export class DataRetentionPolicyService {
 
   /** Plan-gate a project-targeted mutation via the project's owning organization. */
   async assertPlanForProject(input: { actor: RetentionActor; projectId: string }): Promise<void> {
-    const lineage = await this.options.directory.tryGetProjectLineage({
+    const lineage = await this.options.directory.findProjectLineage({
       projectId: input.projectId,
     });
     const organizationId = lineage?.organizationId;
@@ -228,7 +225,7 @@ export class DataRetentionPolicyService {
    */
   async assertWriteAllowed(input: {
     actor: RetentionActor;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
     retentionDays: number;
   }): Promise<void> {
     const { plan } = await this.resolveScopePlan(input);
@@ -238,13 +235,9 @@ export class DataRetentionPolicyService {
 
   private async canWriteScope(input: {
     actor: RetentionActor;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
   }): Promise<boolean> {
     const userId = input.actor.userId;
-    if (!userId) {
-      return false;
-    }
-
     const { scopeType, scopeId } = input.scope;
     if (scopeType === "ORGANIZATION") {
       return await this.options.permissions.canManageOrganization({
@@ -253,7 +246,7 @@ export class DataRetentionPolicyService {
       });
     }
 
-    const organizationId = await this.options.directory.tryResolveScopeOrganizationId({
+    const organizationId = await this.options.directory.findScopeOrganizationId({
       scope: input.scope,
     });
     if (!organizationId) {
@@ -286,9 +279,9 @@ export class DataRetentionPolicyService {
    */
   private async resolveScopePlan(input: {
     actor: RetentionActor;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
   }): Promise<{ organizationId: string; plan: DataRetentionPlan }> {
-    const organizationId = await this.options.directory.tryResolveScopeOrganizationId({
+    const organizationId = await this.options.directory.findScopeOrganizationId({
       scope: input.scope,
     });
     if (!organizationId) {

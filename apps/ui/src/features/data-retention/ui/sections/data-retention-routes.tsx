@@ -1,6 +1,6 @@
 /** Which page key the Data Retention address answers: `project:view`, framed by the settings layout, matching the platform page one for one. */
 
-import { dataRetentionScreens } from "@langwatch/data-retention-web/screens/data-retention";
+import { dataRetentionScreens } from "@langwatch/data-retention-web/data-retention";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

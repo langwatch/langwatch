@@ -4,53 +4,22 @@
  * deliberately so.
  */
 import type {
-  DataRetentionService,
-  RetentionCategory,
   ResolvedRetention,
+  RetentionPolicySnapshot,
+  ScopeAssignment,
 } from "@langwatch/data-retention-contract";
+import type { DataRetentionDirectoryPort } from "../ports/data-retention-directory.port.ts";
+import type { DataRetentionService } from "./data-retention.service.ts";
 import type {
-  DataRetentionDirectoryPort,
-  RetentionScopeTarget,
-} from "../ports/data-retention-directory.port.ts";
-import type { DataRetentionPermissionsPort } from "../ports/data-retention-permissions.port.ts";
-import type { DataRetentionPolicyService, RetentionActor } from "./data-retention-policy.service.ts";
-
-export type RetentionRule = Readonly<{
-  scopeType: RetentionScopeTarget["scopeType"];
-  scopeId: string;
-  name: string;
-  category: RetentionCategory;
-  retentionDays: number;
-}>;
-
-export type RetentionScopeAvailability = Readonly<{
-  organization: { id: string; name: string } | null;
-  teams: { id: string; name: string }[];
-  projects: { id: string; name: string; teamId: string }[];
-}>;
-
-export type RetentionPolicySnapshot = Readonly<{
-  projectId: string;
-  /**
-   * Effective per-category retention for this project, falling back to the
-   * platform-wide default when no override is set.
-   */
-  effective: ResolvedRetention;
-  /** Override rows the caller can read, one per (scope, category). */
-  rules: RetentionRule[];
-  /** Scopes the caller can write to (RBAC-filtered), for the chip picker. */
-  available: RetentionScopeAvailability;
-  /**
-   * Whether the organization's plan unlocks configurable retention. Free plans
-   * see the snapshot but the UI must hide the add/edit/delete controls.
-   */
-  canConfigureRetention: boolean;
-}>;
+  DataRetentionPolicyService,
+  RetentionActor,
+} from "./data-retention-policy.service.ts";
+import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 
 export type DataRetentionSnapshotServiceOptions = Readonly<{
   retention: Pick<DataRetentionService, "getResolvedForProject" | "listOrganizationRules">;
   directory: DataRetentionDirectoryPort;
-  permissions: DataRetentionPermissionsPort;
+  permissions: RetentionPermissionsService;
   policy: Pick<DataRetentionPolicyService, "canConfigureRetention">;
 }>;
 
@@ -60,8 +29,8 @@ type OrganizationDirectory = Awaited<
 
 /** Reading a scope: whether this caller may see its row, and what the scope is called. */
 type RetentionScopeLens = {
-  canRead(scopeType: RetentionScopeTarget["scopeType"], scopeId: string): boolean;
-  nameOf(scopeType: RetentionScopeTarget["scopeType"], scopeId: string): string;
+  canRead(scopeType: ScopeAssignment["scopeType"], scopeId: string): boolean;
+  nameOf(scopeType: ScopeAssignment["scopeType"], scopeId: string): string;
 };
 
 export class DataRetentionSnapshotService {
@@ -79,7 +48,7 @@ export class DataRetentionSnapshotService {
     const { directory, retention } = this.options;
 
     const effective = await retention.getResolvedForProject({ projectId });
-    const lineage = await directory.tryGetProjectLineage({ projectId });
+    const lineage = await directory.findProjectLineage({ projectId });
     const organizationId = lineage?.organizationId ?? null;
 
     if (!organizationId) {
@@ -103,16 +72,14 @@ export class DataRetentionSnapshotService {
     projectId: string;
     effective: ResolvedRetention;
     lineage: { name: string; teamId: string | null } | null;
-    userId: string | null | undefined;
+    userId: string;
   }): Promise<RetentionPolicySnapshot> {
     const { projectId, effective, lineage, userId } = input;
-    const decided = userId
-      ? await this.options.permissions.canUpdateProjects({
-          userId,
-          organizationId: null,
-          projectIds: [projectId],
-        })
-      : new Map<string, boolean>();
+    const decided = await this.options.permissions.canUpdateProjects({
+      userId,
+      organizationId: null,
+      projectIds: [projectId],
+    });
     const canWrite = decided.get(projectId) === true;
 
     return {
@@ -146,27 +113,21 @@ export class DataRetentionSnapshotService {
       await Promise.all([
         directory.listOrganizationDirectory({ organizationId }),
         retention.listOrganizationRules({ organizationId }),
-        userId
-          ? permissions.canManageOrganization({ userId, organizationId })
-          : Promise.resolve(false),
+        permissions.canManageOrganization({ userId, organizationId }),
         policy.canConfigureRetention({ organizationId, actor }),
       ]);
 
     const [teamManage, projectUpdate] = await Promise.all([
-      userId
-        ? permissions.canManageTeams({
-            userId,
-            organizationId,
-            teamIds: organizationDirectory.teams.map((team) => team.id),
-          })
-        : Promise.resolve(new Map<string, boolean>()),
-      userId
-        ? permissions.canUpdateProjects({
-            userId,
-            organizationId,
-            projectIds: organizationDirectory.projects.map((project) => project.id),
-          })
-        : Promise.resolve(new Map<string, boolean>()),
+      permissions.canManageTeams({
+        userId,
+        organizationId,
+        teamIds: organizationDirectory.teams.map((team) => team.id),
+      }),
+      permissions.canUpdateProjects({
+        userId,
+        organizationId,
+        projectIds: organizationDirectory.projects.map((project) => project.id),
+      }),
     ]);
 
     const lens = this.scopeLens({

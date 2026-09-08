@@ -5,11 +5,11 @@ import type {
   UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
 
-export abstract class PinnedTraceRepository {
-  abstract tryFindByProjectAndTrace(input: UnpinTraceInput): Promise<PinnedTrace | null>;
-  abstract findAllByProject(input: { projectId: string }): Promise<PinnedTrace[]>;
-  abstract findAllTraceIds(input: { projectId: string }): Promise<string[]>;
-  abstract create(input: PinTraceInput & { source: PinSource }): Promise<PinnedTrace>;
-  abstract delete(input: UnpinTraceInput): Promise<void>;
-  abstract hasManualPin(input: UnpinTraceInput): Promise<boolean>;
+export interface PinnedTraceRepository {
+  findByProjectAndTrace(input: UnpinTraceInput): Promise<PinnedTrace | null>;
+  findAllByProject(input: { projectId: string }): Promise<PinnedTrace[]>;
+  findAllTraceIds(input: { projectId: string }): Promise<string[]>;
+  create(input: PinTraceInput & { source: PinSource }): Promise<PinnedTrace>;
+  delete(input: UnpinTraceInput): Promise<void>;
+  hasManualPin(input: UnpinTraceInput): Promise<boolean>;
 }

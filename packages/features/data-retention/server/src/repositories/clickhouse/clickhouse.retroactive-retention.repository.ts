@@ -6,7 +6,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
-import { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
+import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 
 const mutationRowSchema = z
   .object({
@@ -42,16 +42,14 @@ function tenantFilterParams(projectId: string): Record<string, string> {
   return { tenantFilterNeedle: `WHERE TenantId = '${escapedProjectId}'` };
 }
 
-export class ClickHouseRetroactiveRetentionRepository extends RetroactiveRetentionRepository {
+export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRetentionRepository {
   static create(options: {
     resolveClient: RetentionClickHouseClientResolver;
   }): ClickHouseRetroactiveRetentionRepository {
     return new ClickHouseRetroactiveRetentionRepository(options.resolveClient);
   }
 
-  private constructor(private readonly resolveClient: RetentionClickHouseClientResolver) {
-    super();
-  }
+  private constructor(private readonly resolveClient: RetentionClickHouseClientResolver) {}
 
   async triggerUpdate(input: {
     projectId: string;

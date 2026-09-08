@@ -3,14 +3,16 @@ import type {
   RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 
-export abstract class RetroactiveRetentionRepository {
-  abstract triggerUpdate(input: {
+/**
+ * The rewrite of rows already captured. Backed by ClickHouse, which the process
+ * resolves per tenant, so it is not part of the Postgres repository bundle.
+ */
+export interface RetroactiveRetentionRepository {
+  triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }>;
-  abstract getMutationProgress(input: {
-    projectId: string;
-  }): Promise<RetroactiveMutationProgress[]>;
-  abstract killMutation(input: { projectId: string; mutationId: string }): Promise<void>;
+  getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]>;
+  killMutation(input: { projectId: string; mutationId: string }): Promise<void>;
 }

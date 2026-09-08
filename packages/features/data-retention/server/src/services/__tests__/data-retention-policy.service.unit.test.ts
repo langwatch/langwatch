@@ -3,18 +3,18 @@
  * persist, and who may switch retention off entirely.
  */
 import { describe, expect, it } from "vitest";
-import { DataRetentionAdministratorPort } from "../../ports/data-retention-administrator.port.ts";
 import {
   DataRetentionDirectoryPort,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
 } from "../../ports/data-retention-directory.port.ts";
-import { DataRetentionPermissionsPort } from "../../ports/data-retention-permissions.port.ts";
 import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
 } from "../../ports/data-retention-plan.port.ts";
+import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
 import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
+import { RetentionPermissionsService } from "../retention-permissions.service.ts";
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 
@@ -22,7 +22,7 @@ class StubDirectory extends DataRetentionDirectoryPort {
   constructor(private readonly organizationId: string | null) {
     super();
   }
-  async tryGetProjectLineage(): Promise<RetentionProjectLineage | null> {
+  async findProjectLineage(): Promise<RetentionProjectLineage | null> {
     return {
       projectId: "proj_a",
       name: "A",
@@ -34,33 +34,11 @@ class StubDirectory extends DataRetentionDirectoryPort {
   async listOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
     return { teams: [], projects: [] };
   }
-  async tryResolveScopeOrganizationId(): Promise<string | null> {
+  async findScopeOrganizationId(): Promise<string | null> {
     return this.organizationId;
   }
   async listScopeProjects(): Promise<ReadonlyArray<{ id: string; teamId: string }>> {
     return [];
-  }
-}
-
-class StubPermissions extends DataRetentionPermissionsPort {
-  constructor(private readonly allow: boolean) {
-    super();
-  }
-  async canManageOrganization(): Promise<boolean> {
-    return this.allow;
-  }
-  async canManageTeams(input: {
-    teamIds: readonly string[];
-  }): Promise<ReadonlyMap<string, boolean>> {
-    return new Map(input.teamIds.map((id) => [id, this.allow] as const));
-  }
-  async canUpdateProjects(input: {
-    projectIds: readonly string[];
-  }): Promise<ReadonlyMap<string, boolean>> {
-    return new Map(input.projectIds.map((id) => [id, this.allow] as const));
-  }
-  async canViewTraces(): Promise<ReadonlyMap<string, boolean>> {
-    return new Map();
   }
 }
 
@@ -70,15 +48,6 @@ class StubPlans extends DataRetentionPlanPort {
   }
   async getPlan(): Promise<DataRetentionPlan> {
     return this.plan;
-  }
-}
-
-class StubAdministrators extends DataRetentionAdministratorPort {
-  constructor(private readonly admin: boolean) {
-    super();
-  }
-  isPlatformAdministrator(): boolean {
-    return this.admin;
   }
 }
 
@@ -92,9 +61,11 @@ function policy(options: {
     directory: new StubDirectory(
       "organizationId" in options ? (options.organizationId ?? null) : "org_1",
     ),
-    permissions: new StubPermissions(options.allow ?? true),
+    permissions: RetentionPermissionsService.create({
+      authz: createDataRetentionTestAuthz(options.allow ?? true),
+    }),
     plans: new StubPlans(options.plan ?? { free: false, uncapped: false }),
-    administrators: new StubAdministrators(options.admin ?? false),
+    administrators: { isAdmin: () => options.admin ?? false },
   });
 }
 

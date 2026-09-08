@@ -1,18 +1,14 @@
 /**
  * The organization lineage behind the retention settings page, over Prisma.
- *
- * Moved out of the application process: the reads, the orderings and the
- * archived-project rule are the ones the page has always been served. The one
- * change is that the project row is read ONCE — the application read it twice,
- * for its lineage and again for its name on the personal-account branch —
- * because a second read of the same row by primary key answers the same thing.
+ * It implements the directory PORT rather than joining the repository bundle:
+ * those three tables belong to the organization and project features.
  */
+import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   DataRetentionDirectoryPort,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
-  type RetentionScopeTarget,
 } from "../../ports/data-retention-directory.port.ts";
 
 /** Only what this repository touches. */
@@ -30,7 +26,7 @@ export class PrismaDataRetentionDirectoryRepository extends DataRetentionDirecto
     super();
   }
 
-  async tryGetProjectLineage({
+  async findProjectLineage({
     projectId,
   }: {
     projectId: string;
@@ -90,11 +86,7 @@ export class PrismaDataRetentionDirectoryRepository extends DataRetentionDirecto
     };
   }
 
-  async tryResolveScopeOrganizationId({
-    scope,
-  }: {
-    scope: RetentionScopeTarget;
-  }): Promise<string | null> {
+  async findScopeOrganizationId({ scope }: { scope: ScopeAssignment }): Promise<string | null> {
     if (scope.scopeType === "ORGANIZATION") {
       const organization = await this.database.organization.findUnique({
         where: { id: scope.scopeId },
@@ -121,7 +113,7 @@ export class PrismaDataRetentionDirectoryRepository extends DataRetentionDirecto
     scope,
   }: {
     organizationId: string;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
   }): Promise<ReadonlyArray<{ id: string; teamId: string }>> {
     // The organization constraint is what makes a foreign scopeId resolve to
     // nothing, whichever tier the scope names.

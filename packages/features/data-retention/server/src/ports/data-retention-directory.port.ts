@@ -1,18 +1,10 @@
 /**
  * The organization lineage a retention rule is placed, named and gated against.
- *
- * Three other verticals' rows — organizations, teams and projects — read for
- * one purpose: to say which organization owns a scope target, what a scope is
- * called, and which projects a scope resolves to. They arrive as a port rather
- * than as those verticals' services because this package must not gain an
- * identity graph to print a team's name beside a rule.
+ * A port rather than this feature's own repositories: `Organization`, `Team` and
+ * `Project` belong to other features, and a repository here would claim them.
  */
 
-/** One retention target: the tier plus the organization, team or project id. */
-export type RetentionScopeTarget = Readonly<{
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-  scopeId: string;
-}>;
+import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type RetentionProjectLineage = Readonly<{
@@ -36,7 +28,7 @@ export type RetentionOrganizationDirectory = Readonly<{
 
 export abstract class DataRetentionDirectoryPort {
   /** The project the settings page was opened from, or null when there is none. */
-  abstract tryGetProjectLineage(input: {
+  abstract findProjectLineage(input: {
     projectId: string;
   }): Promise<RetentionProjectLineage | null>;
 
@@ -45,30 +37,19 @@ export abstract class DataRetentionDirectoryPort {
   }): Promise<RetentionOrganizationDirectory>;
 
   /**
-   * The organization that owns a scope target, or null when the target does
-   * not exist.
-   *
-   * The anchor every gate on a scope-targeted mutation checks against — NOT a
-   * caller-supplied project id, which could name a different organization. A
-   * caller who manages a scope in a free organization and also holds a paid
-   * project elsewhere would otherwise clear the paid-tier gate with the second
-   * while writing to the first.
+   * The organization that owns a scope target, or null when it does not exist.
+   * The anchor every scope-targeted gate checks against — never a
+   * caller-supplied project id, which can name a different organization.
    */
-  abstract tryResolveScopeOrganizationId(input: {
-    scope: RetentionScopeTarget;
-  }): Promise<string | null>;
+  abstract findScopeOrganizationId(input: { scope: ScopeAssignment }): Promise<string | null>;
 
   /**
-   * The live projects one scope resolves to, always enumerated FROM the
-   * organization: a foreign team or project id resolves to no rows, which is
-   * what stops a wider scope surfacing another tenant's storage.
-   *
-   * Archived projects are excluded — they are hidden from the nav and every
-   * other listing, so counting them would inflate the "N projects" the storage
-   * card reports beyond what the reader can actually see.
+   * The live projects one scope resolves to, enumerated FROM the organization
+   * so a foreign id resolves to no rows. Archived projects are excluded: the
+   * storage card must not count what the reader cannot see.
    */
   abstract listScopeProjects(input: {
     organizationId: string;
-    scope: RetentionScopeTarget;
+    scope: ScopeAssignment;
   }): Promise<ReadonlyArray<{ id: string; teamId: string }>>;
 }

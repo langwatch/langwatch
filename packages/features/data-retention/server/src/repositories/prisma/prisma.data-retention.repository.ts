@@ -6,44 +6,43 @@ import {
   type RetentionRow,
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
-import { DataRetentionRepository } from "../data-retention.repository.ts";
-import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port.ts";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { DataRetentionRepository } from "../data-retention.repository.ts";
 
-export class PrismaDataRetentionRepository extends DataRetentionRepository {
-  static create(options: { database: DataRetentionDatabasePort }): PrismaDataRetentionRepository {
-    return new PrismaDataRetentionRepository(options.database);
-  }
+const retentionRowSelect = {
+  scopeType: true,
+  scopeId: true,
+  category: true,
+  retentionDays: true,
+} as const;
 
-  private constructor(private readonly database: DataRetentionDatabasePort) {
-    super();
-  }
+export class PrismaDataRetentionRepository
+  extends PrismaRepository.for("RetentionPolicy")
+  implements DataRetentionRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaDataRetentionRepository(prisma));
 
   async findForProjectChain(input: {
     organizationId: string;
     scopes: ScopeAssignment[];
   }): Promise<RetentionRow[]> {
-    const rows = await this.database.retentionPolicy.findMany({
+    const rows = await this.prisma.retentionPolicy.findMany({
       where: {
         organizationId: input.organizationId,
         OR: input.scopes,
       },
-      select: { scopeType: true, scopeId: true, category: true, retentionDays: true },
+      select: retentionRowSelect,
     });
+
     return rows.map((row) => retentionRowSchema.parse(row));
   }
 
   async findAllInOrganization(input: { organizationId: string }): Promise<RetentionPolicy[]> {
-    const rows = await this.database.retentionPolicy.findMany({
+    const rows = await this.prisma.retentionPolicy.findMany({
       where: { organizationId: input.organizationId },
     });
-    return rows.map((row) => retentionPolicySchema.parse(row));
-  }
 
-  async tryFindById(input: { id: string }): Promise<RetentionPolicy | null> {
-    const row = await this.database.retentionPolicy.findUnique({
-      where: { id: input.id },
-    });
-    return row ? retentionPolicySchema.parse(row) : null;
+    return rows.map((row) => retentionPolicySchema.parse(row));
   }
 
   async upsertForScope(input: {
@@ -52,7 +51,7 @@ export class PrismaDataRetentionRepository extends DataRetentionRepository {
     category: RetentionCategory;
     retentionDays: number;
   }): Promise<RetentionPolicy> {
-    const row = await this.database.retentionPolicy.upsert({
+    const row = await this.prisma.retentionPolicy.upsert({
       where: {
         scopeType_scopeId_category: {
           scopeType: input.scope.scopeType,
@@ -72,6 +71,7 @@ export class PrismaDataRetentionRepository extends DataRetentionRepository {
         retentionDays: input.retentionDays,
       },
     });
+
     return retentionPolicySchema.parse(row);
   }
 
@@ -79,7 +79,7 @@ export class PrismaDataRetentionRepository extends DataRetentionRepository {
     scope: ScopeAssignment;
     category: RetentionCategory;
   }): Promise<void> {
-    await this.database.retentionPolicy.deleteMany({
+    await this.prisma.retentionPolicy.deleteMany({
       where: {
         scopeType: input.scope.scopeType,
         scopeId: input.scope.scopeId,

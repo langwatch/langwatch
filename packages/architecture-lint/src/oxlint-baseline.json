@@ -1070,11 +1070,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/data-retention/web/src/screens/data-retention/data-retention.screen.tsx",
+      "key": "cognitive-complexity|packages/features/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
+      "key": "cognitive-complexity|packages/features/data-retention/web/src/ui/sections/data-retention.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3958,11 +3958,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/features/data-retention/web/src/screens/data-retention/data-retention.screen.tsx",
+      "key": "complexity|packages/features/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/features/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
+      "key": "complexity|packages/features/data-retention/web/src/ui/sections/data-retention.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8478,15 +8478,15 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/features/data-retention/web/src/screens/data-retention/data-retention.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/features/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
       "key": "nested-ternary|packages/features/data-retention/web/src/ui/blocks/retention-and-usage-card.tsx",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/features/data-retention/web/src/ui/sections/data-retention.screen.tsx",
       "measured": "2026-09-06"
     },
     {

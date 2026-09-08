@@ -1,47 +1,19 @@
-export { PrismaDataRetentionAdapter } from "./adapters/prisma.data-retention.adapter.ts";
-export { DataRetentionApp } from "./app/data-retention.app.ts";
 export { dataRetentionServer } from "./data-retention.server.ts";
+export { dataRetentionTrpcTransport } from "./transport/data-retention.trpc.ts";
 export type {
   DataRetentionAppConfig,
   DataRetentionInfrastructure,
+  TenantClickHouseClientResolver,
 } from "./app/data-retention.app.ts";
-export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
-export {
-  DataRetentionTrpcApi,
-  type DataRetentionTrpcAuthz,
-  type DataRetentionTrpcContext,
-  type DataRetentionTrpcPolicy,
-  type RetentionScopeTarget,
-} from "./transport/api-trpc/data-retention.api.ts";
 /**
- * The retention POLICY, moved here whole from the platform application. The transport already
- * declared it as a host port, and the port's own docblock said why: every decision resolves
- * organization/team/project lineage and an active plan rather than retention state.
+ * The two capabilities a process supplies: the organization lineage a rule is
+ * placed and gated against, and the plan behind the gate. Both read stores this
+ * feature deliberately does not own.
  */
 export {
   DataRetentionDirectoryPort,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
 } from "./ports/data-retention-directory.port.ts";
-export { DataRetentionPermissionsPort } from "./ports/data-retention-permissions.port.ts";
 export { DataRetentionPlanPort, type DataRetentionPlan } from "./ports/data-retention-plan.port.ts";
-export { DataRetentionAdministratorPort } from "./ports/data-retention-administrator.port.ts";
-export {
-  PrismaDataRetentionDirectoryRepository,
-  type DataRetentionDirectoryDatabase,
-} from "./repositories/prisma/prisma.data-retention-directory.repository.ts";
-export {
-  DataRetentionPolicyService,
-  type DataRetentionPolicyServiceOptions,
-  type RetentionActor,
-} from "./services/data-retention-policy.service.ts";
-export {
-  DataRetentionSnapshotService,
-  type RetentionPolicySnapshot,
-  type RetentionRule,
-  type RetentionScopeAvailability,
-} from "./services/data-retention-snapshot.service.ts";
-export {
-  StorageMeterScopeService,
-  type StorageScopeUsage,
-} from "./services/storage-meter-scope.service.ts";
+export { PrismaDataRetentionDirectoryRepository } from "./repositories/prisma/prisma.data-retention-directory.repository.ts";
