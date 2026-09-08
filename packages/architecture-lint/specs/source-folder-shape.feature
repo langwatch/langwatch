@@ -24,10 +24,10 @@ Feature: A folder is one concept and a file is one readable part
 
   @unit @architecture
   Scenario: A mount file the feature grammar requires is never a fragment
-    Given a process mount file that binds one transport declaration is shorter than the fragment floor
-    And only its own composition reads it
+    Given a feature installer or a process mount file is shorter than the fragment floor
+    And only its own folder reads it
     When architecture lint checks the workspace
-    Then it reports nothing, because the grammar asked for that file and the runtime set its size
+    Then it reports nothing, because the grammar asked for those files and the runtime set their size
 
   @unit @architecture
   Scenario: A baselined finding is silent and a stale baseline entry is reported

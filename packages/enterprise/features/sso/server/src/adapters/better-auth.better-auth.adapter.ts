@@ -13,6 +13,7 @@
 import type { BetterAuthOptions } from "better-auth";
 import { auth0, type genericOAuth, okta } from "better-auth/plugins/generic-oauth";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import { SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 
 /**
  * Derives a user display name from an OAuth profile, falling back through
@@ -571,6 +572,24 @@ export class BetterAuthSsoAdapter {
     configuration: GenericOAuthConfiguration,
   ): Parameters<typeof genericOAuth>[0]["config"] {
     return genericOAuthImplementation.build(configuration);
+  }
+}
+
+/**
+ * Whether the configured provider is one this build can actually mount: the
+ * gate asks the code that builds the providers rather than a second table of
+ * provider ids that could drift from it.
+ */
+export class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
+  static create(): BetterAuthSsoProviderMount {
+    return new BetterAuthSsoProviderMount();
+  }
+
+  isMounted(configuration: SsoConfiguration): boolean {
+    return (
+      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration)).length > 0 ||
+      BetterAuthSsoAdapter.buildGenericOAuthConfigs(configuration).length > 0
+    );
   }
 }
 

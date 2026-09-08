@@ -1,8 +1,27 @@
+export { SsoApi, type SsoOperator } from "./sso.api.ts";
+export { ssoConnectionTrpc } from "./sso-connection.trpc.ts";
 export {
+  activateSsoConnectionInputSchema,
   backofficeSsoConnectionPageSchema,
   backofficeSsoConnectionSchema,
+  listSsoConnectionsInputSchema,
+  registerSsoConnectionInputSchema,
+  rejectSsoDomainClaimInputSchema,
   SSO_FEATURE_ID,
   ssoConfigurationSchema,
+  ssoConnectionByIdSchema,
+  ssoConnectionReasonInputSchema,
+  ssoConnectionTargetSchema,
+  ssoDomainTargetSchema,
+  type ActivateSsoConnectionInput,
+  type BackofficeSsoConnection,
+  type BackofficeSsoConnectionPage,
+  type ListSsoConnectionsInput,
+  type RegisterSsoConnectionInput,
+  type RejectSsoDomainClaimInput,
   type SsoConfiguration,
+  type SsoConnectionByIdInput,
+  type SsoConnectionReasonInput,
+  type SsoConnectionTarget,
+  type SsoDomainTarget,
 } from "./sso.contract.ts";
-export * from "./sso.service.ts";

@@ -74,18 +74,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/enterprise/features/sso/server|LicensingSsoAdapter",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/webhook/server|PrismaWebhookRetentionRepository",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "packages/features/webhook/server|WebhookHealthService",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/eventing|ReplayService",
       "measured": "2026-09-07"
     },
@@ -287,6 +275,14 @@
     },
     {
       "key": "packages/features/trace/server|TraceTtlCacheService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/webhook/server|PrismaWebhookRetentionRepository",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "packages/features/webhook/server|WebhookHealthService",
       "measured": "2026-09-07"
     },
     {

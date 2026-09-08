@@ -19,10 +19,11 @@ export const FOLDER_BUDGET = 12;
 export const FRAGMENT_FLOOR = 20;
 
 /**
- * Files the feature grammar requires one of per feature: the process mount that binds a
- * transport declaration. Their size is set by the runtime's signature, not by the author.
+ * Files the feature grammar requires one of per feature: the installer (`<f>.server.ts`)
+ * and the process mount that binds a transport declaration. Their size is set by the
+ * runtime's signature, not by the author.
  */
-const GRAMMAR_REQUIRED_SUFFIXES = [".mount.ts"];
+const GRAMMAR_REQUIRED_SUFFIXES = [".server.ts", ".mount.ts"];
 
 export const SOURCE_FOLDER_SHAPE_KINDS = ["crowded-folder", "fragment-file"] as const;
 

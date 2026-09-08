@@ -5114,10 +5114,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/enterprise/features/sso/server/src/transport/api-trpc/sso-connection.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/eventing/src/__tests__/eventing-boundary.unit.test.ts",
       "measured": "2026-09-06"
     },
@@ -7992,10 +7988,6 @@
     {
       "key": "namespace-class|packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
       "measured": "2026-09-08"
-    },
-    {
-      "key": "nested-ternary|apps/api/src/api-secret-rest.feature.ts",
-      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",

@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { SsoGate, type SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import type {
-  LicensingService,
+  LicensingApi,
   PlatformLicenseInspection,
 } from "@langwatch/enterprise-licensing-contract";
-
-export abstract class SsoGateLogger {
-  abstract info(context: object, message: string): void;
-  abstract warn(context: object, message: string): void;
-}
+import type { SsoGateLoggerPort } from "../ports/sso-gate-logger.port.ts";
 
 export abstract class SsoProviderMountInspector {
   abstract isMounted(configuration: SsoConfiguration): boolean;
@@ -16,8 +12,8 @@ export abstract class SsoProviderMountInspector {
 
 export interface SsoGateServiceOptions {
   configuration: SsoConfiguration;
-  licensing: LicensingService;
-  logger: SsoGateLogger;
+  licensing: LicensingApi;
+  logger: SsoGateLoggerPort;
   providerMountInspector: SsoProviderMountInspector;
   evaluationTimeoutMs?: number | undefined;
 }
@@ -32,18 +28,16 @@ class SsoGateTimeoutError extends Error {
 }
 
 /** ADR-027's process-frozen, failure-evicting Enterprise SSO gate. */
-export class SsoGateService extends SsoGate {
+export class SsoGateService {
   private memoizedGate: Promise<boolean> | null = null;
 
   private constructor(
     private readonly configuration: SsoConfiguration,
-    private readonly licensing: LicensingService,
-    private readonly logger: SsoGateLogger,
+    private readonly licensing: LicensingApi,
+    private readonly logger: SsoGateLoggerPort,
     private readonly providerMountInspector: SsoProviderMountInspector,
     private readonly evaluationTimeoutMs: number,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: SsoGateServiceOptions): SsoGateService {
     return new SsoGateService(

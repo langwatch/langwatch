@@ -1,20 +1,16 @@
+export { ssoServer } from "./sso.server.ts";
+export { ssoConnectionTrpcTransport } from "./transport/sso-connection.trpc.ts";
+export type { SsoInfrastructure } from "./app/sso.app.ts";
 export {
-  SsoConnectionTrpcApi,
-  type SsoConnectionTrpcContext,
-  type SsoConnectionTrpcPorts,
-} from "./transport/api-trpc/sso-connection.api.ts";
-export {
-  LicensingSsoAdapter,
-  type LicensingSsoAdapterOptions,
-} from "./adapters/licensing.sso.adapter.ts";
-export {
-  SsoGateLogger,
-  SsoGateService,
-  SsoProviderMountInspector,
-  type SsoGateServiceOptions,
-} from "./services/sso-gate.service.ts";
+  SsoConnectionLedgerPort,
+  type SsoConnectionLedgerOperator,
+  type SsoConnectionTeardownRequest,
+} from "./ports/sso-connection-ledger.port.ts";
+export { SsoGateLoggerPort } from "./ports/sso-gate-logger.port.ts";
+export { SsoProviderMountInspector } from "./services/sso-gate.service.ts";
 export {
   BetterAuthSsoAdapter,
+  BetterAuthSsoProviderMount,
   LEGACY_CALLBACK_PROVIDER_IDS,
   PLAIN_OIDC_PROVIDERS,
   buildGenericOAuthConfigs,

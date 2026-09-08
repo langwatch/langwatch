@@ -103,7 +103,12 @@ describe("source folder shape", () => {
 
   describe("given a small file the feature grammar requires", () => {
     /** @scenario A mount file the feature grammar requires is never a fragment */
-    it("leaves a process mount alone however short it is", () => {
+    it("leaves an installer and a process mount alone however short they are", () => {
+      write("packages/features/widget/server/src/widget.server.ts", "export const widgetServer = 1;\n");
+      write(
+        "packages/features/widget/server/src/index.ts",
+        'export { widgetServer } from "./widget.server.ts";\n',
+      );
       write(
         "apps/api/src/features/widget/widget-trpc.mount.ts",
         "export const createWidgetTrpcRouter = 1;\n",

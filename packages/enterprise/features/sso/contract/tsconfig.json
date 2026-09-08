@@ -18,6 +18,12 @@
   "references": [
     {
       "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../runtime-composition/tsconfig.build.json"
     }
   ]
 }

@@ -36,6 +36,15 @@
     },
     {
       "path": "../../../../features/ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../features/audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../features/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../runtime-composition/tsconfig.build.json"
     }
   ]
 }

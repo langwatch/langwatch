@@ -42,10 +42,6 @@
       "path": "packages/architecture-lint/src"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/audit-log-null/src/audit-log-null.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/clickhouse-client/src"
     },
@@ -170,10 +166,6 @@
       "path": "packages/enterprise/composition/api/src/governance/clickhouse-client.port.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/enterprise/features/audit-log/server/src/audit-log.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/enterprise/features/billing/contract/src"
     },
@@ -275,15 +267,7 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/enterprise/features/managed-provider/server/src/managed-provider.server.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/enterprise/features/saas/contract/src/saas-browser.service.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/enterprise/features/sso/contract/src/sso.service.ts"
     },
     {
       "kind": "crowded-folder",
@@ -318,10 +302,6 @@
       "path": "packages/features/agent/contract/src/http-proxy.trpc.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/agent/server/src/agent.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/agent/server/src/services"
     },
@@ -340,10 +320,6 @@
     {
       "kind": "fragment-file",
       "path": "packages/features/analytics/contract/src/visualization/lwql-dataset-names.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/analytics/server/src/analytics.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -394,10 +370,6 @@
       "path": "packages/features/annotation/contract/src/annotation-review.types.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/annotation/server/src/annotation.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/annotation/web/src/ui/elements"
     },
@@ -416,10 +388,6 @@
     {
       "kind": "fragment-file",
       "path": "packages/features/api-key/contract/src/api-key.visibility.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/api-key/server/src/api-key.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -486,10 +454,6 @@
       "path": "packages/features/authz/server/src/adapters"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/authz/server/src/authz.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/automation/contract/src"
     },
@@ -520,10 +484,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/automation/server/src/adapters"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/automation/server/src/automation.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -562,10 +522,6 @@
       "path": "packages/features/coding-agent/server/src/adapters"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/coding-agent/server/src/coding-agent.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/coding-agent/server/src/services"
     },
@@ -578,20 +534,8 @@
       "path": "packages/features/coding-agent/web/src/trace"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/dashboard/server/src/dashboard.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/data-privacy/contract/src"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/data-privacy/server/src/data-privacy.server.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/data-retention/server/src/data-retention.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -602,20 +546,12 @@
       "path": "packages/features/dataset/contract/src/dataset-normalization.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/dataset/server/src/dataset.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/dataset/web/src/model"
     },
     {
       "kind": "crowded-folder",
       "path": "packages/features/dataset/web/src/ui/elements"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/entitlement/server/src/entitlement.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -632,10 +568,6 @@
     {
       "kind": "fragment-file",
       "path": "packages/features/evaluation/contract/src/evaluation.errors.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/evaluation/server/src/evaluation.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -668,10 +600,6 @@
     {
       "kind": "fragment-file",
       "path": "packages/features/experiment/server/src/adapters/noop-experiment-workbench-updates.adapter.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/experiment/server/src/experiment.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -718,10 +646,6 @@
       "path": "packages/features/feature-flag/contract/src"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/feature-flag/server/src/feature-flag.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/gateway/contract/src"
     },
@@ -746,10 +670,6 @@
       "path": "packages/features/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/gateway/server/src/gateway.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/gateway/server/src/ports"
     },
@@ -771,15 +691,7 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/github/server/src/github.server.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/hosted-mcp/contract/src/hosted-mcp.api.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/hosted-mcp/server/src/hosted-mcp.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -820,10 +732,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/langy/server/src/adapters"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/langy/server/src/langy.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -875,10 +783,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/log/server/src/log.server.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/metric/contract/src/metric.api.ts"
     },
     {
@@ -888,10 +792,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/metric/server/src/adapters"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/metric/server/src/metric.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -934,10 +834,6 @@
       "path": "packages/features/monitor/contract/src/monitor.errors.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/monitor/server/src/monitor.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/navigation/web/src/behavior"
     },
@@ -956,10 +852,6 @@
     {
       "kind": "fragment-file",
       "path": "packages/features/notification/contract/src/notification.api.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/notification/server/src/notification.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -984,10 +876,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/ops/server/src/adapters"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/ops/server/src/ops.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -1034,10 +922,6 @@
       "path": "packages/features/organization/contract/src/organization.errors.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/organization/server/src/organization.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/organization/server/src/services"
     },
@@ -1066,20 +950,8 @@
       "path": "packages/features/platform-health/contract/src/platform-health.service.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/platform-health/server/src/platform-health.server.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/presence/server/src/presence.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/presence/web/src"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/project/server/src/project.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -1144,10 +1016,6 @@
     {
       "kind": "fragment-file",
       "path": "packages/features/prompt/web/src/surfaces/prompt-reference/prompt-handle.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/role/server/src/role.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -1227,14 +1095,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/secret/server/src/secret.server.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/share/server/src/share.server.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/share/web/src/readable-date.ts"
     },
     {
@@ -1254,10 +1114,6 @@
       "path": "packages/features/stored-object/server/src/adapters"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/stored-object/server/src/stored-object.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/suite/contract/src"
     },
@@ -1270,20 +1126,12 @@
       "path": "packages/features/suite/contract/src/suite.kind.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/suite/server/src/suite.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/suite/web/src"
     },
     {
       "kind": "fragment-file",
       "path": "packages/features/topic/contract/src/topic.api.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/topic/server/src/topic.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -1386,10 +1234,6 @@
       "path": "packages/features/trace/server/src/services/vercel-canonicaliser.service.ts"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/trace/server/src/trace.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/trace/web/src/behavior"
     },
@@ -1486,20 +1330,12 @@
       "path": "packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-name-cell.tsx"
     },
     {
-      "kind": "fragment-file",
-      "path": "packages/features/user/server/src/user.server.ts"
-    },
-    {
       "kind": "crowded-folder",
       "path": "packages/features/user/web/src/ui/sections"
     },
     {
       "kind": "fragment-file",
       "path": "packages/features/webhook/contract/src/webhook.queries.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/webhook/server/src/webhook.server.ts"
     },
     {
       "kind": "crowded-folder",
@@ -1520,10 +1356,6 @@
     {
       "kind": "crowded-folder",
       "path": "packages/features/workflow/server/src/services"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/workflow/server/src/workflow.server.ts"
     },
     {
       "kind": "crowded-folder",
