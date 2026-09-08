@@ -122,7 +122,13 @@ before the relying code ships:
 Numbered; each states why and what it rejects. §1–§8 are the money
 design — wave 1 ships the lanes **independent**; §2's interconnection
 and §7's mapping ship in **wave 2** (ruled by Sergio 2026-08-29) —
-§9–§17 identity and wave 2, §18–§20 cross-cutting.
+§9–§17 identity, §18–§20 cross-cutting. **The §9–§17 grouping is
+topical, not a wave assignment**: each section states its own wave, and
+two of them straddle. §9 in particular is split — *stamping* the
+provider's raw actor id at ingest is **wave 1** (§4 puts `RawActorId` in
+the rollup's dedup key on day one, and §16's wave-1 idle-seat aggregate
+distinct-counts it); *resolving* that id to a person and a department,
+via §11–§13, is **wave 2**. §16 says the same of itself in its title.
 
 ### §1. One ADR, two waves, cost before identity
 
@@ -241,9 +247,10 @@ The screen never talks to providers and never merges numbers itself:
 
 ```text
 event_log ── gateway-spend events ──┬─(existing projections)──► gateway_spend / budget ledger  (sibling tables)
-          └─ pulled-usage events  ──┴─(rollup fold projection)──► governance_cost_rollup_1d ──► thin cost service ──► screen
-                                                                                  ▲
-                                                             Postgres (names, price list) ┘
+          ├─ pulled-usage events  ──┴─(rollup fold projection)──► governance_cost_rollup_1d ──┐
+          └─ roster count events ─────(seat count projection)───► governance_seat_count_1d ───┤
+                                                                                              ├──► thin cost service ──► screen
+                                                      Postgres (names, seat price list) ──────┘
 ```
 
 The rollup projection consumes the **events** (gateway-spend and
@@ -350,7 +357,9 @@ Values: `gateway` and `pulled` — the two lanes wave 1 ships
 added when a lane actually ships, never reserved ahead of one.
 
 - **`seat` is never a value** — seat money is computed at read, never
-  stored as rows (§6).
+  stored as rows (§6). The roster *counts* it is computed from live in
+  their own sibling table, `governance_seat_count_1d` (Schema, §16), not
+  in this one.
 - **`trace` is not a value** — trace cost stays a separate system
   (per-request `Float64` in `trace_summaries`), and no pipeline carrying
   trace cost registers this fold, so no row can carry a trace source. If
@@ -360,7 +369,10 @@ added when a lane actually ships, never reserved ahead of one.
 ### §6. Seat counts are durable events; seat money never is
 
 Each day the roster puller writes an event: *"provider reported N seats of
-type X."* Money is the multiplication, done at read: count-event × dated
+type X."* Like every other pulled event it lands on the log and is folded
+into a projection the screen can read — `governance_seat_count_1d`
+(Schema), the counts half of §16's wave-1 aggregate. Money is the
+multiplication, done at read: count-event × dated
 price list (which **we maintain** — no API publishes seat prices, proven
 for Copilot). The price list follows the llmcost pattern already in the
 repo — a JSON source of truth loaded into a registry, org-level
@@ -468,6 +480,13 @@ separation keeps its real goal (never lie about who spent) while giving
 every row a tenant home.
 
 ### §9. Money rows carry the provider's raw actor id, stamped at ingest, never edited
+
+**Waves.** The *stamping* ships in **wave 1**: `RawActorId` is a day-one
+rollup column and a dedup-key dimension (§4, Schema), §16's wave-1
+idle-seat aggregate distinct-counts it, and the erasure rules below are
+therefore a wave-1 obligation, not a wave-2 one. Turning that id into a
+*person* — and the department they were in on that date — is **wave 2**,
+via §11–§13. Nothing in this section defers the ingest-time capture.
 
 Whatever the provider said — `user_email`, Anthropic member id `user_…`, a
 UUID — lands in a raw actor-id column plus an actor-kind hint. ADR-122
@@ -657,8 +676,21 @@ knowingly disagree with the provider's own console).
 ### §16. Idle seats split across the waves (FR3)
 
 - **Wave 1, the aggregate**: "you pay for N seats, M were active" per
-  provider — SKU/roster counts × a distinct-count over raw actor ids on
-  usage rows. No identity needed.
+  provider. It is **two reads against two tables**, because seat money is
+  never a rollup row (§5) — naming them here so the implementer does not
+  have to guess:
+  - **M (active)** — `countDistinct(RawActorId)` over
+    `governance_cost_rollup_1d` for the period, dedup-safe like every
+    other read of it. Raw actor id is a rollup dimension from day one
+    (§4, §9), which is exactly why §9's stamping is wave 1.
+  - **N (paid for)** — the roster count-events (§6), read from
+    `governance_seat_count_1d`, their own sibling projection output. They
+    are not rollup rows and the thin service does **not** read the event
+    log at request time, for the same reason the money numbers don't:
+    summed reads come from a projection, always.
+  The thin service multiplies **N** by the dated price list at read (§6),
+  renders "price missing" rather than a silent zero when a license type
+  has no price row, and needs no identity for either half.
 - **Wave 2, the names**: listing *which* seats are idle requires the
   roster ↔ usage-actor join (§11). Idle default: no activity for 30 days,
   adjustable per org; last-activity date always shown.
@@ -737,6 +769,7 @@ then.
 | Nano scale | 1 unit = 10⁻⁹ of one currency unit; $1 = 1,000,000,000 units | exact integer money math; matches `CostNanoUSD`/`AmountNanoUSD` |
 | `cost_source` values | `gateway`, `pulled` (`GOVERNANCE_COST_SOURCE`) | which lane the money came from, in one filterable column; the provider is the `Provider` column; `seat` and `trace` never appear |
 | Rollup table | `governance_cost_rollup_1d` | the one summed table charts read |
+| Seat count table | `governance_seat_count_1d` | roster counts (§6) for the wave-1 idle-seat aggregate; counts only, never money |
 | Rollup grain | 1 day (`toDate`) | matches bill grain; volume is thousands/day |
 | Idle-seat default | 30 days without activity, per-org adjustable | FR3 wave-2 listing |
 | Permission verbs | `governance_cost:view`, `governance_identity:manage` (registry names final at implementation) | ADR-092 registry entries gating the screens |
@@ -775,7 +808,7 @@ then.
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| ClickHouse migration adding `governance_cost_rollup_1d` | no (schema) | large | human review + a written manual rollback (`DROP TABLE`, the 00067 create-table precedent) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
+| ClickHouse migration adding `governance_cost_rollup_1d` and `governance_seat_count_1d` | no (schema) | large | human review + a written manual rollback (`DROP TABLE`, the 00067 create-table precedent) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
 | Prisma migration adding the three identity tables + seat price list | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration) |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
 | Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
@@ -913,8 +946,31 @@ model SeatPrice {
 ```
 
 Seat counts are **events** on the existing spine ("provider reported N
-seats of type X on day D"), not a table here; the roster puller appends
-them like every other pull.
+seats of type X on day D") — the roster puller appends them like every
+other pull. Their *read* path is a sibling projection output, not the
+rollup above, because `seat` is never a `cost_source` (§5):
+
+```sql
+-- ClickHouse: roster counts, the wave-1 seat aggregate's N (§6, §16).
+CREATE TABLE governance_seat_count_1d (
+    TenantId           String,        -- the org's hidden governance project
+    Day                Date,
+    IngestionSourceId  String,
+    Provider           LowCardinality(String),
+    LicenseType        LowCardinality(String),  -- SKU / plan name, §6
+    -- ---- payload ----
+    OrganizationId     String DEFAULT '',
+    SeatCount          UInt32 DEFAULT 0,        -- a count; never money
+    AppliedEventIds    Array(String) DEFAULT [],
+    EventTimestamp     UInt64
+) ENGINE = ReplacingMergeTree(EventTimestamp)
+PARTITION BY toYYYYMM(Day)
+ORDER BY (TenantId, Day, IngestionSourceId, Provider, LicenseType)
+TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE;
+-- Same rules as the rollup: the ORDER BY is the full dimension tuple, and
+-- every read is dedup-safe (argMax/IN-tuple). Seat *money* is still never
+-- stored — the price-list multiplication happens at read (§6).
+```
 
 ## Rejected alternatives
 
@@ -985,6 +1041,24 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.3 (2026-09-08, captain: Sergio Esteban).** Two internal-consistency
+  findings from review, both about wave assignment being readable from the
+  document rather than inferred. No design reversal:
+  - **§9 is split across the waves, and now says so** (Decision intro,
+    §9). The intro filed §9–§17 as "identity and wave 2", but §9's
+    ingest-time raw-actor-id *stamping* is wave 1 — §4 puts `RawActorId`
+    in the day-one rollup dedup key and §16's wave-1 aggregate counts it.
+    The §9–§17 bucket is now stated as topical, with the stamping (wave 1)
+    separated from the resolution to a person (wave 2, §11–§13).
+  - **The wave-1 seat aggregate's data path is named** (§16, §6, §5,
+    Schema, Constants, Gates). It reads two tables, not one: `M` is a
+    dedup-safe `countDistinct(RawActorId)` over the rollup, `N` comes from
+    roster count-events projected into a sibling table,
+    `governance_seat_count_1d` (DDL sketch in Schema). Previously the
+    counts half had no named store — `seat` is never a `cost_source`, so
+    it could not be the rollup, and the §4 diagram did not show roster
+    events entering anything. The diagram now carries that lane, and the
+    thin service still never reads the event log at request time.
 - **v3.2 (2026-08-29, captain: Sergio Esteban).** Eight pre-implementation
   rulings folded, one restructure:
   - **Lane interconnection moved to wave 2** (the restructure): wave 1
