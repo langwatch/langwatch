@@ -1,22 +1,29 @@
 /**
  * @vitest-environment node
  *
- * The dataset application: the one rule that moved off its four doors onto it.
+ * The dataset application: the rules that moved off its four doors onto it.
  *
  * A create-or-replace can arrive INCOMPLETE — naming the dataset by slug
  * rather than id, naming an experiment instead of a name, or naming neither a
  * name nor the columns because it is patching what already exists. Both doors
- * had a fill of their own for that hole: the tRPC door borrowed the name of
- * the experiment the caller named, the REST patch borrowed the name and
- * columns of the dataset it was replacing. "What a partial upsert means" was
- * therefore decided in two places and could answer differently the first time
- * one moved.
+ * had a fill of their own for that hole, so "what a partial upsert means" was
+ * decided in two places and could answer differently the first time one moved.
+ *
+ * A copy reads a SECOND project, which a door's declared check never covers,
+ * so the caller's reach into it is probed here, where the read is made.
  *
  * The services are stubbed. Nothing here speaks HTTP or tRPC.
  */
-import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
+import type { Dataset } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
-import { DatasetApp, type DatasetExperimentLookup } from "../dataset.app.ts";
+
+import { DatasetService } from "../../services/dataset.service.ts";
+import {
+  createDatasetTestApp,
+  createDatasetTestAuthz,
+  createDatasetTestExperiments,
+  datasetTestExperiment,
+} from "./dataset.fixture.ts";
 
 const replacing = {
   id: "dataset_existing",
@@ -27,27 +34,34 @@ const replacing = {
 
 function harness({
   dataset = {},
-  experiments = {},
+  experiments = createDatasetTestExperiments(),
+  permissions = createDatasetTestAuthz(),
 }: {
-  dataset?: Record<string, unknown>;
-  experiments?: Record<string, unknown>;
+  dataset?: Partial<DatasetService>;
+  experiments?: ReturnType<typeof createDatasetTestExperiments>;
+  permissions?: ReturnType<typeof createDatasetTestAuthz>;
 } = {}) {
   const datasetService = {
     getBySlugOrId: vi.fn(async () => replacing),
     upsertDataset: vi.fn(async () => replacing),
+    copyDataset: vi.fn(async () => replacing),
     ...dataset,
-  } as unknown as DatasetService;
+  } satisfies Partial<DatasetService>;
 
-  const experimentLookup = {
-    getById: vi.fn(async () => ({ name: "Nightly regression" })),
-    tryGetBySlug: vi.fn(async () => ({ id: "experiment-1" })),
-    ...experiments,
-  } as unknown as DatasetExperimentLookup;
+  for (const name of ["getBySlugOrId", "upsertDataset", "copyDataset"] as const) {
+    vi.spyOn(DatasetService.prototype, name).mockImplementation(datasetService[name]);
+  }
+  if (datasetService.getDatasetWithRecords) {
+    vi.spyOn(DatasetService.prototype, "getDatasetWithRecords").mockImplementation(
+      datasetService.getDatasetWithRecords,
+    );
+  }
 
   return {
     dataset: datasetService,
-    experiments: experimentLookup,
-    app: DatasetApp.create({ dataset: datasetService, experiments: experimentLookup }),
+    experiments,
+    permissions,
+    app: createDatasetTestApp({ dependencies: { experiments, permissions } }),
   };
 }
 
@@ -141,7 +155,7 @@ describe("DatasetApp", () => {
 
     it("refuses when the experiment it named has no name to lend", async () => {
       const { app, dataset } = harness({
-        experiments: { getById: vi.fn(async () => ({ name: null })) },
+        experiments: createDatasetTestExperiments(datasetTestExperiment(null)),
       });
 
       await expect(
@@ -182,25 +196,65 @@ describe("DatasetApp", () => {
     });
   });
 
+  describe("when a copy names a source project the caller may not read", () => {
+    /** @scenario "A copy is refused when the source project is not the caller's" */
+    it("refuses before the source dataset is read", async () => {
+      const { app, dataset, permissions } = harness({ permissions: createDatasetTestAuthz(false) });
+
+      await expect(
+        app.copyDatasetForActor({
+          actorId: "user-1",
+          sourceDatasetId: "dataset-1",
+          sourceProjectId: "project-source",
+          targetProjectId: "project-target",
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+
+      expect(permissions.hasPermission).toHaveBeenCalledWith({
+        userId: "user-1",
+        permission: "datasets:create",
+        projectId: "project-source",
+      });
+      expect(dataset.copyDataset).not.toHaveBeenCalled();
+    });
+
+    it("copies into the target project once the source is permitted", async () => {
+      const { app, dataset } = harness();
+
+      await app.copyDatasetForActor({
+        actorId: "user-1",
+        sourceDatasetId: "dataset-1",
+        sourceProjectId: "project-source",
+        targetProjectId: "project-target",
+      });
+
+      expect(dataset.copyDataset).toHaveBeenCalledWith({
+        sourceDatasetId: "dataset-1",
+        sourceProjectId: "project-source",
+        targetProjectId: "project-target",
+      });
+    });
+  });
+
   describe("when a page holds only the slug of a batch evaluation's experiment", () => {
     it("turns it into the id those records are keyed by", async () => {
       const { app, experiments } = harness();
 
       await expect(
-        app.tryGetExperimentBySlug({ projectId: "project-1", slug: "nightly" }),
-      ).resolves.toEqual({ id: "experiment-1" });
+        app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "nightly" }),
+      ).resolves.toEqual([]);
       expect(experiments.tryGetBySlug).toHaveBeenCalledWith({
         projectId: "project-1",
         slug: "nightly",
       });
     });
 
-    it("answers null when the project has no experiment by that slug", async () => {
-      const { app } = harness({ experiments: { tryGetBySlug: vi.fn(async () => null) } });
+    it("refuses when the project has no experiment by that slug", async () => {
+      const { app } = harness({ experiments: createDatasetTestExperiments(null) });
 
       await expect(
-        app.tryGetExperimentBySlug({ projectId: "project-1", slug: "ghost" }),
-      ).resolves.toBeNull();
+        app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "ghost" }),
+      ).rejects.toMatchObject({ code: "experiment_not_found" });
     });
   });
 
@@ -208,7 +262,11 @@ describe("DatasetApp", () => {
     it("passes it through rather than substituting one of the application's", async () => {
       const { app, dataset } = harness({
         dataset: {
-          getDatasetWithRecords: vi.fn(async () => ({ dataset: replacing, records: [] })),
+          getDatasetWithRecords: vi.fn(async () => ({
+            dataset: replacing,
+            records: [],
+            truncated: false,
+          })),
         },
       });
 

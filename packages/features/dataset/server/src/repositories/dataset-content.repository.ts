@@ -68,53 +68,50 @@ export type DatasetContentUpdate = {
  * chunks. The chunk and normalization services depend on this class; the
  * Prisma implementation beside it is chosen at the composition root.
  */
-export abstract class DatasetContentRepository {
+export interface DatasetContentRepository {
   /**
    * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock
    * inside one transaction (I-COUNT). Receives a REPOSITORY bound to the
    * transaction, not a database client, since the caller is a service.
    */
-  abstract withDatasetLock<T>(
+  withDatasetLock<T>(
     datasetId: string,
     mutate: (tx: DatasetContentRepository) => Promise<T>,
   ): Promise<T>;
-  abstract tryFindOne(input: { id: string; projectId: string }): Promise<DatasetRow | null>;
-  /** The throwing counterpart to {@link tryFindOne}, for reads inside the lock. */
-  abstract findOneOrThrow(input: { id: string; projectId: string }): Promise<DatasetRow>;
-  abstract tryFindBySlug(input: {
+  findOne(input: { id: string; projectId: string }): Promise<DatasetRow | null>;
+  /** The throwing counterpart to {@link findOne}, for reads inside the lock. */
+  getOne(input: { id: string; projectId: string }): Promise<DatasetRow>;
+  findBySlug(input: {
     slug: string;
     projectId: string;
     excludeId?: string;
   }): Promise<DatasetRow | null>;
-  abstract create(input: CreateDatasetInput): Promise<DatasetRow>;
-  abstract update(input: UpdateDatasetInput): Promise<DatasetRow>;
-  abstract updateContent(input: {
+  create(input: CreateDatasetInput): Promise<DatasetRow>;
+  update(input: UpdateDatasetInput): Promise<DatasetRow>;
+  updateContent(input: {
     id: string;
     projectId: string;
     content: DatasetContentUpdate;
   }): Promise<DatasetRow>;
-  abstract deletePendingUpload(input: { id: string; projectId: string }): Promise<number>;
-  abstract failIfProcessing(input: {
+  deletePendingUpload(input: { id: string; projectId: string }): Promise<number>;
+  failIfProcessing(input: {
     id: string;
     projectId: string;
     statusError: string;
   }): Promise<number>;
-  abstract claimForProcessing(input: { id: string; projectId: string }): Promise<number>;
-  abstract markProcessingRedriven(input: { id: string; projectId: string }): Promise<number>;
-  abstract findStaleProcessing(input: {
-    projectId: string;
-    olderThan: Instant;
-  }): Promise<DatasetRow[]>;
-  abstract tryFindPendingUploadByStagingKey(input: {
+  claimForProcessing(input: { id: string; projectId: string }): Promise<number>;
+  markProcessingRedriven(input: { id: string; projectId: string }): Promise<number>;
+  findStaleProcessing(input: { projectId: string; olderThan: Instant }): Promise<DatasetRow[]>;
+  findPendingUploadByStagingKey(input: {
     projectId: string;
     stagingKey: string;
   }): Promise<DatasetRow | null>;
-  abstract findStalePendingUploads(input: {
+  findStalePendingUploads(input: {
     projectId: string;
     olderThan: Instant;
   }): Promise<DatasetRow[]>;
-  abstract findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>>;
-  abstract listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
+  findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>>;
+  listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: Array<DatasetRow & { _count: { datasetRecords: number } }>;
     total: number;
   }>;

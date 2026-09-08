@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import { type ChunkOffset, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
 import {
   type DatasetMutationRecord,
@@ -79,7 +79,7 @@ export class DatasetChunkDeleteService {
         : null;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
-      const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
+      const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
 
       const chunkCount = current.chunkCount ?? 0;

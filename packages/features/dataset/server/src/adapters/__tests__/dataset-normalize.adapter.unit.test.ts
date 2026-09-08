@@ -44,7 +44,7 @@ const makeStorage = (overrides: Record<string, unknown> = {}) => {
 };
 
 const makeRepo = (dataset: Record<string, unknown> | null) => ({
-  tryFindOne: vi.fn().mockResolvedValue(dataset),
+  findOne: vi.fn().mockResolvedValue(dataset),
   update: vi.fn().mockResolvedValue({}),
 });
 

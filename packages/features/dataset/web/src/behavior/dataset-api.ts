@@ -231,7 +231,7 @@ export type DatasetApiMap = {
  * `createFeatureApi` for why separate instances still share cache entries.
  *
  * INTERNAL to this package by convention: hooks here call it, and screens call
- * the hooks. It is exported from `screens/datasets` only so the process shell
+ * the hooks. It is exported from `./datasets` only so the process shell
  * can mount `datasetApi.Provider`.
  */
 export const datasetApi = createFeatureApi<DatasetApiMap>();

@@ -1,6 +1,6 @@
-import { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import { type Instant, toDate } from "@langwatch/time";
-import { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
+import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import {
   datasetSchema,
   type Dataset,
@@ -42,14 +42,14 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
     ...overrides,
   });
 
-class MemoryDatasetRepository extends DatasetRepository {
+class MemoryDatasetRepository implements DatasetRepository {
   dataset = makeDataset();
-  async tryFindById(input: { id: string; projectId: string }): Promise<Dataset | null> {
+  async findById(input: { id: string; projectId: string }): Promise<Dataset | null> {
     return this.dataset.id === input.id && this.dataset.projectId === input.projectId
       ? this.dataset
       : null;
   }
-  async tryFindBySlug(input: { slug: string; projectId: string }): Promise<Dataset | null> {
+  async findBySlug(input: { slug: string; projectId: string }): Promise<Dataset | null> {
     return this.dataset.slug === input.slug && this.dataset.projectId === input.projectId
       ? this.dataset
       : null;
@@ -113,7 +113,7 @@ class MemoryDatasetRepository extends DatasetRepository {
   }
 }
 
-class MemoryRecordRepository extends DatasetRecordRepository {
+class MemoryRecordRepository implements DatasetRecordRepository {
   records: DatasetRecord[] = [];
   async list(): Promise<{ records: DatasetRecord[]; total: number }> {
     return { records: this.records, total: this.records.length };

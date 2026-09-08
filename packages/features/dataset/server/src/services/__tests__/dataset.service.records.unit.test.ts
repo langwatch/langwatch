@@ -37,8 +37,8 @@ function service(overrides: { columnTypes?: { name: string; type: string }[] } =
   }));
 
   const repository = {
-    tryFindById: async ({ id }: { id: string }) => (id === row.id ? row : null),
-    tryFindBySlug: async ({ slug }: { slug: string }) => (slug === row.slug ? row : null),
+    findById: async ({ id }: { id: string }) => (id === row.id ? row : null),
+    findBySlug: async ({ slug }: { slug: string }) => (slug === row.slug ? row : null),
     update,
   } as unknown as DatasetRepository;
 

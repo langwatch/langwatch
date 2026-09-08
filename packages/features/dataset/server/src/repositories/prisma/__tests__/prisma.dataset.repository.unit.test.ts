@@ -28,7 +28,7 @@ describe("PrismaDatasetRepository", () => {
         const findMany = vi.fn().mockResolvedValue([row("a", 2), row("b", 0), row("c", 7)]);
         const prisma = { dataset: { findMany } } as unknown as PrismaClient;
 
-        const listed = await PrismaDatasetRepository.create(prisma).list({
+        const listed = await PrismaDatasetRepository.create({ prisma }).list({
           projectId: "project-1",
           page: 2,
           limit: 5,

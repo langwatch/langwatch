@@ -11,7 +11,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { DatasetContentPort } from "../ports/dataset.port.ts";
 import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 import { DatasetChunkCountMissingError, DatasetNotReadyError } from "@langwatch/dataset-contract";

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
-import { DatasetRecordRepository } from "../dataset-record.repository.ts";
-import { DatasetRepository } from "../dataset.repository.ts";
+import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import type { DatasetRepository } from "../dataset.repository.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import { DatasetUploadPort } from "../../ports/dataset.port.ts";
 
@@ -28,9 +28,9 @@ const row = (): Dataset =>
     chunkCount: null,
     chunkOffsets: null,
   });
-class Repo extends DatasetRepository {
-  tryFindById = vi.fn(async () => row());
-  tryFindBySlug = vi.fn(async () => row());
+class Repo implements DatasetRepository {
+  findById = vi.fn(async () => row());
+  findBySlug = vi.fn(async () => row());
   list = vi.fn(async () => []);
   create = vi.fn(async () => row());
   update = vi.fn(async () => row());
@@ -39,7 +39,7 @@ class Repo extends DatasetRepository {
   updateMapping = vi.fn(async () => row());
   count = vi.fn(async () => 0);
 }
-class Records extends DatasetRecordRepository {
+class Records implements DatasetRecordRepository {
   list = vi.fn(async () => ({ records: [], total: 0 }));
   createMany = vi.fn(async () => []);
   update = vi.fn(async () => {

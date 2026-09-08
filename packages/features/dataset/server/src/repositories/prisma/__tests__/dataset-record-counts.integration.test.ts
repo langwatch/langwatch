@@ -48,7 +48,7 @@ const database = (): PrismaClient => {
   return connection.client;
 };
 
-const datasets = () => PrismaDatasetContentRepository.create(database());
+const datasets = () => PrismaDatasetContentRepository.create({ prisma: database() });
 
 /** The reads that touched the entries table since the last arrangement. */
 const entryReads = (): PrismaQueryContext[] =>

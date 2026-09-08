@@ -1,7 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import {
-  DatasetService as DatasetServiceContract,
   copyDatasetInputSchema,
   datasetLookupInputSchema,
   listDatasetsInputSchema,
@@ -62,7 +61,7 @@ export type DatasetServiceOptions = {
   generateId?: () => string;
 };
 
-export class DatasetService extends DatasetServiceContract {
+export class DatasetService {
   private readonly generateId: () => string;
 
   private readonly records: DatasetRecordService;
@@ -70,7 +69,6 @@ export class DatasetService extends DatasetServiceContract {
   private readonly naming: DatasetNamingService;
 
   private constructor(private readonly options: DatasetServiceOptions) {
-    super();
     this.generateId = options.generateId ?? nanoid;
     this.naming = DatasetNamingService.create(options.repository);
     this.records = DatasetRecordService.create({
@@ -96,7 +94,7 @@ export class DatasetService extends DatasetServiceContract {
         slugOrId: parsed.datasetId,
       });
       this.assertReady(existing);
-      const conflict = await this.options.repository.tryFindBySlug({
+      const conflict = await this.options.repository.findBySlug({
         projectId: parsed.projectId,
         slug,
         excludeId: existing.id,
@@ -129,7 +127,7 @@ export class DatasetService extends DatasetServiceContract {
       return this.options.repository.update(update);
     }
 
-    const conflict = await this.options.repository.tryFindBySlug({
+    const conflict = await this.options.repository.findBySlug({
       projectId: parsed.projectId,
       slug,
     });
@@ -168,11 +166,11 @@ export class DatasetService extends DatasetServiceContract {
   async getBySlugOrId(input: DatasetLookupInput): Promise<Dataset> {
     const parsed = datasetLookupInputSchema.parse(input);
     const dataset =
-      (await this.options.repository.tryFindById({
+      (await this.options.repository.findById({
         id: parsed.slugOrId,
         projectId: parsed.projectId,
       })) ??
-      (await this.options.repository.tryFindBySlug({
+      (await this.options.repository.findBySlug({
         projectId: parsed.projectId,
         slug: parsed.slugOrId,
       }));
@@ -259,7 +257,7 @@ export class DatasetService extends DatasetServiceContract {
     datasetId: string;
     projectId: string;
   }): Promise<{ success: true }> {
-    const dataset = await this.options.repository.tryFindById({
+    const dataset = await this.options.repository.findById({
       id: input.datasetId,
       projectId: input.projectId,
       includeArchived: true,

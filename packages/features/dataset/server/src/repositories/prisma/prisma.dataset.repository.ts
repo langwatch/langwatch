@@ -6,13 +6,12 @@ import {
   type Dataset,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
-import {
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type {
+  DatasetCreateInput,
   DatasetRepository,
-  type DatasetCreateInput,
-  type DatasetUpdateInput,
+  DatasetUpdateInput,
 } from "../dataset.repository.ts";
-
-type Database = Pick<PrismaClient, "dataset">;
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -20,16 +19,17 @@ type Database = Pick<PrismaClient, "dataset">;
  */
 export type DatasetDatabase = Pick<PrismaClient, "dataset">;
 
-export class PrismaDatasetRepository extends DatasetRepository {
-  private constructor(private readonly database: Database) {
-    super();
+export class PrismaDatasetRepository
+  extends PrismaRepository.for("Dataset")
+  implements DatasetRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaDatasetRepository(prisma));
+
+  private get database(): DatasetDatabase {
+    return this.prisma;
   }
 
-  static create(database: Database): PrismaDatasetRepository {
-    return new PrismaDatasetRepository(database);
-  }
-
-  async tryFindById(input: {
+  async findById(input: {
     id: string;
     projectId: string;
     includeArchived?: boolean;
@@ -44,7 +44,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
     return row ? toDataset(row) : null;
   }
 
-  async tryFindBySlug(input: {
+  async findBySlug(input: {
     slug: string;
     projectId: string;
     excludeId?: string;
@@ -112,7 +112,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
     if (row.count === 0) {
       throw new Error("Dataset was not found while archiving");
     }
-    const archived = await this.tryFindById({
+    const archived = await this.findById({
       id: input.id,
       projectId: input.projectId,
       includeArchived: true,
@@ -127,7 +127,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
       data: { slug: input.slug, archivedAt: null },
     });
     if (changed.count === 0) throw new Error("Dataset was not found while restoring");
-    const restored = await this.tryFindById({
+    const restored = await this.findById({
       id: input.id,
       projectId: input.projectId,
       includeArchived: true,
@@ -146,7 +146,7 @@ export class PrismaDatasetRepository extends DatasetRepository {
       data: { mapping: input.mapping as Prisma.InputJsonValue },
     });
     if (changed.count === 0) throw new Error("Dataset was not found while updating mapping");
-    const updated = await this.tryFindById({
+    const updated = await this.findById({
       id: input.id,
       projectId: input.projectId,
       includeArchived: true,

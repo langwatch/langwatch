@@ -27,9 +27,16 @@ export class UploadValidationError extends Error {
   }
 }
 
-export class DatasetNotFoundError extends Error {
+/**
+ * The dataset the caller named is archived, in another project, or gone. The
+ * caller can act on it — pick another dataset — so it crosses the boundary as
+ * a handled 404 rather than an unknown failure (ADR-045).
+ */
+export class DatasetNotFoundError extends HandledError {
+  declare readonly code: "dataset_not_found";
+
   constructor(message = "Dataset not found") {
-    super(message);
+    super("dataset_not_found", message, { httpStatus: 404, fault: "customer" });
     this.name = "DatasetNotFoundError";
   }
 }
@@ -109,9 +116,15 @@ export class DatasetStaleColumnsError extends HandledError {
 /**
  * Thrown when a write would persist two rows with the same id.
  */
-export class DuplicateRecordIdError extends Error {
+export class DuplicateRecordIdError extends HandledError {
+  declare readonly code: "dataset_duplicate_record_id";
+
   constructor(id: string) {
-    super(`Duplicate record id "${id}" in the same write`);
+    super("dataset_duplicate_record_id", `Duplicate record id "${id}" in the same write`, {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { recordId: id },
+    });
     this.name = "DuplicateRecordIdError";
   }
 }
@@ -237,12 +250,18 @@ export class DatasetNotRetryableError extends Error {
  * Thrown when a chunk rewrite (edit) would produce a single chunk object larger than
  * `CHUNK_MAX_BYTES`, breaking the size invariant (Decision 2).
  */
-export class ChunkTooLargeError extends Error {
+export class ChunkTooLargeError extends HandledError {
+  declare readonly code: "dataset_chunk_too_large";
+
   readonly byteSize: number;
   readonly maxBytes: number;
 
   constructor({ byteSize, maxBytes }: { byteSize: number; maxBytes: number }) {
-    super("Edit would exceed the maximum chunk size");
+    super("dataset_chunk_too_large", "Edit would exceed the maximum chunk size", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { byteSize, maxBytes },
+    });
     this.name = "ChunkTooLargeError";
     this.byteSize = byteSize;
     this.maxBytes = maxBytes;
@@ -253,12 +272,18 @@ export class ChunkTooLargeError extends Error {
  * Thrown when a full (unbounded) export of an s3_jsonl dataset would have to materialize more
  * bytes than `DATASET_FULL_EXPORT_MAX_BYTES` in heap.
  */
-export class DatasetTooLargeToExportError extends Error {
+export class DatasetTooLargeToExportError extends HandledError {
+  declare readonly code: "dataset_too_large_to_export";
+
   readonly sizeBytes: number;
   readonly maxBytes: number;
 
   constructor({ sizeBytes, maxBytes }: { sizeBytes: number; maxBytes: number }) {
-    super("This dataset is too large to export here; streaming export is coming");
+    super(
+      "dataset_too_large_to_export",
+      "This dataset is too large to export here; streaming export is coming",
+      { httpStatus: 413, fault: "customer", meta: { sizeBytes, maxBytes } },
+    );
     this.name = "DatasetTooLargeToExportError";
     this.sizeBytes = sizeBytes;
     this.maxBytes = maxBytes;

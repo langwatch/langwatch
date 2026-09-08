@@ -11,7 +11,11 @@
  * visible to the sweep.
  */
 import { z } from "zod";
-import { datasetRecordFormSchema, datasetRecordInputSchema } from "./dataset.ts";
+import {
+  datasetRecordFormSchema,
+  datasetRecordInputSchema,
+  newDatasetEntriesSchema,
+} from "./dataset.ts";
 import type { Dataset, DatasetNameResult, DatasetSummary } from "./dataset.ts";
 
 /**
@@ -86,6 +90,47 @@ export const datasetApiCopyInputSchema = z.object({
   datasetId: z.string(),
   sourceProjectId: z.string(),
   projectId: z.string(),
+});
+
+/** `datasetRecord.create`: new entries appended to a dataset. */
+export const datasetRecordApiCreateInputSchema = z.intersection(
+  z.object({ projectId: z.string(), datasetId: z.string() }),
+  newDatasetEntriesSchema,
+);
+
+/** `datasetRecord.update`: one entry replaced, or created, by id. */
+export const datasetRecordApiUpdateInputSchema = z.object({
+  projectId: z.string(),
+  datasetId: z.string(),
+  recordId: z.string(),
+  updatedRecord: z.record(z.string(), z.any()),
+});
+
+/** One dataset inside one project: what the whole-dataset reads name. */
+export const datasetRecordApiLookupInputSchema = z.object({
+  projectId: z.string(),
+  datasetId: z.string(),
+});
+
+/** `datasetRecord.listPaginated`: the editor's classic page N of M. */
+export const datasetRecordApiPageInputSchema = z.object({
+  projectId: z.string(),
+  datasetId: z.string(),
+  page: z.number().int().positive().default(1),
+  limit: z.number().int().positive().max(200).default(50),
+});
+
+/** `datasetRecord.deleteMany`: entries removed by id. */
+export const datasetRecordApiDeleteManyInputSchema = z.object({
+  projectId: z.string(),
+  datasetId: z.string(),
+  recordIds: z.array(z.string()),
+});
+
+/** `batchRecord.getAllByexperimentSlug`: one experiment, named by its URL slug. */
+export const batchRecordApiExperimentSlugInputSchema = z.object({
+  projectId: z.string(),
+  experimentSlug: z.string(),
 });
 
 export type DatasetApiUpsertBaseInput = z.infer<typeof datasetApiUpsertBaseInputSchema>;

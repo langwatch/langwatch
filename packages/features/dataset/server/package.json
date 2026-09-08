@@ -27,17 +27,19 @@
   },
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project packages/features/dataset/server/tsconfig.json && tsc --noEmit",
-    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\" --exclude \"**/*.contract.test.ts\"",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\" --exclude \"**/*.contract.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@aws-sdk/client-s3": "^3.826.0",
     "@aws-sdk/s3-request-presigner": "^3.826.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -52,6 +54,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/papaparse": "^5.3.15",
     "typescript": "^7.0.2",

@@ -23,7 +23,7 @@ export class DatasetNamingService {
   async validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
     const parsed = datasetNameInputSchema.parse(input);
     const slug = datasetSlugOf(parsed.proposedName);
-    const conflict = await this.repository.tryFindBySlug({
+    const conflict = await this.repository.findBySlug({
       projectId: parsed.projectId,
       slug,
       excludeId: parsed.excludeDatasetId,

@@ -1,11 +1,12 @@
 import type { DatasetRow } from "../../ports/dataset.port.ts";
 import { type Instant, toDate } from "@langwatch/time";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import {
+import { prismaTables } from "@langwatch/prisma-client/ownership";
+import type {
+  CreateDatasetInput,
   DatasetContentRepository,
-  type CreateDatasetInput,
-  type DatasetContentUpdate,
-  type UpdateDatasetInput,
+  DatasetContentUpdate,
+  UpdateDatasetInput,
 } from "../dataset-content.repository.ts";
 
 /**
@@ -49,18 +50,23 @@ const storesRowsInRecordsTable = (dataset: CountableDataset): boolean =>
   dataset.contentLayout !== "s3_jsonl" && !dataset.useS3;
 
 /** Private Prisma owner for Dataset rows and their object-storage counters. */
-export class PrismaDatasetContentRepository extends DatasetContentRepository {
+export class PrismaDatasetContentRepository implements DatasetContentRepository {
+  /**
+   * Declared rather than inherited from `PrismaRepository.for`: this repository
+   * opens its own advisory-locked transaction and runs `$executeRaw` inside it,
+   * and the model-scoped client that base class hands over carries neither.
+   */
+  static readonly tables = prismaTables("Dataset", "DatasetRecord");
+
+  static create({ prisma }: { prisma: DatasetContentDatabase }): PrismaDatasetContentRepository {
+    return new PrismaDatasetContentRepository(prisma, prisma);
+  }
+
   private constructor(
     private readonly prisma: DatasetContentClient,
     /** Absent on a transaction-scoped instance — only the root can open one. */
     private readonly root: DatasetContentDatabase | null,
-  ) {
-    super();
-  }
-
-  static create(prisma: DatasetContentDatabase): PrismaDatasetContentRepository {
-    return new PrismaDatasetContentRepository(prisma, prisma);
-  }
+  ) {}
 
   /**
    * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock inside
@@ -94,7 +100,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Finds a single dataset by id within a project.
    */
-  async tryFindOne(input: { id: string; projectId: string }): Promise<DatasetRow | null> {
+  async findOne(input: { id: string; projectId: string }): Promise<DatasetRow | null> {
     const client = this.prisma;
     return await client.dataset.findFirst({
       where: {
@@ -109,7 +115,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * s3_jsonl write-mutations re-read the row inside the advisory lock, where a
    * miss is an invariant violation — the throwing counterpart to {@link findOne}.
    */
-  async findOneOrThrow(input: { id: string; projectId: string }): Promise<DatasetRow> {
+  async getOne(input: { id: string; projectId: string }): Promise<DatasetRow> {
     const client = this.prisma;
     return await client.dataset.findFirstOrThrow({
       where: {
@@ -122,7 +128,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Finds dataset by slug within a project.
    */
-  async tryFindBySlug(input: {
+  async findBySlug(input: {
     slug: string;
     projectId: string;
     excludeId?: string;
@@ -285,7 +291,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * route uses this to refuse a stream into a `staging/` slot no row claims.
    * `stagingKey` is server-minted and bound at presign time.
    */
-  async tryFindPendingUploadByStagingKey(input: {
+  async findPendingUploadByStagingKey(input: {
     projectId: string;
     stagingKey: string;
   }): Promise<DatasetRow | null> {

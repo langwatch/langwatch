@@ -1,84 +1,98 @@
 /**
  * The dataset feature's application: what all four of its doors call.
  *
- * It holds every service and port the feature needs, and it is the one typed
- * thing a transport is given. Before it, `dataset.api.ts` declared
- * `Readonly<{ dataset: DatasetService; experiments: ... }>`,
- * `dataset-record.api.ts` declared `Readonly<{ dataset: DatasetService }>`,
- * `batch-record.api.ts` declared `Readonly<{ experiments: ... }>`, and the REST
- * family took a bare `() => DatasetService` — four descriptions of one bag,
- * agreeing by attention rather than by construction.
- *
  * Most operations are the service's own and are reached straight through. What
  * lives here as behaviour is what a door would otherwise have to know: how an
- * INCOMPLETE upsert is completed. Both doors had a fill of their own for that
- * hole — the tRPC door borrowed the name of the experiment the caller named,
- * the REST patch borrowed the name and columns of the dataset it was replacing
- * — so "what a partial upsert means" was decided in two places and could
- * answer differently the first time one moved.
+ * INCOMPLETE upsert is completed, and whose reach a copy out of a SECOND
+ * project is checked against. Both doors had a fill of their own for the first
+ * — the tRPC door borrowed the name of the experiment the caller named, the
+ * REST patch borrowed the name and columns of the dataset it was replacing —
+ * so "what a partial upsert means" was decided in two places and could answer
+ * differently the first time one moved.
  *
- * What is NOT here: the wire mapping each door owns. A missing dataset reads
- * as `null` on the tRPC read and as 404 over REST; a not-ready dataset is
- * `PRECONDITION_FAILED` on one and 425 on the other. Those are translations of
- * one domain failure into two contracts, and they belong to the contract that
- * is being spoken. Each door also keeps its own read ceiling, because a byte
- * budget is what a door ASKS for, not what the dataset is.
+ * What is NOT here: the wire mapping each door owns. Each door also keeps its
+ * own read ceiling, because a byte budget is what a door ASKS for, not what
+ * the dataset is.
  *
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
-import type {
-  AbortPendingUploadInput,
-  CopyDatasetInput,
-  CreateDatasetFromUploadInput,
-  CreateDatasetFromUploadResult,
-  CreateDatasetRecordsInput,
-  Dataset,
-  DatasetColumns,
-  DatasetEntrySelection,
-  DatasetHead,
-  DatasetLookupInput,
-  DatasetListResult,
-  DatasetNameInput,
-  DatasetNameResult,
-  DatasetPage,
-  DatasetPageInput,
-  DatasetRecord,
-  DatasetRecordMutationResult,
-  DatasetRecordPage,
-  DatasetService,
-  DatasetWithRecords,
-  DeleteDatasetRecordsInput,
-  FinalizeUploadInput,
-  ListDatasetsInput,
-  PendingUploadInput,
-  PendingUploadResult,
-  RetryNormalizeInput,
-  StagedUploadInput,
-  UpdateDatasetRecordInput,
-  UploadExistingDatasetInput,
-  UpsertDatasetInput,
+import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import {
+  DatasetApi,
+  type AbortPendingUploadInput,
+  type BatchEvaluationRecord,
+  type BatchEvaluationSummary,
+  type CopyDatasetInput,
+  type CreateDatasetFromUploadInput,
+  type CreateDatasetFromUploadResult,
+  type CreateDatasetRecordsInput,
+  type Dataset,
+  type DatasetColumns,
+  type DatasetEntrySelection,
+  type DatasetHead,
+  type DatasetListResult,
+  type DatasetLookupInput,
+  type DatasetNameInput,
+  type DatasetNameResult,
+  type DatasetPage,
+  type DatasetPageInput,
+  type DatasetRecord,
+  type DatasetRecordMutationResult,
+  type DatasetRecordPage,
+  type DatasetWithRecords,
+  type DeleteDatasetRecordsInput,
+  type FinalizeUploadInput,
+  type ListDatasetsInput,
+  type PendingUploadInput,
+  type PendingUploadResult,
+  type RetryNormalizeInput,
+  type StagedUploadInput,
+  type UpdateDatasetRecordInput,
+  type UploadExistingDatasetInput,
+  type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
+import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+
+import { DatasetContentAdapter } from "../adapters/dataset-content.adapter.ts";
+import { DatasetNormalizeAdapter } from "../adapters/dataset-normalize.adapter.ts";
+import { DatasetUploadAdapter } from "../adapters/dataset-upload.adapter.ts";
+import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
+import type {
+  DatasetContentPort,
+  DatasetNormalizeQueuePort,
+  DatasetUploadPort,
+} from "../ports/dataset.port.ts";
+import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
+import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
+import { DatasetService } from "../services/dataset.service.ts";
 
 /**
- * The two experiment reads this feature makes. Declared structurally: Dataset
- * borrows a name from an experiment and turns a URL slug into the id batch
- * records are keyed by, and depends on nothing else the experiment feature
- * owns.
+ * What the composing process owns and this feature may not build for itself.
+ *
+ * Every member is optional because a single-node self-hosted deployment has no
+ * object storage at all (ADR-032): with no resolver the feature still serves
+ * every relational dataset and refuses the direct-upload doors by name.
  */
-export type DatasetExperimentLookup = Readonly<{
-  getById(
-    input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<Readonly<{ name: string | null }>>;
-  tryGetBySlug(
-    input: Readonly<{ projectId: string; slug: string }>,
-  ): Promise<Readonly<{ id: string }> | null>;
-}>;
-
-/** What the process composes this feature's application from. */
-export interface DatasetAppDependencies {
-  dataset: DatasetService;
-  experiments: DatasetExperimentLookup;
+export interface DatasetInfrastructure {
+  /** Where a project's dataset content is stored, when the deployment has any. */
+  readonly storageResolver?: DatasetStorageResolverPort;
+  /** A process-supplied upload port, in place of the resolver-built one. */
+  readonly storage?: DatasetUploadPort;
+  /** Where normalize work is queued; the in-process service when absent. */
+  readonly queue?: DatasetNormalizeQueuePort;
+  /** A process-supplied content port, in place of the resolver-built one. */
+  readonly content?: DatasetContentPort;
+  /** The identifier format a new entry is written under. */
+  readonly generateId?: () => string;
 }
+
+type DatasetSetup = FeatureSetup<
+  typeof DatasetApp.dependencies,
+  DatasetInfrastructure,
+  undefined,
+  DatasetRepositories
+>;
 
 /**
  * A create-or-replace, as a door has it: possibly naming the dataset by slug
@@ -102,12 +116,66 @@ export interface DatasetUpsertInput {
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
 }
 
-export class DatasetApp {
-  static create(dependencies: DatasetAppDependencies): DatasetApp {
-    return new DatasetApp(dependencies);
+export class DatasetApp implements DatasetApi {
+  static readonly contract = DatasetApi;
+  static readonly dependencies = { experiments: ExperimentApi, permissions: AuthzApi };
+
+  #datasets: DatasetService;
+  #normalization: DatasetNormalizationService | null;
+  #batchEvaluations: DatasetRepositories["batchEvaluations"];
+  #experiments: ExperimentApi;
+  #permissions: AuthzApi;
+
+  private constructor(
+    repositories: DatasetRepositories,
+    dependencies: DatasetSetup["dependencies"],
+    infrastructure: DatasetInfrastructure,
+  ) {
+    const resolver = infrastructure.storageResolver;
+
+    this.#normalization = resolver
+      ? DatasetNormalizationService.create({
+          datasets: repositories.content,
+          normalize: DatasetNormalizeAdapter.create({
+            repository: repositories.content,
+            getStorage: (projectId) => resolver.forProject(projectId),
+          }),
+        })
+      : null;
+
+    this.#datasets = DatasetService.create({
+      repository: repositories.datasets,
+      records: repositories.records,
+      uploads:
+        infrastructure.storage ??
+        (resolver
+          ? DatasetUploadAdapter.create({
+              datasets: repositories.content,
+              records: repositories.recordContent,
+              storageResolver: resolver,
+            })
+          : undefined),
+      queue: infrastructure.queue ?? this.#normalization ?? undefined,
+      content:
+        infrastructure.content ??
+        (resolver
+          ? DatasetContentAdapter.create({
+              datasets: repositories.content,
+              storageResolver: resolver,
+            })
+          : undefined),
+      storageResolver: resolver,
+      generateId: infrastructure.generateId,
+    });
+
+    this.#batchEvaluations = repositories.batchEvaluations;
+    this.#experiments = dependencies.experiments;
+    this.#permissions = dependencies.permissions;
   }
 
-  private constructor(private readonly dependencies: DatasetAppDependencies) {}
+  static create({ repositories, dependencies, infrastructure }: DatasetSetup): DatasetApp {
+    return new DatasetApp(repositories, dependencies, infrastructure);
+  }
 
   // ── Datasets ─────────────────────────────────────────────────────────────
 
@@ -128,7 +196,7 @@ export class DatasetApp {
    */
   async upsertDataset(input: DatasetUpsertInput): Promise<Dataset> {
     const replacing = input.slugOrId
-      ? await this.dependencies.dataset.getBySlugOrId({
+      ? await this.#datasets.getBySlugOrId({
           projectId: input.projectId,
           slugOrId: input.slugOrId,
         })
@@ -137,7 +205,7 @@ export class DatasetApp {
     const borrowed =
       input.name === undefined && input.experimentId !== undefined
         ? (
-            await this.dependencies.experiments.getById({
+            await this.#experiments.getById({
               projectId: input.projectId,
               id: input.experimentId,
             })
@@ -156,7 +224,7 @@ export class DatasetApp {
       );
     }
 
-    return this.dependencies.dataset.upsertDataset({
+    return this.#datasets.upsertDataset({
       projectId: input.projectId,
       name,
       columnTypes: input.columnTypes ?? replacing?.columnTypes ?? [],
@@ -167,22 +235,36 @@ export class DatasetApp {
 
   /** The slug a proposed name would get, and whether it is available. */
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
-    return this.dependencies.dataset.validateDatasetName(input);
+    return this.#datasets.validateDatasetName(input);
   }
 
   /** The next free name for a proposed one. */
   findNextAvailableName(input: DatasetNameInput): Promise<string> {
-    return this.dependencies.dataset.findNextAvailableName(input);
+    return this.#datasets.findNextAvailableName(input);
   }
 
   /** A page of the project's non-archived datasets. */
   listDatasets(input: ListDatasetsInput): Promise<DatasetListResult> {
-    return this.dependencies.dataset.listDatasets(input);
+    return this.#datasets.listDatasets(input);
   }
 
   /** One dataset by slug or id. Missing or archived refuses. */
   getBySlugOrId(input: DatasetLookupInput): Promise<Dataset> {
-    return this.dependencies.dataset.getBySlugOrId(input);
+    return this.#datasets.getBySlugOrId(input);
+  }
+
+  /** Several datasets by id, for the references an evaluation names. */
+  getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]> {
+    return this.#datasets.getByIds(input);
+  }
+
+  /** A dataset renamed in place, keeping its columns and its entries. */
+  renameDataset(input: {
+    datasetId: string;
+    projectId: string;
+    name: string;
+  }): Promise<Dataset> {
+    return this.#datasets.renameDataset(input);
   }
 
   /** The trace and thread mapping a dataset is filled from. */
@@ -192,22 +274,52 @@ export class DatasetApp {
     mapping?: { mapping: Record<string, unknown>; expansions: string[] };
     threadMapping?: { mapping: Record<string, unknown> };
   }): Promise<Dataset> {
-    return this.dependencies.dataset.updateMapping(input);
+    return this.#datasets.updateMapping(input);
   }
 
   /** Archives a dataset. */
   archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }> {
-    return this.dependencies.dataset.archiveDataset(input);
+    return this.#datasets.archiveDataset(input);
   }
 
   /** Restores a dataset the caller just archived. */
   restoreDataset(input: { datasetId: string; projectId: string }): Promise<{ success: true }> {
-    return this.dependencies.dataset.restoreDataset(input);
+    return this.#datasets.restoreDataset(input);
   }
 
   /** The same dataset in another project, records and all. */
   copyDataset(input: CopyDatasetInput): Promise<Dataset> {
-    return this.dependencies.dataset.copyDataset(input);
+    return this.#datasets.copyDataset(input);
+  }
+
+  /**
+   * The same copy, on behalf of a person.
+   *
+   * A copy reads a SECOND project — the source — that a door's declared check
+   * never covers, so the person's reach into it is probed here, where the read
+   * is made. Holding create on a project implies being able to read its
+   * datasets, which is what a copy does.
+   */
+  async copyDatasetForActor(input: CopyDatasetInput & { actorId: string }): Promise<Dataset> {
+    const permitted = await this.#permissions.hasPermission({
+      userId: input.actorId,
+      permission: "datasets:create",
+      projectId: input.sourceProjectId,
+    });
+
+    if (!permitted) {
+      throw new PermissionDeniedError({
+        permission: "datasets:create",
+        scope: { type: "project", id: input.sourceProjectId },
+        denialReason: "no-binding",
+      });
+    }
+
+    return this.#datasets.copyDataset({
+      sourceDatasetId: input.sourceDatasetId,
+      sourceProjectId: input.sourceProjectId,
+      targetProjectId: input.targetProjectId,
+    });
   }
 
   // ── Records ──────────────────────────────────────────────────────────────
@@ -217,7 +329,6 @@ export class DatasetApp {
    * the slice the caller asked for. Both stay arguments: the editor, an export
    * and an evaluation run all want a different budget, and a run reads the
    * first, the last, a random or every entry depending on how it was set up.
-   * The dataset has no opinion about either.
    */
   getDatasetWithRecords(
     input: DatasetLookupInput & {
@@ -225,39 +336,39 @@ export class DatasetApp {
       entrySelection?: DatasetEntrySelection;
     },
   ): Promise<DatasetWithRecords> {
-    return this.dependencies.dataset.getDatasetWithRecords(input);
+    return this.#datasets.getDatasetWithRecords(input);
   }
 
   /** One page of a dataset's records, plus the authoritative total. */
   getDatasetPage(input: DatasetPageInput): Promise<DatasetPage> {
-    return this.dependencies.dataset.getDatasetPage(input);
+    return this.#datasets.getDatasetPage(input);
   }
 
   /** The first entries plus the authoritative total, for previews. */
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead> {
-    return this.dependencies.dataset.getDatasetHead(input);
+    return this.#datasets.getDatasetHead(input);
   }
 
   /** One page of records on their own. */
   listRecords(input: DatasetPageInput): Promise<DatasetRecordPage> {
-    return this.dependencies.dataset.listRecords(input);
+    return this.#datasets.listRecords(input);
   }
 
   /** New entries appended to a dataset. */
   batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
-    return this.dependencies.dataset.batchCreateRecords(input);
+    return this.#datasets.batchCreateRecords(input);
   }
 
   /** One entry replaced, or created, by id. */
   upsertRecord(
     input: UpdateDatasetRecordInput & { recordId: string },
   ): Promise<DatasetRecordMutationResult> {
-    return this.dependencies.dataset.upsertRecord(input);
+    return this.#datasets.upsertRecord(input);
   }
 
   /** Entries removed by id. */
   deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }> {
-    return this.dependencies.dataset.deleteRecords(input);
+    return this.#datasets.deleteRecords(input);
   }
 
   // ── Uploads ──────────────────────────────────────────────────────────────
@@ -266,56 +377,71 @@ export class DatasetApp {
   createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult> {
-    return this.dependencies.dataset.createDatasetFromUpload(input);
+    return this.#datasets.createDatasetFromUpload(input);
   }
 
   /** More rows for a dataset that already exists, from an uploaded file. */
   uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }> {
-    return this.dependencies.dataset.uploadToExistingDataset(input);
+    return this.#datasets.uploadToExistingDataset(input);
   }
 
   /** Starts a direct browser-to-storage upload. */
   createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
-    return this.dependencies.dataset.createPendingUpload(input);
+    return this.#datasets.createPendingUpload(input);
   }
 
   /** Streams a heavy upload into staging where storage is not browser-reachable. */
   writeStagedUpload(input: StagedUploadInput): Promise<void> {
-    return this.dependencies.dataset.writeStagedUpload(input);
+    return this.#datasets.writeStagedUpload(input);
   }
 
   /** Size-checks a direct upload and starts processing it. */
   finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }> {
-    return this.dependencies.dataset.finalizeUpload(input);
+    return this.#datasets.finalizeUpload(input);
   }
 
   /** Re-runs normalization for a failed or stuck dataset. */
   retryNormalize(input: RetryNormalizeInput): Promise<{ datasetId: string; status: "processing" }> {
-    return this.dependencies.dataset.retryNormalize(input);
+    return this.#datasets.retryNormalize(input);
   }
 
   /** Cleans up a still-pending upload whose transfer never landed. */
   abortPendingUpload(
     input: AbortPendingUploadInput,
   ): Promise<{ datasetId: string; aborted: true }> {
-    return this.dependencies.dataset.abortPendingUpload(input);
+    return this.#datasets.abortPendingUpload(input);
   }
 
-  // ── Experiments ──────────────────────────────────────────────────────────
+  // ── Batch evaluations ────────────────────────────────────────────────────
+
+  /** One row per experiment and dataset: how many ran, cost, mean score. */
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]> {
+    return this.#batchEvaluations.summariseByExperiment(input);
+  }
 
   /**
-   * The experiment a URL slug names, or null.
+   * Every batch-evaluation record of the experiment a URL slug names.
    *
-   * Held here so no door reaches a second feature's slice of the process bag
-   * to answer a dataset question: the batch-evaluation records a slug leads to
-   * are keyed by the experiment's id, and turning one into the other is the
-   * only thing this feature asks of Experiment.
+   * The slug-to-id read is the only thing this feature asks of Experiment, and
+   * it is made here so no door reaches a second feature to answer a dataset
+   * question.
    */
-  tryGetExperimentBySlug(
-    input: Readonly<{ projectId: string; slug: string }>,
-  ): Promise<Readonly<{ id: string }> | null> {
-    return this.dependencies.experiments.tryGetBySlug(input);
+  async listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]> {
+    const experiment = await this.#experiments.tryGetBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
+
+    if (!experiment) throw new ExperimentNotFoundError(input.experimentSlug);
+
+    return this.#batchEvaluations.findAllByExperiment({
+      projectId: input.projectId,
+      experimentId: experiment.id,
+    });
   }
 }

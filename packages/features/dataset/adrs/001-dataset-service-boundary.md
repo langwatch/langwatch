@@ -46,6 +46,11 @@ called, so a check installed earlier receives `input === undefined` and the
 authorization decision, the scope-lineage guard and the audit row all see
 nothing while still reporting success.
 
+Dataset also owns trace-to-record mapping state, default evaluator input mappings,
+legacy mapping conversion, and the prior-evaluation source predicate. Evaluator
+definitions remain independent of Dataset; Evaluation execution and Evaluator UI
+import mapping helpers directly from Dataset.
+
 ### Dependencies
 
 Dataset depends on no other product service for the core lifecycle. Future

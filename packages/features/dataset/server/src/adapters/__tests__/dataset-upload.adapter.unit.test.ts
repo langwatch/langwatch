@@ -11,7 +11,7 @@ import type {
 } from "../../ports/dataset-storage.port.ts";
 import type { DatasetRow } from "../../ports/dataset.port.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
-import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository.ts";
+import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import { DatasetUploadAdapter } from "../dataset-upload.adapter.ts";
 
 const PROJECT_ID = "project-1";
@@ -64,8 +64,8 @@ function harness({
 
   const updated: Record<string, unknown>[] = [];
   const datasets = {
-    tryFindOne: async ({ id }: { id: string }) => (row && row.id === id ? row : null),
-    tryFindBySlug: async ({ slug }: { slug: string }) => (row && row.slug === slug ? row : null),
+    findOne: async ({ id }: { id: string }) => (row && row.id === id ? row : null),
+    findBySlug: async ({ slug }: { slug: string }) => (row && row.slug === slug ? row : null),
     create: async (input: Record<string, unknown>) => {
       created.push(input);
       return datasetRow({ ...(input as Partial<DatasetRow>) });

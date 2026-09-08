@@ -5,7 +5,7 @@ import {
   type DatasetNormalizePayload,
   type DatasetNormalizationSender,
 } from "@langwatch/dataset-contract";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { DatasetNormalizePort } from "../ports/dataset-normalize.port.ts";
 import { UploadNotPendingError } from "@langwatch/dataset-contract";
 
@@ -44,7 +44,7 @@ export class DatasetNormalizationService
   }
 
   async enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void> {
-    const dataset = await this.datasets.findOneOrThrow({
+    const dataset = await this.datasets.getOne({
       id: input.datasetId,
       projectId: input.projectId,
     });

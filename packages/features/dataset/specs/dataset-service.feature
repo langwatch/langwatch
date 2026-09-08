@@ -41,6 +41,13 @@ Feature: Shared Dataset service
     Then the Dataset service uses injected storage and queue capabilities
     And it does not import an object-store client or global Prisma
 
+  @integration
+  Scenario: The memory and Postgres dataset repositories answer alike
+    Given the same datasets and entries written to each backend
+    When the same reads, archives, pages and deletes run against every backend
+    Then each answers the same rows, the same absences and the same totals
+    And neither answers with a dataset belonging to another project
+
   @unit
   Scenario: The dataset transports move without changing who may call them
     Given the dataset, dataset record and batch record tRPC surfaces
@@ -48,13 +55,11 @@ Feature: Shared Dataset service
     Then every procedure keeps the name its callers already use
     And every procedure keeps the access decision it declared before the move
 
-  @unit
-  Scenario: The declared check reads the validated input
-    Given a procedure authorized at the project its input names
-    When a permitted caller calls it
-    Then the authorization check resolves its scope from the parsed input
-    And the scope lineage guard is given the same input
-    And no procedure answers before a check has run
+  # Where the declared check reads its scope from is the tRPC runtime's own
+  # promise now, stated once at
+  # packages/api/specs/transport-declaration-split.feature: "A tRPC check reads
+  # the validated input, never the unparsed request". The dataset procedures
+  # declare the grant; they no longer wire the check.
 
   @unit
   Scenario: A copy is refused when the source project is not the caller's

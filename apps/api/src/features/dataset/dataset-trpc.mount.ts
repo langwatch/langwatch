@@ -1,74 +1,31 @@
-/**
- * Adds only the second-project permission probe for a copy and the
- * batch-evaluation reads; all three share one `ctx.app.dataset`.
- */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
+/** Binds the feature's declared procedures to this process's execution path. */
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
-  BatchRecordTrpcApi,
-  DatasetRecordTrpcApi,
-  DatasetTrpcApi,
-  type BatchRecordTrpcContext,
-  type BatchRecordTrpcPorts,
-  type DatasetRecordTrpcContext,
-  type DatasetTrpcContext,
-  type DatasetTrpcPorts,
+  batchRecordTrpcTransport,
+  datasetRecordTrpcTransport,
+  datasetTrpcTransport,
 } from "@langwatch/dataset-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Mounts `dataset.*` on the app process's tRPC root. */
-export function createDatasetTrpcRouter<
-  TContext extends DatasetTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<DatasetTrpcPorts>) {
-  const service = createTrpcApiService(mount);
-  return DatasetTrpcApi.create(
-    mount.root,
-    {
-      protected: service.protected,
-      policy: (permission) => service.policy(permission),
-      validateOutput: service.validateOutput,
-    },
-    mount.ports,
-  );
+/** The one slice of the process context these three namespaces read. */
+export interface DatasetHostContext {
+  app: Readonly<{ dataset: DatasetApi }>;
 }
 
-/** Mounts `datasetRecord.*` on the app process's tRPC root. */
-export function createDatasetRecordTrpcRouter<
-  TContext extends DatasetRecordTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
-  const service = createTrpcApiService(mount);
-  return DatasetRecordTrpcApi.create(mount.root, {
-    protected: service.protected,
-    policy: (permission) => service.policy(permission),
-    validateOutput: service.validateOutput,
-  });
-}
-
-/**
- * Mounts `batchRecord.*` on the tRPC root. `TSummaries`/`TRecords` are
- * inferred from the process's own reads so responses keep their real shapes.
- */
-export function createBatchRecordTrpcRouter<
-  TContext extends BatchRecordTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TSummaries,
-  TRecords,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<BatchRecordTrpcPorts<TSummaries, TRecords>>,
+export function createDatasetTrpcRouter<TContext extends DatasetHostContext>(
+  runtime: TrpcRuntime<TContext>,
 ) {
-  const service = createTrpcApiService(mount);
-  return BatchRecordTrpcApi.create(
-    mount.root,
-    {
-      protected: service.protected,
-      policy: (permission) => service.policy(permission),
-      validateOutput: service.validateOutput,
-    },
-    mount.ports,
-  );
+  return runtime.mount(datasetTrpcTransport, (ctx) => ctx.app.dataset);
+}
+
+export function createDatasetRecordTrpcRouter<TContext extends DatasetHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(datasetRecordTrpcTransport, (ctx) => ctx.app.dataset);
+}
+
+export function createBatchRecordTrpcRouter<TContext extends DatasetHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(batchRecordTrpcTransport, (ctx) => ctx.app.dataset);
 }

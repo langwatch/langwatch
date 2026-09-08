@@ -1,34 +1,10 @@
-export {
-  DatasetApp,
-  type DatasetAppDependencies,
-  type DatasetExperimentLookup,
-  type DatasetUpsertInput,
-} from "./app/dataset.app.ts";
-export {
-  DatasetTrpcApi,
-  type DatasetTrpcContext,
-  type DatasetTrpcPorts,
-} from "./transport/api-trpc/dataset.api.ts";
-export {
-  DatasetRecordTrpcApi,
-  type DatasetRecordTrpcContext,
-} from "./transport/api-trpc/dataset-record.api.ts";
-export {
-  BatchRecordTrpcApi,
-  type BatchRecordTrpcContext,
-  type BatchRecordTrpcPorts,
-} from "./transport/api-trpc/batch-record.api.ts";
-export {
-  createDatasetRestApp,
-  type DatasetDirectUploadAuthorization,
-  type DatasetDirectUploadAuthorizer,
-  type DatasetDirectUploadRequestReader,
-} from "./transport/api-rest/dataset.api.ts";
-export { createDatasetErrorHandler } from "./transport/api-rest/dataset-error-handler.api.ts";
-export {
-  PostgresDatasetAdapter,
-  type PostgresDatasetAdapterOptions,
-} from "./adapters/postgres.dataset.adapter.ts";
+export { DatasetApp, type DatasetInfrastructure, type DatasetUpsertInput } from "./app/dataset.app.ts";
+export { datasetServer } from "./dataset.server.ts";
+export { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
+export { datasetRecordTrpcTransport } from "./transport/dataset-record.trpc.ts";
+export { datasetTrpcTransport } from "./transport/dataset.trpc.ts";
+export { createDatasetRest } from "./transport/dataset.rest.ts";
+export { createDatasetErrorHandler } from "./transport/dataset-rest.errors.ts";
 export {
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
@@ -64,13 +40,8 @@ export {
 } from "./adapters/dataset-object-storage-resolver.adapter.ts";
 export { DatasetUploadAdapter } from "./adapters/dataset-upload.adapter.ts";
 export { DatasetContentAdapter } from "./adapters/dataset-content.adapter.ts";
-export {
-  PostgresDatasetMigrationAdapter,
-  type DatasetMigrationOutcome,
-  type DatasetMigrationRunResult,
-  type DatasetMigrationSummary,
-} from "./adapters/postgres.dataset-migration.adapter.ts";
 export { DatasetNormalizeAdapter } from "./adapters/dataset-normalize.adapter.ts";
+export { DatasetService } from "./services/dataset.service.ts";
 export { DatasetNormalizePort } from "./ports/dataset-normalize.port.ts";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service.ts";
 export * from "./rules/dataset-chunking.rules.ts";
@@ -83,11 +54,5 @@ export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./rules/dataset-chunk-lines.rule
 export * from "./rules/presigned-upload.rules.ts";
 export * from "./rules/dataset-sanitize.rules.ts";
 export * from "@langwatch/dataset-contract";
-export {
-  DATASET_GENERATE_FEATURE_KEY,
-  createDatasetGenerateRestApp,
-  type DatasetGenerateRestPorts,
-  type DatasetGenerateRestSession,
-} from "./transport/api-rest/dataset-generate.api.ts";
 
 export { DatasetContentBackfillTask } from "./tasks/dataset-content-backfill.task.ts";

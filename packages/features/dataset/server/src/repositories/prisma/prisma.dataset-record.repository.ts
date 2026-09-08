@@ -1,12 +1,12 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   datasetRecordSchema,
+  DatasetRecordNotFoundError,
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import { DatasetRecordRepository } from "../dataset-record.repository.ts";
-
-type Database = Pick<PrismaClient, "datasetRecord">;
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -14,13 +14,14 @@ type Database = Pick<PrismaClient, "datasetRecord">;
  */
 export type DatasetRecordDatabase = Pick<PrismaClient, "datasetRecord">;
 
-export class PrismaDatasetRecordRepository extends DatasetRecordRepository {
-  private constructor(private readonly database: Database) {
-    super();
-  }
+export class PrismaDatasetRecordRepository
+  extends PrismaRepository.for("DatasetRecord")
+  implements DatasetRecordRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaDatasetRecordRepository(prisma));
 
-  static create(database: Database): PrismaDatasetRecordRepository {
-    return new PrismaDatasetRecordRepository(database);
+  private get database(): DatasetRecordDatabase {
+    return this.prisma;
   }
 
   async list(input: {
@@ -80,11 +81,7 @@ export class PrismaDatasetRecordRepository extends DatasetRecordRepository {
       },
       data: { entry: input.entry as Prisma.InputJsonValue },
     });
-    if (changed.count === 0) {
-      const error = new Error("Dataset record not found");
-      error.name = "DatasetRecordNotFoundError";
-      throw error;
-    }
+    if (changed.count === 0) throw new DatasetRecordNotFoundError();
     const row = await this.database.datasetRecord.findFirstOrThrow({
       where: {
         id: input.id,

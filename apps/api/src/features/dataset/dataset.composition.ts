@@ -1,124 +1,65 @@
 /**
- * A project's datasets and the batch-evaluation rollups beside them, composed as their
- * own feature. `dataset.*` reads and writes the rows themselves; `batchRecord.*` answers
- * the two rollups an experiment's runs are summarised by.
+ * A project's datasets and the batch-evaluation rollups beside them, installed
+ * over this process's own graph. `dataset.*` and `datasetRecord.*` read and
+ * write the rows themselves; `batchRecord.*` answers the two rollups an
+ * experiment's runs are summarised by.
  */
-import type { DatasetService } from "@langwatch/dataset-contract";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import { datasetServer, type DatasetInfrastructure } from "@langwatch/dataset-server";
 import {
-  DatasetApp,
-  PostgresDatasetAdapter,
-  type BatchRecordTrpcPorts,
-  type DatasetExperimentLookup,
-  type DatasetTrpcPorts,
-} from "@langwatch/dataset-server";
-import { HandledError } from "@langwatch/handled-error";
+  ExperimentApi,
+  type ExperimentApi as ExperimentApiContract,
+} from "@langwatch/experiment-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp } from "@langwatch/runtime-composition";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
-import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount.ts";
-
-/**
- * The ONE dataset service on this process.
- */
-export function composeDatasetService(options: {
-  infrastructure: ApiTrpcInfrastructure;
-}): DatasetService {
-  return PostgresDatasetAdapter.create({ database: options.infrastructure.prisma }).build();
-}
-
-/** The other features' services the dataset surface reaches, named one by one. */
-export type DatasetPeers = Readonly<{
-  /**
-   * The dataset service the execution half already composed.
-   */
-  datasets: DatasetService;
-  /** The experiment lookup a dataset resolves a borrowed name through. */
-  experimentLookup: DatasetExperimentLookup;
-}>;
-
+import { mountDatasetRest } from "./dataset-rest.mount.ts";
+import {
+  createBatchRecordTrpcRouter,
+  createDatasetRecordTrpcRouter,
+  createDatasetTrpcRouter,
+} from "./dataset-trpc.mount.ts";
 import type { ComposedDatasetFeature } from "./dataset.composition.types.ts";
 
-/** Composes the dataset surface over this process's own graph. */
-export function composeDatasetFeature(options: {
-  infrastructure: ApiTrpcInfrastructure;
+/** The other features the dataset surface reads through. */
+export type DatasetPeers = Readonly<{
+  /** The experiment a dataset borrows a name from, and a slug resolves through. */
+  experiments: ExperimentApiContract;
+  /** How a copy's SECOND project — the source — is checked. */
+  permissions: AuthzApiContract;
+}>;
+
+/** What the REST family answers through: the door, its envelope and the URLs. */
+export type DatasetRestPorts = Readonly<{
+  credential: Parameters<typeof mountDatasetRest>[0]["credential"];
+  platformUrl: Parameters<typeof mountDatasetRest>[0]["platformUrl"];
+  errors: Parameters<typeof mountDatasetRest>[0]["errors"];
+}>;
+
+/** Installs the dataset surfaces over this process's own graph. */
+export async function installApiDataset(options: {
+  prisma: PrismaClient;
   peers: DatasetPeers;
-}): ComposedDatasetFeature {
-  const { prisma, authz } = options.infrastructure;
+  infrastructure: DatasetInfrastructure;
+  rest: DatasetRestPorts;
+}): Promise<ComposedDatasetFeature> {
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma: options.prisma })
+    .withInfrastructure({})
+    .withProvided(ExperimentApi, options.peers.experiments)
+    .withProvided(AuthzApi, options.peers.permissions)
+    .withFeature(datasetServer, { infrastructure: options.infrastructure })
+    .boot({ role: "api" });
 
-  const app = DatasetApp.create({
-    dataset: options.peers.datasets,
-    experiments: options.peers.experimentLookup,
-  });
-
-  const dataset: DatasetTrpcPorts = {
-    /**
-     * A copy reads a SECOND project — the source — that the declared check on the
-     * procedure never covered, so the source is probed separately before anything is read
-     * from it. Answered by the one AuthZ service this process authorizes with.
-     */
-    probeProjectPermission: (ctx, projectId, permission) =>
-      authz.hasPermission({
-        userId: (ctx as unknown as ApiTrpcPortsContext).actor().id,
-        permission,
-        projectId,
-      }),
-  };
-
-  const batchRecord: BatchRecordTrpcPorts<unknown, unknown> = {
-    summariseByExperiment: (_ctx, { projectId }) =>
-      prisma.batchEvaluation.groupBy({
-        by: ["experimentId", "datasetSlug"],
-        where: { projectId },
-        _count: { experimentId: true },
-        _sum: { cost: true },
-        _avg: { score: true },
-      }),
-    listByExperiment: (_ctx, { projectId, experimentId }) =>
-      prisma.batchEvaluation.findMany({
-        where: { projectId, experimentId },
-        include: { dataset: true },
-      }),
-  };
+  const app = runtime.feature(datasetServer).provided;
 
   return {
     routers: (mount) => ({
-      dataset: createDatasetTrpcRouter({ ...mount, ports: dataset }),
-      batchRecord: createBatchRecordTrpcRouter({ ...mount, ports: batchRecord }),
+      dataset: createDatasetTrpcRouter(mount.runtime),
+      datasetRecord: createDatasetRecordTrpcRouter(mount.runtime),
+      batchRecord: createBatchRecordTrpcRouter(mount.runtime),
     }),
     app,
+    rest: mountDatasetRest({ datasets: () => app, ...options.rest }),
   };
-}
-
-/**
- * The dataset surfaces on a process that composed no graph to read them over.
- */
-export function refusingDatasetFeature(): ComposedDatasetFeature {
-  const refuse = (): never => {
-    throw new ApiDatasetUnavailableError();
-  };
-  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
-
-  return {
-    routers: (mount) => ({
-      dataset: createDatasetTrpcRouter({ ...mount, ports: refuseEvery<DatasetTrpcPorts>() }),
-      batchRecord: createBatchRecordTrpcRouter({
-        ...mount,
-        ports: refuseEvery<BatchRecordTrpcPorts<unknown, unknown>>(),
-      }),
-    }),
-    app: refuseEvery<DatasetApp>(),
-  };
-}
-
-/** The dataset store reached on a process that composed none. */
-class ApiDatasetUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super("service_unavailable", "The dataset store is not available on this deployment.", {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiDatasetUnavailableError";
-  }
 }

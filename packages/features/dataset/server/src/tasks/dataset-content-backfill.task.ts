@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { PostgresDatasetMigrationAdapter } from "#adapters/postgres.dataset-migration.adapter";
+import { PrismaDatasetMigrationRepository } from "#repositories/prisma/prisma.dataset-migration.repository";
 
 const logger = createLogger("langwatch:tasks:backfill-dataset-content-to-object-storage");
 
@@ -37,7 +37,7 @@ export class DatasetContentBackfillSweep {
 }
 
 type DatasetBackfillOutcome = Awaited<
-  ReturnType<ReturnType<typeof PostgresDatasetMigrationAdapter.create>["run"]>
+  ReturnType<ReturnType<typeof PrismaDatasetMigrationRepository.create>["run"]>
 >;
 
 /** What the sweep needs of the Postgres migration adapter, and nothing more. */

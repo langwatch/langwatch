@@ -13,7 +13,7 @@ const PROJECT_ID = "project-1";
 function namingOver(takenSlugs: Record<string, string>) {
   const calls: { slug: string; excludeId?: string }[] = [];
   const repository = {
-    tryFindBySlug: async ({ slug, excludeId }: { slug: string; excludeId?: string }) => {
+    findBySlug: async ({ slug, excludeId }: { slug: string; excludeId?: string }) => {
       calls.push({ slug, ...(excludeId ? { excludeId } : {}) });
       const id = takenSlugs[slug];
 
@@ -84,7 +84,7 @@ describe("DatasetNamingService", () => {
   describe("when every candidate name is taken", () => {
     it("refuses rather than looping forever", async () => {
       const repository = {
-        tryFindBySlug: async ({ slug }: { slug: string }) => ({ id: `dataset-${slug}` }),
+        findBySlug: async ({ slug }: { slug: string }) => ({ id: `dataset-${slug}` }),
       } as unknown as DatasetRepository;
 
       await expect(

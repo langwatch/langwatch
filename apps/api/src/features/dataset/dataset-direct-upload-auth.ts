@@ -2,11 +2,6 @@
  * Auth for the browser -> S3 direct-upload routes (ADR-032 D4).
  */
 
-import type {
-  DatasetDirectUploadAuthorization,
-  DatasetDirectUploadAuthorizer,
-  DatasetDirectUploadRequestReader,
-} from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import { isCrossSiteRequest } from "../../api-rest.cross-site.ts";
@@ -15,6 +10,38 @@ import type { ApiHandlerManagedCredentials } from "../../app/api-handler-managed
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
 
 const PERMISSION = "datasets:manage" as const;
+
+/**
+ * What the direct-upload routes get back when they ask whether this caller may
+ * drive an upload for `projectId`.
+ *
+ * `body` is the full handled payload for the failures that have one (currently
+ * only the API-key ceiling denial: code, permission, tips, docsUrl). Routes
+ * answer with it in preference to `error`, which is only a sentence.
+ *
+ * Declared here rather than in the feature: sessions, API keys and the
+ * same-site signal are all this process's, and the door that reads them is one
+ * the REST runtime cannot declare yet — see `dataset-rest.mount.ts`.
+ */
+export type DatasetDirectUploadAuthorization =
+  | { ok: true; projectId: string; teamId: string }
+  | { ok: false; status: 401 | 403; error: string; body?: object };
+
+/**
+ * The whole of the request an authorizer reads: the raw `Request` it resolves a
+ * session or an API key from, and the headers it reads the same-site signal
+ * from. Named structurally rather than as Hono's `Context`, which is invariant
+ * in its variables map.
+ */
+export type DatasetDirectUploadRequestReader = {
+  req: { raw: Request; header(name: string): string | undefined };
+};
+
+/** Authorizes a direct-upload request for one project. */
+export type DatasetDirectUploadAuthorizer = (
+  c: DatasetDirectUploadRequestReader,
+  projectId: string,
+) => Promise<DatasetDirectUploadAuthorization>;
 
 /**
  * Authorize a direct-upload request for `projectId` via browser session OR API key,

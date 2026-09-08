@@ -159,7 +159,7 @@
       "id": "datasets",
       "root": "dataset",
       "uses": {
-        "screens": ["@langwatch/dataset-web/screens/datasets"],
+        "screens": ["@langwatch/dataset-web/datasets"],
         "surfaces": ["@langwatch/dataset-web/drawers"]
       }
     },

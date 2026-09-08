@@ -30,6 +30,10 @@ import type {
   UploadExistingDatasetInput,
   UpsertDatasetInput,
 } from "./dataset.ts";
+import type {
+  BatchEvaluationRecord,
+  BatchEvaluationSummary,
+} from "./batch-record.trpc.ts";
 
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {
@@ -55,6 +59,12 @@ export interface DatasetApi {
   archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }>;
   restoreDataset(input: { datasetId: string; projectId: string }): Promise<{ success: true }>;
   copyDataset(input: CopyDatasetInput): Promise<Dataset>;
+  /**
+   * The same copy, on behalf of a person: the caller's reach into the SOURCE
+   * project is probed before anything is read from it, which a door's declared
+   * check — made against the target — never covers.
+   */
+  copyDatasetForActor(input: CopyDatasetInput & { actorId: string }): Promise<Dataset>;
   getDatasetWithRecords(
     input: DatasetLookupInput & {
       limitMb?: number | null;
@@ -74,7 +84,17 @@ export interface DatasetApi {
   finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }>;
   retryNormalize(input: RetryNormalizeInput): Promise<{ datasetId: string; status: "processing" }>;
   abortPendingUpload(input: AbortPendingUploadInput): Promise<{ datasetId: string; aborted: true }>;
-  tryGetExperimentBySlug(input: Readonly<{ projectId: string; slug: string }>): Promise<Readonly<{ id: string }> | null>;
+  getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]>;
+  renameDataset(input: { datasetId: string; projectId: string; name: string }): Promise<Dataset>;
+  /** One row per experiment and dataset: how many ran, total cost, mean score. */
+  summariseBatchEvaluations(input: {
+    projectId: string;
+  }): Promise<BatchEvaluationSummary[]>;
+  /** Every batch-evaluation record of the experiment the slug names. */
+  listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]>;
 }
 
 export const DatasetApi = featureApi<DatasetApi>("dataset");

@@ -22,8 +22,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/time": "workspace:*",
+    "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "papaparse": "^5.5.3",
     "zod": "^4.4.3"
   },

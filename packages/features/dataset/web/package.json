@@ -50,15 +50,15 @@
       "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
-    "./screens/datasets": {
-      "langwatch-declaration-source": "./src/screens/datasets/index.ts",
-      "types": "./dist/screens/datasets/index.d.ts",
-      "default": "./src/screens/datasets/index.ts"
+    "./datasets": {
+      "langwatch-declaration-source": "./src/datasets.ts",
+      "types": "./dist/datasets.d.ts",
+      "default": "./src/datasets.ts"
     },
     "./surfaces/dataset-table": {
-      "langwatch-declaration-source": "./src/surfaces/dataset-table/index.ts",
-      "types": "./dist/surfaces/dataset-table/index.d.ts",
-      "default": "./src/surfaces/dataset-table/index.ts"
+      "langwatch-declaration-source": "./src/dataset-table.ts",
+      "types": "./dist/dataset-table.d.ts",
+      "default": "./src/dataset-table.ts"
     },
     "./surfaces/dataset-preview-table": {
       "langwatch-declaration-source": "./src/ui/blocks/dataset-preview-table.tsx",

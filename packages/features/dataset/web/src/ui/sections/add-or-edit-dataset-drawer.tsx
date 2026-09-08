@@ -359,7 +359,8 @@ export const DATASET_NAME_TAKEN_CODE = "dataset_name_taken";
  *
  * The wire message of a handled error IS its code slug, and the dataset
  * transport sets exactly this one for a name conflict
- * (`dataset.api.ts`'s `datasetErrorHandler`). Comparing the code is what the
+ * (`DatasetConflictError`, raised by the dataset application). Comparing the
+ * code is what the
  * platform drawer did through `readHandledError`; a screen may not import that
  * reader, and the equality below asks the same question of the same value.
  */

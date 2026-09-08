@@ -21,8 +21,8 @@ import type {
   DatasetColumns,
 } from "@langwatch/dataset-contract";
 import type { Readable } from "node:stream";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository.ts";
+import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { DatasetRecordContentRepository } from "../repositories/dataset-record-content.repository.ts";
 import type { DatasetStorageResolverPort } from "../ports/dataset-storage.port.ts";
 import type { DatasetRow, DatasetUploadPort } from "../ports/dataset.port.ts";
 import {
@@ -164,7 +164,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
 
   async createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
     const slug = slugify(input.name);
-    if (await this.datasets.tryFindBySlug({ projectId: input.projectId, slug }))
+    if (await this.datasets.findBySlug({ projectId: input.projectId, slug }))
       throw new DatasetConflictError();
     const storage = await this.storageResolver.forProject(input.projectId);
     const upload = await storage.createPresignedUpload({ projectId: input.projectId });
@@ -187,7 +187,7 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
     if (!storage.putStaged) throw new DirectUploadUnavailableError();
     const key = stagingUploadKey(input.projectId, input.uploadId);
     if (
-      !(await this.datasets.tryFindPendingUploadByStagingKey({
+      !(await this.datasets.findPendingUploadByStagingKey({
         projectId: input.projectId,
         stagingKey: key,
       }))
@@ -281,8 +281,8 @@ export class DatasetUploadAdapter implements DatasetUploadPort {
 
   private async findDataset(slugOrId: string, projectId: string): Promise<DatasetRow> {
     const dataset =
-      (await this.datasets.tryFindOne({ id: slugOrId, projectId })) ??
-      (await this.datasets.tryFindBySlug({ slug: slugOrId, projectId }));
+      (await this.datasets.findOne({ id: slugOrId, projectId })) ??
+      (await this.datasets.findBySlug({ slug: slugOrId, projectId }));
     if (!dataset) throw new DatasetNotFoundError();
     return dataset;
   }

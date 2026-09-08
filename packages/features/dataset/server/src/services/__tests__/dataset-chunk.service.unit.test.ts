@@ -23,7 +23,7 @@ function fakeRepository(record: DatasetMutationRecord) {
 
   const make = (transactional: boolean): DatasetContentRepository =>
     ({
-      findOneOrThrow: async () => current,
+      getOne: async () => current,
       updateContent: async (input: { id: string; content: Record<string, unknown> }) => {
         updates.push({ id: input.id, content: input.content, transactional });
         current = { ...current, ...(input.content as Partial<DatasetMutationRecord>) };

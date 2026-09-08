@@ -5,7 +5,7 @@ import { Readable } from "node:stream";
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
-import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository.ts";
+import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import type { DatasetStorageResolverPort } from "../../ports/dataset-storage.port.ts";
 import { DatasetUploadAdapter } from "../dataset-upload.adapter.ts";
 import { LocalDatasetStorage } from "../local.dataset-storage.adapter.ts";
@@ -69,13 +69,13 @@ describe("Dataset self-hosted storage", () => {
         const root = path.join(os.tmpdir(), `lw-ds-selfhost-large-${nanoid()}`);
         let createdRow: Record<string, unknown> | undefined;
         const datasets = {
-          tryFindBySlug: async () => null,
-          tryFindOne: async ({ id }: { id: string }) => (createdRow?.id === id ? createdRow : null),
+          findBySlug: async () => null,
+          findOne: async ({ id }: { id: string }) => (createdRow?.id === id ? createdRow : null),
           create: async (input: Record<string, unknown>) => {
             createdRow = { ...input, createdAt: new Date(), updatedAt: new Date() };
             return createdRow;
           },
-          tryFindPendingUploadByStagingKey: async ({ stagingKey }: { stagingKey: string }) =>
+          findPendingUploadByStagingKey: async ({ stagingKey }: { stagingKey: string }) =>
             createdRow?.stagingKey === stagingKey ? createdRow : null,
           claimForProcessing: async () => 1,
         } as unknown as DatasetContentRepository;

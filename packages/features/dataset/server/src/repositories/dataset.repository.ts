@@ -16,36 +16,32 @@ export type DatasetUpdateInput = {
   columnTypes: DatasetColumns;
 };
 
-export abstract class DatasetRepository {
-  abstract tryFindById(input: {
+export interface DatasetRepository {
+  findById(input: {
     id: string;
     projectId: string;
     includeArchived?: boolean;
   }): Promise<Dataset | null>;
-  abstract tryFindBySlug(input: {
+  findBySlug(input: {
     slug: string;
     projectId: string;
     excludeId?: string;
     includeArchived?: boolean;
   }): Promise<Dataset | null>;
-  abstract list(input: {
-    projectId: string;
-    page: number;
-    limit: number;
-  }): Promise<DatasetSummary[]>;
-  abstract create(input: DatasetCreateInput): Promise<Dataset>;
-  abstract update(input: DatasetUpdateInput): Promise<Dataset>;
-  abstract archive(input: {
+  list(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]>;
+  create(input: DatasetCreateInput): Promise<Dataset>;
+  update(input: DatasetUpdateInput): Promise<Dataset>;
+  archive(input: {
     id: string;
     projectId: string;
     slug: string;
     archivedAt: Instant | null;
   }): Promise<Dataset>;
-  abstract restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset>;
-  abstract updateMapping(input: {
+  restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset>;
+  updateMapping(input: {
     id: string;
     projectId: string;
     mapping: Record<string, unknown>;
   }): Promise<Dataset>;
-  abstract count(input: { projectId: string; slug: string }): Promise<number>;
+  count(input: { projectId: string; slug: string }): Promise<number>;
 }

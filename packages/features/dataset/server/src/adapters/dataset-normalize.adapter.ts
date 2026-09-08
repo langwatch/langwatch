@@ -374,7 +374,7 @@ export class DatasetNormalizeAdapter extends DatasetNormalizePort {
   async normalize(payload: DatasetNormalizePayload): Promise<void> {
     const { projectId, datasetId, stagingKey, filename } = payload;
 
-    const dataset = await this.deps.repository.tryFindOne({ id: datasetId, projectId });
+    const dataset = await this.deps.repository.findOne({ id: datasetId, projectId });
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
     // race is a no-op.

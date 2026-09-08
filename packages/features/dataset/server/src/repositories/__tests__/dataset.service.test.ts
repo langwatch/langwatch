@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DatasetService } from "../../services/dataset.service.ts";
-import { DatasetRepository } from "../dataset.repository.ts";
-import { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import type { DatasetRepository } from "../dataset.repository.ts";
+import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
 
 const row = (): Dataset =>
@@ -27,10 +27,10 @@ const row = (): Dataset =>
     chunkCount: null,
     chunkOffsets: null,
   });
-class Repo extends DatasetRepository {
+class Repo implements DatasetRepository {
   value = row();
-  tryFindById = async () => this.value;
-  tryFindBySlug = async () => null;
+  findById = async () => this.value;
+  findBySlug = async () => null;
   list = async () => [];
   create = async () => this.value;
   update = async () => this.value;
@@ -39,7 +39,7 @@ class Repo extends DatasetRepository {
   updateMapping = async () => this.value;
   count = async () => 0;
 }
-class Records extends DatasetRecordRepository {
+class Records implements DatasetRecordRepository {
   list = async () => ({ records: [], total: 0 });
   createMany = async () => [];
   update = async () => {

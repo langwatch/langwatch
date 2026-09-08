@@ -6,7 +6,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
+import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import {
   type ChunkedDatasetMeta,
   type ChunkOffset,
@@ -152,7 +152,7 @@ export class DatasetChunkService {
     const datasetStorage = storage;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
-      const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
+      const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
 
       return this.appendLines({
@@ -201,7 +201,7 @@ export class DatasetChunkService {
         : null;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
-      const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
+      const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
 
       const target = { tx, current, dataset, projectId, recordId, entry, storage: datasetStorage };

@@ -43,8 +43,8 @@ const record = (id: string, entrySize = 10) => ({
 
 function serviceHolding(records: ReturnType<typeof record>[]) {
   const repository = {
-    tryFindById: async () => null,
-    tryFindBySlug: async () => dataset,
+    findById: async () => null,
+    findBySlug: async () => dataset,
   } as unknown as DatasetRepository;
 
   const recordsRepository = {
