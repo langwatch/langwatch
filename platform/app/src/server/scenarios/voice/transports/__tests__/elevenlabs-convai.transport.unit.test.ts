@@ -54,6 +54,41 @@ describe("wrapConnectRejection", () => {
     });
   });
 
+  describe("when the underlying connect times out", () => {
+    /** @scenario "A run with a wrong agent id or a removed key fails without hanging the pool" */
+    it("calls the adapter's disconnect best-effort, and still rejects with the prefix", async () => {
+      const disconnect = vi.fn(async () => {});
+      const adapter = {
+        connect: () => new Promise<void>(() => {}),
+        disconnect,
+      };
+      const wrapped = wrapConnectRejection(adapter, 20);
+
+      await expect(wrapped.connect()).rejects.toThrow(
+        new RegExp(
+          `^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`,
+        ),
+      );
+      expect(disconnect).toHaveBeenCalled();
+    });
+
+    it("swallows a disconnect failure and keeps the timeout error", async () => {
+      const adapter = {
+        connect: () => new Promise<void>(() => {}),
+        disconnect: async () => {
+          throw new Error("already closed");
+        },
+      };
+      const wrapped = wrapConnectRejection(adapter, 20);
+
+      await expect(wrapped.connect()).rejects.toThrow(
+        new RegExp(
+          `^${ELEVENLABS_CONNECT_REJECTED_PREFIX}: connection timed out`,
+        ),
+      );
+    });
+  });
+
   describe("when the underlying connect succeeds", () => {
     it("resolves without wrapping", async () => {
       let called = false;

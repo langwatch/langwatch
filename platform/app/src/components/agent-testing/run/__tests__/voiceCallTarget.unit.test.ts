@@ -129,4 +129,27 @@ describe("voiceCallTargetOf", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe("when the agent id exceeds the shared schema's 128-character limit", () => {
+    it("resolves nothing rather than opening a call with an id the server would reject", () => {
+      const result = voiceCallTargetOf({
+        form: form({
+          target: { type: "voice", id: "agent_voice" },
+          scenarioAgents: [
+            {
+              id: "agent_voice",
+              name: "x",
+              type: "voice",
+              config: {
+                transport: "elevenlabs_convai",
+                agentId: "a".repeat(129),
+              },
+            },
+          ],
+        }),
+        subject: CASE_SUBJECT,
+      });
+      expect(result).toBeNull();
+    });
+  });
 });

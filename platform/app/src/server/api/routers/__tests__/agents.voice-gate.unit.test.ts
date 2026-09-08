@@ -16,6 +16,12 @@ import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.
 import { createInnerTRPCContext } from "../../trpc";
 import { agentsRouter } from "../agents";
 
+// A static top-level import of appPermissionsMock here throws "Cannot access
+// before initialization": vi.mock is hoisted above every import in the file,
+// so referencing an imported binding from inside its factory hits the TDZ.
+// The dynamic import is load-bearing for that reason (proven by running this
+// suite with a static import — the exact pattern every other
+// appPermissionsMock consumer in the repo also uses).
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import(
     "~/test-utils/appPermissionsMock"

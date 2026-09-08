@@ -10,6 +10,7 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { CallRecord, CallTurn } from "../call-record";
+import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
@@ -75,20 +76,23 @@ export function readElevenLabsErrorReason(
   return fallback;
 }
 
-/** Reject `promise` if it has not settled within `timeoutMs`. */
+/** Reject `promise` if it has not settled within `timeoutMs`, running
+ *  `onTimeout` (best-effort, errors swallowed) the moment it fires so a
+ *  caller can release whatever the still-pending promise was holding. */
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
+  onTimeout?: () => void,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`connection timed out after ${timeoutMs}ms`)),
-          timeoutMs,
-        );
+        timer = setTimeout(() => {
+          onTimeout?.();
+          reject(new Error(`connection timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
       }),
     ]);
   } finally {
@@ -99,8 +103,11 @@ async function withTimeout<T>(
 /**
  * Replace an adapter's `connect()` so a transport-level failure surfaces as the
  * run's error with the mandated prefix instead of a raw socket error, and can
- * never hang past `timeoutMs`. Exported so the exact message is unit-tested
- * against a throwing inner without a live socket.
+ * never hang past `timeoutMs`. On the timeout path specifically, the adapter's
+ * own socket is still open with nobody waiting on it, so `disconnect()` is
+ * called best-effort to release it (#31); a disconnect failure is swallowed so
+ * the customer-facing timeout message still wins. Exported so the exact
+ * message is unit-tested against a throwing inner without a live socket.
  */
 export function wrapConnectRejection<
   T extends { connect: () => Promise<void> },
@@ -108,7 +115,13 @@ export function wrapConnectRejection<
   const original = adapter.connect.bind(adapter);
   adapter.connect = async () => {
     try {
-      await withTimeout(original(), timeoutMs);
+      await withTimeout(original(), timeoutMs, () => {
+        void (adapter as { disconnect?: () => Promise<void> })
+          .disconnect?.()
+          .catch(() => {
+            // Best-effort only: the timeout error below is what the caller sees.
+          });
+      });
     } catch (error) {
       throw new Error(
         `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`,
@@ -176,7 +189,10 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     )}`;
     let response: Response;
     try {
-      response = await fetch(url, { headers: authHeaders(credential) });
+      response = await fetch(url, {
+        headers: authHeaders(credential),
+        signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
+      });
     } catch (error) {
       throw new Error(
         `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`,
@@ -204,7 +220,10 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     const url = `${credential.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(
       conversationId,
     )}`;
-    const response = await fetch(url, { headers: authHeaders(credential) });
+    const response = await fetch(url, {
+      headers: authHeaders(credential),
+      signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
+    });
     // Not ready yet: the record does not exist for this conversation. The
     // caller falls back to the live transcript rather than treating it as a
     // fetch failure.

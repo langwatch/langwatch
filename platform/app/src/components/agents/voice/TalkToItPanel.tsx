@@ -41,6 +41,11 @@ const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
 /** Placeholder cap before minting; the session mint response replaces it. */
 const PRE_MINT_MAX_SECONDS_PLACEHOLDER = VOICE_CALL_MAX_SECONDS_DEFAULT;
 
+/** A hung mint request must not leave the panel spinning forever (#4). */
+const MINT_FETCH_TIMEOUT_MS = 15_000;
+/** Finish uploads a transcript and waits on the verdict; longer than mint. */
+const FINISH_FETCH_TIMEOUT_MS = 30_000;
+
 interface MintResponse {
   transport: VoiceTransport;
   sessionToken: string;
@@ -87,6 +92,12 @@ type TalkRefs = {
   runSetId: { current: string | undefined };
   tick: { current: ReturnType<typeof setInterval> | null };
   createdRowId: { current: string | undefined };
+  // The latest reducer state, mirrored in during render (#21): `start` and its
+  // handlers are wired once on mount, so a callback reached through them
+  // (onDisconnect) would otherwise always read the `state` closed over at that
+  // first render — the empty transcript — instead of what has accumulated
+  // since.
+  stateRef: { current: TalkState };
 };
 
 function createTalkRefs(agentRowId: string | undefined): TalkRefs {
@@ -99,6 +110,7 @@ function createTalkRefs(agentRowId: string | undefined): TalkRefs {
     runSetId: { current: undefined },
     tick: { current: null },
     createdRowId: { current: agentRowId },
+    stateRef: { current: initialTalkState },
   };
 }
 
@@ -174,17 +186,19 @@ async function runFinish({
   props,
   refs,
   dispatch,
-  state,
   cutAtLimit,
   nameOverride,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  state: TalkState;
   cutAtLimit: boolean;
   nameOverride?: string;
 }): Promise<void> {
+  // Read off the ref, not a closed-over `state` param: a provider-initiated
+  // disconnect reaches this through handlers wired once at call start, so a
+  // captured `state` would still be the empty initial one (#21).
+  const state = refs.stateRef.current;
   const transcript = "transcript" in state ? state.transcript : ([] as never[]);
   const body = {
     projectId: props.projectId,
@@ -197,16 +211,26 @@ async function runFinish({
     cutAtLimit,
     ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
   };
-  const res = await fetch(
-    `/api/voice/session/${encodeURIComponent(
-      refs.conversationId.current ?? "session",
-    )}/finish`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/voice/session/${encodeURIComponent(
+        refs.conversationId.current ?? "session",
+      )}/finish`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(FINISH_FETCH_TIMEOUT_MS),
+      },
+    );
+  } catch (error) {
+    dispatch({
+      type: "SAVE_FAILED",
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     applyFinishFailure(dispatch, data);
@@ -276,6 +300,7 @@ async function mintSession({
         // no row id.
         agentRowId: refs.createdRowId.current,
       }),
+      signal: AbortSignal.timeout(MINT_FETCH_TIMEOUT_MS),
     });
     const data = (await res.json().catch(() => ({}))) as Record<
       string,
@@ -372,11 +397,14 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   const refsRef = useRef<TalkRefs | null>(null);
   if (!refsRef.current) refsRef.current = createTalkRefs(props.agentRowId);
   const refs = refsRef.current;
+  // Mirrored during render so it is current before any effect (including the
+  // provider's onDisconnect, fired outside React) runs finish (#21).
+  refs.stateRef.current = state;
 
   const finish = useCallback(
     (cutAtLimit: boolean, nameOverride?: string) =>
-      runFinish({ props, refs, dispatch, state, cutAtLimit, nameOverride }),
-    [props, refs, state],
+      runFinish({ props, refs, dispatch, cutAtLimit, nameOverride }),
+    [props, refs],
   );
   const endCall = useCallback(
     (cutAtLimit: boolean) => runEndCall({ refs, dispatch, finish, cutAtLimit }),
@@ -398,7 +426,14 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   // trigger, and the consent notice shows through the connecting state.
   useEffect(() => {
     void start();
-    return () => stopTick(refs);
+    return () => {
+      stopTick(refs);
+      // Unmounting mid-call (Back, or the dialog closing) must not leave the
+      // provider session connected with the mic open and the call never
+      // ingested — run the same end-of-call path an explicit "End call"
+      // uses (#18).
+      if (refs.stateRef.current.kind === "live") void endCall(false);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

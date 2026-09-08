@@ -13,9 +13,18 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The panel statically pulls the vendor client; the drawer test never opens it,
-// so stub it to keep that SDK out of the drawer's import graph.
+// so stub it to keep that SDK out of the drawer's import graph. A test that
+// needs to simulate the panel reporting a created row clicks this button.
 vi.mock("../voice/TalkToItPanel", () => ({
-  TalkToItPanel: () => null,
+  TalkToItPanel: (props: { onAgentCreated?: (agentRowId: string) => void }) =>
+    props.onAgentCreated ? (
+      <button
+        data-testid="mock-panel-created-row"
+        onClick={() => props.onAgentCreated?.("agent_row_created")}
+      >
+        simulate created row
+      </button>
+    ) : null,
 }));
 
 import { AgentVoiceEditorDrawer } from "../AgentVoiceEditorDrawer";
@@ -67,6 +76,9 @@ const updateMock = vi.fn();
 const mockCloseDrawer = vi.fn();
 const mockGoBack = vi.fn();
 
+/** Overridden per test to simulate ?drawer.talk=1 from the card menu (#23). */
+let mockDrawerParams: Record<string, string | undefined> = {};
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
@@ -75,7 +87,7 @@ vi.mock("~/hooks/useDrawer", () => ({
     canGoBack: false,
     goBack: mockGoBack,
   }),
-  useDrawerParams: () => ({}),
+  useDrawerParams: () => mockDrawerParams,
   getComplexProps: () => ({}),
   getFlowCallbacks: () => ({}),
 }));
@@ -144,6 +156,7 @@ describe("AgentVoiceEditorDrawer", () => {
     mockAgentById = null;
     mockProviders = [];
     mockVoiceAgentsEnabled = true;
+    mockDrawerParams = {};
     try {
       sessionStorage.clear();
     } catch {
@@ -275,6 +288,47 @@ describe("AgentVoiceEditorDrawer", () => {
 
       await user.type(screen.getByTestId("voice-agent-id-input"), "agent_1");
       expect(talk).toBeEnabled();
+    });
+  });
+
+  describe("when Talk to it has already created the agent row for a new draft", () => {
+    it("updates the created row instead of inserting a duplicate on Save", async () => {
+      const user = userEvent.setup();
+      mockProviders = [ELEVENLABS_KEYED_PROVIDER];
+      renderVoiceDrawer();
+
+      await user.type(screen.getByTestId("voice-agent-name-input"), "Support");
+      await user.type(screen.getByTestId("voice-agent-id-input"), "agent_1");
+      await user.click(await screen.findByTestId("voice-agent-talk"));
+
+      await user.click(await screen.findByTestId("mock-panel-created-row"));
+      await user.click(screen.getByTestId("save-agent-button"));
+
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "agent_row_created" }),
+      );
+      expect(createMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the card menu opened Talk to it directly (?drawer.talk=1)", () => {
+    /** @scenario "Talk to it appears on a voice agent's card menu while the flag is on" */
+    it("opens the drawer with the call panel already visible", async () => {
+      mockAgentById = {
+        id: "voice_1",
+        name: "Support line",
+        config: { transport: "elevenlabs_convai", agentId: "agent_1" },
+      };
+      mockProviders = [ELEVENLABS_KEYED_PROVIDER];
+      mockDrawerParams = { agentId: "voice_1", talk: "1" };
+      renderVoiceDrawer({ agentId: "voice_1" });
+
+      expect(
+        await screen.findByTestId("mock-panel-created-row"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("voice-agent-name-input"),
+      ).not.toBeInTheDocument();
     });
   });
 

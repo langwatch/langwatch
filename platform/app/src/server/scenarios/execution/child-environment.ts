@@ -160,9 +160,9 @@ export function buildChildEnvironment({
       setId: jobData.setId,
     }),
     ...tlsEnv,
-    // Voice-only, and only the two keys the prefetcher resolved. The caller
-    // narrows to a voice target before passing this, so it is absent for every
-    // other run.
-    ...(callerEnv ?? {}),
+    // Voice-only, and only the two keys the prefetcher resolved. Narrowed
+    // here (not just at the call site) so a caller credential can never reach
+    // an unrelated child even if a future caller forgets to gate it (#26).
+    ...(jobData.target.type === "voice" ? (callerEnv ?? {}) : {}),
   });
 }

@@ -38,7 +38,10 @@ import {
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioRepository } from "~/server/scenarios/scenario.repository";
 import { scenarioRunIdForConversation } from "~/server/scenarios/voice/call-record";
-import { voiceCallMaxSeconds } from "~/server/scenarios/voice/voice-limits";
+import {
+  VOICE_HTTP_TIMEOUT_MS,
+  voiceCallMaxSeconds,
+} from "~/server/scenarios/voice/voice-limits";
 import {
   VoiceAgentNotFoundError,
   writeVoiceCallRun,
@@ -371,12 +374,33 @@ export const route = secured
       });
       if (!credential) return c.json({ error: "No key" }, 404);
 
-      const upstream = await fetch(
-        `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(
-          conversationId,
-        )}/audio`,
-        { headers: { "xi-api-key": credential.apiKey } },
+      // A timeout on the connect/headers phase only: once the response
+      // arrives we stop racing the timeout against the body so a long
+      // recording is never cut mid-stream. The caller's own abort (tab
+      // closed, request cancelled) still propagates the whole way through.
+      const timeoutController = new AbortController();
+      const timeout = setTimeout(
+        () => timeoutController.abort(),
+        VOICE_HTTP_TIMEOUT_MS,
       );
+      const onCallerAbort = () => timeoutController.abort();
+      c.req.raw.signal.addEventListener("abort", onCallerAbort);
+
+      let upstream: Response;
+      try {
+        upstream = await fetch(
+          `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(
+            conversationId,
+          )}/audio`,
+          {
+            headers: { "xi-api-key": credential.apiKey },
+            signal: timeoutController.signal,
+          },
+        );
+      } finally {
+        clearTimeout(timeout);
+        c.req.raw.signal.removeEventListener("abort", onCallerAbort);
+      }
       if (!upstream.ok || !upstream.body) {
         return c.json({ error: "Recording unavailable" }, 404);
       }
@@ -384,7 +408,7 @@ export const route = secured
         status: 200,
         headers: {
           "content-type": upstream.headers.get("content-type") ?? "audio/mpeg",
-          "cache-control": "private, max-age=60",
+          "cache-control": "no-store",
         },
       });
     },

@@ -20,16 +20,21 @@
 export const VOICE_CALL_MAX_SECONDS_DEFAULT = 300;
 export const VOICE_RUNS_MAX_CONCURRENT_DEFAULT = 2;
 
+/** Bounded timeout for the voice HTTP calls that must not hang forever: the
+ *  mint request and the call-record fetch. Long enough for the provider's
+ *  usual latency, short enough that a stuck upstream still frees the caller. */
+export const VOICE_HTTP_TIMEOUT_MS = 15_000;
+
 /** Parse a positive integer env var, falling back to `fallback` for anything
- *  missing, empty, non-numeric or non-positive. */
+ *  missing, empty, non-numeric, non-integer or non-positive. */
 export function parsePositiveIntEnv(
   raw: string | undefined,
   fallback: number,
 ): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return Math.floor(parsed);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return fallback;
+  return parsed;
 }
 
 export function voiceCallMaxSeconds(

@@ -120,6 +120,15 @@ function Page() {
     });
   };
 
+  // The card menu's Talk to it opens straight onto the call panel, rather
+  // than the editor form the person then has to click Talk to it again from
+  // (#23).
+  const handleTalkToItAgent = (agent: TypedAgent) => {
+    openDrawer(getAgentEditorDrawer(agent.type), {
+      urlParams: { agentId: agent.id, talk: "1" },
+    });
+  };
+
   const handleDeleteAgent = (agent: TypedAgent) => {
     setAgentToDelete(agent);
   };
@@ -233,7 +242,7 @@ function Page() {
                 }
                 onTalkToIt={
                   agent.type === "voice"
-                    ? () => handleEditAgent(agent)
+                    ? () => handleTalkToItAgent(agent)
                     : undefined
                 }
                 onOpenWorkflow={

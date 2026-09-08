@@ -10,8 +10,8 @@
  */
 
 import {
-  VOICE_TRANSPORTS,
   type VoiceTransport,
+  voiceAgentConfigSchema,
 } from "~/server/agents/voice/voice-agent.config";
 import type { RunDialogSubject } from "./run-dialog-types";
 import type { RunDialogForm } from "./useRunDialogForm";
@@ -46,22 +46,11 @@ export function voiceCallTargetOf({
     (candidate) => candidate.id === target.id,
   );
   if (!agent) return null;
-  const config = agent.config as
-    | { transport?: unknown; agentId?: unknown }
-    | undefined;
-  const transport = config?.transport;
-  const agentId = config?.agentId;
-  if (
-    typeof transport !== "string" ||
-    !VOICE_TRANSPORTS.includes(transport as VoiceTransport) ||
-    typeof agentId !== "string" ||
-    agentId.trim() === ""
-  ) {
-    return null;
-  }
+  const parsed = voiceAgentConfigSchema.safeParse(agent.config);
+  if (!parsed.success) return null;
   return {
-    transport: transport as VoiceTransport,
-    agentId: agentId.trim(),
+    transport: parsed.data.transport,
+    agentId: parsed.data.agentId,
     agentRowId: agent.id,
     // A call is scored against a scenario only when the dialog runs exactly
     // one; every other scope has no single scenario to write the run under.

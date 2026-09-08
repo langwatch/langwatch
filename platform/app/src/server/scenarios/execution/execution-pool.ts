@@ -162,9 +162,15 @@ export class ScenarioExecutionPool {
    * Whether a job may start now: a global slot is free AND, for a voice job, the
    * project is under its voice cap. The voice cap holds extra voice runs in the
    * queue without blocking a text run behind them.
+   *
+   * Admission counts against `_runningJobs`, not `_running`: a job is admitted
+   * (and its slot spoken for) the moment `startJob` records it, before its
+   * child ever registers — an async prefetch can take a while, and counting
+   * `_running` instead would let a second `submit`/dequeue see a free slot
+   * during that window and admit past `_concurrency` (#27).
    */
   private canStart(jobData: ExecutionJobData): boolean {
-    if (this._running.size >= this._concurrency) return false;
+    if (this._runningJobs.size >= this._concurrency) return false;
     if (this._voiceGate && jobData.target.type === "voice") {
       return this._voiceGate.canAcquire(jobData.projectId);
     }
@@ -304,7 +310,10 @@ export class ScenarioExecutionPool {
   }
 
   private dequeueNext(): void {
-    while (this._pending.length > 0 && this._running.size < this._concurrency) {
+    while (
+      this._pending.length > 0 &&
+      this._runningJobs.size < this._concurrency
+    ) {
       if (this.skipNextCancelledPending()) continue;
 
       // Start the first job that may start now. A voice job blocked by its

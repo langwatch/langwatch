@@ -126,10 +126,19 @@ describe("buildChildEnvironment", () => {
     });
   });
 
-  describe("given a non-voice run with no caller env", () => {
+  describe("given a non-voice run with a non-empty caller env", () => {
     /** @scenario The caller voice keys reach the child env only for a voice target */
-    it("puts no caller OpenAI key into the child env", () => {
-      const env = buildChildEnvironment({ jobData, labels: [], telemetry });
+    it("excludes the caller's keys from the child env", () => {
+      const httpJobData: ExecutionJobData = {
+        ...jobData,
+        target: { type: "http", referenceId: "agent_1" },
+      };
+      const env = buildChildEnvironment({
+        jobData: httpJobData,
+        labels: [],
+        telemetry,
+        callerEnv: { OPENAI_API_KEY: "sk-openai" },
+      });
 
       expect("OPENAI_API_KEY" in env).toBe(false);
     });

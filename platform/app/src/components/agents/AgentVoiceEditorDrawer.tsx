@@ -362,11 +362,19 @@ function useVoiceAgentData({
   return { agentQuery, hasElevenLabsKey };
 }
 
-/** Create or update the voice agent from the current form, when valid. */
+/**
+ * Create or update the voice agent from the current form, when valid.
+ *
+ * `agentId` is the editor's own prop id (an existing agent opened for edit);
+ * `createdAgentRowId` is the row "Talk to it" created mid-session for a
+ * still-unsaved draft. Once either is set, Save must update that row rather
+ * than insert a duplicate (#20).
+ */
 function submitVoiceAgent({
   projectId,
   isValid,
   agentId,
+  createdAgentRowId,
   form,
   createMutation,
   updateMutation,
@@ -374,6 +382,7 @@ function submitVoiceAgent({
   projectId: string;
   isValid: boolean;
   agentId: string | undefined;
+  createdAgentRowId: string | undefined;
   form: { name: string; transport: VoiceTransport; voiceAgentId: string };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -383,9 +392,10 @@ function submitVoiceAgent({
     transport: form.transport,
     agentId: form.voiceAgentId.trim(),
   };
-  if (agentId) {
+  const savedAgentId = agentId ?? createdAgentRowId;
+  if (savedAgentId) {
     updateMutation.mutate({
-      id: agentId,
+      id: savedAgentId,
       projectId,
       name: form.name.trim(),
       config,
@@ -400,6 +410,48 @@ function submitVoiceAgent({
   }
 }
 
+/** The memoized Save handler, split out so {@link useVoiceAgentEditor} stays
+ *  within the file's line-per-function budget. */
+function useSaveVoiceAgent({
+  projectId,
+  isValid,
+  agentId,
+  createdAgentRowId,
+  form,
+  createMutation,
+  updateMutation,
+}: {
+  projectId: string;
+  isValid: boolean;
+  agentId: string | undefined;
+  createdAgentRowId: string | undefined;
+  form: { name: string; transport: VoiceTransport; voiceAgentId: string };
+  createMutation: ReturnType<typeof api.agents.create.useMutation>;
+  updateMutation: ReturnType<typeof api.agents.update.useMutation>;
+}): () => void {
+  return useCallback(
+    () =>
+      submitVoiceAgent({
+        projectId,
+        isValid,
+        agentId,
+        createdAgentRowId,
+        form,
+        createMutation,
+        updateMutation,
+      }),
+    [
+      projectId,
+      isValid,
+      agentId,
+      createdAgentRowId,
+      form,
+      createMutation,
+      updateMutation,
+    ],
+  );
+}
+
 /**
  * All the voice-editor state and callbacks the drawer and its views render from.
  *
@@ -411,15 +463,19 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const projectId = project?.id ?? "";
+  const drawerParams = useDrawerParams();
   const { onClose, onSave, agentId, isOpen, isCreating } = resolveEditorInputs({
     props,
     closeDrawer,
     complexProps: getComplexProps(),
-    drawerParams: useDrawerParams(),
+    drawerParams,
     flowCallbacksForSave: getFlowCallbacks("agentVoiceEditor"),
   });
 
-  const [talkOpen, setTalkOpen] = useState(false);
+  // The card menu's Talk to it action opens the drawer straight onto the call
+  // panel via ?drawer.talk=1, rather than making the user click Talk to it
+  // again once the editor has loaded (#23).
+  const [talkOpen, setTalkOpen] = useState(drawerParams.talk === "1");
   const [createdAgentRowId, setCreatedAgentRowId] = useState<string>();
 
   const { agentQuery, hasElevenLabsKey } = useVoiceAgentData({
@@ -444,18 +500,15 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isValid = isVoiceFormValid(form);
 
-  const handleSave = useCallback(
-    () =>
-      submitVoiceAgent({
-        projectId,
-        isValid,
-        agentId,
-        form,
-        createMutation,
-        updateMutation,
-      }),
-    [projectId, isValid, agentId, form, createMutation, updateMutation],
-  );
+  const handleSave = useSaveVoiceAgent({
+    projectId,
+    isValid,
+    agentId,
+    createdAgentRowId,
+    form,
+    createMutation,
+    updateMutation,
+  });
 
   const handleClose = useCallback(() => {
     if (projectId) clearDraft(projectId);
@@ -588,6 +641,7 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
         </Drawer.Body>
         <VoiceAgentFooter
           agentId={editor.agentId}
+          createdAgentRowId={editor.createdAgentRowId}
           voiceAgentId={form.voiceAgentId}
           hasElevenLabsKey={editor.hasElevenLabsKey}
           isValid={editor.isValid}
@@ -790,6 +844,7 @@ function CredentialsLine({ hasElevenLabsKey }: { hasElevenLabsKey: boolean }) {
 
 function VoiceAgentFooter({
   agentId,
+  createdAgentRowId,
   voiceAgentId,
   hasElevenLabsKey,
   isValid,
@@ -799,6 +854,7 @@ function VoiceAgentFooter({
   onSave,
 }: {
   agentId: string | undefined;
+  createdAgentRowId: string | undefined;
   voiceAgentId: string;
   hasElevenLabsKey: boolean;
   isValid: boolean;
@@ -807,6 +863,9 @@ function VoiceAgentFooter({
   onTalk: () => void;
   onSave: () => void;
 }) {
+  // Once "Talk to it" has created the row, further saves update it — the
+  // panel's created id stands in for the editor's own agentId (#20).
+  const savedAgentId = agentId ?? createdAgentRowId;
   // Talk to it is enabled as soon as the transport's agent id is filled and the
   // project has a key — no save-first. The tooltip names whichever is missing.
   const canTalk = voiceAgentId.trim().length > 0 && hasElevenLabsKey;
@@ -840,7 +899,7 @@ function VoiceAgentFooter({
           loading={isSaving}
           data-testid="save-agent-button"
         >
-          {agentId ? "Save Changes" : "Create Agent"}
+          {savedAgentId ? "Save Changes" : "Create Agent"}
         </Button>
       </HStack>
     </Drawer.Footer>

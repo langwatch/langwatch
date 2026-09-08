@@ -326,6 +326,27 @@ describe("Feature: Voice session HTTP door", () => {
     });
   });
 
+  describe("given a recording request for a conversation with a run", () => {
+    /** @scenario "The finished call plays its recording through the same-origin proxy url" */
+    it("proxies the audio with a no-store Cache-Control so it is never CDN-cached", async () => {
+      getScenarioRunData.mockResolvedValue({ id: "run_1" });
+      const upstreamFetch = vi.fn(async () => ({
+        ok: true,
+        body: new ReadableStream(),
+        headers: new Headers({ "content-type": "audio/mpeg" }),
+      }));
+      vi.stubGlobal("fetch", upstreamFetch);
+
+      const res = await app.request(
+        `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      vi.unstubAllGlobals();
+    });
+  });
+
   describe("given the project's release_voice_agents_enabled flag is off", () => {
     beforeEach(() => {
       isEnabled.mockResolvedValue(false);

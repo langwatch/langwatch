@@ -27,7 +27,12 @@ vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
 
 import { ScenarioForm } from "../ScenarioForm";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // A test below flips the flag off; reset it so a later test in this file
+  // does not inherit that override (#22).
+  mockVoiceAgentsEnabled = true;
+});
 
 function renderForm() {
   return render(

@@ -27,7 +27,7 @@ describe("voiceCallMaxSeconds", () => {
 
   describe("when the env var is invalid", () => {
     it("falls back to the default", () => {
-      for (const raw of ["", "0", "-5", "abc"]) {
+      for (const raw of ["", "0", "-5", "abc", "0.5", "1.9"]) {
         expect(
           voiceCallMaxSeconds({
             VOICE_CALL_MAX_SECONDS: raw,
