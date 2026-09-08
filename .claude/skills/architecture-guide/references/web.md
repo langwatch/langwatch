@@ -92,22 +92,24 @@ carries facts the screen needs (`project`, `currentUser`, `hasPermission`,
 `notifySuccess`, `notifyFailure`), never a `pathname`: the view arrives as a prop.
 `src/testing.tsx` ships `Stub<F>Host extends <F>HostPort` for consumers' tests.
 
-## Data access: the api-map
+## Data access: the derived client
 
 ```ts
 // behavior/annotation-api.ts
-export type AnnotationApiMap = {
-  annotation: {
-    getAll: { query: { input: ProjectScope & { traceIds?: string[] }; output: WireOf<AnnotationWithUser>[] } };
-    create: { mutation: { input: AnnotationApiCreateInput; output: WireOf<Annotation> } };
-  };
-  annotationScore: { getAllActive: { query: { input: ProjectScope; output: WireOf<AnnotationScore>[] } } };
-};
-export const annotationApi = createFeatureApi<AnnotationApiMap>();
-export type RouterOutputs = OutputsFromMap<AnnotationApiMap>;
+import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
+import { createFeatureApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/platform-api-client/feature-api";
+
+type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> & ContractApiMap<typeof annotationScoreTrpc>;
+export const annotationApi = createFeatureApi<AnnotationProcedures>();
+export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
 ```
 
-- `createFeatureApi`, `WireOf` and `OutputsFromMap` live in
+- The feature's own namespaces are derived from the contract's `<f>.trpc.ts`
+  declarations: no hand-written map, so the browser cannot disagree with the server about
+  an input or an output. A procedure another feature owns and this package still calls is
+  the one thing written by hand, in a `BorrowedProcedures` type that says so, until that
+  feature's contract declares it.
+- `createFeatureApi`, `ContractApiMap`, `WireOf` and `OutputsFromMap` live in
   `@langwatch/platform-api-client/feature-api`. Types come from the contract, never from
   `AppRouter` (ADR-130) and never `any`.
 - The segment names are the tRPC cache key and must equal the namespaces the process

@@ -1,6 +1,6 @@
 ---
 name: api-rest-route
-description: "Add or change one public REST endpoint the annotation way: declare its params, query, body and response schemas in the feature's contract, add the operation to the <Feature>Api, write the inline handler on the feature's flat transport/<f>.rest.ts declaration (defineTransport from @langwatch/api/rest) with its permission and docs, mount the declaration through the process's REST family in apps/api/src/features/<f>/<f>-rest.mount.ts, regenerate the OpenAPI description with the task instead of hand-editing the frozen document, and bind the scenario. Use whenever someone says 'add a REST endpoint', 'expose this over the public API', 'a new /api/v1/... route', 'API key access to X', or asks why a new route 404s, is missing from the OpenAPI document, or answers 403. Do not add routes to a legacy transport/api-rest or transport/public-rest folder; those are inventoried by feature-shape and go away when the feature converts."
+description: "Add or change one public REST endpoint the annotation way: declare its params, query, body and response schemas in the feature's contract, add the operation to the <Feature>Api, write the inline handler on the feature's flat transport/<f>.rest.ts declaration (defineRestRouter from @langwatch/api/rest) with its permission and docs, mount the declaration through the process's REST family in apps/api/src/features/<f>/<f>-rest.mount.ts, regenerate the OpenAPI description with the task instead of hand-editing the frozen document, and bind the scenario. Use whenever someone says 'add a REST endpoint', 'expose this over the public API', 'a new /api/v1/... route', 'API key access to X', or asks why a new route 404s, is missing from the OpenAPI document, or answers 403. Do not add routes to a legacy transport/api-rest or transport/public-rest folder; those are inventoried by feature-shape and go away when the feature converts."
 user-invocable: true
 argument-hint: "<feature> <method and path, e.g. 'POST /api/annotations/trace/:id'>"
 ---
@@ -15,7 +15,7 @@ packages/features/annotation/contract/src/annotation-rest.schemas.ts   params, q
 packages/features/annotation/contract/src/annotation.api.ts            the operation the handler calls
 packages/features/annotation/server/src/transport/annotation.rest.ts   the declaration with inline handlers
 apps/api/src/features/annotation/annotation-rest.mount.ts              the process mount (credential, family, refusal bodies)
-packages/api/src/rest/transport.ts · transport-mount.ts                defineTransport and mountProjectTransport
+packages/api/src/rest/transport.ts · transport-mount.ts                defineRestRouter and mountProjectTransport
 ```
 
 `transport/api-rest/**` and `transport/public-rest/**` are the older spelling; a
@@ -53,30 +53,36 @@ add it there if it is new (`feature-extend` step 2), and the app implements it.
 `packages/features/<f>/server/src/transport/<f>.rest.ts`:
 
 ```ts
-export const annotationRest = defineTransport(AnnotationApi)
+export const annotationRest = defineRestRouter(AnnotationApi)
+  .withNamespace("annotations")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withRouter((router) =>
-    router
-      .post("/trace/:id", "createTraceAnnotation")
-      .withParams(annotationRestParamsSchema)
-      .withInput(annotationRestWriteSchema)
-      .withPermission("annotations:create")
-      .withOutput(annotationRestResponseSchema)
-      .withDocs({ summary: "Create an unattributed annotation on a trace" })
-      .handle(async ({ app, input, scope }) => {
-        const annotation = await app.createUnattributed({ ...input, projectId: scope.id, traceId: input.id });
-        return { data: annotation };
-      })
 
-      .delete("/:id", "deleteAnnotation")
-      .withParams(annotationRestParamsSchema)
-      .withPermission("annotations:manage")
-      .withDocs({ summary: "Delete an annotation in the caller’s project" })
-      .handle(async ({ app, input, scope }) => {
-        await app.delete({ id: input.id, projectId: scope.id });
-      }),
-  );
+  .post("/trace/:id", "createTraceAnnotation")
+  .withParams(annotationRestParamsSchema)
+  .withInput(annotationRestWriteSchema)
+  .withPermission("annotations:create")
+  .withOutput(annotationRestResponseSchema)
+  .withDocs({ summary: "Create an unattributed annotation on a trace" })
+  .handle(async ({ app, input, scope }) => {
+    const annotation = await app.createUnattributed({ ...input, projectId: scope.id, traceId: input.id });
+    return { data: annotation };
+  })
+
+  .delete("/:id", "deleteAnnotation")
+  .withParams(annotationRestParamsSchema)
+  .withPermission("annotations:manage")
+  .withDocs({ summary: "Delete an annotation in the caller’s project" })
+  .handle(async ({ app, input, scope }) => {
+    await app.delete({ id: input.id, projectId: scope.id });
+  })
+
+  .build();
 ```
+
+`withNamespace` is the family name and the base path (`/api/annotations`); the process
+mount reads it from the declaration instead of restating it. A route without
+`withOutput` answers 204; a params schema whose keys differ from the path's `:params`
+does not compile; a route without `withPermission` has no `handle` to call.
 
 - `.get/.post/.patch/.put/.delete(path, operationId)`: the path is relative to the
   family's base path, the operation id is unique across every mount.

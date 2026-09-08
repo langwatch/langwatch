@@ -46,7 +46,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "testing-entry":
     "A server package exports its installer and transport declarations only; tests import doubles from the package's own __tests__ directories.",
   "nested-transport":
-    "One flat declaration per protocol: transport/<feature>.rest.ts and transport/<feature>.trpc.ts built with defineTransport(<Feature>Api).",
+    "One flat declaration per protocol: transport/<feature>.rest.ts built with defineRestRouter(<Feature>Api), and transport/<feature>.trpc.ts built with defineTrpcRouter(<Feature>Api, <feature>Trpc) over the contract's <feature>.trpc.ts declaration.",
   "unregistered-repositories":
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ postgres, memory }) and select it with .withRepositories() in <feature>.server.ts.",
   "postgres-without-memory":

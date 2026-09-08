@@ -69,6 +69,7 @@ index.ts
 <name>.schemas.ts        the domain value's zod schema and inferred types; write/read inputs as schemas
 <name>-rest.schemas.ts   params/query/body/response schemas for the REST door (if public)
 <name>-trpc.schemas.ts   input schemas for the tRPC door
+<name>.trpc.ts           export const <name>Trpc = defineTrpcContract("<name>").query(…).withInput(…).withOutput(…).mutation(…)….build()
 <name>.errors.ts         HandledError subclasses with `declare readonly code`, httpStatus, fault
 ```
 
@@ -98,8 +99,8 @@ src/repositories/prisma/prisma.<name>.repository.ts   extends PrismaRepository.f
 src/repositories/prisma/prisma.<name>.repositories.ts prismaRepositories({ <entity>: Prisma<Entity>Repository })
 src/repositories/memory/memory.<name>.repository.ts   the memory twin, same observable behaviour
 src/repositories/memory/memory.<name>.repositories.ts static requires = [] as const; static create(): <Name>Repositories
-src/transport/<name>.rest.ts                          defineTransport(<Name>Api).withVersion(MANAGEMENT_API_VERSION).withRouter(…)   (public REST, optional)
-src/transport/<name>.trpc.ts                          defineTransport(<Name>Api).withRouter(…)                                        (browser)
+src/transport/<name>.rest.ts                          defineRestRouter(<Name>Api).withNamespace("<name>s").withVersion(MANAGEMENT_API_VERSION)….build()   (public REST, optional)
+src/transport/<name>.trpc.ts                          defineTrpcRouter(<Name>Api, <name>Trpc).procedure(name).withPermission(…).handle(…)….build()      (browser)
 src/tasks/<name>.task.ts                              a one-shot program, if any
 ```
 

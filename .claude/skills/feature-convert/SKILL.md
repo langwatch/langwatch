@@ -1,6 +1,6 @@
 ---
 name: feature-convert
-description: "Convert one existing LangWatch feature package to the annotation shape, piece by piece, until packages/architecture-lint/src/feature-shape-baseline.json has no entry left for it: abstract contract service → <Feature>Api token; adapters/postgres.* → repository interfaces with Prisma and memory backends selected by defineRepositories; hand-built services and peers → one app with static dependencies; transport/api-trpc and api-rest classes → flat defineTransport declarations; fixtures/ and testing.ts → app/__tests__/<f>.fixture.ts; the hand-built or refusing composition in apps/api → createApp(...).withFeature(<f>Server); web screens/ and surfaces/ folders → flat src/<id>.ts entries. Use whenever someone says 'convert <feature>', 'bring <feature> into the annotation shape', 'make api-key look like annotation', 'clean up <feature>', 'what is left in <feature>', 'kill the adapters', 'remove the refusing twin', or points a skill at a feature that still has feature-shape entries. Same procedure for every feature: the input changes, the output shape does not."
+description: "Convert one existing LangWatch feature package to the annotation shape, piece by piece, until packages/architecture-lint/src/feature-shape-baseline.json has no entry left for it: abstract contract service → <Feature>Api token; adapters/postgres.* → repository interfaces with Prisma and memory backends selected by defineRepositories; hand-built services and peers → one app with static dependencies; transport/api-trpc and api-rest classes → procedures declared once in the contract (defineTrpcContract) and bound in flat defineTrpcRouter / defineRestRouter declarations; fixtures/ and testing.ts → app/__tests__/<f>.fixture.ts; the hand-built or refusing composition in apps/api → createApp(...).withFeature(<f>Server); web screens/ and surfaces/ folders → flat src/<id>.ts entries. Use whenever someone says 'convert <feature>', 'bring <feature> into the annotation shape', 'make api-key look like annotation', 'clean up <feature>', 'what is left in <feature>', 'kill the adapters', 'remove the refusing twin', or points a skill at a feature that still has feature-shape entries. Same procedure for every feature: the input changes, the output shape does not."
 user-invocable: true
 argument-hint: "<feature> [contract|repositories|app|transport|composition|web|all]"
 ---
@@ -148,22 +148,30 @@ Another package that imported the fixtures builds its own from the memory reposi
 
 ## 6. Transports: flat declarations
 
-For each class in `transport/api-trpc/<f>.api.ts`, one file per tRPC namespace,
-`transport/<f>.trpc.ts` / `transport/<f>-<part>.trpc.ts`:
+For each class in `transport/api-trpc/<f>.api.ts`, one namespace becomes two files: the
+declaration in the contract and the binding in the server.
 
 ```ts
-export const apiKeyTrpcTransport = defineTransport(ApiKeyApi).withRouter((router) =>
-  router
-    .query("list", (p) => p.withInput(listInputSchema).withOutput(apiKeySchema.array()).withPermission("apiKeys:view").handle(({ app, input }) => app.list(input)))
-    .build(),
-).build();
+// contract/src/api-key.trpc.ts
+export const apiKeyTrpc = defineTrpcContract("apiKey")
+  .query("list").withInput(listInputSchema).withOutput(apiKeySchema.array())
+  .mutation("revoke").withInput(revokeInputSchema)
+  .build();
+
+// server/src/transport/api-key.trpc.ts
+export const apiKeyTrpcTransport = defineTrpcRouter(ApiKeyApi, apiKeyTrpc)
+  .procedure("list").withPermission("apiKeys:view").handle(({ app, input }) => app.list(input))
+  .procedure("revoke").withPermission("apiKeys:manage").handle(async ({ app, input }) => { await app.revoke(input); })
+  .build();
 ```
 
-Each old procedure becomes one `.query`/`.mutation` with the **same wire name**, the same
-input schema, the permission it enforced (or `noPermission({ reason })` /
-`serviceAuthorized({...})`), and a handler calling one app operation. Logic found in the
-class body beyond input mapping moves to the app first. REST likewise becomes
-`transport/<f>.rest.ts` with `defineTransport(<F>Api).withVersion(MANAGEMENT_API_VERSION).withRouter(...)`,
+Each old procedure keeps the **same wire name**, the same input schema (moved into the
+contract if it was private to the class) and the same output; the server keeps the
+permission it enforced (or `noPermission({ reason })` / `serviceAuthorized({...})`) and a
+handler calling one app operation. Logic found in the class body beyond input mapping
+moves to the app first. The web package's hand-written map for these namespaces is then
+replaced by `ContractApiMap<typeof apiKeyTrpc>`. REST becomes `transport/<f>.rest.ts` with
+`defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(MANAGEMENT_API_VERSION)…build()`,
 same paths, same operation ids (`withDocs`), same schemas. Delete the `api-trpc/` and
 `api-rest/` folders. The `api-trpc-procedure` and `api-rest-route` skills hold the
 builder details and the browser side.

@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Add a new 'saved-view' feature: users can save a named set of trace filters per project, list them and delete them. Settings page under the project.",
-      "expected_output": "Creates packages/features/saved-view/{contract,server,web} with feature.json, a spec file written first, a catalogue.json subject, zod schemas with infer, a callable <Name>Api interface with its featureApi token, an installer built with defineFeature, an app class over private services, repository interfaces with Prisma and memory backends selected by defineRepositories, a flat tRPC declaration via defineTransport, an apps/api composition that boots the installer with createApp, apps/ui catalogue and WebInstallation registrations, error codes registered in handled-error, and tests binding every scenario; runs scoped gates only.",
+      "expected_output": "Creates packages/features/saved-view/{contract,server,web} with feature.json, a spec file written first, a catalogue.json subject, zod schemas with infer, a callable <Name>Api interface with its featureApi token, an installer built with defineFeature, an app class over private services, repository interfaces with Prisma and memory backends selected by defineRepositories, a flat tRPC declaration via defineTrpcContract in the contract and defineTrpcRouter / defineRestRouter, an apps/api composition that boots the installer with createApp, apps/ui catalogue and WebInstallation registrations, error codes registered in handled-error, and tests binding every scenario; runs scoped gates only.",
       "files": []
     },
     {

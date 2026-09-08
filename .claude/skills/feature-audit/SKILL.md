@@ -62,9 +62,11 @@ Walk `server/src` against `references/server.md`:
   before excusing a query.
 - **`TenantId` as the first predicate of every ClickHouse query**, plus the partition
   key column in the WHERE when a date range exists, and no `LIMIT 1 BY` on heavy columns.
-- **Transports**: flat `transport/<f>.rest.ts` / `<f>.trpc.ts` via `defineTransport`;
-  input and output schemas on every route; a permission or a declared alternative on
-  every route; handlers calling exactly one app operation. Importing a repository,
+- **Transports**: tRPC declared once in the contract's `<f>.trpc.ts` (`defineTrpcContract`)
+  and bound in `transport/<f>.trpc.ts` with `defineTrpcRouter(<F>Api, <f>Trpc)`; REST in
+  `transport/<f>.rest.ts` via `defineRestRouter`; input and output schemas on every
+  procedure and route; a permission or a declared alternative on every one; handlers
+  calling exactly one app operation; no `TContext`/`TRoot`/mount type in the feature. Importing a repository,
   constructing a service, reading `process.env` or a header, returning a `Response`,
   domain logic in a mapping helper.
 - Legacy pieces (`contract/src/<f>.service.ts`, `adapters/postgres.*`, `fixtures/`,

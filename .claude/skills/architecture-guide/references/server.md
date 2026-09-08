@@ -37,8 +37,8 @@ repositories/prisma/prisma.<f>.repositories.ts        prismaRepositories({ … }
 repositories/memory/memory.<name>.repository.ts       the memory twin of every Prisma repository
 repositories/memory/memory.<f>.repositories.ts        the memory bundle (static requires = [], static create())
 repositories/memory/memory.<name>.database.ts         shared in-memory tables, when several twins share rows
-transport/<f>.rest.ts                                 defineTransport(<F>Api).withVersion(…).withRouter(…)
-transport/<f>.trpc.ts · transport/<f>-<part>.trpc.ts  defineTransport(<F>Api).withRouter(…), one file per tRPC namespace
+transport/<f>.rest.ts                                 defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(…).get(…)….build()
+transport/<f>.trpc.ts · transport/<f>-<part>.trpc.ts  defineTrpcRouter(<F>Api, <f>Trpc).procedure(name).withPermission(…).handle(…)….build(), one file per namespace
 ports/<name>.port.ts                                  abstract class …Port for TECHNICAL infrastructure only
 stores/ · projections/ · subscribers/ · processes/ · intents/    eventing roles, unchanged
 tasks/<name>.task.ts                                  a one-shot program composed by apps/tasks
@@ -228,45 +228,50 @@ dependency.
 collaborator. `PURE_VALUE_CONSTRUCTORS` in `feature-layout-policy.mjs` lists the
 built-ins it may construct.
 
-**`transport/`**: inert declarations. A transport parses input with the contract's
-schemas, declares its permission, calls exactly one app operation and returns a value.
-It never touches a repository, constructs a service, reads a header, or hand-rolls a
-response (`api-transport-*`, `no-raw-hono-mount`).
+**`transport/`**: inert declarations. A transport declares its permission, calls exactly
+one app operation and returns a value the declared output schema accepts. It never
+touches a repository, constructs a service, reads a header, or hand-rolls a response
+(`api-transport-*`, `no-raw-hono-mount`), and it names no process generic
+(`TContext`, `TRoot`, a mount type): the process mount binds the framework's request
+context on its own side.
+
+A tRPC procedure is declared **once, in the contract** (`contract/src/<f>.trpc.ts`,
+`defineTrpcContract` from `@langwatch/api/contract`: name, kind, input, output) and the
+server binds only what the contract could not say (`defineTrpcRouter` from
+`@langwatch/api/trpc`: permission and handler). `.procedure(name)` selects a declared
+member; an unknown name, a duplicate, a missing implementation at `build()`, `handle`
+before an access decision, or data returned from a void procedure does not compile. REST
+is one complete endpoint per route, in the server (`defineRestRouter` from
+`@langwatch/api/rest`); a route without output answers 204, and params must match the
+path exactly. The design is `packages/api/adrs/20260908-transport-declaration-split.md`.
 
 ```ts
-// transport/annotation.rest.ts
-export const annotationRest = defineTransport(AnnotationApi)
+// contract/src/annotation-score.trpc.ts
+export const annotationScoreTrpc = defineTrpcContract("annotationScore")
+  .query("getAll").withInput(annotationScoreProjectScopeSchema).withOutput(annotationScoreSchema.array())
+  .mutation("delete").withInput(annotationScoreScopeSchema).withOutput(annotationScoreSchema)
+  .build();
+
+// server/src/transport/annotation-score.trpc.ts
+export const annotationScoreTrpcTransport = defineTrpcRouter(AnnotationApi, annotationScoreTrpc)
+  .procedure("getAll").withPermission("annotations:view")
+  .handle(async ({ app, input }) => app.listScores({ projectId: input.projectId }))
+  .procedure("delete").withPermission("annotations:delete")
+  .handle(async ({ app, input }) => app.deleteScore({ id: input.scoreId, projectId: input.projectId }))
+  .build();
+
+// server/src/transport/annotation.rest.ts
+export const annotationRest = defineRestRouter(AnnotationApi)
+  .withNamespace("annotations")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withRouter((router) =>
-    router
-      .get("/:id", "getAnnotation")
-      .withParams(annotationRestParamsSchema)
-      .withPermission("annotations:view")
-      .withOutput(annotationRestResponseSchema)
-      .withDocs({ summary: "Get an annotation in the caller’s project" })
-      .handle(async ({ app, input, scope }) => ({ data: await app.getById({ id: input.id, projectId: scope.id }) })),
-  );
-
-// transport/annotation-score.trpc.ts
-export const annotationScoreTrpcTransport = defineTransport(AnnotationApi).withRouter((router) =>
-  router.query("getAll", (p) =>
-    p.withInput(projectScopeSchema).withOutput(annotationScoreSchema.array()).withPermission("annotations:view")
-      .handle(async ({ app, input }) => app.listScores({ projectId: input.projectId })),
-  ),
-);
+  .get("/:id", "getAnnotation")
+  .withParams(annotationRestParamsSchema)
+  .withPermission("annotations:view")
+  .withOutput(annotationRestResponseSchema)
+  .withDocs({ summary: "Get an annotation in the caller’s project" })
+  .handle(async ({ app, input, scope }) => ({ data: await app.getById({ id: input.id, projectId: scope.id }) }))
+  .build();
 ```
-
-**Where transports are going.** The next step of `@langwatch/api` splits the declaration
-from the implementation: the contract declares each tRPC procedure once
-(`contract/src/<f>.trpc.ts`, `defineTrpcContract("<f>").query("getById").withInput(…).withOutput(…)`
-from `@langwatch/api/contract`), the server binds permission and handler to a procedure
-the contract already named (`defineTrpcRouter(<F>Api, <f>Trpc).procedure("getById").withPermission(…).handle(…)`
-from `@langwatch/api/trpc`), and the browser derives its typed client from
-`typeof <f>Trpc` instead of a hand-written api-map. REST stays one complete endpoint per
-route, in the server (`defineRestRouter(<F>Api).withNamespace("<f>s").withVersion("v1")`).
-Until that lands, annotation's `defineTransport` files are the shape to copy: the
-procedure names, schemas and permissions they carry are exactly what the split moves,
-so write them once, in the contract's vocabulary, and nothing is thrown away.
 
 Handlers receive `{ input, app, actor, scope, signal }`: `input` is the merged, parsed
 params/query/body; `scope` is the authorized target (`{ tier: "project", id }`); `actor`

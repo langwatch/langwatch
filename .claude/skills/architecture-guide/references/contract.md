@@ -125,11 +125,11 @@ a pure function or a value, it moves into A's contract, not into a shared `utils
 
 ## The browser's api-map
 
-The web half never names `AppRouter` (ADR-130). It declares the procedures it calls as a
-map typed from contract inputs and outputs in `web/src/behavior/<name>-api.ts`; see
-`references/web.md`. The contract's job is to export the input and output types that map
-needs. The api-map is transitional: once `@langwatch/api/contract` ships
-`defineTrpcContract`, the contract declares the procedures themselves in
-`<f>.trpc.ts` (name, kind, input, output) and the browser derives its client from that
-declaration. Keep the web map's segment and procedure names identical to the transport's
-so the move is mechanical.
+The web half never names `AppRouter` (ADR-130) and writes no procedure map by hand. The
+contract declares each tRPC procedure once in `<f>.trpc.ts` (or `<f>-<part>.trpc.ts`, one
+file per namespace) with `defineTrpcContract("<namespace>")` from `@langwatch/api/contract`:
+the wire name, `query`/`mutation`/`subscription`, `withInput(schema)` and, when it answers
+data, `withOutput(schema)`. The browser derives its client from that declaration
+(`ContractApiMap<typeof <f>Trpc>` in `web/src/behavior/<f>-api.ts`, see `references/web.md`),
+and the server binds permission and handler to the same names. A contract `.trpc.ts` file
+value-imports only `@langwatch/api/contract`, `zod` and its sibling schemas.

@@ -39,6 +39,7 @@ packages/features/annotation/
 ├── feature.json · specs/ · adrs/
 ├── contract/src/
 │   ├── annotation.api.ts            interface AnnotationApi + featureApi token
+│   ├── annotation.trpc.ts · annotation-score.trpc.ts   defineTrpcContract: every procedure's name, kind, input, output
 │   ├── annotation.schemas.ts · annotation-queue.schemas.ts · annotation-rest.schemas.ts · annotation-trpc.schemas.ts
 │   ├── annotation.errors.ts · annotation-queue.errors.ts
 │   └── annotation-*.types.ts · index.ts
@@ -111,10 +112,14 @@ Read the one that matches the layer you are about to touch. Each is short.
   through `defineRepositories({ postgres, memory })`. No `adapters/postgres.*.adapter.ts`
   (`feature-shape: persistence-adapter`, `postgres-without-memory`,
   `unregistered-repositories`).
-- Transports are inert declarations: `transport/<f>.rest.ts` and `transport/<f>.trpc.ts`
-  built with `defineTransport(<F>Api)`, handlers inline beside verb, path, permission and
-  schemas, reading `{ input, app, actor, scope }`. No `transport/<surface>/` folders
-  (`feature-shape: nested-transport`). The process mounts them; the feature never does.
+- A tRPC procedure is declared once, in the contract (`<f>.trpc.ts`,
+  `defineTrpcContract`: name, kind, input, output); the server's `transport/<f>.trpc.ts`
+  binds permission and handler with `defineTrpcRouter(<F>Api, <f>Trpc)` and repeats
+  nothing; the browser derives its client from the same declaration. REST is one complete
+  endpoint per route in `transport/<f>.rest.ts` via `defineRestRouter(<F>Api)`. Handlers
+  read `{ input, app, actor, scope, signal }` and name no process generic. No
+  `transport/<surface>/` folders (`feature-shape: nested-transport`). The process mounts
+  them; the feature never does.
 - `index.ts` of a server package exports the installer and the transport declarations.
   Never a repository, store, projection, service or app (`private-runtime-export`).
 - A `ports/*.port.ts` is for technical infrastructure only (encryption, object storage, a

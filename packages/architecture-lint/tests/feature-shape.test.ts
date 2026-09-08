@@ -151,7 +151,7 @@ describe("feature shape", () => {
 
       expect(rejected).toHaveLength(5);
       expect(rejected.map((violation) => violation.allowed)).toEqual(
-        expect.arrayContaining([expect.stringContaining("defineTransport")]),
+        expect.arrayContaining([expect.stringContaining("defineTrpcRouter")]),
       );
     });
 

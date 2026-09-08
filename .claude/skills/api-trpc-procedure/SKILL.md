@@ -1,6 +1,6 @@
 ---
 name: api-trpc-procedure
-description: "Add or change one tRPC procedure end to end the annotation way: the contract input schema and <Feature>Api operation, the inline handler on the feature's flat transport/<f>.trpc.ts declaration (defineTransport from @langwatch/api/trpc) with its declared permission, the API-side mount in apps/api/src/features/<f>/<f>-trpc.mount.ts and the namespace in app-trpc.features.ts, and the browser's behavior/<f>-api.ts map slot typed from contract types (never AppRouter, ADR-130) plus its hook. Use whenever someone says 'add a tRPC procedure', 'a new mutation for the UI', 'the page needs this data', 'api.<x>.<y> does not exist', a procedure 404s or answers UNAUTHORIZED, or a React Query cache key is not shared with the rest of the app."
+description: "Add or change one tRPC procedure end to end the annotation way: the contract input schema and <Feature>Api operation, the procedure declared once in the contract's <f>.trpc.ts (defineTrpcContract from @langwatch/api/contract: name, kind, input, output), its permission and handler bound in the server's flat transport/<f>.trpc.ts (defineTrpcRouter from @langwatch/api/trpc), the API-side mount in apps/api/src/features/<f>/<f>-trpc.mount.ts and the namespace in app-trpc.features.ts, and the browser client derived from the contract (ContractApiMap, never AppRouter, ADR-130) plus its hook. Use whenever someone says 'add a tRPC procedure', 'a new mutation for the UI', 'the page needs this data', 'api.<x>.<y> does not exist', a procedure 404s or answers UNAUTHORIZED, or a React Query cache key is not shared with the rest of the app."
 user-invocable: true
 argument-hint: "<feature> <namespace.procedure, e.g. 'annotationScore.getAllActive'>"
 ---
@@ -12,32 +12,33 @@ The reference is `annotation`:
 
 ```
 packages/features/annotation/contract/src/annotation-trpc.schemas.ts       input schemas
-packages/features/annotation/contract/src/annotation.api.ts                the operations
-packages/features/annotation/server/src/transport/annotation.trpc.ts       the `annotation.*` declaration
-packages/features/annotation/server/src/transport/annotation-score.trpc.ts the `annotationScore.*` declaration
+packages/features/annotation/contract/src/annotation.trpc.ts               the `annotation.*` declaration (defineTrpcContract)
+packages/features/annotation/contract/src/annotation-score.trpc.ts         the `annotationScore.*` declaration
+packages/features/annotation/contract/src/annotation.api.ts                the operations the handlers call
+packages/features/annotation/server/src/transport/annotation.trpc.ts       the `annotation.*` binding (defineTrpcRouter)
+packages/features/annotation/server/src/transport/annotation-score.trpc.ts the `annotationScore.*` binding
 apps/api/src/features/annotation/annotation-trpc.mount.ts                  the mount (context binding)
 apps/api/src/app-trpc/app-trpc.features.ts · app-trpc.composed.ts          the namespaces and the composed slot
-packages/features/annotation/web/src/behavior/annotation-api.ts            the browser map
+packages/features/annotation/web/src/behavior/annotation-api.ts            the browser client, derived from the contract
 ```
 
 tRPC is the first-party browser transport only. Public integrations get REST
 (ADR-128, `api-rest-route`). A `transport/api-trpc/<f>.api.ts` folder is the older spelling
-(`feature-shape: nested-transport`); add new procedures to the flat declaration, creating
-`transport/<f>.trpc.ts` if the feature has none yet.
+(`feature-shape: nested-transport`); add new procedures to the contract declaration and
+its flat binding, creating `contract/src/<f>.trpc.ts` and `server/src/transport/<f>.trpc.ts`
+if the feature has none yet.
 
-The declaration is about to split (`references/server.md`, "Where transports are going"):
-the contract will name each procedure with its input and output
-(`defineTrpcContract`), the server will bind permission and handler to that name
-(`defineTrpcRouter`), and the browser will derive its client from the contract. Write the
-procedure today so that move is a cut and paste: the input schema in
-`<f>-trpc.schemas.ts`, the output a contract schema, the wire name the same in the
-declaration and the web map.
+A procedure is stated once. The contract names it, its kind, its input and its output;
+the server binds a permission and a handler to that name and repeats nothing; the browser
+derives its client from the contract's type. Design:
+`packages/api/adrs/20260908-transport-declaration-split.md`; spec:
+`packages/api/specs/transport-declaration-split.feature`.
 
 ## 1. Spec first
 
 Golden path plus each named refusal, tagged and bound per the `spec-bind` skill.
 
-## 2. Contract
+## 2. Contract: declare the procedure
 
 The input schema goes in `<f>-trpc.schemas.ts` (`<f>ApiCreateInputSchema`, with the
 `projectId` the permission is checked against as a required field). The output is a
@@ -46,46 +47,63 @@ method on `interface <F>Api` in `<f>.api.ts`; a new failure gets a `HandledError
 in `<f>.errors.ts`, its code added to `packages/handled-error/src/app-codes.ts` and its
 copy to `packages/handled-error/src/presentation.ts` in the same change.
 
-## 3. The declaration
-
-`packages/features/<f>/server/src/transport/<f>.trpc.ts`. One file per namespace; it
-constructs nothing:
+Then the procedure itself joins the namespace's declaration in
+`packages/features/<f>/contract/src/<f>.trpc.ts` (one file per namespace):
 
 ```ts
-export const annotationScoreTrpcTransport = defineTransport(AnnotationApi)
-  .withRouter((router) =>
-    router
-      .query("getAllActive", (p) =>
-        p
-          .withInput(projectScopeSchema)
-          .withOutput(annotationScoreSchema.array())
-          .withPermission("annotations:view")
-          .handle(async ({ app, input }) => app.listScores({ projectId: input.projectId, activeOnly: true })),
-      )
-      .mutation("upsert", (p) =>
-        p
-          .withInput(upsertInputSchema)
-          .withOutput(annotationScoreSchema)
-          .withPermission("annotations:manage")
-          .handle(async ({ app, input, actor }) => app.upsertScore({ ...toUpsertInput(input), actorId: actor.id })),
-      ),
-  );
+export const annotationScoreTrpc = defineTrpcContract("annotationScore")
+  .query("getAllActive")
+  .withInput(annotationScoreProjectScopeSchema)
+  .withOutput(annotationScoreSchema.array())
+  .mutation("upsert")
+  .withInput(annotationScoreUpsertInputSchema)
+  .withOutput(annotationScoreSchema)
+  .build();
 ```
 
-- `.query(name, …)` / `.mutation(name, …)`; `.withInput` and `.withOutput` are mandatory.
-- `.withPermission(...)` takes an `AuthzPermission` or an `AuthzDeclaration`. The check
-  reads its scope id from the **validated** input, which is why it is declared after
-  `.withInput`. A procedure that cannot take a permission states why with the declaration
-  kinds `noPermission({ reason })` or `serviceAuthorized({ reason, permissions, enforces })`;
+- `.query(name)` / `.mutation(name)` / `.subscription(name)`, then `.withInput(schema)`;
+  `.withOutput(schema)` states the answer, and omitting it declares a procedure that
+  answers nothing (a handler returning data then does not compile).
+- The file value-imports `@langwatch/api/contract`, `zod` and sibling schemas only. It is
+  what the browser reads, so nothing server-side may reach it.
+- Declaring the same name twice throws at module load; the wire name is the React Query
+  cache key, so it is chosen once here and never spelled again.
+
+## 3. Server: bind permission and handler
+
+`packages/features/<f>/server/src/transport/<f>.trpc.ts`. One file per namespace; it
+constructs nothing and repeats nothing the contract said:
+
+```ts
+export const annotationScoreTrpcTransport = defineTrpcRouter(AnnotationApi, annotationScoreTrpc)
+  .procedure("getAllActive")
+  .withPermission("annotations:view")
+  .handle(async ({ app, input }) => app.listScores({ projectId: input.projectId, activeOnly: true }))
+  .procedure("upsert")
+  .withPermission("annotations:manage")
+  .handle(async ({ app, input }) => app.upsertScore(toUpsertInput(input)))
+  .build();
+```
+
+- `.procedure(name)` selects a member the contract declared; a name it did not declare,
+  the same name twice, or `build()` with a member unimplemented does not compile (and
+  `router(service)` throws by name at runtime as the second line).
+- `.withPermission(...)` takes an `AuthzPermission` or an `AuthzDeclaration`, and the
+  check reads its scope id from the **validated** input. A procedure that cannot take a
+  permission states why with `noPermission({ reason })` or
+  `serviceAuthorized({ reason, permissions, enforces })`;
   `apps/api/src/app-trpc/app-trpc.declared-check.ts` maps every kind to the middleware
-  that enforces it and throws at boot on a kind it does not know.
-- The handler reads `{ app, input, actor, scope, signal }` and calls exactly one app
-  operation. Small wire-to-domain mapping (`radioOptions(...)`) is a module-local function
-  beside the declaration; domain logic is not. No repositories, no services constructed,
-  no `ctx`, no `process.env` (`api-transport-*` rules).
-- Export the declaration from the server package `index.ts` and list it in
+  that enforces it and throws at boot on a kind it does not know. Without an access
+  decision there is no `handle` to call.
+- The handler reads `{ app, input, actor, scope, signal }`, typed from the contract's
+  input, and calls exactly one app operation. Its return must satisfy the declared
+  output. Small wire-to-domain mapping (`radioOptions(...)`) is a module-local function
+  beside the binding; domain logic is not. No repositories, no services constructed, no
+  `ctx`, no `process.env` (`api-transport-*` rules), no `TContext`/`TRoot`/mount type.
+- Export the binding from the server package `index.ts` and list it in
   `<f>.server.ts`'s `.withTransports(...)`. Two namespaces from one feature are two
-  declarations (`annotationTrpcTransport`, `annotationScoreTrpcTransport`).
+  contract declarations and two bindings (`annotationTrpcTransport`,
+  `annotationScoreTrpcTransport`).
 
 ## 4. Mount it in apps/api
 
@@ -130,23 +148,23 @@ the real mount with `createApiFixture` peers and a recording Prisma client.
 
 ## 5. The browser side
 
-`packages/features/<f>/web/src/behavior/<f>-api.ts` declares the map:
+`packages/features/<f>/web/src/behavior/<f>-api.ts` derives the client from the contract;
+a new procedure on a declared namespace needs no edit here:
 
 ```ts
-export type AnnotationApiMap = {
-  annotationScore: {
-    getAllActive: { query: { input: ProjectScope; output: WireOf<AnnotationScore>[] } };
-    upsert: { mutation: { input: AnnotationScoreUpsertInput; output: WireOf<AnnotationScore> } };
-  };
-};
-export const annotationApi = createFeatureApi<AnnotationApiMap>();
+type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> & ContractApiMap<typeof annotationScoreTrpc>;
+export const annotationApi = createFeatureApi<AnnotationProcedures>();
+export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
 ```
 
-- **Never name `AppRouter`** (ADR-130). Type every slot from the contract's own types;
-  `WireOf<T>` gives the serialised shape (dates as strings); never `any`.
-- **The segment names are load-bearing.** `annotationScore` here must be the namespace
-  `app-trpc.features.ts` mounts, because tRPC hashes that path into the React Query cache
-  key. A different spelling silently stops sharing a cache with every other call site.
+- **Never name `AppRouter`** (ADR-130) and never write a procedure map by hand for a
+  namespace this feature declares. A procedure another feature owns and this package
+  still calls is the one hand-written exception, in a `BorrowedProcedures` type that says
+  so until that feature's contract declares it; `WireOf<T>` gives its serialised shape.
+- **The segment names are load-bearing.** The contract's namespace (`"annotationScore"`)
+  must be the key `app-trpc.features.ts` mounts, because tRPC hashes that path into the
+  React Query cache key. A different spelling silently stops sharing a cache with every
+  other call site.
 - The hook goes in `behavior/use-<thing>.ts` and returns state and callbacks, never JSX.
   Mutation failures are read with `readHandledError` and rendered from the code-keyed
   registry; `meta.fieldErrors` maps onto the offending form fields.
@@ -166,5 +184,5 @@ pnpm --filter @langwatch/platform-api typecheck && pnpm --filter @langwatch/ui t
 ## Report
 
 The namespace and procedure names, the permission or declaration each carries, whether a
-namespace was added (and the two files it touched), the map slot and hook added, the
-scenarios and their bindings.
+namespace was added (and the two files it touched), the hook added, the scenarios and
+their bindings.
