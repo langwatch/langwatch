@@ -1011,7 +1011,7 @@ export default function CliAuthPage() {
                     <strong>{action.organizationName}</strong>. You can close
                     this tab and return to your terminal.
                   </StatusCard>
-                  <FirstTraceRedirect />
+                  <FirstTraceRedirect organizationId={selectedOrgId} />
                 </>
               )}
             </>
