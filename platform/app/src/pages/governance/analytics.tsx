@@ -54,11 +54,6 @@ function AnalyticsPage() {
   const [timeWindow, setTimeWindow] = useState<ExploreWindow>(
     DEFAULT_EXPLORE_WINDOW,
   );
-  const [selection, setSelection] = useState<ExploreSelection>(
-    DEFAULT_EXPLORE_SELECTION,
-  );
-  const patch = (next: Partial<ExploreSelection>) =>
-    setSelection((current) => ({ ...current, ...next }));
 
   return (
     <GovernanceLayout pageTitle="Analytics · AI Governance · LangWatch">
@@ -103,136 +98,7 @@ function AnalyticsPage() {
             </Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="explore" paddingTop={4}>
-            <VStack align="stretch" gap={4}>
-              <HStack gap={2} flexWrap="wrap">
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  letterSpacing="0.08em"
-                  color="fg.muted"
-                  textTransform="uppercase"
-                  paddingRight={1}
-                >
-                  Templates
-                </Text>
-                {EXPLORE_TEMPLATES.map((template) => {
-                  const active = matchesTemplate(selection, template);
-                  return (
-                    <Button
-                      key={template.label}
-                      size="xs"
-                      variant={active ? "subtle" : "outline"}
-                      colorPalette={active ? "orange" : "gray"}
-                      borderRadius="full"
-                      fontWeight={active ? "medium" : "normal"}
-                      onClick={() => setSelection(template.selection)}
-                    >
-                      {template.label}
-                    </Button>
-                  );
-                })}
-              </HStack>
-
-              <HStack
-                gap={4}
-                flexWrap="wrap"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="lg"
-                paddingX={4}
-                paddingY={3}
-              >
-                <ControlSelect
-                  label="Measure"
-                  value={selection.measure}
-                  onChange={(value) =>
-                    patch({ measure: value as ExploreMeasure })
-                  }
-                  options={EXPLORE_MEASURES}
-                />
-                <ControlSelect
-                  label="Break down by"
-                  value={selection.breakdown}
-                  onChange={(value) =>
-                    patch({ breakdown: value as ExploreBreakdown })
-                  }
-                  options={EXPLORE_BREAKDOWNS}
-                />
-                <ControlSelect
-                  label="Over time"
-                  value={selection.interval}
-                  onChange={(value) =>
-                    patch({ interval: value as ExploreInterval })
-                  }
-                  options={EXPLORE_INTERVALS}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  borderStyle="dashed"
-                  fontWeight="normal"
-                >
-                  <Filter size={14} />
-                  Add filter
-                </Button>
-              </HStack>
-
-              <VStack
-                align="stretch"
-                gap={1}
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="lg"
-                padding={5}
-                minHeight="440px"
-              >
-                <Text fontWeight="semibold">
-                  {exploreChartTitle(selection)}
-                </Text>
-                <Text fontSize="sm" color="fg.muted">
-                  {orgName} · last {timeWindow}
-                </Text>
-                <Box
-                  flex={1}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Text color="fg.muted">No data yet</Text>
-                </Box>
-              </VStack>
-
-              <HStack
-                justify="space-between"
-                gap={4}
-                flexWrap="wrap"
-                background="bg.muted"
-                borderRadius="lg"
-                paddingX={4}
-                paddingY={3}
-              >
-                <HStack gap={3}>
-                  <Badge
-                    background="fg"
-                    color="bg"
-                    fontFamily="mono"
-                    fontSize="xs"
-                  >
-                    lwql
-                  </Badge>
-                  <Text fontFamily="mono" fontSize="sm">
-                    {exploreQueryLine(selection)}
-                  </Text>
-                </HStack>
-                <HStack gap={2} color="fg.muted">
-                  <Copy size={14} />
-                  <Text fontSize="sm">
-                    every surface (dashboards, signals, alerts, Langy) compiles
-                    to this
-                  </Text>
-                </HStack>
-              </HStack>
-            </VStack>
+            <ExploreTab orgName={orgName} timeWindow={timeWindow} />
           </Tabs.Content>
           <Tabs.Content value="dashboards" paddingTop={4}>
             <Text color="fg.muted">No dashboards yet.</Text>
@@ -240,6 +106,169 @@ function AnalyticsPage() {
         </Tabs.Root>
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+/** Template chips, the three controls, the chart body and the query line. */
+function ExploreTab({
+  orgName,
+  timeWindow,
+}: {
+  orgName: string;
+  timeWindow: ExploreWindow;
+}) {
+  const [selection, setSelection] = useState<ExploreSelection>(
+    DEFAULT_EXPLORE_SELECTION,
+  );
+  const patch = (next: Partial<ExploreSelection>) =>
+    setSelection((current) => ({ ...current, ...next }));
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <TemplateChips selection={selection} onPick={setSelection} />
+      <HStack
+        gap={4}
+        flexWrap="wrap"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="lg"
+        paddingX={4}
+        paddingY={3}
+      >
+        <ControlSelect
+          label="Measure"
+          value={selection.measure}
+          onChange={(value) => patch({ measure: value as ExploreMeasure })}
+          options={EXPLORE_MEASURES}
+        />
+        <ControlSelect
+          label="Break down by"
+          value={selection.breakdown}
+          onChange={(value) => patch({ breakdown: value as ExploreBreakdown })}
+          options={EXPLORE_BREAKDOWNS}
+        />
+        <ControlSelect
+          label="Over time"
+          value={selection.interval}
+          onChange={(value) => patch({ interval: value as ExploreInterval })}
+          options={EXPLORE_INTERVALS}
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          borderStyle="dashed"
+          fontWeight="normal"
+        >
+          <Filter size={14} />
+          Add filter
+        </Button>
+      </HStack>
+      <ExploreChart
+        selection={selection}
+        orgName={orgName}
+        timeWindow={timeWindow}
+      />
+      <QueryLine selection={selection} />
+    </VStack>
+  );
+}
+
+function TemplateChips({
+  selection,
+  onPick,
+}: {
+  selection: ExploreSelection;
+  onPick: (selection: ExploreSelection) => void;
+}) {
+  return (
+    <HStack gap={2} flexWrap="wrap">
+      <Text
+        fontSize="xs"
+        fontWeight="semibold"
+        letterSpacing="0.08em"
+        color="fg.muted"
+        textTransform="uppercase"
+        paddingRight={1}
+      >
+        Templates
+      </Text>
+      {EXPLORE_TEMPLATES.map((template) => {
+        const active = matchesTemplate(selection, template);
+        return (
+          <Button
+            key={template.label}
+            size="xs"
+            variant={active ? "subtle" : "outline"}
+            colorPalette={active ? "orange" : "gray"}
+            borderRadius="full"
+            fontWeight={active ? "medium" : "normal"}
+            onClick={() => onPick(template.selection)}
+          >
+            {template.label}
+          </Button>
+        );
+      })}
+    </HStack>
+  );
+}
+
+/** The chart body is not real yet and says so. */
+function ExploreChart({
+  selection,
+  orgName,
+  timeWindow,
+}: {
+  selection: ExploreSelection;
+  orgName: string;
+  timeWindow: ExploreWindow;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      gap={1}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="lg"
+      padding={5}
+      minHeight="440px"
+    >
+      <Text fontWeight="semibold">{exploreChartTitle(selection)}</Text>
+      <Text fontSize="sm" color="fg.muted">
+        {orgName} · last {timeWindow}
+      </Text>
+      <Box flex={1} display="flex" alignItems="center" justifyContent="center">
+        <Text color="fg.muted">No data yet</Text>
+      </Box>
+    </VStack>
+  );
+}
+
+function QueryLine({ selection }: { selection: ExploreSelection }) {
+  return (
+    <HStack
+      justify="space-between"
+      gap={4}
+      flexWrap="wrap"
+      background="bg.muted"
+      borderRadius="lg"
+      paddingX={4}
+      paddingY={3}
+    >
+      <HStack gap={3}>
+        <Badge background="fg" color="bg" fontFamily="mono" fontSize="xs">
+          lwql
+        </Badge>
+        <Text fontFamily="mono" fontSize="sm">
+          {exploreQueryLine(selection)}
+        </Text>
+      </HStack>
+      <HStack gap={2} color="fg.muted">
+        <Copy size={14} />
+        <Text fontSize="sm">
+          every surface (dashboards, signals, alerts, Langy) compiles to this
+        </Text>
+      </HStack>
+    </HStack>
   );
 }
 
