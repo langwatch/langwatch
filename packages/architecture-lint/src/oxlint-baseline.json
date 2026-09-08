@@ -1034,22 +1034,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/features/dashboard/server/src/transport/api-rest/graph.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dashboard/server/src/transport/api-trpc/graph.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dashboard/server/src/transport/api-trpc/saved-view.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/features/dashboard/server/src/transport/api-trpc/saved-workbench-chart.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|packages/features/data-privacy/contract/src/data-privacy.chat-array.ts",
       "measured": "2026-09-06"
     },
@@ -5530,10 +5514,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|packages/features/dashboard/server/src/transport/api-trpc/graph.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/data-privacy/contract/src/data-privacy.chat-array.ts",
       "measured": "2026-09-06"
     },
@@ -7079,14 +7059,6 @@
     },
     {
       "key": "id-generation-origin|packages/features/automation/server/src/transport/api-rest/automation.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "id-generation-origin|packages/features/dashboard/server/src/app/dashboard.app.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "id-generation-origin|packages/features/dashboard/server/src/services/saved-view.service.ts",
       "measured": "2026-09-08"
     },
     {

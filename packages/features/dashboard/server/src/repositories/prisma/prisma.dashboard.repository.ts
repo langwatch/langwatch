@@ -1,32 +1,38 @@
-import type {
-  Dashboard as PrismaDashboard,
-  Prisma,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
 import {
+  dashboardSchema,
   graphFiltersSchema,
   graphPayloadSchema,
   graphSchema,
-  dashboardSchema,
-  savedWorkbenchChartSchema,
   savedWorkbenchChartDefinitionSchema,
+  savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
+  SavedWorkbenchChartNotFoundError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
-import {
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+
+import type {
+  DashboardGraphKind,
+  DashboardRecord,
   DashboardRepository,
-  type DashboardGraphKind,
-  type SavedWorkbenchChartRecord,
-  type DashboardRecord,
-  type DashboardSummaryRecord,
-  type GraphRecord,
-} from "../../ports/dashboard.port.ts";
+  DashboardSummaryRecord,
+  GraphRecord,
+  SavedWorkbenchChartRecord,
+} from "../dashboard.repository.ts";
 
 const BUILDER_CHART_KIND = "builder";
 const WORKBENCH_SQL_CHART_KIND = "workbench_sql";
 
-const toDashboard = (row: PrismaDashboard): DashboardRecord =>
+const dashboardRow = (row: {
+  id: string;
+  projectId: string;
+  name: string;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): DashboardRecord =>
   dashboardSchema.parse({
     id: row.id,
     projectId: row.projectId,
@@ -36,20 +42,57 @@ const toDashboard = (row: PrismaDashboard): DashboardRecord =>
     updatedAt: row.updatedAt,
   });
 
-/**
- * Only what this repository touches, so composition names the slice it needs
- * rather than the whole generated client.
- */
-export type DashboardDatabase = Pick<PrismaClient, "customGraph" | "dashboard" | "$transaction">;
+type StoredGraph = {
+  id: string;
+  projectId: string;
+  name: string;
+  graph: unknown;
+  filters: unknown;
+  dashboardId: string | null;
+  gridColumn: number;
+  gridRow: number;
+  colSpan: number;
+  rowSpan: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-export class PrismaDashboardRepository extends DashboardRepository {
-  constructor(private readonly prisma: DashboardDatabase) {
-    super();
-  }
+const graphRow = (row: StoredGraph): GraphRecord =>
+  graphSchema.parse({
+    id: row.id,
+    projectId: row.projectId,
+    name: row.name,
+    graph: graphPayloadSchema.parse(row.graph),
+    filters: row.filters ? graphFiltersSchema.parse(row.filters) : null,
+    dashboardId: row.dashboardId,
+    gridColumn: row.gridColumn,
+    gridRow: row.gridRow,
+    colSpan: row.colSpan,
+    rowSpan: row.rowSpan,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
 
-  static create(prisma: DashboardDatabase): PrismaDashboardRepository {
-    return new PrismaDashboardRepository(prisma);
-  }
+const savedWorkbenchChartRow = (row: StoredGraph): SavedWorkbenchChartRecord =>
+  savedWorkbenchChartSchema.parse({
+    id: row.id,
+    projectId: row.projectId,
+    name: row.name,
+    definition: savedWorkbenchChartDefinitionSchema.parse(row.graph),
+    dashboardId: row.dashboardId,
+    gridColumn: row.gridColumn,
+    gridRow: row.gridRow,
+    colSpan: row.colSpan,
+    rowSpan: row.rowSpan,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+
+export class PrismaDashboardRepository
+  extends PrismaRepository.transactionalFor("Dashboard", "CustomGraph")
+  implements DashboardRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaDashboardRepository(prisma));
 
   async findAllDashboards(input: {
     projectId: string;
@@ -66,43 +109,41 @@ export class PrismaDashboardRepository extends DashboardRepository {
         },
       },
     });
-    return rows.map((row) => ({ ...toDashboard(row), graphCount: row._count.graphs }));
+    return rows.map((row) => ({ ...dashboardRow(row), graphCount: row._count.graphs }));
   }
 
-  async tryFindDashboard(input: {
+  async findDashboard(input: {
     projectId: string;
     dashboardId: string;
-  }): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | null> {
+  }): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
     const row = await this.prisma.dashboard.findFirst({
       where: { id: input.dashboardId, projectId: input.projectId },
       include: {
         graphs: {
-          where: { kind: "builder" },
+          where: { kind: BUILDER_CHART_KIND },
           orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
         },
       },
     });
-    if (!row) return null;
-    return {
-      ...toDashboard(row),
-      graphs: row.graphs.map((graph) => this.toGraph(graph)),
-    };
+    if (!row) return undefined;
+
+    return { ...dashboardRow(row), graphs: row.graphs.map((graph) => graphRow(graph)) };
   }
 
-  async tryFindFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | null> {
+  async findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
     const row = await this.prisma.dashboard.findFirst({
       where: { projectId: input.projectId },
       orderBy: { order: "asc" },
     });
-    return row ? toDashboard(row) : null;
+    return row ? dashboardRow(row) : undefined;
   }
 
-  async tryFindLastDashboard(input: { projectId: string }): Promise<DashboardRecord | null> {
+  async findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
     const row = await this.prisma.dashboard.findFirst({
       where: { projectId: input.projectId },
       orderBy: { order: "desc" },
     });
-    return row ? toDashboard(row) : null;
+    return row ? dashboardRow(row) : undefined;
   }
 
   async findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]> {
@@ -119,7 +160,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     name: string;
     order: number;
   }): Promise<DashboardRecord> {
-    return toDashboard(await this.prisma.dashboard.create({ data: input }));
+    return dashboardRow(await this.prisma.dashboard.create({ data: input }));
   }
 
   async updateDashboard(input: {
@@ -127,7 +168,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     dashboardId: string;
     data: { name: string };
   }): Promise<DashboardRecord> {
-    return toDashboard(
+    return dashboardRow(
       await this.prisma.dashboard.update({
         where: { id: input.dashboardId, projectId: input.projectId },
         data: input.data,
@@ -139,7 +180,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
     projectId: string;
     dashboardId: string;
   }): Promise<DashboardRecord> {
-    return toDashboard(
+    return dashboardRow(
       await this.prisma.dashboard.delete({
         where: { id: input.dashboardId, projectId: input.projectId },
       }),
@@ -147,14 +188,14 @@ export class PrismaDashboardRepository extends DashboardRepository {
   }
 
   async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {
-    await this.prisma.$transaction(
-      input.dashboardIds.map((dashboardId, order) =>
-        this.prisma.dashboard.update({
+    await this.transaction(async (transaction) => {
+      for (const [order, dashboardId] of input.dashboardIds.entries()) {
+        await transaction.dashboard.update({
           where: { id: dashboardId, projectId: input.projectId },
           data: { order },
-        }),
-      ),
-    );
+        });
+      }
+    });
   }
 
   async findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]> {
@@ -168,33 +209,26 @@ export class PrismaDashboardRepository extends DashboardRepository {
         ? [{ gridRow: "asc" }, { gridColumn: "asc" }]
         : { createdAt: "desc" },
     });
-    return rows.map((row) => this.toGraph(row));
+    return rows.map((row) => graphRow(row));
   }
 
-  async tryFindGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | null> {
+  async findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined> {
     const row = await this.prisma.customGraph.findFirst({
-      where: {
-        id: input.graphId,
-        projectId: input.projectId,
-        kind: BUILDER_CHART_KIND,
-      },
+      where: { id: input.graphId, projectId: input.projectId, kind: BUILDER_CHART_KIND },
     });
-    return row ? this.toGraph(row) : null;
+    return row ? graphRow(row) : undefined;
   }
 
-  async tryFindLastGraphGridRow(input: {
+  async findLastGraphGridRow(input: {
     projectId: string;
     dashboardId: string;
-  }): Promise<number | null> {
+  }): Promise<number | undefined> {
     const row = await this.prisma.customGraph.findFirst({
-      where: {
-        projectId: input.projectId,
-        dashboardId: input.dashboardId,
-      },
+      where: { projectId: input.projectId, dashboardId: input.dashboardId },
       orderBy: { gridRow: "desc" },
       select: { gridRow: true },
     });
-    return row?.gridRow ?? null;
+    return row?.gridRow ?? undefined;
   }
 
   async createGraph(input: {
@@ -218,7 +252,7 @@ export class PrismaDashboardRepository extends DashboardRepository {
         kind: BUILDER_CHART_KIND,
       },
     });
-    return this.toGraph(row);
+    return graphRow(row);
   }
 
   async updateGraph(input: {
@@ -229,29 +263,21 @@ export class PrismaDashboardRepository extends DashboardRepository {
     filters?: Record<string, unknown>;
   }): Promise<GraphRecord> {
     const row = await this.prisma.customGraph.update({
-      where: {
-        id: input.graphId,
-        projectId: input.projectId,
-        kind: BUILDER_CHART_KIND,
-      },
+      where: { id: input.graphId, projectId: input.projectId, kind: BUILDER_CHART_KIND },
       data: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.graph === undefined ? {} : { graph: input.graph as Prisma.InputJsonValue }),
         ...(input.filters === undefined ? {} : { filters: input.filters as Prisma.InputJsonValue }),
       },
     });
-    return this.toGraph(row);
+    return graphRow(row);
   }
 
   async deleteGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord> {
     const row = await this.prisma.customGraph.delete({
-      where: {
-        id: input.graphId,
-        projectId: input.projectId,
-        kind: BUILDER_CHART_KIND,
-      },
+      where: { id: input.graphId, projectId: input.projectId, kind: BUILDER_CHART_KIND },
     });
-    return this.toGraph(row);
+    return graphRow(row);
   }
 
   async updateGraphLayout(input: {
@@ -260,59 +286,44 @@ export class PrismaDashboardRepository extends DashboardRepository {
     layout: GraphLayout;
   }): Promise<GraphRecord> {
     const row = await this.prisma.customGraph.update({
-      where: {
-        id: input.graphId,
-        projectId: input.projectId,
-        kind: BUILDER_CHART_KIND,
-      },
+      where: { id: input.graphId, projectId: input.projectId, kind: BUILDER_CHART_KIND },
       data: input.layout,
     });
-    return this.toGraph(row);
+    return graphRow(row);
   }
 
   async updateGraphLayouts(input: {
     projectId: string;
     layouts: Array<{ graphId: string; layout: GraphLayout }>;
   }): Promise<void> {
-    await this.prisma.$transaction(
-      input.layouts.map((item) =>
-        this.prisma.customGraph.update({
-          where: {
-            id: item.graphId,
-            projectId: input.projectId,
-            kind: BUILDER_CHART_KIND,
-          },
+    await this.transaction(async (transaction) => {
+      for (const item of input.layouts) {
+        await transaction.customGraph.update({
+          where: { id: item.graphId, projectId: input.projectId, kind: BUILDER_CHART_KIND },
           data: item.layout,
-        }),
-      ),
-    );
+        });
+      }
+    });
   }
 
   async findAllSavedWorkbenchCharts(input: {
     projectId: string;
   }): Promise<SavedWorkbenchChartRecord[]> {
     const rows = await this.prisma.customGraph.findMany({
-      where: {
-        projectId: input.projectId,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
+      where: { projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map((row) => this.toSavedWorkbenchChart(row));
+    return rows.map((row) => savedWorkbenchChartRow(row));
   }
 
-  async tryFindSavedWorkbenchChart(input: {
+  async findSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
-  }): Promise<SavedWorkbenchChartRecord | null> {
+  }): Promise<SavedWorkbenchChartRecord | undefined> {
     const row = await this.prisma.customGraph.findFirst({
-      where: {
-        id: input.chartId,
-        projectId: input.projectId,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
+      where: { id: input.chartId, projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
     });
-    return row ? this.toSavedWorkbenchChart(row) : null;
+    return row ? savedWorkbenchChartRow(row) : undefined;
   }
 
   async createSavedWorkbenchChart(input: {
@@ -331,24 +342,21 @@ export class PrismaDashboardRepository extends DashboardRepository {
           kind: WORKBENCH_SQL_CHART_KIND,
         },
       });
-      return this.toSavedWorkbenchChart(row);
+      return savedWorkbenchChartRow(row);
     } catch (error) {
-      return mapSavedWorkbenchChartCreateError(error);
+      if (isUniqueViolation(error)) throw new SavedWorkbenchChartAlreadyExistsError();
+      throw error;
     }
   }
 
-  async tryUpdateSavedWorkbenchChart(input: {
+  async updateSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
     name?: string;
     definition?: SavedWorkbenchChartDefinition;
-  }): Promise<SavedWorkbenchChartRecord | null> {
+  }): Promise<SavedWorkbenchChartRecord> {
     const rows = await this.prisma.customGraph.updateManyAndReturn({
-      where: {
-        id: input.chartId,
-        projectId: input.projectId,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
+      where: { id: input.chartId, projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
       data: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.definition === undefined
@@ -356,22 +364,17 @@ export class PrismaDashboardRepository extends DashboardRepository {
           : { graph: input.definition as Prisma.InputJsonValue }),
       },
     });
-    const row = rows[0];
-    return row ? this.toSavedWorkbenchChart(row) : null;
+    return savedWorkbenchChartRow(oneChart(rows));
   }
 
-  async deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<number> {
+  async deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void> {
     const result = await this.prisma.customGraph.deleteMany({
-      where: {
-        id: input.chartId,
-        projectId: input.projectId,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
+      where: { id: input.chartId, projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
     });
-    return result.count;
+    if (result.count === 0) throw new SavedWorkbenchChartNotFoundError();
   }
 
-  async tryPlaceSavedWorkbenchChart(input: {
+  async placeSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
     dashboardId: string;
@@ -379,13 +382,9 @@ export class PrismaDashboardRepository extends DashboardRepository {
     gridRow: number;
     colSpan: number;
     rowSpan: number;
-  }): Promise<SavedWorkbenchChartRecord | null> {
+  }): Promise<SavedWorkbenchChartRecord> {
     const rows = await this.prisma.customGraph.updateManyAndReturn({
-      where: {
-        id: input.chartId,
-        projectId: input.projectId,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
+      where: { id: input.chartId, projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
       data: {
         dashboardId: input.dashboardId,
         gridColumn: input.gridColumn,
@@ -394,100 +393,29 @@ export class PrismaDashboardRepository extends DashboardRepository {
         rowSpan: input.rowSpan,
       },
     });
-    const row = rows[0];
-    return row ? this.toSavedWorkbenchChart(row) : null;
+    return savedWorkbenchChartRow(oneChart(rows));
   }
 
-  async tryUnplaceSavedWorkbenchChart(input: {
+  async unplaceSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
-  }): Promise<SavedWorkbenchChartRecord | null> {
+  }): Promise<SavedWorkbenchChartRecord> {
     const rows = await this.prisma.customGraph.updateManyAndReturn({
-      where: {
-        id: input.chartId,
-        projectId: input.projectId,
-        kind: WORKBENCH_SQL_CHART_KIND,
-      },
-      data: {
-        dashboardId: null,
-        gridColumn: 0,
-        gridRow: 0,
-        colSpan: 1,
-        rowSpan: 1,
-      },
+      where: { id: input.chartId, projectId: input.projectId, kind: WORKBENCH_SQL_CHART_KIND },
+      data: { dashboardId: null, gridColumn: 0, gridRow: 0, colSpan: 1, rowSpan: 1 },
     });
-    const row = rows[0];
-    return row ? this.toSavedWorkbenchChart(row) : null;
-  }
-
-  private toGraph(row: {
-    id: string;
-    projectId: string;
-    name: string;
-    graph: unknown;
-    filters: unknown;
-    dashboardId: string | null;
-    gridColumn: number;
-    gridRow: number;
-    colSpan: number;
-    rowSpan: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }): GraphRecord {
-    return graphSchema.parse({
-      id: row.id,
-      projectId: row.projectId,
-      name: row.name,
-      graph: graphPayloadSchema.parse(row.graph),
-      filters: row.filters ? graphFiltersSchema.parse(row.filters) : null,
-      dashboardId: row.dashboardId,
-      gridColumn: row.gridColumn,
-      gridRow: row.gridRow,
-      colSpan: row.colSpan,
-      rowSpan: row.rowSpan,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
-  }
-
-  private toSavedWorkbenchChart(row: {
-    id: string;
-    projectId: string;
-    name: string;
-    graph: unknown;
-    dashboardId: string | null;
-    gridColumn: number;
-    gridRow: number;
-    colSpan: number;
-    rowSpan: number;
-    createdAt: Date;
-    updatedAt: Date;
-  }): SavedWorkbenchChartRecord {
-    return savedWorkbenchChartSchema.parse({
-      id: row.id,
-      projectId: row.projectId,
-      name: row.name,
-      definition: savedWorkbenchChartDefinitionSchema.parse(row.graph),
-      dashboardId: row.dashboardId,
-      gridColumn: row.gridColumn,
-      gridRow: row.gridRow,
-      colSpan: row.colSpan,
-      rowSpan: row.rowSpan,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
+    return savedWorkbenchChartRow(oneChart(rows));
   }
 }
 
-function prismaErrorCode(error: unknown): string | null {
-  if (typeof error !== "object" || error === null || !("code" in error)) return null;
-  const code = error.code;
-  return typeof code === "string" ? code : null;
+function oneChart(rows: readonly StoredGraph[]): StoredGraph {
+  const row = rows[0];
+  if (!row) throw new SavedWorkbenchChartNotFoundError();
+  return row;
 }
 
-function mapSavedWorkbenchChartCreateError(error: unknown): never {
-  if (prismaErrorCode(error) === "P2002") {
-    throw new SavedWorkbenchChartAlreadyExistsError();
-  }
-  throw error;
+/** Prisma reports a unique-constraint violation as error code `P2002`. */
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  return error.code === "P2002";
 }

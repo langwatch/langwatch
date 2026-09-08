@@ -1,135 +1,122 @@
 /**
- * The dashboard feature's application: what its doors call.
- *
- * It holds the services and ports the feature's api files reach, and it is the
- * one typed thing a transport is given. Before it, each door declared its own
- * private bag — `Readonly<{ dashboard: DashboardService }>` three times over,
- * `Readonly<{ dashboard; automation }>` once, and a bare
- * `() => DashboardService` in each of the two REST families — six descriptions
- * of the same composition, agreeing by attention rather than by construction.
- *
- * Most operations are the service's own. What lives here as a decision is what
- * every door was making for itself, and making differently:
- *
- *   - **what a missing dashboard or graph IS.** The contract raises plain
- *     `Error` subclasses, so each door had to recognise them: the tRPC
- *     surfaces on the imported class, the REST families on
- *     `error.name === "GraphNotFoundError"` — a string comparison inside a
- *     transport, which no compiler checks and a rename would have turned into
- *     a silent 500. Every one of those refusals is named here, once, as a
- *     `HandledError` with a stable code; a door is left to decide only how it
- *     words the answer.
- *   - **the alert watching a graph.** The chart card reads it; nothing else in
- *     Dashboard depends on Automation, so it arrives as the two methods it
- *     calls rather than the whole automation service.
- *
- * What deliberately did NOT move here: the saved-view lifecycle, and the graph
- * door's filter-field catalogue and secret redaction. Each is generic in a type
- * the process owns — the saved view's own row shape, the deployment's filter
- * field union — and folding them into a non-generic application would narrow
- * what the client sees. They stay mount ports until the verticals that own
- * them are drained.
+ * The dashboard feature's application: what its doors call. It holds the
+ * services, peers and ports the feature reaches, and it makes here the
+ * decisions each transport used to make for itself — the alert a graph
+ * carries and its redaction, who is asking, and where a dashboard opens.
  */
-import type {
-  LangWatchQLProtections,
-  LangWatchQLQueryResult,
-  LangWatchQLRunContext,
-} from "@langwatch/analytics-contract";
-import type { Trigger } from "@langwatch/automation-contract";
 import {
-  DashboardNotFoundError,
-  DashboardReorderError,
-  GraphNotFoundError,
+  AnalyticsApi,
+  LangWatchQLNotEnabledError,
+  type AnalyticsApi as AnalyticsApiContract,
+  type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLProtections,
+  type LangWatchQLQueryResult,
+  type LangWatchQLTimeWindow,
+} from "@langwatch/analytics-contract";
+import {
+  AutomationApi,
+  type AutomationApi as AutomationApiContract,
+  type Trigger,
+} from "@langwatch/automation-contract";
+import {
+  DashboardApi,
   type Dashboard,
   type DashboardGraphCountScope,
-  type DashboardService,
   type DashboardSummary,
   type Graph,
   type GraphLayout,
+  type SavedView,
+  type SavedViewJson,
+  type SavedViewPeriod,
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
 } from "@langwatch/dashboard-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 
-// ---------------------------------------------------------------------------
-// The refusals this feature names.
-//
-// Each replaces a branch a transport used to own: two `TRPCError`s built by
-// hand, and two `error.name === "…"` string comparisons. The status each
-// carries is the status those branches already answered with.
-// ---------------------------------------------------------------------------
+import type { AlertRedactionPort } from "../ports/alert-redaction.port.ts";
+import type { PlatformUrlPort } from "../ports/platform-url.port.ts";
+import type { WorkbenchAccessPort } from "../ports/workbench-access.port.ts";
+import type { WorkbenchCallerPort } from "../ports/workbench-caller.port.ts";
+import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
+import { DashboardService } from "../services/dashboard.service.ts";
+import { SavedViewService } from "../services/saved-view.service.ts";
+import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
+import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
 
-/** A dashboard the project does not have. */
-export class DashboardNotThereError extends HandledError {
-  declare readonly code: "dashboard_not_found";
-
-  constructor(projectId: string) {
-    super("dashboard_not_found", "Dashboard not found", {
-      httpStatus: 404,
-      meta: { projectId },
-    });
-    this.name = "DashboardNotThereError";
-  }
-}
-
-/** A graph the project does not have. */
-export class GraphNotThereError extends HandledError {
-  declare readonly code: "graph_not_found";
-
-  constructor(projectId: string) {
-    super("graph_not_found", "Graph not found", { httpStatus: 404, meta: { projectId } });
-    this.name = "GraphNotThereError";
-  }
-}
-
-/**
- * A reorder naming dashboards the project does not have.
- *
- * 404 rather than 400 because that is what the tRPC surface has always
- * answered, and it is the reading that matches the cause: the request is
- * well-formed and the ids in it are not there. The REST family answers 400 for
- * the same refusal and keeps doing so — that disagreement predates this
- * application, and reconciling it would change a published status.
- */
-export class DashboardReorderUnknownIdsError extends HandledError {
-  declare readonly code: "dashboard_reorder_unknown_ids";
-
-  constructor(missingIds: readonly string[]) {
-    super("dashboard_reorder_unknown_ids", `Dashboards not found: ${missingIds.join(", ")}`, {
-      httpStatus: 404,
-      meta: { ids: [...missingIds] },
-    });
-    this.name = "DashboardReorderUnknownIdsError";
-  }
-}
-
-/** The alert reads Dashboard makes on the Automation feature. */
-export type DashboardGraphAlertLookup = Readonly<{
-  getByCustomGraphIds(
-    input: Readonly<{ projectId: string; customGraphIds: string[] }>,
-  ): Promise<Trigger[]>;
-  tryGetByCustomGraphId(
-    input: Readonly<{ projectId: string; customGraphId: string }>,
-  ): Promise<Trigger | null>;
+/** What the deployment answers that Dashboard cannot answer for itself. */
+export type DashboardInfrastructure = Readonly<{
+  workbenchAccess: WorkbenchAccessPort;
+  workbenchCaller: WorkbenchCallerPort;
+  alertRedaction: AlertRedactionPort;
+  platformUrl: PlatformUrlPort;
 }>;
 
-/** What the process composes this feature's application from. */
-export interface DashboardAppDependencies {
-  dashboard: DashboardService;
-  /**
-   * Declared as the two methods it calls rather than the whole automation
-   * service: a chart card shows the trigger watching it, and Dashboard depends
-   * on nothing else Automation owns.
-   */
-  automation: DashboardGraphAlertLookup;
-}
+type DashboardDependencies = Readonly<{
+  analytics: typeof AnalyticsApi;
+  automation: typeof AutomationApi;
+  projects: typeof ProjectApi;
+}>;
 
-export class DashboardApp {
-  static create(dependencies: DashboardAppDependencies): DashboardApp {
-    return new DashboardApp(dependencies);
+type DashboardSetup = FeatureSetup<
+  DashboardDependencies,
+  DashboardInfrastructure,
+  undefined,
+  DashboardRepositories
+>;
+
+export class DashboardApp implements DashboardApi {
+  static readonly contract = DashboardApi;
+  static readonly dependencies = {
+    analytics: AnalyticsApi,
+    automation: AutomationApi,
+    projects: ProjectApi,
+  };
+
+  #dashboards: DashboardService;
+  #charts: SavedWorkbenchChartService;
+  #savedViews: SavedViewService;
+  #automation: AutomationApiContract;
+  #projects: ProjectApiContract;
+  #infrastructure: DashboardInfrastructure;
+
+  private constructor(
+    services: Readonly<{
+      dashboards: DashboardService;
+      charts: SavedWorkbenchChartService;
+      savedViews: SavedViewService;
+    }>,
+    peers: Readonly<{ automation: AutomationApiContract; projects: ProjectApiContract }>,
+    infrastructure: DashboardInfrastructure,
+  ) {
+    this.#dashboards = services.dashboards;
+    this.#charts = services.charts;
+    this.#savedViews = services.savedViews;
+    this.#automation = peers.automation;
+    this.#projects = peers.projects;
+    this.#infrastructure = infrastructure;
   }
 
-  private constructor(private readonly dependencies: DashboardAppDependencies) {}
+  static create(setup: DashboardSetup): DashboardApp {
+    const analytics: AnalyticsApiContract = setup.dependencies.analytics;
+
+    return new DashboardApp(
+      {
+        dashboards: DashboardService.create({
+          repository: setup.repositories.dashboards,
+          workbenchAccess: setup.infrastructure.workbenchAccess,
+        }),
+        charts: SavedWorkbenchChartService.create({
+          repository: setup.repositories.dashboards,
+          policy: SavedWorkbenchChartPolicyService.create({ analytics }),
+          analytics,
+        }),
+        savedViews: SavedViewService.create({ repository: setup.repositories.savedViews }),
+      },
+      { automation: setup.dependencies.automation, projects: setup.dependencies.projects },
+      setup.infrastructure,
+    );
+  }
 
   // -- dashboards ------------------------------------------------------------
 
@@ -138,7 +125,7 @@ export class DashboardApp {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
   }): Promise<DashboardSummary[]> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.getAll(input));
+    return this.#dashboards.getAll(input);
   }
 
   /** One dashboard with its graphs, in grid order. */
@@ -146,44 +133,63 @@ export class DashboardApp {
     projectId: string;
     dashboardId: string;
   }): Promise<Dashboard & { graphs: Graph[] }> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.getById(input));
+    return this.#dashboards.getById(input);
   }
 
   /** A new dashboard, appended after the current last. */
   create(input: { projectId: string; name: string }): Promise<Dashboard> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.create(input));
+    return this.#dashboards.create(input);
   }
 
   /** A dashboard's name. */
   rename(input: { projectId: string; dashboardId: string; name: string }): Promise<Dashboard> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.rename(input));
+    return this.#dashboards.rename(input);
   }
 
   /** Removes a dashboard, cascading to its graphs. */
   delete(input: { projectId: string; dashboardId: string }): Promise<Dashboard> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.delete(input));
+    return this.#dashboards.delete(input);
   }
 
   /** The order the navigation lists them in. */
   reorder(input: { projectId: string; dashboardIds: string[] }): Promise<{ success: true }> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.reorder(input));
+    return this.#dashboards.reorder(input);
   }
 
   /** The project's first dashboard, created on demand. */
   getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.getOrCreateFirst(input));
+    return this.#dashboards.getOrCreateFirst(input);
+  }
+
+  /** Where a reader opens each of these dashboards. */
+  async getDashboardLinks(input: {
+    projectId: string;
+    dashboardIds: string[];
+  }): Promise<Record<string, string>> {
+    const project = await this.#projects.tryGetSummaryById(input.projectId);
+    if (!project) throw new Error(`Project ${input.projectId} has no summary to link against`);
+
+    return Object.fromEntries(
+      input.dashboardIds.map((dashboardId) => [
+        dashboardId,
+        this.#infrastructure.platformUrl.linkTo({
+          projectSlug: project.slug,
+          path: `/analytics/reports?dashboard=${dashboardId}`,
+        }),
+      ]),
+    );
   }
 
   // -- graphs ----------------------------------------------------------------
 
   /** The project's chart-builder graphs, optionally on one dashboard. */
   listGraphs(input: { projectId: string; dashboardId?: string }): Promise<Graph[]> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.listGraphs(input));
+    return this.#dashboards.listGraphs(input);
   }
 
   /** One graph. */
   getGraph(input: { projectId: string; graphId: string }): Promise<Graph> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.getGraph(input));
+    return this.#dashboards.getGraph(input);
   }
 
   /** A new chart on a dashboard, at a grid position. */
@@ -195,7 +201,7 @@ export class DashboardApp {
     dashboardId?: string;
     layout?: Partial<GraphLayout>;
   }): Promise<Graph> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.createGraph(input));
+    return this.#dashboards.createGraph(input);
   }
 
   /** A chart's name, payload, or filters. */
@@ -206,12 +212,12 @@ export class DashboardApp {
     graph?: Record<string, unknown>;
     filters?: Record<string, unknown>;
   }): Promise<Graph> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.updateGraph(input));
+    return this.#dashboards.updateGraph(input);
   }
 
   /** Removes one chart. */
   deleteGraph(input: { projectId: string; graphId: string }): Promise<Graph> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.deleteGraph(input));
+    return this.#dashboards.deleteGraph(input);
   }
 
   /** One chart's grid position. */
@@ -220,7 +226,7 @@ export class DashboardApp {
     graphId: string;
     layout: GraphLayout;
   }): Promise<Graph> {
-    return this.named(input.projectId, () => this.dependencies.dashboard.updateGraphLayout(input));
+    return this.#dashboards.updateGraphLayout(input);
   }
 
   /** The whole grid after a drag. */
@@ -228,33 +234,40 @@ export class DashboardApp {
     projectId: string;
     layouts: Array<{ graphId: string; layout: GraphLayout }>;
   }): Promise<{ success: true }> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.batchUpdateGraphLayouts(input),
-    );
+    return this.#dashboards.batchUpdateGraphLayouts(input);
   }
 
   // -- the alert watching a graph -------------------------------------------
 
-  /** The alert automations watching a set of charts. */
-  getAlertsForGraphs(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {
-    return this.dependencies.automation.getByCustomGraphIds(input);
+  /** The alerts watching a set of charts, with their provider secrets stripped. */
+  async getAlertsForGraphs(input: {
+    projectId: string;
+    customGraphIds: string[];
+  }): Promise<Trigger[]> {
+    const triggers = await this.#automation.getByCustomGraphIds(input);
+
+    return triggers.map((trigger) => this.#redacted(trigger));
   }
 
-  /** The alert automation watching one chart, if any. */
-  tryGetAlertForGraph(input: {
+  /**
+   * The alert watching one chart, when a live one does; secrets stripped. An
+   * alert switched off or deleted is not one, so a card reads nothing there.
+   */
+  async findAlertForGraph(input: {
     projectId: string;
     customGraphId: string;
-  }): Promise<Trigger | null> {
-    return this.dependencies.automation.tryGetByCustomGraphId(input);
+  }): Promise<Trigger | undefined> {
+    const trigger = await this.#automation.tryGetByCustomGraphId(input);
+    if (trigger === null || !trigger.active || trigger.deleted) return undefined;
+
+    return this.#redacted(trigger);
   }
 
   // -- saved LangWatchQL workbench charts ------------------------------------
 
   /** Every saved chart in the project. */
   listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.listSavedWorkbenchCharts(input),
-    );
+    return this.#charts.getAll(input);
   }
 
   /** One saved chart, with its query, parameters and specification. */
@@ -262,12 +275,10 @@ export class DashboardApp {
     projectId: string;
     chartId: string;
   }): Promise<SavedWorkbenchChart> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.getSavedWorkbenchChart(input),
-    );
+    return this.#charts.getById(input);
   }
 
-  /** A new saved chart. */
+  /** A new saved chart, for a credential that resolved its own protections. */
   createSavedWorkbenchChart(input: {
     projectId: string;
     protections: LangWatchQLProtections;
@@ -275,9 +286,7 @@ export class DashboardApp {
     definition: unknown;
     id?: string;
   }): Promise<SavedWorkbenchChart> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.createSavedWorkbenchChart(input),
-    );
+    return this.#charts.create(input);
   }
 
   /** A saved chart's name, its definition, or both. */
@@ -287,25 +296,77 @@ export class DashboardApp {
     name?: string;
     definitionUpdate?: SavedWorkbenchChartDefinitionUpdate;
   }): Promise<SavedWorkbenchChart> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.updateSavedWorkbenchChart(input),
-    );
+    return this.#charts.update(input);
+  }
+
+  /**
+   * A new saved chart for a signed-in member. Their own protections are
+   * resolved for THIS request and decide what the statement may name: a member
+   * who cannot read costs must not save a chart that selects them.
+   */
+  async createMemberSavedWorkbenchChart(input: {
+    projectId: string;
+    actorId: string;
+    name: string;
+    definition: unknown;
+  }): Promise<SavedWorkbenchChart> {
+    await this.#requireWorkbench(input.projectId);
+
+    const protections = await this.#infrastructure.workbenchCaller.resolveProtections({
+      actorId: input.actorId,
+      projectId: input.projectId,
+    });
+
+    return this.#charts.create({
+      projectId: input.projectId,
+      protections,
+      name: input.name,
+      definition: input.definition,
+    });
+  }
+
+  /**
+   * A member's edit of a saved chart. Protections are resolved for this
+   * request rather than remembered from the save, so a member whose
+   * permissions narrowed cannot name a column they may no longer read.
+   */
+  async updateMemberSavedWorkbenchChart(input: {
+    projectId: string;
+    actorId: string;
+    chartId: string;
+    name?: string;
+    definition?: unknown;
+  }): Promise<SavedWorkbenchChart> {
+    await this.#requireWorkbench(input.projectId);
+
+    const definitionUpdate =
+      input.definition === undefined
+        ? undefined
+        : {
+            definition: input.definition,
+            protections: await this.#infrastructure.workbenchCaller.resolveProtections({
+              actorId: input.actorId,
+              projectId: input.projectId,
+            }),
+          };
+
+    return this.#charts.update({
+      projectId: input.projectId,
+      chartId: input.chartId,
+      ...(input.name === undefined ? {} : { name: input.name }),
+      ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
+    });
   }
 
   /** Removes one saved chart. */
   deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.deleteSavedWorkbenchChart(input),
-    );
+    return this.#charts.delete(input);
   }
 
   /**
    * Puts one saved chart on a dashboard, at a grid position when the caller
-   * names one.
-   *
-   * Placement is a property of the chart rather than of the dashboard's own
-   * card list: a saved chart carries its dashboard id and grid box, so this is
-   * a write on the chart and belongs beside the rest of its lifecycle.
+   * names one. Placement is a property of the chart rather than of the
+   * dashboard's own card list.
    */
   placeSavedWorkbenchChart(input: {
     projectId: string;
@@ -316,9 +377,7 @@ export class DashboardApp {
     colSpan?: number;
     rowSpan?: number;
   }): Promise<SavedWorkbenchChart> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.placeSavedWorkbenchChart(input),
-    );
+    return this.#charts.place(input);
   }
 
   /**
@@ -329,43 +388,142 @@ export class DashboardApp {
     projectId: string;
     chartId: string;
   }): Promise<SavedWorkbenchChart> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.unplaceSavedWorkbenchChart(input),
-    );
+    return this.#charts.unplace(input);
   }
 
-  /** Runs one saved chart, for the period the surface asks for. */
-  runSavedWorkbenchChart(input: {
+  /** Runs one saved chart for a member, over the period the surface asks for. */
+  async runSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
-    execution: LangWatchQLRunContext;
+    actorId: string;
+    timeWindow?: LangWatchQLTimeWindow;
+    granularitySeconds?: number;
+    onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
   }): Promise<LangWatchQLQueryResult> {
-    return this.named(input.projectId, () =>
-      this.dependencies.dashboard.runSavedWorkbenchChart(input),
-    );
+    await this.#requireWorkbench(input.projectId);
+
+    const { project, protections } = await this.#infrastructure.workbenchCaller.resolveRunCaller({
+      actorId: input.actorId,
+      projectId: input.projectId,
+    });
+
+    return this.#charts.run({
+      projectId: input.projectId,
+      chartId: input.chartId,
+      execution: {
+        project,
+        protections,
+        ...(input.timeWindow === undefined ? {} : { timeWindow: input.timeWindow }),
+        ...(input.granularitySeconds === undefined
+          ? {}
+          : { granularitySeconds: input.granularitySeconds }),
+        ...(input.onBudgetOverflow === undefined
+          ? {}
+          : { onBudgetOverflow: input.onBudgetOverflow }),
+      },
+    });
   }
 
-  // -- naming the refusals ---------------------------------------------------
+  // -- saved views -----------------------------------------------------------
+
+  /** The project's shared views plus the caller's own personal ones. */
+  listSavedViews(input: {
+    projectId: string;
+    actorId: string;
+    kind?: string;
+  }): Promise<SavedView[]> {
+    return this.#savedViews.getAll({
+      projectId: input.projectId,
+      userId: input.actorId,
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
+    });
+  }
+
+  /** A new view, shared with the project or personal to the caller. */
+  createSavedView(input: {
+    projectId: string;
+    actorId: string;
+    id?: string;
+    name: string;
+    filters: Record<string, unknown>;
+    query?: string;
+    period?: SavedViewPeriod;
+    personal: boolean;
+    kind?: string;
+  }): Promise<SavedView> {
+    return this.#savedViews.createView({
+      projectId: input.projectId,
+      input: {
+        ...(input.id === undefined ? {} : { id: input.id }),
+        name: input.name,
+        filters: input.filters as SavedViewJson,
+        ...(input.query === undefined ? {} : { query: input.query }),
+        ...(input.period === undefined ? {} : { period: input.period as SavedViewJson }),
+        ...(input.personal ? { userId: input.actorId } : {}),
+        ...(input.kind === undefined ? {} : { kind: input.kind }),
+      },
+    });
+  }
+
+  /** Removes one view; a personal view only for the member who owns it. */
+  deleteSavedView(input: {
+    projectId: string;
+    actorId: string;
+    viewId: string;
+  }): Promise<SavedView> {
+    return this.#savedViews.delete({
+      projectId: input.projectId,
+      viewId: input.viewId,
+      userId: input.actorId,
+    });
+  }
+
+  /** Renames one view, under the same ownership rule. */
+  renameSavedView(input: {
+    projectId: string;
+    actorId: string;
+    viewId: string;
+    name: string;
+  }): Promise<SavedView> {
+    return this.#savedViews.rename({
+      projectId: input.projectId,
+      viewId: input.viewId,
+      name: input.name,
+      userId: input.actorId,
+    });
+  }
+
+  /** The order the tab strip lists them in, under the same ownership rule. */
+  reorderSavedViews(input: {
+    projectId: string;
+    actorId: string;
+    viewIds: string[];
+  }): Promise<{ success: true }> {
+    return this.#savedViews.reorder({
+      projectId: input.projectId,
+      viewIds: input.viewIds,
+      userId: input.actorId,
+    });
+  }
 
   /**
-   * Runs one service call and re-raises its named absences on the typed
-   * channel.
-   *
-   * Everything else is re-raised exactly as it arrived: an unanticipated
-   * failure degrades to "unknown" plus a trace id at the boundary (ADR-045),
-   * which is correct. A saved chart's own refusals are already `HandledError`s
-   * raised by the service, so they pass through untouched.
+   * The workbench's rollout gate, asked after the door has placed the caller
+   * by permission. Reads refuse too, and deliberately: a surface that listed
+   * charts while the feature was off would announce what nobody can use.
    */
-  private async named<T>(projectId: string, run: () => Promise<T>): Promise<T> {
-    try {
-      return await run();
-    } catch (error) {
-      if (error instanceof DashboardNotFoundError) throw new DashboardNotThereError(projectId);
-      if (error instanceof GraphNotFoundError) throw new GraphNotThereError(projectId);
-      if (error instanceof DashboardReorderError) {
-        throw new DashboardReorderUnknownIdsError(error.missingIds);
-      }
-      throw error;
-    }
+  async #requireWorkbench(projectId: string): Promise<void> {
+    const enabled = await this.#infrastructure.workbenchAccess.isWorkbenchEnabled({ projectId });
+    if (!enabled) throw new LangWatchQLNotEnabledError();
+  }
+
+  /** One trigger with the provider secrets its parameters carry stripped. */
+  #redacted(trigger: Trigger): Trigger {
+    return {
+      ...trigger,
+      actionParams: this.#infrastructure.alertRedaction.redactActionParams(
+        trigger.action,
+        trigger.actionParams ?? {},
+      ),
+    };
   }
 }

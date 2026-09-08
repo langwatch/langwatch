@@ -14,14 +14,17 @@ import { graphSchema } from "./graph.ts";
  */
 
 /** `getAll`: each dashboard, with the card count the grid renders. */
-export const dashboardTrpcSummarySchema = dashboardSchema.extend({
-  _count: z.object({ graphs: z.number().int().nonnegative() }).strict(),
-});
+export const dashboardTrpcSummarySchema = z
+  .object({
+    ...dashboardSchema.shape,
+    _count: z.object({ graphs: z.number().int().nonnegative() }).strict(),
+  })
+  .strict();
 
 /** `getById`: one dashboard with its graphs, in grid order. */
-export const dashboardTrpcDetailSchema = dashboardSchema.extend({
-  graphs: z.array(graphSchema),
-});
+export const dashboardTrpcDetailSchema = z
+  .object({ ...dashboardSchema.shape, graphs: z.array(graphSchema) })
+  .strict();
 
 /** `create` / `rename` / `delete` / `getOrCreateFirst`: the raw stored row. */
 export const dashboardTrpcRowSchema = dashboardSchema;
@@ -39,7 +42,8 @@ const dashboardWireBaseSchema = z.object({
 });
 
 /** One row of the list, which also reports how many graphs the dashboard holds. */
-export const dashboardListItemResponseSchema = dashboardWireBaseSchema.extend({
+export const dashboardListItemResponseSchema = z.object({
+  ...dashboardWireBaseSchema.shape,
   graphCount: z.number().int().nonnegative(),
 });
 
@@ -51,7 +55,8 @@ export const dashboardListResponseSchema = z.object({
 export const dashboardResponseSchema = dashboardWireBaseSchema;
 
 /** A dashboard read on its own, which carries its graphs in grid order. */
-export const dashboardDetailResponseSchema = dashboardWireBaseSchema.extend({
+export const dashboardDetailResponseSchema = z.object({
+  ...dashboardWireBaseSchema.shape,
   graphs: z.array(graphSchema),
 });
 

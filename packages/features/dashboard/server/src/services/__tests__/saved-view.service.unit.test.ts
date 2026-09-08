@@ -3,7 +3,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
+import {
+  SavedViewNotFoundError,
+  SavedViewReorderUnknownIdsError,
+} from "@langwatch/dashboard-contract";
 import { SavedViewService } from "../saved-view.service.ts";
 
 type Call = { method: string } & Record<string, unknown>;
@@ -29,8 +32,8 @@ function serviceWith(
     createMany: async (input: Record<string, unknown>) => {
       calls.push({ method: "createMany", ...input });
     },
-    tryFindById: async (input: Record<string, unknown>) => {
-      calls.push({ method: "tryFindById", ...input });
+    findById: async (input: Record<string, unknown>) => {
+      calls.push({ method: "findById", ...input });
       return options.byId === undefined ? { id: "view-1", userId: null } : options.byId;
     },
     delete: async (input: Record<string, unknown>) => {
@@ -209,7 +212,7 @@ describe.each([
 
       await act(service, "user-1");
 
-      expect(calls.find((call) => call.method === "tryFindById")).toMatchObject({
+      expect(calls.find((call) => call.method === "findById")).toMatchObject({
         id: "view-1",
         projectId: "project-1",
       });
@@ -235,10 +238,10 @@ describe("SavedViewService.reorder", () => {
 
       const error = await service
         .reorder({ projectId: "project-1", viewIds: ["view-0", "view-elsewhere"], userId: "me" })
-        .catch((caught: SavedViewReorderError) => caught);
+        .catch((caught: SavedViewReorderUnknownIdsError) => caught);
 
-      expect(error).toBeInstanceOf(SavedViewReorderError);
-      expect((error as SavedViewReorderError).missingIds).toEqual(["view-elsewhere"]);
+      expect(error).toBeInstanceOf(SavedViewReorderUnknownIdsError);
+      expect((error as SavedViewReorderUnknownIdsError).missingIds).toEqual(["view-elsewhere"]);
     });
 
     /** @scenario Reordering with an id the project does not have changes nothing */
@@ -265,10 +268,10 @@ describe("SavedViewService.reorder", () => {
 
       const error = await service
         .reorder({ projectId: "project-1", viewIds: ["view-0", "view-theirs"], userId: "me" })
-        .catch((caught: SavedViewReorderError) => caught);
+        .catch((caught: SavedViewReorderUnknownIdsError) => caught);
 
-      expect(error).toBeInstanceOf(SavedViewReorderError);
-      expect((error as SavedViewReorderError).missingIds).toEqual(["view-theirs"]);
+      expect(error).toBeInstanceOf(SavedViewReorderUnknownIdsError);
+      expect((error as SavedViewReorderUnknownIdsError).missingIds).toEqual(["view-theirs"]);
       expect(calls.some((call) => call.method === "updateOrder")).toBe(false);
     });
   });

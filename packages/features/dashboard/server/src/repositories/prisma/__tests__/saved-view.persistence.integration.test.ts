@@ -38,7 +38,7 @@ function database(): PrismaClient {
 
 function service(): SavedViewService {
   return SavedViewService.create({
-    repository: PrismaSavedViewRepository.create({ database: database() }),
+    repository: PrismaSavedViewRepository.create({ prisma: database() }),
   });
 }
 

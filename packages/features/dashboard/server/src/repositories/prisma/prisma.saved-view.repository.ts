@@ -1,41 +1,37 @@
-import type { SavedViewRecord } from "../../ports/dashboard.port.ts";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import {
+import { savedViewSchema } from "@langwatch/dashboard-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+
+import type {
+  CreateSavedViewInput,
+  SavedViewRecord,
   SavedViewRepository,
-  type CreateSavedViewInput,
-  type UpdateSavedViewInput,
+  UpdateSavedViewInput,
 } from "../saved-view.repository.ts";
 
-/**
- * Only the delegate this repository touches, plus the transaction it reorders in. Composition
- * can name this instead of the whole generated client, which keeps
- * `@langwatch/prisma-client/generated` an import of this directory alone.
- */
-export type SavedViewDatabase = Pick<PrismaClient, "savedView" | "$transaction">;
+const savedViewRow = (row: unknown): SavedViewRecord => savedViewSchema.parse(row);
 
 /**
- * Repository layer for saved view data access. Single Responsibility: Database operations for
- * saved views. CRITICAL: Every query includes projectId for multitenancy protection.
+ * Saved-view rows over Postgres.
+ *
+ * CRITICAL: Every query includes projectId for multitenancy protection.
  */
-export class PrismaSavedViewRepository extends SavedViewRepository {
-  private constructor(private readonly prisma: SavedViewDatabase) {
-    super();
-  }
-
-  static create(options: { database: SavedViewDatabase }): PrismaSavedViewRepository {
-    return new PrismaSavedViewRepository(options.database);
-  }
+export class PrismaSavedViewRepository
+  extends PrismaRepository.transactionalFor("SavedView")
+  implements SavedViewRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaSavedViewRepository(prisma));
 
   /**
-   * Finds all saved views visible to a user: project-level views (userId IS NULL)
-   * plus the specified user's personal views.
+   * Every saved view visible to a member: the project's own (userId IS NULL)
+   * plus that member's personal ones.
    */
   async findAll(input: {
     projectId: string;
     userId?: string;
     kind?: string;
   }): Promise<SavedViewRecord[]> {
-    return await this.prisma.savedView.findMany({
+    const rows = await this.prisma.savedView.findMany({
       where: {
         projectId: input.projectId,
         ...(input.kind ? { kind: input.kind } : {}),
@@ -43,56 +39,43 @@ export class PrismaSavedViewRepository extends SavedViewRepository {
       },
       orderBy: { order: "asc" },
     });
+    return rows.map((row) => savedViewRow(row));
   }
 
-  /**
-   * Finds a saved view by id within a project, or nothing when the project
-   * holds no such view.
-   */
-  async tryFindById(input: { id: string; projectId: string }): Promise<SavedViewRecord | null> {
-    return await this.prisma.savedView.findFirst({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
+  async findById(input: { id: string; projectId: string }): Promise<SavedViewRecord | undefined> {
+    const row = await this.prisma.savedView.findFirst({
+      where: { id: input.id, projectId: input.projectId },
     });
+    return row ? savedViewRow(row) : undefined;
   }
 
-  /**
-   * Finds the last saved view by order for a project, or nothing when the
-   * project has none yet.
-   */
-  async tryFindLast(input: { projectId: string; kind?: string }): Promise<SavedViewRecord | null> {
-    return await this.prisma.savedView.findFirst({
+  /** The last view by order, which is where the next one is appended after. */
+  async findLast(input: {
+    projectId: string;
+    kind?: string;
+  }): Promise<SavedViewRecord | undefined> {
+    const row = await this.prisma.savedView.findFirst({
       where: {
         projectId: input.projectId,
         ...(input.kind ? { kind: input.kind } : {}),
       },
       orderBy: { order: "desc" },
     });
+    return row ? savedViewRow(row) : undefined;
   }
 
-  /**
-   * Finds saved views by their ids within a project.
-   */
   async findByIds(input: {
     ids: string[];
     projectId: string;
   }): Promise<Array<{ id: string; userId: string | null }>> {
     return await this.prisma.savedView.findMany({
-      where: {
-        id: { in: input.ids },
-        projectId: input.projectId,
-      },
+      where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, userId: true },
     });
   }
 
-  /**
-   * Creates a new saved view.
-   */
   async create(input: CreateSavedViewInput): Promise<SavedViewRecord> {
-    return await this.prisma.savedView.create({
+    const row = await this.prisma.savedView.create({
       data: {
         id: input.id,
         projectId: input.projectId,
@@ -105,72 +88,53 @@ export class PrismaSavedViewRepository extends SavedViewRepository {
         ...(input.kind ? { kind: input.kind } : {}),
       },
     });
+    return savedViewRow(row);
   }
 
-  /**
-   * Creates multiple saved views, skipping duplicates.
-   * Safe for concurrent first-access seeding.
-   */
+  /** Safe for concurrent first-access seeding: duplicates are skipped. */
   async createMany(input: { views: CreateSavedViewInput[] }): Promise<void> {
     await this.prisma.savedView.createMany({
-      data: input.views.map((v) => ({
-        id: v.id,
-        projectId: v.projectId,
-        userId: v.userId,
-        name: v.name,
-        filters: v.filters as Prisma.InputJsonValue,
-        query: v.query,
-        period: (v.period ?? undefined) as Prisma.InputJsonValue | undefined,
-        order: v.order,
-        ...(v.kind ? { kind: v.kind } : {}),
+      data: input.views.map((view) => ({
+        id: view.id,
+        projectId: view.projectId,
+        userId: view.userId,
+        name: view.name,
+        filters: view.filters as Prisma.InputJsonValue,
+        query: view.query,
+        period: (view.period ?? undefined) as Prisma.InputJsonValue | undefined,
+        order: view.order,
+        ...(view.kind ? { kind: view.kind } : {}),
       })),
       skipDuplicates: true,
     });
   }
 
-  /**
-   * Updates an existing saved view.
-   */
   async update(input: UpdateSavedViewInput): Promise<SavedViewRecord> {
-    return await this.prisma.savedView.update({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
+    const row = await this.prisma.savedView.update({
+      where: { id: input.id, projectId: input.projectId },
       data: input.data as Prisma.SavedViewUpdateInput,
     });
+    return savedViewRow(row);
   }
 
-  /**
-   * Deletes a saved view.
-   */
   async delete(input: { id: string; projectId: string }): Promise<SavedViewRecord> {
-    return await this.prisma.savedView.delete({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
+    const row = await this.prisma.savedView.delete({
+      where: { id: input.id, projectId: input.projectId },
+    });
+    return savedViewRow(row);
+  }
+
+  async updateOrder(input: { projectId: string; viewIds: string[] }): Promise<void> {
+    await this.transaction(async (transaction) => {
+      for (const [order, viewId] of input.viewIds.entries()) {
+        await transaction.savedView.update({
+          where: { id: viewId, projectId: input.projectId },
+          data: { order },
+        });
+      }
     });
   }
 
-  /**
-   * Updates multiple saved views' order in a transaction.
-   */
-  async updateOrder(input: { projectId: string; viewIds: string[] }): Promise<void> {
-    const updates = input.viewIds.map((viewId, index) =>
-      this.prisma.savedView.update({
-        where: { id: viewId, projectId: input.projectId },
-        data: { order: index },
-      }),
-    );
-
-    await this.prisma.$transaction(updates);
-  }
-
-  /**
-   * Counts saved views visible to a user: project-level views (userId IS NULL)
-   * plus the specified user's personal views.
-   */
   async count(input: { projectId: string; userId?: string; kind?: string }): Promise<number> {
     return await this.prisma.savedView.count({
       where: {

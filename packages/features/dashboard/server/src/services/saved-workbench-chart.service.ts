@@ -1,74 +1,82 @@
-import {
-  type LangWatchQLProtections,
-  type LangWatchQLQueryResult,
-  type LangWatchQLRunContext,
-  type LangWatchQLService,
+import type {
+  AnalyticsApi,
+  LangWatchQLProtections,
+  LangWatchQLQueryResult,
+  LangWatchQLRunContext,
 } from "@langwatch/analytics-contract";
+import { generate } from "@langwatch/ksuid";
 import {
-  SavedWorkbenchChartDashboardNotFoundError,
-  SavedWorkbenchChartDefinitionInvalidError,
-  SavedWorkbenchChartDefinitionUpdateProtectionsRequiredError,
-  SavedWorkbenchChartNotFoundError,
-  SavedWorkbenchChartValidationError,
   projectIdSchema,
+  SAVED_WORKBENCH_CHART_KSUID_RESOURCE,
   savedWorkbenchChartDefinitionSchema,
   savedWorkbenchChartIdSchema,
   savedWorkbenchChartNameSchema,
   savedWorkbenchChartPlacementSchema,
+  SavedWorkbenchChartDashboardNotFoundError,
+  SavedWorkbenchChartDefinitionInvalidError,
+  SavedWorkbenchChartNotFoundError,
+  SavedWorkbenchChartValidationError,
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinition,
   type SavedWorkbenchChartDefinitionUpdate,
+  type SavedWorkbenchChartPlacement,
 } from "@langwatch/dashboard-contract";
-import type {
-  DashboardIdGenerator,
-  DashboardRepository,
-  SavedWorkbenchChartPolicy,
-} from "../ports/dashboard.port.ts";
+import type { DashboardRepository } from "../repositories/dashboard.repository.ts";
+import type { SavedWorkbenchChartPolicyService } from "./saved-workbench-chart-policy.service.ts";
 
-/**
- * The saved workbench chart half of the dashboard capability.
- *
- * Owned privately by DashboardService, which stays the only public surface.
- */
+/** The rows this service reads and writes: saved charts, and where they sit. */
+export type SavedWorkbenchChartRepository = Pick<
+  DashboardRepository,
+  | "createSavedWorkbenchChart"
+  | "deleteSavedWorkbenchChart"
+  | "findAllSavedWorkbenchCharts"
+  | "findDashboard"
+  | "findLastGraphGridRow"
+  | "findSavedWorkbenchChart"
+  | "placeSavedWorkbenchChart"
+  | "unplaceSavedWorkbenchChart"
+  | "updateSavedWorkbenchChart"
+>;
+
+/** The saved LangWatchQL charts a project keeps, and their placement on a grid. */
 export class SavedWorkbenchChartService {
+  #repository: SavedWorkbenchChartRepository;
+  #policy: SavedWorkbenchChartPolicyService;
+  #analytics: AnalyticsApi;
+
   private constructor(
-    private readonly repository: DashboardRepository,
-    private readonly ids: DashboardIdGenerator,
-    private readonly policy: SavedWorkbenchChartPolicy,
-    private readonly langWatchQL: LangWatchQLService,
-  ) {}
+    repository: SavedWorkbenchChartRepository,
+    policy: SavedWorkbenchChartPolicyService,
+    analytics: AnalyticsApi,
+  ) {
+    this.#repository = repository;
+    this.#policy = policy;
+    this.#analytics = analytics;
+  }
 
   static create(options: {
-    repository: DashboardRepository;
-    ids: DashboardIdGenerator;
-    savedWorkbenchChartPolicy: SavedWorkbenchChartPolicy;
-    langWatchQL: LangWatchQLService;
+    repository: SavedWorkbenchChartRepository;
+    policy: SavedWorkbenchChartPolicyService;
+    analytics: AnalyticsApi;
   }): SavedWorkbenchChartService {
-    return new SavedWorkbenchChartService(
-      options.repository,
-      options.ids,
-      options.savedWorkbenchChartPolicy,
-      options.langWatchQL,
-    );
+    return new SavedWorkbenchChartService(options.repository, options.policy, options.analytics);
   }
 
   async getAll(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
-    const rows = await this.repository.findAllSavedWorkbenchCharts({
+    const rows = await this.#repository.findAllSavedWorkbenchCharts({
       projectId: projectIdSchema.parse(input.projectId),
     });
 
-    return rows.map((row) => this.present(row));
+    return rows.map((row) => present(row));
   }
 
   async getById(input: { projectId: string; chartId: string }): Promise<SavedWorkbenchChart> {
-    const parsed = zSavedChartRef(input);
+    const parsed = chartRef(input);
 
-    const chart = await this.repository.tryFindSavedWorkbenchChart(parsed);
-    if (!chart) {
-      throw new SavedWorkbenchChartNotFoundError();
-    }
+    const chart = await this.#repository.findSavedWorkbenchChart(parsed);
+    if (!chart) throw new SavedWorkbenchChartNotFoundError();
 
-    return this.present(chart);
+    return present(chart);
   }
 
   async create(input: {
@@ -79,25 +87,22 @@ export class SavedWorkbenchChartService {
     id?: string;
   }): Promise<SavedWorkbenchChart> {
     const projectId = projectIdSchema.parse(input.projectId);
+    const name = parseName(input.name);
+    const definition = parseDefinition(input.definition);
 
-    const name = this.parseName(input.name);
+    await this.#policy.validate({ projectId, protections: input.protections, definition });
 
-    const definition = this.parseDefinition(input.definition);
-
-    await this.policy.validate({
-      projectId,
-      protections: input.protections,
-      definition,
-    });
-
-    const chart = await this.repository.createSavedWorkbenchChart({
-      id: input.id === undefined ? this.ids.generate() : this.parseId(input.id),
+    const chart = await this.#repository.createSavedWorkbenchChart({
+      id:
+        input.id === undefined
+          ? generate(SAVED_WORKBENCH_CHART_KSUID_RESOURCE).toString()
+          : parseId(input.id),
       projectId,
       name,
       definition,
     });
 
-    return this.present(chart);
+    return present(chart);
   }
 
   async update(input: {
@@ -106,49 +111,31 @@ export class SavedWorkbenchChartService {
     name?: string;
     definitionUpdate?: SavedWorkbenchChartDefinitionUpdate;
   }): Promise<SavedWorkbenchChart> {
-    const parsed = zSavedChartRef(input);
+    const parsed = chartRef(input);
 
     await this.getById(parsed);
 
-    const name = input.name === undefined ? undefined : this.parseName(input.name);
+    const name = input.name === undefined ? undefined : parseName(input.name);
 
     const definitionUpdate = input.definitionUpdate;
-    if (definitionUpdate !== undefined && definitionUpdate.protections === undefined) {
-      throw new SavedWorkbenchChartDefinitionUpdateProtectionsRequiredError();
-    }
-
     const definition =
-      definitionUpdate === undefined
-        ? undefined
-        : this.parseDefinition(definitionUpdate.definition);
+      definitionUpdate === undefined ? undefined : parseDefinition(definitionUpdate.definition);
 
     if (definition !== undefined && definitionUpdate !== undefined) {
-      await this.policy.validate({
+      await this.#policy.validate({
         projectId: parsed.projectId,
         protections: definitionUpdate.protections,
         definition,
       });
     }
 
-    const chart = await this.repository.tryUpdateSavedWorkbenchChart({
-      ...parsed,
-      name,
-      definition,
-    });
-    if (!chart) {
-      throw new SavedWorkbenchChartNotFoundError();
-    }
-
-    return this.present(chart);
+    return present(
+      await this.#repository.updateSavedWorkbenchChart({ ...parsed, name, definition }),
+    );
   }
 
   async delete(input: { projectId: string; chartId: string }): Promise<void> {
-    const parsed = zSavedChartRef(input);
-
-    const count = await this.repository.deleteSavedWorkbenchChart(parsed);
-    if (count === 0) {
-      throw new SavedWorkbenchChartNotFoundError();
-    }
+    await this.#repository.deleteSavedWorkbenchChart(chartRef(input));
   }
 
   async place(input: {
@@ -160,9 +147,9 @@ export class SavedWorkbenchChartService {
     colSpan?: number;
     rowSpan?: number;
   }): Promise<SavedWorkbenchChart> {
-    const ref = zSavedChartRef(input);
+    const ref = chartRef(input);
 
-    const placement = this.parsePlacement({
+    const placement = parsePlacement({
       dashboardId: input.dashboardId,
       ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
       ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
@@ -170,43 +157,33 @@ export class SavedWorkbenchChartService {
       ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
     });
 
-    const dashboard = await this.repository.tryFindDashboard({
+    const dashboard = await this.#repository.findDashboard({
       projectId: ref.projectId,
       dashboardId: placement.dashboardId,
     });
-    if (!dashboard) {
-      throw new SavedWorkbenchChartDashboardNotFoundError();
-    }
+    if (!dashboard) throw new SavedWorkbenchChartDashboardNotFoundError();
 
     const gridRow =
       placement.gridRow ??
-      ((await this.repository.tryFindLastGraphGridRow({
+      ((await this.#repository.findLastGraphGridRow({
         projectId: ref.projectId,
         dashboardId: placement.dashboardId,
       })) ?? -1) + 1;
 
-    const chart = await this.repository.tryPlaceSavedWorkbenchChart({
-      ...ref,
-      dashboardId: placement.dashboardId,
-      gridColumn: placement.gridColumn ?? 0,
-      gridRow,
-      colSpan: placement.colSpan ?? 1,
-      rowSpan: placement.rowSpan ?? 1,
-    });
-    if (!chart) {
-      throw new SavedWorkbenchChartNotFoundError();
-    }
-
-    return this.present(chart);
+    return present(
+      await this.#repository.placeSavedWorkbenchChart({
+        ...ref,
+        dashboardId: placement.dashboardId,
+        gridColumn: placement.gridColumn ?? 0,
+        gridRow,
+        colSpan: placement.colSpan ?? 1,
+        rowSpan: placement.rowSpan ?? 1,
+      }),
+    );
   }
 
   async unplace(input: { projectId: string; chartId: string }): Promise<SavedWorkbenchChart> {
-    const chart = await this.repository.tryUnplaceSavedWorkbenchChart(zSavedChartRef(input));
-    if (!chart) {
-      throw new SavedWorkbenchChartNotFoundError();
-    }
-
-    return this.present(chart);
+    return present(await this.#repository.unplaceSavedWorkbenchChart(chartRef(input)));
   }
 
   async run(input: {
@@ -214,67 +191,54 @@ export class SavedWorkbenchChartService {
     chartId: string;
     execution: LangWatchQLRunContext;
   }): Promise<LangWatchQLQueryResult> {
-    const chart = await this.getById({
-      projectId: input.projectId,
-      chartId: input.chartId,
-    });
+    const chart = await this.getById({ projectId: input.projectId, chartId: input.chartId });
 
-    return await this.langWatchQL.execute({
+    return await this.#analytics.executeLangWatchQL({
       ...input.execution,
       sql: chart.definition.sql,
       parameters: chart.definition.parameters,
     });
   }
-
-  private present<T extends { id: string; definition: unknown }>(
-    row: T,
-  ): T & { definition: SavedWorkbenchChartDefinition } {
-    const parsed = savedWorkbenchChartDefinitionSchema.safeParse(row.definition);
-    if (!parsed.success) {
-      throw new SavedWorkbenchChartDefinitionInvalidError(row.id);
-    }
-
-    return { ...row, definition: parsed.data };
-  }
-
-  private parseName(input: unknown): string {
-    const parsed = savedWorkbenchChartNameSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new SavedWorkbenchChartValidationError(parsed.error);
-    }
-
-    return parsed.data;
-  }
-
-  private parseId(input: unknown): string {
-    const parsed = savedWorkbenchChartIdSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new SavedWorkbenchChartValidationError(parsed.error);
-    }
-
-    return parsed.data;
-  }
-
-  private parseDefinition(input: unknown): SavedWorkbenchChartDefinition {
-    const parsed = savedWorkbenchChartDefinitionSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new SavedWorkbenchChartValidationError(parsed.error);
-    }
-
-    return parsed.data;
-  }
-
-  private parsePlacement(input: unknown) {
-    const parsed = savedWorkbenchChartPlacementSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new SavedWorkbenchChartValidationError(parsed.error);
-    }
-
-    return parsed.data;
-  }
 }
 
-const zSavedChartRef = (input: { projectId: string; chartId: string }) => ({
+function present<T extends { id: string; definition: unknown }>(
+  row: T,
+): T & { definition: SavedWorkbenchChartDefinition } {
+  const parsed = savedWorkbenchChartDefinitionSchema.safeParse(row.definition);
+  if (!parsed.success) throw new SavedWorkbenchChartDefinitionInvalidError(row.id);
+
+  return { ...row, definition: parsed.data };
+}
+
+function parseName(input: unknown): string {
+  const parsed = savedWorkbenchChartNameSchema.safeParse(input);
+  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+
+  return parsed.data;
+}
+
+function parseId(input: unknown): string {
+  const parsed = savedWorkbenchChartIdSchema.safeParse(input);
+  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+
+  return parsed.data;
+}
+
+function parseDefinition(input: unknown): SavedWorkbenchChartDefinition {
+  const parsed = savedWorkbenchChartDefinitionSchema.safeParse(input);
+  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+
+  return parsed.data;
+}
+
+function parsePlacement(input: unknown): SavedWorkbenchChartPlacement {
+  const parsed = savedWorkbenchChartPlacementSchema.safeParse(input);
+  if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+
+  return parsed.data;
+}
+
+const chartRef = (input: { projectId: string; chartId: string }) => ({
   projectId: projectIdSchema.parse(input.projectId),
   chartId: input.chartId,
 });

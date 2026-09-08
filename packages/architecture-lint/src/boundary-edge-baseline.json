@@ -93,18 +93,6 @@
     },
     {
       "kind": "cross-feature",
-      "from": "packages/features/dashboard/server/package.json",
-      "to": "@langwatch/analytics-server",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
-      "from": "packages/features/dashboard/server/package.json",
-      "to": "@langwatch/feature-flag-server",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
       "from": "packages/features/data-privacy/web/package.json",
       "to": "@langwatch/authz-web",
       "expires": "2026-10-01"

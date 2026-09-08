@@ -1,12 +1,4 @@
-import {
-  LangWatchQLService,
-  type LangWatchQLExecuteInput,
-  type LangWatchQLQueryResult,
-  type LangWatchQLSchema,
-  type LangWatchQLValidationInput,
-} from "@langwatch/analytics-contract";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
-import { SavedWorkbenchChartPolicy } from "../../../ports/dashboard.port.ts";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -18,12 +10,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  DashboardGraphVisibilityPolicyPort,
-  DashboardIdGenerator,
-} from "../../../ports/dashboard.port.ts";
+import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
+import { WorkbenchAccessPort } from "../../../ports/workbench-access.port.ts";
 import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
+import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
+import { SavedWorkbenchChartService } from "../../../services/saved-workbench-chart.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -31,37 +23,9 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-class TestDashboardIds extends DashboardIdGenerator {
-  generate(): string {
-    return `dashboard-graph-${randomUUID()}`;
-  }
-}
-
-class AllowSavedWorkbenchCharts extends SavedWorkbenchChartPolicy {
-  validate(): void {}
-}
-
-class AllGraphsVisible extends DashboardGraphVisibilityPolicyPort {
-  async placeableKinds(): Promise<readonly ("builder" | "workbench_sql")[]> {
-    return ["builder", "workbench_sql"];
-  }
-}
-
-class UnusedLangWatchQL extends LangWatchQLService {
-  readonly available = false;
-
-  async close(): Promise<void> {}
-
-  describeSchema(): LangWatchQLSchema {
-    return { database: "analytics", datasets: [] };
-  }
-
-  validate(_input: LangWatchQLValidationInput): unknown {
-    return {};
-  }
-
-  async execute(_input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
-    throw new Error("This persistence suite does not execute LangWatchQL");
+class WorkbenchOn extends WorkbenchAccessPort {
+  async isWorkbenchEnabled(): Promise<boolean> {
+    return true;
   }
 }
 
@@ -84,13 +48,21 @@ let organizationId = "";
 let teamId = "";
 let projectId = "";
 
-function service(): DashboardService {
+function graphs(): DashboardService {
   return DashboardService.create({
-    repository: PrismaDashboardRepository.create(database()),
-    ids: new TestDashboardIds(),
-    savedWorkbenchChartPolicy: new AllowSavedWorkbenchCharts(),
-    graphVisibility: new AllGraphsVisible(),
-    langWatchQL: new UnusedLangWatchQL(),
+    repository: PrismaDashboardRepository.create({ prisma: database() }),
+    workbenchAccess: new WorkbenchOn(),
+  });
+}
+
+/** Governance is the policy service's; this suite is about the shared grid. */
+function charts(): SavedWorkbenchChartService {
+  const analytics = createDashboardTestAnalytics();
+
+  return SavedWorkbenchChartService.create({
+    repository: PrismaDashboardRepository.create({ prisma: database() }),
+    policy: SavedWorkbenchChartPolicyService.create({ analytics }),
+    analytics,
   });
 }
 
@@ -160,18 +132,21 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     }
   });
 
-  /** @scenario "Placing a chart onto a dashboard already holding builder charts does not overlap them" */
+  /**
+   * @scenario "Placing a chart onto a dashboard already holding builder charts does not overlap them"
+   */
   it("places a saved chart after an existing builder without moving the builder", async () => {
-    const dashboards = service();
+    const builders = graphs();
+    const savedCharts = charts();
     const dashboard = await createDashboard();
-    const builder = await dashboards.createGraph({
+    const builder = await builders.createGraph({
       projectId,
       dashboardId: dashboard.id,
       name: "Builder",
       graph: {},
       layout: { gridRow: 4 },
     });
-    const saved = await dashboards.createSavedWorkbenchChart({
+    const saved = await savedCharts.create({
       id: `saved-${randomUUID()}`,
       projectId,
       protections: {},
@@ -179,7 +154,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
       definition: { version: 1, sql: "SELECT 1", parameters: {} },
     });
 
-    const placed = await dashboards.placeSavedWorkbenchChart({
+    const placed = await savedCharts.place({
       projectId,
       chartId: saved.id,
       dashboardId: dashboard.id,
@@ -191,23 +166,24 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
 
   /** @scenario "Placing a saved workbench chart does not let a builder chart land on top of it" */
   it("places a builder after an existing saved chart without moving the saved chart", async () => {
-    const dashboards = service();
+    const builders = graphs();
+    const savedCharts = charts();
     const dashboard = await createDashboard();
-    const saved = await dashboards.createSavedWorkbenchChart({
+    const saved = await savedCharts.create({
       id: `saved-${randomUUID()}`,
       projectId,
       protections: {},
       name: "Saved",
       definition: { version: 1, sql: "SELECT 1", parameters: {} },
     });
-    await dashboards.placeSavedWorkbenchChart({
+    await savedCharts.place({
       projectId,
       chartId: saved.id,
       dashboardId: dashboard.id,
       gridRow: 4,
     });
 
-    const builder = await dashboards.createGraph({
+    const builder = await builders.createGraph({
       projectId,
       dashboardId: dashboard.id,
       name: "Builder",
@@ -219,7 +195,7 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
   });
 
   it("maps an explicit saved-chart id collision through the repository's Prisma catch", async () => {
-    const dashboards = service();
+    const savedCharts = charts();
     const input = {
       id: `saved-${randomUUID()}`,
       projectId,
@@ -228,8 +204,8 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
       definition: { version: 1 as const, sql: "SELECT 1", parameters: {} },
     };
 
-    await dashboards.createSavedWorkbenchChart(input);
-    await expect(dashboards.createSavedWorkbenchChart(input)).rejects.toBeInstanceOf(
+    await savedCharts.create(input);
+    await expect(savedCharts.create(input)).rejects.toBeInstanceOf(
       SavedWorkbenchChartAlreadyExistsError,
     );
   });

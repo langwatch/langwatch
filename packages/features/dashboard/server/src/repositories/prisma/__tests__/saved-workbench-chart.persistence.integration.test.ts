@@ -1,23 +1,11 @@
 /**
- * What a saved workbench chart actually is once Postgres holds it.
- *
- * The unit suites drive the service against an in-memory repository, so they
- * prove the orchestration and nothing about the row. These claims are the
- * other half: a definition survives a round trip through a `Json` column, the
- * two chart kinds share one table without becoming readable as each other, and
- * every read and write is fenced to the project that asked.
- *
+ * What a saved workbench chart is once Postgres holds it: a definition
+ * surviving a `Json` round trip, two chart kinds sharing one table without
+ * becoming readable as each other, and every read fenced to its project.
  * @see specs/analytics/lwql-saved-charts.feature
  * @see specs/analytics/lwql-langy-authoring.feature
  */
 
-import {
-  LangWatchQLService,
-  type LangWatchQLExecuteInput,
-  type LangWatchQLQueryResult,
-  type LangWatchQLSchema,
-  type LangWatchQLValidationInput,
-} from "@langwatch/analytics-contract";
 import {
   GraphNotFoundError,
   SavedWorkbenchChartDashboardNotFoundError,
@@ -34,13 +22,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  DashboardGraphVisibilityPolicyPort,
-  DashboardIdGenerator,
-  SavedWorkbenchChartPolicy,
-} from "../../../ports/dashboard.port.ts";
+import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
+import { WorkbenchAccessPort } from "../../../ports/workbench-access.port.ts";
 import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
+import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
+import { SavedWorkbenchChartService } from "../../../services/saved-workbench-chart.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -48,38 +35,9 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-class TestDashboardIds extends DashboardIdGenerator {
-  generate(): string {
-    return `saved-chart-${randomUUID()}`;
-  }
-}
-
-/** Governance is the application's; this suite is about the row. */
-class AllowSavedWorkbenchCharts extends SavedWorkbenchChartPolicy {
-  validate(): void {}
-}
-
-class AllGraphsVisible extends DashboardGraphVisibilityPolicyPort {
-  async placeableKinds(): Promise<readonly ("builder" | "workbench_sql")[]> {
-    return ["builder", "workbench_sql"];
-  }
-}
-
-class UnusedLangWatchQL extends LangWatchQLService {
-  readonly available = false;
-
-  async close(): Promise<void> {}
-
-  describeSchema(): LangWatchQLSchema {
-    return { database: "analytics", datasets: [] };
-  }
-
-  validate(_input: LangWatchQLValidationInput): unknown {
-    return {};
-  }
-
-  async execute(_input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
-    throw new Error("This persistence suite does not execute LangWatchQL");
+class WorkbenchOn extends WorkbenchAccessPort {
+  async isWorkbenchEnabled(): Promise<boolean> {
+    return true;
   }
 }
 
@@ -105,13 +63,21 @@ let projectId = "";
 /** A second tenant, so "not yours" is a real row rather than a missing one. */
 let otherProjectId = "";
 
-function service(): DashboardService {
+function dashboards(): DashboardService {
   return DashboardService.create({
-    repository: PrismaDashboardRepository.create(database()),
-    ids: new TestDashboardIds(),
-    savedWorkbenchChartPolicy: new AllowSavedWorkbenchCharts(),
-    graphVisibility: new AllGraphsVisible(),
-    langWatchQL: new UnusedLangWatchQL(),
+    repository: PrismaDashboardRepository.create({ prisma: database() }),
+    workbenchAccess: new WorkbenchOn(),
+  });
+}
+
+/** Governance is the policy service's; this suite is about the row. */
+function charts(): SavedWorkbenchChartService {
+  const analytics = createDashboardTestAnalytics();
+
+  return SavedWorkbenchChartService.create({
+    repository: PrismaDashboardRepository.create({ prisma: database() }),
+    policy: SavedWorkbenchChartPolicyService.create({ analytics }),
+    analytics,
   });
 }
 
@@ -158,7 +124,7 @@ async function createDashboard(forProjectId = projectId): Promise<{ id: string }
 async function saveChart(
   overrides: { projectId?: string; name?: string } = {},
 ): Promise<{ id: string }> {
-  return service().createSavedWorkbenchChart({
+  return charts().create({
     projectId: overrides.projectId ?? projectId,
     protections: {},
     name: overrides.name ?? "Traces over time",
@@ -208,7 +174,7 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
     it("reads back the query, its parameter values and its specification unchanged", async () => {
       const saved = await saveChart();
 
-      const read = await service().getSavedWorkbenchChart({ projectId, chartId: saved.id });
+      const read = await charts().getById({ projectId, chartId: saved.id });
 
       expect(read.definition).toEqual(DEFINITION);
       expect(read.name).toBe("Traces over time");
@@ -220,7 +186,7 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
       const first = await saveChart({ name: "First" });
       const second = await saveChart({ name: "Second" });
 
-      const listed = await service().listSavedWorkbenchCharts({ projectId });
+      const listed = await charts().getAll({ projectId });
 
       expect(listed.map((chart) => chart.id).sort()).toEqual([first.id, second.id].sort());
     });
@@ -230,16 +196,16 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
     /** @scenario "A builder chart is not readable as a workbench chart" */
     /** @scenario "Builder and workbench rows remain isolated" */
     it("does not answer a workbench read with a builder row", async () => {
-      const builder = await service().createGraph({
+      const builder = await dashboards().createGraph({
         projectId,
         name: "Builder",
         graph: {},
       });
 
-      await expect(
-        service().getSavedWorkbenchChart({ projectId, chartId: builder.id }),
-      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
-      await expect(service().listSavedWorkbenchCharts({ projectId })).resolves.toEqual([]);
+      await expect(charts().getById({ projectId, chartId: builder.id })).rejects.toBeInstanceOf(
+        SavedWorkbenchChartNotFoundError,
+      );
+      await expect(charts().getAll({ projectId })).resolves.toEqual([]);
     });
 
     /** @scenario "A saved workbench chart is not readable as a builder chart" */
@@ -247,10 +213,10 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
     it("does not answer a builder read with a workbench row", async () => {
       const saved = await saveChart();
 
-      await expect(service().getGraph({ projectId, graphId: saved.id })).rejects.toBeInstanceOf(
+      await expect(dashboards().getGraph({ projectId, graphId: saved.id })).rejects.toBeInstanceOf(
         GraphNotFoundError,
       );
-      await expect(service().listGraphs({ projectId })).resolves.toEqual([]);
+      await expect(dashboards().listGraphs({ projectId })).resolves.toEqual([]);
     });
   });
 
@@ -260,7 +226,7 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
       const mine = await saveChart({ name: "Mine" });
       await saveChart({ projectId: otherProjectId, name: "Theirs" });
 
-      const listed = await service().listSavedWorkbenchCharts({ projectId });
+      const listed = await charts().getAll({ projectId });
 
       expect(listed.map((chart) => chart.id)).toEqual([mine.id]);
     });
@@ -270,10 +236,10 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
       const saved = await saveChart();
 
       await expect(
-        service().getSavedWorkbenchChart({ projectId: otherProjectId, chartId: saved.id }),
+        charts().getById({ projectId: otherProjectId, chartId: saved.id }),
       ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
       await expect(
-        service().getSavedWorkbenchChart({
+        charts().getById({
           projectId: otherProjectId,
           chartId: `never-${randomUUID()}`,
         }),
@@ -285,29 +251,31 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
       const saved = await saveChart();
 
       await expect(
-        service().updateSavedWorkbenchChart({
+        charts().update({
           projectId: otherProjectId,
           chartId: saved.id,
           name: "Renamed by a stranger",
         }),
       ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
       await expect(
-        service().deleteSavedWorkbenchChart({ projectId: otherProjectId, chartId: saved.id }),
+        charts().delete({ projectId: otherProjectId, chartId: saved.id }),
       ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
 
-      const after = await service().getSavedWorkbenchChart({ projectId, chartId: saved.id });
+      const after = await charts().getById({ projectId, chartId: saved.id });
       expect(after.name).toBe("Traces over time");
       expect(after.definition).toEqual(DEFINITION);
     });
   });
 
   describe("given a chart being placed on a dashboard", () => {
-    /** @scenario "A placed chart round-trips with the dashboard id and grid position it was given" */
+    /**
+     * @scenario "A placed chart round-trips with the dashboard id and grid position it was given"
+     */
     it("reads back with the dashboard and the grid position it was given", async () => {
       const dashboard = await createDashboard();
       const saved = await saveChart();
 
-      await service().placeSavedWorkbenchChart({
+      await charts().place({
         projectId,
         chartId: saved.id,
         dashboardId: dashboard.id,
@@ -317,9 +285,7 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
         rowSpan: 2,
       });
 
-      await expect(
-        service().getSavedWorkbenchChart({ projectId, chartId: saved.id }),
-      ).resolves.toMatchObject({
+      await expect(charts().getById({ projectId, chartId: saved.id })).resolves.toMatchObject({
         dashboardId: dashboard.id,
         gridColumn: 1,
         gridRow: 3,
@@ -328,22 +294,26 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
       });
     });
 
-    /** @scenario "Placing a chart onto another project's dashboard is refused, and nothing is written" */
+    /**
+     * @scenario "Placing a chart onto another project's dashboard is refused, and nothing is written"
+     */
     it("refuses another project's dashboard and leaves the chart unplaced", async () => {
       const foreignDashboard = await createDashboard(otherProjectId);
       const saved = await saveChart();
 
       await expect(
-        service().placeSavedWorkbenchChart({
+        charts().place({
           projectId,
           chartId: saved.id,
           dashboardId: foreignDashboard.id,
         }),
       ).rejects.toBeInstanceOf(SavedWorkbenchChartDashboardNotFoundError);
 
-      await expect(
-        service().getSavedWorkbenchChart({ projectId, chartId: saved.id }),
-      ).resolves.toMatchObject({ dashboardId: null, gridColumn: 0, gridRow: 0 });
+      await expect(charts().getById({ projectId, chartId: saved.id })).resolves.toMatchObject({
+        dashboardId: null,
+        gridColumn: 0,
+        gridRow: 0,
+      });
     });
   });
 
@@ -352,7 +322,7 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
     it("returns every grid field to its unplaced default, not only the dashboard id", async () => {
       const dashboard = await createDashboard();
       const saved = await saveChart();
-      await service().placeSavedWorkbenchChart({
+      await charts().place({
         projectId,
         chartId: saved.id,
         dashboardId: dashboard.id,
@@ -362,11 +332,9 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
         rowSpan: 2,
       });
 
-      await service().unplaceSavedWorkbenchChart({ projectId, chartId: saved.id });
+      await charts().unplace({ projectId, chartId: saved.id });
 
-      await expect(
-        service().getSavedWorkbenchChart({ projectId, chartId: saved.id }),
-      ).resolves.toMatchObject({
+      await expect(charts().getById({ projectId, chartId: saved.id })).resolves.toMatchObject({
         dashboardId: null,
         gridColumn: 0,
         gridRow: 0,
@@ -381,19 +349,19 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
     it("removes the row rather than leaving the dashboard pointing at it", async () => {
       const dashboard = await createDashboard();
       const saved = await saveChart();
-      await service().placeSavedWorkbenchChart({
+      await charts().place({
         projectId,
         chartId: saved.id,
         dashboardId: dashboard.id,
       });
 
-      await service().deleteSavedWorkbenchChart({ projectId, chartId: saved.id });
+      await charts().delete({ projectId, chartId: saved.id });
 
       await expect(
         database().customGraph.findUnique({ where: { id: saved.id } }),
       ).resolves.toBeNull();
       await expect(
-        service().getById({ projectId, dashboardId: dashboard.id }),
+        dashboards().getById({ projectId, dashboardId: dashboard.id }),
       ).resolves.toMatchObject({ graphs: [] });
     });
   });
