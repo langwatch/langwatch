@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent as StoredAgent } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 type Agent = WireOf<StoredAgent>;
 import { AgentCard } from "@langwatch/agent-web/surfaces/connected-agents";

@@ -35,7 +35,7 @@ import {
   type AgentWithFields as StoredAgentWithFields,
   linkedWorkflowId,
 } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** An agent as the browser holds one: the wire carries its instants as strings. */
 type AgentWithFields = WireOf<StoredAgentWithFields>;

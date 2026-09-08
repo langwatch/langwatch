@@ -5,7 +5,7 @@ import type {
   ConnectedAgentView,
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode, useEffect, useState } from "react";
 import type { AgentBrowserPort } from "../../../../model/agent-browser.port.ts";

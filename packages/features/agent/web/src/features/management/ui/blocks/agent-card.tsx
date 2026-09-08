@@ -1,6 +1,6 @@
 import { Box, Button, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Agent, AgentType } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   ArrowUp,

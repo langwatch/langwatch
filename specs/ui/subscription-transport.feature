@@ -1,5 +1,4 @@
 # Implementation:
-#   packages/platform-api-client/src/sse-subscription-link.ts
 #   apps/ui/src/behavior/ui-feature-transport.ts
 # Plan:
 #   dev/docs/plans/ui-subscription-transport.md

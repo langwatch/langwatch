@@ -2,7 +2,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 
 /** An agent as the drawer holds one: the wire carries its instants as strings. */
 type AgentWithFields = WireOf<StoredAgentWithFields>;

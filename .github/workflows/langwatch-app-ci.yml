@@ -550,20 +550,16 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/system-migrations run typecheck
 
-      # @langwatch/platform-api-client owns `trpcQueryKey`, which re-derives
-      # tRPC's React Query cache-key encoding from a procedure path. Every
-      # feature web package invalidating a procedure its own map does not
-      # declare goes through it, so if the encoding drifts from
-      # `@trpc/react-query`'s the failure is silent — an invalidation that
-      # matches nothing, and stale UI nobody can trace back here. Its suite is
-      # the only thing that pins the encoding, and it ran nowhere.
-      - name: Run @langwatch/platform-api-client unit tests
+      # @langwatch/api/web owns `trpcQueryKey`, which re-derives tRPC's React
+      # Query cache-key encoding from a procedure path. Every feature web
+      # package invalidating a procedure its own map does not declare goes
+      # through it, so if the encoding drifts from `@trpc/react-query`'s the
+      # failure is silent — an invalidation that matches nothing. Its suite runs
+      # with the @langwatch/api unit tests above; this compiles the package's
+      # own TypeScript, browser half included, which `pnpm typecheck` does not.
+      - name: Typecheck @langwatch/api
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/platform-api-client run test:unit
-
-      - name: Typecheck @langwatch/platform-api-client
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/platform-api-client run typecheck
+        run: pnpm --filter @langwatch/api run typecheck
 
       # @langwatch/trace-web is the first feature web package, and the largest
       # body of browser code that left the monolith — 406 tests over 42 files,

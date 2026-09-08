@@ -10,7 +10,7 @@ import {
   type HttpHeader,
   type HttpMethod,
 } from "@langwatch/agent-contract";
-import type { WireOf } from "@langwatch/platform-api-client/feature-api";
+import type { WireOf } from "@langwatch/api/web";
 import { ArrowLeft } from "lucide-react";
 
 /** An agent as the browser holds one: the wire carries its instants as strings. */
