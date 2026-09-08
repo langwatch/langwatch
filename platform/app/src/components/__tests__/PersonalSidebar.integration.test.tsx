@@ -121,8 +121,8 @@ describe("PersonalSidebarLinks", () => {
     });
   });
 
-  describe("given the selected organization holds no personal workspace", () => {
-    it("renders no Traces entry rather than one for another organization", () => {
+  describe("given the loaded organization holds no personal workspace", () => {
+    it("renders no Traces entry", () => {
       state.organizations = [
         orgWithPersonalProject("org-first", "personal-first"),
         { id: "org-shared", teams: [] },
