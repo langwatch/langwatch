@@ -114,7 +114,9 @@ export class ProjectOperationsService {
    * readable. Secret fields arrive as ciphertext: encryption is the process's,
    * not this feature's.
    */
-  async updateSettings(input: Readonly<UpdateProjectInput & { projectId: string }>): Promise<Project> {
+  async updateSettings(
+    input: Readonly<UpdateProjectInput & { projectId: string }>,
+  ): Promise<Project> {
     const project = await this.projects.tryGetWithTeam(input.projectId);
     if (!project) throw new ProjectNotFoundError();
 

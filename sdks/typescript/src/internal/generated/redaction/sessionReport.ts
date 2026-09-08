@@ -36,8 +36,8 @@
  * exact code that runs before a report is sent. A drift test pins the mirror
  * byte-for-byte.
  */
-import { formatPiiMarker, SECRET_MARKER } from "./markers.ts";
-import { isSensitiveAttributeKey, redactSecretsInText } from "./secrets.ts";
+import { formatPiiMarker, SECRET_MARKER } from "./markers.js";
+import { isSensitiveAttributeKey, redactSecretsInText } from "./secrets.js";
 
 const EMAIL_MARKER = formatPiiMarker("EMAIL_ADDRESS");
 const PHONE_MARKER = formatPiiMarker("PHONE_NUMBER");

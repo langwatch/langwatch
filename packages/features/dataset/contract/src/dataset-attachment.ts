@@ -50,9 +50,7 @@ export function datasetAttachmentReferencePath({
  * Splits a cell value into its link target and optional display name. A cell
  * may hold a bare value or a markdown link `[name](target)`.
  */
-export function parseDatasetFileCell(
-  value: unknown,
-): { url: string; fileName?: string } | null {
+export function parseDatasetFileCell(value: unknown): { url: string; fileName?: string } | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (trimmed.length === 0) return null;
@@ -61,7 +59,9 @@ export function parseDatasetFileCell(
   if (link) {
     const [, name, target] = link;
     if (!target) return null;
-    return name && name.trim().length > 0 ? { url: target, fileName: name.trim() } : { url: target };
+    return name && name.trim().length > 0
+      ? { url: target, fileName: name.trim() }
+      : { url: target };
   }
 
   if (/\s/.test(trimmed)) return null;
@@ -93,7 +93,13 @@ export function parseDatasetAttachmentReference(value: unknown): DatasetAttachme
 }
 
 /** The value a `file` cell stores after an upload: a markdown link keeps the name. */
-export function datasetFileCellValue({ fileName, path }: { fileName: string; path: string }): string {
+export function datasetFileCellValue({
+  fileName,
+  path,
+}: {
+  fileName: string;
+  path: string;
+}): string {
   const safeName = fileName.replace(/[[\]]/g, "").trim();
   return safeName.length > 0 ? `[${safeName}](${path})` : path;
 }

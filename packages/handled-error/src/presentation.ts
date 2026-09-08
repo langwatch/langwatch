@@ -2432,7 +2432,8 @@ const presentations = {
   },
   dataset_attachment_too_large: {
     title: "This file is too large",
-    describe: () => "Files up to 20 MB can be uploaded into a cell. Use a smaller file or enter a URL.",
+    describe: () =>
+      "Files up to 20 MB can be uploaded into a cell. Use a smaller file or enter a URL.",
   },
   dataset_attachment_unreadable: {
     title: "This file could not be read",
