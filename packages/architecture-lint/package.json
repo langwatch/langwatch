@@ -16,11 +16,11 @@
     }
   },
   "scripts": {
-    "lint": "node --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
-    "lint:declarations": "node --experimental-transform-types src/cli.ts --root ../.. --no-legacy-application-migration",
-    "lint:migration": "node --experimental-transform-types src/cli.ts --root ../.. --no-declarations",
-    "review:comment-blocks": "node --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
-    "review:test-quality": "node --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
+    "lint": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
+    "lint:declarations": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-legacy-application-migration",
+    "lint:migration": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-declarations",
+    "review:comment-blocks": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
+    "review:test-quality": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
     "rename-package": "node --experimental-transform-types src/rename-workspace-package.cli.ts",
     "rename-feature-sources": "node --experimental-transform-types src/rename-feature-sources.cli.ts",
     "typecheck": "tsc --noEmit",

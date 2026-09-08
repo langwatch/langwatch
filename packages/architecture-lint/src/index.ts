@@ -16,7 +16,7 @@ import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
 import { lintSourceFolderShape } from "./source-folder-shape.ts";
 import { lintPrismaTableOwnership } from "./prisma-table-ownership.ts";
-import { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
+import { declaredWebDependencyPairs, lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 import { lintGlobalAppAccess } from "./global-app-access.ts";
 import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
 import { lintManifests } from "./manifests.ts";
@@ -102,7 +102,7 @@ export { lintServiceCeilingsFile } from "./service-ceilings.ts";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
 export { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
 export { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
-export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
+export { declaredWebDependencyPairs, lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
 export type {
   ModuleImport,
   PackageManifestRecord,
@@ -181,6 +181,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
   const root = resolve(options.root);
   const changedFiles = options.changedFiles ?? changedSourceFiles(root);
   const discovery = discoverClassifiedPackages(root);
+
   const violations = [
     ...discovery.violations,
     ...lintBoundarySignatureMirrors(root),
@@ -200,7 +201,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintStrictContractBuildConfigs(root, discovery.packages),
     ...lintDeclarationProjectReferences(root, discovery.packages),
     ...lintStrictPortModules(root, discovery.packages),
-    ...lintManifests(discovery.packages),
+    ...lintManifests(discovery.packages, declaredWebDependencyPairs(root, discovery.packages)),
     ...lintOverengineeringBaseline(root, discovery.packages),
     ...lintApplicationBoundaries(root, discovery.packages, {
       legacyMigration: options.legacyApplicationMigration !== false,
@@ -208,7 +209,7 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     ...lintApiTransportBoundaries(root, discovery.packages),
     ...lintApiTransportFramework(root, discovery.packages),
     ...lintServiceProjectionBoundaries(discovery.packages),
-    ...lintServiceCeilings(root, discovery.packages, options.serviceCeilingsBaselineReference),
+    ...lintServiceCeilings(root, discovery.packages),
     ...lintCycles(discovery.packages),
     ...lintTestQuality(root, { files: changedFiles }),
     ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),
@@ -222,12 +223,4 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     .sort((a, b) =>
       `${a.file}:${a.line ?? 0}:${a.policy}`.localeCompare(`${b.file}:${b.line ?? 0}:${b.policy}`),
     );
-}
-
-export function formatViolation(violation: ArchitectureViolation): string {
-  const location = `${violation.file}${violation.line ? `:${violation.line}` : ""}`;
-  const importText = violation.specifier ? ` (${violation.specifier})` : "";
-  const allowed = violation.allowed ? `\n  allowed: ${violation.allowed}` : "";
-
-  return `[${violation.policy}] ${location}${importText}\n  ${violation.message}${allowed}`;
 }
