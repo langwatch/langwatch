@@ -152,7 +152,7 @@ import {
   EXPLORE_USAGE_DOCS_PATH,
   EXPLORE_USAGE_LANGY_PROMPT,
 } from "../ui/sections/connect-your-agent-button.tsx";
-import { PersonalOverviewScreen } from "../screens/personal-workspace/personal-overview.screen.tsx";
+import { PersonalOverviewScreen } from "../ui/sections/personal-workspace/personal-overview.screen.tsx";
 import {
   fakePersonalWorkspaceHost,
   renderWithPersonalWorkspaceHost,

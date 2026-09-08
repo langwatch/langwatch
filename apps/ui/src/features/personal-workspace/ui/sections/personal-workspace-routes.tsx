@@ -7,7 +7,7 @@
 import {
   personalWorkspaceScreens,
   type PersonalWorkspaceScreenName,
-} from "@langwatch/user-web/screens/personal-workspace";
+} from "@langwatch/user-web/personal-workspace";
 import { useEffect, type ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

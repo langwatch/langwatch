@@ -10,7 +10,7 @@ import {
   type PersonalOrganization,
   type PersonalTeam,
   type PersonalWorkspaceHostPort,
-} from "@langwatch/user-web/screens/personal-workspace";
+} from "@langwatch/user-web/personal-workspace";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useMemo, type ReactNode } from "react";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";

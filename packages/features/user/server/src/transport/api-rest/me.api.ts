@@ -1,4 +1,4 @@
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -136,7 +136,7 @@ export function createMeRestApp(options: {
    * what lets the OpenAPI spec generator build this app with none.
    */
   personalUsage: () => MePersonalUsageReader;
-  organizations: () => OrganizationService;
+  organizations: () => OrganizationApi;
   projects: () => ProjectService;
 }): MountableRestApp {
   const { service, policy } = options.security.createProjectVersionedApp({

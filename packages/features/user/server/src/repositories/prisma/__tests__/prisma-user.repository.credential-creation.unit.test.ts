@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository.ts";
 
+/** The issuer the deployment states, carried down with each credential write. */
+const ISSUER = "local:credential";
+
 /**
  * Every scalar column on `model User`. Prisma returns all of them from a
  * `create` that names no `select`, so a mock answering `{ id }` regardless is
@@ -65,7 +68,7 @@ function makeDatabase() {
     }),
   };
   return {
-    database: transaction as UserDatabase,
+    database: transaction as unknown as UserDatabase,
     userCreate,
     userUpdate,
     accountCreate,
@@ -75,15 +78,20 @@ function makeDatabase() {
   };
 }
 
+function repositoryOver(database: UserDatabase) {
+  return PrismaUserRepository.create({ prisma: database });
+}
+
 describe("PrismaUserRepository credential creation", () => {
   it("creates a user and credential account atomically", async () => {
     const { database, userCreate, accountCreate } = makeDatabase();
 
     await expect(
-      PrismaUserRepository.create(database, "local:credential").createCredentialUser({
+      repositoryOver(database).createCredentialUser({
         name: "Ada",
         email: "ada@example.com",
         passwordHash: "hash",
+        issuer: ISSUER,
       }),
     ).resolves.toEqual({ id: "user-1" });
     expect(userCreate).toHaveBeenCalledWith({
@@ -95,7 +103,7 @@ describe("PrismaUserRepository credential creation", () => {
         userId: "user-1",
         type: "credential",
         provider: "credential",
-        issuer: "local:credential",
+        issuer: ISSUER,
         providerAccountId: "user-1",
         password: "hash",
       },
@@ -105,8 +113,9 @@ describe("PrismaUserRepository credential creation", () => {
   it("creates a recovery account with a null password for passkey signup", async () => {
     const { database, accountCreate } = makeDatabase();
 
-    await PrismaUserRepository.create(database, "local:credential").createPasskeyUser({
+    await repositoryOver(database).createPasskeyUser({
       email: "ada@example.com",
+      issuer: ISSUER,
     });
 
     expect(accountCreate).toHaveBeenCalledWith({
@@ -126,10 +135,11 @@ describe("PrismaUserRepository credential creation", () => {
       const { database, userCreate } = makeDatabase();
 
       await expect(
-        PrismaUserRepository.create(database, "local:credential").createCredentialUser({
+        repositoryOver(database).createCredentialUser({
           name: "Ada",
           email: "ada@example.com",
           passwordHash: "hash",
+          issuer: ISSUER,
         }),
       ).resolves.toEqual({ id: "user-1" });
       expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
@@ -139,8 +149,9 @@ describe("PrismaUserRepository credential creation", () => {
       const { database, userCreate } = makeDatabase();
 
       await expect(
-        PrismaUserRepository.create(database, "local:credential").createPasskeyUser({
+        repositoryOver(database).createPasskeyUser({
           email: "ada@example.com",
+          issuer: ISSUER,
         }),
       ).resolves.toEqual({ id: "user-1" });
       expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
@@ -152,9 +163,10 @@ describe("PrismaUserRepository credential creation", () => {
     database.account.findFirst = vi.fn(async () => ({ id: "account-1", password: null }));
 
     await expect(
-      PrismaUserRepository.create(database, "local:credential").setFirstPassword({
+      repositoryOver(database).setFirstPassword({
         id: "user-1",
         passwordHash: "bcrypt-hash",
+        issuer: ISSUER,
       }),
     ).resolves.toBe("set");
     expect(accountUpdate).toHaveBeenCalledWith({
@@ -168,9 +180,10 @@ describe("PrismaUserRepository credential creation", () => {
     const { database, accountCreate } = makeDatabase();
 
     await expect(
-      PrismaUserRepository.create(database, "local:credential").setFirstPassword({
+      repositoryOver(database).setFirstPassword({
         id: "user-1",
         passwordHash: "bcrypt-hash",
+        issuer: ISSUER,
       }),
     ).resolves.toBe("set");
     expect(accountCreate).toHaveBeenCalledWith({
@@ -178,7 +191,7 @@ describe("PrismaUserRepository credential creation", () => {
         userId: "user-1",
         type: "credential",
         provider: "credential",
-        issuer: "local:credential",
+        issuer: ISSUER,
         providerAccountId: "user-1",
         password: "bcrypt-hash",
       },
@@ -193,9 +206,10 @@ describe("PrismaUserRepository credential creation", () => {
     }));
 
     await expect(
-      PrismaUserRepository.create(database, "local:credential").setFirstPassword({
+      repositoryOver(database).setFirstPassword({
         id: "user-1",
         passwordHash: "bcrypt-hash",
+        issuer: ISSUER,
       }),
     ).resolves.toBe("already_set");
     expect(accountUpdate).not.toHaveBeenCalled();
@@ -208,9 +222,10 @@ describe("PrismaUserRepository credential creation", () => {
     passkeyCount.mockResolvedValue(1);
     database.user.findUnique = vi.fn(async () => ({ passkeyNudgeDismissedAt: dismissedAt }));
 
-    await expect(
-      PrismaUserRepository.create(database, "local:credential").getPasskeyNudgeStatus("user-1"),
-    ).resolves.toEqual({ hasPasskey: true, dismissedAt });
+    await expect(repositoryOver(database).getPasskeyNudgeStatus("user-1")).resolves.toEqual({
+      hasPasskey: true,
+      dismissedAt,
+    });
     expect(passkeyCount).toHaveBeenCalledWith({ where: { userId: "user-1" } });
   });
 
@@ -218,10 +233,7 @@ describe("PrismaUserRepository credential creation", () => {
     const { database, userUpdate } = makeDatabase();
     const dismissedAt = new Date(42);
 
-    await PrismaUserRepository.create(database, "local:credential").setPasskeyNudgeDismissedAt(
-      "user-1",
-      dismissedAt,
-    );
+    await repositoryOver(database).setPasskeyNudgeDismissedAt({ id: "user-1", dismissedAt });
     expect(userUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { passkeyNudgeDismissedAt: dismissedAt },
@@ -234,10 +246,11 @@ describe("PrismaUserRepository credential creation", () => {
     accountCreate.mockRejectedValue(failure);
 
     await expect(
-      PrismaUserRepository.create(database, "local:credential").createCredentialUser({
+      repositoryOver(database).createCredentialUser({
         name: "Ada",
         email: "ada@example.com",
         passwordHash: "hash",
+        issuer: ISSUER,
       }),
     ).rejects.toBe(failure);
     expect(database.$transaction).toHaveBeenCalledTimes(1);

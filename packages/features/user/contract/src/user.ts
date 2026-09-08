@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const USER_FEATURE_ID = "user" as const;
+export const USER_KSUID_RESOURCE = "user" as const;
+export const USER_ACCOUNT_KSUID_RESOURCE = "account" as const;
 export const USER_AVATAR_PURPOSE = "user_avatar" as const;
 export const USER_AVATAR_OWNER_KIND = "user" as const;
 export const USER_AVATAR_MAX_BYTES = 8 * 1024 * 1024;
@@ -95,6 +97,46 @@ export const userCredentialAccountRowSchema = z
 export const userCredentialAccountSchema = userCredentialAccountRowSchema
   .extend({ id: z.string().min(1) })
   .strict();
+
+/** One sign-in method a person holds, as the settings list renders it. Never a secret. */
+export const userLinkedAccountSchema = z
+  .object({
+    id: z.string().min(1),
+    provider: z.string(),
+    providerAccountId: z.string(),
+  })
+  .strict();
+export type UserLinkedAccount = z.infer<typeof userLinkedAccountSchema>;
+
+/**
+ * What a password rotation did, or why it did nothing. Three outcomes rather
+ * than three exceptions, because the door owes the reader a different sentence
+ * for each and the account owes the door no opinion about status codes.
+ */
+export const userPasswordRotationOutcomeSchema = z.enum([
+  "rotated",
+  "no_password",
+  "wrong_password",
+]);
+export type UserPasswordRotationOutcome = z.infer<typeof userPasswordRotationOutcomeSchema>;
+
+/** What an unlink did. `last_account` is a refusal, not a failure. */
+export const unlinkUserAccountOutcomeSchema = z.enum(["unlinked", "last_account", "not_found"]);
+export type UnlinkUserAccountOutcome = z.infer<typeof unlinkUserAccountOutcomeSchema>;
+
+export const rotateUserPasswordInputSchema = z
+  .object({
+    userId: z.string().min(1),
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(1),
+  })
+  .strict();
+export type RotateUserPasswordInput = z.infer<typeof rotateUserPasswordInputSchema>;
+
+export const unlinkUserAccountInputSchema = z
+  .object({ userId: z.string().min(1), accountId: z.string().min(1) })
+  .strict();
+export type UnlinkUserAccountInput = z.infer<typeof unlinkUserAccountInputSchema>;
 
 export const updateUserProfileInputSchema = z
   .object({

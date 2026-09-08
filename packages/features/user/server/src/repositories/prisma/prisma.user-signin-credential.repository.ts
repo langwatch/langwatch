@@ -1,18 +1,16 @@
+import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  type UnlinkUserAccountOutcome,
-  type UserCredentialAccount,
+import type {
+  UnlinkUserAccountInput,
+  UnlinkUserAccountOutcome,
+  UserLinkedAccount,
+} from "@langwatch/user-contract";
+import type {
+  UserCredentialAccount,
   UserCredentialRepository,
-  type UserLinkedAccount,
 } from "../user-signin-credential.repository.ts";
 
-/**
- * The one model and the one transaction runner these five statements need.
- *
- * Typed at the seam — a `Pick` of the generated client rather than the `object`
- * the older user repository still takes — so a composition that passes the
- * wrong connection is a compile error rather than a runtime `in` test.
- */
+/** The one model and the one transaction runner these five statements need. */
 export type UserCredentialDatabase = Pick<PrismaClient, "account" | "$transaction">;
 
 /** better-auth's own provider name for an email-and-password sign-in method. */
@@ -28,58 +26,45 @@ const AUTH0_DATABASE_SUBJECT_PREFIX = "auth0|";
 /**
  * The account rows behind the /settings/authentication screens.
  *
- * These five statements were written in the API process's own composition
- * (`apps/api/src/app/api-trpc-ports.composition.ts`), which is how a `select`
- * naming `password` came to live outside the package that owns the stored
- * credential format. The lint that governs Prisma reads governs IMPORTS rather
- * than call sites, so a composition already holding the client could select
- * that column with no rule attached to the read at all.
- *
  * They read the same rows, with the same predicates, from inside the feature
- * that owns them.
+ * that owns them — a `select` naming `password` used to live in the API
+ * process's own composition, outside the package that owns the stored format.
  */
-export class PrismaUserCredentialRepository extends UserCredentialRepository {
-  private constructor(private readonly database: UserCredentialDatabase) {
-    super();
+export class PrismaUserCredentialRepository
+  extends PrismaRepository.transactionalFor("Account")
+  implements UserCredentialRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaUserCredentialRepository(prisma));
+
+  readonly #database: UserCredentialDatabase;
+
+  private constructor(prisma: UserCredentialDatabase) {
+    super(prisma);
+    this.#database = prisma;
   }
 
-  static create(database: UserCredentialDatabase): PrismaUserCredentialRepository {
-    return new PrismaUserCredentialRepository(database);
-  }
-
-  async tryFindCredentialAccount({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<UserCredentialAccount | null> {
-    const row = await this.database.account.findFirst({
-      where: { userId, provider: CREDENTIAL_PROVIDER },
+  async findCredentialAccount(input: { userId: string }): Promise<UserCredentialAccount | null> {
+    const row = await this.prisma.account.findFirst({
+      where: { userId: input.userId, provider: CREDENTIAL_PROVIDER },
       select: { id: true, password: true },
     });
+
     return row ? { id: row.id, passwordHash: row.password } : null;
   }
 
-  async writePasswordHash({
-    accountId,
-    passwordHash,
-  }: {
-    accountId: string;
-    passwordHash: string;
-  }): Promise<void> {
-    await this.database.account.update({
-      where: { id: accountId },
-      data: { password: passwordHash },
+  async writePasswordHash(input: { accountId: string; passwordHash: string }): Promise<void> {
+    await this.prisma.account.update({
+      where: { id: input.accountId },
+      data: { password: input.passwordHash },
     });
   }
 
-  async tryFindAuth0DatabaseAccount({
-    userId,
-  }: {
+  async findAuth0DatabaseAccount(input: {
     userId: string;
   }): Promise<{ providerAccountId: string } | null> {
-    return await this.database.account.findFirst({
+    return await this.prisma.account.findFirst({
       where: {
-        userId,
+        userId: input.userId,
         provider: AUTH0_PROVIDER,
         providerAccountId: { startsWith: AUTH0_DATABASE_SUBJECT_PREFIX },
       },
@@ -87,32 +72,29 @@ export class PrismaUserCredentialRepository extends UserCredentialRepository {
     });
   }
 
-  async findLinkedAccounts({ userId }: { userId: string }): Promise<UserLinkedAccount[]> {
-    return await this.database.account.findMany({
-      where: { userId },
+  async findLinkedAccounts(input: { userId: string }): Promise<UserLinkedAccount[]> {
+    return await this.prisma.account.findMany({
+      where: { userId: input.userId },
       select: { id: true, provider: true, providerAccountId: true },
     });
   }
 
-  async unlinkAccount({
-    userId,
-    accountId,
-  }: {
-    userId: string;
-    accountId: string;
-  }): Promise<UnlinkUserAccountOutcome> {
+  async unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome> {
     // Serializable isolation prevents the read of the account count from being
     // a stale snapshot if a concurrent unlink commits between this
     // transaction's count and its delete.
-    return await this.database.$transaction(
+    return await this.#database.$transaction(
       async (transaction) => {
-        const accountCount = await transaction.account.count({ where: { userId } });
+        const accountCount = await transaction.account.count({ where: { userId: input.userId } });
         if (accountCount <= 1) return "last_account" as const;
+
         const account = await transaction.account.findFirst({
-          where: { id: accountId, userId },
+          where: { id: input.accountId, userId: input.userId },
         });
         if (!account) return "not_found" as const;
-        await transaction.account.delete({ where: { id: accountId } });
+
+        await transaction.account.delete({ where: { id: input.accountId } });
+
         return "unlinked" as const;
       },
       { isolationLevel: "Serializable" },

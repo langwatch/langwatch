@@ -15,19 +15,19 @@ import { useState } from "react";
 import { BudgetOverviewList } from "@langwatch/gateway-web/surfaces/budget-overview";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 
-import { api } from "../../behavior/personal-workspace-api.ts";
+import { api } from "../../../behavior/personal-workspace-api.ts";
 import {
   usePersonalToaster,
   useShowErrorToast,
-} from "../../behavior/personal-workspace-feedback.ts";
-import { usePersonalRouter } from "../../behavior/personal-workspace-router.ts";
-import { type PersonalApiKeyRow, usePersonalContext } from "../../behavior/use-personal-context.ts";
-import { formatRelativeTime } from "../../model/relative-time.ts";
-import { AvatarUploadControl } from "../../ui/sections/avatar-upload-control.tsx";
-import { DevicesPanel } from "../../ui/sections/devices-panel.tsx";
-import { HomePagePicker } from "../../ui/sections/home-page-picker.tsx";
-import { PersonalOtlpEndpointPanel } from "../../ui/sections/personal-otlp-endpoint-panel.tsx";
-import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout.tsx";
+} from "../../../behavior/personal-workspace-feedback.ts";
+import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
+import { type PersonalApiKeyRow, usePersonalContext } from "../../../behavior/use-personal-context.ts";
+import { formatRelativeTime } from "../../../model/relative-time.ts";
+import { AvatarUploadControl } from "../avatar-upload-control.tsx";
+import { DevicesPanel } from "../devices-panel.tsx";
+import { HomePagePicker } from "../home-page-picker.tsx";
+import { PersonalOtlpEndpointPanel } from "../personal-otlp-endpoint-panel.tsx";
+import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 import { toEpochMs } from "@langwatch/time";
 
 /** The personal keys carry ISO timestamps; the ladder counts milliseconds. */

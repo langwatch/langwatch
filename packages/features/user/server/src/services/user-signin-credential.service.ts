@@ -1,16 +1,12 @@
-import type { UserPasswordHasherPort } from "../ports/user.port.ts";
 import type {
+  RotateUserPasswordInput,
+  UnlinkUserAccountInput,
   UnlinkUserAccountOutcome,
-  UserCredentialRepository,
   UserLinkedAccount,
-} from "../repositories/user-signin-credential.repository.ts";
-
-/**
- * What a password rotation did, or why it did nothing. Three outcomes rather than three
- * exceptions, because the transport owes the reader a different sentence for each and the
- * service owes the transport no opinion about status codes.
- */
-export type UserPasswordRotationOutcome = "rotated" | "no_password" | "wrong_password";
+  UserPasswordRotationOutcome,
+} from "@langwatch/user-contract";
+import type { UserPasswordHasherPort } from "../ports/user.port.ts";
+import type { UserCredentialRepository } from "../repositories/user-signin-credential.repository.ts";
 
 /**
  * The credential half of a person's account: the password they sign in with, and the list of
@@ -35,12 +31,8 @@ export class UserCredentialService {
    * courtesy: a stolen session is enough to reach this call, and the current password is the
    * one thing the thief does not have.
    */
-  async rotatePassword(input: {
-    userId: string;
-    currentPassword: string;
-    newPassword: string;
-  }): Promise<UserPasswordRotationOutcome> {
-    const account = await this.repository.tryFindCredentialAccount({ userId: input.userId });
+  async rotatePassword(input: RotateUserPasswordInput): Promise<UserPasswordRotationOutcome> {
+    const account = await this.repository.findCredentialAccount({ userId: input.userId });
     if (!account?.passwordHash) {
       return "no_password";
     }
@@ -66,10 +58,10 @@ export class UserCredentialService {
    * can change, or null when this person only holds social identities Auth0
    * federates for somebody else.
    */
-  tryFindAuth0DatabaseAccount(input: {
+  findAuth0DatabaseAccount(input: {
     userId: string;
   }): Promise<{ providerAccountId: string } | null> {
-    return this.repository.tryFindAuth0DatabaseAccount({ userId: input.userId });
+    return this.repository.findAuth0DatabaseAccount({ userId: input.userId });
   }
 
   /** Every sign-in method this person holds. */
@@ -78,7 +70,7 @@ export class UserCredentialService {
   }
 
   /** Removes one sign-in method, refusing to remove the last one. */
-  unlinkAccount(input: { userId: string; accountId: string }): Promise<UnlinkUserAccountOutcome> {
+  unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome> {
     return this.repository.unlinkAccount(input);
   }
 }

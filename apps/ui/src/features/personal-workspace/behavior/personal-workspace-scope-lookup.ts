@@ -2,7 +2,7 @@
 import type {
   PersonalOrganization,
   PersonalProject,
-} from "@langwatch/user-web/screens/personal-workspace";
+} from "@langwatch/user-web/personal-workspace";
 
 export function resolvePersonalWorkspaceOrganization({
   organizationId,

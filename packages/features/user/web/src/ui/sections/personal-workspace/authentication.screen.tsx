@@ -16,10 +16,10 @@
  */
 
 import { Heading, Text, VStack } from "@chakra-ui/react";
-import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
-import { EnterpriseCapabilitiesSection } from "../../ui/sections/enterprise-capabilities-section.tsx";
-import { PasskeysSection } from "../../ui/sections/passkeys-section.tsx";
-import { SignInMethodsSection } from "../../ui/sections/sign-in-methods-section.tsx";
+import { usePersonalWorkspaceHost } from "../../../model/personal-workspace-host.ts";
+import { EnterpriseCapabilitiesSection } from "../enterprise-capabilities-section.tsx";
+import { PasskeysSection } from "../passkeys-section.tsx";
+import { SignInMethodsSection } from "../sign-in-methods-section.tsx";
 
 export default function AuthenticationScreen() {
   const host = usePersonalWorkspaceHost();

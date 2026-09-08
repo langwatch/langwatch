@@ -7,14 +7,17 @@ import type { ComponentType } from "react";
 export type PersonalWorkspaceScreenLoader = () => Promise<{ default: ComponentType }>;
 
 export const personalWorkspaceScreens = {
-  overview: () => import("./personal-overview.screen.tsx"),
-  configure: () => import("./personal-configure.screen.tsx"),
-  sessions: () => import("./personal-sessions.screen.tsx"),
-  pullRequests: () => import("./personal-pull-requests.screen.tsx"),
-  budgetRequest: () => import("./personal-budget-request.screen.tsx"),
-  projectSessions: () => import("./project-sessions.screen.tsx"),
-  projectPullRequests: () => import("./project-pull-requests.screen.tsx"),
-  authentication: () => import("./authentication.screen.tsx"),
+  overview: () => import("./ui/sections/personal-workspace/personal-overview.screen.tsx"),
+  configure: () => import("./ui/sections/personal-workspace/personal-configure.screen.tsx"),
+  sessions: () => import("./ui/sections/personal-workspace/personal-sessions.screen.tsx"),
+  pullRequests: () =>
+    import("./ui/sections/personal-workspace/personal-pull-requests.screen.tsx"),
+  budgetRequest: () =>
+    import("./ui/sections/personal-workspace/personal-budget-request.screen.tsx"),
+  projectSessions: () => import("./ui/sections/personal-workspace/project-sessions.screen.tsx"),
+  projectPullRequests: () =>
+    import("./ui/sections/personal-workspace/project-pull-requests.screen.tsx"),
+  authentication: () => import("./ui/sections/personal-workspace/authentication.screen.tsx"),
 } as const satisfies Record<string, PersonalWorkspaceScreenLoader>;
 
 export type PersonalWorkspaceScreenName = keyof typeof personalWorkspaceScreens;
@@ -26,8 +29,8 @@ export {
   isSecurityKey,
   passkeyLabel,
   providerDisplayName,
-} from "../../model/sign-in-methods.ts";
-export { personalWorkspaceApi } from "../../behavior/personal-workspace-api.ts";
+} from "./model/sign-in-methods.ts";
+export { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";
 export { codingAgentApi } from "@langwatch/coding-agent-web/surfaces/activity";
 export {
   PersonalWorkspaceHostPort,
@@ -45,4 +48,4 @@ export {
   type PersonalScope,
   type PersonalSuccessNotice,
   type PersonalTeam,
-} from "../../model/personal-workspace-host.ts";
+} from "./model/personal-workspace-host.ts";

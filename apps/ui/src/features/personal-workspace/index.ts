@@ -7,7 +7,7 @@
 import {
   codingAgentApi,
   personalWorkspaceApi,
-} from "@langwatch/user-web/screens/personal-workspace";
+} from "@langwatch/user-web/personal-workspace";
 import { uiFeature } from "../../behavior/ui-feature";
 import { personalWorkspacePageLoaders } from "./ui/sections/personal-workspace-routes";
 

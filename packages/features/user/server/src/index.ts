@@ -1,21 +1,13 @@
 export { PostgresUserAdapter } from "./adapters/postgres.user.adapter.ts";
 export {
-  PostgresUserCredentialAdapter,
-  type PostgresUserCredentialAdapterOptions,
-  type UserCredentialDatabase,
-} from "./adapters/postgres.user-signin-credential.adapter.ts";
-export {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
   UserApp,
-  type UserAppDependencies,
+  type UserInfrastructure,
 } from "./app/user.app.ts";
 export { UserAvatarStoragePort, UserPasswordHasherPort } from "./ports/user.port.ts";
-export {
-  UserCredentialService,
-  type UserPasswordRotationOutcome,
-} from "./services/user-signin-credential.service.ts";
 export { UserService } from "./services/user.service.ts";
+export { UserAccountService } from "./services/user-account.service.ts";
 export {
   runGdprUserDataErase,
   UserDataEraseTask,
@@ -30,11 +22,11 @@ export {
 export {
   UserTrpcApi,
   type Auth0PasswordChangeOutcome,
-  type UnlinkAccountOutcome,
   type UserTrpcContext,
   type UserTrpcPorts,
 } from "./transport/api-trpc/user.api.ts";
 export { createMeRestApp, type MePersonalUsageReader } from "./transport/api-rest/me.api.ts";
+export { userServer } from "./user.server.ts";
 export {
   createUserAvatarRestApp,
   type UserAvatarDualAuthVariables,

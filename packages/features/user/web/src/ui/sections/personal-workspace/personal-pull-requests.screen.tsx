@@ -3,10 +3,10 @@ import { Text, VStack } from "@chakra-ui/react";
 import { PullRequestsTable } from "@langwatch/coding-agent-web/surfaces/activity";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
-import { withCodingAgentHost } from "../../ui/sections/coding-agent-host-provider.tsx";
+import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
 
-import { usePersonalContext } from "../../behavior/use-personal-context.ts";
-import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout.tsx";
+import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
+import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**
  * The personal Pull Requests page: what each cost in assistant usage.

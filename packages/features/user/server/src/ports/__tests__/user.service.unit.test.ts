@@ -1,8 +1,8 @@
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { UserAvatarStoragePort } from "../user.port.ts";
-import { UserRepository } from "../../repositories/user.repository.ts";
+import type { UserRepository } from "../../repositories/user.repository.ts";
 import { UserService } from "../../services/user.service.ts";
 
 const user: UserFullProfile = {
@@ -20,13 +20,16 @@ const user: UserFullProfile = {
   tracesExplorerTourDismissedAt: null,
 };
 
-class StubRepository extends UserRepository {
+/** The issuer this deployment stores every credential account row under. */
+const ISSUER = "credential";
+
+class StubRepository implements UserRepository {
   getProfiles = vi.fn(async () => [user]);
-  tryFindById = vi.fn(async () => user);
-  tryFindByEmail = vi.fn(async () => user);
+  findById = vi.fn(async () => user);
+  findByEmail = vi.fn(async () => user);
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
-  tryGetAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
+  findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
   createCredentialUser = vi.fn(async () => ({ id: user.id }));
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
@@ -38,15 +41,17 @@ class StubRepository extends UserRepository {
     dismissed: false,
     dismissedAt: null,
   }));
-  setTraceExplorerTourDismissedAt = vi.fn(async (_id, dismissedAt) => ({
-    dismissed: true,
-    dismissedAt,
-  }));
+  setTraceExplorerTourDismissedAt = vi.fn(
+    async ({ dismissedAt }: { id: string; dismissedAt: Date }) => ({
+      dismissed: true,
+      dismissedAt,
+    }),
+  );
   setLastLoginAt = vi.fn(async () => undefined);
-  tryGetLastHomePath = vi.fn(async () => null);
+  findLastHomePath = vi.fn(async () => null);
   setLastHomePath = vi.fn(async () => undefined);
   setDeactivatedAt = vi.fn(async () => user);
-  setAvatar = vi.fn(async (_id: string, _image: string | null): Promise<void> => undefined);
+  setAvatar = vi.fn(async (_input: { id: string; image: string | null }): Promise<void> => undefined);
 }
 
 class StubAvatarStorage extends UserAvatarStoragePort {
@@ -63,12 +68,13 @@ function createService() {
     ensurePersonalWorkspace: vi.fn(async () => ({
       project: { id: "project-1" },
     })),
-  } as unknown as OrganizationService;
+  } as unknown as OrganizationApi;
   return {
     service: UserService.create({
       repository,
       organizations,
       avatarStorage,
+      credentialIssuer: ISSUER,
       now: () => new Date(42),
     }),
     repository,
@@ -97,7 +103,7 @@ describe("UserService", () => {
     });
   });
 
-  it("creates credential and passkey accounts through its private repository", async () => {
+  it("creates credential and passkey accounts under the deployment's issuer", async () => {
     const { service, repository } = createService();
 
     await service.createCredentialUser({
@@ -111,9 +117,11 @@ describe("UserService", () => {
       name: "Grace",
       email: "grace@example.com",
       passwordHash: "hash",
+      issuer: ISSUER,
     });
     expect(repository.createPasskeyUser).toHaveBeenCalledWith({
       email: "passkey@example.com",
+      issuer: ISSUER,
     });
   });
 
@@ -133,6 +141,7 @@ describe("UserService", () => {
     expect(repository.setFirstPassword).toHaveBeenCalledWith({
       id: "user-1",
       passwordHash: "bcrypt-hash",
+      issuer: ISSUER,
     });
   });
 
@@ -146,7 +155,10 @@ describe("UserService", () => {
     await service.dismissPasskeyNudge({ id: "user-1" });
 
     expect(repository.getPasskeyNudgeStatus).toHaveBeenCalledWith("user-1");
-    expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith("user-1", new Date(42));
+    expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith({
+      id: "user-1",
+      dismissedAt: new Date(42),
+    });
   });
 
   /** @scenario "Deactivating a user invalidates every session family" */
@@ -154,14 +166,20 @@ describe("UserService", () => {
   it("marks a user deactivated", async () => {
     const { service, repository } = createService();
     await service.deactivate({ id: "user-1" });
-    expect(repository.setDeactivatedAt).toHaveBeenCalledWith("user-1", new Date(42));
+    expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
+      id: "user-1",
+      deactivatedAt: new Date(42),
+    });
   });
 
   /** @scenario "user.reactivate clears deactivatedAt on the user" */
   it("clears the deactivation stamp when a user is reactivated", async () => {
     const { service, repository } = createService();
     await service.reactivate({ id: "user-1" });
-    expect(repository.setDeactivatedAt).toHaveBeenCalledWith("user-1", null);
+    expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
+      id: "user-1",
+      deactivatedAt: null,
+    });
   });
 
   it("normalizes a changed email", async () => {
@@ -217,10 +235,10 @@ describe("UserService", () => {
     expect(avatarStorage.store).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: "project-1", userId: "user-1" }),
     );
-    expect(repository.setAvatar).toHaveBeenCalledWith(
-      "user-1",
-      "/api/user-avatar/project-1/object-1",
-    );
+    expect(repository.setAvatar).toHaveBeenCalledWith({
+      id: "user-1",
+      image: "/api/user-avatar/project-1/object-1",
+    });
   });
 
   it("owns user-scoped display preferences", async () => {
@@ -228,9 +246,18 @@ describe("UserService", () => {
     await service.dismissTraceExplorerTour({ id: "user-1" });
     await service.updateLastLogin({ id: "user-1" });
     await service.setLastHomePath({ id: "user-1", path: "/me/usage" });
-    expect(repository.setTraceExplorerTourDismissedAt).toHaveBeenCalledWith("user-1", new Date(42));
-    expect(repository.setLastLoginAt).toHaveBeenCalledWith("user-1", new Date(42));
-    expect(repository.setLastHomePath).toHaveBeenCalledWith("user-1", "/me/usage");
+    expect(repository.setTraceExplorerTourDismissedAt).toHaveBeenCalledWith({
+      id: "user-1",
+      dismissedAt: new Date(42),
+    });
+    expect(repository.setLastLoginAt).toHaveBeenCalledWith({
+      id: "user-1",
+      lastLoginAt: new Date(42),
+    });
+    expect(repository.setLastHomePath).toHaveBeenCalledWith({
+      id: "user-1",
+      path: "/me/usage",
+    });
   });
 });
 
@@ -244,12 +271,12 @@ describe("given a user whose photo came from their identity provider", () => {
   function createStatefulService() {
     class StatefulRepository extends StubRepository {
       image: string | null = SSO_PHOTO;
-      override setAvatar = vi.fn<(id: string, image: string | null) => Promise<void>>(
-        async (_id, image) => {
+      override setAvatar = vi.fn<(input: { id: string; image: string | null }) => Promise<void>>(
+        async ({ image }) => {
           this.image = image;
         },
       );
-      override tryFindById = vi.fn<() => Promise<UserFullProfile>>(async () => ({
+      override findById = vi.fn<() => Promise<UserFullProfile>>(async () => ({
         ...user,
         image: this.image,
       }));
@@ -259,12 +286,13 @@ describe("given a user whose photo came from their identity provider", () => {
       ensurePersonalWorkspace: vi.fn<() => Promise<{ project: { id: string } }>>(async () => ({
         project: { id: "project-1" },
       })),
-    } as unknown as OrganizationService;
+    } as unknown as OrganizationApi;
     return {
       service: UserService.create({
         repository,
         organizations,
         avatarStorage: new StubAvatarStorage(),
+        credentialIssuer: ISSUER,
         now: () => new Date(42),
       }),
       repository,
@@ -302,7 +330,10 @@ describe("given a user whose photo came from their identity provider", () => {
       // What a fresh sign-in writes through this service, and all it writes.
       await service.updateLastLogin({ id: "user-1" });
 
-      expect(repository.setLastLoginAt).toHaveBeenCalledWith("user-1", new Date(42));
+      expect(repository.setLastLoginAt).toHaveBeenCalledWith({
+        id: "user-1",
+        lastLoginAt: new Date(42),
+      });
       expect(repository.setAvatar).not.toHaveBeenCalled();
       await expect(service.tryFindById({ id: "user-1" })).resolves.toMatchObject({
         image: "/api/user-avatar/project-1/object-1",
@@ -322,7 +353,7 @@ describe("given a user whose photo came from their identity provider", () => {
 
       await service.removeAvatar({ userId: "user-1" });
 
-      expect(repository.setAvatar).toHaveBeenLastCalledWith("user-1", null);
+      expect(repository.setAvatar).toHaveBeenLastCalledWith({ id: "user-1", image: null });
       // Null, not the provider's photo: removal returns the person to the
       // fallback chain rather than resurrecting an SSO picture they replaced.
       await expect(service.tryFindById({ id: "user-1" })).resolves.toMatchObject({ image: null });

@@ -3,9 +3,9 @@ import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { PullRequestsTable } from "@langwatch/coding-agent-web/surfaces/activity";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
-import { withCodingAgentHost } from "../../ui/sections/coding-agent-host-provider.tsx";
+import { withCodingAgentHost } from "../coding-agent-host-provider.tsx";
 
-import { useOrganizationTeamProject } from "../../behavior/personal-workspace-session.ts";
+import { useOrganizationTeamProject } from "../../../behavior/personal-workspace-session.ts";
 
 /**
  * The project's Pull Requests page: what each pull request its sessions

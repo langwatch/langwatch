@@ -1,4 +1,4 @@
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   UserService as UserServiceContract,
   UserNotFoundError,
@@ -42,8 +42,10 @@ export class UserService extends UserServiceContract {
   private readonly avatars = UserAvatarCodecService.create();
   private constructor(
     private readonly repository: UserRepository,
-    private readonly organizations: OrganizationService,
+    private readonly organizations: OrganizationApi,
     private readonly avatarStorage: UserAvatarStoragePort,
+    /** The issuer every credential account row this service mints is stored under. */
+    private readonly credentialIssuer: string,
     private readonly now: () => Date,
   ) {
     super();
@@ -51,14 +53,16 @@ export class UserService extends UserServiceContract {
 
   static create(options: {
     repository: UserRepository;
-    organizations: OrganizationService;
+    organizations: OrganizationApi;
     avatarStorage: UserAvatarStoragePort;
+    credentialIssuer: string;
     now?: () => Date;
   }): UserService {
     return new UserService(
       options.repository,
       options.organizations,
       options.avatarStorage,
+      options.credentialIssuer,
       options.now ?? (() => new Date()),
     );
   }
@@ -72,13 +76,13 @@ export class UserService extends UserServiceContract {
   tryFindById(input: UserIdInput): Promise<UserProfile | null> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.tryFindById(parsed.id);
+    return this.repository.findById(parsed.id);
   }
 
   tryFindByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     const parsed = userEmailInputSchema.parse(input);
 
-    return this.repository.tryFindByEmail(parsed.email);
+    return this.repository.findByEmail(parsed.email);
   }
 
   create(input: CreateUserInput): Promise<UserProfile> {
@@ -86,11 +90,17 @@ export class UserService extends UserServiceContract {
   }
 
   createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
-    return this.repository.createCredentialUser(createCredentialUserInputSchema.parse(input));
+    return this.repository.createCredentialUser({
+      ...createCredentialUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+    });
   }
 
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
-    return this.repository.createPasskeyUser(createPasskeyUserInputSchema.parse(input));
+    return this.repository.createPasskeyUser({
+      ...createPasskeyUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+    });
   }
 
   hasPassword(input: UserIdInput): Promise<boolean> {
@@ -100,7 +110,10 @@ export class UserService extends UserServiceContract {
   }
 
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
-    return this.repository.setFirstPassword(setFirstUserPasswordInputSchema.parse(input));
+    return this.repository.setFirstPassword({
+      ...setFirstUserPasswordInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+    });
   }
 
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
@@ -111,7 +124,7 @@ export class UserService extends UserServiceContract {
 
   async dismissPasskeyNudge(input: UserIdInput): Promise<void> {
     const parsed = userIdInputSchema.parse(input);
-    await this.repository.setPasskeyNudgeDismissedAt(parsed.id, this.now());
+    await this.repository.setPasskeyNudgeDismissedAt({ id: parsed.id, dismissedAt: this.now() });
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
@@ -119,7 +132,7 @@ export class UserService extends UserServiceContract {
     const normalizedEmail =
       parsed.email === undefined ? undefined : parsed.email.trim().toLowerCase();
     const current =
-      normalizedEmail === undefined ? null : await this.repository.tryFindById(parsed.id);
+      normalizedEmail === undefined ? null : await this.repository.findById(parsed.id);
     if (normalizedEmail !== undefined && !current) {
       throw new UserNotFoundError(parsed.id);
     }
@@ -140,7 +153,7 @@ export class UserService extends UserServiceContract {
 
   async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
     const parsed = userIdInputSchema.parse(input);
-    const account = await this.repository.tryGetAccountInfo(parsed.id);
+    const account = await this.repository.findAccountInfo(parsed.id);
     if (!account) {
       throw new UserNotFoundError(parsed.id);
     }
@@ -163,28 +176,34 @@ export class UserService extends UserServiceContract {
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.setTraceExplorerTourDismissedAt(parsed.id, this.now());
+    return this.repository.setTraceExplorerTourDismissedAt({
+      id: parsed.id,
+      dismissedAt: this.now(),
+    });
   }
 
   async updateLastLogin(input: UserIdInput): Promise<void> {
     const parsed = userIdInputSchema.parse(input);
-    await this.repository.setLastLoginAt(parsed.id, this.now());
+    await this.repository.setLastLoginAt({ id: parsed.id, lastLoginAt: this.now() });
   }
 
   tryGetLastHomePath(input: UserIdInput): Promise<string | null> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.tryGetLastHomePath(parsed.id);
+    return this.repository.findLastHomePath(parsed.id);
   }
 
   async setLastHomePath(input: SetUserHomePathInput): Promise<void> {
     const parsed = setUserHomePathInputSchema.parse(input);
-    await this.repository.setLastHomePath(parsed.id, parsed.path);
+    await this.repository.setLastHomePath({ id: parsed.id, path: parsed.path });
   }
 
   async deactivate(input: UserIdInput): Promise<UserProfile> {
     const parsed = userIdInputSchema.parse(input);
-    const user = await this.repository.setDeactivatedAt(parsed.id, this.now());
+    const user = await this.repository.setDeactivatedAt({
+      id: parsed.id,
+      deactivatedAt: this.now(),
+    });
 
     return user;
   }
@@ -192,7 +211,7 @@ export class UserService extends UserServiceContract {
   reactivate(input: UserIdInput): Promise<UserProfile> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.setDeactivatedAt(parsed.id, null);
+    return this.repository.setDeactivatedAt({ id: parsed.id, deactivatedAt: null });
   }
 
   async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
@@ -214,13 +233,13 @@ export class UserService extends UserServiceContract {
       projectId: workspace.project.id,
       id: stored.id,
     });
-    await this.repository.setAvatar(parsed.userId, image);
+    await this.repository.setAvatar({ id: parsed.userId, image });
 
     return { image };
   }
 
   async removeAvatar(input: RemoveUserAvatarInput): Promise<void> {
     const parsed = removeUserAvatarInputSchema.parse(input);
-    await this.repository.setAvatar(parsed.userId, null);
+    await this.repository.setAvatar({ id: parsed.userId, image: null });
   }
 }

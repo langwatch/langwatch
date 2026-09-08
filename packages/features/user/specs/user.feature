@@ -20,6 +20,20 @@ Feature: Canonical user lifecycle
     And the bytes are stored with the user-avatar purpose
     And the User service stores the compatibility delivery URL
 
+  Rule: Every backend the feature stores accounts in answers the same way
+
+    @unit
+    Scenario: The memory and Postgres user repositories answer alike
+      Given the same accounts written to each backend
+      When the same reads and writes run against every backend
+      Then each answers the same profiles, the same absences, and the same refusal of a second first password
+
+    @unit
+    Scenario: The memory and Postgres credential repositories answer alike
+      Given a person holding one sign-in method in each backend
+      When the same reads and writes run against every backend
+      Then each refuses to unlink the last method, lists the method without its password, and stores a rotated hash on the same row
+
   # The stored password hash is the one column in this feature that must not
   # travel. It used to: the API process read it on its own connection and the
   # comparison happened in a transport, which meant the rule about that column

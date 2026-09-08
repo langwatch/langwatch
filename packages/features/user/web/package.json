@@ -14,9 +14,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./screens/personal-workspace": {
-      "types": "./dist/screens/personal-workspace/index.d.ts",
-      "default": "./src/screens/personal-workspace/index.ts"
+    "./personal-workspace": {
+      "langwatch-declaration-source": "./src/personal-workspace.ts",
+      "types": "./dist/personal-workspace.d.ts",
+      "default": "./src/personal-workspace.ts"
     }
   },
   "scripts": {

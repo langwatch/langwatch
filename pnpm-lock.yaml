@@ -5134,6 +5134,9 @@ importers:
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -5433,6 +5436,9 @@ importers:
 
   packages/features/evaluation/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -7390,6 +7396,12 @@ importers:
 
   packages/features/monitor/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -10502,6 +10514,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0

@@ -1,5 +1,6 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { UserApp, IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
+import type { UserApi } from "@langwatch/user-contract";
+import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
@@ -7,7 +8,7 @@ import type { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc
 /** The two namespaces this feature mounts, and the slices behind them. */
 export type ComposedUserFeature = Readonly<{
   /** The `ctx.app.users` slice. */
-  app: UserApp;
+  app: UserApi;
   /**
    * The operator allow-list this deployment names, in the shape `ctx.app.ops`
    * carries. Published for the retention gate, so "who may keep data forever"

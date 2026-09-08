@@ -35,7 +35,7 @@
  * in the handler because the identity they authorize against is the platform
  * operator list rather than a tenant.
  *
- * Transport only: gates, throttles, and delegation to {@link UserApp} — which
+ * Transport only: gates, throttles, and delegation to {@link UserApi} — which
  * is where the user's own service, the browser-session revocations, the
  * operator check and the personal workspace now arrive from — and to the
  * process capabilities that are not the user's own: the deployment's auth
@@ -78,6 +78,7 @@ import {
   UserAvatarRateLimitedError,
   userSsoStatusSchema,
   userTourPreferenceSchema,
+  type UserApi,
 } from "@langwatch/user-contract";
 import {
   TRPCError,
@@ -86,7 +87,6 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { UserApp } from "#app/user.app";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:user-router");
@@ -121,13 +121,13 @@ type UserTrpcSession = Readonly<{
  *
  * `app` is the slice of the process's application this feature reaches, not
  * the feature's application itself, because a tRPC root is shared by every
- * feature mounted on it and so carries all of them. Before {@link UserApp}
+ * feature mounted on it and so carries all of them. Before {@link UserApi}
  * this was an inline bag of four narrowed services declared here, which put
  * the composition of the feature inside one of its transports and left
  * nothing for a second door to be handed.
  */
 export type UserTrpcContext = Readonly<{
-  app: Readonly<{ users: UserApp }>;
+  app: Readonly<{ users: UserApi }>;
   session: UserTrpcSession | null;
 }>;
 

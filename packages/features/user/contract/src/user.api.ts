@@ -3,10 +3,16 @@ import type {
   CreateCredentialUserInput,
   CreatedUser,
   RemoveUserAvatarInput,
+  RotateUserPasswordInput,
+  UnlinkUserAccountInput,
+  UnlinkUserAccountOutcome,
+  UserLinkedAccount,
+  UserPasswordRotationOutcome,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
   SetUserAvatarInput,
   SetUserHomePathInput,
+  UpdateUserProfileInput,
   UserAccountInfo,
   UserAvatarResult,
   UserIdInput,
@@ -26,6 +32,8 @@ import type {
 
 /** Portable User use cases exposed to process peers and transports. */
 export interface UserApi {
+  tryFindById(input: { id: string }): Promise<UserProfile | null>;
+  updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   personalCallerFor(input: {
     project: { isPersonal: boolean; ownerUserId: string | null };
     callerUserId: string | undefined;
@@ -42,6 +50,14 @@ export interface UserApi {
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
   dismissPasskeyNudge(input: UserIdInput): Promise<void>;
+  /** Verifies the current password and replaces it, as ONE operation. */
+  rotatePassword(input: RotateUserPasswordInput): Promise<UserPasswordRotationOutcome>;
+  /** The Auth0 database identity, or absent where the person holds only social ones. */
+  findAuth0DatabaseAccount(input: {
+    userId: string;
+  }): Promise<{ providerAccountId: string } | null>;
+  listLinkedAccounts(input: { userId: string }): Promise<UserLinkedAccount[]>;
+  unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   deactivate(input: UserIdInput): Promise<UserProfile>;

@@ -6,13 +6,12 @@
  * The transport above it — and the process composition that used to issue both
  * halves as `prisma.account` statements of its own — never sees the column.
  */
+import type { UnlinkUserAccountOutcome, UserLinkedAccount } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { UserPasswordHasherPort } from "../../ports/user.port.ts";
-import {
-  type UnlinkUserAccountOutcome,
-  type UserCredentialAccount,
+import type {
+  UserCredentialAccount,
   UserCredentialRepository,
-  type UserLinkedAccount,
 } from "../../repositories/user-signin-credential.repository.ts";
 import { UserCredentialService } from "../user-signin-credential.service.ts";
 
@@ -33,20 +32,18 @@ class TestPasswordHasher extends UserPasswordHasherPort {
   }
 }
 
-class FakeCredentialRepository extends UserCredentialRepository {
-  constructor(private account: UserCredentialAccount | null) {
-    super();
-  }
+class FakeCredentialRepository implements UserCredentialRepository {
+  constructor(private account: UserCredentialAccount | null) {}
 
   readonly writes: Array<{ accountId: string; passwordHash: string }> = [];
 
-  tryFindCredentialAccount = vi.fn(async (): Promise<UserCredentialAccount | null> => this.account);
+  findCredentialAccount = vi.fn(async (): Promise<UserCredentialAccount | null> => this.account);
 
   writePasswordHash = vi.fn(async (input: { accountId: string; passwordHash: string }) => {
     this.writes.push(input);
   });
 
-  tryFindAuth0DatabaseAccount = vi.fn(async (): Promise<{ providerAccountId: string } | null> => ({
+  findAuth0DatabaseAccount = vi.fn(async (): Promise<{ providerAccountId: string } | null> => ({
     providerAccountId: "auth0|abc123",
   }));
 

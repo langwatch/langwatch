@@ -9,10 +9,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/user-web/screens/personal-workspace", async () => {
+vi.mock("@langwatch/user-web/personal-workspace", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/user-web/screens/personal-workspace")
-  >("@langwatch/user-web/screens/personal-workspace");
+    typeof import("@langwatch/user-web/personal-workspace")
+  >("@langwatch/user-web/personal-workspace");
   const Screen = () => <div>the personal page</div>;
   const emptyQuery = { data: undefined, isLoading: false, isSuccess: false };
   const apiNode = (): unknown =>

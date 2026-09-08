@@ -4,7 +4,7 @@
  * spends a magic link. Two namespaces and one application, because they are one graph.
  */
 import { compare, hash } from "bcrypt";
-import type { AuthService } from "@langwatch/auth-contract";
+import { AuthApi, type AuthService } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   IdentityEventingPort,
@@ -18,12 +18,13 @@ import {
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { AdminAccessService } from "@langwatch/ops-server";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { OpsApi } from "@langwatch/ops-contract";
+import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { UserService } from "@langwatch/user-contract";
+import { createApp } from "@langwatch/runtime-composition";
+import { UserApi, type UserService } from "@langwatch/user-contract";
 import {
-  PostgresUserCredentialAdapter,
-  UserApp,
+  userServer,
   UserPasswordHasherPort,
   type IdentityTrpcPorts,
   type UserTrpcPorts,
@@ -32,13 +33,20 @@ import {
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiPersonDeploymentFacts } from "../auth/auth.composition.ts";
+import { ApiUserAvatarStorageAdapter } from "./user-avatar-storage.adapter.ts";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
 import type { ComposedUserFeature } from "./user.composition.types.ts";
 
 /** The other services the signed-in person's surfaces reach. */
 export type UserPeers = Readonly<{
-  /** The user directory the browser-session boundary already composed. */
+  /**
+   * The user directory the browser-session boundary already composed.
+   *
+   * Read by nothing here any more: the installer builds the same directory
+   * over the same rows from the repositories it selects. It stays on the type
+   * only until the one caller that passes it stops.
+   */
   users: UserService;
   /** The Auth service the same boundary composed, for the account's own sessions. */
   auth: AuthService;
@@ -49,7 +57,7 @@ export type UserPeers = Readonly<{
 }>;
 
 /** Composes the signed-in person's two namespaces over this process's graph. */
-export function composeUserFeature(options: {
+export async function composeUserFeature(options: {
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
   peers: UserPeers;
@@ -65,28 +73,38 @@ export function composeUserFeature(options: {
   mail?: Pick<ApiPersonMailPort, "sendBudgetIncreaseRequest"> | undefined;
   /** Names this process in every refusal below. */
   processName: string;
-}): ComposedUserFeature {
+}): Promise<ComposedUserFeature> {
   const { prisma, deployment, mail, processName } = options;
-  const { users, auth, organizations, resolveAuthProvider } = options.peers;
+  const { auth, organizations, resolveAuthProvider } = options.peers;
   const logger = createLogger("langwatch:api:user");
   const unavailable = (capability: string) =>
     new ApiUserUnavailableError({ capability, processName });
-
-  // The stored-password format, and the user feature's own reader over the
-  // rows it is stored on. Composed AT ALL because the four answers it serves
-  // used to be `prisma.account` statements written in the API's tRPC ports
-  // composition, one of them selecting the hash itself.
-  const passwords = new BcryptPasswordHasher();
-  const credentials = PostgresUserCredentialAdapter.create({
-    database: prisma,
-    passwords,
-  }).build();
 
   const adminAccess = AdminAccessService.create({
     adminEmails: deployment.adminEmails ?? [],
   });
 
-  const app = UserApp.create({ users, auth, ops: adminAccess, organizations });
+  // The stored-password format, stated once for this process. Both halves of a
+  // rotation run through it, and the user feature's own credential service —
+  // the only holder of a stored hash — is built over it by the installer.
+  const passwords = new BcryptPasswordHasher();
+
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withProvided(AuthApi, auth)
+    .withProvided(OrganizationApi, organizations)
+    .withProvided(OpsApi, adminAccess)
+    .withFeature(userServer, {
+      infrastructure: {
+        credentialIssuer: "credential",
+        avatarStorage: ApiUserAvatarStorageAdapter.absent({ processName }),
+        passwords,
+      },
+    })
+    .boot({ role: "api" });
+
+  const app = runtime.feature(userServer).provided;
 
   // The identifier ledger, and the ceremony that spends a magic link.
   const guards = PostgresIdentityGuardsAdapter.create({ database: prisma }).build();
@@ -137,16 +155,16 @@ export function composeUserFeature(options: {
     rotatePassword: (
       _ctx: unknown,
       input: Readonly<{ userId: string; currentPassword: string; newPassword: string }>,
-    ) => credentials.rotatePassword(input),
+    ) => app.rotatePassword(input),
 
     tryFindAuth0DatabaseAccount: (_ctx: unknown, input: Readonly<{ userId: string }>) =>
-      credentials.tryFindAuth0DatabaseAccount(input),
+      app.findAuth0DatabaseAccount(input),
 
     listLinkedAccounts: (_ctx: unknown, input: Readonly<{ userId: string }>) =>
-      credentials.listLinkedAccounts(input),
+      app.listLinkedAccounts(input),
 
     unlinkAccount: (_ctx: unknown, input: Readonly<{ userId: string; accountId: string }>) =>
-      credentials.unlinkAccount(input),
+      app.unlinkAccount(input),
 
     /**
      * The Auth0 tenant is the deployment's own, and changing a password in it
@@ -289,7 +307,7 @@ export function refusingUserFeature(processName: string): ComposedUserFeature {
   };
 
   return {
-    app: refusing<UserApp>(),
+    app: refusing<UserApi>(),
     ops: refusing<ApiTrpcFeatureApplication["ops"]>(),
     config: {},
     ports,

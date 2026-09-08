@@ -14,29 +14,42 @@ import type {
   UserTourPreference,
 } from "@langwatch/user-contract";
 
+/**
+ * The issuer a credential account row is stored under.
+ *
+ * It travels with the write rather than being held by the repository, because
+ * a repository is built from the connection alone: the deployment states the
+ * issuer once and the app carries it down to the three writes that mint a row.
+ */
+export type UserCredentialIssuer = Readonly<{ issuer: string }>;
+
+export type CreateCredentialUserRow = CreateCredentialUserInput & UserCredentialIssuer;
+export type CreatePasskeyUserRow = CreatePasskeyUserInput & UserCredentialIssuer;
+export type SetFirstUserPasswordRow = SetFirstUserPasswordInput & UserCredentialIssuer;
+
 /** Persistence owned by User. It never crosses the feature boundary. */
-export abstract class UserRepository {
-  abstract getProfiles(userIds: string[]): Promise<UserFullProfile[]>;
-  abstract tryFindById(id: string): Promise<UserProfile | null>;
-  abstract tryFindByEmail(email: string): Promise<UserProfile | null>;
-  abstract create(input: CreateUserInput): Promise<UserProfile>;
-  abstract createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
-  abstract createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
-  abstract hasPassword(id: string): Promise<boolean>;
-  abstract setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
-  abstract getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
-  abstract setPasskeyNudgeDismissedAt(id: string, dismissedAt: Date): Promise<void>;
-  abstract updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
-  abstract tryGetAccountInfo(id: string): Promise<UserAccountInfo | null>;
-  abstract getSsoStatus(id: string): Promise<UserSsoStatus>;
-  abstract getTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
-  abstract setTraceExplorerTourDismissedAt(
-    id: string,
-    dismissedAt: Date,
-  ): Promise<UserTourPreference>;
-  abstract setLastLoginAt(id: string, lastLoginAt: Date): Promise<void>;
-  abstract tryGetLastHomePath(id: string): Promise<string | null>;
-  abstract setLastHomePath(id: string, path: string | null): Promise<void>;
-  abstract setDeactivatedAt(id: string, deactivatedAt: Date | null): Promise<UserProfile>;
-  abstract setAvatar(id: string, image: string | null): Promise<void>;
+export interface UserRepository {
+  getProfiles(userIds: string[]): Promise<UserFullProfile[]>;
+  findById(id: string): Promise<UserProfile | null>;
+  findByEmail(email: string): Promise<UserProfile | null>;
+  create(input: CreateUserInput): Promise<UserProfile>;
+  createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedUser>;
+  createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
+  hasPassword(id: string): Promise<boolean>;
+  setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
+  getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
+  setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Date }): Promise<void>;
+  updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
+  findAccountInfo(id: string): Promise<UserAccountInfo | null>;
+  getSsoStatus(id: string): Promise<UserSsoStatus>;
+  getTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
+  setTraceExplorerTourDismissedAt(input: {
+    id: string;
+    dismissedAt: Date;
+  }): Promise<UserTourPreference>;
+  setLastLoginAt(input: { id: string; lastLoginAt: Date }): Promise<void>;
+  findLastHomePath(id: string): Promise<string | null>;
+  setLastHomePath(input: { id: string; path: string | null }): Promise<void>;
+  setDeactivatedAt(input: { id: string; deactivatedAt: Date | null }): Promise<UserProfile>;
+  setAvatar(input: { id: string; image: string | null }): Promise<void>;
 }
