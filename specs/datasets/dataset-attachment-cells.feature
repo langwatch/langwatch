@@ -110,6 +110,14 @@ Feature: Image and file cells in the dataset grid
     # A reference names its file, so the ending is what the table has. The
     # grid does not need it: there the column type says what the value is.
 
+  @unit
+  Scenario: A cell value of any type is read without failing the table
+    Given a results table that shows a dataset value with no column type behind it
+    When the value is a number, a list, an object or nothing at all
+    Then the table draws it as text
+    # A dataset cell holds whatever the row holds, so the picture test has to
+    # read any value rather than assume a string.
+
   @integration
   Scenario: A data URL opens only for a type the browser shows
     Given I look at a file cell that holds the bytes of a PDF inline

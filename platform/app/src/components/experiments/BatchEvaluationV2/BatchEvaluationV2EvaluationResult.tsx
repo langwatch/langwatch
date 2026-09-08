@@ -19,30 +19,15 @@ import {
   useRef,
   useState,
 } from "react";
+import { cellPictureUrl } from "~/components/datasets/cellPictureUrl";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
-import { isImageAttachmentRef } from "~/shared/datasets/attachment-ref";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
-import { ExternalImage, getImageUrl } from "../../ExternalImage";
+import { ExternalImage } from "../../ExternalImage";
 import { ExpandedTextDialog, HoverableBigText } from "../../HoverableBigText";
 import { getEvaluationColumns } from "./utils";
-
-/**
- * Where a cell's picture is read from, or null when the cell holds no picture.
- *
- * An uploaded picture is a reference relative to this origin, which
- * `getImageUrl` does not recognize, so it is read here. Only a reference that
- * names a picture: this table has no column type behind a value, so a
- * reference to a document stays a document.
- */
-const imageSourceOf = (value: string): string | null => {
-  const fromUrl = getImageUrl(value);
-  if (fromUrl) return fromUrl;
-  const trimmed = value.trim();
-  return isImageAttachmentRef(trimmed) ? trimmed : null;
-};
 
 type EvaluationRowData = {
   rowNumber: number;
@@ -133,8 +118,7 @@ export function BatchEvaluationV2EvaluationResult({
     const firstEntry = Object.values(datasetByIndex)[0];
     for (const column of Array.from(datasetColumns)) {
       const mightHaveImages =
-        typeof firstEntry?.entry?.[column] === "string" &&
-        imageSourceOf(firstEntry.entry[column]!) !== null;
+        cellPictureUrl(firstEntry?.entry?.[column]) !== null;
       cols.push({
         id: `dataset_${column}`,
         header: `Dataset Input (${column})`,
@@ -142,7 +126,7 @@ export function BatchEvaluationV2EvaluationResult({
         render: (row) => {
           const val = row.datasetEntry?.entry?.[column];
           if (mightHaveImages) {
-            const img = imageSourceOf((val as string) ?? "");
+            const img = cellPictureUrl(val);
             if (img) {
               return (
                 <ExternalImage
