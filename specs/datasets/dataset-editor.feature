@@ -241,6 +241,7 @@ Feature: Dataset editor
     When I look at the cell
     Then I see the name of the document
     And I can open the document in a new tab
+    And the document is served under the name it was uploaded with
 
   @integration
   Scenario: A file larger than the limit is refused

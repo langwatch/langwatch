@@ -198,7 +198,7 @@ describe("given a file column", () => {
 
       const link = screen.getByTestId("dataset-cell-file");
       expect(link).toHaveTextContent("report.pdf");
-      expect(link).toHaveAttribute("href", STORED_DOCUMENT);
+      expect(link).toHaveAttribute("href", `${STORED_DOCUMENT}?filename=report.pdf`);
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
     });

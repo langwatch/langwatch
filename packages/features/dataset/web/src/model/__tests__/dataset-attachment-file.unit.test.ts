@@ -16,6 +16,7 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   datasetAttachmentCellValue,
   datasetAttachmentDisplayName,
+  datasetAttachmentOpenUrl,
   readDatasetAttachmentFile,
 } from "../dataset-attachment-file.ts";
 
@@ -96,6 +97,22 @@ describe("given a value in a file cell", () => {
     it("answers with nothing", () => {
       expect(datasetAttachmentDisplayName("just some text")).toBeNull();
       expect(datasetAttachmentDisplayName("")).toBeNull();
+    });
+  });
+
+  describe("when the cell opens it", () => {
+    it("asks the serving route for the name a stored file was uploaded under", () => {
+      expect(datasetAttachmentOpenUrl("[my report v2.pdf](/api/files/p/1)")).toBe(
+        "/api/files/p/1?filename=my%20report%20v2.pdf",
+      );
+    });
+
+    it("leaves an address it does not serve exactly as it is", () => {
+      expect(datasetAttachmentOpenUrl("[notes.pdf](https://example.com/a.pdf)")).toBe(
+        "https://example.com/a.pdf",
+      );
+      expect(datasetAttachmentOpenUrl("/api/files/p/1")).toBe("/api/files/p/1");
+      expect(datasetAttachmentOpenUrl("just some text")).toBeNull();
     });
   });
 });
