@@ -96,8 +96,11 @@ function GovernanceTeamDetailPage() {
               width="14px"
               height="14px"
               borderRadius="full"
+              // A swatch with no team behind it is an empty surface, not text,
+              // so it takes a surface token. `fg.muted` here painted a 14px
+              // circle in reading ink.
               backgroundColor={
-                team ? getHexColorForString(team.teamName) : "fg.muted"
+                team ? getHexColorForString(team.teamName) : "bg.emphasized"
               }
             />
             <Heading size="md">{team?.teamName ?? "Team not found"}</Heading>
