@@ -171,6 +171,18 @@ Feature: Provider rows become discovered people
     # the field blank, and blank must not erase an admin's hand-work daily.
 
   @integration
+  Scenario: Conflicting directory and confirmed email proof changes no department
+    Given a directory row whose directory id identifies one platform member
+    And its email is confirmed by a different platform member
+    And both members already have department assignments
+    And the row names a new nonblank department
+    When the directory sync runs
+    Then neither member's assignment or dated department history changes
+    And no department is created from the conflicting row
+    # This correction preserves directory-only assignment. It does not change
+    # identity-link review; it stops assignment from ignoring conflicting proof.
+
+  @integration
   Scenario: A directory row proving no member assigns nobody
     Given a directory row whose identity proves no platform member
     When the directory sync runs

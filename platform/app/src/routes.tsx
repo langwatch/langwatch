@@ -253,6 +253,21 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/billed")),
       },
       {
+        // The Platform placeholders, behind the same flag as costs/billed
+        // (each page carries its own guard; see
+        // specs/governance/governance-platform-placeholders.feature).
+        path: "/governance/insights",
+        ...page(() => import("./pages/governance/insights")),
+      },
+      {
+        path: "/governance/analytics",
+        ...page(() => import("./pages/governance/analytics")),
+      },
+      {
+        path: "/governance/signals",
+        ...page(() => import("./pages/governance/signals")),
+      },
+      {
         // The people page has been cost centers and then departments; old
         // bookmarks land on the newest name in one hop (the legacy
         // /settings/governance/cost-centers address chains through here,
