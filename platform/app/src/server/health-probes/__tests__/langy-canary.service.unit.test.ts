@@ -491,7 +491,7 @@ describe("buildProductionLangyCanaryDeps", () => {
 
   describe("given the project and session the auth chain resolved", () => {
     describe("when the production deps run a turn", () => {
-      /** @scenario "The production turn is the greeting, sent as the key's owner" */
+      /** @scenario "The production turn is the greeting, sent as the key's principal" */
       it("starts one greeting turn as that session and follows the fold as its user", async () => {
         startConversationTurn.mockResolvedValue(STARTED);
         awaitTurnSettlement.mockResolvedValue(completed("Hi!"));

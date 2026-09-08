@@ -61,6 +61,13 @@ Feature: Starting Langy conversations with a project API key
     And no email and no person is attributed
 
   @unit
+  Scenario: A service key's first turn attributes provisioning to the organization's first admin
+    Given a service key acting as itself in a project whose Langy virtual key has not been provisioned
+    When the first turn provisions that virtual key
+    Then the provisioning is attributed to the organization's first admin
+    And no audit column is pointed at the key's id
+
+  @unit
   Scenario: A service key that vanished between resolution and actor is refused
     Given a service key whose row has been deleted
     When the surface builds the acting identity for a turn

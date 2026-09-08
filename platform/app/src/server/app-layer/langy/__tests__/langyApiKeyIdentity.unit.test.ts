@@ -94,10 +94,8 @@ describe("resolveLangyKeyIdentity", () => {
     expect(after).toMatchObject({ reason: "no-access" });
   });
 
-  /**
-   * @scenario A service key acts as itself when its project is in the cohort
-   * @scenario A service key with no owning user is admitted and the turn runs as the key
-   */
+  /** @scenario A service key acts as itself when its project is in the cohort */
+  /** @scenario A service key with no owning user is admitted and the turn runs as the key */
   it("resolves a service key to the key itself, judged by its project and organization", async () => {
     const isEnabled = vi.fn().mockResolvedValue(true);
 
