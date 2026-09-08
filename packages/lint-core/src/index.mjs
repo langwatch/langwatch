@@ -35,6 +35,9 @@ export { featureSourceSubjectRule } from "./rules/feature-source-subject.rule.mj
 export { logicalStatementSpacingRule } from "./rules/logical-statement-spacing.rule.mjs";
 export { maxStatementsPerLineRule } from "./rules/max-statements-per-line.rule.mjs";
 export { nestedTernaryRule } from "./rules/nested-ternary.rule.mjs";
+export { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
+export { unboundedLoopRule } from "./rules/unbounded-loop.rule.mjs";
+export { idGenerationOriginRule } from "./rules/id-generation-origin.rule.mjs";
 export { noRawHonoMountRule } from "./rules/no-raw-hono-mount.rule.mjs";
 export { boundaryRule } from "./rules/package-boundaries.rule.mjs";
 export { planLiteralsRule } from "./rules/plan-literals.rule.mjs";
@@ -48,3 +51,4 @@ export { serviceQualityRule } from "./rules/service-quality.rule.mjs";
 export { temporalOnlyRule } from "./rules/temporal-only.rule.mjs";
 export { typedPrismaSeamRule } from "./rules/typed-prisma-seam.rule.mjs";
 export { webImportsServerShapedValueRule } from "./rules/web-imports-server-shaped-value.rule.mjs";
+export { zodObjectCompositionRule } from "./rules/zod-object-composition.rule.mjs";

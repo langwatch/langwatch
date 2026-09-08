@@ -23,6 +23,9 @@ import {
   logicalStatementSpacingRule,
   maxStatementsPerLineRule,
   nestedTernaryRule,
+  namespaceClassRule,
+  unboundedLoopRule,
+  idGenerationOriginRule,
   noRawHonoMountRule,
   overloadByLiteralRule,
   planLiteralsRule,
@@ -36,6 +39,7 @@ import {
   temporalOnlyRule,
   typedPrismaSeamRule,
   webImportsServerShapedValueRule,
+  zodObjectCompositionRule,
 } from "@langwatch/lint-core";
 
 export const rules = {
@@ -63,6 +67,9 @@ export const rules = {
   "service-quality": serviceQualityRule,
   "max-statements-per-line": maxStatementsPerLineRule,
   "nested-ternary": nestedTernaryRule,
+  "namespace-class": namespaceClassRule,
+  "unbounded-loop": unboundedLoopRule,
+  "id-generation-origin": idGenerationOriginRule,
   "service-member-spacing": serviceMemberSpacingRule,
   "service-dependencies": serviceDependenciesRule,
   "runtime-undefined": runtimeUndefinedRule,
@@ -71,6 +78,7 @@ export const rules = {
   "boolean-wall": booleanWallRule,
   "awaited-return-chain": awaitedReturnChainRule,
   "web-imports-server-shaped-value": webImportsServerShapedValueRule,
+  "zod-object-composition": zodObjectCompositionRule,
 };
 
 export default {

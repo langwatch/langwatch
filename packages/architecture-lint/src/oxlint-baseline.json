@@ -6974,8 +6974,1028 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "id-generation-origin|apps/api/src/app/api-model-provider.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/api/src/app/api-production.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/api/src/features/analytics/analytics.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/api/src/features/evaluator/evaluator.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/api/src/features/experiment/experiment.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/api/src/features/monitor/monitor.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/api/src/features/scenario/scenario.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/worker/src/app/worker-agent-apps.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/worker/src/app/worker-evaluation-execution.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/worker/src/app/worker-model-provider.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/worker/src/app/worker-scenario-execution.composition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|apps/worker/src/features/automation/automation-runaway.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/enterprise/features/billing/web/src/screens/billing/user-management-drawer.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/enterprise/features/scim/server/src/services/scim-grants.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/app/agent.app.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/rules/agent-id.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/services/connected-agent-dispatch.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/services/connected-agent-long-poll.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/services/connected-agent-registration.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/services/connected-agent-runtime.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/agent/server/src/services/http-agent-test.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/annotation/server/src/repositories/memory/memory.annotation-queue-item.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/annotation/server/src/repositories/memory/memory.annotation-queue.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/annotation/server/src/transport/annotation-score.trpc.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/automation/server/src/transport/api-rest/automation.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dashboard/server/src/app/dashboard.app.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dashboard/server/src/services/saved-view.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/adapters/azure.dataset-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/adapters/dataset-content.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/adapters/dataset-upload.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/adapters/local.dataset-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/adapters/s3.dataset-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/rules/dataset-chunk-lines.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/services/dataset-chunk-writer.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/server/src/services/dataset.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/web/src/behavior/use-bulk-upload.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/web/src/ui/sections/add-rows-from-csv-modal.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/dataset/web/src/ui/sections/datasets/add-rows-from-csv-modal.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/evaluator/server/src/app/evaluator.app.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/evaluator/server/src/transport/api-trpc/evaluator-replication.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/evaluator/server/src/transport/api-trpc/evaluator.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/experiment/contract/src/workbench/actions/transforms/add-evaluator.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/experiment/contract/src/workbench/actions/transforms/add-target.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/experiment/server/src/processes/experiment-cell-workflow.process.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/experiment/server/src/services/experiment-find-or-create.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/experiment/web/src/screens/experiments/workbench.screen.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/feature-flag/web/src/anonymous-id.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/gateway/server/src/tasks/virtual-key-config-backfill.task.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/gateway/server/src/transport/api-rest/gateway-spend.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/github/server/src/repositories/prisma/github-pull-requests.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/identity/server/src/adapters/better-auth.identity-ceremonies.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/repositories/langy-turn-admission.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/repositories/prisma/prisma.langy-turn-admission.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/rules/langy-local-session-contract.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/rules/langy-local-user-wait-record.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/services/langy-conversation.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/services/langy-local-call-dispatcher.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/services/langy-local-control-request.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/services/langy-local-session.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/services/langy-local-user-wait.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/services/langy-ui-action.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/server/src/transport/api-rest/langy-local-control-long-poll.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/langy/web/src/features/langy/behavior/logic/langy-chat-transport.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/notification/server/src/repositories/memory/memory.notification.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/ops/server/src/repositories/redis/queue.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/ops/server/src/repositories/redis/redis.migration-lease.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/ops/server/src/repositories/redis/redis.ops-snapshot.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/ops/server/src/services/replay.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/organization/server/src/adapters/resource-identifiers.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/organization/server/src/services/invite-creation.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/organization/server/src/services/invite-lifecycle.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/platform-health/server/src/services/subsystem-probe.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/presence/web/src/use-tab-session-id.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/project/server/src/adapters/project-credentials.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/server/src/repositories/prisma/prisma.prompt-tag-assignment.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/server/src/repositories/prisma/prisma.prompt-tag.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/server/src/repositories/prisma/prisma.prompt-version.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/server/src/repositories/prisma/prisma.prompt.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/server/src/rules/prompt-execution-event.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/web/src/behavior/playground/use-prompt-execution.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/prompt/web/src/model/tab-id-generators.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/role/server/src/repositories/prisma/prisma.role.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/scenario/server/src/adapters/scenario-secret-reference.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/scenario/server/src/services/agent-test.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/scenario/web/src/behavior/suites/use-run-suite.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/scenario/web/src/behavior/use-scenario-tab-follow.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/scenario/web/src/ui/sections/agent-testing/run/use-run-dialog-batch.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/scenario/web/src/ui/sections/suites/suite-form-drawer.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/share/server/src/repositories/ledger/ledger.share.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/share/server/src/services/share.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/stored-object/server/src/services/stored-object.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/suite/server/src/rules/suite-target.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/suite/server/src/transport/api-rest/run-plans-v1.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/suite/server/src/transport/api-rest/test-suites-v1.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/topic/server/src/repositories/prisma/prisma.topic-clustering.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/trace/server/src/services/trace-metadata-write.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/trace/server/src/transport/api-rest/trace-export.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/trace/web/src/behavior/view.store.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/webhook/server/src/transport/api-rest/webhook.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/contract/src/dataset-transposition.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/server/src/adapters/postgres.workflow.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/server/src/app/workflow.app.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/server/src/services/workflow-studio-copy.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/web/src/behavior/workflow-store.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/web/src/ui/sections/optimization_studio/use-optimization-execution.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "id-generation-origin|packages/features/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts",
+      "measured": "2026-09-08"
+    },
+    {
       "key": "max-depth|packages/architecture-lint/src/api-transport-boundaries.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-activity-tracking.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-feature-adoption.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-product-interest.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-prompt-creation.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-signup-identification.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-sink-registry.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-sso-auto-add.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-subscription-sync.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/billing/server/src/services/nurturing-user-sync.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/adapters/admin-usage-report.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/conversation-trace-assembly.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/copilot-studio-trace-mapper.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/copilot-transcript-grouping.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/copilot-turn-assembly.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/dataverse-environment.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/genie-span-attributes.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/governance/server/src/services/genie-trace-mapper.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/enterprise/features/sso/server/src/adapters/better-auth.better-auth.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/agent/server/src/services/connected-agent-parameter-spec.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/agent/server/src/services/connected-agent-presence.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/analytics/server/src/adapters/langwatch-ql.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/auth/server/src/services/auth0-password.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/adapters/eventing.authz-audit.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/adapters/eventing.authz-grant.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/adapters/eventing.authz-ledger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/adapters/eventing.authz.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/migrations/legacy-import.authz-grant.migration.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/repositories/eventing/eventing.authz-grant.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/authz/server/src/repositories/prisma/prisma.authz-projection.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/automation/server/src/processes/trigger-settlement.process.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/automation/server/src/services/report-chart.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/automation/server/src/services/report-dispatch.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/automation/server/src/services/report-trace-row.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/automation/server/src/services/trigger-evaluator.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/coding-agent/server/src/projections/coding-agent-session.projection.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/data-retention/server/src/adapters/clickhouse.retroactive-retention.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/data-retention/server/src/adapters/prisma.data-retention.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/entitlement/server/src/services/member-classification.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/entitlement/server/src/services/usage-limit-message.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/entitlement/server/src/services/usage-meter-policy.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/evaluation/server/src/adapters/evaluation-processing-producer.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/evaluation/server/src/services/evaluation-thread-mapping.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/evaluation/server/src/services/evaluator-availability.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/processes/experiment-run-id.process.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-execution-data.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-polling-run.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-run-driver.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-run-orchestrator.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-saved-state-execution.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-target-data.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/experiment/server/src/services/experiment-target-loading.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/hosted-mcp/server/src/services/mcp-oauth-client-registry.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/identity/server/src/adapters/better-auth.account-queries.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/identity/server/src/adapters/better-auth.identity-birth.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/langy/server/src/adapters/langy-local-control-runtime.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/langy/server/src/services/langy-conversation-event-guards.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/langy/server/src/services/langy-conversation-memory.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/langy/server/src/services/langy-skip-permissions.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/langy/server/src/services/langy-turn-settlement-waiter.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/metric/server/src/adapters/metric-numbers.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/metric/server/src/adapters/metric-validation.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/metric/server/src/repositories/clickhouse/clickhouse.metric-data-point.mapper.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/ops/server/src/repositories/prisma/prisma.admin-user.mapper.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/ops/server/src/services/ops-dashboard-view.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/project/server/src/services/project-slug.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/child-egress-policy.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/child-logger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/child-process-spawn.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/child-tls-env.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/http-auth.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/litellm-model.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/prompt-template.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/remote-trace-run.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/result-atoms.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/run-configurations.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/scenario-role-model.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/scenario-secret-reference.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/adapters/simulation.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/scenario/server/src/processes/simulation-run-execution-evolution.process.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/stored-object/server/src/adapters/group-queue.object-storage-migration.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/suite/server/src/services/connected-target.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/topic/server/src/adapters/postgres.topic.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/topic/server/src/adapters/topic-clustering-processing-producer.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/topic/server/src/processes/topic-clustering.process.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/clickhouse.trace-projection-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/eventing.deferred-origin.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-evaluator.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-event-attribute-keys.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-events.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-label.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-metadata-keys.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-query.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-facet-span-attribute-keys.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-processing-producer.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query-evaluation.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query-fields.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query-meta-fields.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query-subquery.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query-translators.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query-values.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/adapters/trace-query.clickhouse.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/repositories/clickhouse/trace-full-protection.mapper.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/repositories/clickhouse/trace-full-record.mapper.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/claude-code-log-enrichment.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/claude-code-span-enrichment.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-ai-query.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-cold-scan-detector.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-content-array.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-content-extraction.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-edge-media-extraction.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-edit-overlay-redaction.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-edit-overlay-restore.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-evaluation-mapping.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-event-attribute-mapping.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-eventref-parsing.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-formatting.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-legacy-span-mapping.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-legacy-summary-mapping.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-llm-span-messages.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-log-content-derivation.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-metadata-write.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-number-coercion.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-offload-resolution-batch.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-offload-resolution.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-projection-catalog.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-projection-compile.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-projection-lean.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-read-redaction.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-readable-span.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-safe-json.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-session-groups-cursor.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-span-cost-matching.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-stream-buffer.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-ttl-cache.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-value-media-extraction.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/services/trace-windowed-read.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/subscribers/custom-evaluation-sync.subscriber.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/subscribers/project-metadata.subscriber.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/subscribers/tracked-event-sync.subscriber.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
+      "measured": "2026-09-08"
     },
     {
       "key": "nested-ternary|apps/api/src/api-secret-rest.feature.ts",
@@ -9324,6 +10344,138 @@
     {
       "key": "temporal-only|sdks/typescript/src/observability-sdk/logger/implementation.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "unbounded-loop|packages/enterprise/features/billing/server/src/tasks/stripe-prices-sync.task.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/enterprise/features/governance/server/src/adapters/databricks-genie-puller.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/agent/server/src/services/connected-agent-dispatch.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/agent/server/src/services/connected-agent-long-poll.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/authz/server/src/adapters/eventing.authz-ledger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/automation/server/src/services/report-chart.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/dataset/server/src/adapters/azure.dataset-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/dataset/server/src/adapters/local.dataset-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/dataset/server/src/adapters/postgres.dataset-migration.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/dataset/server/src/adapters/s3.dataset-storage.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/dataset/server/src/services/dataset-record.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/experiment/server/src/services/experiment-connected-cell.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/experiment/server/src/services/experiment-run-driver.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/gateway/server/src/tasks/trace-destination-report.task.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/identity/server/src/adapters/eventing.join-request-ledger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/identity/server/src/adapters/eventing.sso-connection-ledger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/identity/server/src/adapters/identity-ledger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/langy/server/src/services/langy-local-call-dispatcher.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/langy/server/src/services/langy-local-user-wait.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/langy/server/src/transport/api-rest/langy-local-control-long-poll.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/langy/server/src/transport/api-rest/langy-relay.api.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/model-provider/server/src/services/model-provider-scope.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/organization/server/src/repositories/prisma/prisma.group.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/scenario/server/src/adapters/serialized-connected-agent.adapter.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/scenario/server/src/services/scenario-run-export.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/stored-object/server/src/migrations/clickhouse-import.stored-object.migration.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/stored-object/server/src/rules/object-storage-migration-transfer.rules.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/stored-object/server/src/services/stored-object.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/suite/server/src/repositories/prisma/prisma.suite.repository.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/topic/server/src/migrations/legacy-import.topic-clustering.migration.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/trace/server/src/services/trace-export.service.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "unbounded-loop|packages/features/workflow/server/src/services/workflow-studio-dispatch.service.ts",
+      "measured": "2026-09-08"
     }
   ]
 }

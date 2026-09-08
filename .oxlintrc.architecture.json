@@ -38,7 +38,10 @@
     "langwatch/package-boundaries": "error",
     "langwatch/feature-module-classes": "error",
     "langwatch/service-classes": "error",
-    "langwatch/service-dependencies": "error"
+    "langwatch/service-dependencies": "error",
+    "langwatch/namespace-class": "error",
+    "langwatch/unbounded-loop": "error",
+    "langwatch/id-generation-origin": "error"
   },
   "overrides": [
     {
