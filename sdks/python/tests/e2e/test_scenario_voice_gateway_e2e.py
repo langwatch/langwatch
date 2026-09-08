@@ -6,8 +6,9 @@ text-to-speech (the scripted user turns) and speech-to-text (the agent-turn
 transcription) entirely through the gateway's ``/v1/audio/speech`` and
 ``/v1/audio/transcriptions`` routes — never against ``api.openai.com`` — and
 the gateway answers each call with its own response headers. The agent under
-test simply echoes the user's audio back, so the STT transcript is a mechanical
-function of the spoken input and the judge needs no LLM.
+test simply echoes the user's audio back. The judge needs no LLM — its grading
+is deterministic string matching — but the transcript it grades is real STT
+output of the real TTS audio, produced by the STT model.
 
 Required environment:
     SCENARIO_VOICE_GATEWAY_VK   (required) a LangWatch virtual key. When absent
@@ -40,7 +41,6 @@ import pytest
 import scenario
 from scenario.types import ScenarioResult
 from scenario.voice import AdapterCapabilities, AudioChunk, VoiceAgentAdapter
-from scenario.voice.audio_chunk import PCM16_SAMPLE_RATE, PCM16_SAMPLE_WIDTH_BYTES
 from scenario.voice.tts import clear_cache
 
 pytestmark = pytest.mark.e2e
@@ -56,11 +56,6 @@ LINE_2_STEMS = ("purple", "elephant", "juggle", "orange")
 
 SPEECH_ROUTE = "/audio/speech"
 TRANSCRIPTION_ROUTE = "/audio/transcriptions"
-
-
-def _pcm_seconds(data: bytes) -> float:
-    """Duration in seconds of a PCM16 mono 24kHz byte buffer."""
-    return (len(data) // PCM16_SAMPLE_WIDTH_BYTES) / PCM16_SAMPLE_RATE
 
 
 class GatewayEchoAgent(VoiceAgentAdapter):
@@ -154,6 +149,9 @@ class RequestRecorder:
             record.provider = response.headers.get("X-LangWatch-Provider")
             if response.status_code >= 300:
                 try:
+                    # Safe: httpx caches the body, so the OpenAI client still
+                    # reads the same bytes. The bare except is deliberate —
+                    # logging must never break the real call.
                     body_bytes = await response.aread()
                     body_text = body_bytes.decode("utf-8", errors="replace")
                     body_collapsed = " ".join(body_text.split())
@@ -190,12 +188,22 @@ def _request_length(request: httpx.Request) -> Optional[int]:
     raw = request.headers.get("content-length")
     if raw is not None:
         return int(raw)
-    content = getattr(request, "content", None)
+    # httpx.Request.content is a property that raises RequestNotRead when the
+    # body is not buffered; this runs before the real send, so never let it
+    # abort a live request — an unknown length is fine.
+    try:
+        content = request.content
+    except (AttributeError, httpx.RequestNotRead):
+        return None
     return len(content) if content is not None else None
 
 
 async def mechanical_judge(state: scenario.ScenarioState) -> ScenarioResult:
-    """Grade the recording with mechanical, LLM-free criteria.
+    """Grade the recording with deterministic, LLM-free string matching.
+
+    No LLM is involved in the grading itself. Criterion 4 nonetheless grades
+    real STT output of the real TTS audio, so its stem lists tolerate the
+    plural/inflection drift a transcription model introduces.
 
     Returning a ScenarioResult from a script step ends the run with that
     verdict — see ``ScenarioExecutor.run`` (the ``isinstance(result,
@@ -290,7 +298,11 @@ async def test_scenario_voice_runs_through_the_gateway(
                 agents=[
                     GatewayEchoAgent(),
                     scenario.UserSimulatorAgent(
-                        model="openai/gpt-5-mini", voice="openai/nova"
+                        # model is required by the constructor but unused here:
+                        # the scripted scenario.user(text) turns are TTS-only, so
+                        # no chat completion is part of what this cell verifies.
+                        model="openai/gpt-5-mini",
+                        voice="openai/nova",
                     ),
                 ],
                 script=[
@@ -308,34 +320,38 @@ async def test_scenario_voice_runs_through_the_gateway(
     # Print BEFORE any assertion so a failing run always shows the wire log.
     print(f"\nresolved base_url={base_url} gateway_host={gateway_host}")
     print(recorder.format())
+    if run_error is not None:
+        # Surface a crash that is unrelated to routing (raised after the route
+        # assertions below) so it is not misread as a routing failure.
+        print(f"run raised {type(run_error).__name__}: {run_error}")
 
     audio = recorder.audio_requests()
     speech = [r for r in audio if r.path.endswith(SPEECH_ROUTE)]
     transcriptions = [r for r in audio if r.path.endswith(TRANSCRIPTION_ROUTE)]
 
-    # (a) TTS route reached the gateway and returned 200.
-    assert speech, (
-        f"no POST {base_url}{SPEECH_ROUTE} was recorded against {gateway_host}; "
-        f"log:\n{recorder.format()}"
-    )
-    bad_speech = [r for r in speech if r.status != 200]
-    assert not bad_speech, (
-        f"POST {bad_speech[0].path} returned "
-        f"{[r.status or r.error for r in bad_speech]} from {gateway_host} "
-        f"(expected 200) first error body: {bad_speech[0].body!r}"
-    )
+    # The OpenAI SDK retries 429/5xx up to 2 times by default and each attempt
+    # is its own send, so a transient failure retried to a 200 is still a pass —
+    # judge each route by the LAST recorded response, not by every attempt.
+    def _assert_route_ok(recorded: List[RecordedRequest], route: str) -> None:
+        assert recorded, (
+            f"no POST {base_url}{route} was recorded against {gateway_host}; "
+            f"log:\n{recorder.format()}"
+        )
+        statuses = [r.status or r.error for r in recorded]
+        first_bad = next((r for r in recorded if r.status != 200), None)
+        last = recorded[-1]
+        ok = last.status == 200 and any(r.status == 200 for r in recorded)
+        assert ok, (
+            f"POST {last.path} returned {statuses} from {gateway_host} "
+            f"(expected 200) first error body: "
+            f"{first_bad.body if first_bad is not None else None!r}"
+        )
 
-    # (b) STT route reached the gateway and returned 200.
-    assert transcriptions, (
-        f"no POST {base_url}{TRANSCRIPTION_ROUTE} was recorded against "
-        f"{gateway_host}; log:\n{recorder.format()}"
-    )
-    bad_stt = [r for r in transcriptions if r.status != 200]
-    assert not bad_stt, (
-        f"POST {bad_stt[0].path} returned "
-        f"{[r.status or r.error for r in bad_stt]} from {gateway_host} "
-        f"(expected 200) first error body: {bad_stt[0].body!r}"
-    )
+    # (a) TTS route reached the gateway and ended on a 200.
+    _assert_route_ok(speech, SPEECH_ROUTE)
+
+    # (b) STT route reached the gateway and ended on a 200.
+    _assert_route_ok(transcriptions, TRANSCRIPTION_ROUTE)
 
     # (c) every audio call went to the gateway host and none to the provider.
     for r in audio:
@@ -372,7 +388,7 @@ async def test_scenario_voice_runs_through_the_gateway(
         f"{len(agent_segs)} agent audio segments"
     )
 
-    stt_seconds = sum(_pcm_seconds(s.audio) for s in agent_segs)
+    stt_seconds = sum(AudioChunk(data=s.audio).duration_seconds for s in agent_segs)
     tts_chars = len(LINE_1) + len(LINE_2)
     print(
         f"scenario-voice-gateway-cell: success={result.success} "

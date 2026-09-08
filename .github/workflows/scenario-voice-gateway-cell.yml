@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+# Each run spends real provider money, so accidental double dispatches queue
+# instead of running twice.
+concurrency:
+  group: scenario-voice-gateway-cell
+  cancel-in-progress: false
+
 jobs:
   voice-cell:
     runs-on: ubuntu-latest
@@ -34,10 +40,23 @@ jobs:
         working-directory: sdks/python
         run: uv sync --all-groups --all-extras
 
+      # The test file skips when SCENARIO_VOICE_GATEWAY_VK is absent so the
+      # per-push lane stays free, but this dedicated cell must never go green by
+      # skipping — fail loudly when the secret is not configured.
+      - name: Fail loudly if the virtual key secret is not configured
+        env:
+          SCENARIO_VOICE_GATEWAY_VK: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+        run: |
+          if [ -z "$SCENARIO_VOICE_GATEWAY_VK" ]; then
+            echo "::error::PYTHON_SDK_GATEWAY_VIRTUAL_KEY is not set for this repository; the voice cell would skip instead of run"
+            exit 1
+          fi
+
       - name: Run the Scenario voice gateway cell
         working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
+          PYTHONPATH: .
           SCENARIO_VOICE_GATEWAY_VK: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
-          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url || 'https://gateway.langwatch.ai/v1' }}
+          SCENARIO_VOICE_GATEWAY_URL: ${{ inputs.gateway_url }}
         run: uv run pytest -s -vv -m e2e tests/e2e/test_scenario_voice_gateway_e2e.py
