@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -18,9 +18,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
+import type { TimeInterval } from "~/components/governance/filters";
 import { getHexColorForString } from "~/utils/rotatingColors";
-
 import {
   CHART_AXIS_TICK,
   CHART_GRID_STROKE,
@@ -29,10 +28,22 @@ import {
   CHART_TOOLTIP_LABEL,
 } from "../chartTheme";
 
+import { formatBucketTick } from "./costsWindow";
 import type { DailyBucket, RankRow } from "./sampleSeries";
 
 const AXIS_TICK = CHART_AXIS_TICK;
 const GRID_STROKE = CHART_GRID_STROKE;
+
+/**
+ * Plot margins shared by every chart on this screen.
+ *
+ * The right side carries half a tick label rather than the 8px the charts used
+ * to have. A period tick is centred on its point, and the last point sits on
+ * the plot's right edge, so the overhang was being clipped — "Q3 2026" came
+ * out as "Q3 202" with the last digit sliced off. One constant so the four
+ * charts cannot drift apart on it.
+ */
+const CHART_MARGIN = { top: 8, right: 30, bottom: 0, left: 0 } as const;
 
 /** Compact above a thousand, exact below it. Money is read, not audited, here. */
 export function fmtMoney(value: number): string {
@@ -45,8 +56,21 @@ export function fmtCount(value: number): string {
   return numeral(value).format("0.[0]a");
 }
 
-/** ISO day (or full ISO timestamp) to a short `Jul 5` tick. */
-export function formatDayTick(day: string | number): string {
+/**
+ * The tick a bucket start reads as.
+ *
+ * Every time chart on this page takes the interval in view and formats its
+ * axis through `formatBucketTick`, so a screen set to Quarter never draws a
+ * chart ticked by day beside one ticked by quarter — two axes that look alike
+ * and are not the same span is the one chart mistake a reader cannot catch.
+ * A chart with no interval (nothing on this page any more; kept for the
+ * daily-series case) falls back to a short `Jul 5`.
+ */
+export function formatDayTick(
+  day: string | number,
+  interval?: TimeInterval,
+): string {
+  if (interval) return formatBucketTick(day, interval);
   const iso = String(day).slice(0, 10);
   const parsed = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return String(day);
@@ -69,10 +93,20 @@ export function formatDayTick(day: string | number): string {
 function EmptyPanel({
   height,
   unanswered,
+  empty,
 }: {
   height: string;
   unanswered: boolean;
+  /**
+   * What this particular panel says when it has nothing to draw. Every panel
+   * on the Costs page passes one — a bare "Not available." names neither the
+   * panel nor what would fill it, and a reader's next move on reading it is to
+   * report a bug against a screen behaving exactly as designed. The fallback
+   * below is for a caller that has not been given its own words yet.
+   */
+  empty?: (unanswered: boolean) => ReactNode;
 }) {
+  if (empty) return <>{empty(unanswered)}</>;
   return (
     <VStack align="center" justify="center" height={height} color="fg.muted">
       <Text fontSize="sm">
@@ -125,10 +159,13 @@ export function CostRankList({
   rows,
   format = fmtMoney,
   maxRows = 8,
+  empty,
 }: {
   rows: RankRow[] | null;
   format?: (value: number) => string;
   maxRows?: number;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
 }) {
   const shown = useMemo(
     // Copied before sorting: these rows can be a query cache, and sorting in
@@ -140,15 +177,21 @@ export function CostRankList({
     [rows, maxRows],
   );
 
-  if (rows === null) return <EmptyPanel height="220px" unanswered />;
+  if (rows === null)
+    return <EmptyPanel height="220px" unanswered empty={empty} />;
   if (shown.length === 0)
-    return <EmptyPanel height="220px" unanswered={false} />;
+    return <EmptyPanel height="220px" unanswered={false} empty={empty} />;
 
   return (
     <VStack align="stretch" gap={2}>
       {shown.map((row) => (
         <HStack key={row.key} gap={3} fontSize="sm">
-          <Text flex="0 0 34%" truncate title={row.label}>
+          {/* Half the row, because these labels are agent slugs and email
+              addresses — `support-copilot-prod` and `checkout-agent-prod`
+              share a prefix long enough that a third of the row truncated
+              them to the same string, and two rows that read alike are worse
+              than a shorter bar. The full value is on hover either way. */}
+          <Text flex="0 0 50%" minWidth={0} truncate title={row.label}>
             {row.label}
           </Text>
           <Box
@@ -206,7 +249,11 @@ export function CostDonut({ rows }: { rows: RankRow[] }) {
 
   return (
     <HStack align="center" gap={4}>
-      <Box width="150px" height="180px" flexShrink={0}>
+      {/* Narrower than the legend beside it on purpose. The ring carries the
+          shape of the split and needs no more than this to do it; the names
+          are what a reader has to actually read, and every pixel here is one
+          the labels lose. */}
+      <Box width="120px" height="180px" flexShrink={0}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -231,9 +278,13 @@ export function CostDonut({ rows }: { rows: RankRow[] }) {
           </PieChart>
         </ResponsiveContainer>
       </Box>
-      <VStack align="stretch" gap={1.5} flex="1" fontSize="xs">
+      {/* `minWidth={0}` here as well as on the rows: this VStack is itself a
+          flex item, and its default minimum is the width of its widest row.
+          Without it the legend refuses to narrow and pushes its own right
+          edge outside the panel, which is what cut the percentages off. */}
+      <VStack align="stretch" gap={1.5} flex="1" minWidth={0} fontSize="xs">
         {shown.map((row) => (
-          <HStack key={row.key} gap={2}>
+          <HStack key={row.key} gap={2} minWidth={0}>
             <Box
               width="8px"
               height="8px"
@@ -241,11 +292,26 @@ export function CostDonut({ rows }: { rows: RankRow[] }) {
               flexShrink={0}
               backgroundColor={getHexColorForString(row.label)}
             />
-            <Text truncate title={row.label} flex="1">
+            {/* `minWidth={0}` is what makes the truncation actually happen. A
+                flex item's default minimum is its content width, so without
+                this the label refuses to shrink and shoves the two figures
+                past the panel's right edge — which is how "52%" came out as
+                "52" and "3%" lost half of itself. */}
+            <Text truncate title={row.label} flex="1" minWidth={0}>
               {row.label}
             </Text>
-            <Text fontVariantNumeric="tabular-nums">{fmtMoney(row.value)}</Text>
-            <Text color="fg.muted" flex="0 0 32px" textAlign="right">
+            <Text fontVariantNumeric="tabular-nums" flexShrink={0}>
+              {fmtMoney(row.value)}
+            </Text>
+            {/* Wide enough for "100%", which is what a single-agent tenant
+                shows on its first day. */}
+            <Text
+              color="fg.muted"
+              flex="0 0 38px"
+              flexShrink={0}
+              textAlign="right"
+              fontVariantNumeric="tabular-nums"
+            >
               {Math.round((row.value / total) * 100)}%
             </Text>
           </HStack>
@@ -304,17 +370,34 @@ function ChartLegend({
   );
 }
 
-/** Daily stacked bars — the shape the cost-evolution panels want. */
+/**
+ * Stacked bars over the time axis — the shape the cost-evolution panels want.
+ *
+ * `grouped` puts the series side by side instead of on top of one another, for
+ * the one panel whose series must never be added together: seats bought
+ * against seats assigned. Stacking those draws a bar of bought-plus-assigned,
+ * a height nobody holds, and the gap between them is the whole point of the
+ * chart (ADR-128 §16).
+ */
 export function CostStackedBars({
   buckets,
   height = "220px",
   format = fmtMoney,
   showLegend = true,
+  interval,
+  grouped = false,
+  empty,
 }: {
   buckets: DailyBucket[] | null;
   height?: string;
   format?: (value: number) => string;
   showLegend?: boolean;
+  /** The bucket width in view, which the time axis is ticked by. */
+  interval?: TimeInterval;
+  /** Draw the series side by side rather than summed into one bar. */
+  grouped?: boolean;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
 }) {
   const keys = useMemo(() => seriesKeysOf(buckets ?? []), [buckets]);
   const rows = useMemo(
@@ -322,17 +405,18 @@ export function CostStackedBars({
     [buckets, keys],
   );
 
-  if (buckets === null) return <EmptyPanel height={height} unanswered />;
+  if (buckets === null)
+    return <EmptyPanel height={height} unanswered empty={empty} />;
   // A window can come back full of days and empty of series — every day
   // present, nothing spent on any of them. That has rows but nothing to draw,
   // and drawing it anyway leaves bare axes that read as a broken chart.
   if (rows.length === 0 || keys.length === 0)
-    return <EmptyPanel height={height} unanswered={false} />;
+    return <EmptyPanel height={height} unanswered={false} empty={empty} />;
 
   return (
     <Box height={height}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <BarChart data={rows} margin={CHART_MARGIN}>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke={GRID_STROKE}
@@ -341,7 +425,7 @@ export function CostStackedBars({
           <XAxis
             dataKey="day"
             tick={AXIS_TICK}
-            tickFormatter={formatDayTick}
+            tickFormatter={(day) => formatDayTick(day, interval)}
             minTickGap={24}
           />
           <YAxis tick={AXIS_TICK} tickFormatter={format} width={58} />
@@ -350,7 +434,7 @@ export function CostStackedBars({
               format(Number(value)),
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
-            labelFormatter={(label) => formatDayTick(label as string)}
+            labelFormatter={(label) => formatDayTick(label as string, interval)}
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}
             cursor={CHART_TOOLTIP_CURSOR}
@@ -360,7 +444,10 @@ export function CostStackedBars({
             <Bar
               key={k.key}
               dataKey={k.key}
-              stackId="cost"
+              // No stack id at all when grouped: recharts reads a shared one
+              // as "these add up", which is exactly the claim the seat chart
+              // must not make.
+              stackId={grouped ? undefined : "cost"}
               fill={getHexColorForString(k.label)}
               isAnimationActive={false}
             />
@@ -381,10 +468,13 @@ export function CostForecastArea({
   buckets,
   projectedFromDay,
   height = "220px",
+  interval,
 }: {
   buckets: DailyBucket[];
   projectedFromDay: string | null;
   height?: string;
+  /** The bucket width in view, which the time axis is ticked by. */
+  interval?: TimeInterval;
 }) {
   const keys = useMemo(() => seriesKeysOf(buckets), [buckets]);
   const rows = useMemo(() => widenBuckets(buckets, keys), [buckets, keys]);
@@ -396,10 +486,7 @@ export function CostForecastArea({
   return (
     <Box height={height}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={rows}
-          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-        >
+        <AreaChart data={rows} margin={CHART_MARGIN}>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke={GRID_STROKE}
@@ -408,7 +495,7 @@ export function CostForecastArea({
           <XAxis
             dataKey="day"
             tick={AXIS_TICK}
-            tickFormatter={formatDayTick}
+            tickFormatter={(day) => formatDayTick(day, interval)}
             minTickGap={24}
           />
           <YAxis tick={AXIS_TICK} tickFormatter={fmtMoney} width={58} />
@@ -417,7 +504,7 @@ export function CostForecastArea({
               fmtMoney(Number(value)),
               keys.find((k) => k.key === String(name))?.label ?? String(name),
             ]}
-            labelFormatter={(label) => formatDayTick(label as string)}
+            labelFormatter={(label) => formatDayTick(label as string, interval)}
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}
           />
@@ -467,21 +554,24 @@ export function CostLine({
   points,
   height = "220px",
   format = fmtCount,
+  interval,
+  empty,
 }: {
   points: Array<{ day: string; value: number }>;
   height?: string;
   format?: (value: number) => string;
+  /** The bucket width in view, which the time axis is ticked by. */
+  interval?: TimeInterval;
+  /** This panel's own empty state. See `costPanelEmpty`. */
+  empty?: (unanswered: boolean) => ReactNode;
 }) {
   if (points.length === 0)
-    return <EmptyPanel height={height} unanswered={false} />;
+    return <EmptyPanel height={height} unanswered={false} empty={empty} />;
 
   return (
     <Box height={height}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={points}
-          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-        >
+        <AreaChart data={points} margin={CHART_MARGIN}>
           <defs>
             <linearGradient id="cost-line-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3182ce" stopOpacity={0.35} />
@@ -496,13 +586,13 @@ export function CostLine({
           <XAxis
             dataKey="day"
             tick={AXIS_TICK}
-            tickFormatter={formatDayTick}
+            tickFormatter={(day) => formatDayTick(day, interval)}
             minTickGap={24}
           />
           <YAxis tick={AXIS_TICK} tickFormatter={format} width={58} />
           <Tooltip
             formatter={(value) => format(Number(value))}
-            labelFormatter={(label) => formatDayTick(label as string)}
+            labelFormatter={(label) => formatDayTick(label as string, interval)}
             contentStyle={CHART_TOOLTIP_CONTENT}
             labelStyle={CHART_TOOLTIP_LABEL}
           />

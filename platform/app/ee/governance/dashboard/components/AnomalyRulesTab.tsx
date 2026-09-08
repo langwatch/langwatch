@@ -13,6 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { DashboardSelect } from "@ee/governance/dashboard/components/DashboardSelect";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
@@ -735,22 +736,14 @@ function RuleComposer({
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                   Severity
                 </Text>
-                <select
+                <DashboardSelect
+                  ariaLabel="Severity"
+                  options={SEVERITY_OPTIONS}
                   value={composer.severity}
-                  onChange={(e) =>
-                    setComposer({
-                      ...composer,
-                      severity: e.target.value as Severity,
-                    })
+                  onChange={(next) =>
+                    setComposer({ ...composer, severity: next as Severity })
                   }
-                  style={selectStyle}
-                >
-                  {SEVERITY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </VStack>
             </HStack>
 
@@ -821,19 +814,14 @@ function RuleComposer({
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                   Scope
                 </Text>
-                <select
+                <DashboardSelect
+                  ariaLabel="Scope"
+                  options={SCOPE_OPTIONS}
                   value={composer.scope}
-                  onChange={(e) =>
-                    setComposer({ ...composer, scope: e.target.value as Scope })
+                  onChange={(next) =>
+                    setComposer({ ...composer, scope: next as Scope })
                   }
-                  style={selectStyle}
-                >
-                  {SCOPE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </VStack>
               {composer.scope !== "organization" && (
                 <VStack align="stretch" gap={1} flex={1}>
@@ -863,41 +851,37 @@ function RuleComposer({
                     </Button>
                   </HStack>
                   {scopeIdMode === "picker" && composer.scope === "source" ? (
-                    <select
-                      value={composer.scopeId}
-                      onChange={(e) =>
-                        setComposer({ ...composer, scopeId: e.target.value })
-                      }
-                      style={selectStyle}
-                      disabled={sourcesQuery.isLoading}
-                    >
-                      <option value="">
-                        {sourcesQuery.isLoading
+                    <DashboardSelect
+                      ariaLabel="Ingestion source"
+                      // The empty choice is the placeholder rather than an
+                      // option: the app's select shows it until something is
+                      // picked, so an unset scope cannot read as a chosen one.
+                      placeholder={
+                        sourcesQuery.isLoading
                           ? "Loading sources…"
-                          : "— select an ingestion source —"}
-                      </option>
-                      {(sourcesQuery.data ?? []).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.sourceType})
-                        </option>
-                      ))}
-                    </select>
+                          : "Select an ingestion source"
+                      }
+                      options={(sourcesQuery.data ?? []).map((source) => ({
+                        value: source.id,
+                        label: `${source.name} (${source.sourceType})`,
+                      }))}
+                      value={composer.scopeId}
+                      onChange={(next) =>
+                        setComposer({ ...composer, scopeId: next })
+                      }
+                      disabled={sourcesQuery.isLoading}
+                    />
                   ) : scopeIdMode === "picker" &&
                     composer.scope === "source_type" ? (
-                    <select
+                    <DashboardSelect
+                      ariaLabel="Source type"
+                      placeholder="Select a source type"
+                      options={SOURCE_TYPE_PICKER_OPTIONS}
                       value={composer.scopeId}
-                      onChange={(e) =>
-                        setComposer({ ...composer, scopeId: e.target.value })
+                      onChange={(next) =>
+                        setComposer({ ...composer, scopeId: next })
                       }
-                      style={selectStyle}
-                    >
-                      <option value="">— select a source type —</option>
-                      {SOURCE_TYPE_PICKER_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   ) : (
                     <Input
                       size="sm"
@@ -1007,14 +991,6 @@ function RuleComposer({
     </Drawer.Root>
   );
 }
-
-const selectStyle = {
-  padding: "8px",
-  border: "1px solid var(--chakra-colors-border-muted)",
-  borderRadius: "var(--chakra-radii-sm)",
-  background: "white",
-  fontSize: "14px",
-};
 
 function ThresholdPreview({
   ruleType,

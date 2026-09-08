@@ -1,1077 +1,128 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Input,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { CircleCheck, CircleDashed, CircleX } from "lucide-react";
-import numeral from "numeral";
-import { useEffect, useState } from "react";
+import { Badge, Box, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
 import {
   GovernanceHero,
-  INVENTORY_SOURCES_HREF,
+  HOME_MEASURE,
 } from "~/components/governance/GovernanceHero";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { GovernanceHeroGround } from "~/components/governance/home/GovernanceHeroGround";
+import { GovernanceHomeSections } from "~/components/governance/home/GovernanceHomeSections";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
-import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
 import {
-  type GroupBy,
-  SpendOverTimeChart,
-} from "~/components/governance/SpendOverTimeChart";
-import { InstallCliCard } from "~/components/me/InstallCliCard";
-import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
-import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
+  SampleDataToggle,
+  useSampleMode,
+} from "~/components/governance/sample";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import {
-  HandledErrorAlert,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "~/utils/api";
-import { getHexColorForString } from "~/utils/rotatingColors";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 /**
- * Governance overview - spend, users, anomalies, IngestionSource health.
- * Wires the api.activityMonitor.* procedures for live reads off
- * gateway_activity_events.
+ * The governance overview: a greeting, the command palette mounted inline,
+ * the ways in, and the two lists that will fill once there is something in
+ * them.
  *
- * It opens the way the project home does: a greeting, the command palette
- * inline, one lead action (connect a vendor) and a row of shortcuts. The
- * figures and the charts follow only once there is traffic to draw them
- * from, so a fresh organization meets a way in rather than a page of zeroes.
+ * Everything sits in ONE centred column of `HOME_MEASURE`, so the two lists
+ * begin and end on the ask field's own edges rather than running out to the
+ * window. A full-bleed row under a centred field reads as two pages stacked.
+ * The hero stands on the same lit ground as the project home's ask field
+ * (`GovernanceHeroGround`), because the two screens ask for the same thing in
+ * the same words and only one of them was lit.
  *
- * Every panel here reads a different router, and those routers do not all
- * ask for the same grant. The page opens for anyone holding
- * `governance:view` (the grant the Governance product itself is offered on)
- * and each panel then answers for its own access: readable panels render,
- * and the rest name the grant they need. A viewer delegated part of the
- * surface gets the part they hold instead of one refusal for the lot.
+ * It reads nothing of its own. The page used to carry every activity-monitor
+ * panel — spend, users, anomalies, ingestion-source health, the CLI session
+ * policy — each on its own router and its own grant, so a reader whose plan
+ * or role did not include one of them met an error alert before they met the
+ * page. Those panels live on the pages that own them (Costs, Inventory,
+ * Agents, People), and the overview is now the way in rather than a second
+ * copy of all four.
  *
- * A panel the plan does not include is not a page error: the router answers
- * `enterprise_plan_required`, and that panel is simply not drawn. Every other
- * refusal still names itself in an alert.
+ * Reading nothing is also why sample mode here is hard-coded `absent` rather
+ * than settled from queries: there is no read on this page that could ever
+ * come back holding a row, so the honest answer is that nothing is measured.
+ * The toggle in the header is the section's one shared toggle — pressing it
+ * here is the same press as pressing it on People — so it must be on this
+ * page too, or the overview would be the one screen a reader could not turn
+ * the samples off from.
  *
- * Spec: specs/ai-gateway/governance/admin-oversight.feature,
- * specs/ai-governance/rbac/delegated-governance-viewer.feature,
- * specs/ai-governance/dashboard/governance-overview-hero.feature
+ * The one thing still drawn beside the hero is the quarantine-fill warning,
+ * which is silent unless ingest is actually misconfigured
+ * (specs/ai-gateway/governance/ingestion-attribution.feature).
+ *
+ * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature,
+ * specs/ai-governance/dashboard/governance-ui-controls.feature,
+ * specs/ai-gateway/governance/governance-home-routing.feature,
+ * specs/ai-governance/rbac/delegated-governance-viewer.feature
  */
-
-type SourceHealth =
-  RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
-type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
-type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
-type SpendByDepartment =
-  RouterOutputs["activityMonitor"]["spendByDepartment"][number];
-
-const fmtUsd = (n: number | string) => {
-  const v = typeof n === "string" ? Number(n) : n;
-  return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");
-};
-
-const fmtRelative = (date: Date | string | null): string => {
-  if (!date) return "-";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (Number.isNaN(d.getTime())) return "-";
-  const diffMs = Date.now() - d.getTime();
-  // Future-dated sources (clock skew between LangWatch and the
-  // reporting source, or seed scripts that drift past `now`) would
-  // otherwise render as "-63236s ago". Clamp to "just now" instead.
-  if (diffMs < 0) return "just now";
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const days = Math.floor(hr / 24);
-  return `${days}d ago`;
-};
-
-/**
- * "The plan does not include this" is an answer about the panel, not a
- * failure of the page. The panel stays unbuilt and nothing is raised.
- */
-const isPlanLocked = (error: unknown): boolean =>
-  readHandledError(error)?.code === "enterprise_plan_required";
-
-/** The first error worth telling the reader about, if any. */
-const firstReportableError = (errors: ReadonlyArray<unknown>): unknown =>
-  errors.find((error) => error != null && !isPlanLocked(error));
-
 function GovernanceOverviewPage() {
-  const { organization, hasAnyPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { organization, project, hasAnyPermission } =
+    useOrganizationTeamProject({ redirectToOnboarding: false });
   const orgId = organization?.id ?? "";
 
-  // What this viewer may read, panel by panel. Each flag names the grant the
-  // panel's own router asks for, so a query is never fired against a refusal
-  // we can already predict.
-  const canReadActivity = hasAnyPermission("activityMonitor:view");
+  // The one grant the overview asks about: the vendor pill opens an add flow
+  // the inventory refuses without it.
   const canManageSources = hasAnyPermission("ingestionSources:manage");
-  const canReadSessionPolicy = hasAnyPermission("organization:view");
-  const canManageSessionPolicy = hasAnyPermission("organization:manage");
 
-  const summaryQuery = api.activityMonitor.summary.useQuery(
-    { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const usersQuery = api.activityMonitor.spendByUser.useQuery(
-    { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
-    { organizationId: orgId, windowDays: 30, limit: 50 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const departmentsQuery = api.activityMonitor.spendByDepartment.useQuery(
-    { organizationId: orgId, windowDays: 30 },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const anomaliesQuery = api.activityMonitor.recentAnomalies.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
-  const [chartGroupBy, setChartGroupBy] = useState<GroupBy>("team");
-  const spendOverTimeQuery = api.activityMonitor.spendOverTime.useQuery(
-    { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
-    { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
-  );
+  const sample = useSampleMode({ realData: "absent" });
 
-  // The activity-monitor panels share one gate and one enterprise plan check,
-  // so they share one alert. Without it a refusal reads as "no spend, no
-  // users, no anomalies" - a claim about the organization we cannot make.
-  // A plan that does not include them is the one refusal that is not raised.
-  const activityError = firstReportableError([
-    summaryQuery.error,
-    usersQuery.error,
-    teamsQuery.error,
-    departmentsQuery.error,
-    healthQuery.error,
-    anomaliesQuery.error,
-    spendOverTimeQuery.error,
-  ]);
-
-  const summary = summaryQuery.data;
-  const users = usersQuery.data ?? [];
-  const teams = teamsQuery.data ?? [];
-  const departments = departmentsQuery.data ?? [];
-  const sourceHealth = healthQuery.data ?? [];
-  const anomalies = anomaliesQuery.data ?? [];
-
-  const hasTraffic =
-    !!summary &&
-    (summary.spentThisWindowUsd > 0 ||
-      summary.activeUsersThisWindow > 0 ||
-      summary.openAnomalyCount > 0);
+  // The Insights screen rides the billed-cost flag, the same way the section
+  // rail decides whether to list it (`useVisibleSectionNavItems`). Offering
+  // the button without the flag would point at a page the guard refuses.
+  const insights = useFeatureFlag("release_ui_governance_billed_cost_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
+    organizationId: organization?.id,
+    enabled: !!organization?.id,
+  });
 
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
+      <VStack
+        align="stretch"
+        gap={8}
+        width="full"
+        maxW={HOME_MEASURE}
+        marginX="auto"
+      >
         {/* Small and to the side: the hero's greeting is the page's one big
             line, and the product shell stands the section rail down here, so
-            this is the only place the page still says its own name. */}
-        <HStack gap={2}>
-          <Heading size="sm">AI Governance</Heading>
-          <Badge colorPalette="purple" variant="subtle">
-            Preview
-          </Badge>
-        </HStack>
-
-        {orgId && <QuarantineFillAlert organizationId={orgId} />}
-
-        <Box paddingY={{ base: 2, md: 4 }}>
-          <GovernanceHero canManageSources={canManageSources} />
-        </Box>
-
-        {!canReadActivity && (
-          <SectionCard
-            title="Spend and activity"
-            subline="Spend, active users, anomalies, and ingestion-source health for the organization."
-          >
-            <PermissionRequiredNotice
-              permission="activityMonitor:view"
-              detail="Spend, active users, anomalies, and ingestion-source health stay hidden until then. The rest of this page still works."
+            this is the only place the page still says its own name. The
+            sample toggle sits at the right of it, where every other
+            governance page keeps its actions. */}
+        <VStack align="stretch" gap={6}>
+          {/* Stacked above the ground on purpose. The hero's light bleeds a
+              long way past its own box — that is what makes it read as light
+              rather than as a panel — and it reaches this row, whose words
+              would otherwise sit under the bloom that keeps the middle of the
+              ground clean. The project home stands its own chrome up the same
+              way for the same reason. */}
+          <HStack gap={2} align="center" position="relative" zIndex={1}>
+            <Heading size="sm">AI Governance</Heading>
+            <Badge colorPalette="purple" variant="subtle">
+              Preview
+            </Badge>
+            <Spacer />
+            <SampleDataToggle
+              active={sample.active}
+              onToggle={sample.toggle}
+              size="sm"
             />
-          </SectionCard>
-        )}
+          </HStack>
 
-        {canReadActivity && (
-          <>
-            <HandledErrorAlert
-              error={activityError}
-              fallbackTitle="Couldn't load spend and activity"
-            />
+          {orgId && <QuarantineFillAlert organizationId={orgId} />}
 
-            {hasTraffic && summary && (
-              <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-                <SummaryCard
-                  title="Spend (30 d)"
-                  value={fmtUsd(summary.spentThisWindowUsd)}
-                  subline={
-                    summary.spentThisWindowUsd === 0
-                      ? "no traffic this window"
-                      : !summary.hasPriorBaseline ||
-                          summary.spentThisWindowUsd < 10
-                        ? "insufficient baseline"
-                        : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
-                  }
-                  tone={
-                    summary.hasPriorBaseline &&
-                    summary.spentThisWindowUsd >= 10 &&
-                    summary.windowOverPreviousPct > 25
-                      ? "amber"
-                      : "default"
-                  }
-                />
-                <SummaryCard
-                  title="Active users (30 d)"
-                  value={numeral(summary.activeUsersThisWindow).format("0,0")}
-                  subline={
-                    summary.activeUsersThisWindow === 0
-                      ? "nobody used AI this window"
-                      : `${summary.newUsersThisWindow} new this window`
-                  }
-                />
-                <SummaryCard
-                  title="Open anomalies"
-                  value={numeral(summary.openAnomalyCount).format("0,0")}
-                  subline={
-                    summary.openAnomalyCount === 0
-                      ? "nothing to alert on"
-                      : `${summary.anomalyBreakdown.critical} critical · ${summary.anomalyBreakdown.warning} warning`
-                  }
-                  tone={summary.openAnomalyCount > 0 ? "amber" : "default"}
-                />
-              </SimpleGrid>
-            )}
+          <GovernanceHeroGround>
+            <Box paddingTop={{ base: 2, md: 4 }}>
+              <GovernanceHero canManageSources={canManageSources} />
+            </Box>
+          </GovernanceHeroGround>
+        </VStack>
 
-            {/*
-             * Monitoring sections follow the hero when populated - the
-             * admin's daily-driver answer to "what happened, where, who"
-             * without scrolling past config knobs. Config (CLI session TTL)
-             * lives below as an occasional-touch control. With no traffic
-             * yet there is nothing honest to draw, so the figures wait.
-             */}
-
-            {hasTraffic && (
-              <SectionCard
-                title="Spend over time"
-                subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
-                actions={
-                  <GroupByToggle
-                    value={chartGroupBy}
-                    onChange={setChartGroupBy}
-                  />
-                }
-              >
-                <SpendOverTimeChart
-                  buckets={spendOverTimeQuery.data?.buckets}
-                  groupBy={chartGroupBy}
-                  emptyHint="Connect an ingestion source to start collecting governance data."
-                />
-              </SectionCard>
-            )}
-
-            {hasTraffic && teams.length > 0 && (
-              <SectionCard title="Spend share across teams">
-                <SpendByTeamBar teams={teams} />
-              </SectionCard>
-            )}
-
-            {hasTraffic && (
-              <>
-                <SectionCard
-                  title="Top teams by spend"
-                  subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
-                  actions={
-                    teams.length > 0 ? (
-                      <Link
-                        href="/governance/teams"
-                        color="blue.600"
-                        fontSize="sm"
-                      >
-                        View all teams →
-                      </Link>
-                    ) : null
-                  }
-                >
-                  {teams.length === 0 ? (
-                    <Text color="fg.muted" fontSize="sm">
-                      No team activity this window.
-                    </Text>
-                  ) : (
-                    <VStack align="stretch" gap={0}>
-                      <TeamRowHeader />
-                      {teams.slice(0, 5).map((t) => (
-                        <TeamRow key={t.teamId ?? "org-wide"} team={t} />
-                      ))}
-                    </VStack>
-                  )}
-                </SectionCard>
-
-                <SectionCard
-                  title="Top users by spend"
-                  subline="Top 5 LangWatch members ranked by spend (last 30 days)."
-                  actions={
-                    users.length > 0 ? (
-                      <Link
-                        href="/governance/users"
-                        color="blue.600"
-                        fontSize="sm"
-                      >
-                        View all users →
-                      </Link>
-                    ) : null
-                  }
-                >
-                  {users.length === 0 ? (
-                    <Text color="fg.muted" fontSize="sm">
-                      No active users this window.
-                    </Text>
-                  ) : (
-                    <VStack align="stretch" gap={0}>
-                      <UserRowHeader />
-                      {users.slice(0, 5).map((u) => (
-                        <UserRow key={u.actor} user={u} />
-                      ))}
-                    </VStack>
-                  )}
-                </SectionCard>
-
-                <SectionCard
-                  title="Spend by department"
-                  subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
-                  actions={
-                    <Link
-                      href="/governance/people"
-                      color="blue.600"
-                      fontSize="sm"
-                    >
-                      Manage departments →
-                    </Link>
-                  }
-                >
-                  {departments.length === 0 ? (
-                    <Text color="fg.muted" fontSize="sm">
-                      No spend to attribute this window. Assign people, teams,
-                      and projects to departments to compare spend across the
-                      org.
-                    </Text>
-                  ) : (
-                    <VStack align="stretch" gap={0}>
-                      <DepartmentRowHeader />
-                      {departments.map((c) => (
-                        <DepartmentRow
-                          key={c.departmentId ?? "unassigned"}
-                          department={c}
-                        />
-                      ))}
-                    </VStack>
-                  )}
-                </SectionCard>
-              </>
-            )}
-
-            <SectionCard
-              title="Recent anomalies"
-              subline="Cross-source rules that fired and haven't been acknowledged."
-              aria-live="polite"
-            >
-              {anomalies.length === 0 ? (
-                <Text color="fg.muted" fontSize="sm">
-                  {hasTraffic
-                    ? "All quiet - no active alerts."
-                    : "Available when the detection backend ships."}
-                </Text>
-              ) : (
-                <VStack align="stretch" gap={2}>
-                  {anomalies.map((a) => (
-                    <AnomalyRow key={a.id} alert={a} />
-                  ))}
-                </VStack>
-              )}
-            </SectionCard>
-
-            <SectionCard
-              title="Ingestion sources"
-              subline="External AI platforms reporting activity to LangWatch."
-            >
-              {sourceHealth.length === 0 ? (
-                <VStack align="start" gap={2}>
-                  <Text color="fg.muted" fontSize="sm">
-                    No ingestion sources configured.
-                  </Text>
-                  {/* An invitation to write, so only for whoever can. */}
-                  {canManageSources && (
-                    <Link href={INVENTORY_SOURCES_HREF} color="blue.600">
-                      + Add a source
-                    </Link>
-                  )}
-                </VStack>
-              ) : (
-                <HStack gap={3} wrap="wrap">
-                  {sourceHealth.map((src) => (
-                    <SourceChip key={src.id} source={src} />
-                  ))}
-                </HStack>
-              )}
-            </SectionCard>
-          </>
-        )}
-
-        <SectionCard
-          title="Onboard your team"
-          subline="Members install the CLI on their devices to start using AI tools through LangWatch."
-        >
-          <InstallCliCard compact />
-        </SectionCard>
-
-        <SessionPolicySection
-          organizationId={orgId}
-          canRead={canReadSessionPolicy}
-          canManage={canManageSessionPolicy}
+        <GovernanceHomeSections
+          canSetUpInsights={insights.enabled}
+          sample={sample.active}
         />
       </VStack>
     </GovernanceLayout>
-  );
-}
-
-function SessionPolicySection({
-  organizationId,
-  canRead,
-  canManage,
-}: {
-  organizationId: string;
-  canRead: boolean;
-  canManage: boolean;
-}) {
-  return (
-    <SectionCard
-      title="CLI session policy"
-      subline="Maximum lifetime of a CLI/device session before re-login is required. Applies to every member's `langwatch login` session."
-    >
-      {canRead ? (
-        <SessionPolicyForm
-          organizationId={organizationId}
-          canManage={canManage}
-        />
-      ) : (
-        <PermissionRequiredNotice permission="organization:view" />
-      )}
-    </SectionCard>
-  );
-}
-
-/**
- * Mounted only for a viewer who may read the policy, which is what keeps the
- * read out of a hook that would otherwise run against a refusal.
- */
-function SessionPolicyForm({
-  organizationId,
-  canManage,
-}: {
-  organizationId: string;
-  canManage: boolean;
-}) {
-  const policyQuery = api.sessionPolicy.get.useQuery(
-    { organizationId },
-    { enabled: !!organizationId, refetchOnWindowFocus: false },
-  );
-  const utils = api.useUtils();
-  const setMutation = api.sessionPolicy.setMaxDuration.useMutation({
-    onSuccess: () => {
-      void utils.sessionPolicy.get.invalidate({ organizationId });
-      toaster.create({ title: "Session policy saved", type: "success" });
-    },
-    onError: (err) =>
-      showErrorToast({
-        error: err,
-        fallbackTitle: "Couldn't save the session policy",
-      }),
-  });
-
-  const persisted = policyQuery.data?.maxSessionDurationDays ?? 0;
-  const [value, setValue] = useState<string>("0");
-
-  useEffect(() => {
-    if (policyQuery.data) setValue(String(persisted));
-  }, [persisted, policyQuery.data]);
-
-  const parsed = Number(value);
-  const isInvalid = !Number.isInteger(parsed) || parsed < 0 || parsed > 365;
-  const isDirty = !isInvalid && parsed !== persisted;
-  const onSave = () => {
-    if (isInvalid || !organizationId) return;
-    setMutation.mutate({ organizationId, maxSessionDurationDays: parsed });
-  };
-  const onReset = () => setValue(String(persisted));
-
-  return (
-    <VStack align="stretch" gap={3}>
-      <HandledErrorAlert
-        error={policyQuery.error}
-        fallbackTitle="Couldn't load the session policy"
-      />
-      <HStack gap={3} align="end">
-        <VStack align="start" gap={1}>
-          <Text fontSize="xs" color="fg.muted">
-            Days (0 = unbounded)
-          </Text>
-          <Input
-            type="number"
-            min={0}
-            max={365}
-            step={1}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            width="120px"
-            size="sm"
-            borderColor={isInvalid ? "red.300" : undefined}
-            readOnly={!canManage}
-            disabled={!canManage}
-          />
-        </VStack>
-        {/* The write is `organization:manage`. Offering Save to a viewer who
-            only reads would hand them a button the server refuses. */}
-        {canManage && (
-          <>
-            <Button
-              size="sm"
-              onClick={onSave}
-              loading={setMutation.isPending}
-              disabled={!isDirty || isInvalid}
-            >
-              Save
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onReset}
-              disabled={!isDirty || setMutation.isPending}
-            >
-              Reset
-            </Button>
-          </>
-        )}
-      </HStack>
-      <Text fontSize="xs" color="fg.muted">
-        Suggested presets: <code>7</code> (high-security) · <code>30</code>{" "}
-        (standard) · <code>0</code> (open-source / small teams). Values higher
-        than the natural refresh-token life (~30d) cap at the refresh-token
-        expiry.
-      </Text>
-      {isInvalid && (
-        <Text fontSize="xs" color="red.600">
-          Enter an integer between 0 and 365.
-        </Text>
-      )}
-      {!canManage && (
-        <PermissionRequiredNotice
-          permission="organization:manage"
-          detail="You can read the current policy. Changing it needs this grant."
-        />
-      )}
-    </VStack>
-  );
-}
-
-type SummaryCardTone = "default" | "amber";
-
-function SummaryCard({
-  title,
-  value,
-  subline,
-  tone = "default",
-}: {
-  title: string;
-  value: string;
-  subline: string;
-  tone?: SummaryCardTone;
-}) {
-  const accent = tone === "amber" ? "orange.500" : "fg";
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
-      >
-        {title}
-      </Text>
-      <Heading as="span" size="md" color={accent} marginTop={1}>
-        {value}
-      </Heading>
-      <Text fontSize="sm" color="fg.muted" marginTop={1}>
-        {subline}
-      </Text>
-    </Box>
-  );
-}
-
-function GroupByToggle({
-  value,
-  onChange,
-}: {
-  value: GroupBy;
-  onChange: (next: GroupBy) => void;
-}) {
-  const options: GroupBy[] = ["team", "user", "model"];
-  return (
-    <HStack
-      gap={0}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      {options.map((opt, i) => {
-        const active = opt === value;
-        return (
-          <Button
-            key={opt}
-            size="xs"
-            variant={active ? "solid" : "ghost"}
-            colorPalette={active ? "orange" : "gray"}
-            onClick={() => onChange(opt)}
-            borderRadius={0}
-            borderRightWidth={i < options.length - 1 ? "1px" : 0}
-            borderColor="border.muted"
-            textTransform="capitalize"
-          >
-            By {opt}
-          </Button>
-        );
-      })}
-    </HStack>
-  );
-}
-
-function SectionCard({
-  title,
-  subline,
-  actions,
-  children,
-  ...rest
-}: {
-  title: string;
-  subline?: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-  [key: string]: unknown;
-}) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={5}
-      {...rest}
-    >
-      <HStack align="start" justify="space-between" marginBottom={3} gap={4}>
-        <VStack align="start" gap={1} flex={1}>
-          <Heading as="h3" size="sm">
-            {title}
-          </Heading>
-          {subline && (
-            <Text fontSize="sm" color="fg.muted">
-              {subline}
-            </Text>
-          )}
-        </VStack>
-        {actions && <Box flexShrink={0}>{actions}</Box>}
-      </HStack>
-      {children}
-    </Box>
-  );
-}
-
-const SOURCE_STATUS_ICON = {
-  active: CircleCheck,
-  awaiting_first_event: CircleDashed,
-  disabled: CircleX,
-} as const;
-
-const SOURCE_STATUS_COLOR = {
-  active: "green.600",
-  awaiting_first_event: "orange.500",
-  disabled: "fg.muted",
-} as const;
-
-function SourceChip({ source }: { source: SourceHealth }) {
-  const Icon =
-    SOURCE_STATUS_ICON[
-      (source.status as keyof typeof SOURCE_STATUS_ICON) ??
-        "awaiting_first_event"
-    ] ?? CircleDashed;
-  const color =
-    SOURCE_STATUS_COLOR[
-      (source.status as keyof typeof SOURCE_STATUS_COLOR) ??
-        "awaiting_first_event"
-    ] ?? "fg.muted";
-
-  return (
-    <Link
-      href="/governance/inventory?tab=sources"
-      _hover={{ textDecoration: "none" }}
-    >
-      <HStack
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="full"
-        paddingX={3}
-        paddingY={2}
-        gap={2}
-        _hover={{ borderColor: "orange.300" }}
-      >
-        <Box color={color}>
-          <Icon size={14} />
-        </Box>
-        <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="medium">
-            {source.name}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {source.sourceType} · {fmtRelative(source.lastEventIso ?? null)}
-            {source.eventsLast24h > 0 &&
-              ` · ${numeral(source.eventsLast24h).format("0,0")} events / 24h`}
-          </Text>
-        </VStack>
-      </HStack>
-    </Link>
-  );
-}
-
-type AnomalySeverity = "critical" | "warning" | "info";
-
-const SEVERITY_COLOR: Record<AnomalySeverity, string> = {
-  critical: "red.600",
-  warning: "orange.500",
-  info: "blue.600",
-};
-
-function AnomalyRow({
-  alert,
-}: {
-  alert: {
-    id: string;
-    severity: AnomalySeverity;
-    rule: string;
-    sourceLabel: string;
-    detectedAtIso: string;
-    currentState: "open" | "acknowledged" | "resolved";
-  };
-}) {
-  return (
-    <HStack
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-      gap={3}
-      alignItems="start"
-    >
-      <Box color={SEVERITY_COLOR[alert.severity]} paddingTop="2px">
-        <CircleDashed size={16} />
-      </Box>
-      <VStack align="start" gap={0} flex={1}>
-        <HStack gap={2}>
-          <Badge
-            colorPalette={
-              alert.severity === "critical"
-                ? "red"
-                : alert.severity === "warning"
-                  ? "orange"
-                  : "blue"
-            }
-          >
-            {alert.severity}
-          </Badge>
-          <Text fontSize="sm" fontWeight="medium">
-            {alert.rule}
-          </Text>
-        </HStack>
-        <Text fontSize="xs" color="fg.muted">
-          {alert.sourceLabel} · detected {fmtRelative(alert.detectedAtIso)}
-        </Text>
-      </VStack>
-      <Badge size="sm" variant="surface">
-        {alert.currentState}
-      </Badge>
-    </HStack>
-  );
-}
-
-function UserRowHeader() {
-  return (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="xs"
-      fontWeight="semibold"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-    >
-      <Box flex={3}>User</Box>
-      <Box flex={2}>Spend</Box>
-      <Box flex={2}>Requests</Box>
-      <Box flex={2}>Last active</Box>
-      <Box flex={2}>Trend</Box>
-      <Box flex={2}>Most-used</Box>
-    </HStack>
-  );
-}
-
-function TeamRowHeader() {
-  return (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="xs"
-      fontWeight="semibold"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-    >
-      <Box flex={3}>Team</Box>
-      <Box flex={2}>Spend</Box>
-      <Box flex={2}>Requests</Box>
-      <Box flex={2}>Last active</Box>
-      <Box flex={2}>Trend</Box>
-      <Box flex={2}>Sources</Box>
-    </HStack>
-  );
-}
-
-function DepartmentRowHeader() {
-  return (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="xs"
-      fontWeight="semibold"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-    >
-      <Box flex={3}>Department</Box>
-      <Box flex={2}>Spend</Box>
-      <Box flex={2}>Requests</Box>
-    </HStack>
-  );
-}
-
-function DepartmentRow({ department }: { department: SpendByDepartment }) {
-  const isUnassigned = department.departmentId === null;
-  const dotColor = isUnassigned
-    ? "#94a3b8"
-    : getHexColorForString(department.departmentName);
-  return (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="sm"
-    >
-      <Box flex={3}>
-        <HStack gap={2}>
-          <Box
-            width="10px"
-            height="10px"
-            borderRadius="full"
-            backgroundColor={dotColor}
-            flexShrink={0}
-          />
-          <Text fontWeight="medium" color={isUnassigned ? "fg.muted" : "fg"}>
-            {department.departmentName}
-          </Text>
-        </HStack>
-      </Box>
-      <Box flex={2}>{fmtUsd(department.spendUsd)}</Box>
-      <Box flex={2}>{numeral(department.requestCount).format("0,0")}</Box>
-    </HStack>
-  );
-}
-
-/**
- * Trend cell rendering - three states:
- *   1. No prior baseline (first window of activity, or seed without
- *      prior-window distribution): render '-' muted. Avoids the
- *      misleading +100% on every brand-new team / fresh customer.
- *   2. |delta| > 25%: orange (anomalous spike) or blue (sharp drop).
- *      Threshold matches `summary.windowOverPreviousPct` palette.
- *   3. otherwise: gray neutral with arrow + %.
- */
-/**
- * Cap absurd display values caused by tiny prior baselines (e.g.
- * prior=$0.0001, current=$1 → +999900%). Above 1000% we just show
- * ">1000%" - the actual number is uninformative noise. Below 1% we
- * show "+0%" / "-0%" rather than "+0.0034%" pixel grit. The tone
- * threshold uses the raw value so a real 5000% growth still flags
- * orange-amber even though we display ">1000%".
- */
-function fmtTrendPct(pct: number): string {
-  const abs = Math.abs(pct);
-  if (abs >= 1000) return ">1000%";
-  if (abs < 1) return "0%";
-  return `${Math.round(abs)}%`;
-}
-
-function TrendCell({
-  pct,
-  hasBaseline,
-}: {
-  pct: number;
-  hasBaseline: boolean;
-}) {
-  if (!hasBaseline) {
-    return (
-      <Box flex={2} color="fg.muted">
-        -
-      </Box>
-    );
-  }
-  const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "·";
-  const color = pct > 25 ? "orange.500" : pct < -25 ? "blue.500" : "fg.muted";
-  return (
-    <Box flex={2} color={color}>
-      {arrow} {fmtTrendPct(pct)}
-    </Box>
-  );
-}
-
-function TeamRow({ team }: { team: SpendByTeam }) {
-  const isOrgWide = !team.teamId;
-  const dotColor = isOrgWide ? "#94a3b8" : getHexColorForString(team.teamName);
-  const inner = (
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="sm"
-      _hover={isOrgWide ? undefined : { backgroundColor: "bg.subtle" }}
-      cursor={isOrgWide ? "default" : "pointer"}
-    >
-      <Box flex={3}>
-        <HStack gap={2}>
-          <Box
-            width="10px"
-            height="10px"
-            borderRadius="full"
-            backgroundColor={dotColor}
-            flexShrink={0}
-          />
-          <VStack align="start" gap={0}>
-            <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
-              {team.teamName}
-            </Text>
-            {isOrgWide && (
-              <Text fontSize="xs" color="fg.subtle">
-                synthetic - sources without a team
-              </Text>
-            )}
-          </VStack>
-        </HStack>
-      </Box>
-      <Box flex={2}>{fmtUsd(team.spendUsd)}</Box>
-      <Box flex={2}>{numeral(team.requestCount).format("0,0")}</Box>
-      <Box flex={2} color="fg.muted">
-        {fmtRelative(team.lastActivityIso)}
-      </Box>
-      <TrendCell
-        pct={team.deltaPctVsPriorWindow}
-        hasBaseline={team.hasPriorBaseline}
-      />
-      <Box flex={2} color="fg.muted">
-        {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
-      </Box>
-    </HStack>
-  );
-  if (isOrgWide) return inner;
-  return (
-    <Link
-      href={`/governance/teams/${team.teamId}`}
-      display="block"
-      width="full"
-      _hover={{ textDecoration: "none" }}
-    >
-      {inner}
-    </Link>
-  );
-}
-
-function UserRow({ user }: { user: SpendByUser }) {
-  const dotColor = getHexColorForString(user.actor);
-  return (
-    <Link
-      href={`/governance/users/${encodeURIComponent(user.actor)}`}
-      display="block"
-      width="full"
-      _hover={{ textDecoration: "none" }}
-    >
-      <HStack
-        paddingY={2}
-        paddingX={3}
-        borderBottomWidth="1px"
-        borderColor="border.muted"
-        fontSize="sm"
-        _hover={{ backgroundColor: "bg.subtle" }}
-        cursor="pointer"
-      >
-        <Box flex={3}>
-          <HStack gap={2}>
-            <Box
-              width="10px"
-              height="10px"
-              borderRadius="full"
-              backgroundColor={dotColor}
-              flexShrink={0}
-            />
-            <Text fontWeight="medium">{user.actor}</Text>
-          </HStack>
-        </Box>
-        <Box flex={2}>{fmtUsd(user.spendUsd)}</Box>
-        <Box flex={2}>{numeral(user.requests).format("0,0")}</Box>
-        <Box flex={2} color="fg.muted">
-          {fmtRelative(user.lastActivityIso)}
-        </Box>
-        <TrendCell
-          pct={user.trendVsPreviousPct}
-          hasBaseline={user.hasPriorBaseline}
-        />
-        <Box flex={2} color="fg.muted">
-          {user.mostUsedTarget}
-        </Box>
-      </HStack>
-    </Link>
   );
 }
 

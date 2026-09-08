@@ -46,22 +46,43 @@ const renderField = (props: Parameters<typeof Harness>[0]) =>
     </ChakraProvider>,
   );
 
+/**
+ * The frequency control, addressed the way a reader meets it.
+ *
+ * It used to be a native `<select>`, so these tests read `.value` and drove it
+ * with `selectOptions`. It is the app's select now — a button opening a
+ * listbox — which has no `value` and no options until it is opened. Reading
+ * the label the reader sees is also the better assertion: "Every hour" is what
+ * the drawer promises, "hourly" was only ever the code's word for it.
+ */
+const frequencyPicker = () =>
+  screen.getByRole("combobox", { name: "Frequency" });
+
+async function pickFrequency(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+) {
+  await user.click(frequencyPicker());
+  await user.click(await screen.findByRole("option", { name: label }));
+}
+
 describe("given the Cadence section of the composer", () => {
   describe("when a pull-mode source is being composed", () => {
     /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
     it("shows a Cadence title and a frequency picker, not a cron text box", () => {
       renderField({ sourceType: "databricks_genie", initialValue: "" });
       expect(screen.getByText("Cadence")).toBeTruthy();
-      const frequency = screen.getByLabelText<HTMLSelectElement>("Frequency");
-      expect(frequency.value).toBe("m15");
+      // The app's own select, not the browser's: a button that opens a
+      // listbox, reading its current choice in words rather than carrying a
+      // machine value. See governance-ui-controls.feature.
+      expect(frequencyPicker()).toHaveTextContent("Every 15 minutes");
       expect(screen.queryByLabelText("Cron expression")).toBeNull();
     });
 
     /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
     it("prefills from the source's recommended schedule", () => {
       renderField({ sourceType: "anthropic_admin", initialValue: "" });
-      const frequency = screen.getByLabelText<HTMLSelectElement>("Frequency");
-      expect(frequency.value).toBe("hourly");
+      expect(frequencyPicker()).toHaveTextContent("Every hour");
     });
 
     /** @scenario "The Cadence section opens on a friendly picker, prefilled" */
@@ -107,10 +128,9 @@ describe("given the Cadence section of the composer", () => {
         onChangeSpy,
       });
       const user = userEvent.setup();
-      const frequency = screen.getByLabelText<HTMLSelectElement>("Frequency");
-      await user.selectOptions(frequency, "hourly");
+      await pickFrequency(user, "Every hour");
       expect(onChangeSpy).toHaveBeenLastCalledWith("0 * * * *");
-      expect(frequency.value).toBe("hourly");
+      expect(frequencyPicker()).toHaveTextContent("Every hour");
       expect(screen.queryByTestId("cadence-summary")).toBeNull();
     });
 

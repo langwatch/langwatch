@@ -17,6 +17,7 @@ import {
   HandledErrorAlert,
   readHandledError,
 } from "~/features/errors";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import type { SpendSortField } from "~/hooks/useSpendSortParam";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -250,6 +251,12 @@ export function PeopleSpendPanel({
   onSortChange: (next: SpendSortField) => void;
   canReadSources: boolean;
 }) {
+  // The spend read is Enterprise-gated server-side, and the tRPC gate answers
+  // with a bare FORBIDDEN rather than a coded handled error, so the plan is
+  // checked here first: a non-Enterprise organization gets the locked line
+  // without a request that can only be refused.
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
+  const planAllows = isPlanLoading || isEnterprise;
   const peopleQuery = api.activityMonitor.spendByUser.useQuery(
     {
       organizationId: orgId,
@@ -258,7 +265,7 @@ export function PeopleSpendPanel({
       sortBy,
       sortDir: "desc",
     },
-    { enabled: !!orgId, refetchOnWindowFocus: false },
+    { enabled: !!orgId && planAllows, refetchOnWindowFocus: false },
   );
   const departmentsQuery = api.departments.list.useQuery(
     { organizationId: orgId },
@@ -275,6 +282,7 @@ export function PeopleSpendPanel({
 
   const people = peopleQuery.data ?? [];
   const lockedByPlan =
+    (!isPlanLoading && !isEnterprise) ||
     readHandledError(peopleQuery.error)?.code === "enterprise_plan_required";
 
   return (
@@ -351,7 +359,7 @@ export function PeopleSpendPanel({
  * The plan refusal is expected on a non-Enterprise organization, so it
  * reads as a locked feature in the registry's words, not as a failure.
  */
-function EnterpriseLockedLine() {
+export function EnterpriseLockedLine() {
   const copy = explainHandledError({
     code: "enterprise_plan_required",
     meta: {},
@@ -373,8 +381,7 @@ function EnterpriseLockedLine() {
     >
       <Lock size={14} aria-hidden="true" />
       <Text>
-        {copy.title}
-        {copy.description ? ` ${copy.description}` : ""}
+        {copy.description ? `${copy.title}. ${copy.description}` : copy.title}
       </Text>
     </HStack>
   );

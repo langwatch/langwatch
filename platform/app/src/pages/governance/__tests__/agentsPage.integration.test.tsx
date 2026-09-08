@@ -9,10 +9,18 @@
  * wide agents list exists yet, so each pane is an honest empty state and
  * the page issues no query at all.
  *
+ * These tests run with sample mode turned off, because the empty pane is
+ * what the page shows without it. Sample mode now fills an empty governance
+ * page by default (the section-wide rule in
+ * specs/ai-governance/dashboard/governance-ui-controls.feature), so the
+ * pane's own sentence is only on screen once the reader has said no to the
+ * sample cards. Sample mode has its own suite next door.
+ *
  * Only the boundaries are mocked: layout chrome, feature flag, and the tRPC
  * client (which records every query the page would issue).
  *
- * Spec: specs/ai-gateway/governance/governance-home-routing.feature
+ * Specs: specs/ai-gateway/governance/governance-home-routing.feature,
+ * specs/ai-governance/dashboard/agents-page.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -106,6 +114,8 @@ vi.mock("~/utils/api", () => {
   return { api: node([]) };
 });
 
+import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
+
 import AgentsPage from "../agents";
 
 function renderAgentsAt(initialEntries: string[]) {
@@ -124,9 +134,15 @@ function renderAgentsAt(initialEntries: string[]) {
 beforeEach(() => {
   harness.requested = [];
   harness.permissions = VIEWER_PERMISSIONS;
+  // The reader has said no to the sample cards, which is what puts each
+  // pane's own empty-state sentence on screen.
+  window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+});
 
 describe("the agents page tab shell", () => {
   describe("when a governance viewer opens the bare address", () => {

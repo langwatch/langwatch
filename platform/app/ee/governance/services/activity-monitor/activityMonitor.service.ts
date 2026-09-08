@@ -754,7 +754,7 @@ export class ActivityMonitorService {
   // -----------------------------------------------------------------------
 
   /**
-   * Time-series spend rollup for the bird's-eye `<SpendOverTimeChart>`.
+   * Time-series spend rollup for the bird's-eye spend chart.
    * Bucketed daily, grouped by team / user / model. The wire shape is
    * bucket-major (one entry per day with all non-zero groups inside)
    * which round-trips exactly the cross-product the chart legend

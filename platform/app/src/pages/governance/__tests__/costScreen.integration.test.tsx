@@ -116,6 +116,7 @@ vi.mock("~/utils/api", () => {
   };
 });
 
+import { findNativeSelects } from "~/components/governance/filters";
 import BilledPage from "../billed";
 import CostsPage from "../costs";
 
@@ -267,7 +268,11 @@ describe("the governance cost screen", () => {
 
       const seats = screen.getByTestId("cost-lane-seats");
       expect(within(seats).getByText("Seats")).toBeInTheDocument();
-      expect(within(seats).getByText("AGENT_SEAT_USL")).toBeInTheDocument();
+      // Humanised for reading, with the provider's own SKU kept on the title
+      // so it can still be matched against an invoice.
+      const pool = within(seats).getByText("Agent Seat USL");
+      expect(pool).toBeInTheDocument();
+      expect(pool).toHaveAttribute("title", "AGENT_SEAT_USL");
       expect(within(seats).getByText(/4/)).toBeInTheDocument();
       expect(within(seats).getByText(/2/)).toBeInTheDocument();
       expect(
@@ -554,19 +559,12 @@ describe("the governance cost screen", () => {
     });
   });
 
-  describe("given the per-day lane chart", () => {
-    // Both testids shipped unasserted, so nothing caught the chart swapping
-    // its populated and empty states.
-    it("draws the chart when the window holds days", () => {
-      renderScreen();
-
-      expect(screen.getByTestId("cost-lanes-chart")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("cost-lanes-chart-empty"),
-      ).not.toBeInTheDocument();
-    });
-
-    it("says the window is empty rather than drawing an empty chart", () => {
+  describe("given a window that holds no days", () => {
+    // The full-width lane chart that used to sit under the lanes is gone, and
+    // its empty state with it. The lanes themselves are what a reader is left
+    // with, so they are what has to survive a window with no series behind it
+    // — rendering figures, not disappearing, and not drawing a zero.
+    it("still renders the lanes rather than emptying the screen", () => {
       harness.query = {
         data: summaryFixture({ series: [] }),
         isLoading: false,
@@ -575,8 +573,8 @@ describe("the governance cost screen", () => {
 
       renderScreen();
 
-      expect(screen.getByTestId("cost-lanes-chart-empty")).toBeInTheDocument();
-      expect(screen.queryByTestId("cost-lanes-chart")).not.toBeInTheDocument();
+      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
+      expect(screen.getByTestId("cost-lane-gateway")).toBeInTheDocument();
     });
   });
 
@@ -620,6 +618,35 @@ describe("the governance cost screen", () => {
       expect(
         screen.queryByTestId("cost-stale-sources"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the section's no-native-select rule", () => {
+    // The rule the section rulebook calls its hardest, checked on this page
+    // rather than on the filter row alone.
+    //
+    // Both states, because they render different controls: with figures the
+    // page draws its charts and their legends, and with nothing read it draws
+    // the empty panels and their links. A rule proved against one of those
+    // says nothing about the other.
+    //
+    // The assertion runs against `document.body`, not the render container.
+    // A chip's menu portals out of the container when it opens, so a native
+    // select inside one would sit outside anything `render` hands back — the
+    // rule is about the page, and the page is the document.
+
+    /** @scenario "No governance page renders a native select" */
+    it("contains no native select element, with data and with none", () => {
+      renderScreen();
+      expect(findNativeSelects(document.body)).toHaveLength(0);
+
+      cleanup();
+
+      // Nothing read at all: the summary answers undefined and every
+      // breakdown is already mocked to do the same.
+      harness.query = { data: undefined, isLoading: false, isError: false };
+      renderScreen();
+      expect(findNativeSelects(document.body)).toHaveLength(0);
     });
   });
 });

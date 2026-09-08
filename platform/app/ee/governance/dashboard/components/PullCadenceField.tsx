@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { DashboardSelect } from "@ee/governance/dashboard/components/DashboardSelect";
 import { useMemo, useState } from "react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { SegmentedControl } from "~/components/ui/segmented-control";
@@ -165,19 +159,12 @@ function CadenceFrequencyPicker({
       <HStack gap={3} align="flex-start">
         <Field.Root flex="1">
           <Field.Label fontSize="xs">Frequency</Field.Label>
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              value={choiceFromParts(parts)}
-              onChange={(e) => onPickChoice(e.target.value)}
-            >
-              {FREQUENCY_CHOICES.map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {choice.label}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+          <DashboardSelect
+            ariaLabel="Frequency"
+            options={FREQUENCY_CHOICES}
+            value={choiceFromParts(parts)}
+            onChange={onPickChoice}
+          />
         </Field.Root>
 
         {parts.frequency === "hourly" ? (

@@ -1,11 +1,15 @@
-import { Box, Heading, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type {
   GovernanceSeatLaneDto,
   GovernanceSeatPoolDto,
 } from "@ee/governance/services/governanceCost.service";
 
-import { formatLaneUsd, laneWithheldTotalNote } from "./costLaneFormat";
+import {
+  formatLaneUsd,
+  laneWithheldTotalNote,
+  seatPoolName,
+} from "./costLaneFormat";
 
 /**
  * One cost lane, labeled for what it measures.
@@ -21,6 +25,21 @@ import { formatLaneUsd, laneWithheldTotalNote } from "./costLaneFormat";
  * whether a total is offered is the read side's decision, made once, in
  * `governanceCost.service.ts`.
  */
+/**
+ * The `sample` mark, in the same grey the panels below the lanes use.
+ *
+ * One component so a lane can never carry a different badge from a panel: the
+ * reader learns the mark once, on whichever surface they look at first.
+ */
+function SampleBadge({ shown }: { shown?: boolean }) {
+  if (!shown) return null;
+  return (
+    <Badge size="xs" variant="subtle" colorPalette="gray">
+      sample
+    </Badge>
+  );
+}
+
 export function CostLanePanel({
   label,
   description,
@@ -28,6 +47,7 @@ export function CostLanePanel({
   cellsWithoutAmount,
   currenciesWithoutUsdAmount,
   laneNote,
+  sample = false,
   testId,
 }: {
   label: string;
@@ -44,22 +64,28 @@ export function CostLanePanel({
    * copy about money, it shows what the read side decided to say.
    */
   laneNote?: string | null;
+  /**
+   * Whether this lane's figure is invented. Never optional in practice on a
+   * sample lane: an unbadged figure in the house typeface reads as measured
+   * whether or not it was, and this one is the largest number on the screen.
+   */
+  sample?: boolean;
   testId: string;
 }) {
   return (
     <Box
       data-testid={testId}
       borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={5}
-      flex="1"
-      minWidth="200px"
+      borderColor="border.subtle"
+      borderRadius="lg"
+      backgroundColor="bg.panel"
+      padding={4}
     >
       <VStack align="start" gap={1}>
-        <Heading size="xs" color="fg.muted" textTransform="uppercase">
-          {label}
-        </Heading>
+        <HStack gap={2}>
+          <Heading size="sm">{label}</Heading>
+          <SampleBadge shown={sample} />
+        </HStack>
         <Text
           fontSize="2xl"
           fontWeight="semibold"
@@ -109,9 +135,12 @@ export function CostLanePanel({
  */
 export function SeatLanePanel({
   seats,
+  sample = false,
   testId,
 }: {
   seats: GovernanceSeatLaneDto;
+  /** Whether these counts are invented. Same rule as the money lanes. */
+  sample?: boolean;
   testId: string;
 }) {
   const reported = seats.status === "reported";
@@ -119,17 +148,17 @@ export function SeatLanePanel({
     <Box
       data-testid={testId}
       borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
+      borderColor="border.subtle"
+      borderRadius="lg"
+      backgroundColor="bg.panel"
       borderStyle={reported ? "solid" : "dashed"}
-      padding={5}
-      flex="1"
-      minWidth="200px"
+      padding={4}
     >
       <VStack align="start" gap={1}>
-        <Heading size="xs" color="fg.muted" textTransform="uppercase">
-          Seats
-        </Heading>
+        <HStack gap={2}>
+          <Heading size="sm">Seats</Heading>
+          <SampleBadge shown={sample} />
+        </HStack>
         {seats.status === "reported" ? (
           <SeatPools pools={seats.pools} />
         ) : (
@@ -193,8 +222,10 @@ function SeatPools({ pools }: { pools: GovernanceSeatPoolDto[] }) {
     <VStack align="start" gap={2} width="full">
       {pools.map((pool) => (
         <VStack key={pool.skuPartNumber} align="start" gap={0} width="full">
-          <Text fontSize="sm" fontWeight="medium">
-            {pool.skuPartNumber}
+          {/* The raw SKU stays reachable on hover: it is what a reader matches
+              against the provider's invoice when the two disagree. */}
+          <Text fontSize="sm" fontWeight="medium" title={pool.skuPartNumber}>
+            {seatPoolName(pool.skuPartNumber)}
           </Text>
           <Text
             fontSize="sm"
