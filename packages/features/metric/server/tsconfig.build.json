@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/testing.ts"],
+  "files": ["./src/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -30,9 +30,6 @@
       "path": "../../data-privacy/contract/tsconfig.build.json"
     },
     {
-      "path": "../../data-privacy/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../eventing/tsconfig.build.json"
     },
     {
@@ -49,9 +46,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../trace/server/tsconfig.build.json"
     }
   ]
 }

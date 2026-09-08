@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type {
   CanonicalMetricDataPoint,
+  MetricApi,
   MetricDataPointPreparation,
-  MetricService,
 } from "@langwatch/metric-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
@@ -19,7 +19,7 @@ import {
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export interface MetricRequestCollectionDeps {
-  metrics: MetricService;
+  metrics: MetricApi;
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
   recordMetricCorrelations: (data: RecordMetricCorrelationCommandData[]) => Promise<void>;
 }

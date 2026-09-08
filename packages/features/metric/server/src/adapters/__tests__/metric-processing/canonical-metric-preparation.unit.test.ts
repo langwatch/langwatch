@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepare } from "./fixtures/canonical-metric.fixtures.ts";
+import { prepare } from "./canonical-metric.fixture.ts";
 
 describe("canonical OTLP metric preparation", () => {
   describe("when a request carries every supported metric kind", () => {

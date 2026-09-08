@@ -4766,6 +4766,12 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
@@ -7128,9 +7134,6 @@ importers:
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
-      '@langwatch/data-privacy-server':
-        specifier: workspace:*
-        version: link:../../data-privacy/server
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../eventing
@@ -7155,9 +7158,6 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
-      '@langwatch/trace-server':
-        specifier: workspace:*
-        version: link:../../trace/server
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -9648,9 +9648,15 @@ importers:
 
   packages/features/suite/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract

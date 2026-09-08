@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { affectedRollupBuckets, buildMetricRollups } from "@langwatch/metric-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../app/__tests__/metric.fixture.ts";
 
 describe("gauge and sum rollups", () => {
   describe("when a bucket holds several gauge samples", () => {

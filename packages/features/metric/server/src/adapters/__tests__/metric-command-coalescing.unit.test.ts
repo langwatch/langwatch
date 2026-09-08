@@ -13,7 +13,7 @@ import type {
   CanonicalMetricDataPoint,
   MetricDataPointReceivedEvent,
 } from "@langwatch/metric-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../../app/__tests__/metric.fixture.ts";
 
 const TENANT_ID = "project_metric_coalescing";
 

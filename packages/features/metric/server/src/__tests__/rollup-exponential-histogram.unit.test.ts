@@ -4,7 +4,7 @@ import {
   type CanonicalMetricDataPoint,
   MAX_DENSE_BUCKET_SPAN,
 } from "@langwatch/metric-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../app/__tests__/metric.fixture.ts";
 
 /** At scale 0 the base is 2, so bucket i covers (2^i, 2^(i+1)]. */
 function exponential(

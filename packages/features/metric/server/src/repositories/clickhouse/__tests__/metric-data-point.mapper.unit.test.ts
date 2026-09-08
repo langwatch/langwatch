@@ -13,7 +13,7 @@
 
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../../../app/__tests__/metric.fixture.ts";
 import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper.ts";
 
 const EARLIER = 1_787_000_000_000;

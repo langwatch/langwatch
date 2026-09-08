@@ -1,15 +1,12 @@
-import {
-  MetricService as MetricServiceContract,
-  type MetricDataPointPreparation,
-  type MetricPiiRedactionLevel,
+import type {
+  MetricDataPointPreparation,
+  MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
 import { MetricPreparationPort } from "../ports/metric-preparation.port.ts";
 
-/** Concrete process-wide implementation of the metric contract. */
-export class MetricService extends MetricServiceContract {
-  private constructor(private readonly preparation: MetricPreparationPort) {
-    super();
-  }
+/** Canonical preparation for one OTLP metric export request. */
+export class MetricService {
+  private constructor(private readonly preparation: MetricPreparationPort) {}
 
   static create(options: { preparation: MetricPreparationPort }): MetricService {
     return new MetricService(options.preparation);

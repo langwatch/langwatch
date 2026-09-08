@@ -11,14 +11,10 @@ import {
 
 /**
  * Durable metric processing, composed from nothing but a tenant-keyed
- * ClickHouse client.
- *
- * This is the whole seam a background worker needs. {@link MetricRuntimeAdapter}
- * composes the same pipeline alongside the ingestion service, its redaction
- * policy and the organization-keyed read client — everything an HTTP door
- * needs and a queue consumer does not. Asking for those anyway is what kept
- * the pipeline unbuildable outside the App, so this adapter states the
- * consumer's dependencies instead of inheriting the producer's.
+ * ClickHouse client — the whole seam a background worker needs. The redaction
+ * policy and the organization-keyed read client an HTTP door needs stay off
+ * this path, because demanding them is what kept the pipeline unbuildable
+ * outside the App.
  */
 export class ClickHouseMetricProcessingAdapter {
   private constructor(

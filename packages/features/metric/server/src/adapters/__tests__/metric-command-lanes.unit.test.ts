@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { metricDataPointReceivedEventSchema } from "@langwatch/metric-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../../app/__tests__/metric.fixture.ts";
 import {
   metricCommandGroupKey,
   metricMapGroupKey,

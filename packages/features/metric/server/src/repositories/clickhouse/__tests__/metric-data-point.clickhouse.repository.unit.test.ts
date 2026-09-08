@@ -6,7 +6,7 @@ import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-p
 import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper.ts";
 import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../../../app/__tests__/metric.fixture.ts";
 
 type InsertCall = { table: string; values: readonly unknown[] };
 

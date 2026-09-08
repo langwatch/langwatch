@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../../app/__tests__/metric.fixture.ts";
 import { ClickHouseMetricProcessingAdapter } from "../clickhouse.metric-processing.adapter.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import type { MetricClickHouseClient } from "../../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";

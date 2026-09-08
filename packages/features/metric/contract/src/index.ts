@@ -1,9 +1,3 @@
-export {
-  MetricService,
-  type MetricDataPointPreparation,
-  type MetricPiiRedactionLevel,
-  type PreparedMetricDataPoint,
-} from "./metric.service.ts";
 export * from "./metric.api.ts";
 export { scalarsFromCanonicalAttributes } from "./metric-attributes.ts";
 export {

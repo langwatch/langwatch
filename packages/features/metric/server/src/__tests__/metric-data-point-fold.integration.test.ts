@@ -33,7 +33,7 @@ import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
-import { point } from "../fixtures/metric.fixture.ts";
+import { point } from "../app/__tests__/metric.fixture.ts";
 import type { MetricClickHouseClient } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MetricDataPointClickHouseRepository } from "../repositories/clickhouse/clickhouse.metric-data-point.repository.ts";
 import { deleteMigratedTenantRows, startMigratedClickHouse } from "./migrated-clickhouse.harness.ts";

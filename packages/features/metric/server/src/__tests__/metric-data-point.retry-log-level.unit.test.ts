@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
-import type { MetricClickHouseClient } from "@langwatch/metric-server/testing";
+import type { MetricClickHouseClient } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 
 const logger = vi.hoisted(() => ({
   info: vi.fn(),

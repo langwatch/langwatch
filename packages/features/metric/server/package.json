@@ -13,10 +13,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -28,15 +24,14 @@
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
     "@langwatch/data-privacy-contract": "workspace:*",
-    "@langwatch/data-privacy-server": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/trace-server": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "2.10.0",
     "@opentelemetry/otlp-transformer": "0.55.0",

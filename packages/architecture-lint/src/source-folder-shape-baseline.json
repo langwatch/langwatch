@@ -783,15 +783,7 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/metric/contract/src/metric.api.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/metric/contract/src/metric.config.ts"
-    },
-    {
-      "kind": "crowded-folder",
-      "path": "packages/features/metric/server/src/adapters"
     },
     {
       "kind": "crowded-folder",

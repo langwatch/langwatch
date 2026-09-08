@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
-import { CanonicalMetricAdapter, MetricService } from "@langwatch/metric-server/testing";
+import { CanonicalMetricAdapter } from "../../adapters/canonical-metric.adapter.ts";
+import { MetricService } from "../metric.service.ts";
 import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
 import {
   type MetricRequestCollectionResult,

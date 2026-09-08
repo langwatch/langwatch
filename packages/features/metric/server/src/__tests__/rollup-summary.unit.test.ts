@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { affectedRollupBuckets, buildMetricRollups } from "@langwatch/metric-contract";
-import { point } from "@langwatch/metric-server/testing";
+import { point } from "../app/__tests__/metric.fixture.ts";
 
 function summary({ timeUnixMs, count, sum }: { timeUnixMs: number; count: string; sum: number }) {
   return point({ timeUnixMs, metricKind: "summary", count, sum });

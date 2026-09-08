@@ -170,10 +170,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/features/metric/server|MetricRuntimeAdapter",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/features/model-provider/server|UnavailableModelProviderCredentialProbeAdapter",
       "measured": "2026-09-07"
     },

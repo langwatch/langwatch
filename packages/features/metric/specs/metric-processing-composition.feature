@@ -46,6 +46,13 @@ Feature: Composing durable metric processing
     And nothing is reported at boot about a missing Coding Agent pipeline
 
   @unit
+  Scenario: The metric capability is installed by the process that boots it
+    Given a process that provides the data-privacy capability
+    When it installs the metric feature and boots for the worker role
+    Then the metric capability answers under its own name
+    And an OTLP export request prepared through it is redacted before it is accepted
+
+  @unit
   Scenario: Producer and consumer clamp one lane count
     Given a lane count named in the environment
     When the worker composes durable metric and log processing

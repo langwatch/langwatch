@@ -273,18 +273,6 @@
     },
     {
       "kind": "cross-feature",
-      "from": "packages/features/metric/server/package.json",
-      "to": "@langwatch/data-privacy-server",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
-      "from": "packages/features/metric/server/package.json",
-      "to": "@langwatch/trace-server",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
       "from": "packages/features/model-provider/server/package.json",
       "to": "@langwatch/secret-server",
       "expires": "2026-10-01"

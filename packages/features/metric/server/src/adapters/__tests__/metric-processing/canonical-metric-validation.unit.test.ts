@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gaugeMetric, prepare, requestForMetric } from "./fixtures/canonical-metric.fixtures.ts";
+import { gaugeMetric, prepare, requestForMetric } from "./canonical-metric.fixture.ts";
 
 describe("canonical OTLP metric validation", () => {
   describe("when one data point in a metric is malformed", () => {
