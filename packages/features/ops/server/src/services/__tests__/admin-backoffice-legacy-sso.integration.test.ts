@@ -6,6 +6,8 @@
  *
  * Spec: specs/identity/sso-onboarding-tiers.feature
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
@@ -34,6 +36,7 @@ function backoffice() {
   return PostgresOpsAdapter.create({
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
+    auditLog: createApiFixture<AuditLogApi>(),
     adminEmails: ["olive@example.com"],
     users: new UsersStub(),
     auth: new AuthStub(),

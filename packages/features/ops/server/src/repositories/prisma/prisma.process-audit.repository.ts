@@ -1,12 +1,16 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 import {
   ProcessAuditSinkPort,
   type ProcessControlAction,
 } from "../../ports/process-audit-sink.port.ts";
 
 const TARGET_KIND = "process_instance";
+
+const auditMetadataSchema = z.record(z.string(), z.json());
 
 /** Target of an act that names no single instance; the scope is in metadata. */
 const FLEET_TARGET_ID = "fleet";
@@ -17,11 +21,20 @@ const FLEET_TARGET_ID = "fleet";
  * contract the scheduler controls follow (ADR-091): a redriven intent is a
  */
 export class ProcessAuditRepository extends ProcessAuditSinkPort {
-  static create({ prisma }: { prisma: PrismaClient }): ProcessAuditRepository {
-    return new ProcessAuditRepository(prisma);
+  static create({
+    prisma,
+    auditLog,
+  }: {
+    prisma: PrismaClient;
+    auditLog: AuditLogApi;
+  }): ProcessAuditRepository {
+    return new ProcessAuditRepository(prisma, auditLog);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(
+    private readonly prisma: PrismaClient,
+    private readonly auditLog: AuditLogApi,
+  ) {
     super();
   }
 
@@ -33,27 +46,22 @@ export class ProcessAuditRepository extends ProcessAuditSinkPort {
     processKey: string | null;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    await this.prisma.auditLog.create({
-      data: {
-        userId: entry.actorUserId,
-        // Scheduled singletons run under the `__global__` pseudo-project; the
-        // audit row records the ref verbatim rather than inventing a scope.
-        // A fleet-scoped act has no project at all and records null, the same
-        // as the queue sink: a placeholder here would read as a real project
-        // to every query over this column.
-        projectId: entry.projectId,
-        organizationId: null,
-        action: entry.action,
-        targetKind: TARGET_KIND,
-        // The triple only when all three parts are real. A process-scoped
-        // bulk act has a name but no instance, and `foo/null/null` would
-        // read as an instance that does not exist; the scope is in metadata.
-        targetId:
-          entry.processName && entry.projectId && entry.processKey
-            ? `${entry.processName}/${entry.projectId}/${entry.processKey}`
-            : FLEET_TARGET_ID,
-        metadata: (entry.metadata ?? {}) as Prisma.InputJsonValue,
-      },
+    // Scheduled singletons run under the `__global__` pseudo-project; the audit
+    // row records the ref verbatim rather than inventing a scope. A fleet-scoped
+    // act has no project at all and records none, the same as the queue sink.
+    // The target triple is written only when all three parts are real: a
+    // process-scoped bulk act has a name but no instance, and `foo/null/null`
+    // would read as an instance that does not exist.
+    await this.auditLog.record({
+      userId: entry.actorUserId,
+      ...(entry.projectId === null ? {} : { projectId: entry.projectId }),
+      action: entry.action,
+      targetKind: TARGET_KIND,
+      targetId:
+        entry.processName && entry.projectId && entry.processKey
+          ? `${entry.processName}/${entry.projectId}/${entry.processKey}`
+          : FLEET_TARGET_ID,
+      metadata: auditMetadataSchema.parse(entry.metadata ?? {}),
     });
   }
 

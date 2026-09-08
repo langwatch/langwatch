@@ -3,10 +3,11 @@ import type {
   OpsService as OpsServiceContract,
   UserWithBackofficeIncludes,
 } from "@langwatch/ops-contract";
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { Cluster, Redis as IORedis } from "ioredis";
-import type { UserService } from "@langwatch/user-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
@@ -31,7 +32,7 @@ import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
-import { QueueAuditRepository } from "../repositories/prisma/queue-audit.repository.ts";
+import { QueueAuditAdapter } from "./audit-log.queue-audit.adapter.ts";
 import { NullQueueRepository } from "../repositories/queue.repository.ts";
 import { QueueService } from "../services/queue.service.ts";
 import type { QueuePayloadDecoderPort } from "../ports/queue-payload-decoder.port.ts";
@@ -44,18 +45,20 @@ import type { Instant } from "@langwatch/time";
 export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   database: AdminDatabase & SchedulerAuditDatabase;
   audit: AdminAuditSink;
+  /** The shared audit log every operator act is recorded on. */
+  auditLog: AuditLogApi;
   access?: AdminAccess | undefined;
   now?: (() => Instant) | undefined;
   redis?: IORedis | Cluster | undefined;
   queuePayloads?: QueuePayloadDecoderPort | undefined;
-  users: UserService;
-  auth: AuthService;
+  users: UserApi;
+  auth: AuthApi;
   /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
   legacySsoStringWritesRetired?: boolean | undefined;
   scheduler: {
     repository: SchedulerOpsRepository;
     wake: SchedulerWakePort;
-    projects: ProjectService;
+    projects: ProjectApi;
   };
 }
 
@@ -83,7 +86,7 @@ export class PostgresOpsAdapter {
             redis: this.options.redis,
             payloads: this.queuePayloads(),
           }),
-          audit: QueueAuditRepository.create({ prisma: this.options.database }),
+          audit: QueueAuditAdapter.create({ auditLog: this.options.auditLog }),
         })
       : QueueService.create({ repo: NullQueueRepository.create() });
 
@@ -109,7 +112,10 @@ export class PostgresOpsAdapter {
       }),
       scheduler: SchedulerOpsService.create({
         ...this.options.scheduler,
-        audit: PrismaSchedulerAuditRepository.create(this.options.database),
+        audit: PrismaSchedulerAuditRepository.create({
+          database: this.options.database,
+          auditLog: this.options.auditLog,
+        }),
       }),
       anomalyState: this.options.redis
         ? RedisAnomalyStateRepository.create(this.options.redis)

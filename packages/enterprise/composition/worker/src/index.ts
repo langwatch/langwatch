@@ -1,4 +1,5 @@
 import { EnterpriseCatalogue } from "@langwatch/enterprise";
+
 import type {
   ManagedProviderConfigurationPort,
   ManagedProviderCredentialsPort,
@@ -55,3 +56,5 @@ export {
   type SpendSpikeAnomalyWorkerDependencies,
   type SpendSpikeAnomalyWorkerHandle,
 } from "./governance/spend-spike-anomaly.worker.ts";
+
+export { EnterpriseWorkerAuditLog } from "./audit-log.composition.ts";

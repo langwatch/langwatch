@@ -1,4 +1,14 @@
-import type { AgentService, AgentStateStorePort } from "@langwatch/agent-contract";
+import { EnterpriseApiAuditLog } from "@langwatch/enterprise-api";
+import { EvaluatorApp } from "@langwatch/evaluator-server";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import {
+  createApp,
+  LocalFeatureApis,
+  ResourceScope,
+  type BootedRuntime,
+} from "@langwatch/runtime-composition";
+import { AgentApi } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -7,14 +17,14 @@ import {
   createProcessObservability,
   type ProcessObservability,
 } from "@langwatch/observability/node";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { SecretService } from "@langwatch/secret-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
 import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
-import { PostgresSecretAdapter, type SecretEncryptionPort } from "@langwatch/secret-server";
+import { SecretApp, type SecretEncryptionPort } from "@langwatch/secret-server";
 import { RESERVED_PROJECT_SECRET_NAMES } from "@langwatch/secret-contract";
 import { Hono } from "hono";
 import { register } from "prom-client";
@@ -58,14 +68,10 @@ import {
 } from "../platform/infrastructure/api-clickhouse.infrastructure.ts";
 import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
 import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
-import { ApiAgentTestAdapter } from "../features/agent/agent-test.adapter.ts";
-import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter.ts";
-import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition.ts";
-import {
-  ApiConnectedAgentsAbsenceReportPort,
-  ApiConnectedAgentsComposition,
-} from "./api-connected-agents.composition.ts";
-import { ConnectedAgentPresenceService, ConnectedAgentStateAdapter } from "@langwatch/agent-server";
+import { installApiAgent, type ApiAgentComposition } from "./api-agents.composition.ts";
+import { ApiConnectedAgentsComposition } from "./api-connected-agents.composition.ts";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { AgentInfrastructure } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router.ts";
 import {
   composeDatasetFeature,
@@ -200,7 +206,6 @@ import {
   ApiTraceReadViewerProtections,
   type ApiViewerProtectionsPort,
 } from "../features/trace/trace-viewer-protections.ts";
-import { ApiTraceAnnotationContent } from "../features/annotation/annotation-trace-content.ts";
 import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
@@ -214,8 +219,9 @@ import {
   unavailableIdempotentRunner,
   type ApiIdempotencyComposition,
 } from "./api-idempotency.composition.ts";
-import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
-import { createGatewaySpendRestApp, settlementGraceMs } from "@langwatch/gateway-server";
+import { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
+import { createGatewaySpendRestApp } from "@langwatch/gateway-server/api-rest/gateway-spend";
+import { settlementGraceMs } from "@langwatch/gateway-server";
 import { composeApiGatewaySpendRest } from "./api-gateway-spend-rest.composition.ts";
 import { composeApiGatewayWebhooks } from "./api-gateway-webhooks.composition.ts";
 import {
@@ -239,11 +245,8 @@ import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-
 
 import { createPlatformUrlBuilder } from "./api-rest-ports.ts";
 import { nanoid } from "nanoid";
-import {
-  composeHttpProxyFeature,
-  LoggedApiStudioAbsence,
-  type ApiStudioHostPort,
-} from "../features/agent/http-proxy.composition.ts";
+import { composeHttpProxyFeature } from "../features/agent/http-proxy.composition.ts";
+import type { WorkflowStudioDispatchService } from "@langwatch/workflow-server";
 import {
   composeModelProviderFeature,
   LoggedApiModelProviderAbsence as LoggedApiModelProviderSurfaceAbsence,
@@ -260,11 +263,12 @@ import {
   refusingSpendFeature,
   type ApiUsageStatsPort,
 } from "../features/entitlement/spend.composition.ts";
+import { refusingAnnotationFeature } from "../features/annotation/annotation-absence.ts";
+import { installApiAnnotation } from "../features/annotation/annotation.composition.ts";
 import {
-  composeAnnotationFeature,
-  refusingAnnotationFeature,
-  type ApiAnnotationTraceContentPort,
-} from "../features/annotation/annotation.composition.ts";
+  installApiNotification,
+  type ComposedNotificationFeature,
+} from "../features/notification/notification.composition.ts";
 import {
   composeApiTraceProducerCommands,
   type ApiTraceProducerCommands,
@@ -287,10 +291,7 @@ import {
   LwqlKeyMapService,
 } from "@langwatch/analytics-server";
 import { composeApiModelProviderHost } from "./api-model-provider-host.composition.ts";
-import {
-  composeApiStudioHost,
-  composeApiWorkflowStudioDispatch,
-} from "./api-studio-host.composition.ts";
+import { composeApiWorkflowStudioDispatch } from "./api-studio-host.composition.ts";
 import {
   composeApiAuthoringRest,
   LoggedApiAuthoringRestAbsence,
@@ -430,10 +431,7 @@ import {
   LoggedApiScimAbsence,
   type ApiScimRestPorts,
 } from "./api-scim.composition.ts";
-import {
-  composeApiEnterpriseAudit,
-  LoggedApiEnterpriseAuditAbsence,
-} from "./api-enterprise-audit.composition.ts";
+import { composeApiAudit, LoggedApiAuditAbsence } from "./api-audit.composition.ts";
 import type { PlatformOperatorPort } from "@langwatch/identity-server";
 import { RedisNlpLambdaArnCacheAdapter } from "@langwatch/workflow-server";
 import {
@@ -505,16 +503,16 @@ export type ApiProductionCompositionOptions = {
   /**
    * A host's already-composed agent service, when it has one.
    */
-  agents?: AgentService;
+  agents?: AgentApi;
   /**
    * A host's already-composed secret service, when it has one. Optional since this process can
    * build its own: see {@link ApiProductionComposition.resolveSecrets} for which wins.
    */
-  secrets?: SecretService;
+  secrets?: SecretApp;
   /**
    * A host's already-composed API-key service, when it has one.
    */
-  apiKeys?: ApiKeyService;
+  apiKeys?: ApiKeyApi;
   /**
    * A host's already-composed AuthZ service, when it has one. Optional since this process can
    * build its own: see {@link ApiProductionComposition.resolveAuthz} for which wins and what an
@@ -561,12 +559,6 @@ export type ApiProductionCompositionOptions = {
    */
   mail?: ApiPersonMailPort;
   /**
-   * The reviewer's trace content, for the annotation queue. The one thing the product half
-   * cannot build for itself: resolving a trace's full content with the caller's own redactions
-   * applied reaches a trace application this process does not compose.
-   */
-  traceContent?: ApiAnnotationTraceContentPort;
-  /**
    * Whether a project has run any simulation, for the setup checklist.
    */
   simulations?: ApiSimulationEvidencePort;
@@ -585,7 +577,7 @@ export type ApiProductionCompositionOptions = {
    * The optimization studio's outbound event dispatch, and the agent test's own
    * trace write. Absent, both refuse.
    */
-  studio?: ApiStudioHostPort;
+  studioDispatch?: WorkflowStudioDispatchService;
   /**
    * The usage reading and the approaching-limit mail, over the deployment's
    * billing store. Absent, both refuse rather than reporting zero of an
@@ -619,7 +611,7 @@ export type ApiProductionCompositionOptions = {
 
 /** The credential pair every product transport on this process is built from. */
 type ApiResolvedTenancy = Readonly<{
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   organizations: OrganizationService;
 }>;
 
@@ -642,6 +634,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The audit trail this process records on, composed once and held.
    */
   private composedAudit: ApiAuditPort | undefined;
+  private composedAuditLog: AuditLogApi | undefined;
   /**
    * The Enterprise application members this process composed over its own graph, or none.
    * An injected application wins — see {@link resolveEnterprise}.
@@ -653,7 +646,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedEventing: ApiEventingInfrastructure | undefined;
   private composedAuthz: ApiAuthzComposition | undefined;
   private composedTenancy: ApiTenancyComposition | undefined;
-  private composedAgents: ApiAgentsComposition | undefined;
+  private composedAgents: ApiAgentComposition | undefined;
+  private agentApi: AgentApi | undefined;
+  private evaluatorApi: EvaluatorApp | undefined;
+  private agentRelayMaxPayloadMb: number | undefined;
+  private readonly agentClients = new LocalFeatureApis();
   private composedConnectedAgents: ApiConnectedAgentsComposition | undefined;
   private composedAuth: ApiAuthComposition | undefined;
   /**
@@ -714,9 +711,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedDataPrivacy!: ComposedDataPrivacyFeature;
   private composedIntegrationsChecks!: ComposedIntegrationsChecksFeature;
   private composedAnnotation!: ComposedAnnotationFeature;
+  private composedNotification: ComposedNotificationFeature | undefined;
   private composedSavedView!: ComposedSavedViewFeature;
   private composedSpend!: ComposedSpendFeature;
   private composedHttpProxy!: ComposedHttpProxyFeature;
+  private composedStudioDispatch: WorkflowStudioDispatchService | undefined;
   private composedModelProvider!: ComposedModelProviderFeature;
   /**
    * The trace-side senders this process registered, once. Held on the composition because three
@@ -833,7 +832,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The one evaluator-id slug rule on this process.
    */
   private readonly evaluatorIdSlug = EvaluationNameAutoslugService.create();
-  private secrets: SecretService | undefined;
+  private secrets: SecretApi | undefined;
+  private secretApp: SecretApp | undefined;
   private requestPolicy: ApiRequestPolicy | undefined;
 
   private constructor(private readonly options: ApiProductionCompositionOptions) {
@@ -845,9 +845,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * product service below is built from it; then AuthZ, because both doors authorize through it
    * and neither can be built before it exists; then the transports.
    */
-  compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
+  async compose(options: ApiRuntimeCompositionOptions): Promise<ApiRuntimeProcessPort> {
     const queueInfrastructure = this.composeQueue(options);
     this.composedDatabase = composeApiDatabase(options);
+    // Booted whether or not a host injected its own trail: the operator and
+    // evaluator surfaces record and read through this token, not through the
+    // request policy's.
+    if (this.composedDatabase) {
+      const auditLog = await EnterpriseApiAuditLog.create({
+        prisma: this.composedDatabase.connection.client,
+      });
+      options.resources.own("audit-log", () => auditLog.stop());
+      this.composedAuditLog = auditLog.auditLog();
+    }
     // The process's ONE rollout store, composed before every feature that gates on a flag —
     // Eventing included, since the kill switch each command it produces consults is read from
     // here.
@@ -898,7 +908,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       );
     }
 
-    this.secrets = this.resolveSecrets(encryption);
+    this.secretApp = this.resolveSecretApp(encryption);
+    this.secrets = this.secretApp;
     this.composedIsSaas = options.config.infrastructure.modelProvider.isSaas;
     this.composedRestEnvironment = {
       demoProjectId: options.config.authz.demoProjectId,
@@ -932,16 +943,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authorization: AuthzApiAuthorizationAdapter.create(authz),
       audit: this.resolveAudit(),
     });
-    const agents = this.resolveAgents(options);
-    this.resolveConnectedAgents(options, authz, tenancy, agents);
-    // "Test agent", over the scenario feature's Scenario application — a
-    // thunk for the same reason `workflowCopies` above is one: the agent
-    // group composes AFTER this point, so a service read here rather than at
-    // the call would always be absent.
-    const agentTesting = ApiAgentTestAdapter.create({
-      service: () => this.composedScenario?.agentTestService,
-      processName: options.config.serviceName,
-    });
+    const agents = this.allocateAgent(options);
     this.composedAnalytics = this.composeAnalytics(options, authz);
     // The person half of the same record: the two signed-out doors, the signed-in person's
     // account and credentials, their organization's membership and groups, join requests,
@@ -968,12 +970,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           // not any one feature's, so a gate and the surface beside it cannot
           // disagree.
           plans: this.resolvePlanProvider(options),
-          featureFlags: this.composedFeatureFlag.service,
+          featureFlags: this.composedFeatureFlag.app.flags,
           // One variable, one meaning: `IS_SAAS` is what decides whether this
           // installation bills through Stripe, read from the one leaf that
           // already carries it rather than from a second of its own.
           saasBilling: options.config.infrastructure.modelProvider.isSaas,
           audit: this.resolveAudit(),
+          auditLog: this.resolveAuditLog(),
         }
       : undefined;
     // The execution features: the studio's own lifecycle, the optimization
@@ -999,6 +1002,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       infrastructure,
       queueInfrastructure,
     );
+    this.composedDataPrivacy = infrastructure
+      ? composeDataPrivacyFeature({
+          infrastructure,
+          peers: { projects: tenancy.projects, organizations: tenancy.organizations },
+        })
+      : refusingDataPrivacyFeature();
     this.composedTopic = infrastructure
       ? composeTopicFeature({ infrastructure })
       : refusingTopicFeature();
@@ -1058,7 +1067,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // one of its six collaborators lost every role surface with it.
     this.composedRole =
       infrastructure && this.composedAuthz
-        ? composeRoleFeature({ infrastructure, grants: this.composedAuthz.grants })
+        ? composeRoleFeature({
+            infrastructure,
+            grants: this.composedAuthz.grants,
+            authzApp: this.composedAuthz.app,
+          })
         : refusingRoleFeature();
     this.composedHome = infrastructure
       ? composeHomeFeature({ infrastructure })
@@ -1109,20 +1122,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       infrastructure && this.composedDatasets
         ? composeDatasetFeature({
             infrastructure,
-            peers: {
-              // Taken rather than built so a project's rows have ONE service:
-              // the workflow and experiment applications read them through the
-              // same one, and two would let `dataset.getAll` disagree with an
-              // experiment's own row read.
-              datasets: this.composedDatasets,
-              experimentLookup: this.composedExperiment.experimentLookup,
-            },
+            peers: { experimentLookup: this.composedExperiment.experimentLookup },
           })
         : refusingDatasetFeature();
     this.composedEvaluator =
-      infrastructure && this.composedEvaluators
+      infrastructure && this.composedEvaluators && this.evaluatorApi
         ? composeEvaluatorFeature({
             infrastructure,
+            app: this.evaluatorApi,
             peers: {
               evaluators: this.composedEvaluators,
               workflows: this.composedWorkflow.app,
@@ -1154,36 +1161,33 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedBugReport = infrastructure
       ? composeBugReportFeature({ infrastructure })
       : refusingBugReportFeature();
-    // A project's scoped privacy rules, over the SAME project and organization
-    // directories every other tenant-resolving surface reads. It used to ride
-    // inside the product half beside the inbox and the annotations.
-    this.composedDataPrivacy =
-      infrastructure && directory
-        ? composeDataPrivacyFeature({
-            infrastructure,
-            peers: { projects: directory.projects, organizations: directory.organizations },
-          })
-        : refusingDataPrivacyFeature();
     // The setup checklist. Its provider step is answered by the model-provider feature's OWN
     // persistence rather than by a `prisma.modelProvider` read written in the checklist: the
     // question is one existence read over the project's scope cascade, and that table holds
     // every stored credential in the deployment. A reviewer's comments, scores and queues.
-    this.composedAnnotation = this.composeAnnotation(infrastructure);
+    this.composedAnnotation = await this.installAnnotation(infrastructure);
     // The stored filter sets, and the spend the billing screen reports. Both
     // used to ride inside the observability half, so a process missing the
     // trace read stack lost a person's saved views with it.
     this.composedSavedView = infrastructure
       ? composeSavedViewFeature({ infrastructure })
       : refusingSavedViewFeature();
+    // The durable notification record the approaching-limit warning writes,
+    // so the next reading knows this organization was already told.
+    this.composedNotification = infrastructure
+      ? await installApiNotification({ infrastructure })
+      : undefined;
     this.composedSpend = this.composeSpend(options, infrastructure);
     // The studio's dispatch and the provider surfaces. Both used to ride inside
     // the observability half, so a process missing the trace read stack lost
     // the studio and every stored credential with it. The provider feature
     // takes the trace stack's OWN span reader as a peer, because a cost rule's
     // preview matches against the spans the explorer reads.
-    this.composedHttpProxy = composeHttpProxyFeature({
-      studio: this.composeStudioHost(options, encryption),
-      report: LoggedApiStudioAbsence.create(createLogger(options.config.serviceName)),
+    this.composedHttpProxy = composeHttpProxyFeature();
+    await this.installAgent(options);
+    this.composedConnectedAgents = ApiConnectedAgentsComposition.create({
+      agents,
+      relayMaxPayloadMb: options.config.infrastructure.connectedAgents.relayMaxPayloadMb,
     });
     this.composedModelProvider = infrastructure
       ? composeModelProviderFeature({
@@ -1293,7 +1297,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           presence: this.composedPresence.app,
           users: this.composedUser.app,
           analytics: this.composedAnalytics.analytics,
-          annotations: this.composedAnnotation.app,
+          annotation: this.composedAnnotation.app,
           modelProviders: this.composedModelProvider.app,
           dataRetention: this.composedDataRetention.service,
           planProvider: this.resolvePlanProvider(options),
@@ -1315,7 +1319,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           dashboard: this.composedAnalytics.dashboard,
           dataset: this.composedDataset.app,
           evaluatorApp: this.composedEvaluator.app,
-          featureFlags: this.composedFeatureFlag.service,
+          featureFlag: this.composedFeatureFlag.app,
           prompts: this.composedPrompt.app,
           gateway: this.composedGateway.app,
           github,
@@ -1378,23 +1382,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     }
     const process = ApiProcess.create({
       agents,
-      agentTesting,
-      ...(this.composedConnectedAgents
-        ? {
-            connectedAgents: {
-              presence: (input: { projectId: string; agents: { id: string; type: string }[] }) =>
-                ConnectedAgentPresenceService.readAgentPresence({
-                  ...input,
-                  runtime: this.composedConnectedAgents!.runtime,
-                }),
-            },
-          }
-        : {}),
       ...(features ? { features } : {}),
       // Read once, in api.config.ts, and handed down: every mounted surface
       // validates its declared outputs or none of them does.
       validateOutput: options.config.validateTrpcOutput,
-      secrets: this.secrets,
+      secrets: this.secretApp,
       requestPolicy: this.requestPolicy,
       ...this.composeDoors(
         authz,
@@ -1420,7 +1412,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
     });
 
-    return Promise.resolve(ApiProductionProcess.create(process));
+    return ApiProductionProcess.create(process, this.composedAgents?.runtime);
   }
 
   /**
@@ -1467,14 +1459,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   optionalPorts(): Readonly<{
     viewerProtections: ApiViewerProtectionsPort | undefined;
-    traceContent: ApiAnnotationTraceContentPort | undefined;
     simulations: ApiSimulationEvidencePort | undefined;
     personMail: ApiPersonMailPort | undefined;
     seatAllowances: ApiSeatAllowancePort | undefined;
   }> {
     return {
       viewerProtections: this.resolveViewerProtections(),
-      traceContent: this.resolveAnnotationTraceContent(),
       simulations: this.resolveSimulationEvidence(),
       personMail: this.resolvePersonMail(),
       seatAllowances: this.composedSeatAllowances,
@@ -1494,76 +1484,76 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The secret service this process serves, and where it came from. Precedence, and the reason
    * for it: 1. An injected service wins.
    */
-  private resolveSecrets(encryption: SecretEncryptionPort | undefined): SecretService | undefined {
+  private resolveSecretApp(encryption: SecretEncryptionPort | undefined): SecretApp | undefined {
     if (this.options.secrets) return this.options.secrets;
 
     const database = this.composedDatabase;
     if (!database || !encryption) return undefined;
 
-    return PostgresSecretAdapter.create({
-      database: database.connection.client,
-      encryption,
-      reservedNames: RESERVED_PROJECT_SECRET_NAMES,
-    }).build();
-  }
-
-  /**
-   * The agent service this process serves, and where it came from. Precedence, and the reason
-   * for it: 1. An injected service wins.
-   */
-  private resolveAgents(options: ApiRuntimeCompositionOptions): AgentService | undefined {
-    if (this.options.agents) return this.options.agents;
-
-    const logger = createLogger(options.config.serviceName);
-    this.composedAgents = ApiAgentsComposition.tryCompose({
-      database: this.composedDatabase?.connection,
-      processName: options.config.serviceName,
-      // The execution half opens AFTER the agent service, so the Workflow
-      // application is resolved at the copy rather than captured here.
-      workflowCopies: ApiAgentWorkflowCopyAdapter.create({
-        workflows: () => this.composedWorkflowRuntime?.workflows,
-        processName: options.config.serviceName,
-      }),
-      report: LoggedApiAgentsAbsence.create(logger),
-    });
-    return this.composedAgents?.agents;
-  }
-
-  /**
-   * The connected-agent transport (ADR-128): the WebSocket gateway, the HTTP
-   */
-  private resolveConnectedAgents(
-    options: ApiRuntimeCompositionOptions,
-    authz: AuthzService,
-    tenancy: ApiResolvedTenancy,
-    agents: AgentService | undefined,
-  ): ApiConnectedAgentsComposition | undefined {
-    if (!agents) return undefined;
-    const projects = this.composedTenancy?.projects;
-    this.composedConnectedAgents = ApiConnectedAgentsComposition.tryCompose({
-      database: this.composedDatabase?.connection,
-      redis: this.composedQueueRedis ?? null,
-      agents,
-      apiKeys: tenancy.apiKeys,
-      credentials: ApiHandlerManagedCredentials.create({ apiKeys: tenancy.apiKeys, authz }),
-      // Absent when this process received its tenancy from a host rather than
-      // composing its own: the `project_required` refusal then names none,
-      // the same degrade every other project-dependent packaged family here
-      // already accepts for that shape.
-      projectsReachableBy: async (organizationId) => {
-        if (!projects) return [];
-        const page = await projects.listByOrganization({ organizationId, page: 1, limit: 50 });
-        return page.data.map((project) => ({ id: project.id, name: project.name }));
+    return SecretApp.create({
+      dependencies: {},
+      infrastructure: {
+        database: database.connection.client,
+        encryption,
+        reservedNames: RESERVED_PROJECT_SECRET_NAMES,
       },
-      publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
-      replicaCount: options.config.infrastructure.connectedAgents.replicaCount,
-      ...(options.config.infrastructure.connectedAgents.relayMaxPayloadMb !== undefined
-        ? { relayMaxPayloadMb: options.config.infrastructure.connectedAgents.relayMaxPayloadMb }
-        : {}),
-      processName: options.config.serviceName,
-      report: LoggedApiConnectedAgentsAbsence.create(createLogger(options.config.serviceName)),
+      config: undefined,
+      resources: new ResourceScope(),
     });
-    return this.composedConnectedAgents;
+  }
+
+  private allocateAgent(options: ApiRuntimeCompositionOptions): AgentApi {
+    this.agentRelayMaxPayloadMb = options.config.infrastructure.connectedAgents.relayMaxPayloadMb;
+    if (this.options.agents) {
+      this.agentApi = this.options.agents;
+      return this.agentApi;
+    }
+    if (!this.composedDatabase) {
+      throw new Error("Agent installation requires a database or an injected AgentApi.");
+    }
+    this.agentClients.declare(AgentApi);
+    this.agentApi = this.agentClients.reference(AgentApi);
+    options.resources.own("agent peer clients", () => this.agentClients.close());
+    return this.agentApi;
+  }
+
+  private async installAgent(options: ApiRuntimeCompositionOptions): Promise<void> {
+    if (this.options.agents) return;
+    const database = this.composedDatabase?.connection;
+    const permissions = this.composedAuthz?.app;
+    const auditLog = this.composedAuditLog;
+    if (!database || !permissions || !auditLog) {
+      throw new Error("Agent installation requires database, authorization and audit-log APIs.");
+    }
+    const publicBaseUrl = options.config.infrastructure.execution.publicBaseUrl;
+    if (!publicBaseUrl) {
+      throw new Error("Agent installation requires the configured public base URL.");
+    }
+
+    this.composedAgents = await installApiAgent({
+      database,
+      infrastructure: {
+        redis: this.composedQueueRedis,
+      },
+      config: {
+        publicBaseUrl,
+        connected: options.config.infrastructure.connectedAgents,
+        httpTesting: true,
+      },
+      peers: {
+        apiKeys: this.composedApiKey.app,
+        auditLog,
+        permissions,
+        projects: this.composedProject.app,
+        scenarios: this.composedScenario.scenarios,
+        traces: this.composedTrace.traces,
+        users: this.composedUser.app,
+        workflows: this.composedWorkflow.app,
+      },
+    });
+    this.agentClients.bind(AgentApi, this.composedAgents.agents);
+    this.agentClients.ready();
+    options.resources.own("agent feature", () => this.composedAgents!.runtime.stop());
   }
 
   /**
@@ -1584,7 +1574,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     /** The key the credentials handed to that data plane are signed under. */
     gatewayJwtSecret: string | undefined,
   ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
-    const secrets = this.secrets;
+    const secrets = this.secretApp;
     const gatewayApp = this.composedGateway.app;
     // One credential resolution for both doors: the framework-shaped
     // `AppRestSecurity` every packaged REST family is built from, and the
@@ -1613,10 +1603,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // example. Their own relative order is the array's; see
     // `createApiProcessRestFeatures`.
     const rest = new Hono();
-    // The reviewer's comments are served only where this process composed the
-    // annotation half; without it the family is left off rather than mounted
-    // over a stub that answers 500 to every reader.
-    const annotations = this.composedAnnotation.app;
     const handlerManagedCredentials = ApiHandlerManagedCredentials.create({
       apiKeys: tenancy.apiKeys,
       authz,
@@ -1627,7 +1613,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const payloads = composeApiTraceSpool({
       storage: this.composedStoredObject.storage,
       azureRetentionConfirmed: this.azureSpoolRetentionConfirmed,
-      featureFlags: this.composedFeatureFlag.service,
+      featureFlags: this.composedFeatureFlag.app.flags,
       logger: createLogger("langwatch:api:trace-ingest:edge-spool"),
     });
     const otlpIngest = composeApiTraceIngest({
@@ -1644,7 +1630,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // worker's content drop reads: a picture stored here is one object, and
       // it is not stored at all for a project whose policy discards it.
       media: {
-        featureFlags: this.composedFeatureFlag.service,
+        featureFlags: this.composedFeatureFlag.app.flags,
         hasContentDropRules: (projectId) => this.composedDataPrivacy.dropsAnyContent(projectId),
         ...(this.composedStoredObject.bytes
           ? { service: ApiTraceMediaStore.create(this.composedStoredObject.bytes) }
@@ -1839,15 +1825,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       modelProviders,
       projects,
       workflows: workflowService ? this.composedWorkflow.app : undefined,
-      studioDispatch: modelProviders
-        ? composeApiWorkflowStudioDispatch({
-            nlpServiceUrl,
-            modelProviders,
-            payloadStaging: DeferredPayloadStagingAdapter.create(
-              () => this.composedStoredObject.payloadStaging,
-            ),
-          })
-        : undefined,
+      studioDispatch: this.composedStudioDispatch,
       nlpServiceUrl,
       report: LoggedApiAuthoringRestAbsence.create(createLogger(serviceName)),
     });
@@ -1902,7 +1880,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       publicBaseUrl && automationApp && workflowService
         ? {
             resolveProjectByApiKey: async (token: string) => {
-              const resolved = await tenancy.apiKeys.tryResolveToken({ token });
+              const resolved = await tenancy.apiKeys.findResolvedToken({ token });
               return resolved?.type === "legacyProjectKey" ? { id: resolved.project.id } : null;
             },
             publicBaseUrl,
@@ -2125,8 +2103,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // applications over one project's rows let the SDK's door and the
     // browser's door answer the same question differently.
     const packaged = composeApiPackagedRest({
-      agents: this.composedAgents?.agents,
+      agents: this.agentApi,
       connectedAgents: this.composedConnectedAgents,
+      relayMaxPayloadMb: this.agentRelayMaxPayloadMb,
       scenario: this.composedScenario,
       analytics: this.composedAnalytics,
       authz,
@@ -2176,7 +2155,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       packagedAbsence: LoggedApiPackagedRestAbsence.create(createLogger(serviceName)),
       services: {
         packaged,
-        ...(annotations ? { annotations: () => annotations } : {}),
+        ...this.composedAnnotation.restServices,
         analytics: () => analytics,
         ...(langWatchQL ? { langWatchQL } : {}),
         ...(promptApp
@@ -2427,7 +2406,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       resources: options.resources,
       queue: queueInfrastructure,
       processName: options.config.serviceName,
-      killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlag.service),
+      killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlag.app.flags),
       report: LoggedApiEventingAbsence.create(logger),
     });
   }
@@ -2589,7 +2568,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return composeApiLangyRest({
       langy: this.composedLangy.app,
       apiKeys: tenancy.apiKeys,
-      featureFlags: this.composedFeatureFlag.service,
+      featureFlags: this.composedFeatureFlag.app.flags,
       // The guarded client this process already opened, read through the two
       // fields the actor bridge selects. A second directory would be a second
       // answer to "who owns this key".
@@ -2741,10 +2720,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /** The store the local-control runtime shares with connected agents: Redis when there is one. */
-  private composeLangyLocalStore(
-    redis: Parameters<typeof ConnectedAgentStateAdapter.redis>[0] | null,
-  ): AgentStateStorePort {
-    return redis ? ConnectedAgentStateAdapter.redis(redis) : ConnectedAgentStateAdapter.memory();
+  private composeLangyLocalStore(redis: RedisConnection | null): SessionStateStore {
+    return redis ? SessionStateStoreFactory.redis(redis) : SessionStateStoreFactory.memory();
   }
 
   /**
@@ -2770,7 +2747,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       apiKeys: tenancy.apiKeys,
       organizations: this.composedOrganization.app,
       authz,
-      featureFlags: this.composedFeatureFlag.service,
+      featureFlags: this.composedFeatureFlag.app.flags,
       publicBaseUrl,
     });
   }
@@ -2786,7 +2763,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       auth: auth?.auth,
       apiKeys: tenancy.apiKeys,
       prisma: this.composedDatabase?.connection.client,
-      featureFlags: this.composedFeatureFlag.service,
+      featureFlags: this.composedFeatureFlag.app.flags,
     });
   }
 
@@ -2882,26 +2859,29 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
   }
 
-  /**
-   * The audit trail every completed mutation on this process is recorded on.
-   *
-   * An injected trail wins, so a host that already holds one keeps it; otherwise this process
-   * composes its own over the connection it already opened. Composed ONCE and held, because
-   * every door here reads it and two trails would file the same action twice.
-   *
-   * The connection is read through a thunk rather than captured: this resolves while the
-   * request policy is being built, which is before the composition sequence reaches the
-   * database, and a trail that captured `undefined` then would record nothing for the life of
-   * the process.
-   */
+  /** Policy construction precedes audit installation; resolve its API when recording. */
   private resolveAudit(): ApiAuditPort {
     this.composedAudit ??=
       this.options.audit ??
-      composeApiEnterpriseAudit({
-        prisma: () => this.composedDatabase?.connection.client,
-        report: LoggedApiEnterpriseAuditAbsence.create(createLogger("langwatch:api:audit")),
+      composeApiAudit({
+        auditLog: () => this.composedAuditLog,
+        report: LoggedApiAuditAbsence.create(createLogger("langwatch:api:audit")),
       });
     return this.composedAudit;
+  }
+
+  /**
+   * The audit log the operator and evaluator surfaces record and read through.
+   * Composed by {@link compose} before any feature reads it; a process that
+   * opened no database never builds the infrastructure record that names it.
+   */
+  private resolveAuditLog(): AuditLogApi {
+    if (!this.composedAuditLog) {
+      throw new Error(
+        "API composition read the audit log before it installed one: the audit-log feature is booted with the database, ahead of every feature that records on it.",
+      );
+    }
+    return this.composedAuditLog;
   }
 
   /**
@@ -2970,17 +2950,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     };
   }
 
-  /**
-   * Opens this process's ClickHouse, once.
-   *
-   * Before the tenancy graph rather than inside the analytics half, because the project
-   * directory needs the LangWatchQL key map and the key map is a ClickHouse write: opened
-   * later, a project created on this process never reached the table the approved views
-   * read, and a governed query against it resolved nothing until the next backfill.
-   *
-   * It needs no tenancy of its own — a database connection, the operator's endpoints and
-   * the tenant directory over the same client — so the move costs nothing.
-   */
+  /** Open before tenancy so newly created projects can publish their LangWatchQL keys. */
   private resolveClickHouse(
     options: ApiRuntimeCompositionOptions,
   ): ApiClickHouseInfrastructure | undefined {
@@ -3023,7 +2993,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       prisma: database.client,
       authz,
       projects,
-      featureFlags: this.composedFeatureFlag.service,
+      featureFlags: this.composedFeatureFlag.app.flags,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       langWatchQL: options.config.infrastructure.clickhouse.langwatchQl,
       resources: options.resources,
@@ -3103,7 +3073,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
     this.composedApiKey = composeApiKeyFeature({
       audit: this.resolveAudit(),
-      peers: { apiKeys: tenancy.apiKeys },
+      app: tenancy.apiKeyApp,
     });
   }
 
@@ -3112,28 +3082,23 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * and it is the database: every port here is a row read with a project or user id already in
    * hand.
    */
-  private composeAnnotation(
+  private async installAnnotation(
     infrastructure: ApiTrpcInfrastructure | undefined,
-  ): ComposedAnnotationFeature {
-    const projects = this.composedTenancy?.projects;
-    const organizations = this.composedTenancy?.organizations;
-    const users = this.composedAuth?.compose().users;
-    // A host that injected its own api-key and organization pair composed no
-    // tenancy here, so it holds those directories itself.
-    if (!infrastructure || !projects || !organizations || !users) {
+  ): Promise<ComposedAnnotationFeature> {
+    const permissions = this.composedAuthz?.app;
+    if (!infrastructure || !permissions) {
       return refusingAnnotationFeature();
     }
 
-    const traceContent = this.resolveAnnotationTraceContent();
-
-    return composeAnnotationFeature({
+    return installApiAnnotation({
       infrastructure,
-      peers: { projects, organizations, users, traceCommands: this.composedTraceCommands },
-      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
-      // The reviewer's trace content, taken off the trace half this process already composed
-      // rather than left for a host to supply. Nothing supplies it, so the queue read refused
-      // and the annotations screen answered nothing at all.
-      ...(traceContent ? { traceContent } : {}),
+      peers: {
+        projects: this.composedProject.app,
+        organizations: this.composedOrganization.app,
+        users: this.composedUser.app,
+        traces: this.composedTrace.traces,
+        permissions,
+      },
     });
   }
 
@@ -3225,7 +3190,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): ComposedScenarioFeature {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
-    const agents = this.composedAgents?.agents;
+    const agents = this.agentApi;
     // The broadcast fabric presence publishes on. Read off the presence feature
     // rather than composed again: this half's subscription and every presence
     // event ride ONE emitter per tenant.
@@ -3243,29 +3208,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const workflows = this.composedWorkflowRuntime?.workflows;
     const modelProviders = this.composedModelProviders;
     const secrets = this.secrets;
-    const traces = this.composedTrace.traceReads?.readers().tree;
+    const traces = this.composedTrace.traces;
     if (!workflows || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
 
     return composeScenarioFeature({
       prisma: database.client,
+      resources: options.resources,
       authz,
       agents,
-      // The SAME presence read the agents page answers with, so a target that
-      // names an agent without an environment settles on the row the listing
-      // shows as online.
-      ...(this.composedConnectedAgents
-        ? {
-            connectedPresence: (input: {
-              projectId: string;
-              agents: readonly { id: string; type: string }[];
-            }) =>
-              ConnectedAgentPresenceService.readAgentPresence({
-                projectId: input.projectId,
-                agents: input.agents,
-                runtime: this.composedConnectedAgents!.runtime,
-              }),
-          }
-        : {}),
+      connectedPresence: (input) => agents.getPresence(input),
       // Preparing a run reaches four other verticals and three deployment facts. Every one of
       // them is the object the rest of this process already serves: the workflow a workflow
       // target hydrates from, the ONE gateway its three model roles resolve on, the project
@@ -3288,7 +3239,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
       // The SAME user directory the browser-session boundary composed: a run's
       // author and the person the session names must be one answer.
-      users: auth.users,
+      users: this.composedUser.app,
       projects: tenancy.projects,
       broadcast: this.composedPresence.emitter,
       encryption,
@@ -3342,6 +3293,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // declared — the refusal, its code and its copy already exist.
       rateLimit: (input) => this.rateLimiter.consume(input),
       processName: options.config.serviceName,
+      traceCommands: this.composedTraceCommands,
+      spanIngest: ApiTraceSpanIngestAdapter.create(this.composedTraceCommands),
       ...(this.options.traceReads ? { traceReads: this.options.traceReads } : {}),
       // The read stack, over the SAME retention cascade and topic tree the
       // group composes for its own surfaces: a span read's floor and a grid
@@ -3353,6 +3306,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
           defaultRetentionDays: options.config.platformDefaultRetentionDays,
           authz,
+          dataPrivacy: this.composedDataPrivacy.service,
           projects: tenancy.projects,
           plans: this.resolvePlanProvider(options),
           dataRetention: this.composedDataRetention.service,
@@ -3395,40 +3349,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
   }
 
-  /**
-   * Composes the studio's outbound dispatch and the provider surfaces.
-   */
-  private composeStudioHost(
-    options: ApiRuntimeCompositionOptions,
-    encryption: SecretEncryptionPort | undefined,
-  ): ApiStudioHostPort {
-    return (
-      this.options.studio ??
-      composeApiStudioHost({
-        nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
-        modelProviders: this.resolveModelProviders(options, encryption),
-        ...(this.composedEventing
-          ? {
-              traceIngest: {
-                recordSpan: (data) => this.composedTraceCommands.recordSpan(data),
-              },
-            }
-          : {}),
-        processName: options.config.serviceName,
-        payloadStaging: DeferredPayloadStagingAdapter.create(
-          () => this.composedStoredObject.payloadStaging,
-        ),
-        nlpLambdaFleet: options.config.nlpLambdaFleet,
-        nlpLambdaFleetNamed: options.config.nlpLambdaFleetNamed,
-        // The process's own queue Redis, so a resolved function ARN is cached
-        // across this process's restarts rather than per instance.
-        arnCache: this.composedQueueRedis
-          ? RedisNlpLambdaArnCacheAdapter.create(this.composedQueueRedis)
-          : undefined,
-      })
-    );
-  }
-
   /** The vendor probes, the Codex device flow and the cost-rule preview. */
   private composeModelProviderHost(
     options: ApiRuntimeCompositionOptions,
@@ -3456,12 +3376,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     options: ApiRuntimeCompositionOptions,
     infrastructure: ApiTrpcInfrastructure | undefined,
   ): ComposedSpendFeature {
-    if (!infrastructure) return refusingSpendFeature();
+    const notifications = this.composedNotification;
+    if (!infrastructure || !notifications) return refusingSpendFeature();
     const usage =
       this.options.usage ??
       composeApiUsageStats({
         prisma: infrastructure.prisma,
         plans: this.resolvePlanProvider(options),
+        notifications: notifications.app,
         // Both routings, off the ONE connection: the trace rollup is keyed by
         // project and the billable-events rollup by organization, which the
         // tenant router cannot answer. They travel together because this
@@ -3651,6 +3573,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // membership counts the organization half spends a seat against: a member refused there
       // and a member counted here cannot be told two different numbers.
       seats: this.composedSeatAllowances,
+      licensingStore: PostgresOrganizationLicenseAdapter.create(database.client).build(),
+      licensePublicKey: options.config.infrastructure.licensing.publicKey,
     });
   }
 
@@ -3690,7 +3614,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         experiments: this.composedExperiment.experiments,
         monitors: this.composedMonitors,
         evaluators: this.composedEvaluators,
-        agents: this.composedAgents?.agents,
+        agents: this.agentApi,
         simulations: this.composedScenario.simulations,
       })),
       // The SAME local-control runtime the worker's REST door reads, so the
@@ -4042,22 +3966,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The reviewer's trace content: an injected port, else the process's own trace application
-   * carried through its own redaction pass. Absent only where the process composed no read
-   * stack, and then the queue read refuses by name.
-   */
-  private resolveAnnotationTraceContent(): ApiAnnotationTraceContentPort | undefined {
-    if (this.options.traceContent) return this.options.traceContent;
-    const reads = this.composedTrace?.traceReads;
-    if (!reads) return undefined;
-    const traces = this.composedTrace.traces;
-    return ApiTraceAnnotationContent.create({
-      getViewerProtections: (ctx, input) => reads.getViewerProtections(ctx, input),
-      readTracesWithSpans: (input) => traces.readTracesWithSpans(input),
-    });
-  }
-
-  /**
    * The caller's read-time redactions: an injected resolver, else this process's own trace read
    * stack. Absent only where the process composed no read stack, and then the two surfaces that
    * ask refuse by name rather than guessing what a reader may see.
@@ -4168,7 +4076,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composeExecutionFeatures(
     options: ApiRuntimeCompositionOptions,
-    agents: AgentService | undefined,
+    agents: AgentApi | undefined,
     encryption: SecretEncryptionPort | undefined,
     tenancy: ApiResolvedTenancy,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
@@ -4215,13 +4123,31 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       peers: { workflows: workflowRuntime.workflows, nlpRuntime: workflowRuntime.nlpRuntime },
     });
     this.composedEvaluators = evaluators;
+    this.evaluatorApi = EvaluatorApp.create({ evaluators, modelProviders });
     const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
     this.composedExecutionMonitors = monitors;
 
+    this.composedStudioDispatch =
+      this.options.studioDispatch ??
+      composeApiWorkflowStudioDispatch({
+        nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
+        modelProviders,
+        payloadStaging: DeferredPayloadStagingAdapter.create(
+          () => this.composedStoredObject.payloadStaging,
+        ),
+        nlpLambdaFleet: options.config.nlpLambdaFleet,
+        nlpLambdaFleetNamed: options.config.nlpLambdaFleetNamed,
+        arnCache: this.composedQueueRedis
+          ? RedisNlpLambdaArnCacheAdapter.create(this.composedQueueRedis)
+          : void 0,
+      });
+
     this.composedWorkflow = composeWorkflowFeature({
       infrastructure,
+      resources: options.resources,
       runtime: workflowRuntime,
-      peers: { datasets, evaluators, modelProviders },
+      studioDispatch: this.composedStudioDispatch,
+      peers: { datasets, evaluators: this.evaluatorApi, modelProviders, agents },
       // The studio's autogenerated commit message, over the SAME gateway a
       // studio node resolves its own model through.
       commitMessages: composeWorkflowCommitMessages({
@@ -4550,59 +4476,6 @@ export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReportPort {
   }
 }
 
-/**
- * Names what the agent service is missing once, at boot, rather than leaving it to be inferred.
- * Two different facts, so two different lines.
- */
-export class LoggedApiAgentsAbsence extends ApiAgentsAbsenceReportPort {
-  static create(logger: Pick<Logger, "info" | "warn">): LoggedApiAgentsAbsence {
-    return new LoggedApiAgentsAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "info" | "warn">) {
-    super();
-  }
-
-  absent(reason: "no-database"): void {
-    this.logger.warn(
-      { reason },
-      "API composed no agent service and no host supplied one: agents.* mounts against the null object and refuses every call by name",
-    );
-  }
-
-  withoutWorkflowCopies(): void {
-    this.logger.info(
-      { reason: "no-workflow-application" },
-      "API composed its agent service without a workflow-copy capability: every agent operation is served except copying a workflow agent, which needs the Studio graph this process does not compose",
-    );
-  }
-}
-
-/** Names the connected-agent transport's (ADR-128) composition decisions once, at boot. */
-export class LoggedApiConnectedAgentsAbsence extends ApiConnectedAgentsAbsenceReportPort {
-  static create(logger: Pick<Logger, "warn">): LoggedApiConnectedAgentsAbsence {
-    return new LoggedApiConnectedAgentsAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
-
-  withoutDatabase(): void {
-    this.logger.warn(
-      { reason: "no-database" },
-      "API composed no connected-agent transport: with no database an instance has nowhere to register, so the WebSocket gateway and the /connect/* long-poll routes do not mount",
-    );
-  }
-
-  withoutSharedStore(replicaCount: number): void {
-    this.logger.warn(
-      { reason: "no-redis", replicaCount },
-      "API composed the connected-agent transport on a memory store with more than one app replica: every connect refuses replica_count_unsupported, because an instance registered on one pod would be invisible to the others. Configure Redis, or run a single replica",
-    );
-  }
-}
-
 /** Names the absent Auth graph once, at boot, rather than leaving it inferred. */
 export class LoggedApiAuthAbsence extends ApiAuthAbsenceReportPort {
   static create(logger: Pick<Logger, "warn">): LoggedApiAuthAbsence {
@@ -4760,15 +4633,22 @@ class ApiLifecycleOnlyProcess extends ApiRuntimeProcessPort {
 
 /** The real listener/process whose close sequence owns graph and telemetry shutdown. */
 class ApiProductionProcess extends ApiRuntimeProcessPort {
-  static create(process: ApiProcess): ApiProductionProcess {
-    return new ApiProductionProcess(process);
+  static create(
+    process: ApiProcess,
+    agents: BootedRuntime<AgentInfrastructure> | undefined,
+  ): ApiProductionProcess {
+    return new ApiProductionProcess(process, agents);
   }
 
-  private constructor(private readonly process: ApiProcess) {
+  private constructor(
+    private readonly process: ApiProcess,
+    private readonly agents: BootedRuntime<AgentInfrastructure> | undefined,
+  ) {
     super();
   }
 
-  start(): Promise<{ host: string; port: number } | undefined> {
+  async start(): Promise<{ host: string; port: number } | undefined> {
+    await this.agents?.start();
     return this.process.start();
   }
 

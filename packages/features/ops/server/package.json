@@ -31,6 +31,7 @@
     "@clickhouse/client": "^1.23.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
@@ -43,6 +44,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
@@ -55,6 +57,7 @@
   },
   "devDependencies": {
     "@langwatch/feature-flag-server": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "^26.0.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"

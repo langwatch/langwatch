@@ -2,10 +2,6 @@
   "version": 0,
   "entries": [
     {
-      "key": "packages/enterprise/features/audit-log/server|AuditLogAdapter",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "packages/enterprise/features/billing/server|NullBillingOrganizationAdapter",
       "measured": "2026-09-07"
     },
@@ -82,11 +78,11 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/enterprise/features/webhook/server|PrismaWebhookRetentionRepository",
+      "key": "packages/features/webhook/server|PrismaWebhookRetentionRepository",
       "measured": "2026-09-07"
     },
     {
-      "key": "packages/enterprise/features/webhook/server|WebhookHealthService",
+      "key": "packages/features/webhook/server|WebhookHealthService",
       "measured": "2026-09-07"
     },
     {

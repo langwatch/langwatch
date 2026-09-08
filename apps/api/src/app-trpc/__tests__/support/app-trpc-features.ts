@@ -210,6 +210,7 @@ export function buildAppTrpcFeatures(
       authz: refuseEveryMember("infrastructure.authz"),
       plans: refuseEveryMember("infrastructure.plans"),
       featureFlags: refuseEveryMember("infrastructure.featureFlags"),
+      auditLog: refuseEveryMember("infrastructure.auditLog"),
       // The hosted product, so both Enterprise billing namespaces carry their
       // procedures — which is what the lists below read them for.
       saasBilling: true,

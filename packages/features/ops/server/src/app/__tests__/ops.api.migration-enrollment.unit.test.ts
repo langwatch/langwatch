@@ -7,7 +7,12 @@
  * Corresponds to specs/migration/authz-grants-rollout.feature (the enrollment
  * scenarios).
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { UserApi } from "@langwatch/user-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { initTRPC } from "@trpc/server";
@@ -95,9 +100,8 @@ const router = OpsTrpcApi.create(
 function buildApp(): OpsApp {
   return OpsApp.create({
     infrastructure: {
-      ops: {} as OpsCapability,
-      featureFlags: {} as FeatureFlagService,
-      projects: { searchByQuery: async () => [] },
+      createCapability: () => createApiFixture<OpsCapability>(),
+      featureFlags: createApiFixture<FeatureFlagService>(),
       eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
         projections() {
           return [];
@@ -113,7 +117,12 @@ function buildApp(): OpsApp {
         }
       })(),
     },
-    dependencies: {},
+    dependencies: {
+      users: createApiFixture<UserApi>(),
+      auth: createApiFixture<AuthApi>(),
+      projects: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      auditLog: createApiFixture<AuditLogApi>(),
+    },
     config: undefined,
     resources: new ResourceScope(),
   });

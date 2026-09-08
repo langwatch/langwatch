@@ -26,6 +26,10 @@
  * That is what lets one operation serve the back office, a script and a future
  * REST door without knowing which it is serving.
  */
+import {
+  AuditLogApi,
+  type AuditLogApi as AuditLogApiContract,
+} from "@langwatch/audit-log-contract";
 import type {
   FeatureFlagRules,
   FeatureFlagService,
@@ -60,7 +64,13 @@ import type {
 } from "@langwatch/ops-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
 import { OpsApi } from "@langwatch/ops-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import {
+  ProjectApi,
+  type ProjectApi as ProjectApiContract,
+  type SearchProjectsResult,
+} from "@langwatch/project-contract";
+import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
@@ -219,16 +229,38 @@ export type OpsOperator = Readonly<{
 
 /** What the process composes this feature's application from. */
 export interface OpsAppDependencies {
-  ops: OpsCapability;
+  users: UserApiContract;
+  auth: AuthApiContract;
+  projects: ProjectApiContract;
+  auditLog: AuditLogApiContract;
+}
+
+/** The process-owned adapters used to make one Ops capability at boot. */
+export interface OpsAppInfrastructure {
+  createCapability(dependencies: OpsAppDependencies): OpsCapability;
   featureFlags: FeatureFlagService;
-  projects: Pick<ProjectService, "searchByQuery">;
   /**
    * The live pipeline graph, read for the kill-switch keys an operator may
    * set. Without it every generated key is unsettable.
    */
   eventingIntrospection: OpsEventingIntrospectionPort;
 }
-type OpsSetup = FeatureSetup<Record<string, never>, OpsAppDependencies, undefined>;
+type OpsRuntimeDependencies = Readonly<{
+  ops: OpsCapability;
+  featureFlags: FeatureFlagService;
+  projects: ProjectApiContract;
+  eventingIntrospection: OpsEventingIntrospectionPort;
+}>;
+type OpsSetup = FeatureSetup<
+  {
+    users: typeof UserApi;
+    auth: typeof AuthApi;
+    projects: typeof ProjectApi;
+    auditLog: typeof AuditLogApi;
+  },
+  OpsAppInfrastructure,
+  undefined
+>;
 
 /** The badge's two integers, and when they were computed. */
 export interface OpsBadgeReading {
@@ -320,16 +352,28 @@ export class OpsUnknownFeatureFlagError extends HandledError {
 
 export class OpsApp implements OpsApi {
   static readonly contract = OpsApi;
-  static readonly dependencies = {};
-  static readonly configSchema = undefined;
+  static readonly dependencies = {
+    users: UserApi,
+    auth: AuthApi,
+    projects: ProjectApi,
+    auditLog: AuditLogApi,
+  };
+  static readonly configSchema = void 0;
 
-  static create({ infrastructure }: OpsSetup): OpsApp {
-    return new OpsApp(infrastructure);
+  static create(setup: OpsSetup): OpsApp {
+    const { infrastructure } = setup;
+
+    return new OpsApp({
+      ops: infrastructure.createCapability(setup.dependencies),
+      featureFlags: infrastructure.featureFlags,
+      projects: setup.dependencies.projects,
+      eventingIntrospection: infrastructure.eventingIntrospection,
+    });
   }
 
-  readonly #dependencies: OpsAppDependencies;
+  readonly #dependencies: OpsRuntimeDependencies;
 
-  private constructor(dependencies: OpsAppDependencies) {
+  private constructor(dependencies: OpsRuntimeDependencies) {
     this.#dependencies = dependencies;
   }
 
@@ -440,9 +484,11 @@ export class OpsApp implements OpsApi {
   }
 
   /** The project lookup behind the operator's tenant pickers. */
-  searchProjects(
-    input: Parameters<ProjectService["searchByQuery"]>[0],
-  ): ReturnType<ProjectService["searchByQuery"]> {
+  searchProjects(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
     return this.#dependencies.projects.searchByQuery(input);
   }
 

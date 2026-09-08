@@ -1,19 +1,15 @@
 {
-  "extends": "../../../../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
-
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "paths": {
-      "@langwatch/audit-log-contract": ["../contract/src/index.ts"]
-    },
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/audit-log-null.tsbuildinfo",
     "lib": ["es2022"],
-    "types": [],
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-
     "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
@@ -22,7 +18,10 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../features/audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../runtime-composition/tsconfig.build.json"
     }
   ]
 }

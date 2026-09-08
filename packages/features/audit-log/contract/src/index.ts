@@ -4,6 +4,9 @@ export {
   auditLogJsonValueSchema,
   type AuditLogEntry,
   type AuditLogJsonValue,
+  auditLogHistoryEntrySchema,
+  type AuditLogHistoryEntry,
+  type ListAuditLogEntityHistoryInput,
 } from "./audit-log.ts";
 export { recordAuditLogCommandSchema, type RecordAuditLogCommand } from "./audit-log.commands.ts";
-export { AuditLogService } from "./audit-log.service.ts";
+export { AuditLogApi, type AuditLogApi as AuditLogApiContract } from "./audit-log.api.ts";

@@ -4,6 +4,11 @@
  * Spec: specs/ops/dead-letter-recovery.feature
  */
 import { randomUUID } from "node:crypto";
+import type {
+  AuditLogApi,
+  AuditLogHistoryEntry,
+  RecordAuditLogCommand,
+} from "@langwatch/audit-log-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PrismaConfigService,
@@ -17,6 +22,29 @@ import { ManagerExplorerService } from "../services/manager-explorer.service.ts"
 import { ProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
+
+/** The audit log this suite records on: the same rows, written straight to Postgres. */
+class PrismaAuditLogTestSink implements AuditLogApi {
+  static create(prisma: PrismaClient): PrismaAuditLogTestSink {
+    return new PrismaAuditLogTestSink(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  async record(command: RecordAuditLogCommand): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        ...command,
+        args: command.args ?? undefined,
+        metadata: command.metadata ?? undefined,
+      },
+    });
+  }
+
+  async listEntityHistory(): Promise<AuditLogHistoryEntry[]> {
+    return [];
+  }
+}
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -61,7 +89,10 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     service = ManagerExplorerService.create({
       store,
       fleet,
-      audit: ProcessAuditRepository.create({ prisma }),
+      audit: ProcessAuditRepository.create({
+        prisma,
+        auditLog: PrismaAuditLogTestSink.create(prisma),
+      }),
       introspection: new NoopIntrospection(),
     });
   });

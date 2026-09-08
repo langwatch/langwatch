@@ -1,5 +1,10 @@
-import type { AuditLogEntry } from "@langwatch/enterprise-audit-log-contract";
+import type {
+  AuditLogEntry,
+  AuditLogHistoryEntry,
+  ListAuditLogEntityHistoryInput,
+} from "@langwatch/audit-log-contract";
 
-export abstract class AuditLogRepository {
-  abstract create(entry: AuditLogEntry): Promise<void>;
+export interface AuditLogRepository {
+  create(entry: AuditLogEntry): Promise<void>;
+  findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
 }

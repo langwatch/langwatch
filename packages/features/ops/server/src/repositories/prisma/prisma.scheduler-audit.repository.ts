@@ -1,20 +1,10 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
 import { SchedulerAuditSinkPort } from "../../ports/scheduler-audit-sink.port.ts";
 
-/** Writes scheduler controls to the shared audit log. */
+/** The rows the scheduler history reads back, and the people it names. */
 export type SchedulerAuditDatabase = {
   auditLog: {
-    create(input: {
-      data: {
-        userId: string;
-        projectId: string;
-        organizationId: null;
-        action: SchedulerControlAction;
-        targetKind: string;
-        targetId: string;
-        metadata: { slot: string | null };
-      };
-    }): Promise<unknown>;
     findMany(input: {
       where: { targetKind: string };
       orderBy: { createdAt: "desc" };
@@ -47,12 +37,21 @@ export type SchedulerAuditDatabase = {
 };
 
 export class PrismaSchedulerAuditRepository extends SchedulerAuditSinkPort {
-  private constructor(private readonly database: SchedulerAuditDatabase) {
+  private constructor(
+    private readonly database: SchedulerAuditDatabase,
+    private readonly auditLog: AuditLogApi,
+  ) {
     super();
   }
 
-  static create(database: SchedulerAuditDatabase): PrismaSchedulerAuditRepository {
-    return new PrismaSchedulerAuditRepository(database);
+  static create({
+    database,
+    auditLog,
+  }: {
+    database: SchedulerAuditDatabase;
+    auditLog: AuditLogApi;
+  }): PrismaSchedulerAuditRepository {
+    return new PrismaSchedulerAuditRepository(database, auditLog);
   }
 
   async append(entry: {
@@ -62,16 +61,13 @@ export class PrismaSchedulerAuditRepository extends SchedulerAuditSinkPort {
     projectId: string;
     slot: Date | null;
   }): Promise<void> {
-    await this.database.auditLog.create({
-      data: {
-        userId: entry.actorUserId,
-        projectId: entry.projectId,
-        organizationId: null,
-        action: entry.action,
-        targetKind: "scheduled_job",
-        targetId: entry.scheduleId,
-        metadata: { slot: entry.slot?.toISOString() ?? null },
-      },
+    await this.auditLog.record({
+      userId: entry.actorUserId,
+      projectId: entry.projectId,
+      action: entry.action,
+      targetKind: "scheduled_job",
+      targetId: entry.scheduleId,
+      metadata: { slot: entry.slot?.toISOString() ?? null },
     });
   }
 

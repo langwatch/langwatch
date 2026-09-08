@@ -1,26 +1,28 @@
 import {
-  AuditLogService as AuditLogServiceContract,
   recordAuditLogCommandSchema,
+  type AuditLogHistoryEntry,
   type AuditLogJsonValue,
+  type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
-} from "@langwatch/enterprise-audit-log-contract";
+} from "@langwatch/audit-log-contract";
 import type { AuditLogRepository } from "../repositories/audit-log.repository.ts";
 
-export type DefaultAuditLogServiceOptions = {
-  repository: AuditLogRepository;
-  maxArgsBytes?: number;
-};
+const TRUNCATION_LENGTHS = [2048, 1024, 512, 256, 128] as const;
 
-export class DefaultAuditLogService extends AuditLogServiceContract {
+export class AuditLogService {
   private constructor(
     private readonly repository: AuditLogRepository,
     private readonly maxArgsBytes: number,
-  ) {
-    super();
-  }
+  ) {}
 
-  static create(options: DefaultAuditLogServiceOptions): DefaultAuditLogService {
-    return new DefaultAuditLogService(options.repository, options.maxArgsBytes ?? 4 * 1024);
+  static create({
+    repository,
+    maxArgsBytes,
+  }: {
+    repository: AuditLogRepository;
+    maxArgsBytes: number;
+  }): AuditLogService {
+    return new AuditLogService(repository, maxArgsBytes);
   }
 
   async record(command: RecordAuditLogCommand): Promise<void> {
@@ -30,8 +32,12 @@ export class DefaultAuditLogService extends AuditLogServiceContract {
       args:
         parsed.args === undefined
           ? undefined
-          : DefaultAuditLogService.boundJson(parsed.args, this.maxArgsBytes),
+          : AuditLogService.boundJson(parsed.args, this.maxArgsBytes),
     });
+  }
+
+  listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
+    return this.repository.findEntityHistory(input);
   }
 
   private static truncateString(value: string, maxLength: number): string {
@@ -43,18 +49,18 @@ export class DefaultAuditLogService extends AuditLogServiceContract {
     maxStringLength: number,
   ): AuditLogJsonValue {
     if (typeof value === "string") {
-      return DefaultAuditLogService.truncateString(value, maxStringLength);
+      return AuditLogService.truncateString(value, maxStringLength);
     }
 
     if (Array.isArray(value)) {
-      return value.map((item) => DefaultAuditLogService.truncateValue(item, maxStringLength));
+      return value.map((item) => AuditLogService.truncateValue(item, maxStringLength));
     }
 
     if (value !== null && typeof value === "object") {
       return Object.fromEntries(
         Object.entries(value).map(([key, item]) => [
           key,
-          DefaultAuditLogService.truncateValue(item, maxStringLength),
+          AuditLogService.truncateValue(item, maxStringLength),
         ]),
       );
     }
@@ -67,8 +73,8 @@ export class DefaultAuditLogService extends AuditLogServiceContract {
       return value;
     }
 
-    for (const length of [2048, 1024, 512, 256, 128]) {
-      const candidate = DefaultAuditLogService.truncateValue(value, length);
+    for (const length of TRUNCATION_LENGTHS) {
+      const candidate = AuditLogService.truncateValue(value, length);
       if (JSON.stringify(candidate).length <= maxBytes) {
         return candidate;
       }

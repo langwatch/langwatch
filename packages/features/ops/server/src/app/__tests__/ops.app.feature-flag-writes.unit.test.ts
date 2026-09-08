@@ -3,9 +3,14 @@
  * live pipeline graph advertises, and nothing else.
  * @see specs/ops/internal-feature-flags.feature
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   OpsEventingIntrospectionPort,
   type OpsKillSwitchDescriptor,
@@ -37,21 +42,25 @@ class OneSwitchIntrospection extends OpsEventingIntrospectionPort {
 
 function buildApp(): { app: OpsApp; written: string[] } {
   const written: string[] = [];
-  const featureFlags = {
+  const featureFlags = createApiFixture<FeatureFlagService>({
     setEnabled: async ({ key }: { key: string }) => {
       written.push(key);
     },
-  } as unknown as FeatureFlagService;
+  });
 
   return {
     app: OpsApp.create({
       infrastructure: {
-        ops: {} as OpsCapability,
+        createCapability: () => createApiFixture<OpsCapability>(),
         featureFlags,
-        projects: { searchByQuery: async () => [] },
         eventingIntrospection: new OneSwitchIntrospection(),
       },
-      dependencies: {},
+      dependencies: {
+        users: createApiFixture<UserApi>(),
+        auth: createApiFixture<AuthApi>(),
+        projects: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+        auditLog: createApiFixture<AuditLogApi>(),
+      },
       config: undefined,
       resources: new ResourceScope(),
     }),
@@ -60,6 +69,32 @@ function buildApp(): { app: OpsApp; written: string[] } {
 }
 
 describe("given an operator writing a feature flag", () => {
+  it("constructs one capability with complete peers and forwards project search", async () => {
+    const searchByQuery = vi.fn<ProjectApi["searchByQuery"]>().mockResolvedValue([]);
+    const dependencies = {
+      users: createApiFixture<UserApi>(),
+      auth: createApiFixture<AuthApi>(),
+      projects: createApiFixture<ProjectApi>({ searchByQuery }),
+      auditLog: createApiFixture<AuditLogApi>(),
+    };
+    const createCapability = vi.fn<() => OpsCapability>(() => createApiFixture<OpsCapability>());
+    const app = OpsApp.create({
+      dependencies,
+      infrastructure: {
+        createCapability,
+        featureFlags: createApiFixture<FeatureFlagService>(),
+        eventingIntrospection: new OneSwitchIntrospection(),
+      },
+      config: void 0,
+      resources: new ResourceScope(),
+    });
+    const query = { query: "support", organizationId: "organization-a", limit: 7 };
+
+    expect(createCapability).toHaveBeenCalledExactlyOnceWith(dependencies);
+    expect(await app.searchProjects(query)).toEqual([]);
+    expect(searchByQuery).toHaveBeenCalledExactlyOnceWith(query);
+  });
+
   describe("when the key is a kill switch the live pipelines will read", () => {
     it("stores the value", async () => {
       const { app, written } = buildApp();

@@ -11,20 +11,14 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": [
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/tests/**",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "**/*.stories.*",
-    "**/*.bench.*",
-    "**/__bench__/**"
-  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/__tests__/**", "**/*.test.*"],
   "references": [
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../features/audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../runtime-composition/tsconfig.build.json"
     }
   ]
 }

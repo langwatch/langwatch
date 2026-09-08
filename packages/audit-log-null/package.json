@@ -1,0 +1,32 @@
+{
+  "name": "@langwatch/audit-log-null",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The audit log an installation without the Enterprise feature answers with.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project packages/audit-log-null/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

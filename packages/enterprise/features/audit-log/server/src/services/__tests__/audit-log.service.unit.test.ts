@@ -6,7 +6,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { AuditLogRepository } from "../../repositories/audit-log.repository.ts";
-import { DefaultAuditLogService } from "../audit-log.service.ts";
+import { AuditLogService } from "../audit-log.service.ts";
 
 const command = (args?: unknown) => ({
   organizationId: "organization-1",
@@ -17,9 +17,9 @@ const command = (args?: unknown) => ({
 
 function serviceWith(maxArgsBytes?: number) {
   const create = vi.fn(async (_row: { args?: unknown }) => undefined);
-  const service = DefaultAuditLogService.create({
+  const service = AuditLogService.create({
     repository: { create } as unknown as AuditLogRepository,
-    ...(maxArgsBytes === undefined ? {} : { maxArgsBytes }),
+    maxArgsBytes: maxArgsBytes ?? 4 * 1024,
   });
 
   return { create, service };
@@ -33,7 +33,7 @@ const storedArgs = async (args: unknown, maxArgsBytes?: number) => {
   return create.mock.calls[0]?.[0]?.args;
 };
 
-describe("DefaultAuditLogService.record", () => {
+describe("AuditLogService.record", () => {
   describe("given args that fit", () => {
     /** @scenario "A valid audit command is persisted" */
     it("stores them exactly as they were", async () => {

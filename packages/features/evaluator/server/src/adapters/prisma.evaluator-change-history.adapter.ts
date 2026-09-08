@@ -1,36 +1,13 @@
 /**
- * The change history one evaluator's detail panel renders.
- *
- * Moved from the platform app's `runtime/app/features/evaluator.ts`, including
- * the three JSON paths the audit rows are matched on. All three are load
- * bearing: an evaluator's id appears under `id` on a rename, `evaluatorId` on
- * a run, and `newEvaluatorId` on a copy, so dropping any of them silently
- * shortens a customer's history rather than failing.
+ * The change history one evaluator's detail panel renders. All three argument
+ * names are load bearing: an evaluator's id appears under `id` on a rename,
+ * `evaluatorId` on a run and `newEvaluatorId` on a copy.
  */
-import type { EvaluatorHistoryEntry } from "@langwatch/evaluator-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { EvaluatorAuditLogPort } from "../ports/evaluator.port.ts";
 
-/** The two tables this adapter reads, named structurally. */
+/** The one table this adapter reads for itself; the history comes from the audit log. */
 export type EvaluatorAuditLogDatabase = {
-  auditLog: {
-    findMany(input: {
-      where: {
-        projectId: string;
-        action: { startsWith: string };
-        OR: Array<{ args: { path: string[]; equals: string } }>;
-      };
-      orderBy: { createdAt: "desc" };
-      take: number;
-    }): Promise<
-      Array<{
-        id: string;
-        action: string;
-        createdAt: EvaluatorHistoryEntry["createdAt"];
-        args: unknown;
-        userId: string | null;
-      }>
-    >;
-  };
   user: {
     findMany(input: {
       where: { id: { in: string[] } };
@@ -40,27 +17,27 @@ export type EvaluatorAuditLogDatabase = {
 };
 
 export class PrismaEvaluatorAuditLogAdapter extends EvaluatorAuditLogPort {
-  static create(database: EvaluatorAuditLogDatabase): PrismaEvaluatorAuditLogAdapter {
-    return new PrismaEvaluatorAuditLogAdapter(database);
+  static create(options: {
+    database: EvaluatorAuditLogDatabase;
+    auditLog: AuditLogApi;
+  }): PrismaEvaluatorAuditLogAdapter {
+    return new PrismaEvaluatorAuditLogAdapter(options.database, options.auditLog);
   }
 
-  private constructor(private readonly database: EvaluatorAuditLogDatabase) {
+  private constructor(
+    private readonly database: EvaluatorAuditLogDatabase,
+    private readonly auditLog: AuditLogApi,
+  ) {
     super();
   }
 
   history(input: { evaluatorId: string; projectId: string; limit: number }) {
-    return this.database.auditLog.findMany({
-      where: {
-        projectId: input.projectId,
-        action: { startsWith: "evaluators." },
-        OR: [
-          { args: { path: ["id"], equals: input.evaluatorId } },
-          { args: { path: ["evaluatorId"], equals: input.evaluatorId } },
-          { args: { path: ["newEvaluatorId"], equals: input.evaluatorId } },
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      take: input.limit,
+    return this.auditLog.listEntityHistory({
+      projectId: input.projectId,
+      actionPrefix: "evaluators.",
+      entityId: input.evaluatorId,
+      argumentNames: ["id", "evaluatorId", "newEvaluatorId"],
+      limit: input.limit,
     });
   }
 

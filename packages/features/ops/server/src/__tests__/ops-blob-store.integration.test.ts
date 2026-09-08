@@ -1,3 +1,5 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { createTenantId } from "@langwatch/eventing";
 import {
   blobHolderSetKey,
@@ -89,6 +91,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       } as unknown as PrismaClient,
       adminEmails: [],
       audit: { record: async () => undefined },
+      auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserService,
       auth: new NoopAuthService(),
       redis,

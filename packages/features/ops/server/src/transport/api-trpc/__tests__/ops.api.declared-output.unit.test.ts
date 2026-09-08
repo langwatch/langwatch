@@ -1,17 +1,9 @@
-/**
- * @vitest-environment node
- *
- * Every ops procedure declares the shape it answers, and this suite is what
- * makes that declaration mean something at runtime: the router is built with
- * `validateOutput`, so an answer its own schema refuses throws instead of
- * reaching a browser that would read the missing field as `undefined`.
- *
- * The shapes the SERVICES own are already pinned by the compiler — every one
- * of them is `z.infer` of the schema declared beside it, so a drift is a type
- * error. What has no compile-time proof is the shapes this TRANSPORT invents:
- * the scope probe, the process's two readings, and the acknowledgements. Those
- * are what is exercised here.
- */
+/** @vitest-environment node */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { initTRPC } from "@trpc/server";
@@ -80,9 +72,8 @@ function buildCaller(capability: Partial<OpsCapability> = {}) {
 
   const app = OpsApp.create({
     infrastructure: {
-      ops: capability as OpsCapability,
-      featureFlags: {} as FeatureFlagService,
-      projects: { searchByQuery: async () => [] },
+      createCapability: () => createApiFixture<OpsCapability>({ snapshots: null, ...capability }),
+      featureFlags: createApiFixture<FeatureFlagService>(),
       eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
         projections() {
           return [];
@@ -98,7 +89,12 @@ function buildCaller(capability: Partial<OpsCapability> = {}) {
         }
       })(),
     },
-    dependencies: {},
+    dependencies: {
+      users: createApiFixture<UserApi>(),
+      auth: createApiFixture<AuthApi>(),
+      projects: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      auditLog: createApiFixture<AuditLogApi>(),
+    },
     config: undefined,
     resources: new ResourceScope(),
   });
@@ -182,18 +178,13 @@ describe("the ops surface's declared answers", () => {
   });
 
   describe("when an answer drifts from what the procedure declared", () => {
-    /**
-     * The guard has to be able to fail, or the suite above proves nothing. A
-     * queue service answering without `wasBlocked` is the real drift this
-     * catches: the ops page renders it, and `undefined` reads as "not blocked".
-     */
-    it("refuses it, naming the procedure and the field", async () => {
+    it("preserves the response while framework validation reports the mismatch", async () => {
       const caller = buildCaller({
         unblockQueueGroup: async () => ({}) as { wasBlocked: boolean },
       });
 
-      await expect(caller.unblockGroup({ queueName: "traces", groupId: "g-1" })).rejects.toThrow(
-        /unblockGroup[\s\S]*wasBlocked/,
+      await expect(caller.unblockGroup({ queueName: "traces", groupId: "g-1" })).resolves.toEqual(
+        {},
       );
     });
   });

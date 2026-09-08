@@ -30,7 +30,7 @@
       "path": "../../tsconfig.build.json"
     },
     {
-      "path": "../../../features/audit-log/server/tsconfig.build.json"
+      "path": "../../features/audit-log/server/tsconfig.build.json"
     },
     {
       "path": "../../features/billing/server/tsconfig.build.json"
