@@ -11,12 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": [
-    "./src/index.ts",
-    "./src/surfaces/presence-indicators.ts",
-    "./src/surfaces/presence-state.ts",
-    "./src/presence-availability.ts"
-  ],
+  "files": ["./src/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

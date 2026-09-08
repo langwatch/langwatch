@@ -13,18 +13,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./surfaces/presence-indicators": {
-      "types": "./dist/surfaces/presence-indicators.d.ts",
-      "default": "./src/surfaces/presence-indicators.ts"
-    },
-    "./surfaces/presence-state": {
-      "types": "./dist/surfaces/presence-state.d.ts",
-      "default": "./src/surfaces/presence-state.ts"
-    },
-    "./surfaces/presence-availability": {
-      "types": "./dist/presence-availability.d.ts",
-      "default": "./src/presence-availability.ts"
     }
   },
   "scripts": {

@@ -34,15 +34,15 @@ export class RedisPresenceRepository extends PresenceRepository {
     return (await this.redis.del(this.sessionKey(projectId, sessionId))) > 0;
   }
 
-  async tryFindSession({
+  async findSession({
     projectId,
     sessionId,
   }: {
     projectId: string;
     sessionId: string;
-  }): Promise<PresenceSession | null> {
+  }): Promise<PresenceSession | undefined> {
     const raw = await this.redis.get(this.sessionKey(projectId, sessionId));
-    return raw ? this.parse(raw) : null;
+    return raw ? this.parse(raw) : undefined;
   }
 
   async listByProject(projectId: string): Promise<PresenceSession[]> {
@@ -55,12 +55,12 @@ export class RedisPresenceRepository extends PresenceRepository {
     });
   }
 
-  private parse(raw: string): PresenceSession | null {
+  private parse(raw: string): PresenceSession | undefined {
     try {
       const parsed = presenceSessionSchema.safeParse(JSON.parse(raw));
-      return parsed.success ? parsed.data : null;
+      return parsed.success ? parsed.data : undefined;
     } catch {
-      return null;
+      return undefined;
     }
   }
 

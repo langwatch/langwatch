@@ -1115,22 +1115,6 @@
     },
     {
       "kind": "fragment-file",
-      "path": "packages/features/presence/contract/src/presence-stream.service.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/presence/contract/src/presence.api.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/presence/contract/src/presence.app.ts"
-    },
-    {
-      "kind": "fragment-file",
-      "path": "packages/features/presence/contract/src/presence.service.ts"
-    },
-    {
-      "kind": "fragment-file",
       "path": "packages/features/presence/server/src/presence.server.ts"
     },
     {

@@ -1,5 +1,4 @@
 import {
-  PresenceService as PresenceServiceContract,
   PresenceSessionNotOwnedError,
   presenceCursorInputSchema,
   presenceLeaveInputSchema,
@@ -12,30 +11,28 @@ import {
   type PresenceSession,
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port.ts";
 import type { PresenceRepository } from "../repositories/presence.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 export const PRESENCE_TTL_SECONDS = 30;
 
-export class PresenceService extends PresenceServiceContract {
+export class PresenceService {
   private constructor(
     private readonly repository: PresenceRepository,
     private readonly broadcast: PresenceBroadcastPort,
-    private readonly projects: ProjectService,
-    private readonly diagnostics: PresenceDiagnosticsPort | undefined,
+    private readonly projects: ProjectApi,
+    private readonly diagnostics: PresenceDiagnosticsPort,
     private readonly ttlSeconds: number,
     private readonly now: () => number,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     repository: PresenceRepository;
     broadcast: PresenceBroadcastPort;
-    projects: ProjectService;
-    diagnostics?: PresenceDiagnosticsPort;
+    projects: ProjectApi;
+    diagnostics: PresenceDiagnosticsPort;
     ttlSeconds?: number;
     now?: () => number;
   }): PresenceService {
@@ -62,7 +59,7 @@ export class PresenceService extends PresenceServiceContract {
 
   async update(input: PresenceUpdateInput): Promise<PresenceSession> {
     const parsed = presenceUpdateInputSchema.parse(input);
-    const existing = await this.repository.tryFindSession({
+    const existing = await this.repository.findSession({
       projectId: parsed.projectId,
       sessionId: parsed.sessionId,
     });
@@ -81,7 +78,7 @@ export class PresenceService extends PresenceServiceContract {
     const parsed = presenceLeaveInputSchema.parse(input);
     // A session already gone answers the same as one this member published: leaving twice is
     // ordinary, and an absence must not tell a caller which sessions exist.
-    const existing = await this.repository.tryFindSession({
+    const existing = await this.repository.findSession({
       projectId: parsed.projectId,
       sessionId: parsed.sessionId,
     });
@@ -146,7 +143,7 @@ export class PresenceService extends PresenceServiceContract {
     try {
       await this.broadcast.publish(input);
     } catch (error) {
-      this.diagnostics?.warn("Failed to broadcast presence event", {
+      this.diagnostics.warn("Failed to broadcast presence event", {
         error,
         projectId: input.projectId,
         channel: input.channel,

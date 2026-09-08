@@ -8,8 +8,11 @@ import {
   type PresenceEvent,
   type PresenceLocation,
 } from "@langwatch/presence-contract";
-import { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
+import {
+  createPresenceTestProjects,
+  RecordingPresenceDiagnostics,
+} from "../../app/__tests__/presence.fixture.ts";
 import { PresenceBroadcastPort } from "../../ports/presence.port.ts";
 import { MemoryPresenceRepository } from "../../repositories/memory/memory.presence.repository.ts";
 import { PRESENCE_TTL_SECONDS, PresenceService } from "../presence.service.ts";
@@ -42,8 +45,14 @@ function createService() {
   const now = () => clockMs;
   const repository = MemoryPresenceRepository.create({ now });
   const broadcast = new RecordingBroadcast();
-  const projects = { isPresenceEnabled: async () => true } as unknown as ProjectService;
-  const service = PresenceService.create({ repository, broadcast, projects, now });
+  const projects = createPresenceTestProjects();
+  const service = PresenceService.create({
+    repository,
+    broadcast,
+    projects,
+    diagnostics: new RecordingPresenceDiagnostics(),
+    now,
+  });
 
   return {
     service,

@@ -113,10 +113,40 @@ export const presenceUpdateInputSchema = z
   .strict();
 export type PresenceUpdateInput = z.infer<typeof presenceUpdateInputSchema>;
 
-export const presenceLeaveInputSchema = z
+/**
+ * What a browser publishes on a heartbeat. The presenting person is absent by
+ * construction: it is read from the authenticated session, so a payload cannot
+ * claim somebody else's name or avatar.
+ */
+export const presenceUpdateRequestSchema = z
   .object({
     projectId: z.string().min(1),
     sessionId: z.string().min(1),
+    location: presenceLocationSchema,
+  })
+  .strict();
+export type PresenceUpdateRequest = z.infer<typeof presenceUpdateRequestSchema>;
+
+export const presenceHeartbeatInputSchema = z
+  .object({
+    ...presenceUpdateRequestSchema.shape,
+    /** Who is publishing, as the boundary authenticated them. */
+    userId: z.string().min(1),
+  })
+  .strict();
+export type PresenceHeartbeatInput = z.infer<typeof presenceHeartbeatInputSchema>;
+
+export const presenceLeaveRequestSchema = z
+  .object({
+    projectId: z.string().min(1),
+    sessionId: z.string().min(1),
+  })
+  .strict();
+export type PresenceLeaveRequest = z.infer<typeof presenceLeaveRequestSchema>;
+
+export const presenceLeaveInputSchema = z
+  .object({
+    ...presenceLeaveRequestSchema.shape,
     /**
      * Who is asking. Read from the authenticated session by the transport, never from the
      * payload: a session is removed only by the person publishing it.
@@ -135,6 +165,35 @@ export const presenceCursorInputSchema = z
   })
   .strict();
 export type PresenceCursorInput = z.infer<typeof presenceCursorInputSchema>;
+
+/** One cursor tick as a browser publishes it; the person comes from the session. */
+export const presenceCursorRequestSchema = z
+  .object({
+    projectId: z.string().min(1),
+    sessionId: z.string().min(1),
+    payload: presenceCursorPayloadSchema,
+  })
+  .strict();
+export type PresenceCursorRequest = z.infer<typeof presenceCursorRequestSchema>;
+
+export const presenceCursorTickInputSchema = z
+  .object({
+    ...presenceCursorRequestSchema.shape,
+    /** Who is publishing, as the boundary authenticated them. */
+    userId: z.string().min(1),
+  })
+  .strict();
+export type PresenceCursorTickInput = z.infer<typeof presenceCursorTickInputSchema>;
+
+/** The cursors of one anchor, minus the subscriber's own. */
+export const presenceCursorSubscriptionSchema = z
+  .object({
+    ...presenceProjectInputSchema.shape,
+    anchor: presenceCursorAnchorSchema,
+    sessionId: z.string().min(1),
+  })
+  .strict();
+export type PresenceCursorSubscription = z.infer<typeof presenceCursorSubscriptionSchema>;
 
 /** What the presence writes answer with: the tick was accepted. */
 export const presenceAcknowledgedSchema = z.object({ ok: z.literal(true) }).strict();

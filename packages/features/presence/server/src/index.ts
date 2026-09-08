@@ -1,14 +1,11 @@
-export {
-  RuntimePresenceAdapter,
-  type RuntimePresenceAdapterOptions,
-} from "./adapters/runtime-presence.adapter.ts";
-export { PresenceTrpcApi, type PresenceTrpcContext } from "./transport/api-trpc/presence.api.ts";
+export { presenceServer } from "./presence.server.ts";
+export { presenceTrpcTransport } from "./transport/presence.trpc.ts";
+export type { PresenceInfrastructure } from "./app/presence.app.ts";
 export {
   PresenceBroadcastPort,
   PresenceDiagnosticsPort,
   PresenceEmitterPort,
 } from "./ports/presence.port.ts";
-export { PresenceStreamService } from "./services/presence-stream.service.ts";
 
 /**
  * The tenant broadcast fabric the presence emitter and the export relay both subscribe on.

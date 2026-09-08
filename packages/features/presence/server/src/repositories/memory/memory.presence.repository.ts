@@ -35,19 +35,19 @@ export class MemoryPresenceRepository extends PresenceRepository {
     return this.entries.delete(this.key(projectId, sessionId));
   }
 
-  async tryFindSession({
+  async findSession({
     projectId,
     sessionId,
   }: {
     projectId: string;
     sessionId: string;
-  }): Promise<PresenceSession | null> {
+  }): Promise<PresenceSession | undefined> {
     const key = this.key(projectId, sessionId);
     const entry = this.entries.get(key);
-    if (!entry) return null;
+    if (!entry) return undefined;
     if (entry.expiresAt <= this.now()) {
       this.entries.delete(key);
-      return null;
+      return undefined;
     }
     return entry.session;
   }

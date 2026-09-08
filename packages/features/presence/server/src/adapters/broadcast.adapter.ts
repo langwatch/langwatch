@@ -4,6 +4,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
 import { BroadcastTenantRateLimiterAdapter } from "./broadcast-tenant-rate-limiter.adapter.ts";
+import { PresenceBroadcastPort, type PresenceEmitterPort } from "../ports/presence.port.ts";
 
 export type BroadcastEventType =
   | "trace_updated"
@@ -49,7 +50,7 @@ function redisChannel(eventType: BroadcastEventType): string {
  * available, uses Redis pub/sub for high availability across multiple server instances. If no
  * redis, it will not orchestrate but send directly.
  */
-export class BroadcastAdapter {
+export class BroadcastAdapter extends PresenceBroadcastPort implements PresenceEmitterPort {
   private static readonly DRAIN_DELAY_MS = 2000;
 
   private eventEmitters = new Map<string, EventEmitter>();
@@ -61,33 +62,56 @@ export class BroadcastAdapter {
   private active = false;
   private readonly senderRateLimiter = new BroadcastTenantRateLimiterAdapter();
   private readonly subscriberRateLimiter = new BroadcastTenantRateLimiterAdapter();
+  private closed = false;
 
   static create(redis: Cluster | IORedis | null): BroadcastAdapter {
     return new BroadcastAdapter(redis);
   }
 
   private constructor(private readonly redis: Cluster | IORedis | null) {
-    this.subscriber = redis?.duplicate() ?? null;
-    this.setupRedisSubscription();
-    this.startCleanupInterval();
-    this.active = true;
+    super();
   }
 
-  private setupRedisSubscription() {
+  /** Activates Redis delivery and stale-emitter cleanup when the host starts serving. */
+  async start(): Promise<void> {
+    if (this.active || this.closed) return;
+    this.senderRateLimiter.start();
+    this.subscriberRateLimiter.start();
+    this.subscriber = this.redis?.duplicate() ?? null;
+    try {
+      await this.setupRedisSubscription();
+      this.startCleanupInterval();
+      this.active = true;
+    } catch (error) {
+      this.senderRateLimiter.destroy();
+      this.subscriberRateLimiter.destroy();
+      const subscriber = this.subscriber;
+      this.subscriber = null;
+      if (subscriber) await subscriber.quit();
+      throw error;
+    }
+  }
+
+  async publish(input: {
+    projectId: string;
+    event: string;
+    channel: "presence_updated" | "presence_cursor";
+    rateLimited: boolean;
+  }): Promise<void> {
+    if (input.rateLimited) {
+      await this.broadcastToTenantRateLimited(input.projectId, input.event, input.channel, "delta");
+      return;
+    }
+    await this.broadcastToTenant(input.projectId, input.event, input.channel);
+  }
+
+  private setupRedisSubscription(): Promise<void> {
     if (!this.subscriber) {
       this.logger.warn("Redis not available, SSE broadcasting disabled");
-      return;
+      return Promise.resolve();
     }
 
     const channels = ALL_EVENT_TYPES.map(redisChannel);
-    this.subscriber.subscribe(...channels, (err, count) => {
-      if (err) {
-        this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
-        return;
-      }
-      this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
-    });
-
     this.subscriber.on("message", (channel, message) => {
       const eventType = ALL_EVENT_TYPES.find((et) => redisChannel(et) === channel);
       if (!eventType) return;
@@ -107,6 +131,18 @@ export class BroadcastAdapter {
 
     this.subscriber.on("error", (error) => {
       this.logger.error({ error }, "Redis subscriber error");
+    });
+
+    return new Promise((resolve, reject) => {
+      this.subscriber?.subscribe(...channels, (err, count) => {
+        if (err) {
+          this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
+          reject(err);
+          return;
+        }
+        this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
+        resolve();
+      });
     });
   }
 
@@ -273,6 +309,9 @@ export class BroadcastAdapter {
   }
 
   async close() {
+    if (this.closed) return;
+    this.closed = true;
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;

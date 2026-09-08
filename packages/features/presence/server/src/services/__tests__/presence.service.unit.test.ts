@@ -1,9 +1,12 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
-import { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../presence.port.ts";
+import {
+  createPresenceTestProjects,
+  RecordingPresenceBroadcast,
+  RecordingPresenceDiagnostics,
+} from "../../app/__tests__/presence.fixture.ts";
 import { PresenceRepository } from "../../repositories/presence.repository.ts";
-import { PresenceService } from "../../services/presence.service.ts";
+import { PresenceService } from "../presence.service.ts";
 
 const session: PresenceSession = {
   projectId: "project-1",
@@ -14,39 +17,22 @@ const session: PresenceSession = {
 };
 
 class StubRepository extends PresenceRepository {
-  current: PresenceSession | null = null;
+  current: PresenceSession | undefined;
   upsert = vi.fn(async () => undefined);
   remove = vi.fn(async () => true);
   listByProject = vi.fn(async () => (this.current ? [this.current] : []));
-  tryFindSession = vi.fn(async () => this.current);
+  findSession = vi.fn(async () => this.current);
 }
 
-class RecordingBroadcast extends PresenceBroadcastPort {
-  publish = vi.fn(async () => undefined);
-}
-
-class RecordingDiagnostics extends PresenceDiagnosticsPort {
-  warn = vi.fn();
-}
-
-type StubProjects = ProjectService & { enabled: boolean };
-
-function createProjects(): StubProjects {
-  const projects = {
-    enabled: true,
-    isPresenceEnabled: async () => projects.enabled,
-  };
-  return projects as unknown as StubProjects;
-}
-
-function createService() {
+function createService(options: { enabled?: boolean } = {}) {
   const repository = new StubRepository();
-  const broadcast = new RecordingBroadcast();
-  const projects = createProjects();
+  const broadcast = new RecordingPresenceBroadcast();
+  const projects = createPresenceTestProjects(options.enabled ?? true);
   const service = PresenceService.create({
     repository,
     broadcast,
     projects,
+    diagnostics: new RecordingPresenceDiagnostics(),
     now: () => 42,
   });
   return { service, repository, broadcast, projects };
@@ -55,8 +41,7 @@ function createService() {
 describe("PresenceService", () => {
   /** @scenario "Presence uses Project-owned policy" */
   it("uses the canonical Project service for the effective policy", async () => {
-    const { service, projects } = createService();
-    projects.enabled = false;
+    const { service } = createService({ enabled: false });
     await expect(service.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
   });
 
@@ -207,14 +192,14 @@ describe("PresenceService", () => {
   });
 
   it("keeps broadcast failures off the persistence path", async () => {
-    const broadcast = new RecordingBroadcast();
+    const broadcast = new RecordingPresenceBroadcast();
     broadcast.publish.mockRejectedValue(new Error("broadcast unavailable"));
-    const diagnostics = new RecordingDiagnostics();
+    const diagnostics = new RecordingPresenceDiagnostics();
     const repository = new StubRepository();
     const service = PresenceService.create({
       repository,
       broadcast,
-      projects: createProjects(),
+      projects: createPresenceTestProjects(),
       diagnostics,
       now: () => 42,
     });

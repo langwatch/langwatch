@@ -5,8 +5,9 @@ export abstract class PresenceRepository {
   abstract upsert(session: PresenceSession, ttlSeconds: number): Promise<void>;
   abstract remove(input: { projectId: string; sessionId: string }): Promise<boolean>;
   abstract listByProject(projectId: string): Promise<PresenceSession[]>;
-  abstract tryFindSession(input: {
+  /** A session that has expired or was never published is a normal absence. */
+  abstract findSession(input: {
     projectId: string;
     sessionId: string;
-  }): Promise<PresenceSession | null>;
+  }): Promise<PresenceSession | undefined>;
 }

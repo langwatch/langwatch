@@ -78,3 +78,9 @@ cross-feature stores.
 
 Application composition imports the reusable presentation and browser state
 from `@langwatch/presence-web`; no duplicate implementation remains in the app.
+
+`PresenceApp` names the portable `ProjectApi` and `UserApi` peers in its
+`static dependencies` and is installed by `presenceServer`; the API composition
+root boots that installer and hands it the fan-out it publishes on. The
+process-composition bridge that used to construct the graph by hand is gone,
+and with it the second, hand-wired way to build Presence.
