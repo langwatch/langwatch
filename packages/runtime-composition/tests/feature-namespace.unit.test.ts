@@ -38,6 +38,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   notification: "notifications",
   onboarding: "onboardings",
   ops: "ops",
+  "platform-health": "platform-healths",
   organization: "organizations",
   presence: "presence",
   project: "projects",

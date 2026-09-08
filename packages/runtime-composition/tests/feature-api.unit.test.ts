@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
+import { LocalFeatureApis } from "../src/local-feature-api.ts";
 import {
   DuplicateProviderError,
   FeatureApiUnavailableError,
@@ -26,6 +27,106 @@ interface OrganizationApi {
   projectName(): Promise<string>;
 }
 const OrganizationApi = featureApi<OrganizationApi>("organization");
+
+describe("process-owned feature references", () => {
+  it("forwards through the bound app only after readiness", async () => {
+    const apis = new LocalFeatureApis();
+    apis.declare(OrganizationApi);
+    const organizations = apis.reference(OrganizationApi);
+
+    expect(() => organizations.name).toThrow(FeatureApiUnavailableError);
+    apis.bind(OrganizationApi, {
+      name: async () => "installed organization",
+      projectName: async () => "installed project",
+    });
+    expect(() => organizations.name).toThrow(FeatureApiUnavailableError);
+
+    apis.ready();
+    await expect(organizations.name()).resolves.toBe("installed organization");
+    const name = organizations.name;
+    apis.close();
+    expect(() => name()).toThrow(FeatureApiUnavailableError);
+    expect(() => apis.ready()).toThrow("bindings are closed");
+  });
+
+  it("rejects missing and duplicate bindings", () => {
+    const apis = new LocalFeatureApis();
+    apis.declare(OrganizationApi);
+    expect(() => apis.ready()).toThrow("has no implementation");
+    expect(() => apis.declare(OrganizationApi)).toThrow("declared twice");
+
+    const app: OrganizationApi = {
+      name: async () => "organization",
+      projectName: async () => "project",
+    };
+    apis.bind(OrganizationApi, app);
+    expect(() => apis.bind(OrganizationApi, app)).toThrow("bound twice");
+  });
+
+  it("keeps every client in a nested chain gated by its own readiness", async () => {
+    const inner = new LocalFeatureApis();
+    const outer = new LocalFeatureApis();
+    inner.declare(OrganizationApi);
+    outer.declare(OrganizationApi);
+    const app: OrganizationApi = {
+      name: async () => "organization",
+      projectName: async () => "project",
+    };
+    inner.bind(OrganizationApi, app);
+    outer.bind(OrganizationApi, inner.reference(OrganizationApi));
+    const api = outer.reference(OrganizationApi);
+
+    expect(() => api.name).toThrow(FeatureApiUnavailableError);
+    outer.ready();
+    expect(() => api.name).toThrow(FeatureApiUnavailableError);
+    inner.ready();
+    const name = api.name;
+    await expect(name()).resolves.toBe("organization");
+
+    inner.close();
+    expect(name).toThrow(FeatureApiUnavailableError);
+    outer.close();
+  });
+
+  it("rejects direct and indirect client binding cycles before readiness", () => {
+    const first = new LocalFeatureApis();
+    const second = new LocalFeatureApis();
+    const third = new LocalFeatureApis();
+    for (const apis of [first, second, third]) apis.declare(OrganizationApi);
+
+    expect(() => first.bind(OrganizationApi, first.reference(OrganizationApi))).toThrow(
+      "cyclic client binding",
+    );
+    first.bind(OrganizationApi, second.reference(OrganizationApi));
+    second.bind(OrganizationApi, third.reference(OrganizationApi));
+    expect(() => third.bind(OrganizationApi, first.reference(OrganizationApi))).toThrow(
+      "cyclic client binding",
+    );
+
+    third.bind(OrganizationApi, {
+      name: async () => "organization",
+      projectName: async () => "project",
+    });
+    for (const apis of [first, second, third]) apis.ready();
+    for (const apis of [first, second, third]) apis.close();
+  });
+
+  it("does not invoke arbitrary proxy get traps as feature operations", () => {
+    const apis = new LocalFeatureApis();
+    apis.declare(OrganizationApi);
+    const get = vi.fn(() => () => "untrusted");
+    const app: OrganizationApi = {
+      name: async () => "organization",
+      projectName: async () => "project",
+    };
+    apis.bind(OrganizationApi, new Proxy(app, { get }));
+    apis.ready();
+
+    expect(() => Reflect.get(apis.reference(OrganizationApi), "hidden")).toThrow("operations only");
+    expect(get).not.toHaveBeenCalled();
+    apis.close();
+  });
+});
 
 interface Infrastructure {
   events: string[];
@@ -117,6 +218,37 @@ function graph(infrastructure: Infrastructure, reversed = false) {
 }
 
 describe("feature APIs", () => {
+  it.each(["api", "worker"] satisfies ServerRole[])(
+    "forwards an installed %s client through outer references without exposing its implementation",
+    async (role) => {
+      const runtime = await graph({ events: [] }).boot({ role });
+      const outer = new LocalFeatureApis();
+      outer.declare(ProjectApi);
+      outer.bind(ProjectApi, runtime.service(ProjectApi));
+      outer.ready();
+      const api = outer.reference(ProjectApi);
+      const name = api.name;
+      const value = { original: true };
+      const failure = new Error("original failure");
+
+      await expect(name()).resolves.toBe("project");
+      await expect(api.organizationName()).resolves.toBe("organization");
+      expect(api.echo(value)).toBe(value);
+      expect(() => api.fail(failure)).toThrow(failure);
+      expect(() => Reflect.get(api, "rawGetter")).toThrow("operations only");
+      expect(() => Reflect.get(api, "valueOf")).toThrow("operations only");
+      expect(Reflect.get(api, "constructor")).toBe(void 0);
+      expect(Reflect.get(api, "then")).toBe(void 0);
+      expect(() => Reflect.set(api, "name", () => "replacement")).toThrow("read-only");
+      expect(api.name).toBe(name);
+
+      outer.close();
+      expect(name).toThrow(FeatureApiUnavailableError);
+      await expect(runtime.service(ProjectApi).name()).resolves.toBe("project");
+      await runtime.stop();
+    },
+  );
+
   it("rejects API providers through the legacy installer before construction", async () => {
     const events: string[] = [];
     const legacy = serverFeature("project")

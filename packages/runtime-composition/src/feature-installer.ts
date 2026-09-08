@@ -1,3 +1,4 @@
+import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import type {
   DependencyToken,
@@ -10,6 +11,11 @@ import { publicNamespace, publicNamespaceFromUnknown } from "./feature-namespace
 import type { ResourceOwnership } from "./resource-scope.ts";
 import { FeatureConfigError } from "./boot-errors.ts";
 import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
+import {
+  instantiateRepositories,
+  type RepositoriesFor,
+  type RepositoryRegistry,
+} from "./repository-registry.ts";
 
 /** Which process is booting. A role hosts only the work that role owns. */
 export type ServerRole = "api" | "worker" | "task";
@@ -20,12 +26,20 @@ export interface FeatureConfigSchema<Config> {
 }
 
 /** The complete context supplied to a server app's static factory. */
-export interface FeatureSetup<Dependencies extends TokenMap, Infrastructure, Config> {
+export type FeatureSetup<
+  Dependencies extends TokenMap,
+  Infrastructure,
+  Config,
+  Repositories = never,
+> = Readonly<{
   readonly dependencies: ResolvedTokens<Dependencies>;
-  readonly infrastructure: Infrastructure;
   readonly config: Config;
   readonly resources: ResourceOwnership;
-}
+}> &
+  ([Infrastructure] extends [never]
+    ? object
+    : Readonly<{ readonly infrastructure: Infrastructure }>) &
+  ([Repositories] extends [never] ? object : Readonly<{ readonly repositories: Repositories }>);
 
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
@@ -41,6 +55,7 @@ export type AppDefinition<Dependencies extends TokenMap, Infrastructure, Config,
 > &
   Readonly<{
     readonly configSchema: FeatureConfigSchema<Config>;
+    readonly repositories?: FeatureRepositories;
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, NoInfer<Config>>,
     ) => NoInfer<App>;
@@ -53,6 +68,7 @@ export type AppDefinitionWithoutConfig<
   App,
 > = AppContract<Dependencies, App> &
   Readonly<{
+    readonly repositories?: FeatureRepositories;
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, Infrastructure, undefined>,
     ) => NoInfer<App>;
@@ -70,6 +86,7 @@ export interface FeatureSetupArguments<Config, Infrastructure, Dependencies> {
   readonly config: Config;
   readonly infrastructure: Infrastructure;
   readonly dependencies: Dependencies;
+  readonly persistence?: FeatureInstallArguments<Infrastructure>["persistence"];
 }
 
 /** What the one transport assembly is handed, in a role that serves doors. */
@@ -135,6 +152,11 @@ export interface FeatureInstallArguments<Infrastructure> {
   readonly resources: ResourceOwnership;
   readonly config: unknown;
   readonly infrastructure: Infrastructure;
+  /** The process-selected repository backend, present only for repository-aware features. */
+  readonly persistence?: Readonly<{
+    backend: string;
+    infrastructure: Readonly<Record<string, unknown>>;
+  }>;
   readonly role: ServerRole;
   /** The instance the graph resolved for one token. */
   resolve(token: TokenIdentity): unknown;
@@ -147,6 +169,13 @@ export interface FeatureInstallArguments<Infrastructure> {
  */
 export interface InstallableServerFeature<Infrastructure> {
   readonly name: string;
+  readonly repositories?: FeatureRepositories;
+  readonly repositoryRegistry?: RepositoryRegistry<
+    Record<
+      string,
+      Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
+    >
+  >;
   readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
@@ -542,6 +571,7 @@ export class ServerFeatureAssembly<
           infrastructure: args.infrastructure,
           dependencies,
           resources: args.resources,
+          persistence: args.persistence,
         };
         const provided = state.setup(setupArguments);
         const { worker, close } = state;
@@ -625,6 +655,17 @@ export function defineFeature<const Name extends FeatureName>(
 class DefinedFeatureBuilder<Name extends FeatureName> {
   constructor(private readonly name: Name) {}
 
+  withRepositories<
+    Definitions extends Record<
+      string,
+      Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
+    >,
+  >(
+    repositories: RepositoryRegistry<Definitions>,
+  ): RepositoryDefinedFeatureBuilder<Name, Definitions> {
+    return new RepositoryDefinedFeatureBuilder(this.name, repositories);
+  }
+
   withApp<Dependencies extends TokenMap, Infrastructure, Config, App>(
     app: AppDefinition<Dependencies, Infrastructure, Config, App>,
   ): ConfiguredAppBuilder<Name, Dependencies, Infrastructure, Config, App>;
@@ -642,6 +683,195 @@ class DefinedFeatureBuilder<Name extends FeatureName> {
       return new ConfiguredAppBuilder(this.name, app);
     }
     return new UnconfiguredAppBuilder(this.name, app);
+  }
+}
+
+type RepositoryAppDefinition<
+  Dependencies extends TokenMap,
+  Infrastructure,
+  Config,
+  Repositories,
+  App,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly configSchema: FeatureConfigSchema<Config>;
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories> &
+        Readonly<{ infrastructure: Infrastructure }>,
+    ) => NoInfer<App>;
+  }>;
+
+type RepositoryAppDefinitionWithoutConfig<
+  Dependencies extends TokenMap,
+  Infrastructure,
+  Repositories,
+  App,
+> = AppContract<Dependencies, App> &
+  Readonly<{
+    readonly create: (
+      setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories> &
+        Readonly<{ infrastructure: Infrastructure }>,
+    ) => NoInfer<App>;
+  }>;
+
+class RepositoryDefinedFeatureBuilder<
+  Name extends FeatureName,
+  Definitions extends Record<
+    string,
+    Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
+  >,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly repositories: RepositoryRegistry<Definitions>,
+  ) {}
+
+  withApp<Dependencies extends TokenMap, Infrastructure extends object, Config, App>(
+    app: RepositoryAppDefinition<
+      Dependencies,
+      Infrastructure,
+      Config,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >,
+  ): RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>;
+  withApp<Dependencies extends TokenMap, Infrastructure extends object = object, App = unknown>(
+    app: RepositoryAppDefinitionWithoutConfig<
+      Dependencies,
+      Infrastructure,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >,
+  ): RepositoryUnconfiguredAppBuilder<Name, Definitions, Dependencies, Infrastructure, App>;
+  withApp<Dependencies extends TokenMap, Infrastructure extends object, Config, App>(
+    app:
+      | RepositoryAppDefinition<
+          Dependencies,
+          Infrastructure,
+          Config,
+          RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+          App
+        >
+      | RepositoryAppDefinitionWithoutConfig<
+          Dependencies,
+          Infrastructure,
+          RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+          App
+        >,
+  ) {
+    if ("configSchema" in app) {
+      return new RepositoryAppBuilder(this.name, this.repositories, app);
+    }
+    return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app);
+  }
+}
+
+class RepositoryAppBuilder<
+  Name extends FeatureName,
+  Definitions extends Record<
+    string,
+    Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
+  >,
+  Dependencies extends TokenMap,
+  Infrastructure,
+  Config,
+  App,
+> {
+  constructor(
+    private readonly name: Name,
+    private readonly repositories: RepositoryRegistry<Definitions>,
+    private readonly app: RepositoryAppDefinition<
+      Dependencies,
+      Infrastructure,
+      Config,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >,
+  ) {}
+
+  withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
+    ...transports: Transports
+  ): Readonly<{
+    build: () => ReturnType<
+      RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, Config, App>["build"]
+    > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> };
+  }> {
+    return {
+      build: () => ({
+        ...this.build(),
+        transports,
+        namespace: publicNamespace(this.name),
+      }),
+    };
+  }
+
+  build(): ServerFeatureDeclaration<
+    Config,
+    Infrastructure,
+    Dependencies,
+    Record<never, never>,
+    App,
+    undefined,
+    undefined,
+    undefined,
+    undefined
+  > {
+    const app = this.app;
+    const registry = this.repositories;
+    const setup = serverFeature<Infrastructure>(this.name)
+      .withConfig(app.configSchema)
+      .withDependencies(app.dependencies)
+      .withSetup(({ dependencies, infrastructure, config, resources, persistence }) => {
+        if (!persistence) {
+          throw new Error(`Feature "${this.name}" requires process persistence.`);
+        }
+        const repositories = instantiateRepositories(registry, persistence);
+        return app.create({ dependencies, infrastructure, config, resources, repositories });
+      })
+      .provides(app.contract)
+      .build();
+    return {
+      ...setup,
+      repositoryRegistry: registry,
+      ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
+    };
+  }
+}
+
+class RepositoryUnconfiguredAppBuilder<
+  Name extends FeatureName,
+  Definitions extends Record<
+    string,
+    Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
+  >,
+  Dependencies extends TokenMap,
+  Infrastructure extends object,
+  App,
+> extends RepositoryAppBuilder<Name, Definitions, Dependencies, Infrastructure, undefined, App> {
+  constructor(
+    name: Name,
+    repositories: RepositoryRegistry<Definitions>,
+    app: RepositoryAppDefinitionWithoutConfig<
+      Dependencies,
+      Infrastructure,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >,
+  ) {
+    // Named member by member: an app is usually a class, and spreading a class
+    // drops its static methods (`create` is not enumerable).
+    super(name, repositories, {
+      contract: app.contract,
+      dependencies: app.dependencies,
+      configSchema: { parse: () => void 0 },
+      create: (setup) => app.create(setup),
+    } as RepositoryAppDefinition<
+      Dependencies,
+      Infrastructure,
+      undefined,
+      RepositoriesFor<RepositoryRegistry<Definitions>, keyof Definitions>,
+      App
+    >);
   }
 }
 
@@ -697,6 +927,7 @@ class ConfiguredAppBuilder<
       .build();
     return {
       ...declaration,
+      repositories: snapshotRepositories(app.repositories),
       ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
     };
   }
@@ -746,6 +977,7 @@ class UnconfiguredAppBuilder<
       .build();
     return {
       ...declaration,
+      repositories: snapshotRepositories(app.repositories),
       ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
     };
   }

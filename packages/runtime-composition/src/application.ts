@@ -1,3 +1,8 @@
+import {
+  assertRepositoryOwnership,
+  snapshotRepositories,
+  type FeatureRepositories,
+} from "./repository-ownership.ts";
 /** Declares, constructs and starts the process graph; see ADR-133. */
 import {
   type DependencyToken,
@@ -24,6 +29,11 @@ import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
 import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
+import {
+  selectedRepositoryOwnership,
+  validateRepositorySelection,
+  type RepositoryRegistry,
+} from "./repository-registry.ts";
 export type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /** What a booted runtime hands back for one feature. */
@@ -116,6 +126,13 @@ export class BootedRuntime<Infrastructure> {
 /** One feature declared on an application, before boot looks at it. */
 interface DeclaredFeature {
   readonly name: string;
+  readonly repositories?: FeatureRepositories;
+  readonly repositoryRegistry?: RepositoryRegistry<
+    Record<
+      string,
+      Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
+    >
+  >;
   readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
@@ -129,6 +146,9 @@ export class ApplicationBuilder<Infrastructure> {
   private readonly features: DeclaredFeature[] = [];
   private readonly preProvided = new Map<TokenIdentity, unknown>();
   private readonly services: RuntimeService[] = [];
+  private persistence:
+    | Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>
+    | undefined;
 
   constructor(
     private readonly name: string,
@@ -152,12 +172,24 @@ export class ApplicationBuilder<Infrastructure> {
     );
   }
 
+  /** Selects one persistence backend for repository-aware feature installers. */
+  withPersistence<Backend extends string>(
+    backend: Backend,
+    infrastructure: Readonly<Record<string, unknown>>,
+  ): this {
+    if (backend.trim().length === 0) throw new Error("A persistence backend needs a name.");
+    this.persistence = Object.freeze({ backend, infrastructure });
+    return this;
+  }
+
   private addFeature<FeatureInfrastructure>(
     declaration: InstallableServerFeature<FeatureInfrastructure>,
     featureInfrastructure: FeatureInfrastructure,
   ): this {
     this.features.push({
       name: declaration.name,
+      repositories: snapshotRepositories(declaration.repositories),
+      repositoryRegistry: declaration.repositoryRegistry,
       apiContract: declaration.apiContract,
       dependencies: declaration.dependencies,
       transportDependencies: declaration.transportDependencies,
@@ -193,6 +225,24 @@ export class ApplicationBuilder<Infrastructure> {
     const config = options.config ?? {};
 
     const declarations = this.features;
+    for (const declaration of declarations) {
+      if (!declaration.repositoryRegistry) continue;
+      if (!this.persistence) {
+        throw new Error(`Feature "${declaration.name}" requires process persistence.`);
+      }
+      validateRepositorySelection(declaration.repositoryRegistry, this.persistence);
+    }
+    assertRepositoryOwnership(
+      declarations.map((declaration) => ({
+        ...declaration,
+        repositories: {
+          ...(declaration.repositories ?? {}),
+          ...(declaration.repositoryRegistry && this.persistence
+            ? selectedRepositoryOwnership(declaration.repositoryRegistry, this.persistence)
+            : {}),
+        },
+      })),
+    );
     // Providers first: the same feature declared twice is reported by the token
     // it claims twice, which is the thing a reader can act on. A feature that
     // provides nothing still gets the plainer refusal below.
@@ -216,6 +266,7 @@ export class ApplicationBuilder<Infrastructure> {
           resources,
           config: config[declaration.name],
           infrastructure: this.infrastructure,
+          persistence: this.persistence,
           role,
           resolve: (token) =>
             token instanceof FeatureApiToken ? apis.reference(token) : provided.get(token),
@@ -346,6 +397,14 @@ export class ApplicationBuilder<Infrastructure> {
 
 /** Names an application. Nothing is constructed until `boot`. */
 export function createApp(options: { name: string }): {
+  withPersistence<Backend extends string>(
+    backend: Backend,
+    infrastructure: Readonly<Record<string, unknown>>,
+  ): {
+    withInfrastructure<Infrastructure>(
+      infrastructure: Infrastructure,
+    ): ApplicationBuilder<Infrastructure>;
+  };
   withInfrastructure<Infrastructure>(
     infrastructure: Infrastructure,
   ): ApplicationBuilder<Infrastructure>;
@@ -353,6 +412,19 @@ export function createApp(options: { name: string }): {
   const name = options.name.trim();
   if (!name) throw new Error("An application needs a name.");
   return {
+    withPersistence<Backend extends string>(
+      backend: Backend,
+      persistence: Readonly<Record<string, unknown>>,
+    ) {
+      return {
+        withInfrastructure<Infrastructure>(infrastructure: Infrastructure) {
+          return new ApplicationBuilder<Infrastructure>(name, infrastructure).withPersistence(
+            backend,
+            persistence,
+          );
+        },
+      };
+    },
     withInfrastructure<Infrastructure>(infrastructure: Infrastructure) {
       return new ApplicationBuilder<Infrastructure>(name, infrastructure);
     },

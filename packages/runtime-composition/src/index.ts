@@ -22,6 +22,7 @@ export {
   tokenName,
 } from "./dependency-token.ts";
 export { featureApi, FeatureApiToken } from "./feature-api-token.ts";
+export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
   type FeatureConfigSchema,
   type AppDefinition,
@@ -59,3 +60,22 @@ export {
   type ShutdownSignalHost,
 } from "./graceful-shutdown.ts";
 export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
+export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
+
+export {
+  defineRepositories,
+  instantiateRepositories,
+  validateRepositorySelection,
+  type PersistenceSelection,
+  type RepositoryBackends,
+  type RepositoryRegistry,
+  type RepositoriesFor,
+} from "./repository-registry.ts";
+
+export {
+  assertRepositoryOwnership,
+  RepositoryOwnershipConflictError,
+  type RepositoryTables,
+  type RepositoryDeclaration,
+  type FeatureRepositories,
+} from "./repository-ownership.ts";

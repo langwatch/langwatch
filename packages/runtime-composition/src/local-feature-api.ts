@@ -1,5 +1,5 @@
 import { FeatureApiUnavailableError } from "./boot-errors.ts";
-import type { FeatureApiIdentity } from "./feature-api-token.ts";
+import type { FeatureApiIdentity, FeatureApiToken } from "./feature-api-token.ts";
 
 /** References are wired at boot, never constructed on a request's first call. */
 export class LocalFeatureApis {
@@ -7,24 +7,41 @@ export class LocalFeatureApis {
   private readonly bindings = new Map<FeatureApiIdentity, LocalFeatureApi>();
 
   declare(token: FeatureApiIdentity): void {
+    this.assertConstructing();
+    if (this.bindings.has(token)) {
+      throw new Error(`Feature API "${token.name}" was declared twice.`);
+    }
     this.bindings.set(token, new LocalFeatureApi(token.name, () => this.assertReady(token)));
   }
 
+  reference<Api>(token: FeatureApiToken<Api>): Api;
+  reference(token: FeatureApiIdentity): object;
   reference(token: FeatureApiIdentity): object {
     return this.binding(token).reference;
   }
 
-  bind(token: FeatureApiIdentity, implementation: unknown): void {
+  bind<Token extends FeatureApiIdentity>(
+    token: Token,
+    implementation: Token extends FeatureApiToken<infer Api> ? NoInfer<Api> : unknown,
+  ): void {
+    this.assertConstructing();
     this.binding(token).bind(implementation);
   }
 
   ready(): void {
+    this.assertConstructing();
     for (const binding of this.bindings.values()) binding.assertBound();
     this.phase = "ready";
   }
 
   close(): void {
     this.phase = "closed";
+  }
+
+  private assertConstructing(): void {
+    if (this.phase !== "constructing") {
+      throw new Error(`Feature API bindings are ${this.phase}.`);
+    }
   }
 
   private binding(token: FeatureApiIdentity): LocalFeatureApi {
@@ -39,6 +56,7 @@ export class LocalFeatureApis {
 }
 
 class LocalFeatureApi {
+  static readonly #clients = new WeakMap<object, LocalFeatureApi>();
   readonly reference: object;
   private implementation: object | undefined;
   private readonly operations = new Map<PropertyKey, (...args: unknown[]) => unknown>();
@@ -59,6 +77,7 @@ class LocalFeatureApi {
         setPrototypeOf: () => false,
       },
     );
+    LocalFeatureApi.#clients.set(this.reference, this);
   }
 
   bind(implementation: unknown): void {
@@ -66,7 +85,20 @@ class LocalFeatureApi {
     if (typeof implementation !== "object" || implementation === null) {
       throw new TypeError(`Feature API "${this.name}" must be implemented by an object.`);
     }
+    this.assertAcyclic(implementation);
     this.implementation = implementation;
+  }
+
+  private assertAcyclic(implementation: object): void {
+    const visited = new Set<LocalFeatureApi>([this]);
+    let client = LocalFeatureApi.#clients.get(implementation);
+    while (client) {
+      if (visited.has(client)) {
+        throw new TypeError(`Feature API "${this.name}" has a cyclic client binding.`);
+      }
+      visited.add(client);
+      client = client.implementation ? LocalFeatureApi.#clients.get(client.implementation) : void 0;
+    }
   }
 
   assertBound(): object {
@@ -83,8 +115,10 @@ class LocalFeatureApi {
     }
     const existing = this.operations.get(property);
     if (existing) return existing;
-    const descriptor = operationDescriptor(implementation, property);
-    const value: unknown = descriptor?.value;
+    const client = LocalFeatureApi.#clients.get(implementation);
+    const value: unknown = client
+      ? client.operation(property)
+      : operationDescriptor(implementation, property)?.value;
     if (typeof value !== "function") {
       throw new TypeError(
         `Feature API "${this.name}" exposes operations only: ${String(property)} is not callable.`,

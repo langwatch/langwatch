@@ -9,6 +9,7 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const installer = resolve(root, "src/feature-installer.ts");
 const application = resolve(root, "src/application.ts");
 const contract = resolve(root, "src/contract.ts");
+const repositoryRegistry = resolve(root, "src/repository-registry.ts");
 const tsc = resolve(root, "node_modules/.bin/tsc");
 type Diagnostic = { line: number; code: string; text: string };
 
@@ -21,7 +22,8 @@ function diagnosticsFor(source: string): Diagnostic[] {
     source
       .replaceAll("__INSTALLER__", installer)
       .replaceAll("__APPLICATION__", application)
-      .replaceAll("__CONTRACT__", contract),
+      .replaceAll("__CONTRACT__", contract)
+      .replaceAll("__REPOSITORY_REGISTRY__", repositoryRegistry),
   );
   writeFileSync(
     config,
@@ -229,6 +231,54 @@ describe("defineFeature compiler diagnostics", () => {
       abstract class Contract { abstract readonly value: string; }
       class App { static readonly contract = Contract; static readonly dependencies = {}; static create(): { wrong: boolean } { return { wrong: true }; } }
       defineFeature("annotation").withApp(App).build(); // EXPECT
+    `,
+    ],
+    [
+      "rejects repository factory requirements that disagree with its argument",
+      "TS2322",
+      `
+      import { defineRepositories } from "__REPOSITORY_REGISTRY__";
+      class PostgresRepositories {
+        static readonly requires = ["prisma"] as const;
+        static create({ connection }: { connection: object }) { return { value: "postgres" }; }
+      }
+      defineRepositories({ postgres: PostgresRepositories }); // EXPECT
+    `,
+    ],
+    [
+      "rejects repository factories with more than one argument",
+      "TS2322",
+      `
+      import { defineRepositories } from "__REPOSITORY_REGISTRY__";
+      class PostgresRepositories {
+        static readonly requires = ["prisma"] as const;
+        static create({ prisma }: { prisma: object }, retry: number) { return { value: prisma, retry }; }
+      }
+      defineRepositories({ postgres: PostgresRepositories }); // EXPECT
+    `,
+    ],
+    [
+      "rejects a repository backend result the app cannot consume",
+      "TS2769",
+      `
+      import { defineFeature, type FeatureSetup } from "__INSTALLER__";
+      import { defineRepositories } from "__REPOSITORY_REGISTRY__";
+      type Repositories = { value: { read(): string } };
+      class PostgresRepositories {
+        static readonly requires = [] as const;
+        static create(): Repositories { return { value: { read: () => "postgres" } }; }
+      }
+      class MemoryRepositories {
+        static readonly requires = [] as const;
+        static create() { return { wrong: true }; }
+      }
+      const repositories = defineRepositories({ postgres: PostgresRepositories, memory: MemoryRepositories });
+      class App {
+        static readonly contract = App;
+        static readonly dependencies = {};
+        static create({ repositories }: FeatureSetup<{}, never, undefined, Repositories>) { return new App(); }
+      }
+      defineFeature("annotation").withRepositories(repositories).withApp(App); // EXPECT
     `,
     ],
   ] as const;
