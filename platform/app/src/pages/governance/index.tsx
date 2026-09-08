@@ -9,15 +9,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  CheckCircle2,
-  Circle,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-} from "lucide-react";
+import { CircleCheck, CircleDashed, CircleX } from "lucide-react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
+import {
+  GovernanceHero,
+  INVENTORY_SOURCES_HREF,
+} from "~/components/governance/GovernanceHero";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
@@ -31,9 +29,12 @@ import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import {
+  HandledErrorAlert,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Permission } from "~/server/api/rbac";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
@@ -42,9 +43,10 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * Wires the api.activityMonitor.* procedures for live reads off
  * gateway_activity_events.
  *
- * When no traffic has been ingested yet, the page shows a setup
- * checklist instead of empty zeroes - a "configure your first source"
- * onboarding rather than an empty wasteland.
+ * It opens the way the project home does: a greeting, the command palette
+ * inline, one lead action (connect a vendor) and a row of shortcuts. The
+ * figures and the charts follow only once there is traffic to draw them
+ * from, so a fresh organization meets a way in rather than a page of zeroes.
  *
  * Every panel here reads a different router, and those routers do not all
  * ask for the same grant. The page opens for anyone holding
@@ -53,8 +55,13 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * and the rest name the grant they need. A viewer delegated part of the
  * surface gets the part they hold instead of one refusal for the lot.
  *
+ * A panel the plan does not include is not a page error: the router answers
+ * `enterprise_plan_required`, and that panel is simply not drawn. Every other
+ * refusal still names itself in an alert.
+ *
  * Spec: specs/ai-gateway/governance/admin-oversight.feature,
- * specs/ai-governance/rbac/delegated-governance-viewer.feature
+ * specs/ai-governance/rbac/delegated-governance-viewer.feature,
+ * specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 
 type SourceHealth =
@@ -88,6 +95,17 @@ const fmtRelative = (date: Date | string | null): string => {
   return `${days}d ago`;
 };
 
+/**
+ * "The plan does not include this" is an answer about the panel, not a
+ * failure of the page. The panel stays unbuilt and nothing is raised.
+ */
+const isPlanLocked = (error: unknown): boolean =>
+  readHandledError(error)?.code === "enterprise_plan_required";
+
+/** The first error worth telling the reader about, if any. */
+const firstReportableError = (errors: ReadonlyArray<unknown>): unknown =>
+  errors.find((error) => error != null && !isPlanLocked(error));
+
 function GovernanceOverviewPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -98,30 +116,10 @@ function GovernanceOverviewPage() {
   // panel's own router asks for, so a query is never fired against a refusal
   // we can already predict.
   const canReadActivity = hasAnyPermission("activityMonitor:view");
-  const canReadSources = hasAnyPermission("ingestionSources:view");
   const canManageSources = hasAnyPermission("ingestionSources:manage");
-  const canReadPolicies = hasAnyPermission("routingPolicies:view");
-  const canReadAnomalyRules = hasAnyPermission("anomalyRules:view");
-  const canReadCatalog = hasAnyPermission("aiTools:manage");
   const canReadSessionPolicy = hasAnyPermission("organization:view");
   const canManageSessionPolicy = hasAnyPermission("organization:manage");
 
-  const sourcesQuery = api.ingestionSources.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadSources, refetchOnWindowFocus: false },
-  );
-  const policiesQuery = api.routingPolicy.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadPolicies, refetchOnWindowFocus: false },
-  );
-  const anomalyRulesQuery = api.anomalyRules.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadAnomalyRules, refetchOnWindowFocus: false },
-  );
-  const catalogQuery = api.aiTools.adminList.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId && canReadCatalog, refetchOnWindowFocus: false },
-  );
   const summaryQuery = api.activityMonitor.summary.useQuery(
     { organizationId: orgId, windowDays: 30 },
     { enabled: !!orgId && canReadActivity, refetchOnWindowFocus: false },
@@ -155,35 +153,24 @@ function GovernanceOverviewPage() {
   // The activity-monitor panels share one gate and one enterprise plan check,
   // so they share one alert. Without it a refusal reads as "no spend, no
   // users, no anomalies" - a claim about the organization we cannot make.
-  const activityError =
-    summaryQuery.error ??
-    usersQuery.error ??
-    teamsQuery.error ??
-    departmentsQuery.error ??
-    healthQuery.error ??
-    anomaliesQuery.error ??
-    spendOverTimeQuery.error;
-  const setupError =
-    sourcesQuery.error ??
-    policiesQuery.error ??
-    anomalyRulesQuery.error ??
-    catalogQuery.error;
+  // A plan that does not include them is the one refusal that is not raised.
+  const activityError = firstReportableError([
+    summaryQuery.error,
+    usersQuery.error,
+    teamsQuery.error,
+    departmentsQuery.error,
+    healthQuery.error,
+    anomaliesQuery.error,
+    spendOverTimeQuery.error,
+  ]);
 
-  const sources = sourcesQuery.data ?? [];
-  const policies = policiesQuery.data ?? [];
   const summary = summaryQuery.data;
   const users = usersQuery.data ?? [];
   const teams = teamsQuery.data ?? [];
   const departments = departmentsQuery.data ?? [];
   const sourceHealth = healthQuery.data ?? [];
   const anomalies = anomaliesQuery.data ?? [];
-  const anomalyRules = anomalyRulesQuery.data ?? [];
-  const catalogTiles = catalogQuery.data ?? [];
 
-  const hasSources = sources.length > 0;
-  const hasPolicies = policies.length > 0;
-  const hasAnomalyRules = anomalyRules.length > 0;
-  const hasCatalogTiles = catalogTiles.length > 0;
   const hasTraffic =
     !!summary &&
     (summary.spentThisWindowUsd > 0 ||
@@ -193,8 +180,11 @@ function GovernanceOverviewPage() {
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
+        {/* Small and to the side: the hero's greeting is the page's one big
+            line, and the product shell stands the section rail down here, so
+            this is the only place the page still says its own name. */}
         <HStack gap={2}>
-          <Heading size="md">AI Governance</Heading>
+          <Heading size="sm">AI Governance</Heading>
           <Badge colorPalette="purple" variant="subtle">
             Preview
           </Badge>
@@ -202,97 +192,9 @@ function GovernanceOverviewPage() {
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
 
-        <HandledErrorAlert
-          error={setupError}
-          fallbackTitle="Couldn't load the setup state"
-        />
-
-        {canReadActivity && !hasTraffic && (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={5}
-          >
-            <VStack align="start" gap={1} marginBottom={4}>
-              <Heading as="h3" size="sm">
-                Setup checklist
-              </Heading>
-              <Text fontSize="sm" color="fg.muted">
-                Complete each step to start collecting governance data. Live
-                metrics replace this checklist once your first ingestion source
-                is reporting events. (AI Gateway traffic shows in{" "}
-                <Link href="/gateway/usage">Gateway → Usage</Link>; this
-                dashboard rolls up signals from ingestion sources beyond the
-                gateway.)
-              </Text>
-            </VStack>
-            <VStack align="stretch" gap={2}>
-              <SetupItem
-                done={hasCatalogTiles}
-                missingPermission={
-                  canReadCatalog ? undefined : "aiTools:manage"
-                }
-                title="Add tools to the catalog"
-                description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
-                href="/governance/inventory?tab=catalog"
-                ctaLabel={
-                  hasCatalogTiles
-                    ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
-                    : "Add tools to the catalog"
-                }
-              />
-              <SetupItem
-                done={hasPolicies}
-                missingPermission={
-                  canReadPolicies ? undefined : "routingPolicies:view"
-                }
-                title="Define a routing policy"
-                description="Tell virtual keys which providers + models to route through."
-                href="/gateway/routing-policies"
-                ctaLabel={
-                  hasPolicies
-                    ? `${policies.length} ${policies.length === 1 ? "policy" : "policies"} configured`
-                    : "Add a routing policy"
-                }
-              />
-              <SetupItem
-                done={hasSources}
-                missingPermission={
-                  canReadSources ? undefined : "ingestionSources:view"
-                }
-                title="Connect an ingestion source"
-                description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/governance/inventory?tab=sources"
-                ctaLabel={
-                  hasSources
-                    ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
-                    : "Add an ingestion source"
-                }
-              />
-              <SetupItem
-                done={hasAnomalyRules}
-                missingPermission={
-                  canReadAnomalyRules ? undefined : "anomalyRules:view"
-                }
-                title="Define anomaly rules"
-                description="Set thresholds that page on-call when activity drifts."
-                href="/governance/anomaly-rules"
-                ctaLabel={
-                  hasAnomalyRules
-                    ? `${anomalyRules.length} rule${anomalyRules.length === 1 ? "" : "s"} configured`
-                    : "Anomaly rules"
-                }
-              />
-            </VStack>
-            <Box marginTop={5}>
-              <InstallCliCard
-                heading="Install the CLI to onboard your team"
-                subline="Members install the CLI on their devices to start using AI tools through LangWatch. Run `langwatch login` after install to authenticate."
-              />
-            </Box>
-          </Box>
-        )}
+        <Box paddingY={{ base: 2, md: 4 }}>
+          <GovernanceHero canManageSources={canManageSources} />
+        </Box>
 
         {!canReadActivity && (
           <SectionCard
@@ -357,12 +259,11 @@ function GovernanceOverviewPage() {
             )}
 
             {/*
-             * Monitoring sections lead the page when populated - admin's
-             * daily-driver answer to "what happened, where, who" without
-             * scrolling past config knobs. Config (CLI session TTL +
-             * content-logging mode) lives below as occasional-touch
-             * controls. Setup checklist + empty-state ingestion-sources
-             * placeholder render above when there's no traffic yet.
+             * Monitoring sections follow the hero when populated - the
+             * admin's daily-driver answer to "what happened, where, who"
+             * without scrolling past config knobs. Config (CLI session TTL)
+             * lives below as an occasional-touch control. With no traffic
+             * yet there is nothing honest to draw, so the figures wait.
              */}
 
             {hasTraffic && (
@@ -384,88 +285,105 @@ function GovernanceOverviewPage() {
               </SectionCard>
             )}
 
-            {teams.length > 0 && (
+            {hasTraffic && teams.length > 0 && (
               <SectionCard title="Spend share across teams">
                 <SpendByTeamBar teams={teams} />
               </SectionCard>
             )}
 
-            <SectionCard
-              title="Top teams by spend"
-              subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
-              actions={
-                teams.length > 0 ? (
-                  <Link href="/governance/teams" color="blue.600" fontSize="sm">
-                    View all teams →
-                  </Link>
-                ) : null
-              }
-            >
-              {teams.length === 0 ? (
-                <Text color="fg.muted" fontSize="sm">
-                  No team activity this window.
-                </Text>
-              ) : (
-                <VStack align="stretch" gap={0}>
-                  <TeamRowHeader />
-                  {teams.slice(0, 5).map((t) => (
-                    <TeamRow key={t.teamId ?? "org-wide"} team={t} />
-                  ))}
-                </VStack>
-              )}
-            </SectionCard>
+            {hasTraffic && (
+              <>
+                <SectionCard
+                  title="Top teams by spend"
+                  subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
+                  actions={
+                    teams.length > 0 ? (
+                      <Link
+                        href="/governance/teams"
+                        color="blue.600"
+                        fontSize="sm"
+                      >
+                        View all teams →
+                      </Link>
+                    ) : null
+                  }
+                >
+                  {teams.length === 0 ? (
+                    <Text color="fg.muted" fontSize="sm">
+                      No team activity this window.
+                    </Text>
+                  ) : (
+                    <VStack align="stretch" gap={0}>
+                      <TeamRowHeader />
+                      {teams.slice(0, 5).map((t) => (
+                        <TeamRow key={t.teamId ?? "org-wide"} team={t} />
+                      ))}
+                    </VStack>
+                  )}
+                </SectionCard>
 
-            <SectionCard
-              title="Top users by spend"
-              subline="Top 5 LangWatch members ranked by spend (last 30 days)."
-              actions={
-                users.length > 0 ? (
-                  <Link href="/governance/users" color="blue.600" fontSize="sm">
-                    View all users →
-                  </Link>
-                ) : null
-              }
-            >
-              {users.length === 0 ? (
-                <Text color="fg.muted" fontSize="sm">
-                  No active users this window.
-                </Text>
-              ) : (
-                <VStack align="stretch" gap={0}>
-                  <UserRowHeader />
-                  {users.slice(0, 5).map((u) => (
-                    <UserRow key={u.actor} user={u} />
-                  ))}
-                </VStack>
-              )}
-            </SectionCard>
+                <SectionCard
+                  title="Top users by spend"
+                  subline="Top 5 LangWatch members ranked by spend (last 30 days)."
+                  actions={
+                    users.length > 0 ? (
+                      <Link
+                        href="/governance/users"
+                        color="blue.600"
+                        fontSize="sm"
+                      >
+                        View all users →
+                      </Link>
+                    ) : null
+                  }
+                >
+                  {users.length === 0 ? (
+                    <Text color="fg.muted" fontSize="sm">
+                      No active users this window.
+                    </Text>
+                  ) : (
+                    <VStack align="stretch" gap={0}>
+                      <UserRowHeader />
+                      {users.slice(0, 5).map((u) => (
+                        <UserRow key={u.actor} user={u} />
+                      ))}
+                    </VStack>
+                  )}
+                </SectionCard>
 
-            <SectionCard
-              title="Spend by department"
-              subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
-              actions={
-                <Link href="/governance/people" color="blue.600" fontSize="sm">
-                  Manage departments →
-                </Link>
-              }
-            >
-              {departments.length === 0 ? (
-                <Text color="fg.muted" fontSize="sm">
-                  No spend to attribute this window. Assign people, teams, and
-                  projects to departments to compare spend across the org.
-                </Text>
-              ) : (
-                <VStack align="stretch" gap={0}>
-                  <DepartmentRowHeader />
-                  {departments.map((c) => (
-                    <DepartmentRow
-                      key={c.departmentId ?? "unassigned"}
-                      department={c}
-                    />
-                  ))}
-                </VStack>
-              )}
-            </SectionCard>
+                <SectionCard
+                  title="Spend by department"
+                  subline="Spend grouped by department across every project in the org, including personal AI use (last 30 days)."
+                  actions={
+                    <Link
+                      href="/governance/people"
+                      color="blue.600"
+                      fontSize="sm"
+                    >
+                      Manage departments →
+                    </Link>
+                  }
+                >
+                  {departments.length === 0 ? (
+                    <Text color="fg.muted" fontSize="sm">
+                      No spend to attribute this window. Assign people, teams,
+                      and projects to departments to compare spend across the
+                      org.
+                    </Text>
+                  ) : (
+                    <VStack align="stretch" gap={0}>
+                      <DepartmentRowHeader />
+                      {departments.map((c) => (
+                        <DepartmentRow
+                          key={c.departmentId ?? "unassigned"}
+                          department={c}
+                        />
+                      ))}
+                    </VStack>
+                  )}
+                </SectionCard>
+              </>
+            )}
 
             <SectionCard
               title="Recent anomalies"
@@ -498,10 +416,7 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link
-                      href="/governance/inventory?tab=sources"
-                      color="blue.600"
-                    >
+                    <Link href={INVENTORY_SOURCES_HREF} color="blue.600">
                       + Add a source
                     </Link>
                   )}
@@ -516,6 +431,13 @@ function GovernanceOverviewPage() {
             </SectionCard>
           </>
         )}
+
+        <SectionCard
+          title="Onboard your team"
+          subline="Members install the CLI on their devices to start using AI tools through LangWatch."
+        >
+          <InstallCliCard compact />
+        </SectionCard>
 
         <SessionPolicySection
           organizationId={orgId}
@@ -663,75 +585,6 @@ function SessionPolicyForm({
         />
       )}
     </VStack>
-  );
-}
-
-function SetupItem({
-  done,
-  title,
-  description,
-  href,
-  ctaLabel,
-  upcoming,
-  missingPermission,
-}: {
-  done: boolean;
-  title: string;
-  description: string;
-  href: string;
-  ctaLabel: string;
-  upcoming?: boolean;
-  /**
-   * The grant this step's state is read with, when the viewer does not hold
-   * it. A tick or a count is a claim about the organization, and the viewer
-   * who cannot read the resource gets the name of the grant instead of a
-   * claim we did not earn.
-   */
-  missingPermission?: Permission;
-}) {
-  const isDone = done && !missingPermission;
-  return (
-    <HStack
-      borderWidth="1px"
-      borderColor={isDone ? "green.200" : "border.muted"}
-      borderRadius="sm"
-      padding={3}
-      gap={3}
-      alignItems="start"
-      opacity={upcoming ? 0.7 : 1}
-    >
-      <Box
-        color={isDone ? "green.500" : "fg.muted"}
-        paddingTop="2px"
-        aria-hidden="true"
-      >
-        {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-      </Box>
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <HStack gap={2}>
-          <Text fontSize="sm" fontWeight="medium">
-            {title}
-          </Text>
-          {upcoming && (
-            <Badge size="sm" variant="surface" colorPalette="gray">
-              Coming soon
-            </Badge>
-          )}
-        </HStack>
-        <Text fontSize="xs" color="fg.muted">
-          {description}
-        </Text>
-      </VStack>
-      {missingPermission ? (
-        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-          Needs {missingPermission}
-        </Text>
-      ) : (
-        <Link href={href} color="blue.600">
-          {ctaLabel}
-        </Link>
-      )}
-    </HStack>
   );
 }
 

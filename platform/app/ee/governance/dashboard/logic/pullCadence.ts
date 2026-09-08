@@ -215,6 +215,33 @@ export function summarizePullCadence(parts: PullCadenceParts): string {
 }
 
 /**
+ * The cadence as a few words for a table cell ("Every 15 minutes", "Daily
+ * at 03:00 UTC"), or null when the source has no schedule. A cron outside
+ * the four shapes the picker speaks reads "Custom schedule" rather than the
+ * raw expression: the cell says that a schedule exists, the edit drawer
+ * says what it is.
+ */
+export function shortPullCadence(
+  cron: string | null | undefined,
+): string | null {
+  if (!cron || cron.trim() === "") return null;
+  const parts = partsFromPullCron(cron);
+  if (!parts) return "Custom schedule";
+  switch (parts.frequency) {
+    case "minutes":
+      return `Every ${parts.everyMinutes} minutes`;
+    case "hourly":
+      return parts.minute === 0
+        ? "Hourly"
+        : `Hourly at ${parts.minute} minutes past`;
+    case "daily":
+      return `Daily at ${timeOfDay(parts)} UTC`;
+    case "weekly":
+      return `Weekly on ${WEEKDAYS[parts.dayOfWeek] ?? "a weekday"} at ${timeOfDay(parts)} UTC`;
+  }
+}
+
+/**
  * Why this cron can't be saved, or null when it's fine. Mirrors the server's
  * `pullScheduleSchema` — five fields, croner parse, AND a reachable next run
  * (the server computes next-run-at and refuses a cron that never fires, e.g.

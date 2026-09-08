@@ -1,8 +1,10 @@
 import {
+  Badge,
   Box,
   Button,
   Heading,
   HStack,
+  SimpleGrid,
   Spinner,
   Text,
   VStack,
@@ -19,9 +21,9 @@ import {
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
   arrayMove,
+  rectSortingStrategy,
   SortableContext,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -35,7 +37,12 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { AiToolEntry } from "~/components/me/tiles/types";
+import { TileIcon } from "~/components/me/tiles/TileIcon";
+import type {
+  AiToolEntry,
+  CodingAssistantConfig,
+  ExternalToolConfig,
+} from "~/components/me/tiles/types";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
@@ -48,6 +55,13 @@ const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",
   model_provider: "Model providers",
   external_tool: "Internal tools",
+};
+
+/** The one-tile form of each section heading, for the card's type badge. */
+const TYPE_LABELS: Record<AiToolEntry["type"], string> = {
+  coding_assistant: "Coding assistant",
+  model_provider: "Model provider",
+  external_tool: "Internal tool",
 };
 
 const SECTION_ORDER: AiToolEntry["type"][] = [
@@ -454,11 +468,14 @@ function SortableSection({
     >
       <SortableContext
         items={items.map((e) => e.id)}
-        strategy={verticalListSortingStrategy}
+        strategy={rectSortingStrategy}
       >
-        <VStack align="stretch" gap={1}>
+        {/* Sized to the container, not the viewport: with the assistant
+            panel open the pane is half the window, and three fixed
+            columns would squeeze every name into an ellipsis. */}
+        <SimpleGrid minChildWidth="260px" gap={3}>
           {items.map((entry) => (
-            <SortableCatalogRow
+            <SortableCatalogCard
               key={entry.id}
               entry={entry}
               departmentNameById={departmentNameById}
@@ -468,13 +485,13 @@ function SortableSection({
               isPending={togglePendingId === entry.id}
             />
           ))}
-        </VStack>
+        </SimpleGrid>
       </SortableContext>
     </DndContext>
   );
 }
 
-function SortableCatalogRow({
+function SortableCatalogCard({
   entry,
   departmentNameById,
   onEdit,
@@ -506,7 +523,7 @@ function SortableCatalogRow({
   };
 
   return (
-    <CatalogRow
+    <CatalogCard
       entry={entry}
       departmentNameById={departmentNameById}
       onEdit={onEdit}
@@ -546,7 +563,31 @@ function scopeChipsFor(
   }));
 }
 
-function CatalogRow({
+/**
+ * The CLI path policy a coding-assistant tile carries, in the words the
+ * tile drawer uses for the two switches. Both default to allowed when the
+ * config does not say (the same reading `cliBootstrap` makes).
+ */
+export function cliPathsLine(entry: AiToolEntry): string | null {
+  if (entry.type !== "coding_assistant") return null;
+  const config = entry.config as CodingAssistantConfig;
+  const gateway = config.allowVk !== false;
+  const direct = config.allowOtelDirect !== false;
+  if (gateway && direct) return "CLI paths: gateway · direct";
+  if (gateway) return "CLI paths: gateway only";
+  if (direct) return "CLI paths: direct only";
+  return "CLI paths: none";
+}
+
+/** The one line under the scope chips that says what the tile points at. */
+function detailLine(entry: AiToolEntry): string | null {
+  if (entry.type === "external_tool") {
+    return (entry.config as ExternalToolConfig).linkUrl || null;
+  }
+  return cliPathsLine(entry);
+}
+
+function CatalogCard({
   entry,
   departmentNameById,
   onEdit,
@@ -569,72 +610,104 @@ function CatalogRow({
   dragListeners?: SyntheticListenerMap;
   dragAttributes?: DraggableAttributes;
 }) {
+  const detail = detailLine(entry);
   return (
-    <HStack
+    <VStack
       ref={dragRef}
       style={style}
+      align="stretch"
+      gap={3}
       borderWidth="1px"
       borderColor="border.muted"
-      borderRadius="sm"
-      padding={2}
-      gap={2}
+      borderRadius="md"
+      padding={4}
       backgroundColor="bg.panel"
-      data-testid={`catalog-row-${entry.id}`}
+      data-testid={`catalog-card-${entry.id}`}
     >
-      <Box
-        color="fg.muted"
-        cursor="grab"
-        {...(dragListeners ?? {})}
-        {...(dragAttributes ?? {})}
-        aria-label="Drag to reorder"
-      >
-        <GripVertical size={16} />
-      </Box>
-      <Text fontSize="sm" flex={1} fontWeight="medium">
-        {entry.displayName}
-      </Text>
+      <HStack alignItems="start" gap={2}>
+        <Box
+          color="fg.muted"
+          cursor="grab"
+          paddingTop="2px"
+          {...(dragListeners ?? {})}
+          {...(dragAttributes ?? {})}
+          aria-label="Drag to reorder"
+        >
+          <GripVertical size={16} />
+        </Box>
+        <VStack align="start" gap={1} flex={1} minWidth={0}>
+          <Text fontSize="sm" fontWeight="semibold" lineClamp={2}>
+            {entry.displayName}
+          </Text>
+          <HStack gap={1} wrap="wrap">
+            <Badge size="sm" variant="surface">
+              {TYPE_LABELS[entry.type]}
+            </Badge>
+            {!entry.enabled && (
+              <Badge size="sm" variant="surface" colorPalette="gray">
+                Disabled
+              </Badge>
+            )}
+          </HStack>
+        </VStack>
+        <TileIcon
+          iconAsset={entry.iconAsset}
+          iconKey={entry.iconKey}
+          type={entry.type}
+          size={32}
+        />
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Actions for ${entry.displayName}`}
+            >
+              <MoreVertical size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="edit"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Pencil size={14} /> Edit
+            </Menu.Item>
+            <Menu.Item
+              value="toggle"
+              disabled={isPending}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleEnabled();
+              }}
+            >
+              <Power size={14} /> {entry.enabled ? "Disable" : "Enable"}
+            </Menu.Item>
+            <Menu.Item
+              value="delete"
+              color="red.500"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 size={14} /> Delete
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </HStack>
       <ProviderScopeChips
         size="xs"
         scopes={scopeChipsFor(entry, departmentNameById)}
       />
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <Button variant="ghost" size="xs" aria-label="Tile actions">
-            <MoreVertical size={14} />
-          </Button>
-        </Menu.Trigger>
-        <Menu.Content>
-          <Menu.Item
-            value="edit"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit();
-            }}
-          >
-            <Pencil size={14} /> Edit
-          </Menu.Item>
-          <Menu.Item
-            value="toggle"
-            disabled={isPending}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleEnabled();
-            }}
-          >
-            <Power size={14} /> {entry.enabled ? "Disable" : "Enable"}
-          </Menu.Item>
-          <Menu.Item
-            value="delete"
-            color="red"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Trash2 size={14} /> Delete
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Root>
-    </HStack>
+      {detail && (
+        <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+          {detail}
+        </Text>
+      )}
+    </VStack>
   );
 }
