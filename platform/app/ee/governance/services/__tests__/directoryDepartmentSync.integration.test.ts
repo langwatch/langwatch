@@ -17,7 +17,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-
+import { DepartmentService } from "../department/department.service";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import { DIRECTORY_REPORT_ACTION } from "../pullers/microsoftGraphDirectory";
 import type { NormalizedPullEvent } from "../pullers/pullerAdapter";
@@ -203,6 +203,51 @@ describe("Feature: directory departments land on the entities we already have", 
 
     expect(outcome.assigned).toBe(1);
     expect((await membership(jonasUserId)).departmentId).not.toBeNull();
+  });
+
+  describe("given directory and confirmed email evidence name different members", () => {
+    /** @scenario "Conflicting directory and confirmed email proof changes no department" */
+    it("leaves both assignments and their histories untouched", async () => {
+      const departmentService = DepartmentService.create(prisma);
+      for (const [userId, name] of [
+        [mariaUserId, "Engineering"],
+        [jonasUserId, "Operations"],
+      ] as const) {
+        const department = await departmentService.resolveByNameOrCreate({
+          organizationId,
+          name,
+        });
+        await departmentService.assignUser({
+          organizationId,
+          userId,
+          departmentId: department.id,
+        });
+      }
+      const readState = async () => ({
+        maria: await membership(mariaUserId),
+        jonas: await membership(jonasUserId),
+        history: await prisma.departmentMembershipHistory.findMany({
+          where: { organizationId },
+          orderBy: { id: "asc" },
+        }),
+        departments: await departments(),
+      });
+      const before = await readState();
+
+      const outcome = await service().applyDirectoryEvents({
+        organizationId,
+        events: [
+          directoryEvent({
+            actor: JONAS_OID,
+            mail: `m.silva-${ns}@acme.test`,
+            department: "Conflicting New Department",
+          }),
+        ],
+      });
+
+      expect(outcome.assigned).toBe(0);
+      expect(await readState()).toEqual(before);
+    });
   });
 
   /** @scenario "A directory row proving no member assigns nobody" */

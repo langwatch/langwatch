@@ -163,6 +163,35 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("the department filter", () => {
+  describe("given real totals and activity in two departments", () => {
+    /** @scenario "The department filter explains that it changes only the department chart" */
+    it("names its panel-only scope and leaves totals and user costs unchanged", async () => {
+      renderScreen();
+      const userPanel = () =>
+        screen.getByText("Cost by user").closest('[data-testid="cost-panel"]')
+          ?.textContent;
+      const originalUserPanel = userPanel();
+      expect(originalUserPanel).toContain("ada@acme.test");
+      expect(screen.getByText("$123.45")).toBeInTheDocument();
+      expect(screen.getByText("$67.89")).toBeInTheDocument();
+
+      await pickFilter("Department", "Engineering");
+
+      expect(
+        screen.getByText(
+          "Department filters only the Cost by department chart.",
+        ),
+      ).toBeInTheDocument();
+      const departmentPanel = screen
+        .getByText("Cost by department")
+        .closest('[data-testid="cost-panel"]');
+      expect(departmentPanel?.textContent).toContain("Engineering");
+      expect(departmentPanel?.textContent).not.toContain("Support");
+      expect(screen.getByText("$123.45")).toBeInTheDocument();
+      expect(screen.getByText("$67.89")).toBeInTheDocument();
+      expect(userPanel()).toBe(originalUserPanel);
+    });
+  });
   describe("given a department is selected and the window then drops it", () => {
     it("never labels the chip all departments while still filtering by one", async () => {
       renderScreen();

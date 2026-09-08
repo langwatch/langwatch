@@ -70,11 +70,11 @@ export const FRONTEND_FEATURE_FLAGS = [
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
-  // The Costs and Billed pages + their governance nav items. Composed ON
+  // Costs and the Platform preview pages + their governance nav items. Composed ON
   // TOP of `release_ui_ai_governance_enabled` (never instead of it): the
   // section flag off still hides everything. Off by default. Costs renders
-  // the real cost lanes (ADR-128 wave 1); Billed is still a placeholder
-  // shipped ahead of its view. See
+  // the real cost lanes (ADR-128); the unfinished Billed address stays
+  // unavailable even when enabled. See
   // specs/ai-gateway/governance/governance-home-routing.feature and
   // specs/governance/governance-cost-screen.feature.
   "release_ui_governance_billed_cost_enabled",

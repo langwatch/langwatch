@@ -11,9 +11,10 @@
  * through the identical two calls — no parallel department shape, no free
  * text on the person row.
  *
- * Who a row may assign is decided by the match engine's own proof standard,
- * through the same account index (`loadAccountIndex`): the directory id the
- * org's SSO connection recorded, or an address a member has CONFIRMED. An
+ * Assignment uses the match engine's conflict rule and account index
+ * (`loadAccountIndex`): the directory id the org's SSO connection recorded,
+ * or an address a member has CONFIRMED. Directory-only assignment remains
+ * supported here; opening an identity link has a stricter evidence rule. An
  * unconfirmed address is a claim anyone can type in, and two candidates are
  * a contradiction, not a coin toss — both assign nobody.
  *
@@ -40,7 +41,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { DepartmentService } from "./department/department.service";
 import { IdentityMatchService } from "./identityMatch.service";
 import {
-  normalizeEmail,
+  decideMatch,
   type OrganizationAccountIndex,
 } from "./logic/identityEvidence";
 import { DIRECTORY_REPORT_ACTION } from "./pullers/microsoftGraphDirectory";
@@ -182,10 +183,9 @@ export class DirectoryDepartmentSyncService {
 /**
  * The one member a directory row proves, or null.
  *
- * The directory id is checked first — it is the identifier the row IS keyed
- * by — and the confirmed address second. Either way, exactly one candidate
- * or nobody: the engine suspends automatic linking on a contradiction, and
- * an assignment must not out-run the engine's own caution.
+ * Conflicting proof is rejected before choosing either identifier. Otherwise
+ * keep directory-only assignment: the match engine's no-action result means
+ * "do not open an identity link", not "discard the directory's department".
  */
 function provenUserId({
   row,
@@ -194,12 +194,15 @@ function provenUserId({
   row: NormalizedPullEvent;
   accounts: OrganizationAccountIndex;
 }): string | null {
+  const decision = decideMatch({
+    identity: { rawActorId: row.actor, displayText: extraString(row, "mail") },
+    accounts,
+  });
+  if (decision.outcome === "suspend") return null;
+
   const byDirectory = accounts.usersByDirectoryId.get(row.actor) ?? [];
   if (byDirectory.length === 1) return byDirectory[0] ?? null;
   if (byDirectory.length > 1) return null;
 
-  const mailKey = normalizeEmail(extraString(row, "mail"));
-  if (mailKey === null) return null;
-  const byMail = accounts.usersByVerifiedEmail.get(mailKey) ?? [];
-  return byMail.length === 1 ? (byMail[0] ?? null) : null;
+  return decision.outcome === "link" ? decision.userId : null;
 }

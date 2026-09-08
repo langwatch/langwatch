@@ -3,8 +3,11 @@ Feature: Governance home — route, nav promotion, persona detection
   daily-use org-scoped home), NOT under Settings. The whole family
   lives there: `/governance/inventory*`, `/governance/anomaly-rules`,
   `/governance/people`, and — behind the
-  `release_ui_governance_billed_cost_enabled` flag — `/governance/costs`
-  and `/governance/billed`. Routing policies are gateway behavior and
+  `release_ui_governance_billed_cost_enabled` flag — `/governance/costs`,
+  and the Platform placeholders
+  `/governance/insights`, `/governance/analytics` and
+  `/governance/signals`. The unfinished `/governance/billed` address
+  stays unavailable even with that flag on. Routing policies are gateway behavior and
   live at `/gateway/routing-policies` instead. The legacy
   `/settings/governance*` and `/settings/routing-policies` addresses
   redirect permanently to the new ones
@@ -173,7 +176,9 @@ Feature: Governance home — route, nav promotion, persona detection
   Scenario: The inventory family is exempt from the no-organization onboarding bouncer
     Given a session that belongs to no organization yet
     When it sits on "/governance/inventory", "/governance/inventory/<id>",
-      "/governance/people", "/governance/costs" or "/governance/billed"
+      "/governance/people", "/governance/costs", "/governance/billed",
+      "/governance/insights", "/governance/analytics" or
+      "/governance/signals"
     Then the route is recognized as bouncer-exempt, like every sibling
       governance route, instead of bouncing to "/onboarding/welcome"
     # The bounce fires only for zero-ORG sessions (an org with zero
@@ -288,8 +293,8 @@ Feature: Governance home — route, nav promotion, persona detection
       | Anomaly Rules     | /governance/anomaly-rules                     |
       | People            | /governance/people                            |
     # Tool Tiles is gone from the rail — it lives inside Inventory as
-    # the Catalog tab. Costs and Billed join the rail only when
-    # release_ui_governance_billed_cost_enabled is on (see the
+    # the Catalog tab. Costs and Platform join the rail only when
+    # release_ui_governance_billed_cost_enabled is on; Billed stays absent (see the
     # billed-cost flag section below).
 
   # The former "Admin-authoring sub-routes share the GovernanceLayout chrome"
@@ -311,7 +316,7 @@ Feature: Governance home — route, nav promotion, persona detection
       project=null
 
   # ---------------------------------------------------------------------------
-  # Costs + Billed placeholders — behind release_ui_governance_billed_cost_enabled
+  # Costs release gate; the unfinished Billed destination stays unavailable
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @billed-cost-flag @integration
@@ -331,16 +336,26 @@ Feature: Governance home — route, nav promotion, persona detection
     # still hides every governance surface on its own.
 
   @bdd @ui @governance-home @billed-cost-flag @integration
-  Scenario: With the billed-cost flag on, Costs and Billed appear as placeholders
+  Scenario: With the billed-cost flag on, Costs appears without the unfinished Billed destination
     Given "release_ui_governance_billed_cost_enabled" is enabled
       for the organization
     When the admin looks at the GOVERNANCE rail
-    Then "Costs" (/governance/costs) and "Billed" (/governance/billed)
-      are listed between Overview and Inventory
-    And each page renders its heading
-    # Costs has since grown its real content — the billed/gateway/seat
-    # lanes of specs/governance/governance-cost-screen.feature (ADR-128
-    # wave 1). Billed is still the placeholder shell this scenario was
-    # written for. The scenario TITLE is left verbatim because it is the
-    # parity binding key for sectionNavParity.integration.test.tsx, which
-    # asserts the rail listing and not either page's body.
+    Then "Costs" (/governance/costs) is listed between Overview and Inventory
+    And no "Billed" entry is listed
+    And "Insights" (/governance/insights), "Analytics"
+      (/governance/analytics) and "Signals & Alerts"
+      (/governance/signals) are listed after People, in that order
+    # The three Platform entries ride the same flag on purpose: they are
+    # placeholder screens for the Langy-driven brief, explore and rule
+    # registry that ADR-128's cost work leads into, and they are meant
+    # to be previewed by the same audience that previews Costs. Their
+    # bodies and headings are specified and bound in specs/governance/
+    # governance-platform-placeholders.feature; this scenario pins only
+    # the rail listing, and its binding renders no page.
+
+  @bdd @ui @governance-home @billed-cost-flag @integration
+  Scenario: The unfinished Billed address stays unavailable when Costs is enabled
+    Given "release_ui_governance_billed_cost_enabled" is enabled
+      for the organization
+    When the admin cold-loads "/governance/billed"
+    Then the not-found scene is shown instead of an unfinished page
