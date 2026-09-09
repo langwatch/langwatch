@@ -1146,10 +1146,22 @@ describe("the Anthropic Admin puller", () => {
       expect(message).toContain("costType");
       // …and none of the values, which are customer billing coordinates and
       // money. This string reaches logs and the source's error state.
+      //
+      // The money has to be named in the form the code would actually emit.
+      // `amount` arrives in CENTS, so the fixture rows carry "41280.000000"
+      // and "10000.000000": asserting only the dollar conversions would let
+      // an implementation interpolate the raw provider string and still pass,
+      // which is a guard that cannot fail. Both forms are listed, plus the
+      // bare integers, so neither the pre- nor the post-conversion value can
+      // slip through.
       for (const value of [
         "ws_1",
         "Claude usage",
         "claude-opus-5",
+        "41280.000000",
+        "10000.000000",
+        "41280",
+        "10000",
         "412.80",
         "100.00",
       ]) {
