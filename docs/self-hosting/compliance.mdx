@@ -99,13 +99,14 @@ require Enterprise.
 | Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
 | Art. 30, record of processing | event_log @ 49d retention | Apache 2.0 |
 | Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
-| Art. 33, breach notification | Anomaly rule dispatch, a webhook POST to the rule's destination URL, HMAC-signed when the destination has a shared secret (rules cannot be created in the app today) | **Enterprise** |
+| Art. 33, breach detection and escalation | Anomaly rule dispatch, a webhook POST to the rule's destination URL, HMAC-signed when the destination has a shared secret (rules cannot be created in the app today). This surfaces the event to you; the notification to the supervisory authority and the breach record are yours to make | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
 If your processor agreement requires retention longer than the 49-day
-default OR a named breach-notification mechanism (Art. 33's "without
-undue delay, where feasible, not later than 72 hours"), Enterprise is
-the right tier. Self-hosted, a license is what opens a longer window at
+default OR a named breach-detection mechanism that feeds your Art. 33
+notification (its "without undue delay, where feasible, not later than
+72 hours" clock starts when you become aware), Enterprise is the right
+tier. Self-hosted, a license is what opens a longer window at
 all.
 
 This reaches customers outside the EU as well, but only where Art. 3
