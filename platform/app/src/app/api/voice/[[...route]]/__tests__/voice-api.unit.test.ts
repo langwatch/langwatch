@@ -359,6 +359,29 @@ describe("Feature: Voice session HTTP door", () => {
     });
   });
 
+  describe("given a recording request for a run whose project has no ElevenLabs credential", () => {
+    describe("when the audio proxy is requested", () => {
+      it("answers recording_key_missing and never fetches the provider", async () => {
+        getScenarioRunData.mockResolvedValue({ id: "run_1" });
+        findElevenLabsProviderForProject.mockResolvedValue(null);
+        const upstreamFetch = vi.fn();
+        vi.stubGlobal("fetch", upstreamFetch);
+
+        // finally so a failing assertion cannot leak the stub onto later tests (isolate: false)
+        try {
+          const res = await app.request(
+            `/api/voice/session/conv_1/audio?projectId=${PROJECT_ID}`,
+          );
+          expect(res.status).toBe(404);
+          expect((await res.json()).error).toBe("voice_recording_key_missing");
+          expect(upstreamFetch).not.toHaveBeenCalled();
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
+    });
+  });
+
   describe("given a recording request for a conversation with a run", () => {
     describe("when the audio proxy is requested", () => {
       /** @scenario "The finished call plays its recording through the same-origin proxy url" */

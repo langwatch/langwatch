@@ -88,7 +88,6 @@ describe("AgentTypeSelectorDrawer", () => {
           expect(screen.getByText("Code Agent")).toBeInTheDocument();
           expect(screen.getByText("Workflow Agent")).toBeInTheDocument();
         });
-        // Prompt Agent should no longer exist
         expect(screen.queryByText("Prompt Agent")).not.toBeInTheDocument();
       });
 

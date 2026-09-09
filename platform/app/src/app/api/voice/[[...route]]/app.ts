@@ -64,11 +64,15 @@ const transportSchema = z.enum(
  * reads exactly like the drawer and run dialog do — never a 403 that would
  * leak that the door exists at all, AC29).
  */
-async function requireProject(
-  req: Request,
-  projectId: string,
-  permission: "scenarios:create" | "scenarios:view",
-): Promise<void> {
+async function requireProject({
+  req,
+  projectId,
+  permission,
+}: {
+  req: Request;
+  projectId: string;
+  permission: "scenarios:create" | "scenarios:view";
+}): Promise<void> {
   const session = await getServerAuthSession({ req });
   if (!session) throw new VoiceUnauthenticatedError();
   const allowed = await probeProjectPermission(
@@ -103,7 +107,11 @@ secured
     ),
     async (c) => {
       const { projectId, transport, agentId, agentRowId } = c.req.valid("json");
-      await requireProject(c.req.raw, projectId, "scenarios:create");
+      await requireProject({
+        req: c.req.raw,
+        projectId,
+        permission: "scenarios:create",
+      });
 
       const result = await mintVoiceSession({
         ports,
@@ -155,7 +163,11 @@ secured
     ),
     async (c) => {
       const body = c.req.valid("json");
-      await requireProject(c.req.raw, body.projectId, "scenarios:create");
+      await requireProject({
+        req: c.req.raw,
+        projectId: body.projectId,
+        permission: "scenarios:create",
+      });
 
       // The token must verify, and its project must be the authorised one, or
       // the finish is refused before anything is read or written.
@@ -203,7 +215,11 @@ export const route = secured
     async (c) => {
       const { conversationId } = c.req.valid("param");
       const { projectId } = c.req.valid("query");
-      await requireProject(c.req.raw, projectId, "scenarios:view");
+      await requireProject({
+        req: c.req.raw,
+        projectId,
+        permission: "scenarios:view",
+      });
 
       // Only proxy when a run for this conversation exists in the authorised
       // project — otherwise one project could stream another's recording.
