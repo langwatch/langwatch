@@ -212,9 +212,15 @@ function SourceTableRow({
                 </Text>
               </Link>
             )}
-            <Text fontSize="xs" color="fg.muted">
-              {typeLabel}
-            </Text>
+            {/* The type sits under the name to say what a source the admin
+                named "Anthropic spend" actually is. A source named after its
+                own type has nothing left to explain, so the line is dropped
+                rather than printed twice. */}
+            {typeLabel !== source.name && (
+              <Text fontSize="xs" color="fg.muted">
+                {typeLabel}
+              </Text>
+            )}
           </VStack>
         </HStack>
       </Table.Cell>

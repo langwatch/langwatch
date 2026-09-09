@@ -180,6 +180,40 @@ describe("given the ingestion sources table", () => {
     });
   });
 
+  describe("when a source is named after its own type", () => {
+    /**
+     * The sample rows are exactly this shape — they carry the catalog's label
+     * as the name — so without the guard the Sources tab printed every
+     * connector's name twice, one line above the other.
+     *
+     * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
+     */
+    /** @scenario "A source named after its own type does not say so twice" */
+    it("writes the type once", () => {
+      renderTable({
+        sources: [
+          makeSource({
+            id: "src-named-after-type",
+            name: "Workato",
+            sourceType: "workato",
+          }),
+        ],
+      });
+
+      const row = screen.getByTestId("source-row-src-named-after-type");
+      expect(within(row).getAllByText("Workato")).toHaveLength(1);
+    });
+
+    /** @scenario "A source named after its own type does not say so twice" */
+    it("still writes the type under a name of the admin's own", () => {
+      renderTable({ sources: [WORKATO] });
+
+      const row = screen.getByTestId("source-row-src-workato");
+      expect(within(row).getByText("Workato prod")).toBeVisible();
+      expect(within(row).getByText("Workato")).toBeVisible();
+    });
+  });
+
   describe("when the viewer cannot manage sources", () => {
     /** @scenario "Row actions live in the overflow menu" */
     it("renders no row actions at all", () => {

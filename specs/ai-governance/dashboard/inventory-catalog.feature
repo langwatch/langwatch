@@ -264,6 +264,38 @@ Feature: The Inventory catalog is the tools the organization runs
     When the Catalog pane renders
     Then each card carries the sample badge
 
+  @unit
+  Scenario: Sample sources are the connectors the product offers, named as the menu names them
+    Given sample mode is on
+    When the sample sources are worked out
+    Then every row is a source type the Add source menu offers
+    And each row carries that type's catalog name rather than one coined for the sample
+    # The rows used to be built from the sample TOOL cards, so the Sources tab
+    # listed a "ChatGPT Enterprise" connector and a "Custom Agents" one.
+    # Neither is a thing anyone can connect, and a reader who switched the
+    # samples off and opened Add source found none of what they had just been
+    # shown. Sample data may invent an INSTANCE — whether this organization's
+    # connection is healthy, when data last arrived — never a source type and
+    # never a name for one.
+
+  @unit
+  Scenario: A retired source type is offered as a sample no more than it is offered for real
+    Given a source type the catalog has retired
+    When the sample sources are worked out
+    Then no sample row is on that type
+    # One filter, read by the Add source menu and by the sample alike. Two
+    # would let a retired connector come back on one screen after being pulled
+    # from the other.
+
+  @integration
+  Scenario: A source named after its own type does not say so twice
+    Given a source whose name is the name of its type
+    When its row renders
+    Then the type is written once
+    # The type sits under the name to say what a source somebody called
+    # "Anthropic spend" actually is. A source named after its own type has
+    # nothing left to explain.
+
   @integration
   Scenario: A failed read raises no alert while sample mode is on
     Given the source list failed to load

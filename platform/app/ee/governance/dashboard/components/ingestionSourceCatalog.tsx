@@ -285,6 +285,19 @@ export function routesConversations(sourceType: SourceType): boolean {
   return option?.routesConversations === true;
 }
 
+/**
+ * The source types the product actually offers today, in catalog order.
+ *
+ * The one place a retired type is filtered out, so every surface asking "what
+ * can a customer have" gets the same answer: the Add source menu through
+ * `gatedSourceTypeOptions`, and the Sources tab's sample rows through
+ * `sampleIngestionSources`. A second filter written at a callsite is how a
+ * retired type reappears on one screen after being pulled from another.
+ */
+export function offeredSourceTypeOptions(): SourceTypeOption[] {
+  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated);
+}
+
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
   locked: boolean;
@@ -303,12 +316,10 @@ export function gatedSourceTypeOptions({
 }: {
   isEnterprise: boolean;
 }): GatedSourceTypeOption[] {
-  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated).map(
-    (option) => ({
-      ...option,
-      locked: !isEnterprise && option.value !== "otel_generic",
-    }),
-  );
+  return offeredSourceTypeOptions().map((option) => ({
+    ...option,
+    locked: !isEnterprise && option.value !== "otel_generic",
+  }));
 }
 
 /**
