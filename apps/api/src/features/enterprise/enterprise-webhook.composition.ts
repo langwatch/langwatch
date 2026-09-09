@@ -5,7 +5,7 @@
  * See ADR candidate: webhook plan-gate independence, comment-sweep plan.
  */
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { WebhookAccessService, WebhookApp } from "@langwatch/enterprise-api/webhooks";
+import { WebhookAccessService, WebhookApp } from "@langwatch/webhook-server";
 
 /**
  * The slice's application, gated on the deployment's own plan provider. Without
@@ -21,11 +21,7 @@ export function composeApiWebhookApplication(options: {
 
   const access = WebhookAccessService.create(plans);
 
-  return WebhookApp.create({
-    endpoints: webhooks.endpoints,
-    health: webhooks.health,
-    events: webhooks.events,
-    assertEndpointsEntitled: (organizationId) => access.assertEndpointsAvailable(organizationId),
-    dispatch: (input) => webhooks.dispatch(input),
-  });
+  return webhooks.withEntitlement((organizationId) =>
+    access.assertEndpointsAvailable(organizationId),
+  );
 }
