@@ -23,8 +23,9 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "safe-regex2": "^5.1.1",
     "zod": "^4.4.3"
   },

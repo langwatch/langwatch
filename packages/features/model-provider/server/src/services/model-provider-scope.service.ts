@@ -1,6 +1,6 @@
-import type { OrganizationService, OrganizationTeam } from "@langwatch/organization-contract";
+import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import {
   ModelProviderProjectScopeService,
@@ -27,14 +27,14 @@ export type { ModelProviderProjectSystemContext };
 
 export class ModelProviderScopeService {
   private constructor(
-    private readonly projects: ProjectService,
-    private readonly organizations: OrganizationService,
+    private readonly projects: ProjectApi,
+    private readonly organizations: OrganizationApi,
     private readonly projectScopeFacts: ModelProviderProjectScopeService,
   ) {}
 
   static create(options: {
-    projects: ProjectService;
-    organizations: OrganizationService;
+    projects: ProjectApi;
+    organizations: OrganizationApi;
   }): ModelProviderScopeService {
     return new ModelProviderScopeService(
       options.projects,

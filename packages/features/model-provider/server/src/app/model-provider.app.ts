@@ -25,39 +25,49 @@
  */
 import {
   CODEX_DEFAULT_MODEL,
+  ModelProviderApi,
+  type ModelCostDeleteRequest,
+  type ModelCostWriteRequest,
+  type ModelDefaultAssignmentRequest,
+  type ModelDefaultConfigWriteRequest,
+  type ModelDefaultDeleteRequest,
+  type ModelDefaultSnapshotRequest,
+  type ModelProviderCaller,
+  type ModelProviderDeleteRequest,
+  type ModelProviderTestConnectionRequest,
+  type ModelProviderWriteRequest,
   type ModelCost,
-  type ModelCostDeleteInput,
+  type ModelCostEstimateInput,
   type ModelCostListInput,
-  type ModelCostWriteInput,
-  type ModelDefaultAssignmentInput,
+  type ModelDefaultApiKeyScopeCheck,
   type ModelDefaultConfig,
-  type ModelDefaultConfigWriteInput,
-  type ModelDefaultDeleteInput,
   type ModelDefaultEffective,
   type ModelDefaultInheritedValues,
   type ModelDefaultResolveInput,
   type ModelDefaultScope,
   type ModelDefaultSnapshot,
-  type ModelDefaultSnapshotInput,
   type ModelProvider,
+  type ModelProviderAlternateResolution,
+  type ModelProviderApiKeyValidation,
+  type ModelProviderApiKeyValidationInput,
+  type ModelProviderCodexGatewayRefresh,
+  type ModelProviderCodexGatewayRefreshInput,
   type ModelProviderCodexStatus,
   type ModelProviderCodexStatusInput,
   type ModelProviderCredentialVerdict,
-  type ModelProviderDeleteInput,
+  type ModelProviderExecution,
+  type ModelProviderExecutionParameters,
+  type ModelProviderExecutionPrepareInput,
   type ModelProviderListOrganizationInput,
   type ModelProviderListProjectInput,
+  type ModelProviderResolution,
   type ModelProviderService,
   type ModelProviderSummary,
-  type ModelProviderTestConnectionInput,
-  type ModelProviderWriteInput,
   type TranslateInput,
   type TranslateOutput,
 } from "@langwatch/model-provider-contract";
 
-/** Who a write is attributed to. */
-export interface ModelProviderCaller {
-  readonly id: string;
-}
+export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
 
 /**
  * The process's span reader, opaque here. Only the process knows its concrete
@@ -81,7 +91,8 @@ export interface ModelProviderAppDependencies {
  */
 const CODEX_CODING_ROLES = ["LANGY", "FAST"] as const;
 
-export class ModelProviderApp {
+export class ModelProviderApp implements ModelProviderApi {
+  static readonly contract = ModelProviderApi;
   static create(dependencies: ModelProviderAppDependencies): ModelProviderApp {
     return new ModelProviderApp(dependencies);
   }
@@ -97,6 +108,33 @@ export class ModelProviderApp {
     return this.dependencies.modelProviders.getForProject(input);
   }
 
+  tryGetProviderForProject(input: {
+    projectId: string;
+    provider: string;
+  }): Promise<ModelProvider | null> {
+    return this.dependencies.modelProviders.tryGetProviderForProject(input);
+  }
+
+  tryFindRowServingModel(input: {
+    projectId: string;
+    provider: string;
+    model: string;
+  }): Promise<ModelProvider | null> {
+    return this.dependencies.modelProviders.tryFindRowServingModel(input);
+  }
+
+  getExecutionProviders(
+    input: ModelProviderListProjectInput,
+  ): Promise<Record<string, ModelProviderExecution>> {
+    return this.dependencies.modelProviders.getExecutionProviders(input);
+  }
+
+  prepareExecution(
+    input: ModelProviderExecutionPrepareInput,
+  ): Promise<ModelProviderExecutionParameters> {
+    return this.dependencies.modelProviders.prepareExecution(input);
+  }
+
   /** Every stored provider row the project can see, keys masked. */
   listForProject(input: ModelProviderListProjectInput): Promise<ModelProviderSummary[]> {
     return this.dependencies.modelProviders.listForProject(input);
@@ -108,24 +146,27 @@ export class ModelProviderApp {
   }
 
   /** Stores or replaces a provider row, attributed to the caller. */
-  upsert(
-    input: Omit<ModelProviderWriteInput, "actorId">,
-    by: ModelProviderCaller,
-  ): Promise<ModelProvider> {
+  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
     return this.dependencies.modelProviders.upsert({ ...input, actorId: by.id });
   }
 
   /** Removes a provider row, attributed to the caller. */
-  delete(input: Omit<ModelProviderDeleteInput, "actorId">, by: ModelProviderCaller): Promise<void> {
+  delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.delete({ ...input, actorId: by.id });
   }
 
   /** Probes a credential that is already stored, attributed to the caller. */
   testConnection(
-    input: Omit<ModelProviderTestConnectionInput, "actorId">,
+    input: ModelProviderTestConnectionRequest,
     by: ModelProviderCaller,
   ): Promise<ModelProviderCredentialVerdict> {
     return this.dependencies.modelProviders.testConnection({ ...input, actorId: by.id });
+  }
+
+  validateApiKey(
+    input: ModelProviderApiKeyValidationInput,
+  ): Promise<ModelProviderApiKeyValidation> {
+    return this.dependencies.modelProviders.validateApiKey(input);
   }
 
   /**
@@ -161,6 +202,12 @@ export class ModelProviderApp {
     return this.dependencies.modelProviders.getCodexStatus(input);
   }
 
+  refreshCodexForGateway(
+    input: ModelProviderCodexGatewayRefreshInput,
+  ): Promise<ModelProviderCodexGatewayRefresh> {
+    return this.dependencies.modelProviders.refreshCodexForGateway(input);
+  }
+
   /**
    * Points the coding-assistant roles at the Codex model.
    *
@@ -190,9 +237,21 @@ export class ModelProviderApp {
     return this.dependencies.modelProviders.tryGetResolvedDefault(input);
   }
 
+  resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
+    return this.dependencies.modelProviders.resolveModelForFeature(input);
+  }
+
+  findAlternateModel(input: {
+    projectId: string;
+    featureKey: string;
+    skipFromScope: ModelProviderResolution["scope"];
+  }): Promise<ModelProviderAlternateResolution> {
+    return this.dependencies.modelProviders.findAlternateModel(input);
+  }
+
   /** The Default Models settings page's snapshot, scoped to what the caller may write. */
   getDefaultSnapshot(
-    input: Omit<ModelDefaultSnapshotInput, "actorId">,
+    input: ModelDefaultSnapshotRequest,
     by: ModelProviderCaller,
   ): Promise<ModelDefaultSnapshot> {
     return this.dependencies.modelProviders.getDefaultSnapshot({ ...input, actorId: by.id });
@@ -205,10 +264,7 @@ export class ModelProviderApp {
    * actor of the write — and they are always the same person. Filling both
    * here is what stops a handler filling one and forgetting the other.
    */
-  setDefault(
-    input: Omit<ModelDefaultAssignmentInput, "actorId" | "authorId">,
-    by: ModelProviderCaller,
-  ): Promise<void> {
+  setDefault(input: ModelDefaultAssignmentRequest, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.setDefault({
       ...input,
       authorId: by.id,
@@ -218,7 +274,7 @@ export class ModelProviderApp {
 
   /** Saves a whole default-models config and its scope attachments. */
   saveDefaultConfig(
-    input: Omit<ModelDefaultConfigWriteInput, "actorId" | "authorId">,
+    input: ModelDefaultConfigWriteRequest,
     by: ModelProviderCaller,
   ): Promise<ModelDefaultConfig> {
     return this.dependencies.modelProviders.saveDefaultConfig({
@@ -229,11 +285,16 @@ export class ModelProviderApp {
   }
 
   /** Deletes a default-models config and every scope attachment it holds. */
-  deleteDefaultConfig(
-    input: Omit<ModelDefaultDeleteInput, "actorId">,
-    by: ModelProviderCaller,
-  ): Promise<void> {
+  deleteDefaultConfig(input: ModelDefaultDeleteRequest, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.deleteDefaultConfig({ ...input, actorId: by.id });
+  }
+
+  assertApiKeyMayWriteDefaultScopes(input: ModelDefaultApiKeyScopeCheck): Promise<void> {
+    return this.dependencies.modelProviders.assertApiKeyMayWriteDefaultScopes(input);
+  }
+
+  tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
+    return this.dependencies.modelProviders.tryGetDefaultConfig(input);
   }
 
   /** What the cascade would hand back for these scopes if they held nothing. */
@@ -254,16 +315,17 @@ export class ModelProviderApp {
     return this.dependencies.modelProviders.listCosts(input);
   }
 
+  estimateCost(input: ModelCostEstimateInput): number {
+    return this.dependencies.modelProviders.estimateCost(input);
+  }
+
   /** Writes one cost rule at a scope the caller may manage, attributed to them. */
-  upsertCost(
-    input: Omit<ModelCostWriteInput, "actorId">,
-    by: ModelProviderCaller,
-  ): Promise<ModelCost> {
+  upsertCost(input: ModelCostWriteRequest, by: ModelProviderCaller): Promise<ModelCost> {
     return this.dependencies.modelProviders.upsertCost({ ...input, actorId: by.id });
   }
 
   /** Removes one cost rule, authorized against the STORED row's scope. */
-  deleteCost(input: Omit<ModelCostDeleteInput, "actorId">, by: ModelProviderCaller): Promise<void> {
+  deleteCost(input: ModelCostDeleteRequest, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.deleteCost({ ...input, actorId: by.id });
   }
 

@@ -36,9 +36,9 @@ import {
   type TranslateInput,
   type TranslateOutput,
 } from "@langwatch/model-provider-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type {
   CodexTokenRefresher,
   ModelCostRepository,
@@ -65,15 +65,15 @@ import { ModelProviderResolutionService } from "./model-provider-resolution.serv
 
 export interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;
-  projects: ProjectService;
-  organizations: OrganizationService;
+  projects: ProjectApi;
+  organizations: OrganizationApi;
   credentialPolicy: ModelProviderCredentialPolicy;
   codexTokenRefresher: CodexTokenRefresher;
   connectionRateLimiter: ModelProviderConnectionRateLimiter;
   defaults: ModelDefaultRepository;
   costs: ModelCostRepository;
   catalog: ModelProviderCatalog;
-  authorization: AuthzService;
+  authorization: AuthzApi;
   translation: ModelTranslationPort;
   ids: ModelProviderIdService;
 }

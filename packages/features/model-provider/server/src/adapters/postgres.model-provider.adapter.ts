@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelProviderService as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
@@ -19,12 +19,12 @@ import { ModelProviderKeysService } from "../services/model-provider-keys.servic
 
 export interface PostgresModelProviderAdapterOptions {
   database: PrismaClient;
-  projects: ProjectService;
-  organizations: OrganizationService;
+  projects: ProjectApi;
+  organizations: OrganizationApi;
   catalog: ModelProviderCatalog;
   translation: ModelTranslationPort;
   ids: ModelProviderIdService;
-  authorization: AuthzService;
+  authorization: AuthzApi;
   credentials: ModelProviderCredentialCodec;
   codexTokenRefresher: CodexTokenRefresher;
   connectionRateLimiter: ModelProviderConnectionRateLimiter;

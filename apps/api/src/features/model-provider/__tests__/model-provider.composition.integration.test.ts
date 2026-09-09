@@ -2,12 +2,11 @@
  * The provider surfaces, served by the API process.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { composeApiModelProviderHost } from "../../../app/api-model-provider-host.composition.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
@@ -59,7 +58,7 @@ function composeApplication(options: { host?: ReturnType<typeof realHost> } = {}
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

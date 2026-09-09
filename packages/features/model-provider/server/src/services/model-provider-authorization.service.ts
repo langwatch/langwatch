@@ -1,4 +1,4 @@
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   ModelDefaultScope,
   ModelDefaultApiKeyPrincipal,
@@ -15,9 +15,9 @@ type ModelProviderPermission =
  * Whether an actor may read or write a model-provider scope.
  */
 export class ModelProviderAuthorizationService {
-  private constructor(private readonly authz: AuthzService) {}
+  private constructor(private readonly authz: AuthzApi) {}
 
-  static create(authz: AuthzService): ModelProviderAuthorizationService {
+  static create(authz: AuthzApi): ModelProviderAuthorizationService {
     return new ModelProviderAuthorizationService(authz);
   }
 
