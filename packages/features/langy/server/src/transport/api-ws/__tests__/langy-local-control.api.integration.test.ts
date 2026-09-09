@@ -19,10 +19,10 @@ import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-c
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { UpgradeHandler } from "@langwatch/api";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api.ts";
 import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api.ts";
@@ -99,7 +99,7 @@ const mintedKeys = new Map<string, { apiKeyId: string; userId: string }>();
 const personalKey = { apiKeyId: `apikey_${nanoid(10)}`, userId };
 
 const apiKeys = {
-  async tryResolveToken({ token }: { token: string }): Promise<ResolvedApiKeyToken | null> {
+  async findResolvedToken({ token }: { token: string }): Promise<ResolvedApiKeyCredential | null> {
     // The developer's own key resolves like any other real key: it belongs to
     // a person, and it is simply not the key approving a control request
     // mints. That is what separates "wrong kind" from "not a key at all", and
@@ -125,7 +125,7 @@ const apiKeys = {
       },
     };
   },
-} as unknown as ApiKeyService;
+} as unknown as ApiKeyApi;
 
 /** One `upgrade` listener per pod, the same shape the process router has. */
 function upgradeRouterFor(server: Server) {
@@ -146,7 +146,7 @@ function upgradeRouterFor(server: Server) {
   };
 }
 
-function testPorts(store: AgentStateStorePort) {
+function testPorts(store: SessionStateStore) {
   const runtime = LangyLocalControlRuntimeAdapter.create({
     store,
     projects: { tryReadOrganizationId: async () => organizationId },
@@ -240,7 +240,7 @@ function testPorts(store: AgentStateStorePort) {
 }
 
 async function startPod(): Promise<Pod> {
-  const { runtime, core } = testPorts(ConnectedAgentStateAdapter.redis(connection));
+  const { runtime, core } = testPorts(SessionStateStoreFactory.redis(connection));
   const server = createServer((_request, response) => {
     response.statusCode = 404;
     response.end();

@@ -428,6 +428,185 @@ function ChatRows({
 // a page of thirty un-memoized rows (each with its own actions menu) was the
 // dominant cost of opening history. All handlers are render-stable (see above),
 // so a row only re-renders when its own item, active flag or edit state moves.
+function RenameRow({
+  draftTitle,
+  saving,
+  onDraftTitleChange,
+  onSaveRename,
+  onCancelRename,
+}: {
+  draftTitle: string;
+  saving: boolean;
+  onDraftTitleChange: (title: string) => void;
+  onSaveRename: () => void;
+  onCancelRename: () => void;
+}) {
+  return (
+    <HStack gap={1} flex={1} minWidth={0} paddingX={2} paddingY={1.5}>
+      <Input
+        size="xs"
+        autoFocus
+        aria-label="Conversation title"
+        value={draftTitle}
+        onChange={(event) => onDraftTitleChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onSaveRename();
+          }
+          // Stop Escape here: it cancels the rename, it does not leave the
+          // view (the container handles that when nothing is being edited).
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onCancelRename();
+          }
+        }}
+      />
+      <IconButton
+        size="2xs"
+        variant="ghost"
+        aria-label="Save title"
+        disabled={!draftTitle.trim() || saving}
+        onClick={onSaveRename}
+      >
+        <Check size={13} />
+      </IconButton>
+      <IconButton size="2xs" variant="ghost" aria-label="Cancel rename" onClick={onCancelRename}>
+        <X size={13} />
+      </IconButton>
+    </HStack>
+  );
+}
+
+function ChatRowTitleButton({
+  item,
+  isActive,
+  showDate,
+  onSelect,
+}: {
+  item: ChatItem;
+  isActive: boolean;
+  showDate: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={() => onSelect(item.value)}
+      // Named EXPLICITLY: the label is what a screen reader announces and
+      // what a test can find the row by. It always carries the date, even
+      // when the visible row leaves it to the group header above.
+      aria-label={`${item.title}, ${item.dateLabel}`}
+      flex={1}
+      minWidth={0}
+      textAlign="left"
+      paddingX={2}
+      paddingY={1.5}
+      borderRadius="md"
+      borderWidth={0}
+      background="transparent"
+      cursor="pointer"
+      {...(isActive ? { "aria-current": "true" } : {})}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.focusRing",
+        outlineOffset: "-2px",
+      }}
+    >
+      <VStack align="stretch" gap={0.5} minWidth={0}>
+        {/* Plain truncated text, deliberately NOT AnimatedConversationTitle:
+            the letter-by-letter reveal builds two components per character,
+            and a page of thirty titles paid ~1,500 component mounts for an
+            animation that only means something where a title visibly
+            changes — the panel header. */}
+        <Box
+          as="span"
+          display="block"
+          fontSize="13px"
+          lineHeight="1.25"
+          fontWeight={isActive ? "600" : undefined}
+          color={item.untitled ? "fg.muted" : "fg"}
+          fontStyle={item.untitled ? "italic" : undefined}
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          title={item.title}
+        >
+          {item.title}
+        </Box>
+        {showDate || item.messageCount > 0 ? (
+          <HStack gap={1.5} color="fg.subtle" minWidth={0}>
+            {showDate ? (
+              <chakra.time
+                dateTime={
+                  item.lastActivityAtMs > 0
+                    ? readableDate(item.lastActivityAtMs).toISOString()
+                    : undefined
+                }
+                textStyle="2xs"
+                whiteSpace="nowrap"
+              >
+                {item.dateLabel}
+              </chakra.time>
+            ) : null}
+            {item.messageCount > 0 ? (
+              <Text textStyle="2xs" truncate>
+                {showDate ? "· " : ""}
+                {item.messageCount.toLocaleString()} messages
+              </Text>
+            ) : null}
+          </HStack>
+        ) : null}
+      </VStack>
+    </chakra.button>
+  );
+}
+
+function ChatRowMenu({
+  item,
+  onStartRename,
+  onDelete,
+}: {
+  item: ChatItem;
+  onStartRename: (item: ChatItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    // lazyMount + unmountOnExit: a page of rows must not mount thirty menu
+    // subtrees nobody has opened — the content renders on first open.
+    <Menu.Root positioning={{ placement: "bottom-end", gutter: 4 }} lazyMount unmountOnExit>
+      <Menu.Trigger asChild>
+        <IconButton
+          className="row-actions"
+          size="2xs"
+          variant="ghost"
+          color="fg.subtle"
+          aria-label="Conversation actions"
+          opacity={0}
+          _focusVisible={{ opacity: 1 }}
+          transition="opacity 120ms"
+          flexShrink={0}
+        >
+          <MoreHorizontal size={14} />
+        </IconButton>
+      </Menu.Trigger>
+      <Menu.Content minWidth="152px">
+        <Menu.Item value="rename" onClick={() => onStartRename(item)}>
+          <Pencil size={14} /> Rename
+        </Menu.Item>
+        {/* No "Fork chat". The mutation still exists server-side
+            (`langy.forkConversation`), but branching a conversation is not
+            something the panel offers: it doubled the list with
+            near-identical titles nobody could tell apart. */}
+        <Menu.Separator />
+        <Menu.Item value="delete" color="fg.error" onClick={() => onDelete(item.value)}>
+          <Trash2 size={14} /> Delete
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 const ChatRow = memo(function ChatRow({
   item,
   showDate,
@@ -473,147 +652,17 @@ const ChatRow = memo(function ChatRow({
       {...(isActive ? { background: "bg.subtle" } : {})}
     >
       {editing ? (
-        <HStack gap={1} flex={1} minWidth={0} paddingX={2} paddingY={1.5}>
-          <Input
-            size="xs"
-            autoFocus
-            aria-label="Conversation title"
-            value={draftTitle}
-            onChange={(event) => onDraftTitleChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onSaveRename();
-              }
-              // Stop Escape here: it cancels the rename, it does not leave the
-              // view (the container handles that when nothing is being edited).
-              if (event.key === "Escape") {
-                event.stopPropagation();
-                onCancelRename();
-              }
-            }}
-          />
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            aria-label="Save title"
-            disabled={!draftTitle.trim() || saving}
-            onClick={onSaveRename}
-          >
-            <Check size={13} />
-          </IconButton>
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            aria-label="Cancel rename"
-            onClick={onCancelRename}
-          >
-            <X size={13} />
-          </IconButton>
-        </HStack>
+        <RenameRow
+          draftTitle={draftTitle}
+          saving={saving}
+          onDraftTitleChange={onDraftTitleChange}
+          onSaveRename={onSaveRename}
+          onCancelRename={onCancelRename}
+        />
       ) : (
-        <chakra.button
-          type="button"
-          onClick={() => onSelect(item.value)}
-          // Named EXPLICITLY: the label is what a screen reader announces and
-          // what a test can find the row by. It always carries the date, even
-          // when the visible row leaves it to the group header above.
-          aria-label={`${item.title}, ${item.dateLabel}`}
-          flex={1}
-          minWidth={0}
-          textAlign="left"
-          paddingX={2}
-          paddingY={1.5}
-          borderRadius="md"
-          borderWidth={0}
-          background="transparent"
-          cursor="pointer"
-          {...(isActive ? { "aria-current": "true" } : {})}
-          _focusVisible={{
-            outline: "2px solid",
-            outlineColor: "orange.focusRing",
-            outlineOffset: "-2px",
-          }}
-        >
-          <VStack align="stretch" gap={0.5} minWidth={0}>
-            {/* Plain truncated text, deliberately NOT AnimatedConversationTitle:
-                the letter-by-letter reveal builds two components per character,
-                and a page of thirty titles paid ~1,500 component mounts for an
-                animation that only means something where a title visibly
-                changes — the panel header. */}
-            <Box
-              as="span"
-              display="block"
-              fontSize="13px"
-              lineHeight="1.25"
-              fontWeight={isActive ? "600" : undefined}
-              color={item.untitled ? "fg.muted" : "fg"}
-              fontStyle={item.untitled ? "italic" : undefined}
-              whiteSpace="nowrap"
-              overflow="hidden"
-              textOverflow="ellipsis"
-              title={item.title}
-            >
-              {item.title}
-            </Box>
-            {showDate || item.messageCount > 0 ? (
-              <HStack gap={1.5} color="fg.subtle" minWidth={0}>
-                {showDate ? (
-                  <chakra.time
-                    dateTime={
-                      item.lastActivityAtMs > 0
-                        ? readableDate(item.lastActivityAtMs).toISOString()
-                        : undefined
-                    }
-                    textStyle="2xs"
-                    whiteSpace="nowrap"
-                  >
-                    {item.dateLabel}
-                  </chakra.time>
-                ) : null}
-                {item.messageCount > 0 ? (
-                  <Text textStyle="2xs" truncate>
-                    {showDate ? "· " : ""}
-                    {item.messageCount.toLocaleString()} messages
-                  </Text>
-                ) : null}
-              </HStack>
-            ) : null}
-          </VStack>
-        </chakra.button>
+        <ChatRowTitleButton item={item} isActive={isActive} showDate={showDate} onSelect={onSelect} />
       )}
-      {/* lazyMount + unmountOnExit: a page of rows must not mount thirty menu
-          subtrees nobody has opened — the content renders on first open. */}
-      <Menu.Root positioning={{ placement: "bottom-end", gutter: 4 }} lazyMount unmountOnExit>
-        <Menu.Trigger asChild>
-          <IconButton
-            className="row-actions"
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            aria-label="Conversation actions"
-            opacity={0}
-            _focusVisible={{ opacity: 1 }}
-            transition="opacity 120ms"
-            flexShrink={0}
-          >
-            <MoreHorizontal size={14} />
-          </IconButton>
-        </Menu.Trigger>
-        <Menu.Content minWidth="152px">
-          <Menu.Item value="rename" onClick={() => onStartRename(item)}>
-            <Pencil size={14} /> Rename
-          </Menu.Item>
-          {/* No "Fork chat". The mutation still exists server-side
-              (`langy.forkConversation`), but branching a conversation is not
-              something the panel offers: it doubled the list with
-              near-identical titles nobody could tell apart. */}
-          <Menu.Separator />
-          <Menu.Item value="delete" color="fg.error" onClick={() => onDelete(item.value)}>
-            <Trash2 size={14} /> Delete
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Root>
+      <ChatRowMenu item={item} onStartRename={onStartRename} onDelete={onDelete} />
     </HStack>
   );
 });

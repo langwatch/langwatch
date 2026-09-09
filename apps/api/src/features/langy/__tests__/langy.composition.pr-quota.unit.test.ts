@@ -2,6 +2,8 @@
  * The per-user daily pull-request cap, as the API process composes it
  * (specs/langy/langy-github-prs.feature).
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LANGY_GITHUB_PRS_PER_DAY,
@@ -95,6 +97,7 @@ function composedTurns(redis: RedisConnection | null): LangyTurnTechnicalPorts {
       featureFlags: {} as unknown as FeatureFlagApi,
       saasBilling: false,
       audit: undefined,
+      auditLog: createApiFixture<AuditLogApi>(),
     },
     peers: { projects: {} as unknown as ProjectService },
     commands: {} as unknown as LangyConversationCommands,

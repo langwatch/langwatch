@@ -1,4 +1,4 @@
-import { LANGY_SESSION_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
+import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -26,7 +26,7 @@ export type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_fou
 export class LangySessionKeyService extends LangySessionKeyPort {
   private constructor(
     private readonly repository: LangySessionKeyRepository,
-    private readonly apiKeys: ApiKeyService,
+    private readonly apiKeys: ApiKeyApi,
     private readonly authz: AuthzService,
     private readonly metrics: LangySessionKeyMetricsPort,
   ) {
@@ -35,7 +35,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
 
   static create(input: {
     repository: LangySessionKeyRepository;
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     authz: AuthzService;
     metrics: LangySessionKeyMetricsPort;
   }): LangySessionKeyService {

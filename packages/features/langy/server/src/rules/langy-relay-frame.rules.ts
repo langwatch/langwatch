@@ -11,7 +11,11 @@
  * Splitting the two schemas keeps the security boundary crisp: the envelope is
  * verified as bytes BEFORE its payload is trusted or parsed.
  */
-import { type HerrEnvelope, handledErrorFromHerr } from "@langwatch/handled-error";
+import {
+  type HandledError,
+  type HerrEnvelope,
+  handledErrorFromHerr,
+} from "@langwatch/handled-error";
 import { cliToolResultSchema } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -53,8 +57,12 @@ const herrEnvelopeWireSchema: z.ZodType<HerrEnvelope> = z.lazy(() =>
     reasons: z.array(herrEnvelopeWireSchema).optional(),
   }),
 );
-const receivedDomainErrorSchema = herrEnvelopeWireSchema.transform((body) =>
-  handledErrorFromHerr(body),
+function receivedDomainErrorFromHerr(body: HerrEnvelope): HandledError {
+  return handledErrorFromHerr(body);
+}
+interface ReceivedDomainError extends HandledError {}
+const receivedDomainErrorSchema: z.ZodType<ReceivedDomainError> = herrEnvelopeWireSchema.transform(
+  receivedDomainErrorFromHerr,
 );
 
 /**
@@ -131,7 +139,7 @@ export const langyRelayToolCallSchema = z.object({
  * to new UI cards (a card is not a special case — it rides the same stream,
  * ordering, and HMAC as a token). `final`/`error` are the two terminals.
  */
-export const langyRelayFrameSchema = z.discriminatedUnion("type", [
+const langyRelayFrameVariants = [
   /** A buffered run of assistant prose. */
   z.object({ type: z.literal("delta"), text: z.string() }),
   /**
@@ -235,6 +243,10 @@ export const langyRelayFrameSchema = z.discriminatedUnion("type", [
     type: z.literal("handoff"),
     resumeToken: z.string().optional(),
   }),
-]);
-export type LangyRelayFrame = z.infer<typeof langyRelayFrameSchema>;
+] as const;
+export type LangyRelayFrame = z.output<(typeof langyRelayFrameVariants)[number]>;
+export const langyRelayFrameSchema: z.ZodType<LangyRelayFrame> = z.discriminatedUnion(
+  "type",
+  langyRelayFrameVariants,
+);
 export type LangyRelayToolCall = z.infer<typeof langyRelayToolCallSchema>;

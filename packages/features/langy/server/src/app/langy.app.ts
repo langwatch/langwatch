@@ -18,14 +18,27 @@ import {
   type LangyMessagePart,
   type LangyMessageRole,
   type LangyStreamEntry,
+  LangyApi,
+  type LangyApi as LangyApiContract,
+  langyServerConfigSchema,
+  type LangyServerConfig,
 } from "@langwatch/langy-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
 import { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter.ts";
 import { LangyTurnAccessAdapter } from "../adapters/redis.langy-turn-access.adapter.ts";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
-import { SETTLEMENT_CONFIRM_POLLS, SETTLEMENT_POLL_MS } from "../services/langy-turn-tail.service.ts";
+import {
+  SETTLEMENT_CONFIRM_POLLS,
+  SETTLEMENT_POLL_MS,
+} from "../services/langy-turn-tail.service.ts";
+import {
+  PostgresLangyAdapter,
+  type LangyServiceCompositionOptions,
+  type PostgresLangyAdapterOptions,
+} from "../adapters/langy.langy.adapter.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -37,6 +50,14 @@ export type LangyRedis = Readonly<{
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   duplicate(): { disconnect(): void };
 }>;
+
+export type LangyInfrastructure = Readonly<
+  PostgresLangyAdapterOptions &
+    LangyServiceCompositionOptions & {
+      redis: LangyRedis | null;
+      broadcast: LangyBroadcast;
+    }
+>;
 
 /** The read side of the process's broadcast fabric. */
 export type LangyBroadcast = Readonly<{
@@ -62,12 +83,12 @@ export class LangySessionRequiredError extends HandledError {
 }
 
 /** What the process composes this feature's application from. */
-export interface LangyAppDependencies {
+type LangyAppDependencies = {
   langy: LangyService;
   /** Absent in a deployment without Redis; the live edge degrades to the fold. */
   redis: LangyRedis | null;
   broadcast: LangyBroadcast;
-}
+};
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
 export interface LangyEgressState {
@@ -97,9 +118,30 @@ export interface LangyTurnRequest {
   turnContext: object;
 }
 
-export class LangyApp {
-  static create(dependencies: LangyAppDependencies): LangyApp {
-    return new LangyApp(dependencies);
+type LangySetup = FeatureSetup<Record<never, never>, LangyInfrastructure, LangyServerConfig>;
+
+export class LangyApp implements LangyApiContract {
+  static readonly contract: typeof LangyApi = LangyApi;
+  static readonly dependencies: Record<never, never> = {};
+  static readonly configSchema = langyServerConfigSchema;
+
+  static create(setup: LangySetup): LangyApp {
+    const adapter = PostgresLangyAdapter.create({ database: setup.infrastructure.database });
+    const langy = adapter.build({
+      turns: setup.infrastructure.turns,
+      credentials: setup.infrastructure.credentials,
+      commands: setup.infrastructure.commands,
+      events: setup.infrastructure.events,
+      runtime: setup.infrastructure.runtime,
+      relay: setup.infrastructure.relay,
+      feedbackPromptRedis: setup.infrastructure.feedbackPromptRedis,
+      blockMetrics: setup.infrastructure.blockMetrics,
+    });
+    return new LangyApp({
+      langy,
+      redis: setup.infrastructure.redis,
+      broadcast: setup.infrastructure.broadcast,
+    });
   }
 
   private constructor(private readonly dependencies: LangyAppDependencies) {}
@@ -110,6 +152,93 @@ export class LangyApp {
    */
   get langyService(): LangyService {
     return this.dependencies.langy;
+  }
+
+  tryGetEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
+    return this.dependencies.langy.tryGetEgressAllowlist(input);
+  }
+
+  trySetEgressAllowlist(input: {
+    projectId: string;
+    allowlist: LangyEgressAllowlist;
+  }): Promise<LangyEgressAllowlist | null> {
+    return this.dependencies.langy.trySetEgressAllowlist(input);
+  }
+
+  openRelayConnection() {
+    return this.dependencies.langy.openRelayConnection();
+  }
+
+  getPage(input: Parameters<LangyService["getPage"]>[0]) {
+    return this.dependencies.langy.getPage(input);
+  }
+
+  getEventsAfter(input: Parameters<LangyService["getEventsAfter"]>[0]) {
+    return this.dependencies.langy.getEventsAfter(input);
+  }
+
+  tryFindByIdVisible(input: Parameters<LangyService["tryFindByIdVisible"]>[0]) {
+    return this.dependencies.langy.tryFindByIdVisible(input);
+  }
+
+  getAllByConversation(input: Parameters<LangyService["getAllByConversation"]>[0]) {
+    return this.dependencies.langy.getAllByConversation(input);
+  }
+
+  deleteById(input: Parameters<LangyService["deleteById"]>[0]) {
+    return this.dependencies.langy.deleteById(input);
+  }
+
+  updateById(input: Parameters<LangyService["updateById"]>[0]) {
+    return this.dependencies.langy.updateById(input);
+  }
+
+  forkById(input: Parameters<LangyService["forkById"]>[0]) {
+    return this.dependencies.langy.forkById(input);
+  }
+
+  startConversationTurn(input: Parameters<LangyService["startConversationTurn"]>[0]) {
+    return this.dependencies.langy.startConversationTurn(input);
+  }
+
+  warmConversationWorker(input: Parameters<LangyService["warmConversationWorker"]>[0]) {
+    return this.dependencies.langy.warmConversationWorker(input);
+  }
+
+  tryGetModelsAllowedForProject(projectId: string) {
+    return this.dependencies.langy.tryGetModelsAllowedForProject(projectId);
+  }
+
+  revokeWorkerSessionKey(input: Parameters<LangyService["revokeWorkerSessionKey"]>[0]) {
+    return this.dependencies.langy.revokeWorkerSessionKey(input);
+  }
+
+  turnExists(input: Parameters<LangyService["turnExists"]>[0]) {
+    return this.dependencies.langy.turnExists(input);
+  }
+
+  ingestAgentTurnResult(input: Parameters<LangyService["ingestAgentTurnResult"]>[0]) {
+    return this.dependencies.langy.ingestAgentTurnResult(input);
+  }
+
+  tryGetRunToken(input: Parameters<LangyService["tryGetRunToken"]>[0]) {
+    return this.dependencies.langy.tryGetRunToken(input);
+  }
+
+  recordToolCallStarted(input: Parameters<LangyService["recordToolCallStarted"]>[0]) {
+    return this.dependencies.langy.recordToolCallStarted(input);
+  }
+
+  recordToolCallCompleted(input: Parameters<LangyService["recordToolCallCompleted"]>[0]) {
+    return this.dependencies.langy.recordToolCallCompleted(input);
+  }
+
+  recordTurnHandoff(input: Parameters<LangyService["recordTurnHandoff"]>[0]) {
+    return this.dependencies.langy.recordTurnHandoff(input);
+  }
+
+  recordPlanUpdated(input: Parameters<LangyService["recordPlanUpdated"]>[0]) {
+    return this.dependencies.langy.recordPlanUpdated(input);
   }
 
   // -- conversation reads ----------------------------------------------------

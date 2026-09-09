@@ -4,7 +4,7 @@ import { z } from "zod";
 export const LANGY_SESSION_KEY_REAP_PROCESS_NAME = "langySessionKeyReap";
 
 /**
- * Hourly. The keys carry their own `expiresAt` and `ApiKeyService.verify`
+ * Hourly. The keys carry their own `expiresAt` and `ApiKeyApi.verify`
  * already refuses an elapsed one, so a reaped key was inert before this ran —
  * the sweep is about not leaving a long tail of live-looking rows behind a
  * manager that died without revoking them, not about closing an auth hole.

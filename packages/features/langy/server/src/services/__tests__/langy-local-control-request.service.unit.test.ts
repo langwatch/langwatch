@@ -6,8 +6,8 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { CONTROL_REQUEST_TTL_MS } from "@langwatch/langy-contract";
 import {
   ControlRequestService,
@@ -19,7 +19,7 @@ const userId = "user_1";
 const conversationId = "conv_1";
 
 let now = 1_700_000_000_000;
-let store: AgentStateStorePort;
+let store: SessionStateStore;
 let mint: ReturnType<typeof vi.fn>;
 let service: ControlRequestService;
 
@@ -41,7 +41,7 @@ function create(
 
 beforeEach(() => {
   now = 1_700_000_000_000;
-  store = ConnectedAgentStateAdapter.memory({ now: () => now });
+  store = SessionStateStoreFactory.memory({ now: () => now });
   mint = vi.fn(async () => ({ token: "sk-lw-minted", apiKeyId: "key_1" }));
   service = ControlRequestService.create({
     store,

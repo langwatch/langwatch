@@ -3,7 +3,7 @@
  * same on the turn surface and the UI-action surface: credential (401), per-project rollout (dark
  * 404), then the API-key ceiling (403), then the identity bridge.
  */
-import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { FeatureFlagKey, FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
@@ -32,7 +32,7 @@ export type LangyRestCredentialReader = (
  * Enforces one permission as the resolved key's ceiling, throwing the deployment's own refusal.
  */
 export type LangyRestCeilingPort = (input: {
-  resolved: ResolvedApiKeyToken;
+  resolved: ResolvedApiKeyCredential;
   permission: AuthzPermission;
 }) => Promise<void>;
 
@@ -41,7 +41,7 @@ export type LangyRestCredentialPorts = Readonly<{
   /** Reads the credential off the request. */
   readCredential: LangyRestCredentialReader;
   /** The directory the credential is resolved and stamped through. */
-  apiKeys: () => ApiKeyService;
+  apiKeys: () => ApiKeyApi;
   /** Enforces one permission as the key's ceiling. */
   enforceCeiling: LangyRestCeilingPort;
   /** This deployment's flag store, for the per-project rollout gate. */
@@ -55,7 +55,7 @@ export type LangyRestCaller =
   | Readonly<{ dark: true }>
   | Readonly<{
       dark: false;
-      resolved: ResolvedApiKeyToken;
+      resolved: ResolvedApiKeyCredential;
       projectId: string;
       userId: string;
       markUsed: () => void;
@@ -75,7 +75,7 @@ export async function resolveLangyRestCaller(input: {
   if (!credentials) throw new LangyApiCredentialMissingError();
 
   const apiKeys = input.ports.apiKeys();
-  const resolved = await apiKeys.tryResolveToken({
+  const resolved = await apiKeys.findResolvedToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });

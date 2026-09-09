@@ -9,7 +9,7 @@
  * answers with is the one that resource's own REST door hands out as
  * `platformUrl`. A miss is `null`, and the fallback drops the navigate.
  */
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
@@ -31,7 +31,7 @@ export type ApiLangyNavigateResources = Readonly<{
   experiments?: ExperimentService | undefined;
   monitors?: MonitorService | undefined;
   evaluators?: EvaluatorService | undefined;
-  agents?: AgentService | undefined;
+  agents?: AgentApi | undefined;
   simulations?: SimulationService | undefined;
 }>;
 

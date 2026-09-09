@@ -6,7 +6,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { Unsubscribe } from "@langwatch/agent-contract";
+import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS } from "@langwatch/langy-contract";
 import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
 import {

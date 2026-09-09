@@ -4,7 +4,7 @@
  * heartbeat, so a sleeping machine reads offline with no explicit deregister.
  */
 
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
 import { policyKey, presenceKey } from "../rules/langy-local-control-keys.rules.ts";
 import { nowInstant } from "@langwatch/time";
@@ -19,13 +19,13 @@ import {
 const POLICY_TTL_SECONDS = 6 * 60 * 60;
 
 export interface LocalPresenceOptions {
-  store: AgentStateStorePort;
+  store: SessionStateStore;
   now?: () => number;
   presenceTtlMs?: number;
 }
 
 export class LangyLocalPresenceAdapter extends LangyLocalPresencePort {
-  private readonly store: AgentStateStorePort;
+  private readonly store: SessionStateStore;
   private readonly presenceTtlMs: number;
   readonly now: () => number;
 

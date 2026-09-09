@@ -73,7 +73,7 @@ function buildApi(options: { granted: boolean }) {
     readCredential: () => ({ token: "test-token", projectId: PROJECT_ID }),
     apiKeys: () =>
       ({
-        tryResolveToken: async () => ({
+        findResolvedToken: async () => ({
           type: "apiKey" as const,
           apiKeyId: "key-1",
           userId: USER_ID,

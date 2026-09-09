@@ -4,7 +4,7 @@
  * own composition root (ADR-093/ADR-128); this module only assembles around it.
  */
 
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
 import { LocalCallDispatcherService } from "../services/langy-local-call-dispatcher.service.ts";
 import type { LocalCallBuffer } from "../rules/langy-local-call-record.rules.ts";
@@ -21,7 +21,7 @@ import type {
 } from "../rules/langy-local-user-wait-record.rules.ts";
 
 export interface LocalControlRuntime {
-  store: AgentStateStorePort;
+  store: SessionStateStore;
   presence: LangyLocalPresenceAdapter;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
@@ -45,7 +45,7 @@ export class LangyLocalControlRuntimeAdapter {
     pollIntervalMs,
     now,
   }: {
-    store: AgentStateStorePort;
+    store: SessionStateStore;
     projects: ControlRequestProjects;
     mintSessionKey: ControlRequestKeyMinter;
     events: UserWaitEvents;

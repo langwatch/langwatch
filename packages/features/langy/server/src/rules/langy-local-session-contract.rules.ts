@@ -18,10 +18,10 @@ import type {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
-import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
+import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {} from "./langy-local-session-text.rules.ts";
 import { workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";

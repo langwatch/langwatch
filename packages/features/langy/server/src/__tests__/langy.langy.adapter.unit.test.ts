@@ -142,12 +142,10 @@ describe("PostgresLangyAdapter", () => {
         const instance = PostgresLangyAdapter.create({ database: undefined! });
         const service = instance.build(compositionOptions());
 
-        const app = LangyApp.create({ langy: service, redis: null, broadcast: testBroadcast() });
+        const app = createApp();
 
-        expect(app.langyService).toBe(service);
-        expect(
-          LangyApp.create({ langy: service, redis: null, broadcast: testBroadcast() }).langyService,
-        ).toBe(app.langyService);
+        expect(app.langyService).toBe(app.langyService);
+        expect(createApp().langyService).not.toBe(app.langyService);
         expect(instance.build(compositionOptions())).toBe(service);
       });
     });
@@ -219,6 +217,21 @@ function compositionOptions() {
     context: { tryRender: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
+  });
+}
+
+function createApp(): LangyApp {
+  const infrastructure = {
+    database: undefined!,
+    ...compositionOptions(),
+    redis: null,
+    broadcast: testBroadcast(),
+  };
+  return LangyApp.create({
+    dependencies: {},
+    infrastructure,
+    config: { agentUrl: undefined, internalSecret: undefined },
+    resources: { own: () => void 0, ownService: () => void 0 },
   });
 }
 

@@ -3,7 +3,7 @@
  */
 import { LangyTokenBufferAdapter, SkipPermissionsService } from "@langwatch/langy-server";
 import { LangyUiNoBrowserError } from "@langwatch/langy-contract";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyUiActionBackendService,
@@ -76,7 +76,7 @@ export type ApiLangyLocalOptions = Readonly<{
 
 export type ApiLangyRestOptions = Readonly<{
   langy: LangyApp | undefined;
-  apiKeys: ApiKeyService | undefined;
+  apiKeys: ApiKeyApi | undefined;
   featureFlags: FeatureFlagApi | undefined;
   /** The user directory a key's owning person is read from. */
   actors: LangyActorUserReader | undefined;

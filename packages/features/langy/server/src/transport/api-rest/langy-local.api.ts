@@ -153,7 +153,7 @@ export function createLangyLocalRestApp(options: {
     const credentials = ports.readCredential(c.req.raw);
     if (!credentials) throw new LangyApiCredentialMissingError();
 
-    const resolved = await ports.apiKeys().tryResolveToken({
+    const resolved = await ports.apiKeys().findResolvedToken({
       token: credentials.token,
       projectId: credentials.projectId,
     });

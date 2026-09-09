@@ -13,8 +13,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
 
@@ -41,7 +41,7 @@ function connectedFolder(now: number) {
 }
 
 async function callWaitingOnACard(clock: { now: number }) {
-  const store: AgentStateStorePort = ConnectedAgentStateAdapter.memory({
+  const store: SessionStateStore = SessionStateStoreFactory.memory({
     now: () => clock.now,
   });
   const presence = LangyLocalPresenceAdapter.create({ store, now: () => clock.now });

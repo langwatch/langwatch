@@ -6,8 +6,8 @@
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import { LangyLocalPresenceAdapter } from "../redis.langy-local-presence.adapter.ts";
 import type { ConnectedWorkspace } from "../../ports/langy-local-presence.port.ts";
@@ -15,7 +15,7 @@ import type { ConnectedWorkspace } from "../../ports/langy-local-presence.port.t
 const conversationId = "conv_1";
 
 let now = 1_700_000_000_000;
-let store: AgentStateStorePort;
+let store: SessionStateStore;
 let presence: LangyLocalPresenceAdapter;
 
 function workspace(instanceId = "lci_1"): ConnectedWorkspace {
@@ -38,7 +38,7 @@ function workspace(instanceId = "lci_1"): ConnectedWorkspace {
 
 beforeEach(() => {
   now = 1_700_000_000_000;
-  store = ConnectedAgentStateAdapter.memory({ now: () => now });
+  store = SessionStateStoreFactory.memory({ now: () => now });
   presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
 });
 

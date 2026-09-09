@@ -11,7 +11,7 @@ import {
   type LangyUserWaitStartedEventData,
   type PollWaitResponse,
 } from "@langwatch/langy-contract";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 
 /** What the platform keeps about one card while it is on screen. */
@@ -86,7 +86,7 @@ export interface UserWaitQuestion {
 }
 
 export interface UserWaitServiceOptions {
-  store: AgentStateStorePort;
+  store: SessionStateStore;
   events: UserWaitEvents;
   buffer: UserWaitBuffer;
   /**

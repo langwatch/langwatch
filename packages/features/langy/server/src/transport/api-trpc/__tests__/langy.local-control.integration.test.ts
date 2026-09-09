@@ -16,7 +16,7 @@
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { SkipPermissionsDecision } from "../../../services/langy-skip-permissions.service.ts";
 import {
   LangyLocalControlRuntimeAdapter,
@@ -170,7 +170,7 @@ beforeEach(async () => {
   // A store per test: process memory is the whole truth for one file, and a
   // fresh one is cheaper than unwinding presence, calls and cards by hand.
   runtime = LangyLocalControlRuntimeAdapter.create({
-    store: ConnectedAgentStateAdapter.memory(),
+    store: SessionStateStoreFactory.memory(),
     projects: { tryReadOrganizationId: async () => organizationId },
     mintSessionKey: async () => ({
       token: `sk-lw-${nanoid(48)}`,

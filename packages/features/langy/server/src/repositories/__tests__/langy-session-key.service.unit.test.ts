@@ -1,4 +1,4 @@
-import { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
@@ -46,7 +46,7 @@ class SessionKeyMetrics extends LangySessionKeyMetricsPort {
 
 function createService(input: {
   repository: SessionKeyRepository;
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   authz: AuthzService;
   metrics: SessionKeyMetrics;
 }): LangySessionKeyService {
@@ -56,7 +56,7 @@ function createService(input: {
 describe("LangySessionKeyService", () => {
   it("mints only the holder's Langy permissions at the project scope", async () => {
     const repository = new SessionKeyRepository();
-    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+    const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {
       const apiKey = Object.assign(Object.create(null), { id: "key-1" });
       return { token: "session-token", apiKey };
     });
@@ -64,7 +64,7 @@ describe("LangySessionKeyService", () => {
       "project:view",
       "prompts:update",
     ];
-    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
     const effectivePermissions: AuthzService["effectivePermissions"] = vi.fn(
@@ -106,11 +106,11 @@ describe("LangySessionKeyService", () => {
   // guard states over the const and this states over the mint.
   it("carries the full tenant-data write surface onto a key whose holder holds it", async () => {
     const repository = new SessionKeyRepository();
-    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+    const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {
       const apiKey = Object.assign(Object.create(null), { id: "key-1" });
       return { token: "session-token", apiKey };
     });
-    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
     authz.effectivePermissions = vi.fn(async () => [...LANGY_CANDIDATE_PERMISSIONS]);
@@ -162,11 +162,11 @@ describe("LangySessionKeyService", () => {
   /** @scenario Langy can delete my work, because I can */
   it("mints a key carrying a destructive grain the caller holds", async () => {
     const repository = new SessionKeyRepository();
-    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+    const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {
       const apiKey = Object.assign(Object.create(null), { id: "key-1" });
       return { token: "session-token", apiKey };
     });
-    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
     authz.effectivePermissions = vi
@@ -192,11 +192,11 @@ describe("LangySessionKeyService", () => {
   /** @scenario Langy cannot delete my work when I cannot */
   it("withholds a destructive grain the caller does not hold, even though Langy could ask for it", async () => {
     const repository = new SessionKeyRepository();
-    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+    const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {
       const apiKey = Object.assign(Object.create(null), { id: "key-1" });
       return { token: "session-token", apiKey };
     });
-    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
     // Holds enough to mint a key at all (view), but not the destructive grain.
@@ -235,7 +235,7 @@ describe("LangySessionKeyService", () => {
     const metrics = new SessionKeyMetrics();
     const service = createService({
       repository,
-      apiKeys: Object.create(ApiKeyService.prototype),
+      apiKeys: Object.create(null),
       authz: Object.create(AuthzService.prototype),
       metrics,
     });

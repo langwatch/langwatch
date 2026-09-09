@@ -3,7 +3,7 @@ import { LangyAccessService } from "./langy-access.service.ts";
 
 /**
  * The two fields this gate reads off a resolved credential. Structural rather than
- * `ResolvedApiKeyToken` itself, so the gate names what it uses and nothing more.
+ * `ResolvedApiKeyCredential` itself, so the gate names what it uses and nothing more.
  */
 export type LangyIdentityToken =
   | {

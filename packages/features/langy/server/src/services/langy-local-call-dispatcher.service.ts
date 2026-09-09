@@ -10,7 +10,7 @@ import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
@@ -42,7 +42,7 @@ import {
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 export class LocalCallDispatcherService {
-  private readonly store: AgentStateStorePort;
+  private readonly store: SessionStateStore;
   private readonly presence: LangyLocalPresencePort;
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;

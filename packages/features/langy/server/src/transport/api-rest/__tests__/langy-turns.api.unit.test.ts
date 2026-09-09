@@ -107,7 +107,7 @@ function buildApi(options: { surfaceOpen?: boolean } = {}) {
     readCredential: () => ({ token: "test-token", projectId: PROJECT_ID }),
     apiKeys: () =>
       ({
-        tryResolveToken: vi.fn(async () => ({
+        findResolvedToken: vi.fn(async () => ({
           type: "apiKey" as const,
           apiKeyId: "key-1",
           userId: USER_ID,

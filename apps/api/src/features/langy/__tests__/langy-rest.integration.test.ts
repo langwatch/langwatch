@@ -4,7 +4,7 @@
  * because it is the part a rewrite silently breaks.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   createLangyInternalRestApp,
@@ -364,7 +364,7 @@ function langyWorld(
       tryFindVisible: async () => null,
     } as never,
     apiKeys: {
-      tryResolveToken: async () => resolvedKey(),
+      findResolvedToken: async () => resolvedKey(),
       markUsed: () => {
         world.markedUsed = true;
       },
@@ -383,7 +383,7 @@ function langyWorld(
     enforceCeiling: async ({
       permission,
     }: {
-      resolved: ResolvedApiKeyToken;
+      resolved: ResolvedApiKeyCredential;
       permission: string;
     }) => {
       ceilingChecks.push(permission);

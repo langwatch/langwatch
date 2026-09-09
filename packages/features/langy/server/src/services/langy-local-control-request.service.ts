@@ -7,7 +7,7 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { Temporal, nowInstant } from "@langwatch/time";
 
 /** The stored epoch millis as the ISO string the wire has always carried. */
@@ -85,7 +85,7 @@ export type ControlRequestProjects = Readonly<{
 }>;
 
 export interface ControlRequestServiceOptions {
-  store: AgentStateStorePort;
+  store: SessionStateStore;
   projects: ControlRequestProjects;
   /** Mints the per-conversation session key the command line authenticates with. */
   mintSessionKey: ControlRequestKeyMinter;
@@ -94,7 +94,7 @@ export interface ControlRequestServiceOptions {
 }
 
 export class ControlRequestService {
-  private readonly store: AgentStateStorePort;
+  private readonly store: SessionStateStore;
   private readonly projects: ControlRequestProjects;
   private readonly ttlMs: number;
   private readonly mintSessionKey: ControlRequestKeyMinter;

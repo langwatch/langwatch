@@ -3,7 +3,7 @@
  * tells another about a conversation's folder. Shape only: the dispatcher owns the transitions.
  */
 import { z } from "zod";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port.ts";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 import {
@@ -63,7 +63,7 @@ export type WorkspaceNudge = z.infer<typeof workspaceNudgeSchema>;
 export type LocalCallBuffer = Pick<LangyTokenBufferPort, "appendStatus" | "heartbeat">;
 
 export interface LocalCallDispatcherOptions {
-  store: AgentStateStorePort;
+  store: SessionStateStore;
   presence: LangyLocalPresencePort;
   buffer?: LocalCallBuffer;
   now?: () => number;

@@ -7,14 +7,14 @@
 import type {} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
 import {
   LangyActorSessionService,
   type LangyActorUserReader,
 } from "./langy-actor-session.service.ts";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
-import type { AgentStateStorePort, Unsubscribe } from "@langwatch/agent-contract";
+import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {
   connectMessage,
   conversationTitle,
@@ -63,14 +63,14 @@ const logger = createLogger("langwatch:langy:local-control:session");
 
 export interface LocalControlSessionCoreOptions {
   /** The directory the worker's session key is resolved through. */
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   /** Reads the credential off the connecting frame. */
   readCredential: ControlCredentialReader;
   /** The user directory the acting person is read from. */
   actors: LangyActorUserReader;
   /** This deployment's own origin, for the follow-along link. */
   baseHost: string | undefined;
-  store: AgentStateStorePort;
+  store: SessionStateStore;
   presence: LangyLocalPresencePort;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
@@ -85,10 +85,10 @@ export interface LocalControlSessionCoreOptions {
 }
 
 export class LocalControlSessionCoreService {
-  private readonly apiKeys: ApiKeyService;
+  private readonly apiKeys: ApiKeyApi;
   private readonly readCredential: ControlCredentialReader;
   private readonly baseHost: string | undefined;
-  private readonly store: AgentStateStorePort;
+  private readonly store: SessionStateStore;
   private readonly turns: ControlTurnStarter;
   private readonly skipGate: ControlSkipGate;
   private readonly conversations: () => ControlConversations;
@@ -204,7 +204,7 @@ export class LocalControlSessionCoreService {
       };
     }
 
-    const resolved = await this.apiKeys.tryResolveToken({
+    const resolved = await this.apiKeys.findResolvedToken({
       token: credentials.token,
       projectId: credentials.projectId,
     });

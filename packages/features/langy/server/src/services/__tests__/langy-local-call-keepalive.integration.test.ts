@@ -23,8 +23,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules.ts";
 import { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter.ts";
 import { createAgentTurnLivenessSubscriber } from "../../subscribers/langy-conversation.subscriber.ts";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server/testing";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
 import { DispatchError } from "@langwatch/eventing";
 import type { EventSubscriberContext } from "@langwatch/eventing";
@@ -44,7 +44,7 @@ const context: EventSubscriberContext = {
 
 let connection: RedisConnection;
 let buffer: LangyTokenBufferAdapter;
-let store: AgentStateStorePort;
+let store: SessionStateStore;
 let now = 1_752_600_100_000;
 
 const startedAt = (): number => now;
@@ -137,7 +137,7 @@ beforeAll(() => {
   })!;
   if (!connection) throw new Error("This test needs a real Redis");
   buffer = LangyTokenBufferAdapter.create({ redis: connection });
-  store = ConnectedAgentStateAdapter.memory({ now: () => now });
+  store = SessionStateStoreFactory.memory({ now: () => now });
 });
 
 afterAll(async () => {

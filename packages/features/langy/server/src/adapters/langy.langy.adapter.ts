@@ -1,5 +1,5 @@
 import type { AppendStore, StateProjectionStore } from "@langwatch/eventing";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type {
   LangyConversationStateData,
@@ -156,7 +156,7 @@ export class PostgresLangyAdapter {
   }
 
   createSessionKeys(input: {
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     authz: AuthzService;
     metrics: LangySessionKeyMetricsPort;
   }): LangySessionKeyService {

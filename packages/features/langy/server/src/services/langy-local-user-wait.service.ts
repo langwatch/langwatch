@@ -9,7 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
 import {
   CALL_POLL_HOLD_MS,
@@ -39,7 +39,7 @@ import {
 } from "../rules/langy-local-user-wait-record.rules.ts";
 
 export class UserWaitService {
-  private readonly store: AgentStateStorePort;
+  private readonly store: SessionStateStore;
   private readonly events: UserWaitEvents;
   private readonly buffer: UserWaitBuffer;
   private readonly sendPermission: NonNullable<UserWaitServiceOptions["sendPermission"]>;
