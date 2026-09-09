@@ -97,6 +97,27 @@ export function IdentifierFirstSignIn() {
     readonly SignInMethod[]
   >([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  /**
+   * Whether an expired session of this browser's explains the arrival.
+   *
+   * Asked alongside the routing question rather than before it, so the cold
+   * screen — which is what nearly everybody gets — is never held up waiting for
+   * an answer about a session that does not exist. When the answer does name
+   * somebody, the effect below feeds it into the SAME `decide` call a typed
+   * address would make, and the screen moves to the method step on its own.
+   *
+   * `retry: false` because the question has one answer and a second ask cannot
+   * change it; a failure simply leaves the cold screen standing, which is the
+   * correct fallback rather than a thing to report.
+   */
+  const priorSession = api.auth.priorSession.useQuery(undefined, {
+    enabled: !session,
+    staleTime: Infinity,
+    retry: false,
+  });
+  const recoveredEmail =
+    priorSession.data?.kind === "expired" ? priorSession.data.email : null;
+  const recoveryAsked = useRef(false);
   // The address is being made into an account and the credential step is up.
   // Nothing has been created and nothing has been sent yet — see the note on
   // `NoAccountYet`.
@@ -157,6 +178,28 @@ export function IdentifierFirstSignIn() {
       }
     });
   }, [decide, breakGlass, session]);
+
+  /**
+   * An expired session answers the address question, once.
+   *
+   * This is the whole of the recovery: the address we already know is handed to
+   * the router exactly as a typed one would be, so the person lands on the step
+   * that asks them to prove who they are rather than on the step that asks who
+   * they are. Nothing here signs anybody in — an expired session is a fact about
+   * the past, not a credential, and it shortens the walk by one step without
+   * replacing a step of it.
+   *
+   * Guarded by a ref AND by whether an address is already in play: somebody who
+   * started typing before this answer arrived must not have the field taken off
+   * them, and somebody who pressed "use a different email" must not be dragged
+   * back to the address they just rejected.
+   */
+  useEffect(() => {
+    if (recoveryAsked.current || session) return;
+    if (!recoveredEmail || routing.identifier) return;
+    recoveryAsked.current = true;
+    void decide({ identifier: recoveredEmail, breakGlass });
+  }, [recoveredEmail, session, routing.identifier, decide, breakGlass]);
 
   const dialFederated = (method: SignInMethod) => {
     report.chose(method.id);
@@ -318,7 +361,7 @@ export function IdentifierFirstSignIn() {
 
   if (showPicker) {
     return (
-      <AuthCard title="Log in to LangWatch">
+      <AuthCard {...signInGreeting(recoveredEmail)}>
         <HandledErrorAlert
           error={passkeyError}
           fallbackTitle="Could not use a passkey"
@@ -369,7 +412,7 @@ export function IdentifierFirstSignIn() {
   }
 
   return (
-    <AuthCard title="Log in to LangWatch" finePrint={<AuthFinePrint />}>
+    <AuthCard {...signInGreeting(recoveredEmail)} finePrint={<AuthFinePrint />}>
       {/* The alert explains the form; it does not replace it. A failure to
           reach the router is nearly always worth retrying, and the retry is
           typing the address again — so taking the field away leaves somebody
@@ -445,6 +488,34 @@ function signInDepth({
   if (creatingAccountFor) return "credential";
   if (showPicker) return "credential";
   return "entry";
+}
+
+/**
+ * What the card calls itself, and why it sometimes says something else.
+ *
+ * The default greets somebody arriving to log in. That is wrong for the one
+ * arrival we can explain: a person whose session aged out while they were away
+ * did not come here to log in, they came back, and greeting them as a first-time
+ * visitor makes the screen look like it has never met them.
+ *
+ * The line says the one thing that is true. Not "something went wrong" — nothing
+ * did, and an error tone invites somebody to go looking for a fault. Not "please
+ * log in again" — they can see the form. Sessions last thirty days, so the
+ * explanation is also the reassurance: being asked again is the system working.
+ *
+ * Returns the whole prop pair rather than just a string, so the two cards that
+ * spread it cannot end up with one saying the title and the other the intro.
+ */
+function signInGreeting(recoveredEmail: string | null): {
+  title: string;
+  intro?: string;
+} {
+  if (!recoveredEmail) return { title: "Log in to LangWatch" };
+  return {
+    title: "Welcome back",
+    intro:
+      "Your session expired while you were away. Log in again to pick up where you left off.",
+  };
 }
 
 /**
