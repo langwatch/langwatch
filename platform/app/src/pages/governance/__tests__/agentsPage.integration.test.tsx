@@ -115,6 +115,14 @@ vi.mock("~/utils/api", () => {
               };
             };
           }
+          if (property === "useMutation") {
+            return () => ({
+              mutate: vi.fn(),
+              mutateAsync: vi.fn(),
+              isPending: false,
+              variables: undefined,
+            });
+          }
           if (property === "useUtils") return () => node([]);
           return node([...path, property]);
         },
@@ -188,11 +196,20 @@ describe("the agents page address contract", () => {
       expect(screen.queryByText(/application/i)).toBeNull();
     });
 
+    /**
+     * Two reads, and the second one is not optional. Which empty state the
+     * page may show depends on whether a provider that can list agents is
+     * connected, so the page cannot decide what to say about an empty
+     * organization from the agents read alone.
+     */
     /** @scenario "The agents page reads the organization's own agents" */
-    it("queries the organization's agents", () => {
+    it("queries the organization's agents and its listable sources", () => {
       renderAgentsAt(["/governance/agents"]);
 
-      expect(harness.requested).toEqual(["governanceAgents.list"]);
+      expect(harness.requested).toEqual([
+        "governanceAgents.syncSources",
+        "governanceAgents.list",
+      ]);
     });
   });
 

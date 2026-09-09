@@ -119,8 +119,12 @@ const HEALTH_TONES: Record<AgentHealth, GovernanceSummaryTone> = {
  *
  * "Custom and Databricks", not "Custom, Databricks". The card has room for the
  * word and a reader should not have to parse punctuation to read a sentence.
+ *
+ * Exported for the page's empty states, which name connected providers in a
+ * sentence and would otherwise grow a second copy of this that punctuates two
+ * items differently from the summary strip a few pixels above it.
  */
-function spokenList(items: readonly string[]): string {
+export function spokenList(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? "";
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]!}`;
 }

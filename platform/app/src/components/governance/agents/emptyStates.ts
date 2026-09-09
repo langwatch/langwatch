@@ -1,6 +1,8 @@
 import { Bot, SearchX } from "lucide-react";
 import type { ComponentType } from "react";
 
+import { spokenList } from "./agentSummary";
+
 /**
  * The words this page shows when it has nothing to show, held apart from the
  * thing that renders them. Two states, because there are two ways for this
@@ -56,6 +58,12 @@ export interface GovernanceEmptyStateCopy {
  * The headline says the state and the sentence says the reason, because "no
  * agents" on its own reads as a fault. It is not one: no agent has registered
  * yet, and the copy points at the one move that changes that.
+ *
+ * This is now the branch for an organization with NO provider that can list
+ * agents. Registering really is the only move such a reader has. Where a
+ * provider is connected, {@link agentsUnlistedCopy} says so instead, because
+ * telling that reader to go write registration code would be the page failing
+ * to notice what they already have.
  */
 export const AGENTS_EMPTY_COPY: GovernanceEmptyStateCopy = {
   icon: Bot,
@@ -66,6 +74,42 @@ export const AGENTS_EMPTY_COPY: GovernanceEmptyStateCopy = {
   // Registering creates something of the organization's own.
   emphasis: "primary",
 };
+
+/**
+ * Providers that can list agents are connected, and the page holds none.
+ *
+ * A THIRD nothing, and the reason it earns its own words is that the page
+ * cannot currently tell the two possibilities apart. A provider that answered
+ * "this tenant has no agents" and a provider that refused to answer are
+ * different facts, one about the tenant and one about the credential, and this
+ * page has no read that distinguishes them: the outcome events exist in the
+ * log and no projection folds them (see `ingestionPullRunStatus`). So the copy
+ * says only what is known — these providers are connected, and nothing has
+ * been listed from them — and offers the ask rather than asserting the tenant
+ * is empty. Claiming emptiness on a refusal would be exactly the collapse the
+ * three-outcome listing was built to prevent.
+ *
+ * When a read for the last outcome exists, this state splits: a listed-empty
+ * arm may say the tenant has none, and a refused arm names the credential and
+ * what to do about it. Neither may be written before the page can tell which
+ * it is looking at.
+ *
+ * A factory rather than a constant, because the sentence names the providers
+ * and a fixed string would either omit them or invent them.
+ */
+export function agentsUnlistedCopy(
+  providerNames: readonly string[],
+): GovernanceEmptyStateCopy {
+  return {
+    icon: Bot,
+    headline: "No agents to show yet",
+    description: `${spokenList([...providerNames])} ${providerNames.length === 1 ? "is" : "are"} connected, and no agent has been listed from ${providerNames.length === 1 ? "it" : "them"} yet. Nothing has registered itself here either. Ask now to find out what they hold.`,
+    actionLabel: "Sync agents",
+    // Asking is how this organization's own agents get here, which is the same
+    // weight registering one carries on the state above.
+    emphasis: "primary",
+  };
+}
 
 /**
  * Agents exist; the reader has filtered them all out of view.

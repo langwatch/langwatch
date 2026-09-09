@@ -63,6 +63,7 @@ export {
 } from "./agentSummary";
 export {
   AGENTS_EMPTY_COPY,
+  agentsUnlistedCopy,
   type GovernanceEmptyStateCopy,
   NO_MATCHING_AGENTS_COPY,
 } from "./emptyStates";
