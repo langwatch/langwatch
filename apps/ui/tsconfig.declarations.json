@@ -1,6 +1,10 @@
 {
   "files": [],
   "references": [
+    { "path": "../../packages/features/experiment/contract/tsconfig.build.json" },
+    {
+      "path": "../../packages/api/tsconfig.build.json"
+    },
     {
       "path": "../../packages/config/tsconfig.build.json"
     },
@@ -110,6 +114,9 @@
       "path": "../../packages/features/scenario/server/tsconfig.build.json"
     },
     {
+      "path": "../../packages/features/scenario/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/features/scenario/web/tsconfig.build.json"
     },
     {
@@ -132,9 +139,6 @@
     },
     {
       "path": "../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/api/tsconfig.build.json"
     },
     {
       "path": "../../packages/prisma-client/tsconfig.build.json"

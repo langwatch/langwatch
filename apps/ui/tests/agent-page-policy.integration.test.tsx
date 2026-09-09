@@ -8,10 +8,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/agent-web/screens/agent-management", async () => {
+vi.mock("@langwatch/agent-web/agent-management", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/agent-web/screens/agent-management")
-  >("@langwatch/agent-web/screens/agent-management");
+    typeof import("@langwatch/agent-web/agent-management")
+  >("@langwatch/agent-web/agent-management");
   const Screen = () => <div>the agents page</div>;
   const emptyQuery = { data: undefined, isLoading: false };
   const apiNode = (): unknown =>

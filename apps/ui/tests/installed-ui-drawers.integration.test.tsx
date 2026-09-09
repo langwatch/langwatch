@@ -15,16 +15,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 const stub = vi.hoisted(() => {
   const drawers = async (names: readonly string[]): Promise<Record<string, unknown>> => {
-    const { createElement } = await import("react");
+    const { createElement, isValidElement } = await import("react");
     const module: Record<string, unknown> = {};
     for (const name of names) {
       module[name] = (props: Record<string, unknown>) =>
         createElement(
           "div",
           { "data-testid": `drawer-${name}` },
-          JSON.stringify(props, (_key, value) =>
-            typeof value === "function" ? "[callback]" : value,
-          ),
+          JSON.stringify(props, (_key, value) => {
+            if (isValidElement(value)) return "[element]";
+            return typeof value === "function" ? "[callback]" : value;
+          }),
         );
     }
     return module;
@@ -34,21 +35,87 @@ const stub = vi.hoisted(() => {
 
 vi.mock("@langwatch/scenario-web/drawers", () =>
   stub.drawers([
-    "AgentCodeEditorDrawerFromUrl",
-    "AgentHttpEditorDrawerFromUrl",
-    "WorkflowSelectorDrawerFromUrl",
-    "AgentListDrawer",
-    "AgentWorkflowTargetEditorDrawer",
     "AgentTestingCaseEditorDrawer",
-    "ConnectedAgentDrawer",
-    "ConnectFromCodeDrawer",
     "ScenarioRunDetailDrawer",
     "ScenarioFormDrawerFromUrl",
     "SuiteFormDrawer",
-    "AgentWorkflowEditorDrawer",
     "ScenarioVersionHistoryDrawer",
   ]),
 );
+
+vi.mock("@langwatch/agent-web/agent-editors", () =>
+  stub.drawers([
+    "AgentCodeEditorDrawer",
+    "WorkflowSelectorDrawer",
+    "AgentListDrawer",
+    "AgentWorkflowTargetEditorDrawer",
+    "ConnectedAgentDrawer",
+    "ConnectFromCodeDrawer",
+    "AgentWorkflowEditorDrawer",
+    "AgentTestPanel",
+  ]),
+);
+vi.mock("@langwatch/agent-web/agent-http-editor", () => stub.drawers(["AgentHttpEditorDrawer"]));
+
+const agentCalls = vi.hoisted(() => ({
+  address: "",
+  getById: vi.fn<(input: { id: string; projectId: string }) => void>(),
+}));
+vi.mock("@langwatch/agent-web/agent-client", () => ({
+  agentApi: {
+    Provider: ({ children }: { children: ReactNode }) => children,
+    agents: {
+      getById: {
+        useQuery: (input: { id: string; projectId: string }) => {
+          agentCalls.getById(input);
+          return {
+            data: {
+              id: input.id,
+              name: "Agent",
+              projectId: input.projectId,
+              type: agentCalls.address.includes("agentConnectedDetail") ? "connected" : "workflow",
+              workflowId: "workflow_1",
+              config: { workflow_id: "workflow_1" },
+            },
+            isLoading: false,
+            error: null,
+          };
+        },
+      },
+      getAll: { useQuery: () => ({ data: [], isLoading: false, error: null }) },
+      create: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) },
+      update: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) },
+      delete: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) },
+      cascadeArchive: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) },
+    },
+    useUtils: () => ({
+      agents: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+        getRelatedEntities: { fetch: vi.fn() },
+      },
+    }),
+  },
+}));
+vi.mock("@langwatch/scenario-web/screens/simulations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/scenario-web/screens/simulations")>()),
+  useScenarioHost: () => ({ project: () => ({ id: "project_1", slug: "acme-app" }) }),
+  scenarioApi: {
+    Provider: ({ children }: { children: ReactNode }) => children,
+    httpProxy: { execute: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) } },
+    workflow: { create: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) } },
+  },
+}));
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+  api: { workflow: { getById: { useQuery: () => ({ data: void 0, isLoading: false }) } } },
+}));
+vi.mock("@langwatch/ui-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/ui-host/capabilities")>()),
+  useUiCapabilities: () => ({
+    session: { activeScope: () => ({ projectId: "project_1", projectSlug: "acme-app" }) },
+    feedback: { succeeded: vi.fn(), failed: vi.fn() },
+  }),
+}));
 
 vi.mock("@langwatch/evaluator-web/drawers", () =>
   stub.drawers(["GuardrailsDrawer", "EvaluatorHistoryPanel", "EvaluatorListDrawer"]),
@@ -161,6 +228,8 @@ import { installedUiDrawers } from "../src/features/installed-ui-features";
 afterEach(() => cleanup());
 
 async function openAddress(address: string, component: string): Promise<string> {
+  agentCalls.address = address;
+  agentCalls.getById.mockClear();
   render(
     <ChakraProvider value={defaultSystem}>
       <MemoryRouter initialEntries={[`/acme-app/traces${address}`]}>
@@ -187,19 +256,19 @@ const OPENINGS: ReadonlyArray<{
     what: "the agent type selector picking a code agent",
     drawer: "agentCodeEditor",
     address: "?drawer.open=agentCodeEditor",
-    component: "AgentCodeEditorDrawerFromUrl",
+    component: "AgentCodeEditorDrawer",
   },
   {
     what: "the agent type selector picking an HTTP agent",
     drawer: "agentHttpEditor",
     address: "?drawer.open=agentHttpEditor",
-    component: "AgentHttpEditorDrawerFromUrl",
+    component: "AgentHttpEditorDrawer",
   },
   {
     what: "the agent type selector picking a workflow agent",
     drawer: "workflowSelector",
     address: "?drawer.open=workflowSelector",
-    component: "WorkflowSelectorDrawerFromUrl",
+    component: "WorkflowSelectorDrawer",
   },
   {
     what: "the studio agent picker",
@@ -212,7 +281,6 @@ const OPENINGS: ReadonlyArray<{
     drawer: "agentWorkflowTargetEditor",
     address: "?drawer.open=agentWorkflowTargetEditor&drawer.agentId=agent_1",
     component: "AgentWorkflowTargetEditorDrawer",
-    carries: ["agent_1"],
   },
   {
     what: "Agent Testing editing a test case",
@@ -323,6 +391,13 @@ describe("given an address the product writes", () => {
       it(`mounts ${opening.drawer}`, async () => {
         const props = await openAddress(opening.address, opening.component);
 
+        if (opening.drawer === "agentWorkflowTargetEditor") {
+          expect(agentCalls.getById).toHaveBeenCalledWith({
+            id: "agent_1",
+            projectId: "project_1",
+          });
+        }
+
         for (const carried of opening.carries ?? []) {
           expect(props, `${opening.drawer} did not receive ${carried}`).toContain(carried);
         }
@@ -381,9 +456,9 @@ describe("given a drawer that hands `open` straight to a Chakra control", () => 
    * defect was invisible until a drawer that does not was registered.
    */
   const COERCED = [
-    { drawer: "agentCodeEditor", component: "AgentCodeEditorDrawerFromUrl" },
-    { drawer: "agentHttpEditor", component: "AgentHttpEditorDrawerFromUrl" },
-    { drawer: "workflowSelector", component: "WorkflowSelectorDrawerFromUrl" },
+    { drawer: "agentCodeEditor", component: "AgentCodeEditorDrawer" },
+    { drawer: "agentHttpEditor", component: "AgentHttpEditorDrawer" },
+    { drawer: "workflowSelector", component: "WorkflowSelectorDrawer" },
     { drawer: "inviteMember", component: "InviteMemberDrawer" },
     { drawer: "createTeam", component: "CreateTeamDrawer" },
   ] as const;

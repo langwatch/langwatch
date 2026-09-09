@@ -10,9 +10,11 @@ import {
   type UiScopeHostPort,
 } from "@langwatch/ui-host/use-organization-team-project";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { UiActiveScope, UiActor, UiFeedbackPort } from "@langwatch/ui-host/capabilities";
 import { UiSessionPort } from "@langwatch/ui-host/capabilities";
+import type { UiSessionSnapshot } from "@langwatch/ui-host/session";
+import type { UiResolvedScope, UiScopeProject } from "../model/ui-scope";
 import { useUiAddress } from "./ui-address";
 import { uiLeaveTo } from "./ui-departure";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";
@@ -25,12 +27,14 @@ import {
   uiAuthClient,
   UI_SESSION_QUERY_KEY,
   type UiAuthClient,
+  type UiSessionReading as UiSessionResponse,
 } from "./ui-session-client";
 import {
   useUiEffectivePermissions,
   useUiFeatureFlags,
   useUiOrganizations,
   useUiSharedProject,
+  type UiEffectivePermissionsRead,
 } from "./ui-session-queries";
 
 /**
@@ -117,17 +121,18 @@ export class UiFeatureFlagRequests {
 }
 
 export type BrowserUiSessionState = {
-  readonly actor: UiActor | null;
-  readonly scope: UiActiveScope;
-  /** Undefined until the server has answered for this scope. */
-  readonly permissions: ReadonlySet<string> | undefined;
-  /** Whether the scope and its permissions have both answered. */
-  readonly settled: boolean;
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
-  /** The resolved scope on the port every feature's shared hook reads. */
   readonly scopeHost: UiScopeHostPort | undefined;
-};
+} & (
+  | { readonly snapshot: UiSessionSnapshot }
+  | {
+      readonly actor: UiActor | null;
+      readonly scope: UiActiveScope;
+      readonly permissions: ReadonlySet<string> | undefined;
+      readonly settled: boolean;
+    }
+);
 
 /** The port over one render's worth of answers. */
 export class BrowserUiSession extends UiSessionPort {
@@ -140,10 +145,18 @@ export class BrowserUiSession extends UiSessionPort {
   }
 
   currentUser(): UiActor | null {
+    if ("snapshot" in this.state) return this.state.snapshot.session.user;
     return this.state.actor;
   }
 
   activeScope(): UiActiveScope {
+    if ("snapshot" in this.state) {
+      const { scope } = this.state.snapshot;
+      return {
+        organizationId: scope.organization?.id ?? null,
+        projectId: scope.project?.id ?? null,
+      };
+    }
     return this.state.scope;
   }
 
@@ -153,13 +166,23 @@ export class BrowserUiSession extends UiSessionPort {
    * actions) through the engine's own helper, so the two can't drift.
    */
   hasPermission(permission: string): boolean {
+    if ("snapshot" in this.state) return this.state.snapshot.permissions.can(permission);
     const granted = this.state.permissions;
     if (!granted) return false;
     return permissionSatisfiedBy({ granted, requested: permission });
   }
 
   isSettled(): boolean {
+    if ("snapshot" in this.state) {
+      const { session, scope, permissions } = this.state.snapshot;
+      return session.status !== "loading" && scope.status !== "loading" && !permissions.isLoading;
+    }
     return this.state.settled;
+  }
+
+  override snapshot(): UiSessionSnapshot {
+    if (!("snapshot" in this.state)) return super.snapshot();
+    return this.state.snapshot;
   }
 
   override scopeHost(): UiScopeHostPort | undefined {
@@ -237,6 +260,7 @@ export function useBrowserUiSession({
     transport,
     isDemo,
     enabled: !!actor || !route.isPublicRoute,
+    userId,
   });
   const sharedTrace = useUiSharedProject({
     transport,
@@ -260,29 +284,23 @@ export function useBrowserUiSession({
   // viewer has no membership anywhere, and the page is about the one view the
   // token opens. The organization stays whatever the reader's own session
   // resolved, which for a signed-out viewer is nothing.
+  const isSharedRoute = Boolean(route.shareToken && route.isPublicRoute);
   const sharedProject = sharedTrace.data?.project;
-  const project = sharedProject ?? resolved.project;
+  const project = isSharedRoute ? sharedProject : resolved.project;
   const organizationId = resolved.organization?.id;
 
   const permissions = useUiEffectivePermissions({
     transport,
     projectId: project?.id,
     organizationId,
+    userId,
   });
-
-  // Built once per fetched set rather than once per `hasPermission` call: a
-  // page asking about a dozen permissions on every render would otherwise
-  // rebuild the same set a dozen times a render.
-  const granted = useMemo(
-    () => (permissions.data ? new Set(permissions.data.permissions) : void 0),
-    [permissions.data],
-  );
-
-  // Settled means "the answers are the server's, not the fail-closed default".
-  // A caller with no scope at all has nothing to ask about, and waiting for an
-  // answer that will never be requested would leave a guard loading forever.
-  const settled =
-    !organizations.isLoading && (granted !== void 0 || (!project?.id && !organizationId));
+  const organizationPermissions = useUiEffectivePermissions({
+    transport,
+    projectId: void 0,
+    organizationId,
+    userId,
+  });
 
   const requestedFlags = useSyncExternalStore(
     flagRequests.subscribe,
@@ -315,55 +333,109 @@ export function useBrowserUiSession({
 
   const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);
 
-  // Published once the graph has answered, so a feature reading the shared
-  // scope sees "still arriving" rather than a project that is about to change.
-  const organization = resolved.organization;
-  const team = resolved.team;
-  const organizationRole = resolved.organizationRole;
-  const scopeHost = useMemo<UiScopeHostPort | undefined>(
-    () =>
-      organizations.isLoading && !project
-        ? void 0
-        : createUiScopeHost({
-            project: () =>
-              project
-                ? { id: project.id, slug: project.slug, name: project.name ?? project.slug }
-                : void 0,
-            organization: () =>
-              organization ? { id: organization.id, name: organization.name } : void 0,
-            team: () => (team ? { id: team.id, name: team.name } : void 0),
-            organizationRole: () => organizationRole,
-            hasPermission: (permission) =>
-              granted ? permissionSatisfiedBy({ granted, requested: permission }) : false,
-            isDemoProject: () => isDemo,
-            isLoading: () => !settled,
-          }),
-    [
-      organizations.isLoading,
-      project,
-      organization,
-      team,
-      organizationRole,
-      granted,
-      isDemo,
-      settled,
-    ],
-  );
+  const sessionReading = readSession(session);
+  const scope = readActiveScope({
+    session: sessionReading,
+    source: isSharedRoute ? sharedTrace : organizations,
+    resolved,
+    project,
+  });
+  const snapshot: UiSessionSnapshot = {
+    session: sessionReading,
+    scope,
+    permissions: readPermissions(scope.status, permissions, organizationPermissions),
+  };
 
-  return useMemo(
-    () =>
-      BrowserUiSession.create({
-        actor,
-        scope: {
-          organizationId: organizationId ?? null,
-          projectId: project?.id ?? null,
-        },
-        permissions: granted,
-        settled,
-        flags,
-        askFlag,
-        scopeHost,
-      }),
-    [actor, organizationId, project?.id, granted, settled, flags, askFlag, scopeHost],
-  );
+  return BrowserUiSession.create({
+    snapshot,
+    flags,
+    askFlag,
+    scopeHost: legacyScopeHost(snapshot, resolved.organizationRole, isDemo),
+  });
+}
+
+function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionSnapshot["session"] {
+  if (query.isLoading) return { status: "loading", user: null };
+  if (query.data?.unreachable) return { status: "offline", user: null };
+  if (query.isError || query.data?.failure) return { status: "error", user: null };
+  const actor = query.data?.actor;
+  if (actor) return { status: "authenticated", user: actor };
+  return { status: "anonymous", user: null };
+}
+
+function readActiveScope({
+  session,
+  source,
+  resolved,
+  project,
+}: {
+  session: UiSessionSnapshot["session"];
+  source: UseQueryResult<unknown>;
+  resolved: UiResolvedScope;
+  project: UiScopeProject | undefined;
+}): UiSessionSnapshot["scope"] {
+  const empty = { organization: void 0, team: void 0, project: void 0 };
+  if (session.status === "loading" || source.isLoading) {
+    return { ...empty, status: "loading" };
+  }
+  if (session.status === "offline" || session.status === "error" || source.isError) {
+    return { ...empty, status: "unavailable" };
+  }
+
+  const { organization, team } = resolved;
+  return {
+    status: "ready",
+    organization: organization ? { id: organization.id, name: organization.name } : void 0,
+    team: team ? { id: team.id, name: team.name } : void 0,
+    project: project
+      ? { id: project.id, slug: project.slug, name: project.name ?? project.slug }
+      : void 0,
+  };
+}
+
+function readPermissions(
+  scopeStatus: UiSessionSnapshot["scope"]["status"],
+  project: UseQueryResult<UiEffectivePermissionsRead>,
+  organization: UseQueryResult<UiEffectivePermissionsRead>,
+): UiSessionSnapshot["permissions"] {
+  const status = permissionStatus(scopeStatus, project, organization);
+  const projectGrants = new Set(project.isError ? [] : project.data?.permissions);
+  const organizationGrants = new Set(organization.isError ? [] : organization.data?.permissions);
+  return {
+    status,
+    isLoading: status === "loading",
+    can: (requested) =>
+      scopeStatus === "ready" && permissionSatisfiedBy({ granted: projectGrants, requested }),
+    canInOrganization: (requested) =>
+      scopeStatus === "ready" && permissionSatisfiedBy({ granted: organizationGrants, requested }),
+  };
+}
+
+function permissionStatus(
+  scopeStatus: UiSessionSnapshot["scope"]["status"],
+  project: UseQueryResult<UiEffectivePermissionsRead>,
+  organization: UseQueryResult<UiEffectivePermissionsRead>,
+): UiSessionSnapshot["permissions"]["status"] {
+  if (scopeStatus !== "ready") return scopeStatus;
+  if (project.isLoading || organization.isLoading) return "loading";
+  if (project.isError || organization.isError) return "unavailable";
+  return "ready";
+}
+
+function legacyScopeHost(
+  snapshot: UiSessionSnapshot,
+  organizationRole: string | undefined,
+  isDemo: boolean,
+): UiScopeHostPort | undefined {
+  if (snapshot.scope.status === "loading") return void 0;
+  return createUiScopeHost({
+    project: () => snapshot.scope.project,
+    organization: () => snapshot.scope.organization,
+    team: () => snapshot.scope.team,
+    organizationRole: () => organizationRole,
+    hasPermission: snapshot.permissions.can,
+    hasOrganizationPermission: snapshot.permissions.canInOrganization,
+    isDemoProject: () => isDemo,
+    isLoading: () => snapshot.permissions.isLoading,
+  });
 }

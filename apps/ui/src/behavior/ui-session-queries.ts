@@ -21,7 +21,7 @@ export const UI_SHARED_TRACE_PROCEDURE = "sharedTrace.get";
  */
 const ORGANIZATIONS_STALE_TIME_MS = 30_000;
 
-/** The server re-reads the operator rows every few seconds; the browser holds its answer far longer. */
+/** The server re-reads operator rows every few seconds; the browser holds its answer far longer. */
 const FEATURE_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 /**
@@ -37,22 +37,28 @@ export type UiSharedProject = {
   readonly slug: string;
 };
 
-type UiSharedTraceRead = { readonly project: UiSharedProject };
-type UiEffectivePermissionsRead = { readonly permissions: readonly string[] };
+export type UiSharedTraceRead = { readonly project: UiSharedProject };
+export type UiEffectivePermissionsRead = { readonly permissions: readonly string[] };
 type UiFeatureFlagRead = { readonly enabled: boolean };
 
 export function useUiOrganizations({
   transport,
   isDemo,
   enabled,
+  userId,
 }: {
   transport: UiFeatureApiTransport;
   isDemo: boolean;
   enabled: boolean;
+  /** Keeps one user's organization graph from reaching the next user. */
+  userId: string | undefined;
 }): UseQueryResult<readonly UiScopeOrganization[]> {
   const input = { isDemo };
   return useQuery({
-    queryKey: trpcQueryKey(UI_ORGANIZATIONS_PROCEDURE, { input, type: "query" }),
+    queryKey: [
+      ...trpcQueryKey(UI_ORGANIZATIONS_PROCEDURE, { input, type: "query" }),
+      userId ?? "anonymous",
+    ],
     queryFn: () =>
       transport.query(UI_ORGANIZATIONS_PROCEDURE, input, OFF_BATCH) as Promise<
         readonly UiScopeOrganization[]
@@ -99,23 +105,29 @@ export function useUiEffectivePermissions({
   transport,
   projectId,
   organizationId,
+  userId,
 }: {
   transport: UiFeatureApiTransport;
   projectId: string | undefined;
   organizationId: string | undefined;
+  /** Keeps a previous user's cached grants from reaching the next user. */
+  userId: string | undefined;
 }): UseQueryResult<UiEffectivePermissionsRead> {
   const input = {
     ...(projectId ? { projectId } : {}),
     ...(!projectId && organizationId ? { organizationId } : {}),
   };
   return useQuery({
-    queryKey: trpcQueryKey(UI_EFFECTIVE_PERMISSIONS_PROCEDURE, { input, type: "query" }),
+    queryKey: [
+      ...trpcQueryKey(UI_EFFECTIVE_PERMISSIONS_PROCEDURE, { input, type: "query" }),
+      userId ?? "anonymous",
+    ],
     queryFn: () =>
       transport.query(
         UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
         input,
       ) as Promise<UiEffectivePermissionsRead>,
-    enabled: !!projectId || !!organizationId,
+    enabled: !!userId && (!!projectId || !!organizationId),
     staleTime: ORGANIZATIONS_STALE_TIME_MS,
     refetchOnWindowFocus: true,
   });

@@ -1,7 +1,7 @@
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 import { UiRpcPort, type UiRpcSubscription } from "../src/behavior/ui-rpc";
-import { TrpcAgentBrowserAdapter } from "../src/features/agent/behavior/trpc-agent-browser.adapter";
+import { TrpcAgentClient } from "../src/features/agent/behavior/trpc-agent.client";
 
 type RpcCall = {
   kind: "query" | "mutation";
@@ -13,7 +13,6 @@ class RecordingRpc extends UiRpcPort {
   readonly calls: RpcCall[] = [];
 
   constructor(private readonly responses: Map<string, unknown>) {
-    super();
   }
 
   query(path: string, input: unknown): Promise<unknown> {
@@ -59,10 +58,10 @@ const agent: AgentWithFields = {
   fieldsResolved: true,
 };
 
-describe("TrpcAgentBrowserAdapter", () => {
+describe("TrpcAgentClient", () => {
   it("maps project reads to the existing Agent tRPC procedure", async () => {
     const rpc = new RecordingRpc(new Map([["agents.getById", agent]]));
-    const browser = TrpcAgentBrowserAdapter.create(rpc);
+    const browser = TrpcAgentClient.create(rpc);
 
     const result = await browser.getById({ id: "agent_1", projectId: "project_1" });
 
@@ -84,7 +83,7 @@ describe("TrpcAgentBrowserAdapter", () => {
       copiedFromAgentId: "agent_1",
     };
     const rpc = new RecordingRpc(new Map([["agents.copy", copied]]));
-    const browser = TrpcAgentBrowserAdapter.create(rpc);
+    const browser = TrpcAgentClient.create(rpc);
     const input = {
       agentId: "agent_1",
       projectId: "project_2",
@@ -128,7 +127,7 @@ describe("TrpcAgentBrowserAdapter", () => {
         ],
       ]),
     );
-    const browser = TrpcAgentBrowserAdapter.create(rpc);
+    const browser = TrpcAgentClient.create(rpc);
     const archiveInput = { id: "agent_1", projectId: "project_1" };
     const copiesInput = { agentId: "agent_1", projectId: "project_1" };
 
@@ -153,7 +152,7 @@ describe("TrpcAgentBrowserAdapter", () => {
 
   it("rejects a malformed response at the browser transport boundary", async () => {
     const rpc = new RecordingRpc(new Map([["agents.pushToCopies", { pushedTo: "1" }]]));
-    const browser = TrpcAgentBrowserAdapter.create(rpc);
+    const browser = TrpcAgentClient.create(rpc);
 
     await expect(
       browser.pushToCopies({

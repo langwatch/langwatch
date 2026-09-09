@@ -16,10 +16,10 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: (options: Record<string, unknown>) => toasts.created.push(options) },
 }));
 
-vi.mock("@langwatch/annotation-web/screens/annotations", async () => {
+vi.mock("@langwatch/annotation-web/annotations", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/annotation-web/screens/annotations")
-  >("@langwatch/annotation-web/screens/annotations");
+    typeof import("@langwatch/annotation-web/annotations")
+  >("@langwatch/annotation-web/annotations");
   return {
     ...actual,
     annotationApi: {
@@ -40,7 +40,7 @@ vi.mock("../src/behavior/ui-organization-facts", () => ({
 import {
   type AnnotationHostPort,
   useAnnotationHost,
-} from "@langwatch/annotation-web/screens/annotations";
+} from "@langwatch/annotation-web/annotations";
 import {
   UiCapabilityContextProvider,
   UiDocumentTitlePort,

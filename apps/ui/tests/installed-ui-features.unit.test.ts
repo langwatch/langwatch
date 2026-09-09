@@ -414,7 +414,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/agent-web",
         "@langwatch/analytics-web",
         "@langwatch/annotation-web",
-        "@langwatch/annotation-web/screens/annotation-scores",
+        "@langwatch/annotation-web/annotation-scores",
         "@langwatch/api-key-web",
         "@langwatch/auth-web",
         "@langwatch/authz-web",

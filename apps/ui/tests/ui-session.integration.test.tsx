@@ -11,9 +11,11 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   UiCapabilityUnavailableError,
+  UiFeedbackPort,
   UiSessionPort,
   useUiCapabilities,
 } from "@langwatch/ui-host/capabilities";
+import { useActiveScope, usePermissions, useSession } from "@langwatch/ui-host/session";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import { useBrowserUiSession } from "../src/behavior/ui-session";
 import type { UiAuthClient } from "../src/behavior/ui-session-client";
@@ -113,6 +115,11 @@ class StubSession extends UiSessionPort {
   }
 }
 
+class SilentFeedback extends UiFeedbackPort {
+  succeeded(): void {}
+  failed(): void {}
+}
+
 let dispose: (() => void) | undefined;
 
 afterEach(() => {
@@ -138,6 +145,7 @@ function renderSession({
   authClient = signedInAsJane,
   page,
   installed,
+  feedback,
   live = true,
 }: {
   path: string;
@@ -145,11 +153,15 @@ function renderSession({
   authClient?: UiAuthClient;
   page: ReactNode;
   installed?: UiSessionPort;
+  feedback?: UiFeedbackPort;
   live?: boolean;
 }) {
   const Shell = createUiFeatureShell({
     apis: [],
-    capabilities: installed ? { session: installed } : {},
+    capabilities: {
+      ...(installed ? { session: installed } : {}),
+      ...(feedback ? { feedback } : {}),
+    },
     transport,
     ...(live
       ? {
@@ -190,7 +202,78 @@ function ScopeProbe() {
   );
 }
 
+function SnapshotProbe() {
+  const session = useSession();
+  const scope = useActiveScope();
+  const permissions = usePermissions();
+  return (
+    <div>
+      <span data-testid="session-status">{session.status}</span>
+      <span data-testid="snapshot-user">{session.user?.id ?? "nobody"}</span>
+      <span data-testid="scope-status">{scope.status}</span>
+      <span data-testid="snapshot-project">{scope.project?.id ?? "none"}</span>
+      <span data-testid="permissions-status">{permissions.status}</span>
+      <span data-testid="can-annotations">{String(permissions.can("annotations:update"))}</span>
+    </div>
+  );
+}
+
 describe("given a screen mounted in a composition that reads the deployment's session", () => {
+  it("publishes auth loading before the session query answers", () => {
+    const { transport } = recordingTransport();
+    const view = renderSession({ path: "/acme-app/traces", transport, page: <SnapshotProbe /> });
+
+    expect(view.getByTestId("session-status").textContent).toBe("loading");
+    expect(view.getByTestId("scope-status").textContent).toBe("loading");
+    expect(view.getByTestId("permissions-status").textContent).toBe("loading");
+    expect(view.getByTestId("can-annotations").textContent).toBe("false");
+  });
+
+  it("publishes anonymous from the auth query without waiting for grants", async () => {
+    const { transport } = recordingTransport();
+    const view = renderSession({
+      path: "/acme-app/traces",
+      transport,
+      authClient: signedOut,
+      page: <SnapshotProbe />,
+    });
+
+    await waitFor(() => expect(view.getByTestId("session-status").textContent).toBe("anonymous"));
+    expect(view.getByTestId("snapshot-user").textContent).toBe("nobody");
+  });
+
+  it("keeps an auth refusal distinct from an offline session read", async () => {
+    const refused: UiAuthClient = {
+      $fetch: () => Promise.resolve({ error: { code: "session_refused", status: 401 } }),
+      signOut: refusesToSignOut,
+    };
+    const offline: UiAuthClient = {
+      $fetch: () => Promise.resolve({ error: { status: 503 } }),
+      signOut: refusesToSignOut,
+    };
+    const { transport } = recordingTransport();
+    const refusedView = renderSession({
+      path: "/acme-app/traces",
+      transport,
+      authClient: refused,
+      page: <SnapshotProbe />,
+      feedback: new SilentFeedback(),
+    });
+    await waitFor(() =>
+      expect(refusedView.getByTestId("session-status").textContent).toBe("error"),
+    );
+    dispose?.();
+
+    const offlineView = renderSession({
+      path: "/acme-app/traces",
+      transport,
+      authClient: offline,
+      page: <SnapshotProbe />,
+      feedback: new SilentFeedback(),
+    });
+    await waitFor(() => expect(offlineView.getByTestId("api-waiting")).toBeTruthy());
+  });
+
   describe("when the reader is signed in", () => {
     it("answers with the signed-in reader", async () => {
       const { transport } = recordingTransport();
@@ -361,10 +444,10 @@ describe("given a screen that asks what the reader may do", () => {
       await waitFor(() =>
         expect(view.getByTestId("answers").textContent).toContain("datasets:view=true"),
       );
-      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1);
+      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2);
     });
 
-    it("asks about the project it resolved, and not about the organization as well", async () => {
+    it("asks separately about the resolved project and organization", async () => {
       const { transport, callsTo } = recordingTransport({ permissions: [] });
 
       const view = renderSession({
@@ -374,10 +457,11 @@ describe("given a screen that asks what the reader may do", () => {
       });
 
       await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
-      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1));
-      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)[0]?.input).toEqual({
-        projectId: "proj-app",
-      });
+      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2));
+      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE).map((call) => call.input)).toEqual([
+        { projectId: "proj-app" },
+        { organizationId: "org-acme" },
+      ]);
     });
   });
 });

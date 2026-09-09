@@ -5,6 +5,7 @@
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 import { projectNavItems } from "@langwatch/navigation-web/chrome";
+import { annotationRoutes } from "../../features/annotation/ui/sections/annotation-routes";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 /** The pattern the router falls back to when nothing else claims a path. */
@@ -48,9 +49,19 @@ function resolvedPattern({
   return matches?.[0]?.route.path ?? null;
 }
 
-const patterns = uiRouteDescriptors(uiRouteTable)
+const tablePatterns = uiRouteDescriptors(uiRouteTable)
   .map((descriptor) => descriptor.path)
   .filter((path): path is string => typeof path === "string");
+
+// `createUiRouteObjects` attaches project feature contributions at the table's
+// project anchor. Annotations is currently the only navigation destination
+// served that way, so include its installed routes in the composed tree.
+const patterns = [
+  ...tablePatterns,
+  ...annotationRoutes
+    .map((route) => route.path)
+    .filter((path): path is string => typeof path === "string"),
+];
 const declaredPaths = Object.values(projectNavItems).map((item) => item.path);
 
 describe("given the destinations the app can navigate to", () => {

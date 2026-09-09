@@ -8,10 +8,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/annotation-web/screens/annotations", async () => {
+vi.mock("@langwatch/annotation-web/annotations", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/annotation-web/screens/annotations")
-  >("@langwatch/annotation-web/screens/annotations");
+    typeof import("@langwatch/annotation-web/annotations")
+  >("@langwatch/annotation-web/annotations");
   const Screen = ({ view }: { view: string }) => <div>the annotations page: {view}</div>;
   const emptyQuery = { data: undefined, isLoading: false };
   const apiNode = (): unknown =>

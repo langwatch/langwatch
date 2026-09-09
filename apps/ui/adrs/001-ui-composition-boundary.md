@@ -77,6 +77,31 @@ the sole importer of the drawer implementation. Composition hubs such as Trace
 Explorer may declare many surfaces, but that rationale and exact edge set must
 remain visible in the catalogue.
 
+## Shared session and active scope
+
+The application shell resolves identity and navigation scope once. Features
+read `useSession()`, `useActiveScope()` and `usePermissions()` from
+`@langwatch/ui-host/session`. These hooks read the existing capability provider;
+they do not fetch, persist selections, redirect or mount another provider.
+Session status describes authentication, scope status describes the selected
+organization/team/project, and permission readiness describes grant reads.
+Loading, failure and an empty result remain distinguishable.
+
+The browser publisher owns authentication, route resolution, remembered
+selection and query lifecycles. User-specific query caches include the actor;
+grants additionally include their exact project or organization target. Failed
+grant reads do not retain affirmative cached permissions. Organization grants
+are queried at organization scope, not inferred from project grants. Share
+routes resolve their project exclusively through the share token.
+
+Annotation adopts these readers first. The old organization/team/project hook
+remains a compatibility reader for other consumers during migration. New
+feature-local copies are not an alternative: they duplicate scope policy and
+make embedded surfaces depend on the route that happens to host them.
+
+The behavioral contract is
+[shared scope host](../../../specs/ui/shared-scope-host.feature).
+
 ## Alternatives considered
 
 A one-to-one mirror of backend features was rejected because real product

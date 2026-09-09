@@ -123,8 +123,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
                 const conversationId = langy.state.conversationId ?? "";
                 // A failure here reads as an empty tool list otherwise, and
                 // the reply is what says why Langy did not ask for the code.
-                const hasCodeAccessTool = langy.state.toolNames.includes("code_access");
-                if (!hasCodeAccessTool) {
+                if (!langy.state.toolNames.includes("code_access")) {
                   console.log(
                     "[layer2] tools without code_access:",
                     langy.state.toolNames.join(", "),
