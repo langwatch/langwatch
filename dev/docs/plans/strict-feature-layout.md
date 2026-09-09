@@ -327,6 +327,7 @@ wiring lines for the root session.
 ## 9. Decisions open for Alex
 
 Ordered by what they unblock.
+- **D-r. `featureApi` owner labels for doors that are not modules.** The health probes carry `featureApi<HealthProbeApi>("platform-health")`, the OpenAPI discovery doors `"ops"`, the rum intake `"trace"`, the image relay `"stored-object"`; `featureApi` only accepts catalogue ids and none of these doors is a module. Either the catalogue grows a `platform` id for process-owned doors, or these four labels stand. Unblocks nothing; a lint could refuse `featureApi` outside a contract package once decided.
 
 - **D-a. The modules tree shape.** Repo-root `modules/` and `enterprise/{packages,modules}` (my reading of "in the root we have packages, modules, enterprise") or `packages/modules/*`. Also: run before or after Kimi lands api-key. Unblocks clause 12.
 - **D-b. The 09-07 pile.** About 1,400 uncommitted paths from the stopped lane (worker-tenancy rewrite, api-trace-read-stack, catalogue rewrites, ~890 files yesterday). Adopt by slice, hand to an owner, or discard. Unblocks the worker side of wave 4.
