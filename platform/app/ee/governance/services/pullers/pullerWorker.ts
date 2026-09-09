@@ -307,8 +307,15 @@ function assertRunMadeProgress(params: {
   );
 }
 
-/** What one pull run reports back to whoever asked for it. */
-export type IngestionPullRunOutcome = {
+/**
+ * What one pull run reports back to whoever asked for it.
+ *
+ * Named a report rather than an outcome because `IngestionPullRunOutcome` in
+ * the pipeline's own constants is already taken, and means something
+ * narrower: the single word "completed" or "failed" that lands on the
+ * run-status row. This is the whole of what the run has to say.
+ */
+export type IngestionPullRunReport = {
   nextCursor: string | null;
   eventCount: number;
   /**
@@ -355,7 +362,7 @@ function outcomeForSourceNotPulling({
   status: string;
   ingestionSourceId: string;
   cursor: string | null;
-}): IngestionPullRunOutcome | null {
+}): IngestionPullRunReport | null {
   if (status === "active" || status === "awaiting_first_event") return null;
   logger.info(
     { ingestionSourceId, status },
@@ -376,7 +383,7 @@ export async function runIngestionPull(params: {
   cursor: string | null;
   pulledUsage?: PulledUsageDispatcher;
   identityMatch?: DiscoveredPeopleMatcher;
-}): Promise<IngestionPullRunOutcome> {
+}): Promise<IngestionPullRunReport> {
   registerBuiltInPullers();
 
   const ingestionSourceId = params.sourceId;
