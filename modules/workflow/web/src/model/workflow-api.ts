@@ -1,7 +1,7 @@
 /**
- * The procedures the Workflows screens call. HAND-WRITTEN, MEANT TO BE
- * GENERATED. SEGMENT NAMES ARE LOAD-BEARING — tRPC hashes the path into
- * the cache key. ADR-004's one governed-closure exception here.
+ * The procedures the Workflows screens call. Segment names are load-bearing -
+ * tRPC hashes the path into the cache key. ADR-004's one governed-closure
+ * exception here.
  */
 
 import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
@@ -52,26 +52,13 @@ import type {
   PromptUpdateTrpcInput,
   PromptUpdateTrpcOutput,
 } from "@langwatch/prompt-contract";
-import type {
-  StudioWorkflow,
-  WorkflowApiAutosaveInput,
-  WorkflowApiAutosaveOutput,
-  WorkflowApiCommitVersionInput,
-  WorkflowApiCommitVersionOutput,
-  WorkflowApiEngineModeInput,
-  WorkflowApiEngineModeOutput,
-  WorkflowApiGenerateCommitMessageInput,
-  WorkflowApiGenerateCommitMessageOutput,
-  WorkflowApiGetByIdInput,
-  WorkflowApiGetByIdOutput,
-  WorkflowApiGetVersionsInput,
-  WorkflowApiGetVersionsOutput,
-  WorkflowApiPublishInput,
-  WorkflowApiPublishOutput,
-  WorkflowApiRestoreVersionInput,
-  WorkflowApiRestoreVersionOutput,
-} from "@langwatch/workflow-contract";
-import { createModuleApi, type OutputsFromMap, type RouterFromMap } from "@langwatch/api/web";
+import type { workflowTrpc, workflowOptimizationTrpc } from "@langwatch/workflow-contract";
+import {
+  createModuleApi,
+  type ContractApiMap,
+  type OutputsFromMap,
+  type RouterFromMap,
+} from "@langwatch/api/web";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
 export type WorkflowProjectPath = {
@@ -96,7 +83,7 @@ export type WorkflowListRow = {
 
 /**
  * One replica of a workflow, as the push dialog lists it. `fullPath` is
- * composed by the TRANSPORT, same string the replication picker builds;
+ * composed by the transport, same string the replication picker builds;
  * the list only ever contains replicas the caller may update.
  */
 export type WorkflowCopyRow = {
@@ -114,9 +101,9 @@ export type WorkflowCopyRow = {
 export type WorkflowRelatedEntity = { id: string; name: string };
 
 /**
- * What deleting a workflow would take with it, named BEFORE the reader
- * types "delete": linked evaluators/agents are ARCHIVED, every online
- * evaluation built on them is DELETED, none recoverable from this screen.
+ * What deleting a workflow would take with it, named before the reader types
+ * "delete": linked evaluators/agents are archived, every online evaluation
+ * built on them is deleted, none recoverable from this screen.
  */
 export type WorkflowRelatedEntities = {
   evaluators: WorkflowRelatedEntity[];
@@ -144,8 +131,8 @@ export type WorkflowOrganizationGraph = {
 };
 
 /**
- * A procedure the STUDIO calls whose row shape no contract publishes yet.
- * Declared by PATH ONLY; every `Unpublished` below is OWED WORK, named not hidden.
+ * A procedure the studio calls whose row shape no contract publishes yet.
+ * Declared by path only; every `Unpublished` below is owed work, named not hidden.
  */
 // oxlint-disable-next-line no-explicit-any
 type Unpublished = any;
@@ -156,143 +143,16 @@ type UnpublishedSubscription = {
   subscription: { input: Unpublished; output: Unpublished };
 };
 
-export type WorkflowApiMap = {
-  workflow: {
-    /** The project's workflows, newest edit first, with copy lineage redacted. */
-    getAll: { query: { input: { projectId: string }; output: WorkflowListRow[] } };
-
-    create: {
-      mutation: {
-        input: {
-          projectId: string;
-          dsl: StudioWorkflow;
-          commitMessage: string;
-          /** Publish on creation, so a workflow made for an evaluator can run at once. */
-          publish?: boolean;
-        };
-        output: { workflow: { id: string } };
-      };
-    };
-
-    copy: {
-      mutation: {
-        input: {
-          workflowId: string;
-          projectId: string;
-          sourceProjectId: string;
-          copyDatasets: boolean;
-        };
-        output: { workflow: { id: string } };
-      };
-    };
-
-    archive: { mutation: { input: { workflowId: string; projectId: string }; output: unknown } };
-
-    cascadeArchive: {
-      mutation: {
-        input: { workflowId: string; projectId: string };
-        output: WorkflowCascadeArchiveResult;
-      };
-    };
-
-    getRelatedEntities: {
-      query: {
-        input: { workflowId: string; projectId: string };
-        output: WorkflowRelatedEntities;
-      };
-    };
-
-    syncFromSource: {
-      mutation: { input: { workflowId: string; projectId: string }; output: unknown };
-    };
-
-    getCopies: {
-      query: { input: { workflowId: string; projectId: string }; output: WorkflowCopyRow[] };
-    };
-
-    pushToCopies: {
-      mutation: {
-        input: { workflowId: string; projectId: string; copyIds: string[] };
-        output: { pushedTo: number; selectedCopies: number };
-      };
-    };
-
-    /**
-     * The studio's own eight — this family's own transport, not borrowed
-     * vocabulary. Stated since `@langwatch/workflow-contract` already
-     * declares them; without them `getVersions.data` was `any`.
-     */
-    getById: { query: { input: WorkflowApiGetByIdInput; output: WorkflowApiGetByIdOutput } };
-    getVersions: {
-      query: { input: WorkflowApiGetVersionsInput; output: WorkflowApiGetVersionsOutput };
-    };
-    engineMode: {
-      query: { input: WorkflowApiEngineModeInput; output: WorkflowApiEngineModeOutput };
-    };
-    autosave: {
-      mutation: { input: WorkflowApiAutosaveInput; output: WorkflowApiAutosaveOutput };
-    };
-    commitVersion: {
-      mutation: { input: WorkflowApiCommitVersionInput; output: WorkflowApiCommitVersionOutput };
-    };
-    generateCommitMessage: {
-      mutation: {
-        input: WorkflowApiGenerateCommitMessageInput;
-        output: WorkflowApiGenerateCommitMessageOutput;
-      };
-    };
-    publish: { mutation: { input: WorkflowApiPublishInput; output: WorkflowApiPublishOutput } };
-    restoreVersion: {
-      mutation: { input: WorkflowApiRestoreVersionInput; output: WorkflowApiRestoreVersionOutput };
-    };
-  };
-
-  optimization: {
-    /**
-     * Null when nothing is published yet, which the chat address renders as
-     * "workflow not found" rather than as a failure.
-     */
-    getPublishedWorkflow: {
-      query: {
-        input: { workflowId: string; projectId: string };
-        /**
-         * Null when nothing is published yet. Left `Unpublished` since the
-         * studio's publish menu reads all four workflow-version fields, not
-         * just the one the chat address needed.
-         */
-        output: Unpublished;
-      };
-    };
-
-    /** Runs the published graph over the public endpoint and answers its JSON. */
-    chat: {
-      mutation: {
-        input: {
-          workflowId: string;
-          projectId: string;
-          inputMessages: Record<string, string>[];
-        };
-        output: unknown;
-      };
-    };
-
-    /** The saved components and evaluators the node palette offers. */
-    getComponents: UnpublishedQuery;
-    toggleSaveAsComponent: UnpublishedMutation;
-    disableAsComponent: UnpublishedMutation;
-    toggleSaveAsEvaluator: UnpublishedMutation;
-    disableAsEvaluator: UnpublishedMutation;
-  };
-
+/**
+ * Procedures other features own. Each belongs in that feature's own contract;
+ * until it is split, this family states the shape it reads.
+ */
+type BorrowedProcedures = {
   organization: {
     getAll: { query: { input: { isDemo: boolean }; output: WorkflowOrganizationGraph[] } };
   };
 
-  /**
-   * THE BORROWED VOCABULARY, one segment per feature the studio reaches.
-   * Kept letter for letter with the call sites' `api.x.y` so a studio
-   * query and the same query fired elsewhere share ONE cache entry.
-   */
+  /** Agent mutation borrowed from agent-contract. */
   agents: {
     getAll: UnpublishedQuery;
     getById: UnpublishedQuery;
@@ -338,11 +198,7 @@ export type WorkflowApiMap = {
     };
     update: { mutation: { input: EvaluatorApiUpdateInput; output: EvaluatorApiUpdateOutput } };
   };
-  /**
-   * THE EXPERIMENTS FAMILY'S OWN, longest since `experiment-web` serves
-   * five addresses here. `onExperimentUpdate` is the first SUBSCRIPTION
-   * declared: the workbench reloads silently on a save landing elsewhere.
-   */
+  /** Experiments family, longest since experiment-web serves five addresses here. */
   experiments: {
     copy: UnpublishedMutation;
     deleteExperiment: UnpublishedMutation;
@@ -437,8 +293,16 @@ export type WorkflowApiMap = {
 };
 
 /**
+ * Everything this family calls: the declared namespaces from the contract plus
+ * the borrowed procedures.
+ */
+export type WorkflowApiMap = ContractApiMap<typeof workflowTrpc> &
+  ContractApiMap<typeof workflowOptimizationTrpc> &
+  BorrowedProcedures;
+
+/**
  * The Workflows family's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
+ * same React Query cache as the application's `api` proxy - see
  * `createModuleApi` for why separate instances still share cache entries.
  */
 export const workflowApi = createModuleApi<WorkflowApiMap>();
