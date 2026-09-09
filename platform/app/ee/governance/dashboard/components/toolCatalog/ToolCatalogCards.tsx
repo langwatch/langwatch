@@ -150,7 +150,7 @@ export function ToolCatalogCard({ card }: { card: ToolCard }) {
             {card.vendor}
           </Text>
         </Box>
-        {card.sample && (
+        {card.isSample && (
           <Badge size="xs" colorPalette="orange" variant="surface">
             sample
           </Badge>

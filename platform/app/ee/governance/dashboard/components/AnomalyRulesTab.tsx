@@ -570,7 +570,10 @@ export function AnomalyRulesTab() {
               key={sev}
               severity={sev}
               rules={grouped[sev]}
-              knowsFleetIsEmpty={!rulesQuery.error}
+              // A list still in flight is not a list of nothing. `!error` is
+              // true while loading, which had the page printing "0" and "No
+              // critical rules." beside its own spinner.
+              knowsFleetIsEmpty={rulesQuery.data !== undefined}
               canManage={canManage}
               composerOpen={!!composer}
               archivingId={archivingId}
@@ -714,6 +717,18 @@ function RuleComposer({
       refetchOnWindowFocus: false,
     },
   );
+  // Built once per source list rather than once per render. An inline `.map()`
+  // hands `DashboardSelect` a new array every time, its `useMemo` on `options`
+  // never hits, and Chakra reads each new collection identity as a new list —
+  // resetting highlight and scroll under an open dropdown.
+  const sourceOptions = useMemo(
+    () =>
+      (sourcesQuery.data ?? []).map((source) => ({
+        value: source.id,
+        label: `${source.name} (${source.sourceType})`,
+      })),
+    [sourcesQuery.data],
+  );
   const isEdit = !!composer.id;
   return (
     <Drawer.Root
@@ -834,8 +849,16 @@ function RuleComposer({
                   ariaLabel="Scope"
                   options={SCOPE_OPTIONS}
                   value={composer.scope}
+                  // The id belongs to the scope that chose it. Carrying a
+                  // source id into a source-type scope saves a rule the
+                  // subscriber can never match, and the picker shows its
+                  // placeholder throughout, so nothing on screen says so.
                   onChange={(next) =>
-                    setComposer({ ...composer, scope: next as Scope })
+                    setComposer({
+                      ...composer,
+                      scope: next as Scope,
+                      scopeId: "",
+                    })
                   }
                 />
               </VStack>
@@ -877,10 +900,7 @@ function RuleComposer({
                           ? "Loading sources…"
                           : "Select an ingestion source"
                       }
-                      options={(sourcesQuery.data ?? []).map((source) => ({
-                        value: source.id,
-                        label: `${source.name} (${source.sourceType})`,
-                      }))}
+                      options={sourceOptions}
                       value={composer.scopeId}
                       onChange={(next) =>
                         setComposer({ ...composer, scopeId: next })

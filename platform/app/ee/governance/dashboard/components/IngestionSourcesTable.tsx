@@ -53,7 +53,15 @@ const DELIVERY_LABEL: Record<SourceGroup, string> = {
 export function fmtRelative(date: Date | string | null): string {
   if (!date) return "-";
   const d = typeof date === "string" ? new Date(date) : date;
-  const diffMs = Date.now() - d.getTime();
+  const time = d.getTime();
+  // An unparsable string gives NaN, and every `<` below is false against NaN,
+  // so the unguarded version fell through to the days branch and printed
+  // "NaN days ago" in the column that says whether data is still arriving.
+  if (Number.isNaN(time)) return "-";
+  // A source whose clock runs ahead of this browser's would otherwise read
+  // "-3 seconds ago". The honest answer to "how long ago" for a future
+  // timestamp is "just now".
+  const diffMs = Math.max(0, Date.now() - time);
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${plural(sec, "second")} ago`;
   const min = Math.floor(sec / 60);
@@ -118,7 +126,7 @@ export function ConnectorsHeader({
 }
 
 export function IngestionSourcesTable({
-  sample = false,
+  isSample = false,
   sources,
   canManage,
   rotatingId,
@@ -127,7 +135,7 @@ export function IngestionSourcesTable({
   onRotate,
   onArchive,
 }: {
-  sample?: boolean;
+  isSample?: boolean;
   sources: readonly Source[];
   canManage: boolean;
   rotatingId: string | null;
@@ -160,7 +168,7 @@ export function IngestionSourcesTable({
           <SourceTableRow
             key={source.id}
             source={source}
-            sample={sample}
+            isSample={isSample}
             canManage={canManage}
             isPendingRotate={rotatingId === source.id}
             isPendingArchive={archivingId === source.id}
@@ -175,7 +183,7 @@ export function IngestionSourcesTable({
 }
 
 function SourceTableRow({
-  sample,
+  isSample,
   source,
   canManage,
   isPendingRotate,
@@ -184,7 +192,7 @@ function SourceTableRow({
   onRotate,
   onArchive,
 }: {
-  sample: boolean;
+  isSample: boolean;
   source: Source;
   canManage: boolean;
   isPendingRotate: boolean;
@@ -212,7 +220,7 @@ function SourceTableRow({
         <HStack gap={3} alignItems="center">
           <SourceTypeIconGlyph sourceType={sourceType} size="20px" />
           <VStack align="start" gap={0} minWidth={0}>
-            {sample ? (
+            {isSample ? (
               <Text fontSize="sm" fontWeight="semibold" lineClamp={1}>
                 {source.name}
               </Text>

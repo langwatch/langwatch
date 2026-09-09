@@ -95,7 +95,7 @@ function renderTable({
 
 afterEach(() => cleanup());
 
-describe("the ingestion sources table", () => {
+describe("given the ingestion sources table", () => {
   describe("when the fleet mixes real-time and scheduled sources", () => {
     /** @scenario "The sources table shows delivery as a column" */
     it("lists them in one table, real-time first and by name within each", () => {
