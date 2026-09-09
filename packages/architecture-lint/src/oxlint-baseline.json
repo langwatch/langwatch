@@ -371,56 +371,52 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/api-transport-boundaries.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/api-transport.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/api-transport-framework.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/boundaries/application-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/application-boundaries.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/check-feature-parity.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/composed-exports.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/feature-configuration.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/feature-catalogue.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/feature-layout.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/global-app-access.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/legacy-feature-fragments.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/quality/composed-exports.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/feature-configuration.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/policies/test-quality.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/feature-layout.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/tools/check-feature-parity.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/frontend-ui-boundaries.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/tools/workspace-package-rename.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|packages/architecture-lint/src/global-app-access.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/legacy-feature-fragments.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/test-quality.ts",
+      "key": "cognitive-complexity|packages/architecture-lint/src/workspace/feature-catalogue.ts",
       "measured": "2026-09-07"
-    },
-    {
-      "key": "cognitive-complexity|packages/architecture-lint/src/workspace-package-rename.ts",
-      "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|packages/architecture-lint/src/workspace/snapshot.ts",
@@ -3791,19 +3787,19 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/architecture-lint/src/check-feature-parity.ts",
+      "key": "complexity|packages/architecture-lint/src/policies/feature-layout.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/architecture-lint/src/feature-layout.ts",
+      "key": "complexity|packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/architecture-lint/src/frontend-ui-boundaries.ts",
+      "key": "complexity|packages/architecture-lint/src/policies/global-app-access.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|packages/architecture-lint/src/global-app-access.ts",
+      "key": "complexity|packages/architecture-lint/src/tools/check-feature-parity.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4787,63 +4783,59 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/api-transport-boundaries.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/api-transport.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/api-transport-framework.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/boundaries/application-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/application-boundaries.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/boundaries/boundary-edge-baseline.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/boundary-edge-baseline.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/feature-layout.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/check-feature-parity.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/colocate-tests.cli.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/global-app-access.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/comment-blocks.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/legacy-feature-fragments.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/composed-exports.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/quality/comment-blocks.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/architecture-lint/src/policies/quality/composed-exports.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/feature-layout.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/quality/service-projection-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/frontend-ui-boundaries.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/global-app-access.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/legacy-feature-fragments.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/service-projection-boundaries.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|packages/architecture-lint/src/test-quality.ts",
+      "key": "condition-shape|packages/architecture-lint/src/policies/test-quality.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|packages/architecture-lint/src/workspace-package-rename.ts",
+      "key": "condition-shape|packages/architecture-lint/src/tools/check-feature-parity.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/architecture-lint/src/tools/colocate-tests.cli.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|packages/architecture-lint/src/tools/workspace-package-rename.ts",
       "measured": "2026-09-06"
     },
     {
@@ -7351,7 +7343,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "max-depth|packages/architecture-lint/src/api-transport-boundaries.ts",
+      "key": "max-depth|packages/architecture-lint/src/policies/api-transport.ts",
       "measured": "2026-09-06"
     },
     {
@@ -8043,20 +8035,20 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/api-transport-framework.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "nested-ternary|packages/architecture-lint/src/cli.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/composed-exports.ts",
-      "measured": "2026-09-07"
+      "key": "nested-ternary|packages/architecture-lint/src/policies/api-transport.ts",
+      "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/frontend-ui-boundaries.ts",
+      "key": "nested-ternary|packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
       "measured": "2026-09-06"
+    },
+    {
+      "key": "nested-ternary|packages/architecture-lint/src/policies/quality/composed-exports.ts",
+      "measured": "2026-09-07"
     },
     {
       "key": "nested-ternary|packages/design-system/src/components/delayed.tsx",

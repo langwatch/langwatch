@@ -81,15 +81,15 @@
     // ------------------------------------------------------------------
     {
       "files": [
-        "packages/architecture-lint/src/api-transport-boundaries.ts",
-        "packages/architecture-lint/src/global-app-access.ts",
-        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
-        "packages/architecture-lint/src/service-projection-boundaries.ts",
-        "packages/architecture-lint/src/check-feature-parity.ts",
-        "packages/architecture-lint/src/test-colocation.ts",
-        "packages/architecture-lint/src/test-quality.ts",
-        "packages/architecture-lint/src/feature-layout.ts",
-        "packages/architecture-lint/src/api-transport-framework.ts"
+        "packages/architecture-lint/src/policies/api-transport.ts",
+        "packages/architecture-lint/src/policies/global-app-access.ts",
+        "packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/policies/quality/service-projection-boundaries.ts",
+        "packages/architecture-lint/src/tools/check-feature-parity.ts",
+        "packages/architecture-lint/src/tools/test-colocation.ts",
+        "packages/architecture-lint/src/policies/test-quality.ts",
+        "packages/architecture-lint/src/policies/feature-layout.ts",
+        "packages/architecture-lint/src/policies/api-transport.ts"
       ],
       "rules": { "langwatch/boolean-wall": "off" }
     },
@@ -306,7 +306,7 @@
     // ------------------------------------------------------------------
     {
       "files": [
-        "packages/architecture-lint/src/api-transport-boundaries.ts"
+        "packages/architecture-lint/src/policies/api-transport.ts"
       ],
       "rules": {
         "max-depth": "off"
@@ -327,10 +327,10 @@
         "mcp/typescript/src/tools/get-experiment-results.ts",
         "packages/api/src/rest/builder.ts",
         "packages/api/src/rest/pipeline.ts",
-        "packages/architecture-lint/src/check-feature-parity.ts",
-        "packages/architecture-lint/src/feature-layout.ts",
-        "packages/architecture-lint/src/frontend-ui-boundaries.ts",
-        "packages/architecture-lint/src/global-app-access.ts",
+        "packages/architecture-lint/src/tools/check-feature-parity.ts",
+        "packages/architecture-lint/src/policies/feature-layout.ts",
+        "packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/policies/global-app-access.ts",
         "packages/architecture-lint/src/workspace/snapshot.ts",
         "packages/enterprise/features/billing/web/src/screens/billing/subscription-page.tsx",
         "packages/enterprise/features/billing/web/src/screens/billing/usage.screen.tsx",

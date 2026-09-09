@@ -31,10 +31,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/architecture-lint/src",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|packages/clickhouse-client/src",
       "measured": "2026-09-08"
     },

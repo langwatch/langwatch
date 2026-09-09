@@ -299,7 +299,7 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | L2 one baseline shape | `{ version: 1, policy, entries[{ key, measured, expires?, count? }] }`, `readBaseline`/`formatBaseline`/`shrinkCheck` in `baseline.ts`, stale rows from one code path, six empty baselines and 277 lines of their plumbing deleted, 18 stale composed-exports rows removed; D2 kept per policy behind `enforceExpiry`; `README.md` lists the files | DONE `6a643f6527` |
 | L3 workspace snapshot | `workspace/{layout,module-graph,snapshot}.ts`, one walk, one parse cache, 25 policies take the snapshot, `source-folder-shape` reads value imports from the graph | DONE `58d0a759b9`; 22.6 s → 12.4 s queue-free, the 10 s bar waits on L5 (one AST pass per file) and one changed-files computation |
 | L4 frontend grammar | governed = discovered, flat entries the only spelling, `frontend-ui-boundaries.ts` split four ways | QUEUED (D7) |
-| L5 registry and folders | `policies/index.ts` with `definePolicy`, package passes its own folder rule | RUNNING (Sonnet) |
+| L5 registry and folders | `policies/index.ts` with 31 `definePolicy` entries, `--list-policies`, folders under twelve, parity tool finds the root by walking up | DONE (Sonnet); tests not mirrored into `tests/<folder>` (L7) |
 | L6 parity out | own tool; `@inert` tag replaces `LEGACY_INERT` | QUEUED (D1) |
 | L7 repo guards home | 37 tests to the code they guard, 29 failing fixed or deleted | QUEUED (D5) |
 | L8 messages | 289 sites against the contract, `allowed` on every finding | QUEUED |
@@ -308,7 +308,6 @@ guarding things outside the package, 29 failing, 17 policies untested).
 
 | Lane | Brief | Started |
 | --- | --- | --- |
-| lint L5 | `architecture-lint-review-2026-09-08.md` §Lanes | 09-09 02:0x |
 
 Live briefs kept as work orders: `wave4-process-wiring.md` (landed `9697edd1f5`; its Wave 5 section is the open work order),
 `api-rest-runtime-gaps-3.md` (part A RUNNING, B and C QUEUED), `api-package-rebuild.md` (phase 3
