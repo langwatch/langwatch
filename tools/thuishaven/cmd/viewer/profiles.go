@@ -13,6 +13,8 @@ import (
 
 // ProfilesTab is the profiles screen.
 type ProfilesTab struct {
+	noHeader
+	noAttention
 	src      Sources
 	services []sources.ServiceProfile
 	cursor   int
@@ -41,7 +43,7 @@ func (t *ProfilesTab) Poll() {
 }
 
 // Body renders the selected service's two top-ten lists side by side.
-func (t *ProfilesTab) Body(f Frame) []string {
+func (t *ProfilesTab) Body(f Frame) []Row {
 	if t.down {
 		return stackDownBody()
 	}
@@ -54,7 +56,7 @@ func (t *ProfilesTab) Body(f Frame) []string {
 	out = append(out, entryRows(service.CPU)...)
 	out = append(out, " "+bold("heap"))
 	out = append(out, entryRows(service.Heap)...)
-	return lastN(out, f.Rows())
+	return lastNRows(indexedRows(out), f.Rows())
 }
 
 // entryRows renders one top-ten list.
@@ -88,7 +90,7 @@ func (t *ProfilesTab) Footer() string {
 	if t.toast != "" {
 		return dim(t.toast)
 	}
-	return dim("↑↓ moves between services · o opens this service's flame graph in Grafana")
+	return dim("↑↓ and [ ] moves between services · o opens this service's flame graph in Grafana")
 }
 
 // Key moves between services and opens the flame graph.
@@ -99,12 +101,27 @@ func (t *ProfilesTab) Key(k string) bool {
 		t.cursor = maxInt(t.cursor-1, 0)
 	case "down", "j":
 		t.cursor = minInt(t.cursor+1, maxInt(len(t.services)-1, 0))
+	case "]":
+		t.moveService(1)
+	case "[":
+		t.moveService(-1)
 	case "o":
 		t.openInGrafana()
 	default:
 		return false
 	}
 	return true
+}
+
+// moveService cycles the services, wrapping - the same two keys, with the same
+// wrap, as the log tab's application sub-tabs, because they are the same
+// gesture: move sideways through this tab's own list.
+func (t *ProfilesTab) moveService(delta int) {
+	if len(t.services) == 0 {
+		return
+	}
+	count := len(t.services)
+	t.cursor = ((t.cursor+delta)%count + count) % count
 }
 
 // openInGrafana sends the selected service's flame graph to the browser.

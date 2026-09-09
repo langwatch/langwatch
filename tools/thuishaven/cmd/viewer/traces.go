@@ -11,6 +11,8 @@ import (
 
 // TracesTab is the traces screen.
 type TracesTab struct {
+	noHeader
+	noAttention
 	src    Sources
 	roots  []sources.RootSpan
 	cursor int
@@ -50,7 +52,7 @@ func (t *TracesTab) Poll() {
 }
 
 // Body renders the trace list, or the open trace's span tree.
-func (t *TracesTab) Body(f Frame) []string {
+func (t *TracesTab) Body(f Frame) []Row {
 	if t.down {
 		return stackDownBody()
 	}
@@ -61,10 +63,12 @@ func (t *TracesTab) Body(f Frame) []string {
 		return emptyBody("traces in the last ten minutes")
 	}
 	out := make([]string, 0, len(t.roots))
+	keys := make([]string, 0, len(t.roots))
 	for i, root := range t.roots {
 		out = append(out, t.row(i, root))
+		keys = append(keys, root.TraceID)
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(keyedRows(out, keys), f.Rows())
 }
 
 // row renders one trace: time, service, root span name, duration and status.
@@ -83,7 +87,7 @@ func (t *TracesTab) row(i int, root sources.RootSpan) string {
 }
 
 // treeBody renders the open trace as an indented span tree.
-func (t *TracesTab) treeBody(f Frame) []string {
+func (t *TracesTab) treeBody(f Frame) []Row {
 	if len(t.tree) == 0 {
 		return emptyBody("spans for this trace")
 	}
@@ -93,7 +97,7 @@ func (t *TracesTab) treeBody(f Frame) []string {
 		out = append(out, " "+indent(span.Depth)+span.Name+"  "+
 			dim(span.Service)+"  "+dim(shortDuration(span.Duration)))
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(indexedRows(out), f.Rows())
 }
 
 // indent is one span's depth, two spaces per level.

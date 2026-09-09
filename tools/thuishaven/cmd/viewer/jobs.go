@@ -1,6 +1,7 @@
 package viewer
 
 import (
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
@@ -13,6 +14,7 @@ import (
 
 // JobsTab is the jobs screen.
 type JobsTab struct {
+	noHeader
 	src    Sources
 	runs   []sources.JobRun
 	cursor int
@@ -26,6 +28,23 @@ func NewJobsTab(src Sources) *JobsTab { return &JobsTab{src: src} }
 // Name is the tab's label and command name.
 func (t *JobsTab) Name() string { return "jobs" }
 
+// Attention marks the jobs tab when a one-shot lane finished while the reader
+// was elsewhere. A failed one is red, because it is the only thing on this
+// screen that ever needs answering.
+func (t *JobsTab) Attention(since time.Time) Attention {
+	mark := AttentionNone
+	for _, run := range t.runs {
+		if !run.At.After(since) {
+			continue
+		}
+		if !run.OK() {
+			return AttentionFailure
+		}
+		mark = AttentionNotice
+	}
+	return mark
+}
+
 // Poll re-reads the journal.
 func (t *JobsTab) Poll() {
 	if t.src.Jobs == nil {
@@ -35,7 +54,7 @@ func (t *JobsTab) Poll() {
 }
 
 // Body renders the run list, or the drilled-into run's captured output.
-func (t *JobsTab) Body(f Frame) []string {
+func (t *JobsTab) Body(f Frame) []Row {
 	if t.openJob != "" {
 		return t.outputBody(f)
 	}
@@ -44,10 +63,16 @@ func (t *JobsTab) Body(f Frame) []string {
 	}
 	now := t.src.Now()
 	out := make([]string, 0, len(t.runs))
+	keys := make([]string, 0, len(t.runs))
 	for i, run := range t.runs {
 		out = append(out, t.row(i, run, now))
+		keys = append(keys, run.Name)
+		if reason := failureReason(run); reason != "" {
+			out = append(out, reason)
+			keys = append(keys, run.Name+":reason")
+		}
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(keyedRows(out, keys), f.Rows())
 }
 
 // row renders one run: its name, when it ran, how long it took and its exit.
@@ -64,8 +89,49 @@ func (t *JobsTab) row(i int, run sources.JobRun, now time.Time) string {
 	return " " + line
 }
 
+// failureReason is the one line under a failed run: the last thing it said
+// before it gave up. A row that says "exit 1" and nothing else sends the reader
+// into the drill-in to find out what every failure already told them on its
+// last line, and most of the time that line is the whole answer.
+func failureReason(run sources.JobRun) string {
+	if run.OK() {
+		return ""
+	}
+	last := reasonLine(run.Output)
+	if last == "" {
+		return "   " + dim("no output captured - enter for the full log")
+	}
+	return "   " + dim(last)
+}
+
+// failureWords are how a tool says it failed. A build that fails still prints
+// progress afterwards - a summary, a cleanup line, a shell's own epilogue - so
+// the last line a job wrote is often not the line that says why it stopped.
+var failureWords = []string{"error", "Error", "ERROR", "failed", "Failed", "FAIL", "Cannot", "cannot find", "ENOENT"}
+
+// reasonLine picks the one line to show under a failed run: the last one that
+// reads as the failure, and otherwise the last one that said anything at all.
+func reasonLine(output []string) string {
+	fallback := ""
+	for i := len(output) - 1; i >= 0; i-- {
+		trimmed := strings.TrimSpace(output[i])
+		if trimmed == "" {
+			continue
+		}
+		if fallback == "" {
+			fallback = trimmed
+		}
+		for _, word := range failureWords {
+			if strings.Contains(trimmed, word) {
+				return trimmed
+			}
+		}
+	}
+	return fallback
+}
+
 // outputBody is the drilled-into run's captured output.
-func (t *JobsTab) outputBody(f Frame) []string {
+func (t *JobsTab) outputBody(f Frame) []Row {
 	for _, run := range t.runs {
 		if run.Name != t.openJob {
 			continue
@@ -78,7 +144,7 @@ func (t *JobsTab) outputBody(f Frame) []string {
 		for _, line := range run.Output {
 			out = append(out, " "+line)
 		}
-		return lastN(out, f.Rows())
+		return lastNRows(textRows(out), f.Rows())
 	}
 	return emptyBody("captured output")
 }
@@ -88,7 +154,7 @@ func (t *JobsTab) Footer() string {
 	if t.openJob != "" {
 		return dim("esc back to the list")
 	}
-	return dim("↑↓ move · enter shows that job's captured output")
+	return dim("↑↓ move · enter shows that job's whole captured output")
 }
 
 // Key moves the cursor and opens or closes the drill-in.

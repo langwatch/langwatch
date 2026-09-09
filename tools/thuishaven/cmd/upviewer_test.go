@@ -19,7 +19,7 @@ import (
 )
 
 // dashModel builds a viewer with the session dashboard wired to a fixed
-// snapshot and a restart spy — the shape both the up and play paths inject.
+// snapshot and a restart spy - the shape both the up and play paths inject.
 func dashModel(t *testing.T, services []app.SessionServiceStatus, restart func(string) (string, error)) *viewerModel {
 	t.Helper()
 	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
@@ -58,6 +58,22 @@ func key(s string) tea.KeyMsg {
 	}
 }
 
+// appendCapture adds one line to a lane's capture, stamped now. Appending, not
+// rewriting: the file tail follows a byte offset, so a rewrite of the same
+// length looks like a file that has not moved.
+func appendCapture(t *testing.T, dir, lane, payload string) {
+	t.Helper()
+	line := time.Now().UTC().Format(time.RFC3339Nano) + " " + payload + "\n"
+	file, err := os.OpenFile(filepath.Join(dir, lane+".log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if _, err := file.WriteString(line); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // writeCapture writes one capture file, stamped now so the viewer counts the
 // lane as live.
 func writeCapture(t *testing.T, dir, lane, payload string) {
@@ -77,15 +93,15 @@ func TestViewerQuitDetachesInsteadOfKilling(t *testing.T) {
 			t.Fatalf("%q must quit the viewer", k)
 		}
 		if msg := cmd(); msg != (tea.QuitMsg{}) {
-			t.Errorf("%q returned %T, want tea.Quit — the viewer only ever detaches", k, msg)
+			t.Errorf("%q returned %T, want tea.Quit - the viewer only ever detaches", k, msg)
 		}
 	}
 }
 
-// @scenario "The tabs are session, logs, errors, traces, metrics, profiles, stores, jobs"
+// @scenario "The tabs are session, logs, jobs, errors, traces, metrics, profiles, stores"
 func TestViewerTopRowIsFixed(t *testing.T) {
 	m := dashModel(t, []app.SessionServiceStatus{{Name: "app"}}, nil)
-	want := []string{"session", "logs", "errors", "traces", "metrics", "profiles", "stores", "jobs"}
+	want := []string{"session", "logs", "jobs", "errors", "traces", "metrics", "profiles", "stores"}
 	if strings.Join(viewer.TabNames, ",") != strings.Join(want, ",") {
 		t.Fatalf("top row = %v, want %v", viewer.TabNames, want)
 	}
@@ -105,10 +121,10 @@ func TestViewerTopRowIsFixed(t *testing.T) {
 			want string
 		}{
 			{keys: []string{"right"}, want: "logs"},
-			{keys: []string{"tab", "tab"}, want: "errors"},
-			{keys: []string{"left"}, want: "jobs"},
-			{keys: []string{"4"}, want: "traces"},
-			{keys: []string{"8"}, want: "jobs"},
+			{keys: []string{"tab", "tab"}, want: "jobs"},
+			{keys: []string{"left"}, want: "stores"},
+			{keys: []string{"4"}, want: "errors"},
+			{keys: []string{"8"}, want: "stores"},
 			{keys: []string{"1"}, want: "session"},
 		}
 		for _, tc := range cases {
@@ -550,112 +566,312 @@ func TestViewerHidesStaleCaptures(t *testing.T) {
 	}
 }
 
+// rows builds a body of identified rows, the way a tab hands one to the model.
+func rows(lines ...string) []viewer.Row {
+	out := make([]viewer.Row, 0, len(lines))
+	for i, line := range lines {
+		out = append(out, viewer.Row{ID: int64(i + 1), Text: line})
+	}
+	return out
+}
+
+// wideLine is one rendered line far wider than any terminal under test.
+func wideLine() string {
+	return logfmt.Render(
+		`{"level":"info","msg":"`+strings.Repeat("word ", 40)+`"}`,
+		logfmt.Options{Lane: "backend", Time: time.Date(2026, 9, 9, 22, 30, 0, 0, time.UTC)},
+	)
+}
+
+// fitted lays a body out the way the model does, for the tests that assert on
+// the layout rather than on the whole frame.
+func fitted(m *viewerModel, body []viewer.Row, budget int) []string {
+	return m.layOutBody(stubTab{body: body}, nil, budget)
+}
+
+// stubTab is a tab with a fixed body and nothing else, for layout tests.
+type stubTab struct {
+	body   []viewer.Row
+	header []string
+}
+
+func (s stubTab) Name() string                         { return "logs" }
+func (s stubTab) Poll()                                {}
+func (s stubTab) Header() []string                     { return s.header }
+func (s stubTab) Body(viewer.Frame) []viewer.Row       { return s.body }
+func (s stubTab) Footer() string                       { return "footer" }
+func (s stubTab) Key(string) bool                      { return false }
+func (s stubTab) Rows() any                            { return s.body }
+func (s stubTab) Attention(time.Time) viewer.Attention { return viewer.AttentionNone }
+
 // @scenario "A line wider than the terminal is cut, not wrapped"
 func TestWideRowsAreCutNotWrapped(t *testing.T) {
-	wide := "22:30:00.000  backend    info   " + strings.Repeat("word ", 40)
-	rows := fitRows([]string{wide, "22:30:01.000  backend    info   last"},
-		fitOptions{width: 60, body: 10, expanded: map[int]bool{}})
+	body := rows(wideLine(), "22:30:01.000  backend    info   last")
+	laid := fitRows(body, fitOptions{width: 60, body: 10, expanded: map[int64]bool{}})
 
-	if len(rows) != 2 {
-		t.Fatalf("rows = %d, want one row per line - a wide line must not become several", len(rows))
+	if len(laid) != 2 {
+		t.Fatalf("rows = %d, want one row per line - a wide line must not become several", len(laid))
 	}
-	for i, row := range rows {
+	for i, row := range paintRows(laid, 60, -1) {
 		if ansi.StringWidth(row) > 60 {
 			t.Errorf("row %d is %d cells wide: %q", i, ansi.StringWidth(row), row)
 		}
 	}
-	if !strings.HasSuffix(rows[0], cutMarker) {
-		t.Errorf("cut row = %q, want a marker where it was cut", rows[0])
+	if !strings.HasSuffix(laid[0].text, cutMarker) {
+		t.Errorf("cut row = %q, want a marker where it was cut", laid[0].text)
 	}
-	if strings.HasSuffix(rows[1], cutMarker) {
-		t.Errorf("row %q fits and must carry no marker", rows[1])
+	if strings.HasSuffix(laid[1].text, cutMarker) {
+		t.Errorf("row %q fits and must carry no marker", laid[1].text)
 	}
 
 	t.Run("when the terminal has not reported its size", func(t *testing.T) {
-		rows := fitRows([]string{wide}, fitOptions{width: 0, body: 10, expanded: map[int]bool{}})
-		if len(rows) != 1 || rows[0] != wide {
-			t.Errorf("rows = %q, want the line untouched until the width is known", rows)
+		laid := fitRows(rows(wideLine()), fitOptions{width: 0, body: 10, expanded: map[int64]bool{}})
+		if len(laid) != 1 || laid[0].text != wideLine() {
+			t.Errorf("rows = %v, want the line untouched until the width is known", laid)
 		}
 	})
 
 	t.Run("the newest rows are the ones kept", func(t *testing.T) {
-		lines := []string{"one", "two", "three", "four"}
-		rows := fitRows(lines, fitOptions{width: 60, body: 2, expanded: map[int]bool{}})
-		if len(rows) != 2 || rows[1] != "four" {
-			t.Errorf("rows = %q, want the last two", rows)
+		laid := fitRows(rows("one", "two", "three", "four"),
+			fitOptions{width: 60, body: 2, expanded: map[int64]bool{}})
+		if len(laid) != 2 || laid[1].text != "four" {
+			t.Errorf("rows = %v, want the last two", laid)
 		}
 	})
 }
 
+// expandingModel is a viewer sized to a narrow terminal, on a tab whose rows
+// carry identity.
+func expandingModel(t *testing.T) *viewerModel {
+	t.Helper()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	m.width, m.height = 63, 30
+	return m
+}
+
+// openRows is how many rows of a laid-out body belong to opened blocks.
+func openRows(painted []string) int {
+	count := 0
+	for _, row := range painted {
+		if strings.Contains(row, openShade) {
+			count++
+		}
+	}
+	return count
+}
+
 // @scenario "Clicking a row opens it in full, and clicking again closes it"
 func TestClickingARowExpandsIt(t *testing.T) {
-	wide := logfmt.Render(
-		`{"level":"info","msg":"`+strings.Repeat("word ", 40)+`"}`,
-		logfmt.Options{Lane: "backend", Time: time.Date(2026, 9, 9, 22, 30, 0, 0, time.UTC)},
-	)
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	m.width, m.height = 61, 30
+	m := expandingModel(t)
+	body := rows(wideLine())
 
-	if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
-		t.Fatalf("rows = %d before any click, want the line cut to one row", got)
+	if got := openRows(fitted(m, body, 20)); got != 0 {
+		t.Fatalf("%d rows are open before any click", got)
 	}
 
 	t.Run("when the developer clicks that row", func(t *testing.T) {
-		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: bodyTopRow})
-		rows := m.fitRows([]string{wide}, 20)
-		if len(rows) < 2 {
-			t.Fatalf("rows = %d after the click, want the row opened in full", len(rows))
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: m.chromeHeight()})
+		painted := fitted(m, body, 20)
+		if openRows(painted) < 2 {
+			t.Fatalf("open rows = %d after the click, want the line shown in full", openRows(painted))
 		}
 		indent := strings.Repeat(" ", logfmt.MessageColumn)
-		if !strings.HasPrefix(rows[1], indent) {
-			t.Errorf("continuation row %q is not indented to the message column", rows[1])
-		}
-		for i, row := range rows {
-			if ansi.StringWidth(row) > 60 {
-				t.Errorf("expanded row %d is %d cells wide: %q", i, ansi.StringWidth(row), row)
-			}
+		if !strings.Contains(painted[1], indent) {
+			t.Errorf("continuation row %q is not indented to the message column", painted[1])
 		}
 	})
 
 	t.Run("when the developer clicks it again", func(t *testing.T) {
-		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: bodyTopRow})
-		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
-			t.Errorf("rows = %d after the second click, want the row closed again", got)
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: m.chromeHeight()})
+		if got := openRows(fitted(m, body, 20)); got != 0 {
+			t.Errorf("open rows = %d after the second click, want the row closed again", got)
 		}
 	})
 
 	t.Run("a click above the body opens nothing", func(t *testing.T) {
 		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: 0})
-		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
-			t.Errorf("rows = %d, want a click on the tab bar to open nothing", got)
+		if got := openRows(fitted(m, body, 20)); got != 0 {
+			t.Errorf("open rows = %d, want a click on the tab bar to open nothing", got)
 		}
 	})
 }
 
+// @scenario "An opened line stays open as the view scrolls"
+func TestExpansionFollowsTheLineNotTheScreenRow(t *testing.T) {
+	m := expandingModel(t)
+	body := rows("22:30:00.000  backend    info   first", wideLine())
+
+	fitted(m, body, 20)
+	m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: m.chromeHeight() + 1})
+	if openRows(fitted(m, body, 20)) < 2 {
+		t.Fatal("the clicked line did not open")
+	}
+
+	t.Run("when new output pushes the line to another row", func(t *testing.T) {
+		moved := append(rows("22:30:02.000  backend    info   newer"), body...)
+		for i := range moved {
+			moved[i].ID = int64(i + 10)
+		}
+		moved[2].ID = 2 // the same line as before, drawn one row further down
+		painted := fitted(m, moved, 20)
+		if !strings.Contains(painted[2], glyphOpen) {
+			t.Errorf("row %q does not head an opened block", painted[2])
+		}
+		if strings.Contains(painted[1], glyphOpen) {
+			t.Errorf("row %q opened instead - expansion followed the screen row, not the line", painted[1])
+		}
+	})
+}
+
+// @scenario "The row under the pointer is marked, so a click has a target"
+func TestHoverMarksTheRowUnderThePointer(t *testing.T) {
+	m := expandingModel(t)
+	body := rows("22:30:00.000  backend    info   first", "22:30:01.000  backend    info   second")
+
+	if painted := fitted(m, body, 20); strings.Contains(strings.Join(painted, "\n"), gutterHover) {
+		t.Fatal("a row is marked before the pointer has been anywhere")
+	}
+
+	m.Update(tea.MouseMsg{Button: tea.MouseButtonNone, Action: tea.MouseActionMotion, Y: m.chromeHeight() + 1})
+	painted := fitted(m, body, 20)
+	if !strings.HasPrefix(painted[1], gutterHover) {
+		t.Errorf("row under the pointer = %q, want a marker in the gutter", painted[1])
+	}
+	if strings.HasPrefix(painted[0], gutterHover) {
+		t.Errorf("row %q is marked and the pointer is not on it", painted[0])
+	}
+
+	t.Run("when the pointer leaves the body", func(t *testing.T) {
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonNone, Action: tea.MouseActionMotion, Y: 0})
+		if strings.Contains(strings.Join(fitted(m, body, 20), "\n"), gutterHover) {
+			t.Error("a row is still marked with the pointer over the tab bar")
+		}
+	})
+}
+
+// @scenario "An opened line is marked in the gutter and reads as one block"
+func TestAnOpenedBlockIsMarkedInTheGutter(t *testing.T) {
+	m := expandingModel(t)
+	body := rows(wideLine())
+	fitted(m, body, 20)
+	m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: m.chromeHeight()})
+
+	painted := fitted(m, body, 20)
+	open := openRows(painted)
+	if open < 3 {
+		t.Fatalf("open rows = %d, want a block of several rows", open)
+	}
+	if !strings.Contains(painted[0], glyphOpen) {
+		t.Errorf("head row = %q, want the head glyph in the gutter", painted[0])
+	}
+	for i := 1; i < open; i++ {
+		if !strings.Contains(painted[i], glyphRest) {
+			t.Errorf("row %d = %q, want the bar joining it to the head", i, painted[i])
+		}
+	}
+
+	t.Run("every row of the block carries the shade, across the whole width", func(t *testing.T) {
+		for i := 0; i < open; i++ {
+			if !strings.HasPrefix(painted[i], openShade) {
+				t.Errorf("row %d = %q, want the block background", i, painted[i])
+			}
+			if ansi.StringWidth(painted[i]) != m.width {
+				t.Errorf("row %d is %d cells wide, want the shade to run the full %d", i, ansi.StringWidth(painted[i]), m.width)
+			}
+		}
+	})
+
+	t.Run("a row outside the block carries neither", func(t *testing.T) {
+		if strings.Contains(painted[open], openShade) {
+			t.Errorf("row %d = %q, want the shade to stop at the block", open, painted[open])
+		}
+	})
+}
+
+// @scenario "An opened line lists its fields one per row"
+func TestAnOpenedLineListsItsFieldsOnePerRow(t *testing.T) {
+	source := `{"level":"warn","msg":"statusprobe_control_plane_unreachable",` +
+		`"caller":"statusprobe/monitor.go:175","error":"connection refused"}`
+	painted := logfmt.Render(source, logfmt.Options{
+		Lane: "gateway", Time: time.Date(2026, 9, 9, 23, 42, 4, 0, time.UTC), Color: true,
+	})
+	row := viewer.Row{ID: 1, Text: painted, Source: source}
+
+	laid := fitRows([]viewer.Row{row}, fitOptions{width: 200, body: 20, expandAll: true, expanded: map[int64]bool{}})
+	if len(laid) != 3 {
+		t.Fatalf("rows = %d, want the line and one row per field", len(laid))
+	}
+	if !strings.Contains(laid[0].text, "statusprobe_control_plane_unreachable") {
+		t.Errorf("head row = %q, want the message", laid[0].text)
+	}
+	if strings.Contains(laid[0].text, "caller=") {
+		t.Errorf("head row = %q, want the fields moved off it", laid[0].text)
+	}
+
+	fields := []struct {
+		row  int
+		want string
+	}{
+		{row: 1, want: "caller=statusprobe/monitor.go:175"},
+		{row: 2, want: `error="connection refused"`},
+	}
+	indent := strings.Repeat(" ", logfmt.MessageColumn)
+	for _, tc := range fields {
+		if !strings.Contains(stripPaint(laid[tc.row].text), tc.want) {
+			t.Errorf("row %d = %q, want %q in the order it was written", tc.row, laid[tc.row].text, tc.want)
+		}
+		if !strings.HasPrefix(stripPaint(laid[tc.row].text), indent) {
+			t.Errorf("row %d = %q, want it under the message column", tc.row, laid[tc.row].text)
+		}
+	}
+
+	t.Run("given a line with no fields that already fits", func(t *testing.T) {
+		plain := "22:30:00.000  backend    info   short"
+		laid := fitRows(rows(plain), fitOptions{width: 200, body: 20, expandAll: true, expanded: map[int64]bool{}})
+		if len(laid) != 1 || laid[0].text != plain {
+			t.Errorf("rows = %v, want opening it to change nothing but the marking", laid)
+		}
+	})
+}
+
+// stripPaint removes escape sequences so an assertion reads what a person sees.
+func stripPaint(line string) string {
+	var b strings.Builder
+	for i := 0; i < len(line); i++ {
+		if line[i] != 0x1b {
+			b.WriteByte(line[i])
+			continue
+		}
+		for i < len(line) && (line[i] < 'a' || line[i] > 'z') && (line[i] < 'A' || line[i] > 'Z') {
+			i++
+		}
+	}
+	return b.String()
+}
+
 // @scenario "x opens every row on the tab, for a terminal that forwards no clicks"
 func TestXExpandsEveryRowOnTheTab(t *testing.T) {
-	wide := "22:30:00.000  backend    info   " + strings.Repeat("word ", 40)
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	m.width, m.height = 61, 30
+	m := expandingModel(t)
+	body := rows(wideLine())
 	m.selectTab("logs")
 
 	m.handleKey("x")
-	if got := len(m.fitRows([]string{wide}, 20)); got < 2 {
-		t.Fatalf("rows = %d after x, want every row opened in full", got)
+	if got := openRows(fitted(m, body, 20)); got < 2 {
+		t.Fatalf("open rows = %d after x, want every row opened in full", got)
 	}
 
 	t.Run("when the developer moves to another tab", func(t *testing.T) {
 		m.selectTab("traces")
-		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
-			t.Errorf("rows = %d, want the setting to belong to the tab it was made on", got)
+		if got := openRows(fitted(m, body, 20)); got != 0 {
+			t.Errorf("open rows = %d, want the setting to belong to the tab it was made on", got)
 		}
 	})
 
 	t.Run("when x is pressed again on the original tab", func(t *testing.T) {
 		m.selectTab("logs")
 		m.handleKey("x")
-		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
-			t.Errorf("rows = %d after the second x, want the rows cut again", got)
+		if got := openRows(fitted(m, body, 20)); got != 0 {
+			t.Errorf("open rows = %d after the second x, want the rows cut again", got)
 		}
 	})
 }
@@ -694,4 +910,247 @@ func TestWrapLogLineLeavesNarrowLinesAlone(t *testing.T) {
 	if rows := wrapLogLine(line, 0); len(rows) != 1 || rows[0] != line {
 		t.Fatalf("unsized terminal changed the line: %q", rows)
 	}
+}
+
+// The frame bubbletea is handed must fit the terminal. It keeps the LAST rows
+// of whatever it gets, so one row too many costs the banner - the row that says
+// which stack this is and how to leave it.
+// @scenario "The frame is never taller than the terminal, so the banner stays"
+func TestTheFrameNeverOutgrowsTheTerminal(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 40; i++ {
+		appendCapture(t, dir, "ui", `{"level":"info","msg":"`+strings.Repeat("word ", 30)+strconv.Itoa(i)+`"}`)
+	}
+	m := newViewerModel("a-very-long-worktree-slug-indeed", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.ingest()
+	m.selectTab("logs")
+
+	for _, size := range []struct{ width, height int }{{width: 60, height: 14}, {width: 40, height: 14}, {width: 200, height: 30}} {
+		t.Run("given a terminal of that size", func(t *testing.T) {
+			m.Update(tea.WindowSizeMsg{Width: size.width, Height: size.height})
+			lines := strings.Split(m.View(), "\n")
+			if len(lines) > size.height {
+				t.Errorf("frame = %d lines at height %d - bubbletea drops the top, which is the banner", len(lines), size.height)
+			}
+			if !strings.Contains(lines[0], "haven up") {
+				t.Errorf("first line = %q, want the banner", lines[0])
+			}
+			for i, line := range lines {
+				if ansi.StringWidth(line) > size.width {
+					t.Errorf("line %d is %d cells wide at width %d: %q", i, ansi.StringWidth(line), size.width, line)
+				}
+			}
+		})
+	}
+}
+
+// @scenario "A tab with something new since it was last seen is marked"
+func TestATabWithSomethingNewIsMarked(t *testing.T) {
+	clock := time.Now()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	m.now = func() time.Time { return clock }
+	files := &sources.MemoryLogs{}
+	jobs := &sources.MemoryJobs{}
+	m.install(viewer.Sources{Files: files, Jobs: jobs, LokiUp: func() bool { return false }, Now: time.Now})
+	m.width, m.height = 200, 30
+	m.selectTab("logs")
+	m.View() // the reader is on logs, so everything is now read
+
+	later := clock.Add(time.Second)
+	jobs.History = []sources.JobRun{{Name: "prepare", At: later, Exit: 1}}
+	files.Append(sources.LogLine{At: later, Lane: "backend", Level: "error",
+		Text: `{"name":"langwatch:api","level":"error","msg":"exploded"}`})
+	m.ingest()
+
+	bar := m.tabsLine()
+	if !strings.Contains(bar, "jobs"+markFailure) {
+		t.Errorf("tab bar = %q, want the failed job marked as a failure", bar)
+	}
+	if !strings.Contains(bar, "errors"+markFailure) {
+		t.Errorf("tab bar = %q, want the new error signature marked", bar)
+	}
+
+	t.Run("the tab on screen never marks itself", func(t *testing.T) {
+		if strings.Contains(bar, "logs"+markFailure) || strings.Contains(bar, "logs"+markNotice) {
+			t.Errorf("tab bar = %q, want the tab being read to carry no mark", bar)
+		}
+	})
+
+	t.Run("a change that did not fail is marked apart from one that did", func(t *testing.T) {
+		quiet := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+		quiet.now = func() time.Time { return clock }
+		ok := &sources.MemoryJobs{}
+		quiet.install(viewer.Sources{Files: &sources.MemoryLogs{}, Jobs: ok, LokiUp: func() bool { return false }, Now: time.Now})
+		quiet.width, quiet.height = 200, 30
+		quiet.selectTab("logs")
+		quiet.View()
+		ok.History = []sources.JobRun{{Name: "seed", At: later}}
+		quiet.ingest()
+		if !strings.Contains(quiet.tabsLine(), "jobs"+markNotice) {
+			t.Errorf("tab bar = %q, want a finished run marked without alarm", quiet.tabsLine())
+		}
+	})
+}
+
+// @scenario "Entering the tab clears its mark"
+func TestEnteringATabClearsItsMark(t *testing.T) {
+	clock := time.Now()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	m.now = func() time.Time { return clock }
+	jobs := &sources.MemoryJobs{}
+	m.install(viewer.Sources{Files: &sources.MemoryLogs{}, Jobs: jobs, LokiUp: func() bool { return false }, Now: time.Now})
+	m.width, m.height = 200, 30
+	m.selectTab("logs")
+	m.View()
+
+	jobs.History = []sources.JobRun{{Name: "prepare", At: clock.Add(time.Second), Exit: 1}}
+	m.ingest()
+	if !strings.Contains(m.tabsLine(), "jobs"+markFailure) {
+		t.Fatal("the jobs tab was not marked in the first place")
+	}
+
+	clock = clock.Add(2 * time.Second) // the reader arrives after the job finished
+	m.selectTab("jobs")
+	m.View()
+	m.selectTab("logs")
+	if strings.Contains(m.tabsLine(), "jobs"+markFailure) {
+		t.Errorf("tab bar = %q, want the mark cleared by reading the tab", m.tabsLine())
+	}
+
+	t.Run("and returns for something newer still", func(t *testing.T) {
+		jobs.History = append(jobs.History, sources.JobRun{Name: "seed", At: clock.Add(time.Hour), Exit: 2})
+		m.ingest()
+		if !strings.Contains(m.tabsLine(), "jobs"+markFailure) {
+			t.Errorf("tab bar = %q, want a newer failure to mark it again", m.tabsLine())
+		}
+	})
+}
+
+// A frame shorter than the terminal leaves the previous, taller frame's rows on
+// screen - which is how the pinned sub-tab header came to appear twice, once
+// where it belongs and once in the middle of the output.
+// @scenario "The body is exactly the rows the terminal has, in every state"
+func TestTheBodyIsExactlyTheRowsTheTerminalHas(t *testing.T) {
+	newTab := func(t *testing.T, width, height int) *viewerModel {
+		t.Helper()
+		dir := t.TempDir()
+		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+		m.width, m.height = width, height
+		m.selectTab("logs")
+		for i := 0; i < 60; i++ {
+			level := "info"
+			if i%5 == 0 {
+				level = "warn"
+			}
+			appendCapture(t, dir, "ui", `{"level":"`+level+`","msg":"`+strings.Repeat("word ", 20)+strconv.Itoa(i)+`"}`)
+			m.ingest()
+		}
+		return m
+	}
+
+	cases := []struct {
+		name   string
+		width  int
+		height int
+		set    func(m *viewerModel)
+	}{
+		{name: "following", width: 100, height: 24, set: func(*viewerModel) {}},
+		{name: "scrolled back", width: 100, height: 24, set: func(m *viewerModel) { m.handleKey("b") }},
+		{name: "filtered to warnings", width: 100, height: 24, set: func(m *viewerModel) { m.handleKey("w") }},
+		{name: "one line opened", width: 100, height: 24, set: func(m *viewerModel) {
+			m.View()
+			m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: m.chromeHeight() + 2})
+		}},
+		{name: "every line opened", width: 100, height: 24, set: func(m *viewerModel) { m.handleKey("x") }},
+		{name: "a narrow terminal", width: 40, height: 24, set: func(m *viewerModel) {}},
+		{name: "a short terminal", width: 100, height: 12, set: func(m *viewerModel) { m.handleKey("x") }},
+	}
+	for _, tc := range cases {
+		t.Run("when the logs tab is drawn "+tc.name, func(t *testing.T) {
+			m := newTab(t, tc.width, tc.height)
+			tc.set(m)
+			lines := strings.Split(m.View(), "\n")
+
+			if len(lines) != tc.height {
+				t.Errorf("frame = %d lines, want exactly the terminal's %d", len(lines), tc.height)
+			}
+			if headers := countHeaders(lines); headers != 1 {
+				t.Errorf("the sub-tab header appears %d times, want once", headers)
+			}
+			if !strings.Contains(lines[m.chromeHeight()], "all") {
+				t.Errorf("row %d = %q, want the header pinned to the top of the body", m.chromeHeight(), lines[m.chromeHeight()])
+			}
+			for i, line := range lines {
+				if ansi.StringWidth(line) > tc.width {
+					t.Errorf("line %d is %d cells wide, want at most %d: %q", i, ansi.StringWidth(line), tc.width, line)
+				}
+			}
+		})
+	}
+}
+
+// countHeaders counts the rows that carry the logs tab's application sub-tabs.
+func countHeaders(lines []string) int {
+	count := 0
+	for _, line := range lines {
+		plain := stripPaint(line)
+		if strings.Contains(plain, " all ") && strings.Contains(plain, " ui ") {
+			count++
+		}
+	}
+	return count
+}
+
+// With the frame exactly the terminal's height, screen row Y and frame row Y
+// are the same row, and a click lands on the line the reader pointed at.
+// @scenario "A click opens the line that was drawn at that row"
+func TestAClickOpensTheLineDrawnAtThatRow(t *testing.T) {
+	dir := t.TempDir()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.width, m.height = 120, 20
+	m.selectTab("logs")
+	for i := 0; i < 40; i++ {
+		appendCapture(t, dir, "ui", `{"level":"info","msg":"line `+strconv.Itoa(i)+`"}`)
+		m.ingest()
+	}
+
+	t.Run("given a scrolled-back view with one line already opened", func(t *testing.T) {
+		m.handleKey("b")
+		m.View()
+		first := m.chromeHeight() + 2
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: first})
+
+		lines := strings.Split(m.View(), "\n")
+		target := drawnRow(lines, m.chromeHeight()+1)
+		want := payloadOf(lines[target])
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: target})
+
+		opened := strings.Split(m.View(), "\n")[target]
+		if !strings.Contains(stripPaint(opened), want) {
+			t.Errorf("the click at row %d opened %q, want the line drawn there: %q", target, stripPaint(opened), want)
+		}
+		if !strings.Contains(opened, openShade) {
+			t.Errorf("row %d = %q, want it opened", target, opened)
+		}
+	})
+}
+
+// drawnRow is the first body row from `from` that actually has a line on it and
+// is not already opened - the row a reader would point at.
+func drawnRow(lines []string, from int) int {
+	for i := from; i < len(lines); i++ {
+		if strings.TrimSpace(stripPaint(lines[i])) != "" && !strings.Contains(lines[i], openShade) {
+			return i
+		}
+	}
+	return from
+}
+
+// payloadOf is the "line N" a rendered row carries, which is what identifies it.
+func payloadOf(row string) string {
+	fields := strings.Fields(stripPaint(row))
+	if len(fields) < 2 {
+		return ""
+	}
+	return strings.Join(fields[len(fields)-2:], " ")
 }

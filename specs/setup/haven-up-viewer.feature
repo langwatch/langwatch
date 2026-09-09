@@ -48,6 +48,14 @@ Feature: haven up terminal viewer — scroll and search
     When the developer presses "N"
     Then the view jumps to the previous match, wrapping past the first one
 
+  Scenario: Paging works from a keyboard with no page keys
+    Given a laptop keyboard with no page up, page down, home or end
+    When the developer presses space or "b"
+    Then the view moves a page down or up
+    And "d" and "u" move half a page, and "g" and "G" jump to the top and the bottom
+    And the footer names those keys rather than the ones the keyboard does not have
+    And the page, home and end keys still work where a keyboard has them
+
   Scenario: Escape clears the search
     Given a committed search is active
     When the developer presses Escape

@@ -20,7 +20,10 @@ const mouseWheelLines = 3
 // pager is one scrollable buffer set: many named rings, one scroll offset per
 // ring, and a search shared across all of them.
 type pager struct {
-	lines map[string][]string
+	lines map[string][]Row
+	// nextID stamps each pushed line, so the reader's expansion follows the
+	// line through scrolling, filtering and new output arriving above it.
+	nextID int64
 	// scroll is how far each ring is pulled back from the live bottom; 0 is
 	// following, where new output stays on screen as it arrives.
 	scroll map[string]int
@@ -33,15 +36,15 @@ type pager struct {
 }
 
 func newPager() *pager {
-	return &pager{lines: map[string][]string{}, scroll: map[string]int{}, matchIdx: -1}
+	return &pager{lines: map[string][]Row{}, scroll: map[string]int{}, matchIdx: -1}
 }
 
 // push appends one line to a ring. A ring scrolled back advances its offset in
 // lockstep, so the window keeps showing the same content instead of drifting
 // under the reader as output streams in.
-func (p *pager) push(ring, line string) {
+func (p *pager) push(ring string, row Row) {
 	lines := p.lines[ring]
-	lines = append(lines, line)
+	lines = append(lines, row)
 	if len(lines) > ringCap {
 		lines = lines[len(lines)-ringCap:]
 	}
@@ -51,8 +54,14 @@ func (p *pager) push(ring, line string) {
 	}
 }
 
+// nextRowID stamps one line as it is pushed.
+func (p *pager) nextRowID() int64 {
+	p.nextID++
+	return p.nextID
+}
+
 // visible slices a ring to the window its scroll offset selects.
-func (p *pager) visible(ring string, rows int) []string {
+func (p *pager) visible(ring string, rows int) []Row {
 	lines := p.lines[ring]
 	end := len(lines) - minInt(p.scroll[ring], len(lines))
 	start := maxInt(end-rows, 0)
@@ -77,17 +86,21 @@ func (p *pager) key(ring, k string, rows int) bool {
 		p.step(ring, 1)
 	case "N":
 		p.step(ring, -1)
-	case "f", "end":
+	case "f", "end", "G":
 		p.scroll[ring] = 0
-	case "pgup":
+	case "pgup", "b":
 		p.scrollBy(ring, rows)
-	case "pgdown":
+	case "pgdown", " ":
 		p.scrollBy(ring, -rows)
+	case "u", "ctrl+u":
+		p.scrollBy(ring, maxInt(rows/2, 1))
+	case "d", "ctrl+d":
+		p.scrollBy(ring, -maxInt(rows/2, 1))
 	case "up", "k", "wheelup":
 		p.scrollBy(ring, wheelOrLine(k))
 	case "down", "j", "wheeldown":
 		p.scrollBy(ring, -wheelOrLine(k))
-	case "home":
+	case "home", "g":
 		p.scroll[ring] = len(p.lines[ring])
 	default:
 		return false
@@ -134,8 +147,8 @@ func (p *pager) matches(ring string) []int {
 	}
 	needle := strings.ToLower(p.query)
 	var idx []int
-	for i, line := range p.lines[ring] {
-		if strings.Contains(strings.ToLower(line), needle) {
+	for i, row := range p.lines[ring] {
+		if strings.Contains(strings.ToLower(row.Text), needle) {
 			idx = append(idx, i)
 		}
 	}
@@ -186,7 +199,11 @@ func (p *pager) footer(ring string) string {
 	if p.prompt {
 		return dim("/") + p.input + sgrReverse + " " + sgrReset + dim("  enter searches · esc cancels")
 	}
-	help := "↑↓/jk scroll · pgup/pgdn page · home/end · / search"
+	// The keys are named the way a keyboard with no page block can reach them.
+	// A Mac laptop has no page up, no page down, no home and no end, so a
+	// footer that names only those is a footer telling most readers they cannot
+	// move. The old keys still work; they are simply not what is advertised.
+	help := "↑↓/jk scroll · space/b page · d/u half · g/G top/bottom · / search"
 	if p.query != "" {
 		help += fmt.Sprintf(" · %q: %d match(es) · n/N step · esc clears", p.query, len(p.matches(ring)))
 	}

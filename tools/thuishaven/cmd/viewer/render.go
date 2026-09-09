@@ -122,4 +122,4 @@ func ago(at, now time.Time) string {
 }
 
 // emptyBody is the one line a tab shows when its source answered with nothing.
-func emptyBody(what string) []string { return []string{" " + dim("no "+what+" yet")} }
+func emptyBody(what string) []Row { return textRows([]string{" " + dim("no "+what+" yet")}) }

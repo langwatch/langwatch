@@ -104,6 +104,6 @@ const tabCommandRows = 500
 // printTabBody writes the tab's own screen, minus the frame around it.
 func printTabBody(tab viewer.Tab) {
 	for _, row := range tab.Body(viewer.Frame{Width: 0, Height: tabCommandRows}) {
-		fmt.Println(row)
+		fmt.Println(row.Text)
 	}
 }

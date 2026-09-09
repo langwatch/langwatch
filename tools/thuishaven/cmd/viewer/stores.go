@@ -16,6 +16,8 @@ const meterWidth = 24
 
 // StoresTab is the stores screen.
 type StoresTab struct {
+	noHeader
+	noAttention
 	src   Sources
 	stats []sources.StoreStat
 }
@@ -38,7 +40,7 @@ func (t *StoresTab) Poll() {
 
 // Body renders one row per server: what is in use, against what limit, with a
 // meter, and a mark once it is past nine tenths of that limit.
-func (t *StoresTab) Body(f Frame) []string {
+func (t *StoresTab) Body(f Frame) []Row {
 	if len(t.stats) == 0 {
 		return emptyBody("managed database servers")
 	}
@@ -47,7 +49,7 @@ func (t *StoresTab) Body(f Frame) []string {
 		out = append(out, "  "+pad(stat.Name, 12)+pad(stat.Measure, 13)+
 			pad(usage(stat), 22)+Bar(stat.Fraction(), meterWidth)+mark(stat))
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(indexedRows(out), f.Rows())
 }
 
 // usage spells "used of limit" in the store's own unit.

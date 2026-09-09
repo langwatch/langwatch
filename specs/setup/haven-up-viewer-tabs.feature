@@ -10,7 +10,7 @@
 
 Feature: haven up viewer tabs
   As a developer watching a stack
-  I want session, logs, errors, traces, metrics, profiles, stores and jobs as tabs
+  I want session, logs, jobs, errors, traces, metrics, profiles and stores as tabs
   So that the one screen I keep open answers the question I have
 
   Background:
@@ -19,10 +19,48 @@ Feature: haven up viewer tabs
   Rule: The top row is fixed and each tab is one datasource
 
     @unit
-    Scenario: The tabs are session, logs, errors, traces, metrics, profiles, stores, jobs
+    Scenario: The tabs are session, logs, jobs, errors, traces, metrics, profiles, stores
       When the viewer opens
       Then the top row shows exactly those tabs in that order, numbered for direct jumps
       And left, right, tab and the digit keys move between them as before
+
+    @unit
+    Scenario: The frame is never taller than the terminal, so the banner stays
+      Given a terminal fourteen rows tall
+      When the logs tab with output is drawn
+      Then the whole screen is at most fourteen lines and the first is the banner
+      And no line is wider than the terminal
+
+    @unit
+    Scenario: The body is exactly the rows the terminal has, in every state
+      Given a logs tab with more output than the terminal can hold
+      When it is drawn following, scrolled back, filtered to warnings, with one
+        line opened, with every line opened, and on a narrow terminal
+      Then the screen is exactly the terminal's height in every one of them
+      And the sub-tab header is drawn once, at the top of the body, and never scrolls
+      And an opened line takes its rows from the body's budget, dropping whole
+        lines off the top rather than half of a block
+
+    @unit
+    Scenario: A click opens the line that was drawn at that row
+      Given a scrolled-back logs tab with one line already opened
+      When the developer clicks a row
+      Then the line opened is the one drawn at that row
+      And it is still the right one after the chrome or the footer takes another row
+
+    @unit
+    Scenario: A tab with something new since it was last seen is marked
+      Given the reader is on the logs tab
+      When a job finishes and an error is logged
+      Then the jobs and errors tabs carry a mark in the top row
+      And a failure is marked apart from an ordinary change
+      And the tab on screen never marks itself
+
+    @unit
+    Scenario: Entering the tab clears its mark
+      Given a tab carries a mark
+      When the reader moves to it
+      Then the mark is gone, and returns only for something newer still
 
     @unit
     Scenario: A Grafana-backed tab says so when the stack is down
@@ -127,6 +165,12 @@ Feature: haven up viewer tabs
       Then for each Node and Go service it lists the ten functions with the most CPU and the most heap over the last ten minutes
       And o opens the flame graph for the selected service in Grafana
 
+    @unit
+    Scenario: Square brackets move between services
+      When the developer presses "]" or "["
+      Then the selected service moves on, wrapping at either end
+      And the footer names those keys
+
   Rule: Stores and jobs read what haven already manages
 
     @unit
@@ -144,6 +188,13 @@ Feature: haven up viewer tabs
       Then each is a row with its name, when it ran, how long it took and its exit
       And enter shows that job's captured output
 
+    @unit
+    Scenario: A failed job says why on the list
+      Given a job that failed after writing its reason to the combined stream
+      When the jobs tab opens
+      Then the failed row is followed by one dim line with the last thing that job said
+      And a successful run has no such line
+
   Rule: Wide lines are cut, not wrapped, and expand on demand
 
     @unit
@@ -152,6 +203,14 @@ Feature: haven up viewer tabs
       When the viewer draws it
       Then it stays one row, cut to the width, with a dim marker where it was cut
       And a line that fits carries no marker
+
+    @unit
+    Scenario: An opened line lists its fields one per row
+      Given a line with structured fields
+      When it is opened
+      Then the message is on the first row and each field is on its own row under it
+      And the fields are in the order they were written, each value in full
+      And a line with no fields that already fits is unchanged apart from its marking
 
     @unit
     Scenario: Clicking a row opens it in full, and clicking again closes it
@@ -164,3 +223,22 @@ Feature: haven up viewer tabs
       When the developer presses x
       Then every row on the tab is shown in full
       And the setting belongs to that tab, and x again cuts them back
+
+    @unit
+    Scenario: An opened line stays open as the view scrolls
+      Given the developer opened one line
+      When new output draws that line at a different row
+      Then the same line is still open, and the row that took its place is not
+      And it closes only on a second click, on x, or on leaving the tab
+
+    @unit
+    Scenario: The row under the pointer is marked, so a click has a target
+      When the pointer moves over a row
+      Then that row alone is marked in the gutter
+      And the marking disappears when the pointer leaves the body
+
+    @unit
+    Scenario: An opened line is marked in the gutter and reads as one block
+      When a line is opened
+      Then its first row carries a coloured glyph in the gutter
+      And every continuation row carries a bar joining it to that first row

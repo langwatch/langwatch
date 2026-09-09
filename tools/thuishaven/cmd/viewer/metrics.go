@@ -9,6 +9,8 @@ import "github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 
 // MetricsTab is the metrics screen.
 type MetricsTab struct {
+	noHeader
+	noAttention
 	src    Sources
 	series []sources.Series
 	down   bool
@@ -39,7 +41,7 @@ const labelWidth = 22
 
 // Body renders one row per metric: a label, the current value, and the last ten
 // minutes as a text sparkline.
-func (t *MetricsTab) Body(f Frame) []string {
+func (t *MetricsTab) Body(f Frame) []Row {
 	if t.down {
 		return stackDownBody()
 	}
@@ -51,7 +53,7 @@ func (t *MetricsTab) Body(f Frame) []string {
 		out = append(out, "  "+pad(series.Label, labelWidth)+
 			pad(series.Value, 12)+"  "+dim(Sparkline(series.Samples)))
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(indexedRows(out), f.Rows())
 }
 
 // Footer says what the panel covers.

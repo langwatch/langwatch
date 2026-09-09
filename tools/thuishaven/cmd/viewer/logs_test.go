@@ -150,7 +150,7 @@ func TestLevelKeysNarrowTheStream(t *testing.T) {
 			if !tab.Key(tc.key) {
 				t.Fatalf("%q was not claimed by the logs tab", tc.key)
 			}
-			body := strings.Join(tab.Body(frame), "\n")
+			body := strings.Join(texts(tab.Body(frame)), "\n")
 			for _, want := range tc.want {
 				if !strings.Contains(body, want) {
 					t.Errorf("body after %q is missing %q", tc.key, want)

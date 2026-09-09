@@ -28,6 +28,7 @@ type ErrorGroup struct {
 
 // ErrorsTab is the errors screen.
 type ErrorsTab struct {
+	noHeader
 	src    Sources
 	groups map[string]*ErrorGroup
 	cursor int
@@ -35,6 +36,10 @@ type ErrorsTab struct {
 	openSignature string
 	pages         *pager
 	last          map[string]string
+	// firstSeen is when the newest distinct failure first appeared, which is
+	// what makes the tab worth a look: another hundred of a failure already on
+	// screen is not news, a failure nobody has seen before is.
+	newestSignature time.Time
 }
 
 // NewErrorsTab builds the errors screen over the same log backing the log tab
@@ -74,6 +79,7 @@ func (t *ErrorsTab) fold(line sources.LogLine) {
 	if !seen {
 		group = &ErrorGroup{Signature: key, FirstSeen: line.At}
 		t.groups[key] = group
+		t.newestSignature = newest(t.newestSignature, line.At)
 	}
 	group.Message, group.Lane, group.App = message, line.Lane, line.App
 	group.Count++
@@ -99,6 +105,15 @@ func detailOf(message, stack string) []string {
 	return append(out, strings.Split(strings.TrimRight(stack, "\n"), "\n")...)
 }
 
+// Attention marks the errors tab when a failure nobody has seen before arrived
+// while the reader was elsewhere.
+func (t *ErrorsTab) Attention(since time.Time) Attention {
+	if t.newestSignature.After(since) {
+		return AttentionFailure
+	}
+	return AttentionNone
+}
+
 // Groups is every distinct failure, most recently seen first.
 func (t *ErrorsTab) Groups() []ErrorGroup {
 	out := make([]ErrorGroup, 0, len(t.groups))
@@ -110,7 +125,7 @@ func (t *ErrorsTab) Groups() []ErrorGroup {
 }
 
 // Body renders the group list, or the drilled-into group's own detail.
-func (t *ErrorsTab) Body(f Frame) []string {
+func (t *ErrorsTab) Body(f Frame) []Row {
 	if t.openSignature != "" {
 		return t.detailBody(f)
 	}
@@ -120,10 +135,12 @@ func (t *ErrorsTab) Body(f Frame) []string {
 	}
 	now := t.src.Now()
 	out := make([]string, 0, len(groups))
+	keys := make([]string, 0, len(groups))
 	for i := range groups {
 		out = append(out, t.row(i, &groups[i], now))
+		keys = append(keys, groups[i].Signature)
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(keyedRows(out, keys), f.Rows())
 }
 
 // row renders one group: count, when it was first and last seen, the lane, and
@@ -140,7 +157,7 @@ func (t *ErrorsTab) row(i int, group *ErrorGroup, now time.Time) string {
 }
 
 // detailBody is the drilled-into group's last occurrence, in full.
-func (t *ErrorsTab) detailBody(f Frame) []string {
+func (t *ErrorsTab) detailBody(f Frame) []Row {
 	group, ok := t.groups[t.openSignature]
 	if !ok {
 		return emptyBody("detail")
@@ -150,7 +167,7 @@ func (t *ErrorsTab) detailBody(f Frame) []string {
 	for _, line := range group.Detail {
 		out = append(out, " "+line)
 	}
-	return lastN(out, f.Rows())
+	return lastNRows(textRows(out), f.Rows())
 }
 
 // Footer names what the keys do on whichever half of the tab is showing.

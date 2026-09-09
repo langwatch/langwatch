@@ -18,13 +18,13 @@ import (
 )
 
 // The attached up viewer: what a human's `haven up` shows. The stack itself
-// runs detached (startDetachedUp), so this is a window onto it — never a leash.
+// runs detached (startDetachedUp), so this is a window onto it - never a leash.
 // The top row is fixed - session, logs, errors, traces, metrics, profiles,
 // stores, jobs - and each tab is one datasource, which is what lets one screen
 // answer the question a person actually arrived with. This file is the model
 // that composes them: the frame, the key routing and the tab bar. What each tab
 // knows how to do lives in cmd/viewer. q detaches (up) or destroys (play);
-// nothing here can stop an `up` stack — that is `haven down`.
+// nothing here can stop an `up` stack - that is `haven down`.
 
 // sessionActions is the viewer's window onto the live stack: a cheap snapshot
 // it refreshes on a slow tick, and a bounce it fires on `r`/`a`. Kept as plain
@@ -100,6 +100,7 @@ type viewerModel struct {
 	tabs     map[string]viewer.Tab
 	logs     *viewer.LogsTab
 	errs     *viewer.ErrorsTab
+	jobs     *viewer.JobsTab
 	files    sources.Logs
 	selected int // index into viewer.TabNames
 	// banner is the header line; the default is `haven up`'s detach contract,
@@ -121,11 +122,27 @@ type viewerModel struct {
 	// key that stops the stack always takes two deliberate presses.
 	confirmStop bool
 	tickN       int // refresh counter, so the snapshot polls on a slow beat
-	// expandedRows are the body rows a click has opened on the tab currently on
-	// screen, by their position in the frame. Position, not line identity: a
-	// click means "that row, there", and on a following log tab the row under
-	// the pointer is the one the reader is looking at. Switching tabs clears it.
-	expandedRows map[int]bool
+	// expandedIDs are the lines a click has opened on the tab currently on
+	// screen, by the identity the tab gave them. Identity, not screen position:
+	// a row opened at the bottom of a following log tab is the same line three
+	// seconds later, twenty rows further up, and must still be open. Switching
+	// tabs clears it.
+	expandedIDs map[int64]bool
+	// hoverRow is the body row the pointer is over, so a click has a visible
+	// target. -1 when the pointer is outside the body or the terminal sends no
+	// motion at all.
+	hoverRow int
+	// rowIDs is what the last frame drew, by screen row, so a click at a Y
+	// coordinate resolves to the line that was under it.
+	rowIDs []int64
+	// seen is when the reader last had each tab on screen. The tabs answer
+	// "what is new since"; only the model knows what "since" is, because only
+	// the model knows what is being looked at.
+	seen map[string]time.Time
+	// now is the clock behind seen. Injected, because "was this newer than the
+	// last look" is a claim about two instants and a test that cannot move
+	// either of them can only assert it by sleeping.
+	now func() time.Time
 	// expandAll opens every row of a tab, per tab, for a terminal that forwards
 	// no clicks.
 	expandAll map[string]bool
@@ -135,10 +152,13 @@ type viewerModel struct {
 
 func newViewerModel(slug, combined, capDir string) *viewerModel {
 	m := &viewerModel{
-		slug:         slug,
-		expandedRows: map[int]bool{},
-		expandAll:    map[string]bool{},
-		banner:       fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
+		slug:        slug,
+		expandedIDs: map[int64]bool{},
+		expandAll:   map[string]bool{},
+		seen:        map[string]time.Time{},
+		now:         time.Now,
+		hoverRow:    -1,
+		banner:      fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
 	}
 	m.install(m.sources(combined, capDir))
 	return m
@@ -154,6 +174,13 @@ func (m *viewerModel) install(src viewer.Sources) {
 	}
 	m.logs, _ = m.tabs["logs"].(*viewer.LogsTab)
 	m.errs, _ = m.tabs["errors"].(*viewer.ErrorsTab)
+	m.jobs, _ = m.tabs["jobs"].(*viewer.JobsTab)
+	// Every tab starts read. Whatever a stack did before this viewer opened is
+	// history, and a tab bar lit up on frame one teaches the reader to ignore it.
+	seenAt := m.now()
+	for _, name := range viewer.TabNames {
+		m.seen[name] = seenAt
+	}
 }
 
 // sources wires every datasource the tabs read. The Grafana-backed ones are
@@ -291,6 +318,11 @@ func (m *viewerModel) ingest() {
 		m.logs.Observe(line)
 		m.errs.Observe(line)
 	}
+	// The jobs journal is read on every beat too, for the same reason the
+	// capture tail is: a file in haven's own home is not the kind of poll the
+	// visible-tab rule is about, and a prepare that failed while you were
+	// reading traces is exactly the one the tab bar has to be able to mark.
+	m.jobs.Poll()
 	m.applyPreferred()
 	if tab, ok := m.tabs[m.currentTab()]; ok {
 		tab.Poll()
@@ -333,25 +365,42 @@ func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.offerKey("wheeldown")
 	case tea.MouseButtonLeft:
 		if msg.Action == tea.MouseActionPress {
-			m.toggleRow(msg.Y - bodyTopRow)
+			m.toggleRow(m.bodyRow(msg.Y))
 		}
+	case tea.MouseButtonNone:
+		m.hoverRow = m.bodyRow(msg.Y)
 	default:
 		// Every other button/gesture is outside this viewer's scope.
 	}
 	return m, nil
 }
 
-// toggleRow opens the clicked body row in full, or closes it again. A click
-// above the body is the banner or the tab bar and opens nothing.
+// bodyRow turns a pointer's Y coordinate into a body row, or -1 when it is over
+// the chrome. It measures the chrome rather than assuming it, because the frame
+// and the screen only line up while the frame is exactly the terminal's height.
+func (m *viewerModel) bodyRow(y int) int {
+	if row := y - m.chromeHeight(); row >= 0 {
+		return row
+	}
+	return -1
+}
+
+// toggleRow opens the line under the clicked body row in full, or closes it
+// again. A click on a row with no identity of its own - a header, a drill-in -
+// opens nothing, because there is no line there to keep open.
 func (m *viewerModel) toggleRow(row int) {
-	if row < 0 {
+	if row < 0 || row >= len(m.rowIDs) {
 		return
 	}
-	if m.expandedRows[row] {
-		delete(m.expandedRows, row)
+	id := m.rowIDs[row]
+	if id == 0 {
 		return
 	}
-	m.expandedRows[row] = true
+	if m.expandedIDs[id] {
+		delete(m.expandedIDs, id)
+		return
+	}
+	m.expandedIDs[id] = true
 }
 
 // handleKey routes a keypress: the tab on screen is offered it first, and
@@ -417,6 +466,7 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 	case "x":
 		tab := m.currentTab()
 		m.expandAll[tab] = !m.expandAll[tab]
+		m.expandedIDs = map[int64]bool{}
 	case "right", "l", "tab":
 		m.moveTab(1)
 	case "left", "h", "shift+tab":
@@ -425,7 +475,7 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 		if n := digitKey(s); n > 0 && n <= len(viewer.TabNames) {
 			m.preferred = ""
 			m.selected = n - 1
-			m.expandedRows = map[int]bool{}
+			m.expandedIDs = map[int64]bool{}
 		}
 	}
 	return m, nil
@@ -446,7 +496,7 @@ func (m *viewerModel) moveTab(delta int) {
 	m.preferred = ""
 	count := len(viewer.TabNames)
 	m.selected = ((m.selected+delta)%count + count) % count
-	m.expandedRows = map[int]bool{}
+	m.expandedIDs = map[int64]bool{}
 }
 
 // selectTab moves to one tab by name.
@@ -454,7 +504,7 @@ func (m *viewerModel) selectTab(name string) {
 	for i, tab := range viewer.TabNames {
 		if tab == name {
 			m.selected = i
-			m.expandedRows = map[int]bool{}
+			m.expandedIDs = map[int64]bool{}
 			return
 		}
 	}
@@ -589,69 +639,259 @@ func minInt(a, b int) int {
 }
 
 func (m *viewerModel) View() string {
-	var b strings.Builder
-	b.WriteString(m.banner)
-	b.WriteString(" " + m.tabsLine() + "\n\n")
+	m.markSeen()
+	chrome := m.chromeRows()
 	if m.onSessionTab() {
-		b.WriteString(m.dashboardBody())
-		return b.String()
+		return strings.Join(m.clampToTerminal(append(chrome, m.dashboardRows()...)), "\n")
 	}
 	tab := m.tabs[m.currentTab()]
-	frame := viewer.Frame{Width: m.width, Height: m.bodyHeight()}
-	for _, row := range m.fitRows(tab.Body(frame), frame.Height) {
-		b.WriteString(row + "\n")
-	}
-	b.WriteString("\n " + tab.Footer() + "\n")
-	return b.String()
+	footer := m.footerRows(tab.Footer())
+	header := m.headerRows(tab)
+	budget := m.bodyBudget(len(footer), len(header))
+	body := m.layOutBody(tab, header, budget)
+	rows := make([]string, 0, len(chrome)+len(body)+1+len(footer))
+	rows = append(rows, chrome...)
+	rows = append(rows, body...)
+	rows = append(rows, "")
+	rows = append(rows, footer...)
+	return strings.Join(m.clampToTerminal(rows), "\n")
 }
 
-// bodyHeight is how many rows fit between the tab bar and the footer.
-func (m *viewerModel) bodyHeight() int {
-	if body := m.height - 6; body > 0 {
-		return body
+// chromeRows is the banner, the tab bar and the blank under them, cut to the
+// terminal like every other row. Cut, because a banner that wraps costs the
+// body a row nobody accounted for, and the row bubbletea then drops off the top
+// is the banner itself.
+func (m *viewerModel) chromeRows() []string {
+	return []string{
+		cutRow(strings.TrimRight(m.banner, "\n"), m.width),
+		cutRow(" "+m.tabsLine(), m.width),
+		"",
 	}
-	return 20
 }
 
-// bodyTopRow is how many rows the banner and the tab bar occupy above the body,
-// which is what turns a click's Y coordinate into a body row.
-const bodyTopRow = 3
+// chromeHeight is how many rows the chrome actually occupies, which is what
+// turns a pointer's Y coordinate into a body row. Measured rather than assumed:
+// a constant that stops matching the chrome sends every click to the wrong line,
+// and nothing about the frame says so.
+func (m *viewerModel) chromeHeight() int { return len(m.chromeRows()) }
+
+// headerRows is what the tab pins above its output, cut to the width. Pinned
+// means pinned: it is not part of the scrollable body, so no amount of
+// scrolling or expanding can leave it in the middle of the output.
+func (m *viewerModel) headerRows(tab viewer.Tab) []string {
+	head := tab.Header()
+	out := make([]string, 0, len(head))
+	for _, row := range head {
+		out = append(out, cutRow(row, m.width))
+	}
+	return out
+}
+
+// dashboardRows is the session screen as rows.
+func (m *viewerModel) dashboardRows() []string {
+	return strings.Split(strings.TrimRight(m.dashboardBody(), "\n"), "\n")
+}
+
+// clampToTerminal keeps a screen inside the terminal by dropping rows off the
+// BOTTOM. Bubbletea keeps the last N rows of whatever it is given, so a frame
+// one row too tall loses its first row - which is the banner, the one row that
+// says which stack this is and how to leave it.
+func (m *viewerModel) clampToTerminal(rows []string) []string {
+	if m.height <= 0 || len(rows) <= m.height {
+		return rows
+	}
+	return rows[:m.height]
+}
+
+// footerRows is the key help, wrapped to the terminal rather than cut. The
+// footer is the one place a reader looks up a key they have forgotten, and its
+// tail is exactly the part they had not learned yet; the body gives way for it.
+func (m *viewerModel) footerRows(text string) []string {
+	var out []string
+	for i, line := range strings.Split(text, "\n") {
+		if i == 0 {
+			line = " " + line
+		}
+		out = append(out, hardWrap(line, m.width)...)
+	}
+	return out
+}
+
+// hardWrap breaks one line into as many rows as the width needs. A width of
+// zero or less is a terminal that has not reported its size.
+func hardWrap(line string, width int) []string {
+	if width <= 0 || ansi.StringWidth(line) <= width {
+		return []string{line}
+	}
+	return strings.Split(ansi.Hardwrap(line, width, true), "\n")
+}
+
+// bodyBudget is how many rows are left for the tab's own output once the
+// chrome, the pinned header, the blank above the footer and the footer itself
+// have taken theirs. It is exact, and the body is padded up to it: a frame
+// shorter than the terminal leaves the previous, taller frame's rows on screen,
+// which is how a pinned header came to appear twice.
+func (m *viewerModel) bodyBudget(footerRows, headerRows int) int {
+	if m.height <= 0 {
+		return 20
+	}
+	if budget := m.height - m.chromeHeight() - 1 - footerRows - headerRows; budget > 0 {
+		return budget
+	}
+	return 1
+}
+
+// layOutBody assembles the body region: the pinned header, then exactly budget
+// rows of output, padded when the tab has less to say. It also records which
+// line each row of the region came from, so the next click resolves against
+// what is actually on screen.
+func (m *viewerModel) layOutBody(tab viewer.Tab, header []string, budget int) []string {
+	fitted := fitRows(tab.Body(viewer.Frame{Width: m.width, Height: budget}), fitOptions{
+		width:     m.width,
+		body:      budget,
+		expanded:  m.expandedIDs,
+		expandAll: m.expandAll[m.currentTab()],
+	})
+	out := make([]string, 0, len(header)+budget)
+	ids := make([]int64, 0, len(header)+budget)
+	for _, row := range header {
+		out = append(out, row)
+		ids = append(ids, 0) // pinned: there is no line here to open
+	}
+	for i, row := range paintRows(fitted, m.width, m.hoverRow-len(header)) {
+		out = append(out, row)
+		ids = append(ids, fitted[i].id)
+	}
+	for len(out) < len(header)+budget {
+		out = append(out, "")
+		ids = append(ids, 0)
+	}
+	m.rowIDs = ids
+	return out
+}
+
+// markSeen stamps the tab on screen as read. A tab never marks itself: the
+// reader is looking at it.
+func (m *viewerModel) markSeen() {
+	m.seen[m.currentTab()] = m.now()
+}
 
 // cutMarker is the one dim character that says a row was cut. A row silently
 // ending at the terminal's edge and a row that happens to be exactly that wide
 // look identical, and only one of them is hiding something.
 const cutMarker = "\x1b[2m…\x1b[0m"
 
-// fitRows lays the tab's body out at this terminal's width. Every row is cut to
-// the width with a marker at the cut rather than wrapped: a screen of wrapped
-// lines is a screen where nothing lines up, and the columns are the whole point
-// of rendering centrally. A row the reader asks for is shown in full instead,
-// wrapped under the message column so the continuation reads as more of the
-// same message.
-func fitRows(lines []string, opts fitOptions) []string {
-	rows := make([]string, 0, len(lines))
-	for i, line := range lines {
-		if opts.expandAll || opts.expanded[i] {
-			rows = append(rows, wrapLogLine(line, opts.width)...)
-			continue
-		}
-		rows = append(rows, cutRow(line, opts.width))
-	}
-	if len(rows) > opts.body {
-		rows = rows[len(rows)-opts.body:]
-	}
-	return rows
+// The gutter and the shade. Two cells before the time column carry where the
+// pointer is; the shade behind a whole block is what says several rows are one
+// line. A glyph on the head alone did not: an opened record is a head and a
+// column of fields, and the eye needs the block, not a bullet.
+const (
+	gutterWidth = 2
+	// gutterPlain is a row with nothing to say about itself.
+	gutterPlain = "  "
+	// glyphHover, glyphOpen and glyphRest are the marks themselves, apart from
+	// the color around them: the shade a block is painted on re-arms itself
+	// after every reset in the row, so the painted gutter is no longer any one
+	// string a reader (or a test) can look for.
+	glyphHover = "·"
+	glyphOpen  = "▌"
+	glyphRest  = "│"
+	// gutterHover marks the row under the pointer, so a click has a target.
+	gutterHover = "\x1b[2m" + glyphHover + "\x1b[0m "
+	// gutterOpen heads an opened block.
+	gutterOpen = "\x1b[36m" + glyphOpen + "\x1b[0m "
+	// gutterOpenRest runs down the rest of an opened block.
+	gutterOpenRest = "\x1b[36m" + glyphRest + "\x1b[0m "
+	// openShade is the background every row of an opened block is painted on:
+	// dark enough to stay behind the text at any terminal theme, light enough
+	// to be a block rather than a hole.
+	openShade = "\x1b[48;5;236m"
+	// shadeOff ends the background without touching the foreground.
+	shadeOff = "\x1b[49m"
+)
+
+// fittedRow is one screen row: the text, the identity of the line it came
+// from, and whether it is part of an opened block.
+type fittedRow struct {
+	id   int64
+	text string
+	// open is whether this row belongs to a line the reader opened.
+	open bool
+	// rest is whether it is a continuation of the row above rather than the
+	// head of one.
+	rest bool
 }
 
-// fitOptions is the terminal's shape and which rows the reader has opened.
+// fitOptions is the terminal's shape and which lines the reader has opened.
 type fitOptions struct {
 	width int
 	body  int
-	// expanded is the body rows a click has opened, by their position on screen.
-	expanded map[int]bool
+	// expanded is the lines a click has opened, by the identity their tab gave
+	// them.
+	expanded map[int64]bool
 	// expandAll opens every row on this tab, for a terminal that forwards no
 	// clicks at all.
 	expandAll bool
+}
+
+// fitRows lays the tab's body out at this terminal's width. Every row is cut to
+// the width with a marker at the cut rather than wrapped: a screen of wrapped
+// lines is a screen where nothing lines up, and the columns are the whole point
+// of rendering centrally. A line the reader opened is shown in full instead.
+//
+// The budget is honored by dropping WHOLE lines off the top, never half of an
+// opened block: a block cut through the middle reads as two unrelated fragments
+// and the one at the top has lost the line it belonged to.
+func fitRows(rows []viewer.Row, opts fitOptions) []fittedRow {
+	blocks := make([][]fittedRow, 0, len(rows))
+	for _, row := range rows {
+		if opts.expandAll || opts.expanded[row.ID] {
+			blocks = append(blocks, expandRow(row, opts.width-gutterWidth))
+			continue
+		}
+		blocks = append(blocks, []fittedRow{{id: row.ID, text: cutRow(row.Text, opts.width-gutterWidth)}})
+	}
+	return keepLastBlocks(blocks, opts.body)
+}
+
+// keepLastBlocks takes whole blocks from the bottom until the budget is full.
+// A single block too tall for the whole body is cut to fit, because showing
+// nothing would be worse than showing its start.
+func keepLastBlocks(blocks [][]fittedRow, budget int) []fittedRow {
+	var out []fittedRow
+	for i := len(blocks) - 1; i >= 0; i-- {
+		if len(out)+len(blocks[i]) > budget {
+			if len(out) == 0 {
+				return blocks[i][:budget]
+			}
+			break
+		}
+		out = append(append([]fittedRow{}, blocks[i]...), out...)
+	}
+	return out
+}
+
+// expandRow lays one opened line out in full: the line itself, then its
+// structured fields one per row under the message column. A line with no fields
+// that already fits is unchanged - opening it says "this one", and changing
+// what it says as well would make the reader find their place again.
+func expandRow(row viewer.Row, room int) []fittedRow {
+	head, fields := row.Parts()
+	out := blockRows(row.ID, wrapLogLine(head, room), nil)
+	indent := strings.Repeat(" ", logfmt.MessageColumn)
+	for _, field := range fields {
+		out = blockRows(row.ID, wrapLogLine(indent+field, room), out)
+	}
+	return out
+}
+
+// blockRows appends wrapped rows to an opened block, marking every one of them
+// as part of it and the first as its head.
+func blockRows(id int64, wrapped []string, into []fittedRow) []fittedRow {
+	for _, text := range wrapped {
+		into = append(into, fittedRow{id: id, text: text, open: true, rest: len(into) > 0})
+	}
+	return into
 }
 
 // cutRow truncates one row to the width, leaving room for the marker. A width
@@ -664,14 +904,46 @@ func cutRow(line string, width int) string {
 	return ansi.Cut(line, 0, maxInt(width-1, 0)) + cutMarker
 }
 
-// fitRows lays out one frame with whatever this viewer's reader has opened.
-func (m *viewerModel) fitRows(lines []string, body int) []string {
-	return fitRows(lines, fitOptions{
-		width:     m.width - 1,
-		body:      body,
-		expanded:  m.expandedRows,
-		expandAll: m.expandAll[m.currentTab()],
-	})
+// paintRows prefixes each laid-out row with its gutter and, for an opened
+// block, paints the whole width behind it.
+func paintRows(rows []fittedRow, width, hover int) []string {
+	out := make([]string, 0, len(rows))
+	for i, row := range rows {
+		text := gutterFor(row, i == hover) + row.text
+		if row.open {
+			text = shade(text, width)
+		}
+		out = append(out, text)
+	}
+	return out
+}
+
+// shade paints one row's whole width on the block background. Every reset the
+// row already carries has to re-arm the background behind it, or the shade ends
+// at the first colored token in the line.
+func shade(text string, width int) string {
+	painted := openShade + strings.ReplaceAll(text, sgrReset, sgrReset+openShade)
+	if pad := width - ansi.StringWidth(text); pad > 0 {
+		painted += strings.Repeat(" ", pad)
+	}
+	return painted + shadeOff + sgrReset
+}
+
+// sgrReset is the sequence a painted row ends every colored run with.
+const sgrReset = "\x1b[0m"
+
+// gutterFor picks one row's gutter. Open wins over hover: the pointer moves
+// again in a moment, and the block it is passing over stays open.
+func gutterFor(row fittedRow, hovered bool) string {
+	switch {
+	case row.open && row.rest:
+		return gutterOpenRest
+	case row.open:
+		return gutterOpen
+	case hovered:
+		return gutterHover
+	}
+	return gutterPlain
 }
 
 // wrapLogLine breaks one rendered line to width cells, for a row the reader
@@ -703,11 +975,12 @@ func wrapLogLine(line string, width int) []string {
 }
 
 // tabsLine renders the fixed top row, the selected one inverted, each numbered
-// for direct jumps.
+// for direct jumps, each carrying whatever happened on it while the reader was
+// somewhere else.
 func (m *viewerModel) tabsLine() string {
 	parts := make([]string, len(viewer.TabNames))
 	for i, name := range viewer.TabNames {
-		label := fmt.Sprintf(" %d %s ", i+1, name)
+		label := fmt.Sprintf(" %d %s%s ", i+1, name, m.attentionMark(i, name))
 		if i == m.selected {
 			parts[i] = "\x1b[7m" + label + "\x1b[0m"
 			continue
@@ -715,4 +988,33 @@ func (m *viewerModel) tabsLine() string {
 		parts[i] = "\x1b[2m" + label + "\x1b[0m"
 	}
 	return strings.Join(parts, " ")
+}
+
+// The marks a tab off screen carries. Cyan for something new, red for
+// something that failed - the same cyan the opened gutter uses, so one color
+// means one thing across the whole screen.
+const (
+	markNotice  = "\x1b[36m•\x1b[0m"
+	markFailure = "\x1b[31m•\x1b[0m"
+)
+
+// attentionMark is the dot after a tab's name. The tab on screen never carries
+// one: the reader is looking at it, so there is nothing to tell them.
+func (m *viewerModel) attentionMark(index int, name string) string {
+	if index == m.selected {
+		return ""
+	}
+	tab, ok := m.tabs[name]
+	if !ok {
+		return ""
+	}
+	switch tab.Attention(m.seen[name]) {
+	case viewer.AttentionFailure:
+		return markFailure
+	case viewer.AttentionNotice:
+		return markNotice
+	case viewer.AttentionNone:
+		return ""
+	}
+	return ""
 }

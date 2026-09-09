@@ -56,11 +56,11 @@ func TestNewOutputDoesNotYankAScrolledBackView(t *testing.T) {
 	tab := scrollTab(t, 200)
 	tab.SelectSubTab("ui")
 	tab.Key("pgup")
-	before := tab.pages.visible("ui", 10)
+	before := texts(tab.pages.visible("ui", 10))
 	back := tab.pages.scroll["ui"]
 
 	pushLines(tab, "ui", "later", 5)
-	if got := tab.pages.visible("ui", 10); strings.Join(got, "|") != strings.Join(before, "|") {
+	if got := texts(tab.pages.visible("ui", 10)); strings.Join(got, "|") != strings.Join(before, "|") {
 		t.Errorf("the window moved under the reader:\n before %v\n after  %v", before, got)
 	}
 	if tab.pages.scroll["ui"] != back+5 {
@@ -119,7 +119,7 @@ func TestEnterJumpsToTheNearestMatchAndHighlights(t *testing.T) {
 	}
 	tab.Key("enter")
 
-	visible := strings.Join(tab.pages.visible("ui", 5), "\n")
+	visible := strings.Join(texts(tab.pages.visible("ui", 5)), "\n")
 	if !strings.Contains(visible, "NEEDLE") {
 		t.Fatalf("view did not jump to the match, showing:\n%s", visible)
 	}
@@ -209,4 +209,60 @@ func TestPagerLeavesTheViewersOwnKeysAlone(t *testing.T) {
 			t.Errorf("the logs tab claimed %q - that binding belongs to the viewer", k)
 		}
 	}
+}
+
+// A Mac laptop keyboard has no page up, no page down, no home and no end. A
+// footer naming only those is a footer telling most readers they cannot move.
+// @scenario "Paging works from a keyboard with no page keys"
+func TestPagingFromAKeyboardWithNoPageKeys(t *testing.T) {
+	newTab := func(t *testing.T) *LogsTab {
+		t.Helper()
+		tab := scrollTab(t, 400)
+		tab.SelectSubTab("ui")
+		tab.Body(Frame{Width: 120, Height: 20}) // the budget is exact: twenty rows
+		return tab
+	}
+
+	cases := []struct {
+		name string
+		keys []string
+		want int
+	}{
+		{name: "space pages down from the bottom, which is nowhere to go", keys: []string{" "}, want: 0},
+		{name: "b pages up", keys: []string{"b"}, want: 20},
+		{name: "b then space returns", keys: []string{"b", " "}, want: 0},
+		{name: "u moves half a page up", keys: []string{"u"}, want: 10},
+		{name: "ctrl+u moves half a page up", keys: []string{"ctrl+u"}, want: 10},
+		{name: "d moves half a page back down", keys: []string{"b", "d"}, want: 10},
+		{name: "ctrl+d moves half a page back down", keys: []string{"b", "ctrl+d"}, want: 10},
+		{name: "g jumps to the top", keys: []string{"g"}, want: 400},
+		{name: "G returns to the bottom", keys: []string{"g", "G"}, want: 0},
+		{name: "the page keys still work where a keyboard has them", keys: []string{"pgup"}, want: 20},
+		{name: "home and end still work too", keys: []string{"home", "end"}, want: 0},
+	}
+	for _, tc := range cases {
+		t.Run("when the developer presses "+strings.Join(tc.keys, " then "), func(t *testing.T) {
+			tab := newTab(t)
+			for _, k := range tc.keys {
+				if !tab.Key(k) {
+					t.Fatalf("%q was not claimed by the logs tab", k)
+				}
+			}
+			if got := tab.pages.scroll["ui"]; got != tc.want {
+				t.Errorf("scrolled back %d lines, want %d", got, tc.want)
+			}
+		})
+	}
+
+	t.Run("the footer names the keys a laptop actually has", func(t *testing.T) {
+		footer := newTab(t).Footer()
+		for _, want := range []string{"space/b page", "d/u half", "g/G top/bottom"} {
+			if !strings.Contains(footer, want) {
+				t.Errorf("footer = %q, want it to name %q", footer, want)
+			}
+		}
+		if strings.Contains(footer, "pgup/pgdn") || strings.Contains(footer, "home/end") {
+			t.Errorf("footer = %q, want it to stop advertising keys a laptop has not got", footer)
+		}
+	})
 }

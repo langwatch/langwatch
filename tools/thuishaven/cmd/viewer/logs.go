@@ -3,6 +3,7 @@ package viewer
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
@@ -41,6 +42,10 @@ type LogsTab struct {
 	// bodyRows is the height the last render had, so a page key moves by what
 	// the reader can actually see rather than by a guess.
 	bodyRows int
+	// lastWarn and lastError are when this tab last saw a line at each level,
+	// which is all the tab bar's mark needs from it.
+	lastWarn  time.Time
+	lastError time.Time
 }
 
 // NewLogsTab builds the logs screen over the file and Loki backings.
@@ -80,6 +85,7 @@ func (t *LogsTab) ingest(line sources.LogLine) {
 	line.App = RouteLine(line.Lane, line.Text, t.last[line.Lane])
 	t.last[line.Lane] = line.App
 	t.apps[line.App] = true
+	t.noteLevel(line)
 	t.rows = append(t.rows, line)
 	if len(t.rows) > ringCap {
 		t.rows = t.rows[len(t.rows)-ringCap:]
@@ -88,8 +94,35 @@ func (t *LogsTab) ingest(line sources.LogLine) {
 	if t.src.Render != nil {
 		rendered = t.src.Render(line)
 	}
-	t.pages.push(AllApps, rendered)
-	t.pages.push(line.App, rendered)
+	row := Row{ID: t.pages.nextRowID(), Text: rendered, Source: line.Text}
+	t.pages.push(AllApps, row)
+	t.pages.push(line.App, row)
+}
+
+// noteLevel remembers when a line worth a mark on the tab bar arrived. Info is
+// not one: the log tab is always receiving info, so marking it for info would
+// mark it permanently and the mark would mean nothing.
+func (t *LogsTab) noteLevel(line sources.LogLine) {
+	switch logfmt.Level(line.Level) {
+	case logfmt.LevelError, logfmt.LevelFatal:
+		t.lastError = newest(t.lastError, line.At)
+	case logfmt.LevelWarn:
+		t.lastWarn = newest(t.lastWarn, line.At)
+	case logfmt.LevelNone, logfmt.LevelTrace, logfmt.LevelDebug, logfmt.LevelInfo:
+		// Ordinary traffic. The tab is always receiving it.
+	}
+}
+
+// Attention marks the log tab when something worth reading arrived while the
+// reader was on another tab: a failure in red, a warning in the ordinary color.
+func (t *LogsTab) Attention(since time.Time) Attention {
+	switch {
+	case t.lastError.After(since):
+		return AttentionFailure
+	case t.lastWarn.After(since):
+		return AttentionNotice
+	}
+	return AttentionNone
 }
 
 // SubTabs is the applications with output, in the fixed order, "all" first.
@@ -106,18 +139,23 @@ func (t *LogsTab) SubTabs() []string {
 // Selected is the sub-tab on screen.
 func (t *LogsTab) Selected() string { return t.selected }
 
+// Header is the application sub-tabs, pinned above the output.
+func (t *LogsTab) Header() []string { return []string{" " + t.subTabsLine()} }
+
 // Body renders the current sub-tab's window.
-func (t *LogsTab) Body(f Frame) []string {
-	rows := maxInt(f.Rows()-1, 1)
+func (t *LogsTab) Body(f Frame) []Row {
+	rows := f.Rows()
 	t.bodyRows = rows
 	lines := t.filtered(t.selected, rows)
-	out := make([]string, 0, rows+1)
-	out = append(out, " "+t.subTabsLine())
 	if len(lines) == 0 {
-		return append(out, " "+dim("waiting for output…"))
+		return []Row{{Text: " " + dim("waiting for output…")}}
 	}
+	out := make([]Row, 0, len(lines))
 	for _, line := range lines {
-		out = append(out, " "+highlight(line, t.pages.query))
+		out = append(out, Row{
+			ID: line.ID, Source: line.Source,
+			Text: " " + highlight(line.Text, t.pages.query),
+		})
 	}
 	return out
 }
@@ -126,21 +164,25 @@ func (t *LogsTab) Body(f Frame) []string {
 // applied to the rendered ring rather than at ingest so that raising it back to
 // everything shows the lines that were already there, instead of only what has
 // arrived since.
-func (t *LogsTab) filtered(ring string, rows int) []string {
+func (t *LogsTab) filtered(ring string, rows int) []Row {
 	if t.floor == logfmt.LevelNone {
 		return t.pages.visible(ring, rows)
 	}
-	var kept []string
-	for _, line := range t.pages.lines[ring] {
-		if rec, ok := logfmt.Parse(stripSGR(line)); ok && levelRank[rec.Level] >= levelRank[t.floor] {
-			kept = append(kept, line)
-			continue
-		}
-		if renderedLevel(line) >= levelRank[t.floor] {
-			kept = append(kept, line)
+	var kept []Row
+	for _, row := range t.pages.lines[ring] {
+		if admits(row.Text, t.floor) {
+			kept = append(kept, row)
 		}
 	}
-	return lastN(kept, rows)
+	return lastNRows(kept, rows)
+}
+
+// admits reports whether one rendered line clears the severity floor.
+func admits(line string, floor logfmt.Level) bool {
+	if rec, ok := logfmt.Parse(stripSGR(line)); ok {
+		return levelRank[rec.Level] >= levelRank[floor]
+	}
+	return renderedLevel(line) >= levelRank[floor]
 }
 
 // renderedLevel reads the severity out of an already-rendered line, whose level
@@ -259,7 +301,13 @@ func (t *LogsTab) Rows() any {
 
 // Lines exposes one sub-tab's rendered ring, for the tests that assert what
 // landed where.
-func (t *LogsTab) Lines(app string) []string { return t.pages.lines[app] }
+func (t *LogsTab) Lines(app string) []string {
+	out := make([]string, 0, len(t.pages.lines[app]))
+	for _, row := range t.pages.lines[app] {
+		out = append(out, row.Text)
+	}
+	return out
+}
 
 // SelectSubTab moves to one application by name, ignoring a name with no
 // output behind it.
@@ -274,6 +322,13 @@ func lastN(lines []string, n int) []string {
 		return lines
 	}
 	return lines[len(lines)-n:]
+}
+
+func lastNRows(rows []Row, n int) []Row {
+	if len(rows) <= n {
+		return rows
+	}
+	return rows[len(rows)-n:]
 }
 
 // stripSGR removes the escape sequences a rendered line carries, so a level

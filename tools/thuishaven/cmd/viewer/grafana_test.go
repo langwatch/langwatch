@@ -11,6 +11,16 @@ import (
 // frame is a terminal big enough that nothing under test is elided by height.
 var frame = Frame{Width: 140, Height: 40}
 
+// texts is a body's painted rows, for an assertion that only cares what is on
+// screen rather than which line each row came from.
+func texts(rows []Row) []string {
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.Text)
+	}
+	return out
+}
+
 // @scenario "A Grafana-backed tab says so when the stack is down"
 func TestGrafanaTabsSayTheStackIsDown(t *testing.T) {
 	traces := &sources.MemoryTraces{Down: true}
@@ -30,7 +40,7 @@ func TestGrafanaTabsSayTheStackIsDown(t *testing.T) {
 	for _, tc := range cases {
 		t.Run("when "+tc.name+" is selected", func(t *testing.T) {
 			tc.tab.Poll()
-			body := tc.tab.Body(frame)
+			body := texts(tc.tab.Body(frame))
 			if len(body) != 1 {
 				t.Fatalf("body = %d lines, want exactly one", len(body))
 			}
@@ -68,7 +78,7 @@ func tracesFixture() *sources.MemoryTraces {
 func TestTracesListsThisStacksRootSpans(t *testing.T) {
 	tab := NewTracesTab(Sources{Traces: tracesFixture(), Now: time.Now})
 	tab.Poll()
-	body := strings.Join(tab.Body(frame), "\n")
+	body := strings.Join(texts(tab.Body(frame)), "\n")
 	for _, want := range []string{"langwatch-app", "POST /api/trace", "120ms", "ok", "error"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body is missing %q:\n%s", want, body)
@@ -97,7 +107,7 @@ func TestTraceOpensAsATreeAndInGrafana(t *testing.T) {
 		if !tab.Key("enter") {
 			t.Fatal("enter was not claimed by the traces tab")
 		}
-		body := tab.Body(frame)
+		body := texts(tab.Body(frame))
 		joined := strings.Join(body, "\n")
 		if !strings.Contains(joined, "clickhouse.insert") || !strings.Contains(joined, "90ms") {
 			t.Errorf("tree body is missing a span's name, service or duration:\n%s", joined)
@@ -161,7 +171,7 @@ func TestMetricsIsAFixedPanel(t *testing.T) {
 	}}
 	tab := NewMetricsTab(Sources{Metrics: metrics, Now: time.Now})
 	tab.Poll()
-	body := tab.Body(frame)
+	body := texts(tab.Body(frame))
 	if len(body) != len(metrics.Series) {
 		t.Fatalf("body = %d rows, want one per metric (%d)", len(body), len(metrics.Series))
 	}
@@ -197,7 +207,7 @@ func TestProfilesShowsTopFunctionsPerService(t *testing.T) {
 		Now:      time.Now,
 	})
 	tab.Poll()
-	body := strings.Join(tab.Body(frame), "\n")
+	body := strings.Join(texts(tab.Body(frame)), "\n")
 	for _, want := range []string{"CPU", "heap", "app.cpu0", "app.cpu9", "app.heap9"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body is missing %q:\n%s", want, body)

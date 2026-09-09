@@ -74,10 +74,49 @@ func (f FileJobs) journal() []domain.OnceJobRun {
 	return out
 }
 
-// laneLabel matches the combined stream's "lane │ text" prefix, with or without
-// the escape sequences the label is painted in, and with either bar character:
-// the launcher writes the box-drawing one and older captures the plain pipe.
+// The combined stream has had two shapes, and a reader of it has to know both.
+// The launcher used to write "lane │ text"; it now writes the same rendered
+// form every other view uses, "23:35:08.662  codegen           Node.js v24…" -
+// a time column, a lane column and the text. A parser that knows only the old
+// one finds no output at all for any job, which is what a failed codegen with
+// no visible reason looked like.
+
+// laneLabel matches the older "lane │ text" prefix, with or without the escape
+// sequences the label is painted in, and with either bar character.
 var laneLabel = regexp.MustCompile(`^(?:\x1b\[[0-9;]*m)*\s*([a-z0-9-]+)\s*(?:\x1b\[[0-9;]*m)*\s*[|│]\s?(.*)$`)
+
+// laneColumns matches the rendered form: a clock, then the lane column, then
+// the level column (blank for a passthrough line) and the message.
+var laneColumns = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}\.\d{3}\s{2}([a-z0-9-]+)\s+(.*)$`)
+
+// laneOf reads which lane wrote one line of the combined stream, in either
+// shape, and what it said.
+func laneOf(raw string) (lane, text string, ok bool) {
+	for _, shape := range []*regexp.Regexp{laneLabel, laneColumns} {
+		if match := shape.FindStringSubmatch(stripSGR(raw)); len(match) == 3 {
+			return match[1], match[2], true
+		}
+	}
+	return "", "", false
+}
+
+// stripSGR removes the escape sequences a rendered line carries, so the columns
+// can be counted in characters a person would see.
+func stripSGR(line string) string {
+	var b strings.Builder
+	for i := 0; i < len(line); i++ {
+		if line[i] != 0x1b {
+			b.WriteByte(line[i])
+			continue
+		}
+		for i < len(line) && !isSGRFinal(line[i]) {
+			i++
+		}
+	}
+	return b.String()
+}
+
+func isSGRFinal(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 
 // laneOutput slices the combined stream into each one-shot lane's own lines.
 func (f FileJobs) laneOutput() map[string][]string {
@@ -87,11 +126,11 @@ func (f FileJobs) laneOutput() map[string][]string {
 	}
 	out := map[string][]string{}
 	for _, raw := range strings.Split(string(data), "\n") {
-		match := laneLabel.FindStringSubmatch(raw)
-		if len(match) < 3 || !domain.IsOnceJobLane(match[1]) {
+		lane, text, ok := laneOf(raw)
+		if !ok || !domain.IsOnceJobLane(lane) {
 			continue
 		}
-		out[match[1]] = append(out[match[1]], match[2])
+		out[lane] = append(out[lane], text)
 	}
 	return out
 }
