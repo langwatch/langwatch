@@ -199,3 +199,188 @@ func TestSystemLogRetrofitStatements(t *testing.T) {
 		})
 	})
 }
+
+// panickedLaptopRAM is the machine the 2026-09-09 watchdog panic happened on:
+// an 18 GiB Mac15,6 whose brew ClickHouse carried no explicit ceiling. The
+// number is here so the regression is the real one, not a rounded stand-in.
+// A var, not a const: the ratio arithmetic below is only representable as an
+// int64 once it is evaluated at runtime.
+var panickedLaptopRAM = uint64(19327352832)
+
+// @scenario "A ClickHouse that may grow into the whole machine is called out"
+// @scenario "A ClickHouse kept to a modest share of the machine passes"
+func TestAssessClickHouseCeiling(t *testing.T) {
+	t.Run("given a server that sets no ceiling of its own", func(t *testing.T) {
+		ceiling := ClickHouseCeiling{}
+
+		t.Run("when checked against the laptop that panicked", func(t *testing.T) {
+			v := AssessClickHouseCeiling(ceiling, panickedLaptopRAM)
+
+			t.Run("fails the check", func(t *testing.T) {
+				if v.Safe {
+					t.Errorf("an uncapped server passed: %+v", v)
+				}
+			})
+
+			t.Run("reports the ceiling as implicit", func(t *testing.T) {
+				if !v.Implicit {
+					t.Error("an absent max_server_memory_usage did not read as implicit")
+				}
+			})
+
+			t.Run("resolves the ratio fallback to most of the machine", func(t *testing.T) {
+				want := int64(float64(panickedLaptopRAM) * DefaultClickHouseRAMRatio)
+				if v.EffectiveBytes != want {
+					t.Errorf("got %d, want %d", v.EffectiveBytes, want)
+				}
+			})
+
+			t.Run("names a safe ceiling far under the effective one", func(t *testing.T) {
+				if v.SafeBytes >= v.EffectiveBytes {
+					t.Errorf("safe %d is not under effective %d", v.SafeBytes, v.EffectiveBytes)
+				}
+			})
+		})
+	})
+
+	t.Run("given a server capped at a small share of the machine", func(t *testing.T) {
+		ceiling := ClickHouseCeiling{MaxServerMemoryUsage: 1 << 30}
+
+		t.Run("when checked against the same machine", func(t *testing.T) {
+			v := AssessClickHouseCeiling(ceiling, panickedLaptopRAM)
+
+			t.Run("passes the check", func(t *testing.T) {
+				if !v.Safe {
+					t.Errorf("a 1 GiB ceiling failed on an 18 GiB machine: %+v", v)
+				}
+			})
+
+			t.Run("reports the ceiling as explicit", func(t *testing.T) {
+				if v.Implicit {
+					t.Error("an explicit max_server_memory_usage read as implicit")
+				}
+			})
+		})
+	})
+
+	t.Run("given the limits haven applies to the container it manages", func(t *testing.T) {
+		ceiling := ClickHouseCeiling{MaxServerMemoryUsage: DefaultClickHouseLimits().MaxServerMemory}
+
+		t.Run("when checked against the same machine", func(t *testing.T) {
+			t.Run("passes, so the check never fires on haven's own tuning", func(t *testing.T) {
+				if v := AssessClickHouseCeiling(ceiling, panickedLaptopRAM); !v.Safe {
+					t.Errorf("haven's own managed limits failed the check: %+v", v)
+				}
+			})
+		})
+	})
+
+	t.Run("given a machine whose memory could not be read", func(t *testing.T) {
+		t.Run("when checked", func(t *testing.T) {
+			v := AssessClickHouseCeiling(ClickHouseCeiling{}, 0)
+
+			t.Run("withholds judgment rather than crying wolf", func(t *testing.T) {
+				if !v.Safe || !v.Unknown {
+					t.Errorf("got %+v, want a safe unknown verdict", v)
+				}
+			})
+		})
+	})
+
+	t.Run("given an explicit ceiling that exceeds the safe share", func(t *testing.T) {
+		ceiling := ClickHouseCeiling{MaxServerMemoryUsage: int64(panickedLaptopRAM)}
+
+		t.Run("when checked", func(t *testing.T) {
+			v := AssessClickHouseCeiling(ceiling, panickedLaptopRAM)
+
+			t.Run("fails without blaming an absent setting", func(t *testing.T) {
+				if v.Safe || v.Implicit {
+					t.Errorf("got %+v, want an unsafe explicit verdict", v)
+				}
+			})
+		})
+	})
+}
+
+// @scenario "The ceiling check does not depend on who manages the server"
+func TestAssessClickHouseCeilingIgnoresTier(t *testing.T) {
+	t.Run("given the same ceiling on the same machine", func(t *testing.T) {
+		ceiling := ClickHouseCeiling{RAMRatio: DefaultClickHouseRAMRatio}
+
+		t.Run("when one is reached as a managed container and one as a URL", func(t *testing.T) {
+			managed := AssessClickHouseCeiling(ceiling, panickedLaptopRAM)
+			unmanaged := AssessClickHouseCeiling(ceiling, panickedLaptopRAM)
+
+			t.Run("reaches the same verdict", func(t *testing.T) {
+				if managed != unmanaged {
+					t.Errorf("managed %+v, unmanaged %+v", managed, unmanaged)
+				}
+			})
+
+			t.Run("differs only in the name the warning carries", func(t *testing.T) {
+				a := managed.Warning("the managed ClickHouse")
+				b := unmanaged.Warning("http://127.0.0.1:8123")
+				if a == "" || b == "" || a == b {
+					t.Errorf("warnings did not track the name: %q vs %q", a, b)
+				}
+			})
+		})
+	})
+}
+
+// @scenario "A ClickHouse that may grow into the whole machine is called out"
+func TestClickHouseCeilingWarning(t *testing.T) {
+	t.Run("given an unsafe implicit ceiling", func(t *testing.T) {
+		v := AssessClickHouseCeiling(ClickHouseCeiling{}, panickedLaptopRAM)
+
+		t.Run("when rendering the warning", func(t *testing.T) {
+			msg := v.Warning("the ClickHouse at http://127.0.0.1:8123")
+
+			t.Run("names the server", func(t *testing.T) {
+				if !strings.Contains(msg, "http://127.0.0.1:8123") {
+					t.Errorf("server not named in: %s", msg)
+				}
+			})
+
+			t.Run("names what it may take, the machine, and what is safe", func(t *testing.T) {
+				for _, want := range []string{
+					HumanBytes(v.EffectiveBytes),
+					HumanBytes(v.HostRAMBytes),
+					HumanBytes(v.SafeBytes),
+				} {
+					if !strings.Contains(msg, want) {
+						t.Errorf("missing %q in: %s", want, msg)
+					}
+				}
+			})
+
+			t.Run("says no ceiling is set, so a default applies", func(t *testing.T) {
+				for _, want := range []string{"no max_server_memory_usage of its own", "90%"} {
+					if !strings.Contains(msg, want) {
+						t.Errorf("missing %q in: %s", want, msg)
+					}
+				}
+			})
+
+			t.Run("names both ways out", func(t *testing.T) {
+				for _, want := range []string{"config.d", "LANGWATCH_HAVEN_CH=0"} {
+					if !strings.Contains(msg, want) {
+						t.Errorf("missing %q in: %s", want, msg)
+					}
+				}
+			})
+		})
+	})
+
+	t.Run("given a safe ceiling", func(t *testing.T) {
+		v := AssessClickHouseCeiling(ClickHouseCeiling{MaxServerMemoryUsage: 1 << 30}, panickedLaptopRAM)
+
+		t.Run("when rendering the warning", func(t *testing.T) {
+			t.Run("stays silent so callers can log it unconditionally", func(t *testing.T) {
+				if msg := v.Warning("the managed ClickHouse"); msg != "" {
+					t.Errorf("got %q, want silence", msg)
+				}
+			})
+		})
+	})
+}

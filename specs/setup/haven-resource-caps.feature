@@ -49,3 +49,32 @@ Feature: Resource caps — shared services can't take the machine
     When haven provisions the ClickHouse it manages
     Then its background merge and scheduling pools are sized for the shared VM
     And large merges and mutations still get scheduled under the smaller pools
+
+  # Bound by domain/clickhouse_test.go (`// @scenario` on
+  # TestAssessClickHouseCeiling and TestClickHouseCeilingWarning). This is the
+  # gap a kernel panic went through on 2026-09-09: haven caps the ClickHouse it
+  # manages, and said nothing at all about a ClickHouse it does not manage,
+  # which defaulted to ~90% of the machine and took the laptop down with it.
+  @unit
+  Scenario: A ClickHouse that may grow into the whole machine is called out
+    Given a ClickHouse server that sets no memory ceiling of its own
+    When haven checks that server against the machine it runs on
+    Then the check fails
+    And the report names what the server may take and what would be safe
+    And it says the server sets no ceiling of its own, so a default applies
+
+  @unit
+  Scenario: A ClickHouse kept to a modest share of the machine passes
+    Given a ClickHouse server whose memory ceiling is a small share of the machine
+    When haven checks that server against the machine it runs on
+    Then the check passes
+
+  # The managed container and an unmanaged server reach the same verdict from
+  # the same policy: the tier a server runs in changes who applies the ceiling,
+  # never what counts as a safe one.
+  @unit
+  Scenario: The ceiling check does not depend on who manages the server
+    Given two ClickHouse servers with the same ceiling on the same machine
+    But only one of them is managed by haven
+    When haven checks both against the machine they run on
+    Then both reach the same verdict
