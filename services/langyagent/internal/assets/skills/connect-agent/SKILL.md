@@ -142,7 +142,7 @@ Use `session` when the agent's API creates its own conversation and cannot accep
 
 The SDK reads the environment from the `environment` argument, then `LANGWATCH_AGENT_ENVIRONMENT`, then `APP_ENV`, `ENVIRONMENT` and `NODE_ENV`, and falls back to `development`. Each environment is a separate row on the agents page, so production and a developer machine are two targets that a comparison run puts side by side.
 
-`development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against.
+`development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against. On a project key the machine is its hostname, so a container whose hostname changes on every recreate registers a new row each start; give it an environment name or pin the hostname (`hostname:` in Compose, `--hostname` on `docker run`).
 
 Leave `environment` out when the service already sets `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`, `ENVIRONMENT` or `NODE_ENV`. The SDK reads them on its own.
 
@@ -352,6 +352,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | `langwatch agent get` lists a parameter without `options`, or does not list it at all | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required. | Change the annotation or add the default, then restart the process. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
+| A new agent row appears on every start, each with a different host label | The agent registered under `development` with a project key from a container, and the container's hostname changes on every recreate. | Set `LANGWATCH_AGENT_ENVIRONMENT` to a name other than `development`, or pin the container's hostname with `hostname:` in Compose or `--hostname` on `docker run`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
 | A turn fails with `agent_call_timeout` | The call took longer than the agent's timeout. | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different LangWatch project, or it reports none at all. | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill. |
