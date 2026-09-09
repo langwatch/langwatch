@@ -234,6 +234,7 @@ describe("given a connection already reading a provider account through an admin
 
   const secondConnection = {
     organizationId: "org_1",
+    actorUserId: "user_admin",
     sourceType: "anthropic_admin" as const,
     name: "Anthropic spend, second",
     parserConfig: {

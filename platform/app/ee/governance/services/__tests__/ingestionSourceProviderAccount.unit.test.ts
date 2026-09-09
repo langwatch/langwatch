@@ -59,6 +59,7 @@ const fakePrisma = () => {
 
 const createInput = {
   organizationId: ORG,
+  actorUserId: "user_admin",
   sourceType: "anthropic_admin" as const,
   name: "Anthropic spend",
   parserConfig: {

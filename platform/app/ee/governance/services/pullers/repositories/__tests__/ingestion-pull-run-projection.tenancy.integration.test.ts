@@ -60,6 +60,8 @@ function projectionFor(
       ConsecutiveErrors: 4,
       LastSuccessAt: 2_000,
       LastRunScheduledFor: 1_500,
+      LastReadThroughAt: null,
+      LastRunCompleteness: null,
       CreatedAt: 1_000,
       UpdatedAt: 2_000,
       LastEventOccurredAt: 2_000,

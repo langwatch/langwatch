@@ -612,9 +612,16 @@ export class GovernanceCostService {
         errorCount: source.errorCount,
         lastSuccessAt: source.lastSuccessAt,
       });
-      return notice
-        ? [{ name: source.name, lastSuccessIso: notice.lastSuccessIso }]
-        : [];
+      // The notice has two shapes. Only the one naming a last SUCCESS is
+      // carried onto this screen. The other shape names how far a page-capped
+      // run read, and that point is not a last success -- feeding it into a
+      // field called "oldest last success" would date an outage from a run
+      // that never failed. The sources screen already shows the read-through
+      // point in its own words; whether the cost screen should say something
+      // separate about a half-read source is an open question, and nothing in
+      // the scenarios asks for it yet.
+      if (notice === null || !("lastSuccessIso" in notice)) return [];
+      return [{ name: source.name, lastSuccessIso: notice.lastSuccessIso }];
     });
     if (stopped.length === 0) return null;
 
