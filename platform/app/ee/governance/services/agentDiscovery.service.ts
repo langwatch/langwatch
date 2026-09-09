@@ -160,7 +160,7 @@ export class AgentDiscoveryService {
     }
     if (listing.outcome === "empty") return { outcome: "empty" };
 
-    for (const agent of listing.agents) {
+    for (const agent of listing.items) {
       await this.agents.recordAgentSighting(this.prisma, {
         organizationId,
         // The source type, which is what `DiscoveredAgent.provider` holds —
@@ -173,7 +173,7 @@ export class AgentDiscoveryService {
         seenAt: now,
       });
     }
-    return { outcome: "listed", recorded: listing.agents.length };
+    return { outcome: "listed", recorded: listing.items.length };
   }
 }
 

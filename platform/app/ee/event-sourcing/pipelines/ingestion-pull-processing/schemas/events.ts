@@ -142,7 +142,7 @@ export const ingestionPullAgentsListingRefusedEventDataSchema =
   listingEnvelope.extend({
     requestedAt: z.number(),
     /**
-     * An `AgentListingRefusalReason`, or `AGENT_LISTING_FAILED_REASON` when we
+     * A `ListingRefusalReason`, or `LISTING_FAILED_REASON` when we
      * never got to ask. Deliberately a plain string and not the enum: the log
      * outlives the enum, so a reason retired in a later release must still
      * replay. Readers key their copy off the values they know and fall back
@@ -154,6 +154,46 @@ export const ingestionPullAgentsListingRefusedEventDataSchema =
   });
 export type IngestionPullAgentsListingRefusedEventData = z.infer<
   typeof ingestionPullAgentsListingRefusedEventDataSchema
+>;
+
+export const ingestionPullPeopleListingRequestedEventDataSchema =
+  listingEnvelope;
+export type IngestionPullPeopleListingRequestedEventData = z.infer<
+  typeof ingestionPullPeopleListingRequestedEventDataSchema
+>;
+
+export const ingestionPullPeopleListedEventDataSchema = listingEnvelope.extend({
+  requestedAt: z.number(),
+  /**
+   * How many people were recorded from what the provider named. Zero is the
+   * whole of "the provider returned an empty list": a refusal never reaches
+   * this event, so a zero here cannot mean anything else.
+   *
+   * It counts what was RECORDED, not what was listed, and those differ by the
+   * erasure suppression the sync passes through. A tenant that erased everyone
+   * a provider still lists reads as a listing of zero, which is the honest
+   * number for what this deployment now knows.
+   */
+  personCount: z.number().int().nonnegative(),
+});
+export type IngestionPullPeopleListedEventData = z.infer<
+  typeof ingestionPullPeopleListedEventDataSchema
+>;
+
+export const ingestionPullPeopleListingRefusedEventDataSchema =
+  listingEnvelope.extend({
+    requestedAt: z.number(),
+    /**
+     * A `ListingRefusalReason`, or `LISTING_FAILED_REASON` when we never got
+     * to ask. A plain string and not the enum for the reason the agent
+     * refusal gives: the log outlives the enum.
+     */
+    reason: z.string().min(1),
+    /** The provider's HTTP status, when the refusal came with one. */
+    status: z.number().int().nullable(),
+  });
+export type IngestionPullPeopleListingRefusedEventData = z.infer<
+  typeof ingestionPullPeopleListingRefusedEventDataSchema
 >;
 
 export const IngestionPullConfiguredEventSchema = EventSchema.extend({
@@ -217,6 +257,33 @@ export type IngestionPullAgentsListingRefusedEvent = z.infer<
   typeof IngestionPullAgentsListingRefusedEventSchema
 >;
 
+export const IngestionPullPeopleListingRequestedEventSchema =
+  EventSchema.extend({
+    type: z.literal(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED),
+    version: z.literal(INGESTION_PULL_EVENT_VERSIONS.PEOPLE_LISTING_REQUESTED),
+    data: ingestionPullPeopleListingRequestedEventDataSchema,
+  });
+export const IngestionPullPeopleListedEventSchema = EventSchema.extend({
+  type: z.literal(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED),
+  version: z.literal(INGESTION_PULL_EVENT_VERSIONS.PEOPLE_LISTED),
+  data: ingestionPullPeopleListedEventDataSchema,
+});
+export const IngestionPullPeopleListingRefusedEventSchema = EventSchema.extend({
+  type: z.literal(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REFUSED),
+  version: z.literal(INGESTION_PULL_EVENT_VERSIONS.PEOPLE_LISTING_REFUSED),
+  data: ingestionPullPeopleListingRefusedEventDataSchema,
+});
+
+export type IngestionPullPeopleListingRequestedEvent = z.infer<
+  typeof IngestionPullPeopleListingRequestedEventSchema
+>;
+export type IngestionPullPeopleListedEvent = z.infer<
+  typeof IngestionPullPeopleListedEventSchema
+>;
+export type IngestionPullPeopleListingRefusedEvent = z.infer<
+  typeof IngestionPullPeopleListingRefusedEventSchema
+>;
+
 export type IngestionPullProcessingEvent =
   | IngestionPullConfiguredEvent
   | IngestionPullDisabledEvent
@@ -224,4 +291,7 @@ export type IngestionPullProcessingEvent =
   | IngestionPullRunFailedEvent
   | IngestionPullAgentsListingRequestedEvent
   | IngestionPullAgentsListedEvent
-  | IngestionPullAgentsListingRefusedEvent;
+  | IngestionPullAgentsListingRefusedEvent
+  | IngestionPullPeopleListingRequestedEvent
+  | IngestionPullPeopleListedEvent
+  | IngestionPullPeopleListingRefusedEvent;

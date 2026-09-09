@@ -69,13 +69,15 @@ import {
   isSameDataverseEnvironment,
 } from "./dataverseEnvironment";
 import {
-  DIRECTORY_USERS_FIRST_PAGE,
+  MAX_DIRECTORY_PAGES,
+  type MicrosoftDirectoryFailure,
+  walkMicrosoftDirectory,
+} from "./microsoftDirectoryRead";
+import {
   type DirectoryUser,
   directoryReadIsDue,
-  isMicrosoftGraphUrl,
   microsoftDirectoryEvents,
   nextDirectoryCursor,
-  readDirectoryUserRows,
 } from "./microsoftGraphDirectory";
 import {
   MICROSOFT_GRAPH_SCOPE,
@@ -99,14 +101,6 @@ const TOKEN_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 /** Dataverse's own page ceiling for this kind of read. */
 const PAGE_SIZE = 50;
-
-/**
- * How many Graph pages a directory read may follow — at 999 rows a page,
- * about fifty thousand users. A tenant bigger than that holds its day and
- * says so in the log (see `fetchDirectoryUsers`), rather than being listed
- * in part.
- */
-const MAX_DIRECTORY_PAGES = 50;
 
 /**
  * The order every transcript read asks for, and the order the continuation
@@ -435,51 +429,34 @@ export function readStoredCostCursor(pollerCursor: unknown): {
 }
 
 /**
- * One directory page: fetched, refusal-checked, parsed — or null when the
- * whole day must hold.
+ * The log line one directory failure earns.
+ *
+ * The walk itself neither logs nor decides — it lives in
+ * `microsoftDirectoryRead.ts` and is shared with the people listing, which
+ * answers the same failures in its own terms. These lines stay here and stay
+ * unchanged, so an operator's saved search for a tenant that has not consented
+ * keeps matching.
  */
-async function readDirectoryPage({
-  url,
-  token,
-  options,
-}: {
-  url: string;
-  token: string;
-  options: PullRunOptions;
-}): Promise<ReturnType<typeof readDirectoryUserRows> | null> {
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const response = await ssrfSafeFetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-    signal: options.signal
-      ? AbortSignal.any([options.signal, timeout])
-      : timeout,
-    // Carries a token minted from the customer's secret, so a redirect
-    // must not hand it to whoever answers.
-    followRedirects: false,
-  });
-
-  if (!response.ok) {
+function logDirectoryFailure(failure: MicrosoftDirectoryFailure): void {
+  if (failure.cause === "http") {
     logger.warn(
-      { status: response.status },
-      response.status === 403
+      { status: failure.status },
+      failure.status === 403
         ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
         : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
     );
-    return null;
+    return;
   }
-
-  const read = readDirectoryUserRows({ response: await response.json() });
-  if (read.malformed) {
+  if (failure.cause === "malformed") {
     logger.warn(
       "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
     );
-    return null;
+    return;
   }
-  return read;
+  logger.error(
+    { refusedHost: hostOf(failure.nextLink) },
+    "copilot studio dataverse: refusing a directory next-page link that is not Microsoft Graph; holding the day",
+  );
 }
 
 /** The finished list — unless nothing in it survived parsing. */
@@ -1605,38 +1582,31 @@ export class CopilotStudioDataversePuller
   }): Promise<DirectoryUser[] | null> {
     const { token, options } = params;
 
-    const users: DirectoryUser[] = [];
-    let unreadableRows = 0;
-    let url: string = DIRECTORY_USERS_FIRST_PAGE;
-
-    for (let page = 0; page < MAX_DIRECTORY_PAGES; page += 1) {
-      const read = await readDirectoryPage({ url, token, options });
-      if (read === null) return null;
-      users.push(...read.users);
-      unreadableRows += read.unreadableRows;
-
-      if (read.nextLink === null) {
-        return completeDirectoryList({ users, unreadableRows });
-      }
-      if (!isMicrosoftGraphUrl(read.nextLink)) {
-        logger.error(
-          { refusedHost: hostOf(read.nextLink) },
-          "copilot studio dataverse: refusing a directory next-page link that is not Microsoft Graph; holding the day",
-        );
-        return null;
-      }
-      url = read.nextLink;
+    const read = await walkMicrosoftDirectory({
+      token,
+      signal: options.signal,
+      maxPages: MAX_DIRECTORY_PAGES,
+    });
+    if (!read.ok) {
+      logDirectoryFailure(read.failure);
+      return null;
+    }
+    if (read.truncated) {
+      // Ran out of page budget with a next link still standing. Held, not
+      // recorded — see the all-or-nothing note above — and said out loud with
+      // the cap in the line, so a tenant bigger than the budget reads as a
+      // limit to raise rather than a silent stall.
+      logger.error(
+        { pagesRead: MAX_DIRECTORY_PAGES, usersRead: read.users.length },
+        "copilot studio dataverse: the directory did not fit the page budget; holding the day",
+      );
+      return null;
     }
 
-    // Ran out of page budget with a next link still standing. Held, not
-    // recorded — see the all-or-nothing note above — and said out loud with
-    // the cap in the line, so a tenant bigger than the budget reads as a
-    // limit to raise rather than a silent stall.
-    logger.error(
-      { pagesRead: MAX_DIRECTORY_PAGES, usersRead: users.length },
-      "copilot studio dataverse: the directory did not fit the page budget; holding the day",
-    );
-    return null;
+    return completeDirectoryList({
+      users: read.users,
+      unreadableRows: read.unreadableRows,
+    });
   }
 
   /**

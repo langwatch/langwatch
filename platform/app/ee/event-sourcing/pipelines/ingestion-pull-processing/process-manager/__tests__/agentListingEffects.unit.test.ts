@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 
-import { AGENT_LISTING_FAILED_REASON } from "../../schemas/constants";
+import { LISTING_FAILED_REASON } from "../../schemas/constants";
 import {
   type AgentListingPort,
   createAgentListingHandler,
@@ -33,6 +33,8 @@ function commandsStub(
     recordRunFailed: vi.fn(),
     recordAgentsListed: vi.fn(),
     recordAgentsListingRefused: vi.fn(),
+    recordPeopleListed: vi.fn(),
+    recordPeopleListingRefused: vi.fn(),
     ...overrides,
   };
 }
@@ -47,6 +49,7 @@ function handlerFor({
   return createAgentListingHandler({
     runPort: { run: () => Promise.reject(new Error("unused")) },
     agentListingPort: port,
+    peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
     commands: () => commands,
     clock: () => 200,
   });
@@ -175,7 +178,7 @@ describe("agent listing outbox effect", () => {
 
       expect(recordAgentsListingRefused).toHaveBeenCalledWith(
         expect.objectContaining({
-          reason: AGENT_LISTING_FAILED_REASON,
+          reason: LISTING_FAILED_REASON,
           status: null,
         }),
       );
@@ -220,7 +223,7 @@ describe("agent listing outbox effect", () => {
 
       // An admin told "listing_failed" must not go hunting for a credential
       // problem they do not have.
-      expect(ours.mock.calls[0]?.[0].reason).toBe(AGENT_LISTING_FAILED_REASON);
+      expect(ours.mock.calls[0]?.[0].reason).toBe(LISTING_FAILED_REASON);
       expect(theirs.mock.calls[0]?.[0].reason).toBe("unauthorized");
     });
   });

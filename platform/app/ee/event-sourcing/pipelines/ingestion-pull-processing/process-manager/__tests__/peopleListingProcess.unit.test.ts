@@ -37,16 +37,15 @@ const ref = {
   processKey: "source-1",
 };
 
-const listingKey = (requestId: string) =>
+const peopleKey = (requestId: string) =>
+  `process:${encodeURIComponent("source-1")}:people:${requestId}`;
+const agentsKey = (requestId: string) =>
   `process:${encodeURIComponent("source-1")}:agents:${requestId}`;
 
 const CONFIGURED_AT = Date.parse("2026-09-09T10:00:00Z");
+/** The wake the cron in `bootConfigured` produces, named once. */
+const NEXT_PULL_AT = Date.parse("2026-09-09T10:15:00Z");
 
-/**
- * Evolve is handed the content-boundary view, not the raw event data, so
- * these payloads are shaped like `buildProcessEventView` output: the fields a
- * given event does not carry arrive as null.
- */
 function envelope({
   eventType,
   occurredAt,
@@ -109,7 +108,7 @@ function requested({
 }) {
   return {
     event: envelope({
-      eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+      eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
       occurredAt: at,
       payload: { sourceId: "source-1", requestId },
     }),
@@ -117,9 +116,9 @@ function requested({
   };
 }
 
-describe("agent listing on the ingestion pull process manager", () => {
+describe("people listing on the ingestion pull process manager", () => {
   describe("when a listing is requested", () => {
-    it("dispatches exactly one listAgents intent for the request", () => {
+    it("dispatches exactly one listPeople intent for the request", () => {
       const booted = bootConfigured();
       const at = Date.parse("2026-09-09T10:03:00Z");
       const result = evolve({
@@ -129,8 +128,8 @@ describe("agent listing on the ingestion pull process manager", () => {
 
       expect(result.intents).toEqual([
         {
-          messageKey: listingKey("req-1"),
-          intentType: "listAgents",
+          messageKey: peopleKey("req-1"),
+          intentType: "listPeople",
           payload: {
             sourceId: "source-1",
             requestId: "req-1",
@@ -140,6 +139,14 @@ describe("agent listing on the ingestion pull process manager", () => {
       ]);
     });
 
+    /**
+     * The failure this whole file exists to rule out.
+     *
+     * The process manager owns each source's cron wake and every handler
+     * returns an explicit `nextWakeAt`. A handler that returned the wrong one,
+     * or none, would silently stop a source from ever pulling again — and it
+     * would look like a listing feature working perfectly.
+     */
     it("leaves the pull schedule exactly where the configuration put it", () => {
       const booted = bootConfigured();
       const result = evolve({
@@ -150,10 +157,8 @@ describe("agent listing on the ingestion pull process manager", () => {
         }),
       });
 
-      // The whole point of not reusing handlePullConfigured: asking about
-      // agents must not push the source's next pull anywhere.
       expect(result.nextWakeAt).toBe(booted.nextWakeAt);
-      expect(result.nextWakeAt).toBe(Date.parse("2026-09-09T10:15:00Z"));
+      expect(result.nextWakeAt).toBe(NEXT_PULL_AT);
     });
 
     it("does not disturb the durable cursor", () => {
@@ -168,6 +173,66 @@ describe("agent listing on the ingestion pull process manager", () => {
 
       expect(result.state.cursor).toBe("cursor-1");
       expect(result.state.currentRun).toBeNull();
+    });
+  });
+
+  describe("when an agent listing is already in flight", () => {
+    /**
+     * The two lists ask different providers different questions, so one in
+     * flight is no reason to refuse the other. Sharing a slot would have made
+     * a people sync silently drop whenever an agent sync was running.
+     */
+    it("still dispatches the people listing", () => {
+      const booted = bootConfigured();
+      const agents = evolve({
+        previousState: booted.state,
+        event: envelope({
+          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+          occurredAt: Date.parse("2026-09-09T10:02:00Z"),
+          payload: { sourceId: "source-1", requestId: "agents-1" },
+        }),
+        now: Date.parse("2026-09-09T10:02:00Z"),
+      });
+      const people = evolve({
+        previousState: agents.state,
+        ...requested({
+          requestId: "req-1",
+          at: Date.parse("2026-09-09T10:03:00Z"),
+        }),
+      });
+
+      expect(people.intents).toHaveLength(1);
+      expect(people.intents[0]?.messageKey).toBe(peopleKey("req-1"));
+      // And the agent listing is left exactly where it was.
+      expect(people.state.currentAgentsListing?.requestId).toBe("agents-1");
+      expect(people.state.currentPeopleListing?.requestId).toBe("req-1");
+    });
+
+    it("keys the two intents apart so neither collapses onto the other", () => {
+      const booted = bootConfigured();
+      const agents = evolve({
+        previousState: booted.state,
+        event: envelope({
+          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+          occurredAt: Date.parse("2026-09-09T10:02:00Z"),
+          // Deliberately the SAME request id as the people listing below.
+          payload: { sourceId: "source-1", requestId: "req-1" },
+        }),
+        now: Date.parse("2026-09-09T10:02:00Z"),
+      });
+      const people = evolve({
+        previousState: agents.state,
+        ...requested({
+          requestId: "req-1",
+          at: Date.parse("2026-09-09T10:03:00Z"),
+        }),
+      });
+
+      expect(agents.intents[0]?.messageKey).toBe(agentsKey("req-1"));
+      expect(people.intents[0]?.messageKey).toBe(peopleKey("req-1"));
+      expect(people.intents[0]?.messageKey).not.toBe(
+        agents.intents[0]?.messageKey,
+      );
     });
   });
 
@@ -189,7 +254,7 @@ describe("agent listing on the ingestion pull process manager", () => {
       });
 
       expect(second.intents).toHaveLength(1);
-      expect(second.intents[0]?.messageKey).toBe(listingKey("req-1"));
+      expect(second.intents[0]?.messageKey).toBe(peopleKey("req-1"));
     });
   });
 
@@ -212,7 +277,7 @@ describe("agent listing on the ingestion pull process manager", () => {
       });
 
       expect(second.intents).toEqual([]);
-      expect(second.state.currentAgentsListing?.requestId).toBe("req-1");
+      expect(second.state.currentPeopleListing?.requestId).toBe("req-1");
     });
 
     it("still leaves the pull schedule alone", () => {
@@ -232,7 +297,7 @@ describe("agent listing on the ingestion pull process manager", () => {
         }),
       });
 
-      expect(second.nextWakeAt).toBe(Date.parse("2026-09-09T10:15:00Z"));
+      expect(second.nextWakeAt).toBe(NEXT_PULL_AT);
     });
   });
 
@@ -251,8 +316,8 @@ describe("agent listing on the ingestion pull process manager", () => {
       });
 
       expect(second.intents).toHaveLength(1);
-      expect(second.intents[0]?.messageKey).toBe(listingKey("req-2"));
-      expect(second.state.currentAgentsListing?.requestId).toBe("req-2");
+      expect(second.intents[0]?.messageKey).toBe(peopleKey("req-2"));
+      expect(second.state.currentPeopleListing?.requestId).toBe("req-2");
     });
   });
 
@@ -269,20 +334,21 @@ describe("agent listing on the ingestion pull process manager", () => {
       const listed = evolve({
         previousState: first.state,
         event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTED,
+          eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED,
           occurredAt: Date.parse("2026-09-09T10:03:30Z"),
           payload: {
             sourceId: "source-1",
             requestId: "req-1",
             requestedAt: Date.parse("2026-09-09T10:03:00Z"),
-            agentCount: 4,
+            personCount: 42,
           },
         }),
         now: Date.parse("2026-09-09T10:03:30Z"),
       });
 
-      expect(listed.state.currentAgentsListing).toBeNull();
+      expect(listed.state.currentPeopleListing).toBeNull();
       expect(listed.intents).toEqual([]);
+      expect(listed.nextWakeAt).toBe(NEXT_PULL_AT);
     });
 
     it("frees the source after a refusal, and keeps the pull scheduled", () => {
@@ -297,7 +363,7 @@ describe("agent listing on the ingestion pull process manager", () => {
       const refused = evolve({
         previousState: first.state,
         event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REFUSED,
+          eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REFUSED,
           occurredAt: Date.parse("2026-09-09T10:03:30Z"),
           payload: {
             sourceId: "source-1",
@@ -310,10 +376,11 @@ describe("agent listing on the ingestion pull process manager", () => {
         now: Date.parse("2026-09-09T10:03:30Z"),
       });
 
-      expect(refused.state.currentAgentsListing).toBeNull();
-      // A provider refusing to list agents says nothing about transcripts.
+      expect(refused.state.currentPeopleListing).toBeNull();
+      // A provider refusing to list its staff says nothing about whether it
+      // will keep serving the rows the pull reads.
       expect(refused.state.enabled).toBe(true);
-      expect(refused.nextWakeAt).toBe(Date.parse("2026-09-09T10:15:00Z"));
+      expect(refused.nextWakeAt).toBe(NEXT_PULL_AT);
     });
 
     it("ignores an outcome from a request it is no longer tracking", () => {
@@ -328,19 +395,56 @@ describe("agent listing on the ingestion pull process manager", () => {
       const stale = evolve({
         previousState: first.state,
         event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTED,
+          eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED,
           occurredAt: Date.parse("2026-09-09T10:04:00Z"),
           payload: {
             sourceId: "source-1",
             requestId: "req-0",
             requestedAt: Date.parse("2026-09-09T09:00:00Z"),
-            agentCount: 1,
+            personCount: 1,
           },
         }),
         now: Date.parse("2026-09-09T10:04:00Z"),
       });
 
-      expect(stale.state.currentAgentsListing?.requestId).toBe("req-1");
+      expect(stale.state.currentPeopleListing?.requestId).toBe("req-1");
+    });
+
+    it("leaves an in-flight agent listing untouched", () => {
+      const booted = bootConfigured();
+      const agents = evolve({
+        previousState: booted.state,
+        event: envelope({
+          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+          occurredAt: Date.parse("2026-09-09T10:02:00Z"),
+          payload: { sourceId: "source-1", requestId: "agents-1" },
+        }),
+        now: Date.parse("2026-09-09T10:02:00Z"),
+      });
+      const people = evolve({
+        previousState: agents.state,
+        ...requested({
+          requestId: "req-1",
+          at: Date.parse("2026-09-09T10:03:00Z"),
+        }),
+      });
+      const listed = evolve({
+        previousState: people.state,
+        event: envelope({
+          eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED,
+          occurredAt: Date.parse("2026-09-09T10:03:30Z"),
+          payload: {
+            sourceId: "source-1",
+            requestId: "req-1",
+            requestedAt: Date.parse("2026-09-09T10:03:00Z"),
+            personCount: 2,
+          },
+        }),
+        now: Date.parse("2026-09-09T10:03:30Z"),
+      });
+
+      expect(listed.state.currentPeopleListing).toBeNull();
+      expect(listed.state.currentAgentsListing?.requestId).toBe("agents-1");
     });
   });
 
@@ -364,7 +468,7 @@ describe("agent listing on the ingestion pull process manager", () => {
         now: Date.parse("2026-09-09T10:04:00Z"),
       });
 
-      expect(disabled.state.currentAgentsListing).toBeNull();
+      expect(disabled.state.currentPeopleListing).toBeNull();
       expect(disabled.nextWakeAt).toBeNull();
     });
   });
@@ -375,7 +479,7 @@ describe("agent listing on the ingestion pull process manager", () => {
       const result = evolve({
         previousState: booted.state,
         event: envelope({
-          eventType: INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+          eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
           occurredAt: Date.parse("2026-09-09T10:03:00Z"),
           payload: { sourceId: "source-1" },
         }),
@@ -383,8 +487,9 @@ describe("agent listing on the ingestion pull process manager", () => {
       });
 
       expect(result.intents).toEqual([]);
-      expect(result.state.currentAgentsListing).toBeNull();
-      expect(result.nextWakeAt).toBe(Date.parse("2026-09-09T10:15:00Z"));
+      expect(result.state.currentPeopleListing).toBeNull();
+      // Degrading must not cost the source its next pull either.
+      expect(result.nextWakeAt).toBe(NEXT_PULL_AT);
     });
   });
 });

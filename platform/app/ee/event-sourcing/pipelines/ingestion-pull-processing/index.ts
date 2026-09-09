@@ -3,9 +3,12 @@ export {
   DisableIngestionPullCommand,
   RecordIngestionPullAgentsListedCommand,
   RecordIngestionPullAgentsListingRefusedCommand,
+  RecordIngestionPullPeopleListedCommand,
+  RecordIngestionPullPeopleListingRefusedCommand,
   RecordIngestionPullRunCompletedCommand,
   RecordIngestionPullRunFailedCommand,
   RequestIngestionPullAgentsListingCommand,
+  RequestIngestionPullPeopleListingCommand,
 } from "./commands";
 export {
   createIngestionPullProcessingPipeline,
