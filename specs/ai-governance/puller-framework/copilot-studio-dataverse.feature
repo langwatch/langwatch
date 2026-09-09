@@ -516,9 +516,14 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     Given Microsoft answers the cost read with more rows than one page holds
     When the cost read runs
     Then the days on every page are recorded
+    And a reply offering an empty next page ends the walk with those days kept
     # The captured probe fits in one page and still carries the field that
     # offers a second. A reader that stops at the first page under-reports
     # the bill and does so silently.
+    # An empty next-page field is Microsoft saying there is no next page, not
+    # a link to nowhere. Read as a link it names no host, fails the host check
+    # and is refused like a foreign one, which holds the window and later
+    # gives it up with the days already read unpriced again.
 
   @unit
   Scenario: A next page cannot move the Azure token to another host

@@ -201,7 +201,12 @@ export interface AzureCostRead {
    * that reports errors would cost the run its conversations.
    */
   unreadableRows: number;
-  /** The next page, when the reply offers one. */
+  /**
+   * The next page, when the reply offers one.
+   *
+   * Null both when Azure sends `null` and when it sends `""` — see
+   * `nextPageMarker`, which is where the two are made to mean the same thing.
+   */
   nextLink: string | null;
   /**
    * The whole reply was not the shape this reads — an HTTP 200 carrying an
@@ -358,6 +363,24 @@ export function azureCostRequestBody({
 }
 
 /**
+ * The reply's next-page link, or null when the reply is the last one.
+ *
+ * Azure ends the walk two ways: `nextLink: null`, and `nextLink: ""`. Only the
+ * first reads as an ending on its own. The empty string is still a string, so
+ * it reaches the caller's host check, fails it — an empty string names no host
+ * — and is refused as though it pointed off Resource Manager. The window is
+ * then held and eventually given up with `pricedThroughDay` rolled back, so
+ * days that were in fact read whole are unpriced again on the next run.
+ *
+ * Normalised here, at the one place that reads the field, so the host check
+ * keeps its only job: refusing a link that genuinely points somewhere else. A
+ * non-empty foreign link is untouched and still refused there.
+ */
+function nextPageMarker(nextLink: string | null): string | null {
+  return nextLink !== null && nextLink.trim() !== "" ? nextLink : null;
+}
+
+/**
  * One reply, as the days it names.
  *
  * Values are read by COLUMN NAME rather than position — see the module note:
@@ -378,7 +401,8 @@ export function readAzureCostRows({
   if (!parsed.success) {
     return { days: [], unreadableRows: 0, nextLink: null, malformed: true };
   }
-  const { columns, rows, nextLink } = parsed.data.properties;
+  const { columns, rows } = parsed.data.properties;
+  const nextLink = nextPageMarker(parsed.data.properties.nextLink);
 
   const indexOf = new Map(columns.map((column, at) => [column.name, at]));
   const at = (row: unknown[], name: string): unknown => {
