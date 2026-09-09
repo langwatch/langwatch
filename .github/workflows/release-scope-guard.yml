@@ -8,7 +8,9 @@ on:
       - main
     paths:
       - ".github/scripts/guard-breaking-change-scope*.ts"
+      - ".github/scripts/dedupe-release-notes*.ts"
       - ".github/release-please-config.json"
+      - ".github/workflows/release-please-sdks.yml"
   workflow_dispatch:
 
 # The heaviest superseder in the repo: 29 of its last 100 runs were still
@@ -42,7 +44,10 @@ jobs:
           node-version: 24
 
       - name: Check guard tests
-        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
+        run: |
+          node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
+          node --test --experimental-strip-types .github/scripts/dedupe-release-notes.test.ts
+          bash -n .github/scripts/dedupe-release-notes.sh
 
       # A squash merge puts the pull request title in the subject and the branch
       # commit messages in the body, so those are the two places a breaking

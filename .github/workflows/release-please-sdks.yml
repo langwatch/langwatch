@@ -61,3 +61,18 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+      # Release Please parses each squash commit's body as well as its subject,
+      # so a body that opens with its own conventional-commit line yields TWO
+      # entries for ONE sha (#7206), and every run rewrites the release
+      # branches from history, which would bring a one-time fix back. The pass
+      # below runs after every regeneration instead, so what a release PR
+      # merges is already one-entry-per-commit.
+      #
+      # Runs unconditionally rather than gated on the action's outputs: an
+      # update to an existing release PR reports no output, and it is exactly
+      # those branches that carry duplicates.
+      - name: Deduplicate release-note entries
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: bash .github/scripts/dedupe-release-notes.sh
