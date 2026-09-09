@@ -3,6 +3,7 @@ import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
 import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
 import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
+import { createAgentListingPort } from "@ee/governance/services/pullers/agentListingPort";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   type DiscoveredPeopleMatcher,
@@ -70,6 +71,7 @@ function registerIngestionPullPipeline(
               identityMatch: deps.identityMatch,
             }),
         },
+        agentListingPort: createAgentListingPort({ prisma: deps.prisma }),
         commands: () => {
           if (!outcomeCommands) {
             throw new Error(
@@ -87,6 +89,10 @@ function registerIngestionPullPipeline(
       ingestionPullCommands.recordRunCompleted(args as never),
     recordRunFailed: (args) =>
       ingestionPullCommands.recordRunFailed(args as never),
+    recordAgentsListed: (args) =>
+      ingestionPullCommands.recordAgentsListed(args as never),
+    recordAgentsListingRefused: (args) =>
+      ingestionPullCommands.recordAgentsListingRefused(args as never),
   };
 
   if (deps.runsWorkers) {
@@ -174,6 +180,9 @@ export function createNoopEnterprisePipelineCommands(): EnterprisePipelineComman
       disable: noop,
       recordRunCompleted: noop,
       recordRunFailed: noop,
+      requestAgentsListing: noop,
+      recordAgentsListed: noop,
+      recordAgentsListingRefused: noop,
     },
     pulledUsage: {
       recordPulledUsage: noop,

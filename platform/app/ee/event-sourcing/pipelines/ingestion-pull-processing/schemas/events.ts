@@ -109,6 +109,53 @@ export type IngestionPullRunFailedEventData = z.infer<
   typeof ingestionPullRunFailedEventDataSchema
 >;
 
+const listingEnvelope = sourceEnvelope.extend({
+  /**
+   * Identity of one ask. Two presses of the same button are two requests with
+   * two ids, because they are two asks; a redelivery of one press carries the
+   * id it was minted with, so it settles onto the same event.
+   */
+  requestId: z.string().min(1),
+});
+
+export const ingestionPullAgentsListingRequestedEventDataSchema =
+  listingEnvelope;
+export type IngestionPullAgentsListingRequestedEventData = z.infer<
+  typeof ingestionPullAgentsListingRequestedEventDataSchema
+>;
+
+export const ingestionPullAgentsListedEventDataSchema = listingEnvelope.extend({
+  requestedAt: z.number(),
+  /**
+   * How many agents the provider named, and therefore how many sightings were
+   * recorded. Zero is the whole of "the provider returned an empty list": a
+   * refusal never reaches this event, so a zero here cannot mean anything
+   * else. That is what keeps the two readable apart after the fact.
+   */
+  agentCount: z.number().int().nonnegative(),
+});
+export type IngestionPullAgentsListedEventData = z.infer<
+  typeof ingestionPullAgentsListedEventDataSchema
+>;
+
+export const ingestionPullAgentsListingRefusedEventDataSchema =
+  listingEnvelope.extend({
+    requestedAt: z.number(),
+    /**
+     * An `AgentListingRefusalReason`, or `AGENT_LISTING_FAILED_REASON` when we
+     * never got to ask. Deliberately a plain string and not the enum: the log
+     * outlives the enum, so a reason retired in a later release must still
+     * replay. Readers key their copy off the values they know and fall back
+     * for the rest.
+     */
+    reason: z.string().min(1),
+    /** The provider's HTTP status, when the refusal came with one. */
+    status: z.number().int().nullable(),
+  });
+export type IngestionPullAgentsListingRefusedEventData = z.infer<
+  typeof ingestionPullAgentsListingRefusedEventDataSchema
+>;
+
 export const IngestionPullConfiguredEventSchema = EventSchema.extend({
   type: z.literal(INGESTION_PULL_EVENT_TYPES.CONFIGURED),
   version: z.literal(INGESTION_PULL_EVENT_VERSIONS.CONFIGURED),
@@ -142,8 +189,39 @@ export type IngestionPullRunCompletedEvent = z.infer<
 export type IngestionPullRunFailedEvent = z.infer<
   typeof IngestionPullRunFailedEventSchema
 >;
+
+export const IngestionPullAgentsListingRequestedEventSchema =
+  EventSchema.extend({
+    type: z.literal(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED),
+    version: z.literal(INGESTION_PULL_EVENT_VERSIONS.AGENTS_LISTING_REQUESTED),
+    data: ingestionPullAgentsListingRequestedEventDataSchema,
+  });
+export const IngestionPullAgentsListedEventSchema = EventSchema.extend({
+  type: z.literal(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTED),
+  version: z.literal(INGESTION_PULL_EVENT_VERSIONS.AGENTS_LISTED),
+  data: ingestionPullAgentsListedEventDataSchema,
+});
+export const IngestionPullAgentsListingRefusedEventSchema = EventSchema.extend({
+  type: z.literal(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REFUSED),
+  version: z.literal(INGESTION_PULL_EVENT_VERSIONS.AGENTS_LISTING_REFUSED),
+  data: ingestionPullAgentsListingRefusedEventDataSchema,
+});
+
+export type IngestionPullAgentsListingRequestedEvent = z.infer<
+  typeof IngestionPullAgentsListingRequestedEventSchema
+>;
+export type IngestionPullAgentsListedEvent = z.infer<
+  typeof IngestionPullAgentsListedEventSchema
+>;
+export type IngestionPullAgentsListingRefusedEvent = z.infer<
+  typeof IngestionPullAgentsListingRefusedEventSchema
+>;
+
 export type IngestionPullProcessingEvent =
   | IngestionPullConfiguredEvent
   | IngestionPullDisabledEvent
   | IngestionPullRunCompletedEvent
-  | IngestionPullRunFailedEvent;
+  | IngestionPullRunFailedEvent
+  | IngestionPullAgentsListingRequestedEvent
+  | IngestionPullAgentsListedEvent
+  | IngestionPullAgentsListingRefusedEvent;
