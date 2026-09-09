@@ -51,7 +51,7 @@ render() {
   return $status
 }
 
-# @scenario "The default install renders no voice resources"
+# @scenario "The voice worker is not deployed unless the operator turns it on"
 test_default_has_no_voice_resources() {
   local out
   if ! out=$(render ""); then
@@ -65,7 +65,7 @@ test_default_has_no_voice_resources() {
   echo "ok   [default has no voice resources] no templates/voice/ source in the default render"
 }
 
-# @scenario "voice.enabled=false explicitly changes nothing"
+# @scenario "Turning the voice worker off explicitly changes nothing"
 test_explicit_false_matches_default() {
   local default_out explicit_out
   default_out=$(render "" | normalise)
@@ -90,7 +90,7 @@ render_component() {
 
 readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com --set voice.twilio.existingSecret=twilio"
 
-# @scenario "Enabling voice renders a single-replica worker wired to the Twilio secret"
+# @scenario "Turning on the voice worker brings up a single call handler wired to Twilio"
 test_enabled_renders_deployment() {
   local block
   block=$(render_component "deployment.yaml" "$ENABLED_FLAGS")
@@ -125,7 +125,7 @@ test_enabled_renders_deployment() {
   echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true, Twilio secretKeyRefs present"
 }
 
-# @scenario "The voice Deployment's terminationGracePeriodSeconds follows voice.*, not workers.*"
+# @scenario "The voice worker's shutdown timing is its own, not borrowed from the background workers"
 test_termination_grace_period_follows_voice_values() {
   local block
   block=$(render_component "deployment.yaml" \
@@ -141,7 +141,7 @@ test_termination_grace_period_follows_voice_values() {
   echo "ok   [voice terminationGracePeriodSeconds] follows --set voice.terminationGracePeriodSeconds, not workers.*"
 }
 
-# @scenario "Enabling voice renders a Service but no Ingress by default"
+# @scenario "The voice worker is reachable inside the cluster by default, but not exposed publicly"
 test_enabled_renders_service_no_ingress() {
   local svc ing
   svc=$(render_component "service.yaml" "$ENABLED_FLAGS")
@@ -161,7 +161,7 @@ test_enabled_renders_service_no_ingress() {
   echo "ok   [voice service / no ingress] Service renders, Ingress does not (ingress.enabled defaults false)"
 }
 
-# @scenario "Enabling the voice ingress renders it for the configured host"
+# @scenario "The voice worker gets its own public hostname for Twilio to call"
 test_ingress_enabled_renders() {
   local ing
   ing=$(render_component "ingress.yaml" \
@@ -181,7 +181,22 @@ test_ingress_enabled_renders() {
   echo "ok   [voice ingress enabled] Ingress renders for voice.example.com at /twilio"
 }
 
-# @scenario "voice.enabled without publicBaseUrl refuses to render"
+# @scenario "The voice worker refuses to expose a hostname that doesn't match its own public address"
+test_ingress_host_mismatch_refuses() {
+  local out
+  if out=$(render "$ENABLED_FLAGS --set voice.ingress.enabled=true --set voice.ingress.host=other.example.com"); then
+    fail "ingress host mismatch" "chart rendered when voice.ingress.host disagreed with voice.publicBaseUrl"
+    return
+  fi
+  case "$out" in
+    *"does not match the hostname in voice.publicBaseUrl"*)
+      echo "ok   [ingress host mismatch] refused with the expected message" ;;
+    *)
+      fail "ingress host mismatch" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+  esac
+}
+
+# @scenario "The voice worker refuses to start without knowing its own public address"
 test_enabled_without_public_base_url_refuses() {
   local out
   if out=$(render "--set voice.enabled=true --set voice.twilio.existingSecret=twilio"); then
@@ -196,7 +211,7 @@ test_enabled_without_public_base_url_refuses() {
   esac
 }
 
-# @scenario "voice.enabled without an existing Twilio secret refuses to render"
+# @scenario "The voice worker refuses to start without Twilio credentials configured"
 test_enabled_without_twilio_secret_refuses() {
   local out
   if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"); then
@@ -217,6 +232,7 @@ test_enabled_renders_deployment
 test_termination_grace_period_follows_voice_values
 test_enabled_renders_service_no_ingress
 test_ingress_enabled_renders
+test_ingress_host_mismatch_refuses
 test_enabled_without_public_base_url_refuses
 test_enabled_without_twilio_secret_refuses
 

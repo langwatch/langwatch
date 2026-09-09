@@ -1149,6 +1149,10 @@ voice:
   # See: https://kubespec.dev/v1/Pod#spec.affinity
   ## @param voice.affinity [object] Affinity overrides.
   affinity: {}
+  # Topology spread constraints
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  ## @param voice.topologySpreadConstraints [array] Topology spread constraints overrides.
+  topologySpreadConstraints: []
   # PriorityClass for the voice worker pod, overriding global.scheduling.priorityClassName.
   # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
   ## @param voice.priorityClassName [string] PriorityClass for the voice worker pod (overrides global.scheduling.priorityClassName).

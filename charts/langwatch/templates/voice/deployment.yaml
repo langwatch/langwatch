@@ -68,6 +68,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # Topology spread constraints - https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+      {{- with (coalesce .Values.voice.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
       {{- with (coalesce .Values.voice.priorityClassName .Values.global.scheduling.priorityClassName) }}
       priorityClassName: {{ . | quote }}
       {{- end }}

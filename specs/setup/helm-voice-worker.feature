@@ -26,56 +26,63 @@ Feature: The voice worker is opt-in and cannot render half-configured
   Rule: The default install carries no voice resources
 
     @e2e
-    Scenario: The default install renders no voice resources
-      Given a default install, which does not set voice.enabled
+    Scenario: The voice worker is not deployed unless the operator turns it on
+      Given a default install, which does not opt into the voice worker
       When the chart renders
-      Then no templates/voice/ manifest appears in the output
+      Then no voice worker resources appear anywhere in the output
 
     @e2e
-    Scenario: voice.enabled=false explicitly changes nothing
+    Scenario: Turning the voice worker off explicitly changes nothing
       Given a default install
-      When the chart renders once as-is and once with voice.enabled=false set explicitly
+      When the chart renders once as-is and once with the voice worker explicitly turned off
       Then the two renders are identical
 
   Rule: Enabling the voice worker renders a correctly wired Deployment, Service and Ingress
 
     @e2e
-    Scenario: Enabling voice renders a single-replica worker wired to the Twilio secret
-      Given voice.enabled=true with a publicBaseUrl and a Twilio existingSecret
+    Scenario: Turning on the voice worker brings up a single call handler wired to Twilio
+      Given the voice worker is turned on with its public address and Twilio credentials configured
       When the chart renders
-      Then the voice Deployment has replicas: 1
-      And VOICE_WORKER_ONLY is set to "true"
-      And TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER are read from the named Secret by the configured keys
+      Then exactly one voice worker instance comes up
+      And it runs in voice-only mode
+      And it reads its Twilio credentials from the configured secret rather than holding them itself
 
     @e2e
-    Scenario: The voice Deployment's terminationGracePeriodSeconds follows voice.*, not workers.*
-      Given voice.enabled=true with a publicBaseUrl and a Twilio existingSecret, voice.terminationGracePeriodSeconds and voice.shutdownDrainSeconds set, and a different workers.terminationGracePeriodSeconds also set
+    Scenario: The voice worker's shutdown timing is its own, not borrowed from the background workers
+      Given the voice worker is turned on with its own shutdown timing configured differently from the background workers' shutdown timing
       When the chart renders
-      Then the voice Deployment's terminationGracePeriodSeconds comes from voice.terminationGracePeriodSeconds, not from workers.terminationGracePeriodSeconds
+      Then the voice worker shuts down on its own configured timeline
+      And the background workers' shutdown timing has no effect on it
 
     @e2e
-    Scenario: Enabling voice renders a Service but no Ingress by default
-      Given voice.enabled=true with a publicBaseUrl and a Twilio existingSecret
+    Scenario: The voice worker is reachable inside the cluster by default, but not exposed publicly
+      Given the voice worker is turned on
       When the chart renders
-      Then the voice Service targets the voice-ws container port
-      And no voice Ingress renders, because voice.ingress.enabled defaults to false
+      Then other workloads in the cluster can reach the voice worker over its call-handling port
+      And no public entry point is created for it, because that step is opt-in
 
     @e2e
-    Scenario: Enabling the voice ingress renders it for the configured host
-      Given voice.enabled=true and voice.ingress.enabled=true with a host set
+    Scenario: The voice worker gets its own public hostname for Twilio to call
+      Given the voice worker is turned on and its public entry point is also turned on with a hostname set
       When the chart renders
-      Then the voice Ingress routes that host at the /twilio path
+      Then the voice worker is reachable at that hostname on the path Twilio calls
+
+    @e2e
+    Scenario: The voice worker refuses to expose a hostname that doesn't match its own public address
+      Given the voice worker's public entry point is turned on with a hostname that disagrees with the voice worker's own configured public address
+      When the chart renders
+      Then the install is refused, because Twilio would call one address while the public entry point routes another
 
   Rule: A voice worker cannot render without the values it cannot work without
 
     @e2e
-    Scenario: voice.enabled without publicBaseUrl refuses to render
-      Given voice.enabled=true with a Twilio existingSecret but no publicBaseUrl
+    Scenario: The voice worker refuses to start without knowing its own public address
+      Given the voice worker is turned on with Twilio credentials configured but no public address set
       When the chart renders
-      Then the install is refused, naming voice.publicBaseUrl as required
+      Then the install is refused, naming the missing public address
 
     @e2e
-    Scenario: voice.enabled without an existing Twilio secret refuses to render
-      Given voice.enabled=true with a publicBaseUrl but no Twilio existingSecret
+    Scenario: The voice worker refuses to start without Twilio credentials configured
+      Given the voice worker is turned on with its public address set but no Twilio credentials configured
       When the chart renders
-      Then the install is refused, naming voice.twilio.existingSecret as required
+      Then the install is refused, naming the missing Twilio credentials

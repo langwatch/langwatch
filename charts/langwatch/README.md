@@ -741,6 +741,7 @@ The chart refuses to render when `voice.enabled` is true and either
 | `voice.nodeSelector`           | Node selector overrides.                                                                                                   | `{}`                 |
 | `voice.tolerations`            | Tolerations overrides.                                                                                                     | `[]`                 |
 | `voice.affinity`               | Affinity overrides.                                                                                                        | `{}`                 |
+| `voice.topologySpreadConstraints` | Topology spread constraints overrides.                                                                                  | `[]`                 |
 | `voice.priorityClassName`      | PriorityClass for the voice worker pod (overrides `global.scheduling.priorityClassName`).                                  | `""`                 |
 | `voice.shutdownDrainSeconds`   | Seconds the voice worker may spend draining in-flight jobs on shutdown.                                                    | `25`                 |
 | `voice.terminationGracePeriodSeconds` | Seconds before SIGKILL. Must be at least `shutdownDrainSeconds` + 30.                                               | `55`                 |
