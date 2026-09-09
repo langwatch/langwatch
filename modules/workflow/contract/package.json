@@ -32,11 +32,11 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "nanoid": "^5.1.5",
-    "zod": "^4.4.3"
+    "nanoid": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

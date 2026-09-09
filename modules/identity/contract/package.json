@@ -22,11 +22,11 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -27,10 +27,10 @@
   },
   "dependencies": {
     "@langwatch/time": "workspace:*",
-    "ioredis": "5.10.1"
+    "ioredis": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

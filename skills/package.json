@@ -18,17 +18,17 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.44",
+    "@ai-sdk/anthropic": "catalog:",
     "@ai-sdk/google": "^3.0.120",
-    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai": "catalog:",
     "@langwatch/scenario": "^0.4.12",
     "@types/mdast": "^4.0.4",
-    "@types/node": "^26.2.0",
-    "chalk": "^6.0.0",
-    "dotenv": "^17.2.2",
-    "node-pty": "^1.0.0",
-    "tsx": "^4.19.2",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "chalk": "catalog:",
+    "dotenv": "catalog:",
+    "node-pty": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

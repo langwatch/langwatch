@@ -12,14 +12,14 @@
   },
   "dependencies": {
     "pixelmatch": "^7.2.0",
-    "playwright": "1.61.1",
+    "playwright": "catalog:",
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
+    "@types/node": "catalog:",
     "@types/pngjs": "^6.0.5",
-    "tsx": "^4.22.4",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

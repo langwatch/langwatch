@@ -27,10 +27,10 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

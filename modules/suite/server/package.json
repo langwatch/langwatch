@@ -42,15 +42,15 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "hono-openapi": "^1.3.1",
-    "ioredis": "^5.9.3",
-    "zod": "^4.4.3"
+    "@trpc/server": "catalog:",
+    "hono-openapi": "catalog:",
+    "ioredis": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
-    "hono": "^4.12.27",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "hono": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

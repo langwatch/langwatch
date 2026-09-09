@@ -95,6 +95,24 @@ dependency and running the command is the whole ceremony; `--scripts` also
 checks that each package's `typecheck` script spells no path, because
 `typecheck:declarations --project .` resolves the caller's own config.
 
+pnpm catalogs are the analogous single source for a dependency's *version*,
+not its project references. `pnpm-workspace.yaml`'s `catalog:` block holds the
+version for every shared dependency whose declared range already agreed
+everywhere it was used, or whose differing spellings already resolved to one
+version; a manifest opts in with `"dep": "catalog:"` instead of writing the
+range itself. A dependency with a second, deliberate resolution — the
+published SDK and the MCP server pinning an older TypeScript major so they
+don't force it on their consumers, for example — gets a small named catalog
+(`"dep": "catalog:<name>"`), named for the reason rather than the package. A
+dependency whose manifests still disagree for no documented reason is left
+with its own explicit range everywhere, on purpose: `dev/scripts/print-resolved-versions.mjs`
+is what proved the migration didn't silently change any manifest's resolved
+version, and `packages/architecture-lint/tests/catalog-enforcement.test.ts`
+is what stops a manifest drifting back to an explicit range for a dependency
+the default catalog already carries. New manifests declare `"dep": "catalog:"`
+for anything already in the catalog; `catalogMode: strict` makes `pnpm add`
+enforce the same rule for a new dependency.
+
 Standalone adopted packages keep declarations and incremental state in their
 own `dist/` directory. The cyclic web group keeps one build-info file beside
 its staging output under `dev/.cache`; its declarations and maps are distributed

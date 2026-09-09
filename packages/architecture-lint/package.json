@@ -34,14 +34,14 @@
   "dependencies": {
     "@langwatch/lint-core": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "typescript": "^6.0.3",
-    "zod": "^4.4.3"
+    "typescript": "catalog:sdk-toolchain",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^26.0.1",
-    "js-yaml": "^5.2.0",
-    "oxlint": "^1.78.0",
-    "vitest": "^5.0.0"
+    "@types/js-yaml": "catalog:",
+    "@types/node": "catalog:",
+    "js-yaml": "catalog:",
+    "oxlint": "catalog:",
+    "vitest": "catalog:"
   }
 }

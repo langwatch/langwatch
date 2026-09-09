@@ -49,23 +49,23 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "chalk": "^6.0.0",
-    "commander": "^15.0.0",
-    "concurrently": "^9.1.2",
+    "chalk": "catalog:",
+    "commander": "catalog:",
+    "concurrently": "catalog:",
     "execa": "^9.6.0",
     "listr2": "^9.0.4",
-    "ora": "^9.0.0",
-    "prompts": "^2.4.2",
+    "ora": "catalog:",
+    "prompts": "catalog:",
     "tar": "^7.4.3",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
-    "@types/prompts": "^2.4.9",
+    "@types/node": "catalog:",
+    "@types/prompts": "catalog:",
     "@types/tar": "^6.1.13",
-    "esbuild": "^0.28.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=20",

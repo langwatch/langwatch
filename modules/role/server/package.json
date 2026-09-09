@@ -30,18 +30,18 @@
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/ksuid": "catalog:",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

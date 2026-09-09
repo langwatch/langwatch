@@ -28,12 +28,12 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "papaparse": "^5.5.3",
-    "zod": "^4.4.3"
+    "papaparse": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/papaparse": "^5.3.15",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/papaparse": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

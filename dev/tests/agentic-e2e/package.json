@@ -11,8 +11,8 @@
     "@langwatch/e2e-stack": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
-    "@types/node": "^22.15.3",
-    "typescript": "^7.0.2"
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   }
 }

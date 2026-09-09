@@ -32,12 +32,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "papaparse": "^5.5.4"
+    "papaparse": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
-    "@types/papaparse": "^5.5.2",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "@types/papaparse": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

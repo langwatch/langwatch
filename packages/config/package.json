@@ -33,12 +33,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "zod": "^4.4.3",
-    "zod-validation-error": "^5.0.0"
+    "zod": "catalog:",
+    "zod-validation-error": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

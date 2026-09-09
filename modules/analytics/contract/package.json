@@ -39,14 +39,14 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "ajv": "^8.20.0",
-    "zod": "^4.4.3"
+    "ajv": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26",
-    "typescript": "^7.0.2",
-    "vega": "6.3.1",
-    "vega-lite": "6.4.3",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vega": "catalog:",
+    "vega-lite": "catalog:",
+    "vitest": "catalog:"
   }
 }

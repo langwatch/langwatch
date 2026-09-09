@@ -27,11 +27,11 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "safe-regex2": "^5.1.1",
-    "zod": "^4.4.3"
+    "safe-regex2": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

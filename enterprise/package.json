@@ -31,10 +31,10 @@
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

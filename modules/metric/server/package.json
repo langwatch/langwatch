@@ -22,27 +22,27 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.23.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
-    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/ksuid": "catalog:",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/core": "2.10.0",
-    "@opentelemetry/otlp-transformer": "0.55.0",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/otlp-transformer": "catalog:",
     "langwatch": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
-    "@types/node": "^26.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

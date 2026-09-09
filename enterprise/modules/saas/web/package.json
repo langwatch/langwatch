@@ -23,17 +23,17 @@
   },
   "dependencies": {
     "@langwatch/enterprise-saas-contract": "workspace:*",
-    "posthog-js": "^1.396.9"
+    "posthog-js": "catalog:"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "jsdom": "^30.0.1",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "react": "^19.2.7",

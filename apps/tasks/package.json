@@ -16,7 +16,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.23.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
     "@langwatch/analytics-server": "workspace:*",
@@ -54,13 +54,13 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/user-server": "workspace:*",
-    "ioredis": "5.10.1",
-    "prisma": "7.9.1",
-    "zod": "^4.3.6"
+    "ioredis": "catalog:",
+    "prisma": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

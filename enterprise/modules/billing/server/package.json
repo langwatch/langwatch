@@ -23,7 +23,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.23.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
@@ -45,18 +45,18 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@slack/webhook": "^7.0.6",
-    "@trpc/server": "^11.18.0",
+    "@slack/webhook": "catalog:",
+    "@trpc/server": "catalog:",
     "geoip-country": "^5.0.202607010001",
-    "ioredis": "^5.9.3",
-    "nanoid": "^5.1.6",
-    "posthog-node": "^5.39.4",
+    "ioredis": "catalog:",
+    "nanoid": "catalog:",
+    "posthog-node": "catalog:",
     "stripe": "^15.12.0",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

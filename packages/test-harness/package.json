@@ -26,18 +26,18 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.14.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@testcontainers/clickhouse": "^12.1.0",
-    "nanoid": "^5.1.6",
+    "@testcontainers/clickhouse": "catalog:",
+    "nanoid": "catalog:",
     "picomatch": "^4.0.4",
-    "typescript": "^7.0.2"
+    "typescript": "catalog:"
   },
   "devDependencies": {
     "@langwatch/workflow-server": "workspace:*",
-    "@types/node": "^26.0.1",
+    "@types/node": "catalog:",
     "@types/picomatch": "^4.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "catalog:"
   }
 }

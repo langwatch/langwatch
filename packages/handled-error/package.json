@@ -34,11 +34,11 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@opentelemetry/api": "^1.9.1",
-    "zod": "^4.4.3"
+    "@opentelemetry/api": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

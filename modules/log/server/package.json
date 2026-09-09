@@ -21,7 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.23.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-privacy-server": "workspace:*",
     "@langwatch/eventing": "workspace:*",
@@ -32,13 +32,13 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
-    "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/otlp-transformer": "0.55.0",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/otlp-transformer": "catalog:",
     "langwatch": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

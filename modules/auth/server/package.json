@@ -25,7 +25,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/passkey": "1.7.1",
+    "@better-auth/passkey": "catalog:",
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
@@ -34,7 +34,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
-    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/ksuid": "catalog:",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
@@ -42,15 +42,15 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@simplewebauthn/server": "^13.3.2",
-    "@trpc/server": "^11.18.0",
-    "bcrypt": "^6.0.0",
-    "better-auth": "^1.7.1",
-    "hono": "^4.12.27",
-    "zod": "^4.4.3"
+    "@trpc/server": "catalog:",
+    "bcrypt": "catalog:",
+    "better-auth": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/bcrypt": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -24,13 +24,13 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
-    "@opentelemetry/otlp-transformer": "0.55.0",
-    "zod": "^4.4.3"
+    "@opentelemetry/otlp-transformer": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "packageManager": "pnpm@10.24.0"
 }

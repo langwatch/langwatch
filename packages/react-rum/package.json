@@ -30,22 +30,22 @@
   },
   "dependencies": {
     "@langwatch/time": "workspace:*",
-    "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/core": "2.10.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
-    "@opentelemetry/instrumentation": "^0.221.0",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/instrumentation": "catalog:",
     "@opentelemetry/instrumentation-document-load": "^0.66.0",
     "@opentelemetry/instrumentation-fetch": "^0.221.0",
-    "@opentelemetry/resources": "^2.8.0",
-    "@opentelemetry/sdk-trace-base": "2.10.0",
-    "@opentelemetry/sdk-trace-web": "2.10.0",
-    "@opentelemetry/semantic-conventions": "^1.41.1"
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-web": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
-    "jsdom": "^30.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "packageManager": "pnpm@10.24.0"
 }

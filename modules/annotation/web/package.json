@@ -47,7 +47,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.36.0",
+    "@chakra-ui/react": "catalog:",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/csv": "workspace:*",
@@ -58,23 +58,23 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
-    "diff": "^9.0.0",
-    "lucide-react": "^1.22.0",
-    "motion": "^12.42.2",
-    "react": "^19.2.7",
-    "react-hook-form": "^7.80.0",
-    "zod": "^4.4.3"
+    "diff": "catalog:",
+    "lucide-react": "catalog:",
+    "motion": "catalog:",
+    "react": "catalog:",
+    "react-hook-form": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "jsdom": "^30.0.1",
-    "react-dom": "^19.2.7",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

@@ -42,16 +42,16 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "hono": "^4.12.27",
-    "hono-openapi": "^1.3.1",
-    "zod": "^4.4.3"
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@clickhouse/client": "^1.23.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/test-harness": "workspace:*",
-    "@types/node": "^24.0.0",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

@@ -25,31 +25,31 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.1080.0",
+    "@aws-sdk/client-ses": "catalog:",
     "@langwatch/egress": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
-    "@sendgrid/mail": "^8.1.6",
-    "nodemailer": "^9.0.3",
-    "react": "^19.2.7",
-    "undici": "^8.5.0",
-    "zod": "^4.4.3"
+    "@sendgrid/mail": "catalog:",
+    "nodemailer": "catalog:",
+    "react": "catalog:",
+    "undici": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@chakra-ui/react": "^3.36.0",
-    "@emotion/react": "^11.14.0",
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
     "@langwatch/design-system": "workspace:*",
-    "@types/node": "^26.0.1",
-    "@types/nodemailer": "^8.0.1",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
-    "next-themes": "^0.4.6",
-    "react-dom": "^19.2.7",
-    "typescript": "^7.0.2",
-    "vite": "^8.1.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "@types/nodemailer": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "next-themes": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

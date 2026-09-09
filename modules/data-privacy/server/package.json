@@ -27,7 +27,7 @@
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
-    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/ksuid": "catalog:",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -36,12 +36,12 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "safe-regex2": "^5.1.1",
-    "zod": "^4.4.3"
+    "safe-regex2": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

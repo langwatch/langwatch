@@ -26,11 +26,11 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "zod": "^4.4.3",
+    "zod": "catalog:",
     "@langwatch/otlp": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

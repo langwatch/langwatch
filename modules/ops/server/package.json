@@ -28,7 +28,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.23.0",
+    "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
@@ -38,7 +38,7 @@
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
-    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/ksuid": "catalog:",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -49,17 +49,17 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "hono": "^4.12.27",
-    "ioredis": "5.10.1",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "ioredis": "catalog:",
     "ra-data-simple-prisma": "3.1.3",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/feature-flag-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
-    "@types/node": "^26.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

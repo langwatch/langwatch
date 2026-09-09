@@ -23,24 +23,24 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "qs": "^6.16.0",
-    "react-error-boundary": "^6.1.2"
+    "qs": "catalog:",
+    "react-error-boundary": "catalog:"
   },
   "devDependencies": {
-    "@chakra-ui/react": "^3.36.0",
-    "@emotion/react": "^11.14.0",
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "14.6.1",
-    "@types/qs": "^6.15.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "jsdom": "^30.0.1",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router": "^8.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/qs": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

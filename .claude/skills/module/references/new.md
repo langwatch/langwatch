@@ -70,6 +70,15 @@ Leave both `references` arrays empty and run `pnpm sync:references` once the
 `dependencies` are written: every project reference is derived from the
 manifests, and lint reports a hand-typed one as drift.
 
+Every new manifest's dependency versions come from the pnpm catalog: check
+`pnpm-workspace.yaml`'s `catalog:` block first and write `"dep": "catalog:"`
+for anything already listed there, rather than typing a range. Only add an
+explicit range for a dependency the catalog doesn't carry yet — and if two or
+more packages will end up sharing that exact range, that's a sign it belongs
+in the catalog instead (`dev/docs/best_practices/typescript.md`, "pnpm
+catalogs"; `packages/architecture-lint/tests/catalog-enforcement.test.ts`
+enforces it).
+
 Operations use RPC verbs (`get`, `getMany`, `list`, `create`, `update`, `delete`,
 `<verb><Entity>`); absence is `find*` returning `undefined`. Add each new error code to
 `packages/handled-error/src/app-codes.ts` (sorted) and its customer copy to

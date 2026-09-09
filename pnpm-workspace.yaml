@@ -43,6 +43,182 @@ packages:
 # working copy declare today), not something to acquire by accident.
 linkWorkspacePackages: false
 
+# The one place each shared dependency's version lives. `catalog:` (default)
+# covers every dependency whose declared range agrees everywhere it is used,
+# or whose differing spellings already resolved to one version before this
+# existed (dev/docs/best_practices/typescript.md, "pnpm catalogs"). A manifest
+# opts in with `"dep": "catalog:"`; `pnpm sync:references` is the sibling for
+# tsconfig project references, not dependency versions.
+catalog:
+  '@ai-sdk/anthropic': ^3.0.44
+  '@ai-sdk/openai': ^3.0.79
+  '@ai-sdk/openai-compatible': ^2.0.55
+  '@aws-sdk/client-cloudwatch-logs': ^3.1080.0
+  '@aws-sdk/client-lambda': ^3.1080.0
+  '@aws-sdk/client-s3': ^3.1080.0
+  '@aws-sdk/client-ses': ^3.1080.0
+  '@aws-sdk/s3-request-presigner': ^3.826.0
+  '@better-auth/passkey': 1.7.1
+  '@chakra-ui/react': ^3.36.0
+  '@clickhouse/client': ^1.23.0
+  '@dnd-kit/core': ^6.3.1
+  '@dnd-kit/sortable': ^10.0.0
+  '@dnd-kit/utilities': 3.2.2
+  '@emotion/react': ^11.14.0
+  '@hono/node-server': ^2.0.6
+  '@hookform/resolvers': ^5.4.0
+  '@langwatch/ksuid': ^2.0.2
+  '@langwatch/scenario': ^1.3.0
+  '@modelcontextprotocol/sdk': ^1.29.0
+  '@monaco-editor/react': ^4.7.0
+  '@opentelemetry/api': ^1.9.1
+  '@opentelemetry/api-logs': 0.221.0
+  '@opentelemetry/core': 2.10.0
+  '@opentelemetry/exporter-logs-otlp-http': 0.221.0
+  '@opentelemetry/exporter-trace-otlp-http': ^0.221.0
+  '@opentelemetry/instrumentation': ^0.221.0
+  '@opentelemetry/otlp-transformer': 0.55.0
+  '@opentelemetry/resources': ^2.8.0
+  '@opentelemetry/sdk-logs': ^0.221.0
+  '@opentelemetry/sdk-metrics': ^2.8.0
+  '@opentelemetry/sdk-node': 0.221.0
+  '@opentelemetry/sdk-trace-base': 2.10.0
+  '@opentelemetry/sdk-trace-node': 2.10.0
+  '@opentelemetry/sdk-trace-web': 2.10.0
+  '@opentelemetry/semantic-conventions': ^1.41.1
+  '@paper-design/shaders-react': ^0.0.76
+  '@playwright/test': ^1.61.1
+  '@prisma/client': 7.9.1
+  '@sendgrid/mail': ^8.1.6
+  '@slack/webhook': ^7.1.0
+  '@tanstack/react-query': 5.101.4
+  '@tanstack/react-table': ^8.21.3
+  '@tanstack/react-virtual': ^3.14.5
+  '@testcontainers/clickhouse': ^12.1.0
+  '@testcontainers/redis': ^12.0.4
+  '@testing-library/jest-dom': ^7.0.1
+  '@testing-library/react': ^16.3.2
+  '@testing-library/user-event': ^14.6.1
+  '@trpc/client': 11.18.0
+  '@trpc/react-query': 11.18.0
+  '@trpc/server': ^11.18.0
+  '@types/bcrypt': ^6.0.0
+  '@types/debug': ^4.1.13
+  '@types/js-yaml': ^4.0.9
+  '@types/jsonwebtoken': ^9.0.10
+  '@types/lodash-es': ^4.17.12
+  '@types/node': ^26.2.0
+  '@types/nodemailer': ^8.0.1
+  '@types/numeral': ^2.0.5
+  '@types/papaparse': ^5.5.2
+  '@types/prompts': ^2.4.9
+  '@types/qs': ^6.15.1
+  '@types/react': ^19.2.17
+  '@types/react-dom': ^19.2.4
+  '@types/ws': ^8.18.1
+  '@vitejs/plugin-react': ^6.0.3
+  '@vitest/browser-playwright': ^5.0.0
+  '@xyflow/react': ^12.11.1
+  ai: ^6.0.217
+  ajv: ^8.20.0
+  bcrypt: ^6.0.0
+  better-auth: ^1.7.1
+  chakra-react-select: ^6.1.3
+  chalk: ^6.0.0
+  commander: ^15.0.0
+  concurrently: ^9.1.2
+  croner: ^10.0.1
+  diff: ^9.0.0
+  dotenv: ^17.4.2
+  esbuild: ^0.28.1
+  fast-deep-equal: ^3.1.3
+  hono: ^4.12.27
+  hono-openapi: ^1.3.1
+  ioredis: 5.10.1
+  js-yaml: ^5.2.0
+  jsdom: ^30.0.1
+  jsonpath-plus: ^10.4.0
+  jsonwebtoken: ^9.0.2
+  libphonenumber-js: ^1.13.7
+  liqe: ^3.8.7
+  liquidjs: ^10.27.1
+  lodash-es: ^4.18.1
+  lucide-react: ^1.22.0
+  monaco-editor: ^0.55.1
+  monacopilot: ^1.2.12
+  motion: ^12.42.2
+  nanoid: ^5.1.7
+  next-themes: ^0.4.6
+  node-pty: ^1.0.0
+  nodemailer: ^9.0.3
+  numeral: ^2.0.6
+  openapi-types: ^12.1.3
+  ora: ^9.3.0
+  oxlint: ^1.78.0
+  papaparse: ^5.5.4
+  pino: ^10.3.1
+  pino-opentelemetry-transport: ^4.0.2
+  pino-pretty: ^13.1.3
+  playwright: 1.61.1
+  posthog-js: ^1.396.9
+  posthog-node: ^5.39.4
+  prisma: 7.9.1
+  prom-client: ^15.1.3
+  prompts: ^2.4.2
+  qs: ^6.16.0
+  react: ^19.2.7
+  react-contextual-analytics: ^1.1.2
+  react-dom: ^19.2.7
+  react-error-boundary: ^6.1.2
+  react-feather: ^2.0.10
+  react-hook-form: ^7.80.0
+  react-icons: ^5.7.0
+  react-markdown: ^10.1.0
+  react-resizable-panels: ^2.1.9
+  react-router: ^8.0.1
+  recharts: ^3.9.1
+  remark-gfm: ^4.0.1
+  safe-regex2: ^5.1.1
+  shiki: ^4.3.0
+  slugify: ^1.6.9
+  ts-pattern: ^5.9.0
+  tsup: ^8.5.0
+  tsx: ^4.22.4
+  typescript: ^7.0.2
+  typescript-eslint: ^8.55.0
+  undici: ^8.5.0
+  use-debounce: ^10.1.1
+  usehooks-ts: ^3.1.1
+  vega: 6.3.1
+  vega-lite: 6.4.3
+  vite: ^8.1.2
+  vitest: ^5.0.0
+  ws: ^8.21.0
+  zod: ^4.4.3
+  zod-validation-error: ^5.0.0
+  zundo: ^2.3.0
+  zustand: ^4.5.7
+
+# Named catalogs, for a dependency with a second, deliberate resolution:
+# `"dep": "catalog:<name>"`.
+#
+# sdk-toolchain: the published SDK (sdks/typescript), the MCP server
+# (mcp/typescript) and architecture-lint all pin TypeScript ^6.0.3 rather than
+# the app's ^7.0.2. The SDK and the MCP server are published packages and must
+# not force TS7 on their consumers; architecture-lint imports the classic
+# `typescript` compiler API directly (`import ts from "typescript"` across its
+# policies and tools), which TS7 no longer exposes from its root export (see
+# CLAUDE.md's TypeScript table and ADR-099 — static scans elsewhere go through
+# `src/test-utils/tsAst.ts`, which owns the one TS7 API session; architecture-lint
+# predates that seam and still needs the real compiler).
+catalogs:
+  sdk-toolchain:
+    typescript: ^6.0.3
+
+# strict: `pnpm add` may only add a dependency at a version the catalog already
+# carries; added in pnpm v10.12.1 (docs/settings/catalogMode), honoured by 10.24.
+catalogMode: strict
+
 # Supply-chain age gate. Previously set only on platform/app/'s root, so five of
 # the six projects had no gate at all. Repo-wide now.
 minimumReleaseAge: 10080

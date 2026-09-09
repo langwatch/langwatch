@@ -26,22 +26,22 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
-    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/ksuid": "catalog:",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "ioredis": "5.10.1",
-    "nanoid": "^5.1.5",
-    "zod": "^4.4.3"
+    "@trpc/server": "catalog:",
+    "ioredis": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/authz-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

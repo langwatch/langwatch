@@ -81,24 +81,24 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.36.0",
+    "@chakra-ui/react": "catalog:",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
-    "zustand": "^4.5.7"
+    "zustand": "catalog:"
   },
   "devDependencies": {
-    "@emotion/react": "^11.14.0",
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "jsdom": "^30.0.1",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@emotion/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "react": "^19.2.7",

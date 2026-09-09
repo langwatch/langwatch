@@ -36,25 +36,25 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.36.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "3.2.2",
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "lucide-react": "^1.22.0",
-    "react": "^19.2.7"
+    "lucide-react": "catalog:",
+    "react": "catalog:"
   },
   "devDependencies": {
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "jsdom": "^30.0.1",
-    "react-dom": "^19.2.7",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

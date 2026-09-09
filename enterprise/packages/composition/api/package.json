@@ -114,8 +114,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1080.0",
-    "@clickhouse/client": "^1.12.1",
+    "@aws-sdk/client-s3": "catalog:",
+    "@clickhouse/client": "catalog:",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -146,13 +146,13 @@
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@langwatch/webhook-server": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "ioredis": "^5.8.2",
-    "nanoid": "^5.1.6"
+    "@trpc/server": "catalog:",
+    "ioredis": "catalog:",
+    "nanoid": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

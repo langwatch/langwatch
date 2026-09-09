@@ -38,14 +38,14 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "@trpc/server": "^11.0.0",
-    "hono": "^4.12.27",
-    "hono-openapi": "^1.3.1",
-    "nanoid": "^5.1.5",
-    "zod": "^4.4.3"
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

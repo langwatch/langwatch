@@ -23,13 +23,13 @@
     "@langwatch/enterprise-managed-provider-contract": "workspace:*"
   },
   "devDependencies": {
-    "@chakra-ui/react": "^3.36.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@chakra-ui/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

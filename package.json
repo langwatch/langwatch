@@ -63,16 +63,16 @@
   },
   "devDependencies": {
     "@0xdeafcafe/tslsp-cli": "0.6.0",
-    "@testing-library/jest-dom": "^7.0.1",
-    "@types/node": "^26.0.1",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "concurrently": "^9.1.2",
+    "@testing-library/jest-dom": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "concurrently": "catalog:",
     "oxfmt": "0.63.0",
-    "oxlint": "^1.78.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.1.2",
-    "vitest": "^5.0.0"
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=24.0.0",

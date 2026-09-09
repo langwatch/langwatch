@@ -38,13 +38,13 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "nanoid": "^5.1.7",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "@trpc/server": "catalog:",
+    "nanoid": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
