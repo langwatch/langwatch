@@ -12,8 +12,9 @@
  * text on the person row.
  *
  * Assignment uses the match engine's conflict rule and account index
- * (`loadAccountIndex`): the directory id the org's SSO connection recorded,
- * or an address a member has CONFIRMED. Directory-only assignment remains
+ * (`loadAccountIndex`): the accepted identity link when the person already
+ * holds one, otherwise the directory id the org's SSO connection recorded, or
+ * an address a member has CONFIRMED. Directory-only assignment remains
  * supported here; opening an identity link has a stricter evidence rule. An
  * unconfirmed address is a claim anyone can type in, and two candidates are
  * a contradiction, not a coin toss — both assign nobody.
@@ -38,6 +39,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 
+import {
+  DiscoveredPersonRepository,
+  IdentityMatchRepository,
+} from "../repositories/governanceIdentity.repository";
 import { DepartmentService } from "./department/department.service";
 import { IdentityMatchService } from "./identityMatch.service";
 import {
@@ -55,15 +60,29 @@ function extraString(event: NormalizedPullEvent, field: string): string {
   return typeof value === "string" ? value : "";
 }
 
+export interface DirectoryDepartmentSyncDeps {
+  prisma: PrismaClient;
+  departments?: DepartmentService;
+  matcher?: IdentityMatchService;
+  discoveredPeople?: DiscoveredPersonRepository;
+  matches?: IdentityMatchRepository;
+}
+
 export class DirectoryDepartmentSyncService {
   private readonly prisma: PrismaClient;
   private readonly departments: DepartmentService;
   private readonly matcher: IdentityMatchService;
+  private readonly discoveredPeople: DiscoveredPersonRepository;
+  private readonly matches: IdentityMatchRepository;
 
-  constructor({ prisma }: { prisma: PrismaClient }) {
-    this.prisma = prisma;
-    this.departments = DepartmentService.create(prisma);
-    this.matcher = IdentityMatchService.create(prisma);
+  constructor(deps: DirectoryDepartmentSyncDeps) {
+    this.prisma = deps.prisma;
+    this.departments =
+      deps.departments ?? DepartmentService.create(deps.prisma);
+    this.matcher = deps.matcher ?? IdentityMatchService.create(deps.prisma);
+    this.discoveredPeople =
+      deps.discoveredPeople ?? new DiscoveredPersonRepository();
+    this.matches = deps.matches ?? new IdentityMatchRepository();
   }
 
   static create(prisma: PrismaClient): DirectoryDepartmentSyncService {
@@ -73,16 +92,23 @@ export class DirectoryDepartmentSyncService {
   /**
    * Applies whatever department facts a batch of directory events carries.
    *
-   * One account-index load per batch, one department resolve per distinct
-   * name, and no write at all for a member already where the directory says
-   * they belong — the read runs daily, and an idempotent day must cost
-   * nothing.
+   * One account-index load per batch, one open-link load per batch, one
+   * department resolve per distinct name, and no write at all for a member
+   * already where the directory says they belong — the read runs daily, and an
+   * idempotent day must cost nothing.
+   *
+   * `provider` is the source type the same pull recorded its discovered people
+   * under (`personDiscovery.service.ts`), and it is what makes the open-link
+   * read exact: `rawActorId` only identifies somebody relative to the provider
+   * that issued it.
    */
   async applyDirectoryEvents({
     organizationId,
+    provider,
     events,
   }: {
     organizationId: string;
+    provider: string;
     events: NormalizedPullEvent[];
   }): Promise<{ assigned: number }> {
     const rows = events.filter(
@@ -92,14 +118,25 @@ export class DirectoryDepartmentSyncService {
     );
     if (rows.length === 0) return { assigned: 0 };
 
-    const accounts = await this.matcher.loadAccountIndex({ organizationId });
+    const [accounts, openLinkByActor] = await Promise.all([
+      this.matcher.loadAccountIndex({ organizationId }),
+      this.loadOpenLinkByActor({
+        organizationId,
+        provider,
+        rawActorIds: [...new Set(rows.map((row) => row.actor))],
+      }),
+    ]);
 
     // userId → department name, resolved through the proof rule. Built first
     // so the current-assignment read below is one query for the whole batch.
     const desired = new Map<string, string>();
     for (const row of rows) {
       const department = extraString(row, "department").trim();
-      const userId = provenUserId({ row, accounts });
+      const userId = provenUserId({
+        row,
+        accounts,
+        openLinkUserId: openLinkByActor.get(row.actor) ?? null,
+      });
       if (userId !== null) desired.set(userId, department);
     }
     if (desired.size === 0) return { assigned: 0 };
@@ -113,6 +150,50 @@ export class DirectoryDepartmentSyncService {
       );
     }
     return { assigned };
+  }
+
+  /**
+   * The account each of this batch's directory identifiers is already linked
+   * to, by the provider's own identifier.
+   *
+   * The accepted link is evidence in its own right — a human confirmed it, or
+   * an earlier pass proved it — and without it here a directory row that
+   * disagrees is free to re-file somebody's department under a different
+   * account. Two reads rather than a join: `IdentityMatch` carries the person
+   * id and `DiscoveredPerson` the provider identifier, and each table belongs
+   * to its own repository. Links an erasure blanked are excluded by
+   * `findOpenByOrganization`, which is what we want — a link to nobody has
+   * nothing to contradict.
+   */
+  private async loadOpenLinkByActor({
+    organizationId,
+    provider,
+    rawActorIds,
+  }: {
+    organizationId: string;
+    provider: string;
+    rawActorIds: string[];
+  }): Promise<Map<string, string>> {
+    const people = await this.discoveredPeople.findByActorIds(this.prisma, {
+      organizationId,
+      provider,
+      rawActorIds,
+    });
+    if (people.length === 0) return new Map();
+
+    const openLinks = await this.matches.findOpenByOrganization(this.prisma, {
+      organizationId,
+    });
+    const userByPersonId = new Map(
+      openLinks.map((link) => [link.discoveredPersonId, link.userId]),
+    );
+
+    const byActor = new Map<string, string>();
+    for (const person of people) {
+      const userId = userByPersonId.get(person.id);
+      if (typeof userId === "string") byActor.set(person.rawActorId, userId);
+    }
+    return byActor;
   }
 
   /** Writes each changed assignment, resolving each department name once. */
@@ -186,19 +267,35 @@ export class DirectoryDepartmentSyncService {
  * Conflicting proof is rejected before choosing either identifier. Otherwise
  * keep directory-only assignment: the match engine's no-action result means
  * "do not open an identity link", not "discard the directory's department".
+ *
+ * An accepted link outranks the directory index. It is somebody's dated,
+ * reviewable answer to "who is this?" — human-confirmed, or proved by an
+ * address the account holder confirmed — and `decideMatch` has just been
+ * handed the chance to contradict it. A stale `ScimExternalId` naming a
+ * different member must not quietly move a department off the account an
+ * admin accepted; the directory identifier corroborates, it never stands
+ * alone (ADR-128 §12).
  */
 function provenUserId({
   row,
   accounts,
+  openLinkUserId,
 }: {
   row: NormalizedPullEvent;
   accounts: OrganizationAccountIndex;
+  openLinkUserId: string | null;
 }): string | null {
   const decision = decideMatch({
-    identity: { rawActorId: row.actor, displayText: extraString(row, "mail") },
+    identity: {
+      rawActorId: row.actor,
+      displayText: extraString(row, "mail"),
+      openLinkUserId,
+    },
     accounts,
   });
   if (decision.outcome === "suspend") return null;
+
+  if (openLinkUserId !== null) return openLinkUserId;
 
   const byDirectory = accounts.usersByDirectoryId.get(row.actor) ?? [];
   if (byDirectory.length === 1) return byDirectory[0] ?? null;

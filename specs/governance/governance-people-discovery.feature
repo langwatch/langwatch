@@ -182,6 +182,17 @@ Feature: Provider rows become discovered people
     # This correction preserves directory-only assignment. It does not change
     # identity-link review; it stops assignment from ignoring conflicting proof.
 
+  @unit
+  Scenario: An accepted identity link outranks a disagreeing directory row
+    Given a discovered person whose accepted identity link names one member
+    And the directory identifier on their row names a different member
+    When the directory sync runs
+    Then the department lands on the member the accepted link names
+    # The link is somebody's dated, reviewable answer to "who is this?", and
+    # the sync now hands it to the same conflict rule the match engine uses.
+    # Without it a stale directory identifier silently re-files a person's
+    # department under another account.
+
   @integration
   Scenario: A directory row proving no member assigns nobody
     Given a directory row whose identity proves no platform member

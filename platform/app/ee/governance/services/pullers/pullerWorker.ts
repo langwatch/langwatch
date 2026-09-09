@@ -627,6 +627,7 @@ async function syncPeopleFactsFromPull({
   try {
     await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
       organizationId: source.organizationId,
+      provider: source.sourceType,
       events,
     });
   } catch (error) {
