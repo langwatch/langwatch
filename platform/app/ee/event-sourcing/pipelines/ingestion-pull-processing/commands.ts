@@ -220,16 +220,23 @@ export const RecordIngestionPullPeopleListedCommand = defineCommand({
   // scoped, so nothing about a person may travel on one.
   //
   // The withheld count is deliberately NOT here, and "no names" is not a
-  // sufficient test for it. Spans are emitted per run and retained with
-  // timestamps, which makes any number on one readable as a series — the
-  // exact reading this feature forbids for that field everywhere else. A
-  // withheld count stepping from N to N+1 at a known moment says an erasure
-  // happened then, and on a small tenant that identifies the person as surely
-  // as a name would. The directory count stays because it is what the
+  // sufficient test for it. The reason is reach, not shape: a span leaves over
+  // a plain exporter to a telemetry backend with its own retention and a
+  // reader set of every engineer with a dashboard login, wider than the people
+  // we granted this tenant's data to. Erasure timing is what that reader set
+  // must not be handed — a withheld count stepping from N to N+1 at a known
+  // moment says an erasure happened then, and on a small tenant that
+  // identifies the person. The directory count stays because it is what the
   // provider named, which our erasure does not move.
   //
-  // The operator has not lost it: `LastPeopleWithheldCount` on the run status
-  // row carries it as a current figure, which is the one shape it is safe in.
+  // Where it lives instead: the event log keeps both counts on every run by
+  // design, and the fold writes `LastPeopleWithheldCount` onto the run status
+  // row. Be precise about that column — nothing READS it. No selector, no
+  // endpoint, no page, so the only path to the number today is a direct query
+  // against the run status table. An operator who once had this in traces has
+  // no tooling path to it, and that is the intended end state rather than a
+  // gap left unfinished: a count that identifies a person by moving gets no
+  // ambient reader. Any surface for it has to pass the reach test above first.
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.request_id": data.requestId,
