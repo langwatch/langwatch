@@ -1240,7 +1240,7 @@ then.
   becomes journal-backed on a separate infra track; not an ADR
   risk.
 - **Puller success/failure must be recorded per run** — today
-  `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but records
+  `assertRunMadeProgress` (`pullerWorker.ts:280-307`) raises but records
   no consecutive-failure count, the error counter has no
   production writer, and no last-successful-pull field exists
   (`lastEventAt` is not pull success), so a silently-failing puller is

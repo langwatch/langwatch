@@ -114,32 +114,54 @@ restated here because it is easy to reintroduce and silent when wrong.
 > carries `user_email`". The adapter shipped the opposite and deliberately
 > so: `actor` carries the provider's **opaque `user-…` id**, and the email
 > reaches `raw_payload` only, through the row schema's `.passthrough()`
-> (`openaiAdmin.puller.ts:400,851` and the comment above them). The id is the
+> (`openaiAdmin.puller.ts:403,864` and the comments above them). The id is the
 > stable key, the erasure suppression list is keyed on exactly that string,
 > and a raw address is heavier on a money row. The decision below stands with
 > "the raw user id" read wherever it says "`user_email`".
 
 `actor` carries the row's raw `user_id`. That same id and the `api_key_id`
-also ride in `extra`, which `pullerWorker.ts:1096` spreads into
+also ride in `extra`, which `ocsfPullEventMapping.ts:108` spreads into
 `metadata.extension` — exactly the shape `databricksGenie.puller.ts` already
 ships for per-person attribution. **`NormalizedPullEvent` does not change**,
 so no published contract moves and no sibling adapter is touched.
 
-Populating the real `ActorUserId` column was considered and rejected. It is
-hardcoded to `""` for every puller (`pullerWorker.ts:1110`), and the one
-surface named to justify filling it — `activityMonitor.service.ts:379` —
-reads `actorEmail || actorUserId || actorEnduserId`, so whatever `actor`
-holds wins that `||` and a column write would never be read.
+Populating the real `ActorUserId` column was considered and rejected. As
+written, it was hardcoded to `""` for every puller, and the one surface named
+to justify filling it — `activityMonitor.service.ts:379` — reads
+`actorEmail || actorUserId || actorEnduserId`, so whatever `actor` holds wins
+that `||` and a column write would never be read.
 
-> **[SUPERSEDED IN PART — see revision v3.]** The rejection above was
-> reasoned from an email in `actor`. With an opaque id there instead, the
-> consequence is that the OCSF **actor email** column
-> (`pullerWorker.ts:1080,1112`) receives an opaque id rather than an address,
-> while the actor **id** column beside it stays `""`. The intended contract
-> is the plain one: **opaque ids belong in the actor id field, and the email
-> field carries addresses only** — a column named for an address must not be
-> read as holding one. This ADR records the divergence; it does not rule on
-> how the fields are filled.
+> **[SUPERSEDED IN PART — see revision v3. RESOLVED — see revision v4.]** The
+> rejection above was reasoned from an email in `actor`. With an opaque id
+> there instead, the consequence was that the OCSF **actor email** column
+> received an opaque id rather than an address, while the actor **id** column
+> beside it stayed `""`. That divergence was real, and it is fixed: the
+> contract this paragraph called the plain one — **opaque ids belong in the
+> actor id field, and the email field carries addresses only** — is now the
+> shipped one.
+>
+> The routing is decided in one place. `ocsfActorFields`
+> (`ocsfPullEventMapping.ts:43-51`) sends an address to `actorEmail` and
+> anything else — an opaque `user-…` id, a directory GUID — to `actorUserId`,
+> and the same placement is applied to the raw OCSF payload
+> (`ocsfPullEventMapping.ts:92,123-124`), so the row and its JSON cannot
+> disagree. The address test is `normalizeEmail`
+> (`identityEvidence.ts:151-155`), the identity match engine's own, so the
+> audit row and the matcher cannot drift apart on what an address is; the
+> value is stored verbatim, because an audit row records what the provider
+> said rather than a rewrite of it.
+>
+> Half the rejection above still stands, and it is the published-contract
+> half: `NormalizedPullEvent` did not change and no sibling adapter was
+> touched. What changed is where the worker puts a string it already had.
+> Attribution did not move either — the read at
+> `activityMonitor.service.ts:379` takes the first of
+> `actorEmail || actorUserId || actorEnduserId` that is set, so an opaque id
+> now arrives on the second term instead of the first; and identity matching,
+> department sync, person discovery, erasure suppression and the cost records
+> all key on the pull event's own `actor`, never on this column.
+>
+> **Rows written before the fix are not corrected** — see Open questions.
 
 This follows ADR-088 Decision 13's principle — write the provider's raw id,
 resolve the person later, never call a directory at pull time. OpenAI
@@ -263,7 +285,7 @@ can exist, so there is nothing to repair.
 | No float round-trip on money | Sub-cent figures keep every digit | `amount` parsed as `string \| number` and stringified once; a string input survives byte-identical |
 | A costless read writes no money | A missing row never overwrites a present one | Unit test: a bucket whose row vanished emits an event with **no** `pulled_usage` key, and `buildPulledUsageRecord` returns null |
 | Re-pulling an unchanged window records nothing new | At-least-once delivery is free | Same window pulled twice; ledger row count unchanged |
-| Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts the actor field = the row's raw `user_id`, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids. **[v3: as shipped that actor field is the OCSF actor *email* column, which is the divergence Decision 6 now records — the address itself reaches `raw_payload` only.]** |
+| Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts the actor field = the row's raw `user_id`, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids. **[v3: as shipped that actor field was the OCSF actor *email* column — the divergence Decision 6 records. v4: resolved. An opaque id now lands in `ActorUserId` with `ActorEmail` left blank, asserted against the real mapper rather than a copy of it (`pullerWorker.ocsfMapping.unit.test.ts:125-151`). The address itself still reaches `raw_payload` only.]** |
 | The watermark never moves backwards | A re-read window, or a page returned out of order, must not rewind progress | Unit test: a response whose last bucket precedes the stored watermark leaves the watermark unchanged |
 | A corrected bucket replaces, never adds | Restatement is the whole point of the re-read window | Same window pulled twice with a changed `amount.value`; the ledger shows the new figure once, and the row count is unchanged |
 | Below the floor the day survives, only the key is lost | A 400 on key grouping must not cost history | Unit test: a floor 400 triggers one retry with `user_id` only, and the resulting rows still carry `user_id` |
@@ -296,11 +318,15 @@ can exist, so there is nothing to repair.
 ## Schema
 
 **No migration, and no contract change.** `NormalizedPullEvent` is untouched
-(Decision 6): identity travels in the existing `extra` bag, which the worker
-already spreads into `metadata.extension`. `ActorUserId` stays the empty
-string, as it is for every puller today — which is the half of the field pair
-Decision 6's v3 correction names: the id column is empty while the column
-named for an email holds an opaque id.
+(Decision 6): identity travels in the existing `extra` bag, which
+`ocsfPullEventMapping.ts:108` spreads into `metadata.extension`. `ActorUserId`
+is no longer the empty string it was for every puller when this was written:
+since the v4 correction the mapper fills it whenever the actor is not an
+address (`ocsfPullEventMapping.ts:43-51`), so an OpenAI row carries its opaque
+`user-…` id there and leaves `ActorEmail` blank. That is a change of column
+placement, not of schema — both columns already existed and both are written
+by the same insert. Rows written before the fix keep the id in `ActorEmail`
+with `ActorUserId` empty beside it; see Open questions.
 
 ```ts
 // What the adapter puts in the existing `extra` record. Raw and unresolved:
@@ -352,6 +378,13 @@ extra: {
 - **Extend `NormalizedPullEvent` and populate `ActorUserId`** — a
   published-contract change whose value no surface reads, because whatever
   `actor` holds always wins the `||` that would have exposed it.
+  **[PARTLY OVERTAKEN — see revision v4.]** The contract half of the rejection
+  stands: `NormalizedPullEvent` never changed. The column half did not.
+  `ActorUserId` is now populated without touching the contract, because the
+  mapper places the actor string it already had by what that string *is*
+  (`ocsfPullEventMapping.ts:43-51`). The `||` argument was about which term a
+  reader wins, which is not the same question as which column may honestly
+  hold an id.
 - **The declarative `http_polling` adapter** — the framework's documented
   default, and genuinely unusable here: its `eventMapping.extra` is a flat
   `z.record(z.string())` that cannot build the nested `dimensions` map the
@@ -420,6 +453,15 @@ adapter duplicates cursor logic a third provider may justify factoring out.
   unassigned; it is the gap that makes a wrong figure undetectable.
 - **Why does the cost surface bill image generation that `/usage/images`
   reports zero rows for?** Out of scope here; recorded in #7579.
+- **Rows written before the actor-field fix still name the person in the
+  wrong column.** Every `governance_ocsf_events` row this puller wrote before
+  revision v4 carries the opaque `user-…` id in `ActorEmail`, and
+  `ActorUserId` is empty on exactly those rows. The fix places new rows
+  correctly and leaves the written ones alone. Whether that history is
+  corrected at all is a separate decision that has not been taken — no owner,
+  no date, and nothing here proposes or describes how it would be done.
+  Recorded because anyone querying either column across the full range will
+  otherwise read the old rows as evidence that the fix never landed.
 - **A uniqueness guard across all provider adapters** — owner unassigned.
 
 ## Revisions
@@ -492,12 +534,14 @@ adapter duplicates cursor logic a third provider may justify factoring out.
     suppression list is keyed on exactly that string, and the address is
     heavier on a money row. The email is not dropped — it survives into
     `raw_payload` through the row schema's `.passthrough()`.
-  - **Consequence, recorded rather than ruled on:** the worker writes
-    `actorEmail: event.actor` and `actorUserId: ""`
-    (`pullerWorker.ts:1080,1110-1112`), so today the OCSF column named for an
-    email address holds an opaque provider id while the actor id column beside
-    it is empty. The intended contract is the plain one — opaque ids belong in
-    the actor id field, and the email field carries addresses only.
+  - **Consequence, recorded rather than ruled on:** the worker wrote
+    `actorEmail: event.actor` and `actorUserId: ""`, so at v3 the OCSF column
+    named for an email address held an opaque provider id while the actor id
+    column beside it was empty. The intended contract is the plain one —
+    opaque ids belong in the actor id field, and the email field carries
+    addresses only. **[Ruled on and fixed in v4; the citation this bullet
+    carried, `pullerWorker.ts:1080,1110-1112`, no longer resolves — the
+    mapping now lives in `ocsfPullEventMapping.ts`.]**
   - **Decision 12 was never implemented.** `openai_compliance` carries no
     `deprecated` flag (`ingestionSourceCatalog.tsx:142-149`) and the picker
     still offers it for new sources. The `deprecated` flag exists and one other
@@ -508,3 +552,43 @@ adapter duplicates cursor logic a third provider may justify factoring out.
     rather than staying green unchanged as the Gates row required.
   - Stale citations refreshed: `pullerWorker.ts:587` → `:1096`, `:602` →
     `:1110`, `activityMonitor.service.ts:354` → `:379`.
+- **v4 (2026-09-09) — the actor-field divergence is resolved in code.** v3
+  recorded the divergence and explicitly declined to rule on it. The rule is
+  now made and shipped, so the prose describing it as live is corrected. The
+  v3 markers stay: a reader should still be able to see that this ADR once
+  claimed `actor` carries `user_email`, that the adapter deliberately ships
+  the opaque id instead, and that for a period the column named for an email
+  held one.
+  - **The placement is decided in one place.** `ocsfActorFields`
+    (`ocsfPullEventMapping.ts:43-51`) routes an address to `actorEmail` and
+    anything else to `actorUserId` — the field OCSF already reserves for the
+    provider's own identifier for the actor (`actor.user.uid`) — and
+    `mapToOcsfRow` applies that same placement to the row and to the raw OCSF
+    payload (`ocsfPullEventMapping.ts:83,92,123-124`), so the two cannot
+    disagree. The mapping moved out of the worker into that pure module for
+    exactly this reason; the worker now calls it (`pullerWorker.ts:66,566`).
+  - **The address test is the identity engine's own.** What counts as an
+    address is `normalizeEmail` (`identityEvidence.ts:151-155`), the function
+    the match engine already uses to decide what proves a link, so the audit
+    row and the matcher cannot drift into disagreeing. The value is stored
+    verbatim rather than normalized, because an audit row records what the
+    provider said.
+  - **Why the bug survived: the test asserted against its own copy of the
+    mapping.** `mapToOcsfRow` was an unexported function inside
+    `pullerWorker.ts`, so the unit test could not call it. Instead the file
+    kept a hand-copied `mapToOcsfRowSemantic` beside it — with
+    `actorEmail: event.actor` written into the copy — under a comment telling
+    the reader to keep the two in sync by hand. The test asserted against the
+    copy and stayed green while the real mapper wrote opaque ids into the
+    email column. It now imports the real functions
+    (`pullerWorker.ocsfMapping.unit.test.ts:17`) and exercises them over the
+    address, opaque-id, directory-GUID and empty-actor cases (`:102-192`).
+  - **Not corrected: the rows already written.** History in
+    `governance_ocsf_events` still carries opaque ids in `ActorEmail`, with
+    `ActorUserId` empty on those same rows. Recorded as known-outstanding in
+    Open questions; no decision has been taken on it and none is proposed
+    here.
+  - Stale citations refreshed: `pullerWorker.ts:1096` →
+    `ocsfPullEventMapping.ts:108`; `pullerWorker.ts:1080,1110-1112` →
+    `ocsfPullEventMapping.ts:43-51,92,123-124`; `openaiAdmin.puller.ts:400,851`
+    → `:403,864`.

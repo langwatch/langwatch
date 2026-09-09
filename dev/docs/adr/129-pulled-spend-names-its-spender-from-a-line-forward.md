@@ -181,7 +181,7 @@ function actorForPulledDay(opts: {
 
 - Positive: the cost screen answers "who spent this" for OpenAI and most Databricks bills (the #7880 ruling made real); no migration, no rebuild, no rollout risk beyond the dark flag.
 - Negative: history before the line stays nameless **forever** for pre-existing sources — bought deliberately as the twice-guard. Anthropic and Copilot money stays nameless while paused, so per-person totals will not sum to the company total; the gap is exactly those providers and should read as "not assignable to a person", not as a bug.
-- Neutral: rollup row count grows per-actor for post-line days (bounded by provider-reported user counts; `RawActorId` sits last in the sort key so cardinality never widens the prefix — ADR-128 §21). Newly named actors flow into person discovery on the existing pull path (`pullerWorker.ts:534-536`, `syncPeopleFactsFromPull`), so OpenAI user ids start minting discovered-person rows once the flag opens.
+- Neutral: rollup row count grows per-actor for post-line days (bounded by provider-reported user counts; `RawActorId` sits last in the sort key so cardinality never widens the prefix — ADR-128 §21). Newly named actors flow into person discovery on the existing pull path (`pullerWorker.ts:516-519`, `syncPeopleFactsFromPull`), so OpenAI user ids start minting discovered-person rows once the flag opens.
 
 ## Open questions
 
