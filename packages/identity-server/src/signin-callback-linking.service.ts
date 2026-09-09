@@ -138,6 +138,49 @@ export interface SignInCallbackLinkingDeps {
   newProposalId: () => string;
 }
 
+/**
+ * Why a match is not unambiguous, or null when it is.
+ *
+ * THE RULE, on its own, because two callers need it and only one of them owns
+ * the callback. `SignInCallbackLinkingService.complete` resolves the user
+ * itself and then applies this. better-auth resolves the user on every
+ * deployment we actually run, and asks its `account.create.before` hook
+ * whether the link it has already chosen may be written — that hook is the
+ * only seam before an `Account` row exists.
+ *
+ * Sharing the function rather than duplicating the checks is what keeps those
+ * two answers from drifting apart, which for a security rule is the whole
+ * game: a link refused in one place must be refused in the other, for the
+ * same recorded reason.
+ *
+ * Order matters only for the reason code an operator reads; any one of them
+ * refuses.
+ */
+export function linkRefusalFor({
+  assertion,
+  candidates,
+}: {
+  assertion: CallbackAssertion;
+  candidates: readonly CallbackUserMatch[];
+}): LinkProposalReason | null {
+  if (candidates.length > 1) return "ambiguous_candidates";
+  const target = candidates[0];
+  if (!target) return "ambiguous_candidates";
+  // One side of the evidence is the IdP's assertion, the other is the user's
+  // own. An unverified orphan row fails the second and is never auto-linked,
+  // which is the anti-hijack invariant, kept.
+  if (!assertion.emailVerified || !target.holdsVerifiedEmail) {
+    return "unverified_orphan";
+  }
+  const vouched = assertion.email
+    ? identifierDomain(normalizeIdentifierValue(assertion.email))
+    : null;
+  const unvouched = target.identifierDomains.filter(
+    (domain) => domain !== vouched,
+  );
+  return unvouched.length > 0 ? "unvouched_identifiers" : null;
+}
+
 export class SignInCallbackLinkingService {
   private readonly directory: SignInCallbackDirectoryPort;
   private readonly proposals: IdentityLinkProposalWrites;
@@ -177,7 +220,7 @@ export class SignInCallbackLinkingService {
       return this.provision(assertion, normalizedEmail);
     }
 
-    const refusal = this.refusalFor({ assertion, candidates });
+    const refusal = linkRefusalFor({ assertion, candidates });
     if (refusal) {
       // One proposal per candidate. An ambiguous match has no single subject,
       // and picking one to hang the proposal on would be the guess this whole
@@ -215,35 +258,6 @@ export class SignInCallbackLinkingService {
       ? normalizeIdentifierValue(assertion.email)
       : "";
     return this.link({ assertion, normalizedEmail, userId });
-  }
-
-  /**
-   * Why this match is not unambiguous, or null when it is. Order matters only
-   * for the reason code an operator reads; any one of them refuses.
-   */
-  private refusalFor({
-    assertion,
-    candidates,
-  }: {
-    assertion: CallbackAssertion;
-    candidates: readonly CallbackUserMatch[];
-  }): LinkProposalReason | null {
-    if (candidates.length > 1) return "ambiguous_candidates";
-    const target = candidates[0];
-    if (!target) return "ambiguous_candidates";
-    // One side of the evidence is the IdP's assertion, the other is the
-    // user's own. An unverified orphan row fails the second and is never
-    // auto-linked, which is the anti-hijack invariant, kept.
-    if (!assertion.emailVerified || !target.holdsVerifiedEmail) {
-      return "unverified_orphan";
-    }
-    const vouched = assertion.email
-      ? identifierDomain(normalizeIdentifierValue(assertion.email))
-      : null;
-    const unvouched = target.identifierDomains.filter(
-      (domain) => domain !== vouched,
-    );
-    return unvouched.length > 0 ? "unvouched_identifiers" : null;
   }
 
   private async link({

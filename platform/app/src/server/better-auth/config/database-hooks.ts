@@ -21,7 +21,13 @@ export interface LegacyDatabaseHooksPort {
     user: { id: string; email: string; name: string };
   }): Promise<void>;
   beforeAccountCreate(args: {
-    account: { userId: string; providerId: string; accountId: string };
+    account: {
+      userId: string;
+      providerId: string;
+      accountId: string;
+      /** The callback's own ID token, for the rule that weighs its claims. */
+      idToken?: string;
+    };
   }): Promise<void>;
   afterAccountCreate(args: {
     account: { userId: string; providerId: string; accountId: string };
@@ -147,6 +153,8 @@ function accountCreateHooks({
           userId: account.userId,
           providerId: account.providerId,
           accountId: account.accountId,
+          idToken:
+            typeof account.idToken === "string" ? account.idToken : undefined,
         },
       });
       providerAssertions().recordVerifiedCallbackToken({

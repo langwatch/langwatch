@@ -17,6 +17,7 @@ import {
   type SignInMethod,
   type SignInRoutingReasonCode,
 } from "@langwatch/identity";
+import { generate } from "@langwatch/ksuid";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
   IdentityBackfillService,
@@ -48,6 +49,7 @@ import {
   MfaCeremonies,
 } from "@langwatch/identity-server/better-auth";
 import { RedisConfigService } from "@langwatch/redis-client";
+import { SignInLinkEvidence } from "./signin-link-evidence";
 import { compare, hash } from "bcrypt";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
@@ -252,6 +254,24 @@ export function identityService(): IdentityService {
       heads: identityHeads,
     }),
   );
+}
+
+/**
+ * ADR-117 §3's two-sided evidence, wired at the one seam better-auth offers.
+ *
+ * The rule itself is `linkRefusalFor`, shared with
+ * `SignInCallbackLinkingService` so the two cannot drift; what this composes
+ * is the reads it needs and the proposal a refusal leaves behind. See
+ * `SignInLinkEvidence` for what it judges and what it deliberately does not.
+ */
+export function signInLinkEvidence(): SignInLinkEvidence {
+  return new SignInLinkEvidence({
+    prisma,
+    proposeLink: (input) => identityService().proposeLink(input),
+    now: Date.now,
+    newCommandId: newIdentityCommandId,
+    newProposalId: () => generate("idlink").toString(),
+  });
 }
 
 /** The guards, over all three of their repositories (ADR-116 §6). */

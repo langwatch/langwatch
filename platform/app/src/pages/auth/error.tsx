@@ -57,6 +57,10 @@ export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
   "DIFFERENT_EMAIL_NOT_ALLOWED",
   "SSO_PROVIDER_NOT_ALLOWED",
+  // Stable in the same sense as the three above: retrying the same way will
+  // fail the same way, because what has to change is a person's decision,
+  // not the attempt.
+  "LINK_NEEDS_APPROVAL",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>
@@ -83,6 +87,8 @@ const errorTitle = (error: string): string => {
       return "Can't link this account";
     case "SSO_PROVIDER_NOT_ALLOWED":
       return "Use your organization's sign-in";
+    case "LINK_NEEDS_APPROVAL":
+      return "This sign-in method needs approval";
     default:
       return "Something went wrong signing you in";
   }
@@ -282,6 +288,14 @@ function recoveryFor({
       return {
         prose: [
           "Your organization requires single sign-on. Sign out and sign in again by entering your company email address, then choose your organization's login.",
+        ],
+        action: signOutAndRetry,
+      };
+    case "LINK_NEEDS_APPROVAL":
+      return {
+        prose: [
+          "We could not confirm that this login belongs to your LangWatch account, so it has not been added to it.",
+          "An administrator in your organization can review the request and approve it. In the meantime, sign in with a method you have used before.",
         ],
         action: signOutAndRetry,
       };
