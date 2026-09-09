@@ -18,7 +18,7 @@
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  *       specs/api-keys/project-key-read-access.feature
  */
-import type { ApiKey, ApiKeyService, ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+import type { ApiKey, ApiKeyApi, ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
   createRestApiService,
   getRoutePolicy,
@@ -246,7 +246,7 @@ function buildApi(
   } = {},
 ) {
   const projects: ProjectService = Object.assign(new TestProjectService(), options.projects);
-  const apiKeys: ApiKeyService = Object.assign(new TestApiKeyService(), options.apiKeys);
+  const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
 
   const hono = createProjectRestApp({
     security: spine({

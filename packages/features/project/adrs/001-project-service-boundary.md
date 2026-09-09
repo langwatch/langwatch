@@ -21,6 +21,11 @@ project-to-organization target resolution, settings changes, archive policy,
 project-key rotation, metadata activity,
 presence and trace-sharing reads, including the personal-workspace invariants.
 
+`ProjectApi.listPaths` owns batched organization/team/project display paths for
+peer-owned entities. Callers supply the project identifiers already authorized
+by their operation. The query preserves archived relation visibility for copy
+history and avoids peer repositories joining Project, Team or Organization.
+
 ### Public surfaces and transports
 
 The contract package exports portable Zod 4 values, handled project errors,

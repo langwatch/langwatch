@@ -40,7 +40,7 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
 } from "@langwatch/project-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   type ProjectCredentialsPort,
   type ProjectDiagnosticsPort,
@@ -54,11 +54,15 @@ import { ProjectSlugService } from "./project-slug.service.ts";
 export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
 
 export class ProjectService extends ProjectServiceContract {
+  listPaths(input: { projectIds: string[] }) {
+    return this.repository.listPaths(input);
+  }
+
   private constructor(
     private readonly metadata: ProjectMetadataService,
     private readonly repository: ProjectRepository,
     private readonly credentials: ProjectCredentialsPort,
-    private readonly organizations: OrganizationService,
+    private readonly organizations: OrganizationApi,
     private readonly keyMap?: ProjectKeyMapPort,
     private readonly storedObjects?: ProjectStoredObjectsPort,
     private readonly diagnostics?: ProjectDiagnosticsPort,
@@ -69,7 +73,7 @@ export class ProjectService extends ProjectServiceContract {
   static create(options: {
     repository: ProjectRepository;
     credentials: ProjectCredentialsPort;
-    organizations: OrganizationService;
+    organizations: OrganizationApi;
     keyMap?: ProjectKeyMapPort;
     storedObjects?: ProjectStoredObjectsPort;
     diagnostics?: ProjectDiagnosticsPort;

@@ -43,6 +43,22 @@ import {
 export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
 
 export class PrismaProjectRepository extends ProjectRepository {
+  async listPaths(input: { projectIds: string[] }) {
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      select: {
+        id: true,
+        name: true,
+        team: { select: { name: true, organization: { select: { name: true } } } },
+      },
+    });
+
+    return projects.map((project) => ({
+      projectId: project.id,
+      fullPath: `${project.team.organization.name} / ${project.team.name} / ${project.name}`,
+    }));
+  }
+
   private constructor(private readonly prisma: PrismaProjectDatabase) {
     super();
   }

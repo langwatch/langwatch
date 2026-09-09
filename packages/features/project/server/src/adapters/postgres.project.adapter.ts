@@ -1,6 +1,5 @@
 import type { ProjectService as ProjectServiceContract } from "@langwatch/project-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   ProjectCredentialsPort,
   ProjectDiagnosticsPort,
@@ -8,6 +7,7 @@ import type {
   ProjectStoredObjectsPort,
 } from "../ports/project.port.ts";
 import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
+import type { PrismaProjectDatabase } from "../repositories/prisma/prisma.project.repository.ts";
 import { ProjectService } from "../services/project.service.ts";
 
 export interface PostgresProjectAdapterOptions {
@@ -18,7 +18,7 @@ export interface PostgresProjectAdapterOptions {
    * `PrismaClient` at the repository, which described the client twice and
    * checked it nowhere.
    */
-  database: PrismaClient;
+  database: PrismaProjectDatabase;
   /**
    * How a new project's id and ingestion key are minted.
    *
@@ -28,7 +28,7 @@ export interface PostgresProjectAdapterOptions {
    * should pass.
    */
   credentials: ProjectCredentialsPort;
-  organizations: OrganizationService;
+  organizations: OrganizationApi;
   keyMap?: ProjectKeyMapPort;
   storedObjects?: ProjectStoredObjectsPort;
   diagnostics?: ProjectDiagnosticsPort;

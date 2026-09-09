@@ -2,7 +2,7 @@
  * The organization-scoped `/api/projects` REST family.
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import {
   DestinationTeamNotFoundError,
@@ -132,7 +132,7 @@ function asProjectUpdateHttpError(error: unknown): unknown {
 export function createProjectRestApp(options: {
   security: AppRestSecurity;
   projects: () => ProjectService;
-  apiKeys: () => ApiKeyService;
+  apiKeys: () => ApiKeyApi;
 }): MountableRestApp {
   const { security, projects, apiKeys } = options;
 

@@ -1,6 +1,13 @@
 Feature: Shared project service
   Project behaviour is implemented once and shared with product features.
 
+  Scenario: A peer lists full project paths for copied entities
+    Given copied entities reference projects with organization and team names
+    When the peer lists paths for those project identifiers
+    Then one batch returns organization, team and project names separated by " / "
+    And only the requested projects are returned
+    And archived related rows are not silently hidden
+
   Scenario: A feature ensures an internal project
     Given the process has one project service
     When a feature ensures an internal project for an organization and kind

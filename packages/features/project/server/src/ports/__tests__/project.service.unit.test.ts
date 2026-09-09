@@ -12,6 +12,7 @@ import {
 } from "@langwatch/project-contract";
 import {
   OrganizationHasNoTeamError,
+  type OrganizationApi,
   OrganizationService as OrganizationServiceContract,
   type AddOrganizationTeamMemberInput,
   type CreateOrganizationTeamInput,
@@ -89,6 +90,7 @@ const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 });
 
 class StubRepository extends ProjectRepository {
+  listPaths = vi.fn(async () => []);
   existing: InternalProject | null = null;
   tryFindInternalByOrganization = vi.fn(async () => this.existing);
   tryFindInternalBySlug = vi.fn(async () => null);
@@ -141,6 +143,10 @@ class StubOrganizationService extends OrganizationServiceContract {
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
 
   getOrganizationMembers(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
+  memberOrganizationIds(): Promise<string[]> {
     return Promise.resolve([]);
   }
 
@@ -327,7 +333,7 @@ const createService = (
   ProjectService.create({
     repository,
     credentials: new FixedCredentials(),
-    organizations,
+    organizations: organizations as unknown as OrganizationApi,
   });
 
 describe("ProjectService", () => {

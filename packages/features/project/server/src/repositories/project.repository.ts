@@ -27,6 +27,9 @@ export interface ProjectWithOrgAdmin {
 
 /** Persistence owned by the Project feature. It never crosses into a caller. */
 export abstract class ProjectRepository {
+  abstract listPaths(input: {
+    projectIds: string[];
+  }): Promise<import("@langwatch/project-contract").ProjectPath[]>;
   abstract tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
   abstract tryFindInternalBySlug(slug: string): Promise<InternalProject | null>;
   abstract createInternalOrFindWinner(input: {

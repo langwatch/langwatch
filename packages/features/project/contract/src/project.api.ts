@@ -1,9 +1,29 @@
-import type { PaginatedProjects, Project, ProjectWithTeam, UpdateProjectInput } from "./project.ts";
+import type {
+  PaginatedProjects,
+  Project,
+  ProjectIdentity,
+  ProjectIdsByOrganizationInput,
+  ProjectNamesByIdsInput,
+  ProjectWithTeam,
+  SearchProjectsResult,
+  UpdateProjectInput,
+} from "./project.ts";
 import type { TopicClusteringRequest } from "./project.responses.ts";
 import { featureApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
+export type ProjectPath = { projectId: string; fullPath: string };
+
 export interface ProjectApi {
+  listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
+  tryGetOrganizationId(projectId: string): Promise<string | undefined>;
+  isPresenceEnabled(input: { projectId: string }): Promise<boolean>;
+  tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null>;
+  searchByQuery(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]>;
   tryGetById(id: string): Promise<Project | null>;
   getOrganizationId(projectId: string): Promise<string>;
   getWithTeam(id: string): Promise<ProjectWithTeam>;
@@ -15,6 +35,8 @@ export interface ProjectApi {
     projectIds?: string[];
   }): Promise<PaginatedProjects>;
   listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
+  listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]>;
+  listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   create(
     input: Readonly<{
       organizationId: string;

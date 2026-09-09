@@ -5,6 +5,9 @@ const unsupported = <Method>(): Method =>
 
 /** Complete project boundary for tests that only exercise one project method. */
 export class TestProjectService extends ProjectService {
+  async listPaths(): Promise<never> {
+    throw new Error("not used by this test");
+  }
   tryFindInternal = unsupported<ProjectService["tryFindInternal"]>();
   ensureInternal = unsupported<ProjectService["ensureInternal"]>();
   isPresenceEnabled = unsupported<ProjectService["isPresenceEnabled"]>();

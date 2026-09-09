@@ -2,14 +2,13 @@
  * The setup checklist, served by the API process.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
 import type { ModelCostProjectPort } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stubCollaborators,
@@ -120,7 +119,7 @@ function composeApplication() {
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

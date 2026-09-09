@@ -21,6 +21,9 @@ import type {
 } from "./project.ts";
 
 export abstract class ProjectService {
+  abstract listPaths(input: {
+    projectIds: string[];
+  }): Promise<import("./project.api.ts").ProjectPath[]>;
   abstract tryFindInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
 
   abstract ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;

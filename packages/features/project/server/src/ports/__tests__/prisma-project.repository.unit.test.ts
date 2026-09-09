@@ -12,16 +12,43 @@ const destination = {
 function repositoryWithQueries(options: {
   findFirst: Array<typeof destination | null>;
   alternatives?: number;
+  paths?: { id: string; name: string; team: { name: string; organization: { name: string } } }[];
 }) {
   const project = {
     findFirst: vi.fn(async () => options.findFirst.shift() ?? null),
     count: vi.fn(async () => options.alternatives ?? 0),
+    findMany: vi.fn(async () => options.paths ?? []),
   };
   const database = { project, team: {} } as unknown as PrismaClient;
   return { repository: PrismaProjectRepository.create(database), project };
 }
 
 describe("PrismaProjectRepository trace destinations", () => {
+  it("lists full project paths for exactly the requested ids without hiding archived relations", async () => {
+    const { repository, project } = repositoryWithQueries({
+      findFirst: [],
+      paths: [
+        {
+          id: "project-1",
+          name: "Project",
+          team: { name: "Team", organization: { name: "Organization" } },
+        },
+      ],
+    });
+
+    await expect(repository.listPaths({ projectIds: ["project-1"] })).resolves.toEqual([
+      { projectId: "project-1", fullPath: "Organization / Team / Project" },
+    ]);
+    expect(project.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["project-1"] } },
+      select: {
+        id: true,
+        name: true,
+        team: { select: { name: true, organization: { select: { name: true } } } },
+      },
+    });
+  });
+
   it("finds a live project only inside the named organization", async () => {
     const { repository, project } = repositoryWithQueries({ findFirst: [destination] });
 

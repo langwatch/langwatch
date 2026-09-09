@@ -12,7 +12,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
 import type { ProjectCredentialsPort } from "../ports/project.port.ts";
 import { ProjectService } from "../services/project.service.ts";
@@ -31,7 +31,7 @@ const credentials: ProjectCredentialsPort = {
  * Only the `newTeamName` branch of `create` reaches Organization, and no test
  * here takes it: every case names an existing team.
  */
-const unusedOrganizations = {} as OrganizationService;
+const unusedOrganizations = {} as OrganizationApi;
 
 describe.skipIf(!DB_URL)(
   "given a personal workspace beside a shared team in one organization",

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { ApiKeyNotFoundError, type ApiKeyService } from "@langwatch/api-key-contract";
+import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   PersonalProjectProtectedError,
@@ -9,18 +9,21 @@ import {
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
-  type ProjectService,
+  type ProjectApi,
+  type Project,
+  type ProjectWithTeam,
+  ProjectService,
 } from "@langwatch/project-contract";
-import type { ShareService } from "@langwatch/share-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import { ProjectOperationsService } from "../../services/project-operations.service.ts";
+import type { ShareApi } from "@langwatch/share-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectApp, type TopicClusteringCommands } from "../project.app.ts";
 import { ProjectTrpcApi } from "../../transport/api-trpc/project.api.ts";
 
 type TestContext = {
-  app: { projects: ProjectApp };
+  app: { projects: ProjectApi };
   actor(): { id: string };
   session: { user: { id: string } } | null;
 };
@@ -41,6 +44,316 @@ class NoClusteringSchedulerError extends HandledError {
   }
 }
 
+type ProjectOperationsOverrides = {
+  tryGetWithTeam?: ProjectService["tryGetWithTeam"];
+  update?: ProjectService["update"];
+};
+
+/** A typed service double for the two application orchestration seams under characterization. */
+class CharacterizationProjectService extends ProjectService {
+  listPaths(): Promise<never> {
+    return this.unimplemented("listPaths");
+  }
+  constructor(private readonly overrides: ProjectOperationsOverrides) {
+    super();
+  }
+
+  tryGetWithTeam: ProjectService["tryGetWithTeam"] = (id) =>
+    this.overrides.tryGetWithTeam?.(id) ?? Promise.resolve(null);
+  update: ProjectService["update"] = (input) =>
+    this.overrides.update?.(input) ?? this.unimplemented("update");
+
+  tryFindInternal: ProjectService["tryFindInternal"] = () => this.unimplemented("tryFindInternal");
+  ensureInternal: ProjectService["ensureInternal"] = () => this.unimplemented("ensureInternal");
+  isPresenceEnabled: ProjectService["isPresenceEnabled"] = () =>
+    this.unimplemented("isPresenceEnabled");
+  getById: ProjectService["getById"] = () => this.unimplemented("getById");
+  tryGetIdentity: ProjectService["tryGetIdentity"] = () => this.unimplemented("tryGetIdentity");
+  getOrganizationId: ProjectService["getOrganizationId"] = () =>
+    this.unimplemented("getOrganizationId");
+  tryGetOrganizationId: ProjectService["tryGetOrganizationId"] = () =>
+    this.unimplemented("tryGetOrganizationId");
+  tryGetById: ProjectService["tryGetById"] = () => this.unimplemented("tryGetById");
+  tryGetSummaryById: ProjectService["tryGetSummaryById"] = () =>
+    this.unimplemented("tryGetSummaryById");
+  getWithTeam: ProjectService["getWithTeam"] = () => this.unimplemented("getWithTeam");
+  create: ProjectService["create"] = () => this.unimplemented("create");
+  archive: ProjectService["archive"] = () => this.unimplemented("archive");
+  listByOrganization: ProjectService["listByOrganization"] = () =>
+    this.unimplemented("listByOrganization");
+  listByTeam: ProjectService["listByTeam"] = () => this.unimplemented("listByTeam");
+  listNamesByIds: ProjectService["listNamesByIds"] = () => this.unimplemented("listNamesByIds");
+  listIdsByOrganization: ProjectService["listIdsByOrganization"] = () =>
+    this.unimplemented("listIdsByOrganization");
+  listActiveByScopes: ProjectService["listActiveByScopes"] = () =>
+    this.unimplemented("listActiveByScopes");
+  updateMetadata: ProjectService["updateMetadata"] = () => this.unimplemented("updateMetadata");
+  touchCodingAgentSessionSeen: ProjectService["touchCodingAgentSessionSeen"] = () =>
+    this.unimplemented("touchCodingAgentSessionSeen");
+  touchCodingAgentPullRequestSeen: ProjectService["touchCodingAgentPullRequestSeen"] = () =>
+    this.unimplemented("touchCodingAgentPullRequestSeen");
+  searchByQuery: ProjectService["searchByQuery"] = () => this.unimplemented("searchByQuery");
+  tryGetTraceSharingConfig: ProjectService["tryGetTraceSharingConfig"] = () =>
+    this.unimplemented("tryGetTraceSharingConfig");
+  resolveOrgAdmin: ProjectService["resolveOrgAdmin"] = () => this.unimplemented("resolveOrgAdmin");
+  resolveTraceDestination: ProjectService["resolveTraceDestination"] = () =>
+    this.unimplemented("resolveTraceDestination");
+  tryGetTraceDestination: ProjectService["tryGetTraceDestination"] = () =>
+    this.unimplemented("tryGetTraceDestination");
+  listTraceDestinations: ProjectService["listTraceDestinations"] = () =>
+    this.unimplemented("listTraceDestinations");
+
+  private unimplemented(operation: string): Promise<never> {
+    return Promise.reject(
+      new Error(`CharacterizationProjectService does not implement ${operation}`),
+    );
+  }
+}
+
+class CharacterizationShareApi implements ShareApi {
+  readonly revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
+
+  constructor(revoke: ShareApi["revokeAllTraceShares"]) {
+    this.revokeAllTraceShares = revoke;
+  }
+  listForResource: ShareApi["listForResource"] = () => this.unimplemented();
+  resolveForViewer: ShareApi["resolveForViewer"] = () => this.unimplemented();
+  createShare: ShareApi["createShare"] = () => this.unimplemented();
+  revokeById: ShareApi["revokeById"] = () => this.unimplemented();
+  unshare: ShareApi["unshare"] = () => this.unimplemented();
+  pinTrace: ShareApi["pinTrace"] = () => this.unimplemented();
+  unpinTrace: ShareApi["unpinTrace"] = () => this.unimplemented();
+  findTracePin: ShareApi["findTracePin"] = () => this.unimplemented();
+  listTracePins: ShareApi["listTracePins"] = () => this.unimplemented();
+  findCachedPayload: ShareApi["findCachedPayload"] = () => this.unimplemented();
+  cachePayload: ShareApi["cachePayload"] = () => this.unimplemented();
+
+  private unimplemented(): Promise<never> {
+    return Promise.reject(new Error("CharacterizationShareApi operation is not configured"));
+  }
+}
+
+class CharacterizationApiKeyApi implements ApiKeyApi {
+  create: ApiKeyApi["create"] = () => this.unimplemented();
+  update: ApiKeyApi["update"] = () => this.unimplemented();
+  findVerifiedToken: ApiKeyApi["findVerifiedToken"] = () => this.unimplemented();
+  findResolvedToken: ApiKeyApi["findResolvedToken"] = () => this.unimplemented();
+  regenerateLegacyProjectKey: ApiKeyApi["regenerateLegacyProjectKey"] = () => this.unimplemented();
+  resolveOrganizationToken: ApiKeyApi["resolveOrganizationToken"] = () => this.unimplemented();
+  resolveVisibleProjects: ApiKeyApi["resolveVisibleProjects"] = () => this.unimplemented();
+  markUsed: ApiKeyApi["markUsed"] = () => undefined;
+  list: ApiKeyApi["list"] = () => this.unimplemented();
+  listAll: ApiKeyApi["listAll"] = () => this.unimplemented();
+  revoke: ApiKeyApi["revoke"] = () => this.unimplemented();
+  ensureCallerIsOrgMember: ApiKeyApi["ensureCallerIsOrgMember"] = () => this.unimplemented();
+  assertSelectionWithinCeiling: ApiKeyApi["assertSelectionWithinCeiling"] = () =>
+    this.unimplemented();
+  isOrgAdmin: ApiKeyApi["isOrgAdmin"] = () => this.unimplemented();
+  isOrgAdminApiKey: ApiKeyApi["isOrgAdminApiKey"] = () => this.unimplemented();
+  findById: ApiKeyApi["findById"] = () => this.unimplemented();
+  getByIdForCaller: ApiKeyApi["getByIdForCaller"] = () => this.unimplemented();
+  findNameByIdInOrg: ApiKeyApi["findNameByIdInOrg"] = () => this.unimplemented();
+  getUserBindings: ApiKeyApi["getUserBindings"] = () => this.unimplemented();
+  getOrgProjects: ApiKeyApi["getOrgProjects"] = () => this.unimplemented();
+  getOrgTeams: ApiKeyApi["getOrgTeams"] = () => this.unimplemented();
+  getOrgMembers: ApiKeyApi["getOrgMembers"] = () => this.unimplemented();
+  findIngestionKey: ApiKeyApi["findIngestionKey"] = () => this.unimplemented();
+  listIngestionKeysForProject: ApiKeyApi["listIngestionKeysForProject"] = () =>
+    this.unimplemented();
+  findByLookupId: ApiKeyApi["findByLookupId"] = () => this.unimplemented();
+  validateCliSelection: ApiKeyApi["validateCliSelection"] = () => this.unimplemented();
+  findDefaultCliSelection: ApiKeyApi["findDefaultCliSelection"] = () => this.unimplemented();
+  mintCliLoginKey: ApiKeyApi["mintCliLoginKey"] = () => this.unimplemented();
+  revokeCliLoginKeysForDevice: ApiKeyApi["revokeCliLoginKeysForDevice"] = () =>
+    this.unimplemented();
+  revokeCliLoginKeyForLogout: ApiKeyApi["revokeCliLoginKeyForLogout"] = () => this.unimplemented();
+  enrichBindingsWithNames: ApiKeyApi["enrichBindingsWithNames"] = () => this.unimplemented();
+  enrichApiKeyList: ApiKeyApi["enrichApiKeyList"] = () => this.unimplemented();
+  listCallerBindings: ApiKeyApi["listCallerBindings"] = () => this.unimplemented();
+  findKeyName: ApiKeyApi["findKeyName"] = () => this.unimplemented();
+  listKeys: ApiKeyApi["listKeys"] = () => this.unimplemented();
+  createKey: ApiKeyApi["createKey"] = () => this.unimplemented();
+  updateKey: ApiKeyApi["updateKey"] = () => this.unimplemented();
+  revokeKey: ApiKeyApi["revokeKey"] = () => this.unimplemented();
+  listOrganizationProjects: ApiKeyApi["listOrganizationProjects"] = () => this.unimplemented();
+  listOrganizationTeams: ApiKeyApi["listOrganizationTeams"] = () => this.unimplemented();
+  listOrganizationMembers: ApiKeyApi["listOrganizationMembers"] = () => this.unimplemented();
+
+  private unimplemented(): Promise<never> {
+    return Promise.reject(new Error("CharacterizationApiKeyApi operation is not configured"));
+  }
+}
+
+class CharacterizationTopicApi implements TopicApi {
+  getAll: TopicApi["getAll"] = () => this.unimplemented();
+  getNamesByIds: TopicApi["getNamesByIds"] = () => this.unimplemented();
+  getClusteringStatus: TopicApi["getClusteringStatus"] = () => this.unimplemented();
+  getClusteringRunHistory: TopicApi["getClusteringRunHistory"] = () => this.unimplemented();
+
+  private unimplemented(): Promise<never> {
+    return Promise.reject(new Error("CharacterizationTopicApi operation is not configured"));
+  }
+}
+
+function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam {
+  const timestamp = new Date("2026-01-01T00:00:00.000Z");
+  const project: Project = {
+    id: "project_123",
+    name: "Project",
+    slug: "project",
+    apiKey: "sk-lw-test",
+    lwqlKey: "lwql-test",
+    teamId: "team-1",
+    language: "typescript",
+    framework: "test",
+    kind: "application",
+    firstMessage: false,
+    integrated: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    userLinkTemplate: null,
+    traceSharingEnabled,
+    presenceEnabled: true,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+  };
+  return {
+    ...project,
+    team: {
+      id: "team-1",
+      name: "Team",
+      slug: "team",
+      organizationId: "org-1",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  };
+}
+
+function characterizationOperations(options: {
+  projects: ProjectOperationsOverrides;
+  revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
+}): ProjectOperationsService {
+  return ProjectOperationsService.create({
+    projects: new CharacterizationProjectService(options.projects),
+    apiKeys: new CharacterizationApiKeyApi(),
+    share: new CharacterizationShareApi(options.revokeAllTraceShares),
+    topics: new CharacterizationTopicApi(),
+    topicClustering: { requestClustering: async () => {} },
+    now: () => 0,
+  });
+}
+
+/** A complete ProjectApi fake keeps this transport suite at the feature boundary. */
+class TestProjectApi implements ProjectApi {
+  tryGetOrganizationId(projectId: string) {
+    return (
+      this.overrides.tryGetOrganizationId?.(projectId) ?? this.unimplemented("tryGetOrganizationId")
+    );
+  }
+
+  searchByQuery(input: { query: string; organizationId?: string; limit?: number }) {
+    return this.overrides.searchByQuery?.(input) ?? this.unimplemented("searchByQuery");
+  }
+
+  listNamesByIds(input: { projectIds: string[] }) {
+    return this.overrides.listNamesByIds?.(input) ?? this.unimplemented("listNamesByIds");
+  }
+
+  listIdsByOrganization(input: { organizationId: string }) {
+    return (
+      this.overrides.listIdsByOrganization?.(input) ?? this.unimplemented("listIdsByOrganization")
+    );
+  }
+
+  listPaths(input: { projectIds: string[] }) {
+    return this.overrides.listPaths?.(input) ?? this.unimplemented("listPaths");
+  }
+
+  constructor(private readonly overrides: Partial<ProjectApi>) {}
+
+  isPresenceEnabled: ProjectApi["isPresenceEnabled"] = (input) =>
+    this.overrides.isPresenceEnabled?.(input) ?? Promise.resolve(false);
+
+  tryGetSummaryById: ProjectApi["tryGetSummaryById"] = (projectId) =>
+    this.overrides.tryGetSummaryById?.(projectId) ?? Promise.resolve(null);
+
+  tryGetById: ProjectApi["tryGetById"] = (id) => {
+    return this.overrides.tryGetById?.(id) ?? Promise.resolve(null);
+  };
+
+  getOrganizationId: ProjectApi["getOrganizationId"] = (projectId) => {
+    return this.overrides.getOrganizationId?.(projectId) ?? this.unimplemented("getOrganizationId");
+  };
+
+  getWithTeam: ProjectApi["getWithTeam"] = (id) => {
+    return this.overrides.getWithTeam?.(id) ?? this.unimplemented("getWithTeam");
+  };
+
+  tryGetWithTeam: ProjectApi["tryGetWithTeam"] = (id) => {
+    return this.overrides.tryGetWithTeam?.(id) ?? Promise.resolve(null);
+  };
+
+  listByOrganization: ProjectApi["listByOrganization"] = (input) => {
+    return (
+      this.overrides.listByOrganization?.(input) ??
+      Promise.resolve({ data: [], pagination: { page: input.page, limit: input.limit, total: 0 } })
+    );
+  };
+
+  listByTeam: ProjectApi["listByTeam"] = (input) => {
+    return this.overrides.listByTeam?.(input) ?? Promise.resolve([]);
+  };
+
+  create: ProjectApi["create"] = (input, by) => {
+    return this.overrides.create?.(input, by) ?? this.unimplemented("create");
+  };
+
+  updateSettings: ProjectApi["updateSettings"] = (input) => {
+    return this.overrides.updateSettings?.(input) ?? this.unimplemented("updateSettings");
+  };
+
+  archive: ProjectApi["archive"] = (input) => {
+    return this.overrides.archive?.(input) ?? Promise.resolve({ alreadyArchived: false });
+  };
+
+  regenerateLegacyProjectKey: ProjectApi["regenerateLegacyProjectKey"] = (input) => {
+    return (
+      this.overrides.regenerateLegacyProjectKey?.(input) ??
+      this.unimplemented("regenerateLegacyProjectKey")
+    );
+  };
+
+  requestTopicClustering: ProjectApi["requestTopicClustering"] = (input, by) => {
+    return (
+      this.overrides.requestTopicClustering?.(input, by) ??
+      this.unimplemented("requestTopicClustering")
+    );
+  };
+
+  touchCodingAgentPullRequestSeen: ProjectApi["touchCodingAgentPullRequestSeen"] = (input) => {
+    return this.overrides.touchCodingAgentPullRequestSeen?.(input) ?? Promise.resolve();
+  };
+
+  private unimplemented(operation: string): Promise<never> {
+    return Promise.reject(new Error(`TestProjectApi does not implement ${operation}`));
+  }
+}
+
 async function expectRefusal(
   call: Promise<unknown>,
   expected: { code: string; httpStatus: number },
@@ -52,18 +365,10 @@ async function expectRefusal(
 
 function harness({
   projects = {},
-  apiKeys = {},
-  share = {},
-  topics = {},
-  topicClustering = {},
   probeProjectPermission = async () => true,
   fieldProtections = {},
 }: {
-  projects?: Partial<ProjectService>;
-  apiKeys?: Partial<ApiKeyService>;
-  share?: Partial<ShareService>;
-  topics?: Partial<TopicService>;
-  topicClustering?: Partial<TopicClusteringCommands>;
+  projects?: Partial<ProjectApi>;
   probeProjectPermission?: () => Promise<boolean>;
   fieldProtections?: Record<string, unknown>;
 } = {}) {
@@ -112,19 +417,50 @@ function harness({
     probeProjectPermission: probe,
     caller: router.createCaller({
       app: {
-        projects: ProjectApp.create({
-          projects: projects as ProjectService,
-          apiKeys: apiKeys as ApiKeyService,
-          share: share as ShareService,
-          topics: topics as TopicService,
-          topicClustering: topicClustering as TopicClusteringCommands,
-        }),
+        projects: new TestProjectApi(projects),
       },
       actor: () => ({ id: "test-user-id" }),
       session: { user: { id: "test-user-id" } },
     }),
   };
 }
+
+describe("ProjectOperationsService characterization", () => {
+  it("revokes outstanding trace shares when sharing is turned off", async () => {
+    const revokeAllTraceShares = vi.fn(async () => {});
+    const updated = characterizationProject(false);
+    const update = vi.fn(async () => updated);
+    const operations = characterizationOperations({
+      projects: {
+        tryGetWithTeam: async () => characterizationProject(true),
+        update,
+      },
+      revokeAllTraceShares,
+    });
+
+    await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "project_123", organizationId: "org-1" }),
+    );
+    expect(revokeAllTraceShares).toHaveBeenCalledWith("project_123");
+  });
+
+  it("leaves shares alone when trace sharing was already off", async () => {
+    const revokeAllTraceShares = vi.fn(async () => {});
+    const operations = characterizationOperations({
+      projects: {
+        tryGetWithTeam: async () => characterizationProject(false),
+        update: async () => characterizationProject(false),
+      },
+      revokeAllTraceShares,
+    });
+
+    await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
+
+    expect(revokeAllTraceShares).not.toHaveBeenCalled();
+  });
+});
 
 describe("ProjectTrpcApi", () => {
   describe("given a process policy that reads the validated input", () => {
@@ -167,13 +503,7 @@ describe("ProjectTrpcApi", () => {
       await router
         .createCaller({
           app: {
-            projects: ProjectApp.create({
-              projects: { tryGetById: async () => null } as unknown as ProjectService,
-              apiKeys: {} as ApiKeyService,
-              share: {} as ShareService,
-              topics: {} as TopicService,
-              topicClustering: {} as TopicClusteringCommands,
-            }),
+            projects: new TestProjectApi({ tryGetById: async () => null }),
           },
           actor: () => ({ id: "test-user-id" }),
           session: { user: { id: "test-user-id" } },
@@ -250,7 +580,7 @@ describe("ProjectTrpcApi", () => {
     /** @scenario "Rotation is recorded for audit" */
     it("returns the new key and records the rotation", async () => {
       const { caller, recordApiKeyRegenerated } = harness({
-        apiKeys: { regenerateLegacyProjectKey: async () => "sk-lw-new" },
+        projects: { regenerateLegacyProjectKey: async () => "sk-lw-new" },
       });
 
       await expect(caller.regenerateApiKey({ projectId: "project_123" })).resolves.toEqual({
@@ -264,7 +594,7 @@ describe("ProjectTrpcApi", () => {
 
     it("lets the credential's own not-found refusal through", async () => {
       const { caller } = harness({
-        apiKeys: {
+        projects: {
           regenerateLegacyProjectKey: async () => {
             throw new ApiKeyNotFoundError("nonexistent_project");
           },
@@ -279,7 +609,7 @@ describe("ProjectTrpcApi", () => {
 
     it("re-throws any other service failure", async () => {
       const { caller } = harness({
-        apiKeys: {
+        projects: {
           regenerateLegacyProjectKey: async () => {
             throw new Error("Connection error");
           },
@@ -294,7 +624,7 @@ describe("ProjectTrpcApi", () => {
 
     it("does not record a rotation that never happened", async () => {
       const { caller, recordApiKeyRegenerated } = harness({
-        apiKeys: {
+        projects: {
           regenerateLegacyProjectKey: async () => {
             throw new Error("Database connection failed");
           },
@@ -313,7 +643,7 @@ describe("ProjectTrpcApi", () => {
         projects: {
           tryGetWithTeam: async () =>
             ({ team: { organizationId: "org-1" }, traceSharingEnabled: false }) as never,
-          update,
+          updateSettings: update,
         },
       });
 
@@ -329,48 +659,13 @@ describe("ProjectTrpcApi", () => {
 
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: "project_123",
-          organizationId: "org-1",
-          data: expect.objectContaining({
-            s3Endpoint: "encrypted(https://s3.example)",
-            s3AccessKeyId: "encrypted(AKIA)",
-            s3SecretAccessKey: "encrypted(shh)",
-            s3Bucket: "bucket",
-          }),
+          projectId: "project_123",
+          s3Endpoint: "encrypted(https://s3.example)",
+          s3AccessKeyId: "encrypted(AKIA)",
+          s3SecretAccessKey: "encrypted(shh)",
+          s3Bucket: "bucket",
         }),
       );
-    });
-
-    it("revokes the outstanding trace shares when sharing is turned off", async () => {
-      const revokeAllTraceShares = vi.fn(async () => {});
-      const { caller } = harness({
-        projects: {
-          tryGetWithTeam: async () =>
-            ({ team: { organizationId: "org-1" }, traceSharingEnabled: true }) as never,
-          update: async () => ({ slug: "my-project" }) as never,
-        },
-        share: { revokeAllTraceShares },
-      });
-
-      await caller.update({ projectId: "project_123", traceSharingEnabled: false });
-
-      expect(revokeAllTraceShares).toHaveBeenCalledWith("project_123");
-    });
-
-    it("leaves the shares alone when sharing was already off", async () => {
-      const revokeAllTraceShares = vi.fn(async () => {});
-      const { caller } = harness({
-        projects: {
-          tryGetWithTeam: async () =>
-            ({ team: { organizationId: "org-1" }, traceSharingEnabled: false }) as never,
-          update: async () => ({ slug: "my-project" }) as never,
-        },
-        share: { revokeAllTraceShares },
-      });
-
-      await caller.update({ projectId: "project_123", traceSharingEnabled: false });
-
-      expect(revokeAllTraceShares).not.toHaveBeenCalled();
     });
 
     it("refuses a half-filled stored-object credential set", async () => {
@@ -382,7 +677,13 @@ describe("ProjectTrpcApi", () => {
     });
 
     it("refuses a project that no longer exists as not found", async () => {
-      const { caller } = harness({ projects: { tryGetWithTeam: async () => null } });
+      const { caller } = harness({
+        projects: {
+          updateSettings: async () => {
+            throw new ProjectNotFoundError("project_123");
+          },
+        },
+      });
 
       await expectRefusal(caller.update({ projectId: "project_123", name: "Renamed" }), {
         code: "project_not_found",
@@ -395,7 +696,7 @@ describe("ProjectTrpcApi", () => {
         projects: {
           tryGetWithTeam: async () =>
             ({ team: { organizationId: "org-1" }, traceSharingEnabled: false }) as never,
-          update: async () => {
+          updateSettings: async () => {
             throw new PersonalWorkspaceBoundaryError("personal workspaces hold one project");
           },
         },
@@ -439,7 +740,9 @@ describe("ProjectTrpcApi", () => {
     });
 
     it("reports an already-archived project as done rather than missing", async () => {
-      const { caller } = harness({ projects: { tryGetWithTeam: async () => null } });
+      const { caller } = harness({
+        projects: { archive: async () => ({ alreadyArchived: true }) },
+      });
 
       await expect(
         caller.archiveById({ projectId: "project_123", projectToArchiveId: "gone" }),
@@ -472,9 +775,10 @@ describe("ProjectTrpcApi", () => {
         },
       });
 
-      await expect(
+      await expectRefusal(
         caller.archiveById({ projectId: "project_123", projectToArchiveId: "gone" }),
-      ).resolves.toEqual({ success: true, alreadyArchived: true });
+        { code: "project_not_found", httpStatus: 404 },
+      );
     });
   });
 
@@ -495,9 +799,9 @@ describe("ProjectTrpcApi", () => {
 
       // The creation is attributed to the caller by the application, not by
       // the transport: no handler stamps a user id of its own.
-      expect(create).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: "org-1", userId: "test-user-id" }),
-      );
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org-1" }), {
+        id: "test-user-id",
+      });
       expect(provisionLangyVirtualKey).toHaveBeenCalledWith(expect.anything(), {
         projectId: "project_new",
         organizationId: "org-1",
@@ -567,35 +871,36 @@ describe("ProjectTrpcApi", () => {
 
   describe("when a manual topic-clustering run is asked for", () => {
     it("says a run is already going rather than reporting a start that did not happen", async () => {
-      const requestClustering = vi.fn(async () => {});
+      const requestClustering = vi.fn(async () => ({
+        started: false,
+        reason: "already_running" as const,
+      }));
       const { caller } = harness({
-        topics: { getClusteringStatus: async () => ({ isRunInFlight: true }) as never },
-        topicClustering: { requestClustering },
+        projects: { requestTopicClustering: requestClustering },
       });
 
       await expect(caller.triggerTopicClustering({ projectId: "project_123" })).resolves.toEqual({
         started: false,
         reason: "already_running",
       });
-      expect(requestClustering).not.toHaveBeenCalled();
+      expect(requestClustering).toHaveBeenCalledWith(
+        { projectId: "project_123" },
+        { id: "test-user-id" },
+      );
     });
 
     it("sends the manual request attributed to the caller", async () => {
-      const requestClustering = vi.fn(async () => {});
+      const requestClustering = vi.fn(async () => ({ started: true as const }));
       const { caller } = harness({
-        topics: { getClusteringStatus: async () => ({ isRunInFlight: false }) as never },
-        topicClustering: { requestClustering },
+        projects: { requestTopicClustering: requestClustering },
       });
 
       await expect(caller.triggerTopicClustering({ projectId: "project_123" })).resolves.toEqual({
         started: true,
       });
       expect(requestClustering).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantId: "project_123",
-          trigger: "manual",
-          requestedByUserId: "test-user-id",
-        }),
+        { projectId: "project_123" },
+        { id: "test-user-id" },
       );
     });
 
@@ -610,9 +915,8 @@ describe("ProjectTrpcApi", () => {
      */
     it("re-raises a named refusal rather than degrading it", async () => {
       const { caller, reportTopicClusteringFailure } = harness({
-        topics: { getClusteringStatus: async () => ({ isRunInFlight: false }) as never },
-        topicClustering: {
-          requestClustering: async () => {
+        projects: {
+          requestTopicClustering: async () => {
             throw new NoClusteringSchedulerError();
           },
         },
@@ -636,8 +940,8 @@ describe("ProjectTrpcApi", () => {
      */
     it("reports the failure and raises an unhandled error", async () => {
       const { caller, reportTopicClusteringFailure } = harness({
-        topics: {
-          getClusteringStatus: async () => {
+        projects: {
+          requestTopicClustering: async () => {
             throw new Error("projection host db-7 unreachable");
           },
         },

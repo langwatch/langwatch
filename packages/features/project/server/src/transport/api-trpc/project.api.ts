@@ -38,6 +38,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import {
   CannotArchiveCurrentProjectError,
+  type ProjectApi,
   ProjectNotFoundError,
   projectApiKeyRotationSchema,
   projectArchivedSchema,
@@ -50,7 +51,6 @@ import {
 } from "@langwatch/project-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { ProjectApp } from "#app/project.app";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.
@@ -60,7 +60,7 @@ import type { ProjectApp } from "#app/project.app";
  * feature mounted on it and so carries all of them.
  */
 export type ProjectTrpcContext = Readonly<{
-  app: Readonly<{ projects: ProjectApp }>;
+  app: Readonly<{ projects: ProjectApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
