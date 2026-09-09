@@ -33,6 +33,7 @@ import {
   type AgentListing,
   type AgentListingRefusal,
   agentsRefused,
+  refusalFromThrown,
 } from "./pullers/agentListing";
 import { listCopilotAgents } from "./pullers/copilotBots";
 import {
@@ -184,10 +185,29 @@ async function listAgentsForSource(params: {
 }): Promise<AgentListing> {
   const { context, signal } = params;
 
-  try {
-    if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
-      const config: DatabricksGeniePullConfig =
-        databricksGeniePullConfigSchema.parse(context.config);
+  // The config parse sits OUTSIDE the `try` blocks below, and has to stay
+  // there.
+  //
+  // This function used to parse inside one wide `try`. The catch was written
+  // for exactly that parse -- a config that no longer matches its schema
+  // really is a source that is not set up to be asked -- and then two network
+  // calls were added inside the same block and silently inherited its verdict.
+  // Every DNS failure, TLS failure, timeout and blocked egress during sign-in
+  // was recorded as an unconfigured source, and the page told an administrator
+  // to go audit a permission that was never at fault.
+  //
+  // The comment on that catch described one case and the code covered all of
+  // them. Scoping each `try` to the network calls alone is what stops that
+  // recurring: a third provider or a fourth await now inherits the safe
+  // default instead of the config verdict, without anyone remembering to.
+  if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
+    const parsed = databricksGeniePullConfigSchema.safeParse(context.config);
+    if (!parsed.success) {
+      return agentsRefused({ reason: "not_configured", status: null });
+    }
+    const config: DatabricksGeniePullConfig = parsed.data;
+
+    try {
       const token = await resolveWorkspaceToken({
         credentials: context.credentials,
         workspaceUrl: config.workspaceUrl,
@@ -198,11 +218,21 @@ async function listAgentsForSource(params: {
         token,
         signal,
       });
+    } catch (error) {
+      return agentsRefusedFromThrow(error);
     }
+  }
 
-    if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
-      const config: CopilotStudioDataverseConfig =
-        copilotStudioDataversePullConfigSchema.parse(context.config);
+  if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
+    const parsed = copilotStudioDataversePullConfigSchema.safeParse(
+      context.config,
+    );
+    if (!parsed.success) {
+      return agentsRefused({ reason: "not_configured", status: null });
+    }
+    const config: CopilotStudioDataverseConfig = parsed.data;
+
+    try {
       const token = await resolveEnvironmentToken({
         credentials: context.credentials,
         environmentUrl: config.environmentUrl,
@@ -213,17 +243,32 @@ async function listAgentsForSource(params: {
         token,
         signal,
       });
+    } catch (error) {
+      return agentsRefusedFromThrow(error);
     }
-
-    return agentsRefused({ reason: "not_configured", status: null });
-  } catch (error) {
-    if (error instanceof ProviderSignInError) {
-      return agentsRefused(refusalFromSignIn(error));
-    }
-    // A config that no longer parses is the same thing to the caller as a
-    // credential that cannot sign in: the source is not set up to be asked.
-    // It is a refusal rather than a throw so one bad source in a list does not
-    // fail the whole sync.
-    return agentsRefused({ reason: "not_configured", status: null });
   }
+
+  return agentsRefused({ reason: "not_configured", status: null });
+}
+
+/**
+ * A throw from a provider turned into a refusal, without guessing.
+ *
+ * A deliberate sign-in verdict is kept as-is, so a genuinely missing or
+ * rejected credential still reads as a credential problem. Anything else
+ * reaching here came out of the transport, and the only question worth asking
+ * is whether the body was the wrong shape or the request never arrived --
+ * which is what {@link refusalFromThrown} decides, on a constructor-set
+ * `name` rather than on message text.
+ *
+ * The default it lands on is `unreachable`, and that direction is the point.
+ * Telling someone to try again when their credential was wrong costs them one
+ * wasted retry. Telling someone to audit a permission when a network was down
+ * sends them to change access control over a fault that was never theirs.
+ */
+function agentsRefusedFromThrow(error: unknown): AgentListing {
+  if (error instanceof ProviderSignInError) {
+    return agentsRefused(refusalFromSignIn(error));
+  }
+  return agentsRefused(refusalFromThrown(error));
 }
