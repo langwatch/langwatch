@@ -1091,6 +1091,12 @@ workers:
 # would split a call's frames across two processes with no shared state.
 ## @section Voice worker (opt-in)
 voice:
+  # See workers.otel — named separately so voice worker telemetry is distinguishable.
+  ## @extra voice.otel OpenTelemetry identity for the voice worker.
+  ## @param voice.otel.serviceName [string, default: langwatch-voice] Service name reported in traces and logs.
+  otel:
+    serviceName: langwatch-voice
+
   ## @param voice.enabled [default: false] Deploy the voice worker Deployment, Service (and Ingress if voice.ingress.enabled). Off by default.
   enabled: false
 
@@ -1143,8 +1149,20 @@ voice:
   # See: https://kubespec.dev/v1/Pod#spec.affinity
   ## @param voice.affinity [object] Affinity overrides.
   affinity: {}
-  ## @param voice.podAnnotations [object] Additional pod annotations for the voice worker.
-  podAnnotations: {}
+  # PriorityClass for the voice worker pod, overriding global.scheduling.priorityClassName.
+  # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param voice.priorityClassName [string] PriorityClass for the voice worker pod (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  # Pod-level configurations, mirroring workers.pod.
+  ## @extra voice.pod Pod-level metadata.
+  ## @param voice.pod.annotations [object] Additional pod annotations for the voice worker.
+  pod:
+    annotations: {}
+  # Deployment-level configurations, mirroring workers.deployment.
+  ## @extra voice.deployment Deployment-level metadata.
+  ## @param voice.deployment.annotations [object] Additional Deployment annotations for the voice worker.
+  deployment:
+    annotations: {}
 
   # Service exposing the Twilio Media Streams WebSocket port in-cluster.
   ## @extra voice.service Service configuration for the voice worker.

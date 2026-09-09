@@ -729,6 +729,7 @@ The chart refuses to render when `voice.enabled` is true and either
 
 | Name                          | Description                                                                                                              | Value              |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `voice.otel.serviceName`       | Service name reported in traces and logs.                                                                                  | `langwatch-voice`    |
 | `voice.enabled`                | Deploy the voice worker Deployment, Service (and Ingress if `voice.ingress.enabled`). Off by default.                      | `false`              |
 | `voice.publicBaseUrl`          | Public `https://` origin Twilio connects to (e.g. `https://voice.example.com`). Required when `voice.enabled` is true.     | `""`                 |
 | `voice.wsPort`                 | Container port of the Twilio Media Streams WebSocket listener.                                                             | `3300`               |
@@ -740,7 +741,9 @@ The chart refuses to render when `voice.enabled` is true and either
 | `voice.nodeSelector`           | Node selector overrides.                                                                                                   | `{}`                 |
 | `voice.tolerations`            | Tolerations overrides.                                                                                                     | `[]`                 |
 | `voice.affinity`               | Affinity overrides.                                                                                                        | `{}`                 |
-| `voice.podAnnotations`         | Additional pod annotations for the voice worker.                                                                           | `{}`                 |
+| `voice.priorityClassName`      | PriorityClass for the voice worker pod (overrides `global.scheduling.priorityClassName`).                                  | `""`                 |
+| `voice.pod.annotations`        | Additional pod annotations for the voice worker.                                                                           | `{}`                 |
+| `voice.deployment.annotations` | Additional Deployment annotations for the voice worker.                                                                    | `{}`                 |
 | `voice.service.type`           | Service type.                                                                                                              | `ClusterIP`          |
 | `voice.service.port`           | Service port (target is `voice.wsPort`).                                                                                   | `3300`               |
 | `voice.ingress.enabled`        | Create an Ingress for the voice worker.                                                                                    | `false`              |

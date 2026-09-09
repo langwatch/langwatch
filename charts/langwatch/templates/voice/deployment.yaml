@@ -14,7 +14,7 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: voice
     {{- include "langwatch.labels" . | nindent 4 }}
-  {{- with .Values.voice.podAnnotations }}
+  {{- with .Values.voice.deployment.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -41,7 +41,7 @@ spec:
         {{- . | nindent 8 }}
         {{- end }}
       annotations:
-        {{- with (coalesce .Values.voice.podAnnotations .Values.global.podAnnotations) }}
+        {{- with (coalesce .Values.voice.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
@@ -90,10 +90,12 @@ spec:
             {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
 
             - name: OTEL_SERVICE_NAME
-              value: "langwatch-voice"
+              value: {{ .Values.voice.otel.serviceName | default "langwatch-voice" | quote }}
 
-            # See the workers Deployment — the voice worker consumes the app's
-            # queues too, so it needs the same callback path back to the app.
+            # Same value as the workers Deployment: even with
+            # VOICE_WORKER_ONLY=true consuming only the voice queue, the
+            # process still needs the app's callback base URL for the rest of
+            # the worker runtime it shares with the workers Deployment.
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
 
