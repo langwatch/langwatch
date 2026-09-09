@@ -1,21 +1,20 @@
 /**
- * The gate that makes `/api/user-avatar` safe to read broadly.
+ * @vitest-environment node
+ * The gate that makes `/api/user-avatar` safe to read broadly, through the
+ * real declaration.
  * Spec: specs/settings/user-avatar-upload.feature
  */
-import { createAppRestSecurity } from "@langwatch/api/rest";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
-import { Readable } from "node:stream";
+import { createRestRuntime, bindRestMiddleware } from "@langwatch/api/rest";
+import type { UserApi, UserAvatarObjectRead } from "@langwatch/user-contract";
+import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import {
-  createUserAvatarRestApp,
-  type UserAvatarObjectReader,
-  type UserAvatarStoredObjectRead,
-} from "../user-avatar.api.ts";
+import { userAvatarCaller, userAvatarRest } from "../user-avatar.rest.ts";
 
 describe("given the avatar route", () => {
   describe("when the object is a user avatar", () => {
-    /** @scenario "The avatar route serves an object whose purpose and owner kind are the avatar ones" */
+    /** @scenario "The avatar route serves an object whose purpose and owner kind
+     *  are the avatar ones" */
     it("serves the bytes with the stored media type and a private cache", async () => {
       const api = mountAvatars(available());
 
@@ -85,16 +84,43 @@ describe("given the avatar route", () => {
       await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
     });
   });
+
+  describe("when the caller has already read too many avatars", () => {
+    it("answers the throttle rather than looking the object up", async () => {
+      let looked = false;
+      const api = mountAvatars(available(), {
+        allowance: { allowed: false, resetAt: 1_000 },
+        onRead: () => {
+          looked = true;
+        },
+      });
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1");
+
+      expect(response.status).toBe(429);
+      expect(looked).toBe(false);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Harness
 // ---------------------------------------------------------------------------
 
+/** The bytes the object store hands over, as the web stream the answer carries. */
+function streamOf(bytes: Uint8Array): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
 /** One avatar read, defaulted to a real avatar so a case changes only its point. */
 function available(
   overrides: { purpose?: string; ownerKind?: string; mediaType?: string } = {},
-): UserAvatarStoredObjectRead {
+): UserAvatarObjectRead {
   return {
     status: "available",
     metadata: {
@@ -103,29 +129,49 @@ function available(
       purpose: overrides.purpose ?? "user_avatar",
       ownerKind: overrides.ownerKind ?? "user",
     },
-    stream: Readable.from([Buffer.from([1, 2, 3])]),
+    stream: streamOf(Uint8Array.from([1, 2, 3])),
   };
 }
 
 /**
- * The family over a session-authenticated caller. The dual-auth verifier is the process's, and
- * the handler keys its rate limit on what that verifier leaves behind — so a pass-through
- * setting nothing would fail before any refusal was reached.
+ * The family over a session-authenticated caller. The dual-credential verifier
+ * is the process's, and the handler keys its count on what that verifier left
+ * behind — so a binding setting nothing would fail before any refusal.
  */
-function mountAvatars(read: UserAvatarStoredObjectRead) {
-  const objects: UserAvatarObjectReader = { getById: async () => read };
-  const app = createUserAvatarRestApp({
-    security: passThroughSecurity(),
-    dualAuth: async (c, next) => {
-      c.set("userId", "user-1");
-      await next();
+function mountAvatars(
+  read: UserAvatarObjectRead,
+  options: {
+    allowance?: { allowed: boolean; resetAt: number };
+    onRead?: () => void;
+  } = {},
+) {
+  const app = {
+    countAvatarRead: async () => options.allowance ?? { allowed: true, resetAt: 0 },
+    readAvatarObject: async () => {
+      options.onRead?.();
+
+      return read;
     },
-    userAvatarObjects: () => objects,
-    rateLimit: async () => ({ allowed: true, resetAt: 0 }),
+  } as unknown as UserApi;
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("An avatar read asks no permission of its credential.");
+      },
+      identify: () => ({ actor: { type: "user", id: "user-1" } as const, scope: null }),
+    },
   });
 
-  const hono = new Hono();
-  hono.route("/", app.hono as never);
+  const hono = runtime.mount(userAvatarRest.router(), {
+    app: () => app,
+    credential: "session",
+    facts: [
+      bindRestMiddleware(userAvatarCaller, () => ({ apiKeyProjectId: null, userId: "user-1" })),
+    ],
+    onError: renderHandled,
+  });
+
   return {
     fetch: (path: string) => hono.fetch(new Request(`http://api.test${path}`)),
   };
@@ -133,34 +179,10 @@ function mountAvatars(read: UserAvatarStoredObjectRead) {
 
 /** A handled refusal reaches the caller at its own status with its own code. */
 const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
+  const handled = error as { status?: number; httpStatus?: number; code?: string };
+  const status = handled.status ?? handled.httpStatus;
+
+  if (typeof status === "number") return c.json({ error: handled.code ?? "error" }, status as never);
+
   return c.json({ error: String(error) }, 500);
 };
-
-function passThroughSecurity() {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: () => noop,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => noop,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}

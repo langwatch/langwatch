@@ -200,3 +200,104 @@ export type UserAvatarResult = z.infer<typeof userAvatarResultSchema>;
  */
 export const identityVerificationCompletedSchema = z.object({ verified: z.literal(true) }).strict();
 export type IdentityVerificationCompleted = z.infer<typeof identityVerificationCompletedSchema>;
+export type UserVerificationCompleted = IdentityVerificationCompleted;
+
+export const completeUserVerificationInputSchema = z
+  .object({
+    userId: z.string().min(1),
+    identifierId: z.string().min(1),
+    verificationId: z.string().min(1),
+    token: z.string().min(1),
+    codeVerifier: z.string().min(1),
+  })
+  .strict();
+export type CompleteUserVerificationInput = z.infer<typeof completeUserVerificationInputSchema>;
+
+/**
+ * Who is asking. `id` is the SUBJECT — the account read and written, even
+ * while an operator browses as them — and `operatorId` is whose preferences
+ * and operator standing apply.
+ */
+export const userCallerSchema = z
+  .object({
+    id: z.string().min(1),
+    operatorId: z.string().min(1),
+    impersonated: z.boolean(),
+  })
+  .strict();
+export type UserCaller = z.infer<typeof userCallerSchema>;
+
+export const registerCredentialAccountInputSchema = z
+  .object({
+    name: z.string().nullable(),
+    email: z.string().min(1),
+    password: z.string().min(1),
+    /** The caller's address, for the per-address signup budget. */
+    callerAddress: z.string().min(1),
+  })
+  .strict();
+export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAccountInputSchema>;
+
+/**
+ * The session row a credential write keeps. Null while an operator is
+ * impersonating: the row is the OPERATOR's, so "end every session but this
+ * one" would neither keep the subject's tab nor mean anything about their
+ * devices.
+ */
+const keptBrowserSession = z.string().min(1).nullable();
+
+export const setOwnFirstPasswordInputSchema = z
+  .object({
+    userId: z.string().min(1),
+    password: z.string().min(1),
+    keepSessionId: keptBrowserSession,
+  })
+  .strict();
+export type SetOwnFirstPasswordInput = z.infer<typeof setOwnFirstPasswordInputSchema>;
+
+export const changeOwnPasswordInputSchema = z
+  .object({
+    userId: z.string().min(1),
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(1),
+    keepSessionId: keptBrowserSession,
+  })
+  .strict();
+export type ChangeOwnPasswordInput = z.infer<typeof changeOwnPasswordInputSchema>;
+
+export const setOwnAvatarInputSchema = z
+  .object({
+    userId: z.string().min(1),
+    organizationId: z.string().min(1),
+    imageDataUrl: z.string().min(1),
+  })
+  .strict();
+export type SetOwnAvatarInput = z.infer<typeof setOwnAvatarInputSchema>;
+
+/** Whether this deployment still owes the person a passkey offer today. */
+export const userPasskeyOfferSchema = z.object({ offer: z.boolean() }).strict();
+export type UserPasskeyOffer = z.infer<typeof userPasskeyOfferSchema>;
+
+/** What one count of a caller's avatar reads answers. */
+export type UserAvatarReadAllowance = Readonly<{ allowed: boolean; resetAt: number }>;
+
+/** What an avatar object carries beside its bytes. */
+export type UserAvatarObjectMetadata = Readonly<{
+  byteLength: number;
+  mediaType: string;
+  purpose: string;
+  ownerKind: string;
+}>;
+
+/**
+ * One avatar read, as the deployment's object store answers it. The bytes
+ * arrive as a web stream, which is what the response carries.
+ */
+export type UserAvatarObjectRead =
+  | Readonly<{
+      status: "available";
+      metadata: UserAvatarObjectMetadata;
+      stream: ReadableStream;
+    }>
+  | Readonly<{ status: "missing"; metadata: UserAvatarObjectMetadata }>
+  | null;

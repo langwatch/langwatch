@@ -8,7 +8,7 @@
  */
 import type { UnlinkUserAccountOutcome, UserLinkedAccount } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { UserPasswordHasherPort } from "../../ports/user.port.ts";
+import type { UserPasswordHasher } from "../../app/user.app.ts";
 import type {
   UserCredentialAccount,
   UserCredentialRepository,
@@ -22,7 +22,7 @@ const NEW_PASSWORD = "the-next-one";
 const STORED_HASH = `hashed:${CURRENT_PASSWORD}`;
 
 /** A reversible stand-in for bcrypt, so a hash is recognisable in assertions. */
-class TestPasswordHasher extends UserPasswordHasherPort {
+class TestPasswordHasher implements UserPasswordHasher {
   async hash({ password }: { password: string }): Promise<string> {
     return `hashed:${password}`;
   }

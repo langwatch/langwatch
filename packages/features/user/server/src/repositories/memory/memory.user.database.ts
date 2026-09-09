@@ -55,6 +55,12 @@ export class MemoryUserDatabase {
     return [...this.#users.values()].find((row) => row.email === email);
   }
 
+  userByEmailInsensitive(email: string): MemoryUserRow | undefined {
+    const wanted = email.toLowerCase();
+
+    return [...this.#users.values()].find((row) => row.email?.toLowerCase() === wanted);
+  }
+
   usersById(ids: readonly string[]): MemoryUserRow[] {
     return ids.flatMap((id) => {
       const row = this.#users.get(id);

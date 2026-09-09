@@ -5,7 +5,7 @@ import type {
   UserLinkedAccount,
   UserPasswordRotationOutcome,
 } from "@langwatch/user-contract";
-import type { UserPasswordHasherPort } from "../ports/user.port.ts";
+import type { UserPasswordHasher } from "../app/user.app.ts";
 import type { UserCredentialRepository } from "../repositories/user-signin-credential.repository.ts";
 
 /**
@@ -16,12 +16,12 @@ import type { UserCredentialRepository } from "../repositories/user-signin-crede
 export class UserCredentialService {
   private constructor(
     private readonly repository: UserCredentialRepository,
-    private readonly passwords: UserPasswordHasherPort,
+    private readonly passwords: UserPasswordHasher,
   ) {}
 
   static create(options: {
     repository: UserCredentialRepository;
-    passwords: UserPasswordHasherPort;
+    passwords: UserPasswordHasher;
   }): UserCredentialService {
     return new UserCredentialService(options.repository, options.passwords);
   }

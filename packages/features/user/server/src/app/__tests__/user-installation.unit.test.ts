@@ -8,11 +8,9 @@ import { describe, expect, it } from "vitest";
 import { userServer } from "../../user.server.ts";
 import {
   createUserTestAuth,
+  createUserTestInfrastructure,
   createUserTestOps,
   createUserTestOrganizations,
-  TEST_CREDENTIAL_ISSUER,
-  TestPasswordHasher,
-  TestUserAvatarStorage,
 } from "./user.fixture.ts";
 
 function process() {
@@ -22,13 +20,7 @@ function process() {
     .withProvided(AuthApi, createUserTestAuth())
     .withProvided(OrganizationApi, createUserTestOrganizations())
     .withProvided(OpsApi, createUserTestOps())
-    .withFeature(userServer, {
-      infrastructure: {
-        credentialIssuer: TEST_CREDENTIAL_ISSUER,
-        avatarStorage: new TestUserAvatarStorage(),
-        passwords: new TestPasswordHasher(),
-      },
-    });
+    .withFeature(userServer, { infrastructure: createUserTestInfrastructure() });
 }
 
 describe("user app installation", () => {

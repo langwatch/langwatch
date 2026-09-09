@@ -34,7 +34,7 @@ import {
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
-import type { UserAvatarStoragePort } from "../ports/user.port.ts";
+import type { UserAvatarStorage } from "../app/user.app.ts";
 import type { UserRepository } from "../repositories/user.repository.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
 
@@ -43,7 +43,7 @@ export class UserService extends UserServiceContract {
   private constructor(
     private readonly repository: UserRepository,
     private readonly organizations: OrganizationApi,
-    private readonly avatarStorage: UserAvatarStoragePort,
+    private readonly avatarStorage: UserAvatarStorage,
     /** The issuer every credential account row this service mints is stored under. */
     private readonly credentialIssuer: string,
     private readonly now: () => Date,
@@ -54,7 +54,7 @@ export class UserService extends UserServiceContract {
   static create(options: {
     repository: UserRepository;
     organizations: OrganizationApi;
-    avatarStorage: UserAvatarStoragePort;
+    avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
     now?: () => Date;
   }): UserService {
@@ -83,6 +83,17 @@ export class UserService extends UserServiceContract {
     const parsed = userEmailInputSchema.parse(input);
 
     return this.repository.findByEmail(parsed.email);
+  }
+
+  /**
+   * Whether an address already answers for somebody, ignoring case: rows
+   * written before sign-in lowercased addresses may carry capitals, and a
+   * case-twin beside one would leave two accounts answering for one person.
+   */
+  async emailIsTaken(input: UserEmailInput): Promise<boolean> {
+    const parsed = userEmailInputSchema.parse(input);
+
+    return (await this.repository.findByEmailInsensitive(parsed.email)) !== null;
   }
 
   create(input: CreateUserInput): Promise<UserProfile> {

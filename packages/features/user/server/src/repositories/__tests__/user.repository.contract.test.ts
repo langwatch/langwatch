@@ -59,6 +59,27 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(users.findByEmail(EMAIL)).resolves.toMatchObject({ id: created.id });
     });
 
+    /**
+     * Rows written before sign-in lowercased addresses may carry capitals, so
+     * the signup gate asks this question rather than the exact-match one: a
+     * case-twin beside one would leave two accounts answering for one person.
+     */
+    it("finds the same account from an address typed with capitals", async () => {
+      const { users } = create();
+
+      const created = await users.createCredentialUser({
+        name: "Ada",
+        email: EMAIL,
+        passwordHash: "hash",
+        issuer: ISSUER,
+      });
+
+      await expect(users.findByEmailInsensitive("Ada@Example.com")).resolves.toMatchObject({
+        id: created.id,
+      });
+      await expect(users.findByEmailInsensitive("other@example.com")).resolves.toBeNull();
+    });
+
     it("reports that the account can sign in with a password", async () => {
       const { users } = create();
 

@@ -1,9 +1,9 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { UserAvatarStoragePort } from "../user.port.ts";
 import type { UserRepository } from "../../repositories/user.repository.ts";
-import { UserService } from "../../services/user.service.ts";
+import type { UserAvatarStorage } from "../../app/user.app.ts";
+import { UserService } from "../user.service.ts";
 
 const user: UserFullProfile = {
   id: "user-1",
@@ -27,6 +27,7 @@ class StubRepository implements UserRepository {
   getProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);
   findByEmail = vi.fn(async () => user);
+  findByEmailInsensitive = vi.fn(async () => user);
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
@@ -54,7 +55,7 @@ class StubRepository implements UserRepository {
   setAvatar = vi.fn(async (_input: { id: string; image: string | null }): Promise<void> => undefined);
 }
 
-class StubAvatarStorage extends UserAvatarStoragePort {
+class StubAvatarStorage implements UserAvatarStorage {
   store = vi.fn(async () => ({ id: "object-1" }));
 }
 

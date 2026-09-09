@@ -786,6 +786,55 @@ const presentations = {
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
+  registration_not_available: {
+    // This install signs people in through its own identity provider, so there
+    // is no password account to create here. Naming the provider is the
+    // operator's job, not ours: we do not know what they called it.
+    title: "You can't create an account here",
+    describe: () => "This workspace signs you in through your organization. Use that sign-in.",
+  },
+  signup_throttled: {
+    title: "Too many signup attempts",
+    describe: () => "Wait a few minutes, then try again.",
+  },
+  password_auth_not_available: {
+    title: "Passwords aren't used here",
+    describe: () =>
+      "This workspace signs you in through your organization, so there is no password to set or change.",
+  },
+  password_attempts_throttled: {
+    title: "Too many password attempts",
+    describe: () => "Wait a few minutes, then try again.",
+  },
+  password_already_set: {
+    title: "This account already has a password",
+    describe: () => "Use Change password instead, which asks for the current one.",
+  },
+  password_not_set: {
+    title: "This account has no password yet",
+    describe: () => "Set a first password instead of changing one.",
+  },
+  last_authentication_method: {
+    title: "That's your only way to sign in",
+    describe: () => "Add another sign-in method first, then remove this one.",
+  },
+  linked_account_not_found: {
+    title: "That sign-in method is already gone",
+    describe: () => "Reload to see the ones still on your account.",
+  },
+  federated_password_account_missing: {
+    // The person holds only social identities, whose passwords live with the
+    // upstream provider. Nothing here can change one, and nothing they do in
+    // this app will add one.
+    title: "There's no password on this account",
+    describe: () => "You sign in through another provider, so change your password with them.",
+  },
+  federated_password_change_unavailable: {
+    // fault: platform. The identity provider refused for a reason only whoever
+    // configured it can fix, so the copy sends the reader to them.
+    title: "We couldn't change your password",
+    describe: () => "Ask whoever set up LangWatch here to check the sign-in configuration.",
+  },
   prompt_not_found: {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

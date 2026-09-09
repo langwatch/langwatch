@@ -88,3 +88,8 @@ export const userApiHomePagePickerStateSchema = z
     firstProjectSlug: z.string().nullable(),
   })
   .strict();
+
+export type UserPersonalContext = z.infer<typeof userApiPersonalContextSchema>;
+export type UserPersonalBudget = z.infer<typeof userApiPersonalBudgetSchema>;
+export type UserBudgetIncreaseRequested = z.infer<typeof userApiBudgetIncreaseRequestedSchema>;
+export type UserHomePagePickerState = z.infer<typeof userApiHomePagePickerStateSchema>;

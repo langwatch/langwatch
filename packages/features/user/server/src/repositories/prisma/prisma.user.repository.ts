@@ -89,6 +89,15 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
+  async findByEmailInsensitive(email: string): Promise<UserProfile | null> {
+    const row = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: userProfileSelect,
+    });
+
+    return row ? userProfileSchema.parse(row) : null;
+  }
+
   async create(input: CreateUserInput): Promise<UserProfile> {
     return userProfileSchema.parse(
       await this.prisma.user.create({ data: input, select: userProfileSelect }),

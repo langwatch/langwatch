@@ -76,6 +76,19 @@ export const userApiSetLastHomePathInputSchema = z.object({
   path: z.string().min(1).max(1024).regex(/^\//, "must start with /").nullable(),
 });
 
+/**
+ * The two proofs an email verification must present together: the emailed
+ * single-use token, and the PKCE verifier held by the context that STARTED the
+ * ceremony. A forwarded link carries only the first and verifies nothing.
+ */
+export const userApiCompleteVerificationInputSchema = z.object({
+  identifierId: z.string().min(1),
+  verificationId: z.string().min(1),
+  token: z.string().min(1),
+  // RFC 7636 §4.1: 43-128 characters from the unreserved set.
+  codeVerifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
+});
+
 export type UserApiEmptyInput = z.infer<typeof userApiEmptyInputSchema>;
 export type UserApiRegisterInput = z.infer<typeof userApiRegisterInputSchema>;
 export type UserApiUnlinkAccountInput = z.infer<typeof userApiUnlinkAccountInputSchema>;
@@ -88,3 +101,6 @@ export type UserApiRequestBudgetIncreaseInput = z.infer<
   typeof userApiRequestBudgetIncreaseInputSchema
 >;
 export type UserApiSetLastHomePathInput = z.infer<typeof userApiSetLastHomePathInputSchema>;
+export type UserApiCompleteVerificationInput = z.infer<
+  typeof userApiCompleteVerificationInputSchema
+>;
