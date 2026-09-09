@@ -1,6 +1,6 @@
 /**
- * The one execution path a mounted REST route runs — parse, authenticate,
- * decide, handle, check the answer, respond — and the mount that puts a
+ * The one execution path a mounted REST route runs - parse, authenticate,
+ * decide, handle, check the answer, respond - and the mount that puts a
  * family's declaration behind it: the ports a process fills, the addresses each
  * route answers at, and the version guards that stand in front of them.
  */
@@ -53,8 +53,6 @@ import {
   permissionOf,
   type RestDeprecation,
   type RestDoorCredential,
-  type RestRawAnswer,
-  type RestRawBody,
   type RestRouteAnswers,
   type RestTransportDeclaration,
   type RestTransportRoute,
@@ -77,6 +75,8 @@ import {
   restRateLimitKey,
   storeRestAnswer,
   tracerMiddleware,
+  type RestRawAnswer,
+  type RestRawBody,
   type RestTransportMiddlewareBinding,
 } from "./request.ts";
 import { DECLARED_ANSWER, ENDPOINT_ROUTE, isDeclined, REQUEST_FAMILY } from "./response.ts";
@@ -89,8 +89,8 @@ const outputLogger = createLogger("langwatch:api:output-validation");
 // answer, respond. The request is parsed BEFORE the credential is resolved, so
 // a malformed body is refused without ever touching the caller's key.
 //
-// A route answers at three addresses — its dated namespace, `latest`, and the
-// family's bare path — plus the `/api/v1` twin of each, and any real date the
+// A route answers at three addresses - its dated namespace, `latest`, and the
+// family's bare path - plus the `/api/v1` twin of each, and any real date the
 // caller pins dispatches to the latest registration on or before it.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ export type RestMountOptions<Api> = Readonly<{
   /**
    * Which credential reaches these routes, as the document names it. The
    * declaration names its own door; this states the one class no door resolves
-   * a scope for — `public` — and naming a door credential that disagrees with
+   * a scope for - `public` - and naming a door credential that disagrees with
    * the declaration's is refused at mount.
    */
   credential?: Credential;
@@ -404,7 +404,7 @@ function routeStack<Api>({
   const deprecated = route.deprecated ?? declaration.deprecated;
   // An any-method route publishes no operation, because it has none: one
   // handler stands behind every method the path can be sent. A family behind a
-  // browser session publishes none either — no API client can present a
+  // browser session publishes none either - no API client can present a
   // cookie, so an advertised operation would be one nothing can call.
   const publishable = route.anyMethod !== true && declaration.credential !== "session";
   const documents = documented && publishable;
@@ -509,7 +509,7 @@ function deprecationLog<Api>({
 
 /**
  * The route's own identity on the request, and the version headers every
- * answer carries — set in a `finally` so a refusal carries them too.
+ * answer carries - set in a `finally` so a refusal carries them too.
  */
 function versionContext({
   route,
@@ -784,7 +784,7 @@ function handlerMiddleware<Api>({
 
 /**
  * The plan question, asked after access is decided and before anything the
- * handler would have done — including the rate-limit count, which an unentitled
+ * handler would have done - including the rate-limit count, which an unentitled
  * caller never spends.
  */
 async function checkEntitlement({
@@ -867,8 +867,8 @@ async function replayable({
 const capabilityLogger = createLogger("langwatch:api:endpoint-capabilities");
 
 /**
- * The call, counted. The key is the framework's — this family, this operation,
- * this version, this principal — and a caller past the limit is refused with
+ * The call, counted. The key is the framework's - this family, this operation,
+ * this version, this principal - and a caller past the limit is refused with
  * the wait the counter named, before the handler is reached.
  */
 async function countCall({
@@ -1009,8 +1009,8 @@ function handlerArguments<Api>({
 }
 
 /**
- * The answer: the declared schema's, the route's own bytes, or — from an
- * any-method route that recognised nothing of its own — none at all, so
+ * The answer: the declared schema's, the route's own bytes, or - from an
+ * any-method route that recognised nothing of its own - none at all, so
  * whatever is mounted after this family routes the request as it always did.
  */
 async function answerWith<Api>({
@@ -1075,7 +1075,7 @@ async function checkRouteScope({
 /**
  * Which question this route's access kind asks of the family's door: the
  * permission the route named, the door alone, or the door for a caller who may
- * have presented nothing — the one question that can answer with nobody.
+ * have presented nothing - the one question that can answer with nobody.
  */
 async function callerOf({
   route,
@@ -1189,8 +1189,8 @@ function normalizedActor(actor: Actor | null): (Actor & { id: string }) | null {
  * The scope the declaration's door promised, or a refusal naming both tiers.
  *
  * A plain `Error`: a door that resolved another tier is mis-wired, and no
- * caller can act on it. The credential-class refusal a CALLER earns — a
- * project key at an organization family — is the door's own, thrown before
+ * caller can act on it. The credential-class refusal a CALLER earns - a
+ * project key at an organization family - is the door's own, thrown before
  * this is ever reached.
  */
 function doorScopeOf({
@@ -1204,7 +1204,7 @@ function doorScopeOf({
   const scope = caller.scope;
 
   // A deployment's own secret names no tenant, so the door has to prove it
-  // resolved none — and, for the shared secret, to name which one let the
+  // resolved none - and, for the shared secret, to name which one let the
   // request in. The instance administrator's key names itself.
   if (tier === null) {
     const named = credential === "internalSecret" ? caller.internal !== undefined : true;
@@ -1320,7 +1320,7 @@ function respondRaw({
 
 /**
  * One of the several answers a route declared. The status comes from the
- * handler, but only the declared ones are servable — an undeclared status is a
+ * handler, but only the declared ones are servable - an undeclared status is a
  * plain `Error`, because no caller can act on a route answering off-contract.
  */
 function respondDeclared({

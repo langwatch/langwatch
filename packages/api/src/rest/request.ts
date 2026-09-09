@@ -25,6 +25,7 @@ import {
 } from "@opentelemetry/api";
 import type { Context, MiddlewareHandler, Next, ValidationTargets } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import { validator as openApiValidator } from "hono-openapi";
 import type { z, ZodIssue, ZodSchema } from "zod";
@@ -37,6 +38,7 @@ import {
   ENDPOINT_ROUTE,
   REQUEST_FAMILY,
   REQUEST_LOG_CLAIM,
+  type Declined,
   type ServiceContext,
 } from "./response.ts";
 
@@ -124,7 +126,7 @@ export class RequestValidationError extends HandledError {
 }
 
 /**
- * One refusal for a rejected request, whatever raised it — a bare zod error
+ * One refusal for a rejected request, whatever raised it - a bare zod error
  * left the status to whichever boundary happened to be installed.
  */
 export function requestValidationErrorFrom({
@@ -185,7 +187,7 @@ function fieldOf(issue: ZodIssue): string {
 function expectationOf(issue: ZodIssue, input: unknown): Record<string, unknown> {
   if (issue.code === "invalid_value") {
     // Zod stopped carrying the rejected value on this issue; read it back
-    // off the raw input instead — scalars only, an object here is a shape
+    // off the raw input instead - scalars only, an object here is a shape
     // mistake that belongs in no envelope.
     const received = valueAt(input, issue.path);
     return {
@@ -232,7 +234,7 @@ function isWireScalar(value: unknown): value is string | number | boolean | null
 
 /**
  * Hono raises a malformed body as `HTTPException(400)` from inside its own
- * validator, BEFORE the schema function runs — so it cannot be caught by the
+ * validator, BEFORE the schema function runs - so it cannot be caught by the
  * hook, only around the middleware.
  */
 function isMalformedBody(error: unknown): error is HTTPException {
@@ -302,7 +304,7 @@ interface ValidationResult {
    * Both are accepted rather than only the current one: reading `.issues` off
    * an array yields `undefined`, and `undefined ?? []` is an empty violation
    * list, so getting this wrong does not throw. It ships a 422 that names no
-   * field at all — the exact detail this whole seam exists to preserve.
+   * field at all - the exact detail this whole seam exists to preserve.
    */
   error?: { issues?: ZodIssue[] } | readonly ZodIssue[];
 }
@@ -322,7 +324,7 @@ export const validator = build as unknown as typeof openApiValidator;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The two capabilities a route declares and a process supplies the store for.
-// The framework owns both keys — family, operation, version, principal — so a
+// The framework owns both keys - family, operation, version, principal - so a
 // store never decides who is being limited or what an entry describes.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -407,6 +409,53 @@ export async function storeRestAnswer({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bytes in and bytes out: the two declarations that take the framework's parser
+// and serialiser off a route, for a body that IS the evidence and an answer
+// that is not JSON.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** How a route that reads its own body wants the bytes it was sent. */
+export type RestRawBodyForm = "text" | "bytes";
+
+/**
+ * A route whose body is the evidence - a signature is computed over the exact
+ * characters a sender wrote, spacing included - so nothing parses it: the form
+ * the handler reads it in, and the media type the document publishes for it.
+ */
+export type RestRawBody = Readonly<{ form: RestRawBodyForm; mediaType: string }>;
+
+/** What the handler is handed for the form it asked for. */
+export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text" ? string : Uint8Array;
+
+/** The `Body` slot of a route that reads its own bytes. */
+export type RestRawBodyDeclared<Form extends RestRawBodyForm = RestRawBodyForm> = Readonly<{
+  rawBody: Form;
+}>;
+
+/** What a route that writes its own body publishes, and nothing of its shape. */
+export type RestRawResponse = Readonly<{ produces: readonly string[] }>;
+
+/** The body a raw answer carries; `null` for a 204, a 304, or a HEAD twin. */
+export type RestRawBodyOut = ReadableStream | Uint8Array | string | null;
+
+/** The answer of a route that writes its own bytes. */
+export type RestRawAnswer = Readonly<{
+  status?: ContentfulStatusCode;
+  headers?: Readonly<Record<string, string>>;
+  body: RestRawBodyOut;
+}>;
+
+/**
+ * What a raw-answering handler returns: its own answer, a whole `Response` it
+ * is forwarding, or - on an any-method route alone - a decline, which hands the
+ * request to whatever is mounted after this family.
+ */
+export type RestRawResult = RestRawAnswer | Response | Declined;
+
+/** The `Output` slot of a route that writes its own bytes: no schema at all. */
+export type RestRawAnswerDeclared = Readonly<{ rawAnswer: "declared" }>;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The multipart body: the one request kind whose parts are not all text, so a
 // declaration names the fields it parses and the file parts it takes delivery
 // of, and the runtime hands the files over beside the parsed input.
@@ -423,6 +472,12 @@ export type RestMultipart = Readonly<{
   fields: z.ZodObject;
   files: RestMultipartFiles;
 }>;
+
+/** The `Body` slot of a route whose request carries files beside its fields. */
+export type RestMultipartDeclared<
+  Fields extends z.ZodObject = z.ZodObject,
+  Files extends RestMultipartFiles = RestMultipartFiles,
+> = Readonly<{ multipartFields: Fields; multipartFiles: Files }>;
 
 /**
  * Reads one multipart body: the declared file parts are taken as files, and
@@ -712,7 +767,7 @@ export function loggerMiddleware(options?: { name?: string }) {
             resolved?.status ??
             (requestError ? getStatusCodeFromError(requestError) : c.res.status);
 
-          // The only error record written per failed request — the error handler deliberately
+          // The only error record written per failed request - the error handler deliberately
           // does not log its own copy. `route` is the matched endpoint (`GET /things/:id`), what
           // you group by when asking which endpoint is failing; absent for a 404 or version guard.
           const route = c.get(ENDPOINT_ROUTE) as string | undefined;
@@ -898,7 +953,7 @@ export interface TypedSSEStream<TEvents extends Record<string, ApiSchema>> {
 }
 
 /**
- * Handler function for SSE endpoints: `(c, stream)` — a stream has no body.
+ * Handler function for SSE endpoints: `(c, stream)` - a stream has no body.
  * Request data arrives through a declared query schema and is read as the
  * typed context variable `c.get("query")`.
  */

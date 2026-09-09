@@ -20,16 +20,40 @@ import type { EndpointDocs, RouteResponse } from "./response.ts";
 // What a declared REST route publishes: its operation id and the answer the
 // declaration named.
 //
-// Parameters and the request body are NOT written here: hono-openapi's own
-// validators already carry that metadata, and the document is generated from
-// the mounted app.
+// Parameters are NOT written here, and neither is the body of a route the
+// runtime parses for itself: hono-openapi's own validators already carry that
+// metadata, and the document is generated from the mounted app. A route that
+// reads its own bytes has no validator, so its body is written here.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What a declaration adds to the operation its route already publishes: the
+ * prose, the groups it is filed under, the answers beyond its declared success,
+ * and the request shape of a route no validator speaks for.
+ */
+export type RestTransportDocs = Readonly<{
+  readonly summary?: string;
+  readonly description?: string;
+  /** The groups the operation is filed under in the published reference. */
+  readonly tags?: readonly string[];
+  /**
+   * The answers the operation documents beyond its declared success, built by
+   * `documentedResponses`. Merged over the generated success block.
+   */
+  readonly responses?: Readonly<Record<number, RouteResponse>>;
+  /**
+   * The shape a caller sends a route that reads its own body: the bytes are
+   * still evidence the handler parses itself, and a reader of the document
+   * still needs to know what to write. Published as any other body is.
+   */
+  readonly requestBody?: Readonly<{ description?: string; schema: ZodType }>;
+}>;
 
 /**
  * The operation id one mount publishes. Every version mount needs a distinct
  * id because OpenAPI requires it to be unique across the whole document, so
- * the declared name belongs to whichever mount a client is told to call — the
- * bare alias — and every other mount suffixes the version it serves.
+ * the declared name belongs to whichever mount a client is told to call - the
+ * bare alias - and every other mount suffixes the version it serves.
  */
 export function operationIdOf({
   operation,
@@ -65,20 +89,9 @@ export function restRouteDocumentation({
 
   if (route.docs?.tags !== undefined) options.tags = [...route.docs.tags];
 
-  // The body of a route nothing parses: the media type it is sent as, and no
-  // schema, because the declaration named none to publish.
-  if (route.rawBody) {
-    options.requestBody = { required: true, content: { [route.rawBody.mediaType]: {} } };
-  }
+  const requestBody = publishedRequestBody(route);
 
-  // The fields and the file parts a multipart route names. The files publish
-  // as binary strings, which is how OpenAPI 3.1 spells an uploaded file.
-  if (route.multipart) {
-    options.requestBody = {
-      required: true,
-      content: { "multipart/form-data": { schema: multipartSchema(route.multipart) } },
-    };
-  }
+  if (requestBody) options.requestBody = requestBody;
 
   // An empty requirement list is the document's way of saying "no credential",
   // which is exactly what a public route is; it also overrides the document's
@@ -113,12 +126,58 @@ export function documentRoute(input: {
 }
 
 /**
+ * The body one operation publishes. A declaration that wrote its request out
+ * is honoured first, under the media type the route reads: a route that parses
+ * its own bytes still has a shape a caller has to send.
+ */
+function publishedRequestBody(
+  route: RestTransportRoute<unknown>,
+): DescribeRouteOptions["requestBody"] {
+  const declared = route.docs?.requestBody;
+
+  if (declared) {
+    const description = declared.description;
+
+    return {
+      required: true,
+      ...(description === undefined ? {} : { description }),
+      content: {
+        [route.rawBody?.mediaType ?? "application/json"]: {
+          schema: publishedInput(declared.schema),
+        },
+      },
+    };
+  }
+
+  // The body of a route nothing parses, which named no shape of its own: the
+  // media type it is sent as, and no schema.
+  if (route.rawBody) return { required: true, content: { [route.rawBody.mediaType]: {} } };
+
+  if (route.multipart) {
+    return {
+      required: true,
+      content: { "multipart/form-data": { schema: multipartSchema(route.multipart) } },
+    };
+  }
+
+  return undefined;
+}
+
+/** The shape a caller sends, as the document spells it, without the draft line. */
+function publishedInput(schema: ZodType): Record<string, unknown> {
+  const { $schema: _draft, ...published } = z.toJSONSchema(schema, { io: "input" });
+
+  return published;
+}
+
+/**
  * The published shape of a multipart body: the fields the route parses, and
  * one binary property per file part it named, required where the declaration
- * said the request must carry it.
+ * said the request must carry it. The files publish as binary strings, which
+ * is how OpenAPI 3.1 spells an uploaded file.
  */
 function multipartSchema(multipart: RestMultipart): Record<string, unknown> {
-  const { $schema: _draft, ...fields } = z.toJSONSchema(multipart.fields, { io: "input" });
+  const fields = publishedInput(multipart.fields);
   const properties = { ...(fields.properties as Record<string, unknown> | undefined) };
   const required = [...((fields.required as string[] | undefined) ?? [])];
 
@@ -235,7 +294,7 @@ export type SecurityRequirement = Record<string, never[]>;
 /**
  * The fixed set of Path Item members that are operations, per OpenAPI 3.1.
  * A Path Item also holds `servers`, `parameters`, `summary`, `description`
- * and `$ref` — the first two are arrays, which are objects to `typeof` —
+ * and `$ref` - the first two are arrays, which are objects to `typeof` —
  * so walking by value shape mistakes them for operations and stamps
  * `security` onto `servers`, producing a document that no longer validates.
  */
@@ -263,7 +322,7 @@ export function documentedPathOf(honoPath: string): string {
  * class. Only classes an API consumer can actually present appear; the
  * omission is the point, since an empty requirement list means "no
  * credential required", which is true of a public route and false of a
- * session-only or internal one — those two are refused, not published.
+ * session-only or internal one - those two are refused, not published.
  */
 const SECURITY_BY_CREDENTIAL_CLASS = {
   project_api_key: [{ project_api_key: [] }],
@@ -280,7 +339,7 @@ const SECURITY_BY_CREDENTIAL_CLASS = {
 /**
  * The security requirement a documented operation publishes, given the
  * credential class its route enforces. Throws when the class is one an API
- * client cannot present (session cookie, internal shared secret) — writing
+ * client cannot present (session cookie, internal shared secret) - writing
  * an empty requirement instead would make every generated client emit an
  * unauthenticated call, so this fails the generator rather than shipping.
  * @param operationKey `"GET /api/gateway/v1/budgets"`, for the message.

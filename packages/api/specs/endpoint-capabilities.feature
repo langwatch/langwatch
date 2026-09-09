@@ -3,7 +3,7 @@
 # (defineRestRouter + createRestRuntime) earns it again with a bound test; then retag and remove
 # the file from LEGACY_INERT in packages/architecture-lint/src/check-feature-parity.ts.
 # See ../adrs/003-endpoint-capabilities-are-ports.md
-Feature: Endpoint capabilities — rate limiting, response caching, deprecation
+Feature: Endpoint capabilities - rate limiting, response caching, deprecation
 
   As a platform operator
   I want rate limiting, caching and deprecation declared on the endpoint and
@@ -146,7 +146,7 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Then the retry's body is byte-for-byte the first response's body
     # The receipt holds the bytes the route wrote, not the value behind them.
     # Storing the handler's own object let the schema re-order the keys on the
-    # way out, so a replay answered the same values as different bytes — which
+    # way out, so a replay answered the same values as different bytes - which
     # is exactly what a caller comparing responses, or verifying a signature
     # over one, is entitled to rely on.
 
@@ -181,6 +181,14 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     And the declared body cap still refuses an oversized body before the handler runs
     And the published document names the media type the endpoint said it reads, with no schema
     And a route that declares both a raw body and a parsed one refuses to build
+
+  @unit
+  Scenario: A route that reads its own body publishes the shape a caller sends it
+    Given an endpoint that reads its own bytes also writes out the request it expects
+    When its operation is published
+    Then the shape it wrote is published under the media type it reads, as any parsed body is
+    And the description it wrote beside the shape is published with it
+    And an endpoint that writes none publishes that media type with no shape at all
 
   @integration
   Scenario: An endpoint answers outside the JSON contract when it declares what it produces

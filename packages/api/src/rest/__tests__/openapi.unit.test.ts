@@ -1,10 +1,71 @@
 /**
- * The 3.1 spelling of an exclusive bound.
+ * What one declared route publishes: the body a caller sends a route that
+ * reads its own bytes, and the 3.1 spelling of an exclusive bound.
  *
  * @see specs/api-reference/exclusive-bounds-3-1.feature
+ * @see ../../../specs/endpoint-capabilities.feature
  */
 import { describe, expect, it } from "vitest";
-import { normalizeExclusiveBounds } from "../openapi.ts";
+import { z } from "zod";
+
+import type { RestTransportDocs } from "../openapi.ts";
+import { normalizeExclusiveBounds, restRouteDocumentation } from "../openapi.ts";
+import type { RestTransportRoute } from "../declaration.ts";
+
+/** A webhook intake: the signature is over the exact characters, so nothing parses them. */
+function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
+  return {
+    method: "post",
+    path: "/intake",
+    operation: "intake",
+    version: "2026-09-09",
+    output: z.void(),
+    rawBody: { form: "text", mediaType: "application/json" },
+    ...(docs ? { docs } : {}),
+    handler: () => undefined,
+  };
+}
+
+describe("restRouteDocumentation", () => {
+  describe("given a route that reads its own body and wrote out the request it expects", () => {
+    /** @scenario "A route that reads its own body publishes the shape a caller sends it" */
+    it("publishes that shape, and its description, under the media type it reads", () => {
+      const published = restRouteDocumentation({
+        route: rawBodyRoute({
+          requestBody: {
+            description: "The event exactly as the sender wrote it.",
+            schema: z.object({ event: z.string(), sentAt: z.number().optional() }),
+          },
+        }),
+      });
+
+      expect(published.requestBody).toEqual({
+        required: true,
+        description: "The event exactly as the sender wrote it.",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { event: { type: "string" }, sentAt: { type: "number" } },
+              required: ["event"],
+            },
+          },
+        },
+      });
+    });
+  });
+
+  describe("given a route that reads its own body and wrote no request out", () => {
+    it("publishes the media type it reads with no shape at all", () => {
+      const published = restRouteDocumentation({ route: rawBodyRoute() });
+
+      expect(published.requestBody).toEqual({
+        required: true,
+        content: { "application/json": {} },
+      });
+    });
+  });
+});
 
 describe("normalizeExclusiveBounds", () => {
   describe("given a lower bound written the 3.0 way", () => {

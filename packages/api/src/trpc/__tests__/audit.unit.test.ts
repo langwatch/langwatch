@@ -15,6 +15,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   callerTraceContext,
+  deriveAuditTarget,
   handleTrpcCallLogging,
   recordTrpcCall,
   redactAuditArgs,
@@ -323,6 +324,72 @@ describe("redactAuditArgs", () => {
         expect(redactAuditArgs({ input, action: "agents.update" })).toBe(input);
         expect(redactAuditArgs({ input })).toBe(input);
       });
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The Target column: what a mutation wrote, and what kind of thing that is.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Every namespace whose mutations write a resource, and the kind each writes. */
+const NAMESPACE_KINDS: [string, string][] = [
+  ["gatewayBudgets.create", "budget"],
+  ["virtualKeys.create", "virtual_key"],
+  ["personalVirtualKeys.create", "virtual_key"],
+  ["gatewayProviders.update", "provider_binding"],
+  ["cacheRules.create", "cache_rule"],
+  ["ingestionSources.create", "ingestion_source"],
+  ["anomalyRules.create", "anomaly_rule"],
+  ["routingPolicy.update", "routing_policy"],
+  ["aiTools.create", "ai_tool_entry"],
+  ["aiToolsCatalog.create", "ai_tool_entry"],
+  ["organization.update", "organization"],
+  ["project.create", "project"],
+  ["team.create", "team"],
+  ["user.update", "user"],
+  ["analytics.savedWorkbenchCharts.create", "saved_workbench_chart"],
+  ["apiKey.create", "api_key"],
+  ["github.disconnect", "github_connection"],
+  ["license.upload", "license"],
+  ["llmModelCost.createOrUpdate", "llm_model_cost"],
+  ["modelProvider.codexSignInPoll", "model_provider"],
+  ["scimToken.generate", "scim_token"],
+  ["subscription.create", "subscription"],
+  ["webhookEndpoints.create", "webhook_endpoint"],
+];
+
+describe("deriveAuditTarget", () => {
+  describe("given a mutation that wrote a resource", () => {
+    it.each(NAMESPACE_KINDS)("records what %s wrote as a %s", (path, kind) => {
+      expect(deriveAuditTarget(path, { id: "res_1" })).toEqual({
+        targetKind: kind,
+        targetId: "res_1",
+      });
+    });
+
+    describe("when the resource is wrapped in the answer", () => {
+      it("takes the id from one level in", () => {
+        expect(deriveAuditTarget("modelProvider.update", { provider: { id: "mp_1" } })).toEqual({
+          targetKind: "model_provider",
+          targetId: "mp_1",
+        });
+      });
+    });
+  });
+
+  describe("given a namespace assembled from two features", () => {
+    // `analytics.*` is charted reads and the workbench, `analytics.savedWorkbenchCharts.*`
+    // the dashboard's saved charts: the sub-router is the honest name, the root has none.
+    it("names the sub-router that wrote, and nothing for the rest of the namespace", () => {
+      expect(deriveAuditTarget("analytics.lwql.query", { rows: [] })).toEqual({});
+    });
+  });
+
+  describe("given a mutation that wrote no resource of its own", () => {
+    it("records no kind for a translation or a blocked-limit report", () => {
+      expect(deriveAuditTarget("translate.translate", { translation: "hallo" })).toEqual({});
+      expect(deriveAuditTarget("licenseEnforcement.reportLimitBlocked", undefined)).toEqual({});
     });
   });
 });
@@ -846,7 +913,7 @@ const spanContextOf = (context: ReturnType<typeof callerTraceContext>) =>
 describe("callerTraceContext", () => {
   // `propagation.extract` delegates to the globally registered propagator, and
   // the global default is a no-op. Without this the extraction assertions would
-  // pass vacuously — every context would come back empty for the wrong reason.
+  // pass vacuously - every context would come back empty for the wrong reason.
   beforeAll(() => {
     propagation.setGlobalPropagator(new W3CTraceContextPropagator());
   });

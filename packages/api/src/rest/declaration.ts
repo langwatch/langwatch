@@ -1,7 +1,7 @@
 /**
  * `defineRestRouter`: one complete declaration per route, under a namespace and
- * a version — its sources, its answers, the door it is asked behind and the
- * handler that answers it — with the declaration-time asserts that refuse an
+ * a version - its sources, its answers, the door it is asked behind and the
+ * handler that answers it - with the declaration-time asserts that refuse an
  * incoherent route where it is written rather than where it is mounted.
  */
 import type { Actor } from "@langwatch/actor";
@@ -32,14 +32,22 @@ import {
 } from "./addressing.ts";
 import {
   defineRestMiddleware,
+  type RawBodyValue,
   type RestCachePolicy,
   type RestMultipart,
+  type RestMultipartDeclared,
   type RestMultipartFiles,
   type RestRateLimitPolicy,
+  type RestRawAnswerDeclared,
+  type RestRawBody,
+  type RestRawBodyDeclared,
+  type RestRawBodyForm,
+  type RestRawResponse,
+  type RestRawResult,
   type RestTransportMiddleware,
 } from "./request.ts";
 import type { RestIdempotency } from "./idempotency.ts";
-import type { Declined, RouteResponse } from "./response.ts";
+import type { RestTransportDocs } from "./openapi.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // `defineRestRouter`: one complete declaration per route, under a namespace and
@@ -95,8 +103,8 @@ type RouteInput<Params extends RouteSource, Query extends RouteSource, Body exte
   : SourceInput<Params> & SourceInput<Query> & SourceInput<ParsedBody<Body>>;
 /**
  * The body a route answers with, as a schema. A discriminated union is one
- * answer with several shapes — a create that either found the object or started
- * an upload — and publishes as `oneOf` with its discriminator.
+ * answer with several shapes - a create that either found the object or started
+ * an upload - and publishes as `oneOf` with its discriminator.
  */
 type OutputSchema =
   | z.ZodObject
@@ -104,18 +112,6 @@ type OutputSchema =
   | z.ZodVoid
   | z.ZodUndefined
   | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
-
-export type RestTransportDocs = Readonly<{
-  readonly summary?: string;
-  readonly description?: string;
-  /** The groups the operation is filed under in the published reference. */
-  readonly tags?: readonly string[];
-  /**
-   * The answers the operation documents beyond its declared success, built by
-   * `documentedResponses`. Merged over the generated success block.
-   */
-  readonly responses?: Readonly<Record<number, RouteResponse>>;
-}>;
 
 /**
  * What a project-scoped door knows about the caller beyond the request's own
@@ -154,7 +150,7 @@ export type RestDoorCredential = Extract<
  * Which scope tier each door's credential resolves. The one table: the type a
  * handler reads and the tier the runtime asserts both come from here, so a door
  * cannot promise one tier and hand over another. `null` is a door whose
- * credential names no tenant at all — a deployment's own shared secret.
+ * credential names no tenant at all - a deployment's own shared secret.
  */
 export const DOOR_SCOPE_TIER = {
   projectKey: "project",
@@ -254,58 +250,6 @@ type ErasedHandler = (args: never, ...facts: never[]) => unknown;
 type MiddlewareFacts<Middleware extends readonly RestTransportMiddleware[]> = {
   [Index in keyof Middleware]: z.output<Middleware[Index]["schema"]>;
 };
-// ─────────────────────────────────────────────────────────────────────────────
-// Bytes in and bytes out: the two declarations that take the framework's parser
-// and serialiser off a route, for a body that IS the evidence and an answer
-// that is not JSON.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** How a route that reads its own body wants the bytes it was sent. */
-export type RestRawBodyForm = "text" | "bytes";
-
-/**
- * A route whose body is the evidence — a signature is computed over the exact
- * characters a sender wrote, spacing included — so nothing parses it: the form
- * the handler reads it in, and the media type the document publishes for it.
- */
-export type RestRawBody = Readonly<{ form: RestRawBodyForm; mediaType: string }>;
-
-/** What the handler is handed for the form it asked for. */
-type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text" ? string : Uint8Array;
-
-/** The `Body` slot of a route that reads its own bytes. */
-export type RestRawBodyDeclared<Form extends RestRawBodyForm = RestRawBodyForm> = Readonly<{
-  rawBody: Form;
-}>;
-
-/** The `Body` slot of a route whose request carries files beside its fields. */
-export type RestMultipartDeclared<
-  Fields extends z.ZodObject = z.ZodObject,
-  Files extends RestMultipartFiles = RestMultipartFiles,
-> = Readonly<{ multipartFields: Fields; multipartFiles: Files }>;
-
-/** What a route that writes its own body publishes, and nothing of its shape. */
-export type RestRawResponse = Readonly<{ produces: readonly string[] }>;
-
-/** The body a raw answer carries; `null` for a 204, a 304, or a HEAD twin. */
-export type RestRawBodyOut = ReadableStream | Uint8Array | string | null;
-
-/** The answer of a route that writes its own bytes. */
-export type RestRawAnswer = Readonly<{
-  status?: ContentfulStatusCode;
-  headers?: Readonly<Record<string, string>>;
-  body: RestRawBodyOut;
-}>;
-
-/**
- * What a raw-answering handler returns: its own answer, a whole `Response` it
- * is forwarding, or — on an any-method route alone — a decline, which hands the
- * request to whatever is mounted after this family.
- */
-export type RestRawResult = RestRawAnswer | Response | Declined;
-
-/** The `Output` slot of a route that writes its own bytes: no schema at all. */
-export type RestRawAnswerDeclared = Readonly<{ rawAnswer: "declared" }>;
 
 /** The methods a route may name, spelled the way HTTP spells them. */
 export type RestMethodName = Uppercase<HttpMethod>;
@@ -361,7 +305,7 @@ type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAn
 
 /**
  * Where a route's permission is checked. `route` asks it at the scope the
- * route's own path names — the project or the team it addresses — rather than
+ * route's own path names - the project or the team it addresses - rather than
  * at the one the credential resolved. The parameter is the field that tier is
  * spelled with, so the tier follows the name.
  */
@@ -652,8 +596,8 @@ class RouteBuilder<
   }
 
   /**
-   * How often one caller may ask. The framework owns the key — this family,
-   * this operation, this version and the principal the door resolved — so the
+   * How often one caller may ask. The framework owns the key - this family,
+   * this operation, this version and the principal the door resolved - so the
    * store the process supplies never decides who is being limited.
    */
   withRateLimit(
@@ -1376,7 +1320,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
 
 /**
  * Opens a feature's REST surface. Each route is one complete declaration —
- * method, path, sources, permission, answer and documentation — because REST
+ * method, path, sources, permission, answer and documentation - because REST
  * shares no declaration with a browser client the way tRPC does.
  */
 export function defineRestRouter<Api>(api: FeatureApiWitness<Api>) {
@@ -1430,7 +1374,7 @@ function assertSupportedPath({
 
   // A literal family owns no prefix, so its routes ARE their addresses. A path
   // of one segment is the relative one a namespaced family would have written,
-  // and here it would hang the route off the root of the process — which is
+  // and here it would hang the route off the root of the process - which is
   // exactly what a family that declared `root` means to do.
   const segments = path.split("/").filter((segment) => segment.length > 0);
   const shortest = root ? 1 : 2;
@@ -1736,7 +1680,7 @@ function assertPermissionTarget({
 }
 
 /**
- * The several answers a route declared: at least one, and one success — or the
+ * The several answers a route declared: at least one, and one success - or the
  * two an upsert gives, which say only whether the resource was created, and so
  * must carry the very same body.
  */

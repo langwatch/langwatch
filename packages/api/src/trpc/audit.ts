@@ -41,7 +41,7 @@ export function auditScopeIds(input: unknown): {
  * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
  * recording in the audit log. `presence.*` runs every ~15s per open tab
  * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
- * buries every genuine action — project edits, deletions, role changes —
+ * buries every genuine action - project edits, deletions, role changes —
  * under a wall of `presence.update` rows. They're already silenced from
  * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
  * equivalent.
@@ -68,10 +68,12 @@ export function deriveAuditTarget(
   data: unknown,
 ): { targetKind?: string; targetId?: string } {
   if (!data || typeof data !== "object") return {};
-  const root = path.split(".")[0] ?? "";
+  const segments = path.split(".");
+  const root = segments[0] ?? "";
   // Path-prefix → targetKind. Mirrors the gateway adapter's
   // GATEWAY_AUDIT_TARGET_KINDS where applicable; new platform-side
-  // resources land here.
+  // resources land here. A namespace assembled from two features names its
+  // sub-router as well, because one kind cannot be honest for both halves.
   const TARGET_KIND_BY_ROUTER: Record<string, string> = {
     gatewayBudgets: "budget",
     virtualKeys: "virtual_key",
@@ -87,22 +89,35 @@ export function deriveAuditTarget(
     project: "project",
     team: "team",
     user: "user",
+    "analytics.savedWorkbenchCharts": "saved_workbench_chart",
+    apiKey: "api_key",
+    github: "github_connection",
+    license: "license",
+    llmModelCost: "llm_model_cost",
+    modelProvider: "model_provider",
+    scimToken: "scim_token",
+    subscription: "subscription",
+    webhookEndpoints: "webhook_endpoint",
   };
-  const targetKind = TARGET_KIND_BY_ROUTER[root];
+  // A namespace whose mutations produce no resource of their own - a
+  // translation, an analytics run, a report that a limit blocked - names no
+  // kind: an audit row would claim a target that was never written.
+  const targetKind =
+    TARGET_KIND_BY_ROUTER[segments.slice(0, 2).join(".")] ?? TARGET_KIND_BY_ROUTER[root];
   // Best-effort id extraction. Mutations return one of:
   //   1. entity directly ({ id })
   //   2. wrapped ({ source: { id } }, { budget: { id } })
   //   3. tuple with one-shot secret ({ source, ingestSecret })
-  //   4. array of entities ([{ id }, ...]) — bulk creates
-  //   5. array of wrapped ([{ invite: { id } }, ...]) — createInvites shape
-  //   6. wrapped array ({ invites: [{ id }] }) — alt bulk shape
+  //   4. array of entities ([{ id }, ...]) - bulk creates
+  //   5. array of wrapped ([{ invite: { id } }, ...]) - createInvites shape
+  //   6. wrapped array ({ invites: [{ id }] }) - alt bulk shape
   const firstId = findFirstId(data);
   return firstId ? { targetKind, targetId: firstId } : { targetKind };
 }
 
 /**
  * One entry of a named field's array: its own `id`, or the `id` of a single
- * object one level inside it — the `{ invites: [{ invite: { id } }] }` shape.
+ * object one level inside it - the `{ invites: [{ invite: { id } }] }` shape.
  */
 function findIdInArrayEntry(item: unknown): string | undefined {
   if (!item || typeof item !== "object") return undefined;
@@ -131,7 +146,7 @@ function findFirstId(value: unknown): string | undefined {
   const obj = value as Record<string, unknown>;
   if (typeof obj.id === "string") return obj.id;
   // One level of named-field walk into objects + arrays. We don't
-  // recurse arbitrarily deep — the audit Target column is best-effort,
+  // recurse arbitrarily deep - the audit Target column is best-effort,
   // and an unbounded walk would surface unrelated ids buried in nested
   // payloads.
   for (const key of Object.keys(obj)) {
@@ -281,7 +296,7 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
   const source = redacted ?? record;
 
   // Built lazily so input carrying no credentials is returned as-is rather
-  // than copied — the audit row is then the object the procedure received.
+  // than copied - the audit row is then the object the procedure received.
   const replace = (field: string, value: unknown) => {
     redacted ??= { ...source };
     redacted[field] = value;
@@ -307,8 +322,8 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
 // The request-log record for one finished call.
 //
 // Everything here is pure: the log target and the exception reporter arrive as
-// arguments, so the decisions — whether a call is recorded at all, at which
-// level, and with which status — can be asked directly.
+// arguments, so the decisions - whether a call is recorded at all, at which
+// level, and with which status - can be asked directly.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -399,14 +414,14 @@ export function handleTrpcCallLogging({
     logData.error = result.error;
 
     // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
-    // The response status hasn't been set yet at middleware time — tRPC sets
+    // The response status hasn't been set yet at middleware time - tRPC sets
     // it later when serializing the response. So we map it ourselves.
     const resolvedStatus =
       result.error instanceof TRPCError ? getHTTPStatusCodeFromError(result.error) : 500;
 
     const cause = result.error instanceof TRPCError ? result.error.cause : undefined;
     // isHandled also matches an instance from a second copy of the package,
-    // which bare `instanceof` misses — see its brand check.
+    // which bare `instanceof` misses - see its brand check.
     const handledCause = HandledError.isHandled(cause) ? cause : undefined;
 
     // A handled error states its own status, and it is the accurate one: tRPC
@@ -429,7 +444,7 @@ export function handleTrpcCallLogging({
     }
 
     // Handled errors log by fault attribution, not status: customer-fault
-    // errors are expected (warn — watched for spikes), while platform and
+    // errors are expected (warn - watched for spikes), while platform and
     // provider failures are incidents worth an error line. Unhandled errors
     // stay status-based.
     const logLevel = handledCause
@@ -471,7 +486,7 @@ export function handleTrpcCallLogging({
 const SILENCED_LOG_PATH_PREFIXES = ["presence."] as const;
 
 /**
- * tRPC call types whose volume is unbounded — SSE subscriptions emit
+ * tRPC call types whose volume is unbounded - SSE subscriptions emit
  * a "trpc call" log line per delivered message. Silencing the
  * subscription type as a whole keeps the dev log readable without
  * sprinkling per-router opt-outs across the codebase.
@@ -516,7 +531,7 @@ export function recordTrpcCall(args: Parameters<typeof handleTrpcCallLogging>[0]
  * HTTP router its tracer middleware has already extracted the same
  * `traceparent` and opened the server span executing this call, and
  * re-extracting would parent the procedure to the remote browser span instead.
- * Only the request-per-call transports are consulted — the WebSocket and SSE
+ * Only the request-per-call transports are consulted - the WebSocket and SSE
  * links hold one long-lived connection, so their `req` is the handshake.
  * See ADR-058.
  */
