@@ -45,7 +45,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
+import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
 import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent.ts";
 
@@ -63,6 +63,14 @@ type GuardVerb = {
     : never;
 }[keyof SsoConnectionGuardsService];
 
+interface SsoConnectionCommandConstructor<Schema extends ZodTypeAny> {
+  new (guards: SsoConnectionGuardsService): {
+    handle(command: Command<z.infer<Schema>>): Promise<SsoConnectionEvent[]>;
+  };
+  readonly schema: CommandSchema<z.infer<Schema>, SsoConnectionCommand["type"]>;
+  getAggregateId(payload: { connectionId: string }): string;
+}
+
 function connectionCommand<Schema extends ZodTypeAny>({
   type,
   schema,
@@ -73,7 +81,7 @@ function connectionCommand<Schema extends ZodTypeAny>({
   schema: Schema;
   description: string;
   verb: GuardVerb;
-}) {
+}): SsoConnectionCommandConstructor<Schema> {
   type Data = z.infer<Schema>;
   return class SsoConnectionCommandHandler implements CommandHandler<
     Command<Data>,

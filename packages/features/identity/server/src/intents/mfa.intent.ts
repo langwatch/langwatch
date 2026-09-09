@@ -17,7 +17,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
+import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
 import type { MfaEvent } from "../projections/mfa-enrollment-state.projection.ts";
 import { mfaEventsFor } from "../intents/mfa-events.intent.ts";
 
@@ -33,6 +33,14 @@ type GuardVerb = {
     : never;
 }[keyof MfaGuardsService];
 
+interface MfaCommandConstructor<Schema extends ZodTypeAny> {
+  new (guards: MfaGuardsService): {
+    handle(command: Command<z.infer<Schema>>): Promise<MfaEvent[]>;
+  };
+  readonly schema: CommandSchema<z.infer<Schema>, MfaCommand["type"]>;
+  getAggregateId(payload: { userId: string }): string;
+}
+
 function mfaCommand<Schema extends ZodTypeAny>({
   type,
   schema,
@@ -43,7 +51,7 @@ function mfaCommand<Schema extends ZodTypeAny>({
   schema: Schema;
   description: string;
   verb: GuardVerb;
-}) {
+}): MfaCommandConstructor<Schema> {
   type Data = z.infer<Schema>;
   return class MfaCommandHandler implements CommandHandler<Command<Data>, MfaEvent> {
     static readonly schema = defineCommandSchema(type, schema, description);

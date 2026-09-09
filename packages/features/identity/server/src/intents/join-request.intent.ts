@@ -18,7 +18,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
+import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
 import { joinRequestEventsFor } from "../intents/join-request-events.intent.ts";
 
@@ -36,6 +36,14 @@ type GuardVerb = {
     : never;
 }[keyof JoinRequestGuardsService];
 
+interface JoinRequestCommandConstructor<Schema extends ZodTypeAny> {
+  new (guards: JoinRequestGuardsService): {
+    handle(command: Command<z.infer<Schema>>): Promise<JoinRequestEvent[]>;
+  };
+  readonly schema: CommandSchema<z.infer<Schema>, JoinRequestCommand["type"]>;
+  getAggregateId(payload: { joinRequestId: string }): string;
+}
+
 function joinRequestCommand<Schema extends ZodTypeAny>({
   type,
   schema,
@@ -46,7 +54,7 @@ function joinRequestCommand<Schema extends ZodTypeAny>({
   schema: Schema;
   description: string;
   verb: GuardVerb;
-}) {
+}): JoinRequestCommandConstructor<Schema> {
   type Data = z.infer<Schema>;
   return class JoinRequestCommandHandler implements CommandHandler<
     Command<Data>,

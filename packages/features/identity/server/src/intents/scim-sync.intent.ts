@@ -13,7 +13,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import type { ZodTypeAny, z } from "zod";
-import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
+import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
 import type { ScimSyncEvent } from "../projections/scim-sync-state.projection.ts";
 import { scimSyncEventsFor } from "../intents/scim-sync-events.intent.ts";
 
@@ -31,6 +31,14 @@ type GuardVerb = {
     : never;
 }[keyof ScimSyncGuardsService];
 
+interface ScimSyncCommandConstructor<Schema extends ZodTypeAny> {
+  new (guards: ScimSyncGuardsService): {
+    handle(command: Command<z.infer<Schema>>): Promise<ScimSyncEvent[]>;
+  };
+  readonly schema: CommandSchema<z.infer<Schema>, ScimSyncCommand["type"]>;
+  getAggregateId(payload: { scimSyncId: string }): string;
+}
+
 function scimSyncCommand<Schema extends ZodTypeAny>({
   type,
   schema,
@@ -41,7 +49,7 @@ function scimSyncCommand<Schema extends ZodTypeAny>({
   schema: Schema;
   description: string;
   verb: GuardVerb;
-}) {
+}): ScimSyncCommandConstructor<Schema> {
   type Data = z.infer<Schema>;
   return class ScimSyncCommandHandler implements CommandHandler<Command<Data>, ScimSyncEvent> {
     static readonly schema = defineCommandSchema(type, schema, description);
