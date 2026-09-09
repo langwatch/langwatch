@@ -37,7 +37,8 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
  * digits.
  */
 function hasSqlState(error: unknown, sqlState: string): boolean {
-  if (typeof error !== "object" || error == null) return false;
+  if (error === null) return false;
+  if (typeof error !== "object") return false;
   if ((error as { code?: unknown }).code === sqlState) return true;
   const meta = (error as { meta?: { code?: unknown } }).meta;
   if (meta?.code === sqlState) return true;
@@ -56,7 +57,8 @@ function hasSqlState(error: unknown, sqlState: string): boolean {
  * lets a callsite read this as its own index and nothing else.
  */
 export function isUniqueViolation(error: unknown): boolean {
-  if (typeof error !== "object" || error == null) return false;
+  if (error === null) return false;
+  if (typeof error !== "object") return false;
   if ((error as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION)
     return true;
   return hasSqlState(error, UNIQUE_VIOLATION);
