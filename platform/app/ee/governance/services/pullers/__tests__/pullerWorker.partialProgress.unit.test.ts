@@ -252,7 +252,6 @@ describe("a pull run that reported errors", () => {
        * hold on a single run while the source still never moves, because what
        * stalled it was the NEXT run re-reading the same object. So the next run
        * is what is asserted: it must start after the bad file, not at it.
-       *
        */
       /** @scenario "Malformed file skipped, run continues" */
       it("does not re-read the same file on the next run, so the source is not stalled", async () => {
