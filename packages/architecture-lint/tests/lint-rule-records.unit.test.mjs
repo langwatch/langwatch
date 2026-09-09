@@ -223,6 +223,28 @@ describe("given the workspace-wide oxlint rules", () => {
       );
     });
   });
+
+  describe("when the class-A migrated built-ins are read", () => {
+    /** @scenario "The nested ternary rule is enabled workspace-wide" */
+    it("enables the built-in no-nested-ternary rule", () => {
+      expect(workspaceRules).toMatch(/"no-nested-ternary":\s*"error"/);
+    });
+
+    /** @scenario "The ambient-undefined rule is not in the workspace-wide config" */
+    it("does not enable the built-in no-undefined rule", () => {
+      expect(workspaceRules).not.toMatch(/"no-undefined":/);
+    });
+
+    /** @scenario "The explicit-any rule is not in the workspace-wide config" */
+    it("does not enable the built-in typescript/no-explicit-any rule", () => {
+      expect(workspaceRules).not.toMatch(/"typescript\/no-explicit-any":/);
+    });
+
+    /** @scenario "The assertion-coverage rule carries no explicit config line" */
+    it("does not add an explicit vitest/expect-expect line", () => {
+      expect(workspaceRules).not.toMatch(/"vitest\/expect-expect":/);
+    });
+  });
 });
 
 describe("given the formatter configuration", () => {

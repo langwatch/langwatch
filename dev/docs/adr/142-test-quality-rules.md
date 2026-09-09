@@ -36,8 +36,6 @@ before the user has done anything wrong.
 
 | Rule | Layer | Meaning |
 | --- | --- | --- |
-| `no-test-without-assertion` | ast-grep | A test with no `expect(...)` is a smoke test wearing a unit test's name. |
-| `no-empty-test` | ast-grep | An empty body is `it.todo(...)`, so the runner counts it as outstanding rather than green. |
 | `no-tautological-assertion` | ast-grep | Comparing an expression to itself, or a literal to the same literal, tests the assertion library. |
 | `use-action-based-test-name` | ast-grep | `it("checks local first")`, not `it("should check local first")`. |
 | `require-bdd-describe-context` | ast-grep | A nested `describe` states a condition: `given <precondition>` or `when <action>`. |
@@ -45,11 +43,20 @@ before the user has done anything wrong.
 | `no-form-disable-on-isvalid` | ast-grep | Disable a submit button while the request is in flight, not on form validity. |
 | `test-quality` | architecture-lint | Tests with no real assertion, duplicated bodies, a mocked subject, or an empty snapshot, across the workspace. |
 
-`vitest/expect-expect` is enabled through the config's `vitest` plugin and
-covers the first two shapes as well, which makes `no-test-without-assertion`
-and `no-empty-test` deletion candidates. ADR-135 records why they are still
-here: the ast-grep rules are what the review bot quotes back on the diff, and
-a rule that only fails CI arrives after the test was written.
+`no-test-without-assertion` and `no-empty-test` were ast-grep rules that
+duplicated `vitest/expect-expect`, a built-in already enabled at oxlint's own
+default (warn) through the config's `vitest` plugin, before and after this
+change. ADR-135's class-A migration deleted both ast-grep rules; the built-in
+was measured, not additionally adopted, because no baseline rows exist for it
+to re-key and `pnpm lint:oxlint --quiet` makes its "warn" severity invisible
+either way - the built-in flags 17 files beyond the three the two ast-grep
+rules together found (all of which it also finds), so nothing that used to
+fail now passes silently, but nothing newly fails either, since the severity
+and enablement are unchanged from before this migration. `vitest/expect-expect`
+carries no row here because it is advisory-only under `--quiet` and was never
+made a required rule of record. The trade recorded in ADR-135 still applies
+going forward: the review bot no longer quotes these two shapes back on the
+diff, only oxlint's own flat message.
 
 `vitest/valid-title` is not a substitute for `use-action-based-test-name`. Its
 `mustNotMatch` option did not fire on `it("should ...")` in the pinned oxlint

@@ -44,7 +44,7 @@ in here somewhere".
 ## Decision
 
 A rule lives in the lowest layer that can express it (ADR-135). Everything in
-this family needs the AST, so it is the plugin, except the four ast-grep rules,
+this family needs the AST, so it is the plugin, except the two ast-grep rules,
 which exist there because CodeRabbit reads them back during review.
 
 | Rule | Layer | Meaning |
@@ -58,7 +58,6 @@ which exist there because CodeRabbit reads them back during review.
 | `langwatch/zod-object-composition` | plugin | Compose Zod objects by spreading `.shape`, and use `.safeExtend()` when refinements must survive. |
 | `no-identity-function` | ast-grep | A named function that returns its own argument is a name, an import and a call for no behaviour. |
 | `require-boolean-name-prefix` | ast-grep | A boolean is named `is` / `has` / `should` / `can` / `will`, or a domain equivalent. |
-| `no-try-prefixed-name` | ast-grep | The `try` prefix again, as a review comment. Duplicates `langwatch/fallible-result-naming`'s `tryPrefix`. |
 
 `langwatch/fallible-result-naming` reports four separate message ids rather
 than one, because the fix differs: no explicit result type, nullable without
@@ -76,7 +75,6 @@ oxlint baseline carries. That is the intended relationship: the rule holds the
 line for new code, the baseline records the debt with a measured date, and the
 ledger may only shrink.
 
-`no-try-prefixed-name` is a straight duplicate of an enabled plugin rule and is
-a deletion candidate recorded in ADR-135. It is kept for now because the
-ast-grep rules are what the review bot quotes, and a rule that only fails CI
-teaches nobody at the point they wrote the name.
+`no-try-prefixed-name` was a straight duplicate of `langwatch/fallible-result-naming`'s
+`tryPrefix` message id and was deleted per ADR-135's follow-ups, with no
+replacement: the enabled plugin rule already carries the check.

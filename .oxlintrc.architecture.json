@@ -15,7 +15,7 @@
     "complexity": ["error", { "max": 25 }],
     "langwatch/cognitive-complexity": ["error", { "max": 15 }],
     "langwatch/condition-shape": "error",
-    "langwatch/nested-ternary": "error",
+    "no-nested-ternary": "error",
     "langwatch/api-context-services": "error",
     "langwatch/comment-block-size": "error",
     "langwatch/comment-block-size-warning": "warn",
@@ -131,7 +131,7 @@
       ],
       "rules": {
         // -- Type-unsafety escape hatches ----------------------------
-        // `any` is already covered by dev/lint/ast-grep no-explicit-any.
+        // `any` is already covered workspace-wide by typescript/no-explicit-any above.
         // These are the other ways a type gets thrown away quietly.
         //
         // ban-ts-comment is the important one: it bans bare `@ts-ignore`
@@ -212,7 +212,6 @@
     //                                     (ordering, backpressure), which a
     //                                     linter cannot tell from a missed
     //                                     batch
-    //   no-nested-ternary                 258 in 140 files, no clean role
     //   no-eq-null                        226   this is the `== null` idiom,
     //                                     rejected on principle, not on count
     //   max-params (max 4)                 85 in 69 files; at max 3 it is 241.
@@ -293,16 +292,20 @@
       }
     },
     // ------------------------------------------------------------------
-    // GENERATED, max-depth and complexity (native oxlint rules cannot read
-    // packages/architecture-lint/src/oxlint-baseline.json the way a plugin
-    // rule does). Regenerate with:
+    // GENERATED, max-depth, complexity and no-nested-ternary (native oxlint
+    // rules cannot read packages/architecture-lint/src/oxlint-baseline.json
+    // the way a plugin rule does). Regenerate with:
     //   node packages/architecture-lint/src/generate-native-baseline-overrides.mjs
-    // and replace the two overrides below with its output. Do not hand-edit
+    // and replace the three overrides below with its output. Do not hand-edit
     // the file lists; edit the baseline and regenerate instead. This must
-    // stay the LAST override for each of these two rules -- oxlint applies
+    // stay the LAST override for each of these rules -- oxlint applies
     // overrides in array order, later wins, and the blanket test-file
     // threshold overrides above (complexity max 40, cognitive-complexity
     // max 40) would otherwise shadow this one for a baselined test file.
+    // no-nested-ternary joined this set under ADR-135/ADR-140's class-A
+    // migration: langwatch/nested-ternary, the plugin rule that used to read
+    // the baseline directly, was deleted and its 342 baseline entries were
+    // re-keyed from nested-ternary| to no-nested-ternary|.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -511,6 +514,362 @@
       ],
       "rules": {
         "complexity": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",
+        "apps/api/src/app/api-authoring-rest.composition.ts",
+        "apps/api/src/app/api-gateway.composition.ts",
+        "apps/api/src/app/api-trace-ingest.composition.ts",
+        "apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts",
+        "apps/api/src/features/langy/langy.composition.ts",
+        "apps/api/src/features/organization/__tests__/tenant-features.composition.integration.test.ts",
+        "apps/api/src/features/role/__tests__/role.composition.integration.test.ts",
+        "apps/api/src/features/scenario/__tests__/scenario.composition.integration.test.ts",
+        "apps/api/src/features/stored-object/__tests__/product-storage.composition.integration.test.ts",
+        "apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
+        "apps/ui/e2e/langy/scenario-transcript.ts",
+        "apps/ui/src/behavior/ui-scope-resolution.ts",
+        "apps/ui/src/features/api-key/ui/sections/api-key-host.tsx",
+        "apps/ui/src/features/authorize/ui/sections/authorize-host.tsx",
+        "apps/ui/src/features/onboarding/ui/sections/onboarding-host.tsx",
+        "apps/ui/src/ui/elements/ui-error-actions.tsx",
+        "apps/worker/src/app/worker-production.composition.ts",
+        "enterprise/modules/billing/contract/src/plan-types.ts",
+        "enterprise/modules/billing/server/src/__tests__/planProvider.unit.test.ts",
+        "enterprise/modules/billing/web/src/model/billing-plans.ts",
+        "enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
+        "enterprise/modules/billing/web/src/screens/billing/usage.screen.tsx",
+        "enterprise/modules/billing/web/src/surfaces/seat-proration-preview/seat-proration-preview.tsx",
+        "enterprise/modules/governance/contract/src/persona-home.ts",
+        "enterprise/modules/governance/server/src/adapters/databricks-genie-puller.adapter.ts",
+        "enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-source-activity.repository.ts",
+        "enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx",
+        "enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ingestion-templates-editor.tsx",
+        "enterprise/modules/governance/web/src/features/ai-tools/ui/sections/tool-catalog-editor.tsx",
+        "enterprise/modules/governance/web/src/features/ottl/ui/elements/ottl-editor.tsx",
+        "enterprise/modules/governance/web/src/features/source-events/behavior/use-source-events-pager.ts",
+        "enterprise/modules/governance/web/src/features/source-events/ui/sections/source-events-table.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-anomaly-rules.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-ingestion-source.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-people.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-team.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-teams.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-user.screen.tsx",
+        "enterprise/modules/governance/web/src/screens/governance/governance-users.screen.tsx",
+        "enterprise/modules/licensing/web/src/ui/elements/license-details-card.tsx",
+        "enterprise/modules/scim/server/src/repositories/prisma/scim.repository.ts",
+        "enterprise/modules/scim/server/src/services/scim-grants.service.ts",
+        "enterprise/modules/scim/server/src/transport/api-rest/__tests__/scim-webhook-intake.api.unit.test.ts",
+        "mcp/typescript/src/langwatch-api.ts",
+        "mcp/typescript/src/tools/create-annotation.ts",
+        "mcp/typescript/src/tools/get-experiment-results.ts",
+        "mcp/typescript/src/tools/list-annotations.ts",
+        "mcp/typescript/src/tools/list-api-keys.ts",
+        "mcp/typescript/src/tools/list-simulation-runs.ts",
+        "mcp/typescript/src/utils/format-evaluations.ts",
+        "modules/agent/server/src/services/connected-agent-parameter-spec.service.ts",
+        "modules/agent/web/src/features/management/ui/blocks/agent-push-dialog.tsx",
+        "modules/analytics/contract/src/analytics.precondition-matchers.ts",
+        "modules/analytics/contract/src/analytics.timeseries.ts",
+        "modules/annotation/server/src/repositories/prisma/prisma.annotation-queue.repository.ts",
+        "modules/annotation/server/src/transport/api-trpc/annotation.api.ts",
+        "modules/annotation/web/src/model/annotation-export.ts",
+        "modules/annotation/web/src/ui/blocks/annotation-score-editor.tsx",
+        "modules/annotation/web/src/ui/sections/annotation-list.tsx",
+        "modules/api-key/server/src/app/api-key.app.ts",
+        "modules/api-key/server/src/services/api-key-grant-policy.service.ts",
+        "modules/auth/web/src/behavior/auth-client.tsx",
+        "modules/auth/web/src/screens/auth/signup.screen.tsx",
+        "modules/auth/web/src/ui/sections/sign-up-credential-form.tsx",
+        "modules/authz/contract/src/authz.commands.ts",
+        "modules/authz/contract/src/walk.ts",
+        "modules/authz/web/src/surfaces/scope-picker/provider-scope-chips.tsx",
+        "modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+        "modules/authz/web/src/surfaces/scope-picker/scope-filter-address.ts",
+        "modules/authz/web/src/surfaces/scope-picker/scope-filter.tsx",
+        "modules/automation/contract/src/templating/template-context.ts",
+        "modules/automation/server/src/processes/trigger-settlement.process.ts",
+        "modules/automation/web/src/features/authoring/__tests__/provider-parity.unit.test.ts",
+        "modules/automation/web/src/features/authoring/model/condition-query.ts",
+        "modules/automation/web/src/features/authoring/ui/blocks/cadence-section.tsx",
+        "modules/automation/web/src/features/authoring/ui/sections/automation-drawer.tsx",
+        "modules/automation/web/src/features/authoring/ui/sections/delivery-picker.tsx",
+        "modules/automation/web/src/features/authoring/ui/sections/main-section-list.tsx",
+        "modules/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
+        "modules/automation/web/src/features/authoring/ui/sections/subject-section.tsx",
+        "modules/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
+        "modules/automation/web/src/features/liquid-editor/model/liquid-json-substitution.ts",
+        "modules/automation/web/src/model/relative-time.ts",
+        "modules/automation/web/src/screens/automations/automations.screen.tsx",
+        "modules/automation/web/src/screens/automations/unsubscribe.screen.tsx",
+        "modules/coding-agent/server/src/projections/coding-agent-session-state.projection.ts",
+        "modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts",
+        "modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
+        "modules/coding-agent/server/src/subscribers/coding-agent-metric-facts-dispatch.subscriber.ts",
+        "modules/coding-agent/web/src/pull-request-detail-drawer.tsx",
+        "modules/coding-agent/web/src/trace/session-view.tsx",
+        "modules/coding-agent/web/src/trace/terminal-session.ts",
+        "modules/coding-agent/web/src/trace/terminal-view.tsx",
+        "modules/data-privacy/web/src/model/data-privacy-rule-config.ts",
+        "modules/data-privacy/web/src/ui/blocks/privacy-rule-drawer.tsx",
+        "modules/data-retention/server/src/repositories/prisma/prisma.data-retention-directory.repository.ts",
+        "modules/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
+        "modules/data-retention/web/src/ui/blocks/retention-and-usage-card.tsx",
+        "modules/data-retention/web/src/ui/sections/data-retention.screen.tsx",
+        "modules/dataset/server/src/adapters/dataset-content.adapter.ts",
+        "modules/dataset/server/src/rules/dataset-selection.rules.ts",
+        "modules/entitlement/server/src/services/usage-meter-policy.service.ts",
+        "modules/entitlement/server/src/services/usage-stats.service.ts",
+        "modules/evaluation/server/src/ports/__tests__/support/evaluation-execution.fixtures.ts",
+        "modules/evaluation/server/src/repositories/clickhouse/evaluation-run-write.repository.ts",
+        "modules/evaluation/server/src/rules/evaluation-causality.rules.ts",
+        "modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
+        "modules/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
+        "modules/evaluator/contract/src/evaluator.ts",
+        "modules/evaluator/server/src/services/evaluator-code.service.ts",
+        "modules/evaluator/server/src/services/evaluator.service.ts",
+        "modules/evaluator/web/src/ui/blocks/evaluator-list-item.tsx",
+        "modules/evaluator/web/src/ui/blocks/evaluator-type-picker.tsx",
+        "modules/evaluator/web/src/ui/sections/checks/check-config-form.tsx",
+        "modules/evaluator/web/src/ui/sections/checks/dynamic-zod-form.tsx",
+        "modules/evaluator/web/src/ui/sections/checks/evaluation-manual-integration.tsx",
+        "modules/evaluator/web/src/ui/sections/checks/try-it-out.tsx",
+        "modules/evaluator/web/src/ui/sections/evaluation-edit.screen.tsx",
+        "modules/evaluator/web/src/ui/sections/evaluations/online-evaluation-drawer.tsx",
+        "modules/evaluator/web/src/ui/sections/evaluator-list-drawer.tsx",
+        "modules/evaluator/web/src/ui/sections/evaluator-push-to-copies-dialog.tsx",
+        "modules/experiment/contract/src/workbench/actions/__tests__/manifest.unit.test.ts",
+        "modules/experiment/contract/src/workbench/actions/projection.ts",
+        "modules/experiment/server/src/processes/experiment-connected-target.process.ts",
+        "modules/experiment/server/src/services/experiment-cell-plan.service.ts",
+        "modules/experiment/server/src/services/experiment-execution-data.service.ts",
+        "modules/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
+        "modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
+        "modules/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
+        "modules/experiment/web/src/ui/elements/experiments/batch-evaluation.tsx",
+        "modules/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
+        "modules/experiment/web/src/ui/elements/navigation-footer.tsx",
+        "modules/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+        "modules/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
+        "modules/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+        "modules/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-header.tsx",
+        "modules/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+        "modules/feature-flag/web/src/experiments-dialog.tsx",
+        "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts",
+        "modules/gateway/server/src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
+        "modules/gateway/server/src/rules/gateway-config-wire.rules.ts",
+        "modules/gateway/server/src/services/gateway-applicable-budgets.service.ts",
+        "modules/gateway/server/src/services/gateway-budget-overview.service.ts",
+        "modules/gateway/server/src/services/gateway-usage.service.ts",
+        "modules/gateway/server/src/services/gateway.service.ts",
+        "modules/gateway/server/src/services/virtual-key-provisioning.service.ts",
+        "modules/gateway/web/src/features/budgets/ui/sections/budget-create-drawer.tsx",
+        "modules/gateway/web/src/features/routing-policies/behavior/use-routing-policy-drawer-form.ts",
+        "modules/gateway/web/src/features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx",
+        "modules/gateway/web/src/features/virtual-keys/ui/blocks/virtual-key-provider-access-section.tsx",
+        "modules/gateway/web/src/features/virtual-keys/ui/elements/virtual-key-expiration-section.tsx",
+        "modules/gateway/web/src/features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx",
+        "modules/gateway/web/src/features/webhooks/ui/sections/webhook-deliveries-drawer.tsx",
+        "modules/gateway/web/src/model/format-time-ago.ts",
+        "modules/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-budgets.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-cache-rules.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-guardrails.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-routing-policies.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+        "modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+        "modules/github/web/src/ui/sections/integrations.screen.tsx",
+        "modules/hosted-mcp/server/src/transport/api-mcp/__tests__/hosted-mcp.api.integration.test.ts",
+        "modules/langy/contract/src/cards/digest.ts",
+        "modules/langy/contract/src/cards/handled-error.ts",
+        "modules/langy/contract/src/event-sourcing/folds/turn-fold.ts",
+        "modules/langy/server/src/adapters/langy-effect.adapter.ts",
+        "modules/langy/server/src/adapters/langy-turn-relay.adapter.ts",
+        "modules/langy/server/src/services/langy-local-session.service.ts",
+        "modules/langy/server/src/services/langy-turn-preparation.service.ts",
+        "modules/langy/server/src/services/langy-turn-start.service.ts",
+        "modules/langy/server/src/subscribers/langy-conversation.subscriber.ts",
+        "modules/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
+        "modules/log/server/src/adapters/canonical-log.adapter.ts",
+        "modules/metric/server/src/adapters/metric-attributes.adapter.ts",
+        "modules/metric/server/src/adapters/metric-values.adapter.ts",
+        "modules/model-provider/contract/src/model-provider-display-names.ts",
+        "modules/model-provider/server/src/adapters/codex-oauth.model-provider-token-refresher.adapter.ts",
+        "modules/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts",
+        "modules/model-provider/server/src/rules/litellm-audio-prices.rules.ts",
+        "modules/model-provider/server/src/services/model-provider-command.service.ts",
+        "modules/monitor/web/src/ui/elements/online-evaluation-performance-preview.tsx",
+        "modules/monitor/web/src/ui/sections/online-evaluations.screen.tsx",
+        "modules/navigation/web/src/ui/sections/command-palette.tsx",
+        "modules/onboarding/web/src/screens/onboarding/project.screen.tsx",
+        "modules/onboarding/web/src/ui/blocks/onboarding-container.tsx",
+        "modules/onboarding/web/src/ui/elements/shared/selectable-icon-card.tsx",
+        "modules/onboarding/web/src/ui/sections/via-platform-screen.tsx",
+        "modules/onboarding/web/src/ui/sections/welcome-screen.tsx",
+        "modules/ops/server/src/transport/api-rest/admin.api.ts",
+        "modules/organization/server/src/repositories/__tests__/prisma.organization-membership.repository.purge.unit.test.ts",
+        "modules/organization/server/src/services/organization-group-binding.service.ts",
+        "modules/organization/web/src/screens/organization/audit-log.screen.tsx",
+        "modules/organization/web/src/screens/organization/teams.screen.tsx",
+        "modules/organization/web/src/ui/sections/group-detail-dialog.tsx",
+        "modules/organization/web/src/ui/sections/member-detail-dialog.tsx",
+        "modules/project/web/src/screens/home/briefing/attention-inbox.ts",
+        "modules/project/web/src/screens/home/briefing/components/home-overview-card.tsx",
+        "modules/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
+        "modules/project/web/src/screens/home/components/home-page-banners.tsx",
+        "modules/project/web/src/screens/home/components/langy-home-hero.tsx",
+        "modules/project/web/src/screens/home/components/traces-overview.tsx",
+        "modules/project/web/src/screens/home/home.screen.tsx",
+        "modules/prompt/web/src/model/prompt-version-diff.ts",
+        "modules/scenario/server/src/adapters/finish-run.adapter.ts",
+        "modules/scenario/server/src/adapters/prompt-template.adapter.ts",
+        "modules/scenario/server/src/adapters/serialized-connected-agent.adapter.ts",
+        "modules/scenario/server/src/services/scenario-prefetch-completion.service.ts",
+        "modules/scenario/web/src/behavior/agent-testing/use-agent-testing-routing.ts",
+        "modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
+        "modules/scenario/web/src/behavior/suites/use-suite-routing.ts",
+        "modules/scenario/web/src/model/agent-testing/run/parameter-line.ts",
+        "modules/scenario/web/src/model/scenario-message-display.ts",
+        "modules/scenario/web/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
+        "modules/scenario/web/src/ui/elements/media-part-placeholder.tsx",
+        "modules/scenario/web/src/ui/elements/scenario-table.tsx",
+        "modules/scenario/web/src/ui/elements/simulation-console/status-display.tsx",
+        "modules/scenario/web/src/ui/sections/agent-testing/results/grouped-rows-table.tsx",
+        "modules/scenario/web/src/ui/sections/agent-testing/results/results-list.tsx",
+        "modules/scenario/web/src/ui/sections/agent-testing/results/run-plan-run-results.tsx",
+        "modules/scenario/web/src/ui/sections/agent-testing/run/target-section.tsx",
+        "modules/scenario/web/src/ui/sections/agent-testing/run/use-compare-rows.ts",
+        "modules/scenario/web/src/ui/sections/agents/__tests__/agent-editor-test-panel.integration.test.tsx",
+        "modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
+        "modules/scenario/web/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+        "modules/scenario/web/src/ui/sections/shared/ai-create-modal.tsx",
+        "modules/scenario/web/src/ui/sections/simulations/scenario-run-detail-drawer.tsx",
+        "modules/scenario/web/src/ui/sections/suites/run-history-panel.tsx",
+        "modules/scenario/web/src/ui/sections/suites/simulations-page.tsx",
+        "modules/secret/web/src/ui/sections/secrets-screen.tsx",
+        "modules/share/server/src/services/share.service.ts",
+        "modules/share/web/src/share-links-list.tsx",
+        "modules/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
+        "modules/stored-object/server/src/adapters/stored-object-storage.port.adapter.ts",
+        "modules/suite/contract/src/target-key.ts",
+        "modules/suite/web/src/model/run-history-transforms.ts",
+        "modules/suite/web/src/ui/elements/pickers/target-picker.tsx",
+        "modules/suite/web/src/ui/elements/runs/message-preview.tsx",
+        "modules/suite/web/src/ui/elements/runs/run-metrics-summary.tsx",
+        "modules/suite/web/src/ui/elements/runs/simulation-card.tsx",
+        "modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
+        "modules/topic/web/src/ui/sections/topic-clustering.screen.tsx",
+        "modules/trace/contract/src/trace-collector-common.ts",
+        "modules/trace/server/src/adapters/trace-query-evaluation.adapter.ts",
+        "modules/trace/server/src/repositories/clickhouse/__tests__/trace-full-record.repository.unit.test.ts",
+        "modules/trace/server/src/repositories/clickhouse/trace-full-record.mapper.ts",
+        "modules/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+        "modules/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts",
+        "modules/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx",
+        "modules/trace/web/src/ui/sections/explorer/filter-sidebar/attribute-value-row.tsx",
+        "modules/trace/web/src/ui/sections/explorer/filter-sidebar/event-drilldown.tsx",
+        "modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-row.tsx",
+        "modules/trace/web/src/ui/sections/explorer/filter-sidebar/section-renderer.tsx",
+        "modules/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+        "modules/trace/web/src/ui/sections/traces/span-details.tsx",
+        "modules/trace/web/src/ui/sections/traces/traces-mapping.tsx",
+        "modules/user/server/src/transport/api-trpc/user.api.ts",
+        "modules/user/web/src/ui/sections/devices-panel.tsx",
+        "modules/user/web/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+        "modules/user/web/src/ui/sections/personal-workspace/personal-sessions.screen.tsx",
+        "modules/user/web/src/ui/sections/personal-workspace/project-pull-requests.screen.tsx",
+        "modules/user/web/src/ui/sections/personal-workspace/project-sessions.screen.tsx",
+        "modules/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
+        "modules/workflow/server/src/transport/api-trpc/workflow.api.ts",
+        "modules/workflow/web/src/behavior/workflow-store.ts",
+        "modules/workflow/web/src/model/code/python-provider.code-actions.ts",
+        "modules/workflow/web/src/ui/elements/code/liquid-condition-editor.tsx",
+        "modules/workflow/web/src/ui/sections/executable-panel/execution-output-panel.tsx",
+        "modules/workflow/web/src/ui/sections/optimization_studio/evaluate.tsx",
+        "modules/workflow/web/src/ui/sections/optimization_studio/history.tsx",
+        "modules/workflow/web/src/ui/sections/optimization_studio/optimization-studio.tsx",
+        "modules/workflow/web/src/ui/sections/optimization_studio/optimize.tsx",
+        "modules/workflow/web/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
+        "modules/workflow/web/src/ui/sections/workflow-autosave.tsx",
+        "modules/workflow/web/src/ui/sections/workflow-node-execution.tsx",
+        "modules/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
+        "packages/api/src/rest/family-error-handler.ts",
+        "packages/api/src/rest/pipeline.ts",
+        "packages/api/src/rest/security/rest-api-service.ts",
+        "packages/api/src/trpc/audit.ts",
+        "packages/api/src/trpc/runtime.ts",
+        "packages/api/src/trpc/trpc-call-logging.ts",
+        "packages/api/src/trpc/trpc-error-formatter.ts",
+        "packages/api/src/trpc/trpc-service-builder.ts",
+        "packages/architecture-lint/src/cli.ts",
+        "packages/architecture-lint/src/policies/api-transport.ts",
+        "packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
+        "packages/architecture-lint/src/policies/quality/composed-exports.ts",
+        "packages/design-system/src/components/delayed.tsx",
+        "packages/design-system/src/components/messages/message-role-label.tsx",
+        "packages/design-system/src/components/toaster.tsx",
+        "packages/eventing/src/pipeline/staticBuilder.ts",
+        "packages/eventing/src/process-manager/processManagerService.ts",
+        "packages/eventing/src/projections/eventTypeTransforms.ts",
+        "packages/eventing/src/projections/foldProjectionExecutor.ts",
+        "packages/eventing/src/projections/projectionRouter.ts",
+        "packages/eventing/src/services/queues/queueManager.ts",
+        "packages/eventing/src/stores/repositories/eventRepositoryMemory.ts",
+        "packages/group-queue/src/groupQueue.ts",
+        "packages/handled-error/src/presentation.ts",
+        "packages/handled-error/src/read-handled-error.ts",
+        "packages/mail/src/templates/onboarding/highlight.ts",
+        "packages/test-harness/src/mock-specifier-scan.ts",
+        "sdks/typescript/src/agent/protocol.ts",
+        "sdks/typescript/src/cli/commands/analytics/query.ts",
+        "sdks/typescript/src/cli/commands/analytics/timeseriesShape.ts",
+        "sdks/typescript/src/cli/commands/annotations/get.ts",
+        "sdks/typescript/src/cli/commands/annotations/list.ts",
+        "sdks/typescript/src/cli/commands/api-keys/list.ts",
+        "sdks/typescript/src/cli/commands/charts/run.ts",
+        "sdks/typescript/src/cli/commands/dataset/get.ts",
+        "sdks/typescript/src/cli/commands/dataset/records-list.ts",
+        "sdks/typescript/src/cli/commands/dataset/upload.ts",
+        "sdks/typescript/src/cli/commands/experiment/results.ts",
+        "sdks/typescript/src/cli/commands/experiment/status.ts",
+        "sdks/typescript/src/cli/commands/gateway-budgets/list.ts",
+        "sdks/typescript/src/cli/commands/ingestion/context.ts",
+        "sdks/typescript/src/cli/commands/ingestion/install.ts",
+        "sdks/typescript/src/cli/commands/langy/__tests__/approval.unit.test.ts",
+        "sdks/typescript/src/cli/commands/langy/__tests__/policy.unit.test.ts",
+        "sdks/typescript/src/cli/commands/push.ts",
+        "sdks/typescript/src/cli/commands/scenarios/update.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+        "sdks/typescript/src/cli/commands/simulation-runs/list.ts",
+        "sdks/typescript/src/cli/commands/skills/installer.ts",
+        "sdks/typescript/src/cli/commands/spend-events/list.ts",
+        "sdks/typescript/src/cli/commands/ui/call.ts",
+        "sdks/typescript/src/cli/commands/virtual-keys/_shared.ts",
+        "sdks/typescript/src/cli/commands/virtual-keys/update.ts",
+        "sdks/typescript/src/cli/commands/webhooks/deliveries.ts",
+        "sdks/typescript/src/cli/daemon/execution.ts",
+        "sdks/typescript/src/cli/daemon/server.ts",
+        "sdks/typescript/src/cli/utils/errorSuggestions.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/cli-api.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/__tests__/session-api.unit.test.ts",
+        "sdks/typescript/src/cli/utils/governance/codex-rollout.ts",
+        "sdks/typescript/src/cli/utils/governance/login-flow.ts",
+        "sdks/typescript/src/cli/utils/governance/wrapper-mode.ts",
+        "sdks/typescript/src/cli/utils/output.ts",
+        "sdks/typescript/src/cli/utils/outputScope.ts",
+        "sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/comparison-harness.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.e2e.test.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.origin.integration.test.ts",
+        "sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.trace.e2e.test.ts",
+        "sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts"
+      ],
+      "rules": {
+        "no-nested-ternary": "off"
       }
     },
 
@@ -743,8 +1102,37 @@
     //   no-useless-assignment       25
     //   vitest/no-disabled-tests    43  (noSkippedTests, Biome warn)
     //   jest/no-standalone-expect  135  (noMisplacedAssertion, Biome warn)
-    //   typescript/no-explicit-any 1395  already covered by
-    //                                   dev/lint/ast-grep no-explicit-any
+    // ------------------------------------------------------------------
+    //
+    // ADR-135/ADR-140's class-A migration deleted langwatch/nested-ternary,
+    // langwatch/runtime-undefined, and the ast-grep no-explicit-any /
+    // no-empty-test / no-test-without-assertion trio in favour of their
+    // oxlint built-in equivalents, with three different outcomes:
+    //
+    //   no-nested-ternary   moved ONTO this list's opposite -- the "rules"
+    //                       block above -- because its 342 baseline entries
+    //                       (previously keyed nested-ternary|) re-keyed
+    //                       cleanly to no-nested-ternary| and the native-rule
+    //                       override below (generated the same way as
+    //                       max-depth and complexity) suppresses every
+    //                       baselined file, leaving zero new findings.
+    //   no-undefined        measured at 11,568 findings across 3,591 files
+    //                       (runtime-undefined was deleted having never been
+    //                       wired into any config, so every one of those is
+    //                       new) and NOT adopted. No baseline entries exist
+    //                       for it to re-key, and a register that size is
+    //                       exactly the "hand-written override" the baseline
+    //                       mechanism replaced. Left off pending a decision.
+    //   typescript/no-explicit-any, vitest/expect-expect
+    //                       have no oxlint-baseline.json rows either (ast-grep
+    //                       never wrote to this file), and `pnpm lint:oxlint`
+    //                       runs with --quiet, which makes a "warn" severity
+    //                       invisible and an unbaselined "error" a hard
+    //                       failure on every finding. Left OFF the "rules"
+    //                       block for the same reason: enabling either here
+    //                       would be advisory-only noise (--quiet) or an
+    //                       immediate red build, neither of which is what
+    //                       "enabled" is supposed to mean. See ADR-141/142.
     // ------------------------------------------------------------------
 
     // ------------------------------------------------------------------

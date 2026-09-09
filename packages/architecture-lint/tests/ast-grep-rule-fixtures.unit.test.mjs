@@ -72,16 +72,6 @@ describe("given the committed ast-grep rules and fixtures", () => {
   });
 
   describe("when the gate reads the test-shape rules", () => {
-    /** @scenario "The assertion-free test rule keeps a fixture and says the test asserts nothing" */
-    it("pins no-test-without-assertion", () => {
-      expectFixturePins("no-test-without-assertion", "asserts nothing");
-    });
-
-    /** @scenario "The empty test rule keeps a fixture and offers it.todo" */
-    it("pins no-empty-test", () => {
-      expectFixturePins("no-empty-test", "it.todo");
-    });
-
     /** @scenario "The tautological assertion rule keeps a fixture and says the assertion cannot fail" */
     it("pins no-tautological-assertion", () => {
       expectFixturePins("no-tautological-assertion", "cannot fail");
@@ -134,11 +124,6 @@ describe("given the committed ast-grep rules and fixtures", () => {
       expectFixturePins("no-double-type-assertion", "as unknown as");
     });
 
-    /** @scenario "The explicit any rule keeps a fixture and offers unknown" */
-    it("pins no-explicit-any", () => {
-      expectFixturePins("no-explicit-any", "unknown");
-    });
-
     /** @scenario "The skip guard rule keeps a fixture and says what the inversion means" */
     it("pins no-clickhouse-env-skip-guard", () => {
       expectFixturePins("no-clickhouse-env-skip-guard", "always skip");
@@ -146,11 +131,6 @@ describe("given the committed ast-grep rules and fixtures", () => {
   });
 
   describe("when the gate reads the naming rules", () => {
-    /** @scenario "The try prefix rule keeps a fixture and says what the prefix hides" */
-    it("pins no-try-prefixed-name", () => {
-      expectFixturePins("no-try-prefixed-name", "says nothing about what the call does");
-    });
-
     /** @scenario "The boolean prefix rule keeps a fixture and names the prefixes it accepts" */
     it("pins require-boolean-name-prefix", () => {
       expectFixturePins("require-boolean-name-prefix", "prefix");
@@ -159,11 +139,6 @@ describe("given the committed ast-grep rules and fixtures", () => {
     /** @scenario "The identity function rule keeps a fixture and says it adds no behaviour" */
     it("pins no-identity-function", () => {
       expectFixturePins("no-identity-function", "identity function");
-    });
-
-    /** @scenario "The delegation rule keeps a fixture and says a class of forwards is a layer" */
-    it("pins no-same-name-delegation", () => {
-      expectFixturePins("no-same-name-delegation", "layer, not a component");
     });
   });
 });

@@ -22,7 +22,6 @@ import {
   layerClassRule,
   logicalStatementSpacingRule,
   maxStatementsPerLineRule,
-  nestedTernaryRule,
   namespaceClassRule,
   unboundedLoopRule,
   idGenerationOriginRule,
@@ -30,7 +29,6 @@ import {
   overloadByLiteralRule,
   planLiteralsRule,
   prismaContainmentRule,
-  runtimeUndefinedRule,
   secretsThroughSourceRule,
   serviceClassesRule,
   serviceDependenciesRule,
@@ -66,13 +64,11 @@ export const rules = {
   "service-classes": serviceClassesRule,
   "service-quality": serviceQualityRule,
   "max-statements-per-line": maxStatementsPerLineRule,
-  "nested-ternary": nestedTernaryRule,
   "namespace-class": namespaceClassRule,
   "unbounded-loop": unboundedLoopRule,
   "id-generation-origin": idGenerationOriginRule,
   "service-member-spacing": serviceMemberSpacingRule,
   "service-dependencies": serviceDependenciesRule,
-  "runtime-undefined": runtimeUndefinedRule,
   "secrets-through-source": secretsThroughSourceRule,
   "logical-statement-spacing": logicalStatementSpacingRule,
   "boolean-wall": booleanWallRule,
@@ -80,6 +76,11 @@ export const rules = {
   "web-imports-server-shaped-value": webImportsServerShapedValueRule,
   "zod-object-composition": zodObjectCompositionRule,
 };
+
+// "nested-ternary" (superseded by the built-in no-nested-ternary) and
+// "runtime-undefined" (superseded by the built-in no-undefined) are gone from
+// this registry - ADR-135/ADR-140's class-A migration. Each built-in is
+// configured directly in .oxlintrc.architecture.json.
 
 export default {
   meta: { name: "eslint-plugin-langwatch", version: "0.1.0" },

@@ -56,14 +56,13 @@ Feature: The linter refuses the shapes that break a platform invariant
       Then the fixture states a refused double assertion and an accepted single one
       And the rule's message names as unknown as
 
-  Rule: `no-explicit-any` refuses an explicit any in a type position
+  Rule: `typescript/no-explicit-any` was measured, not enabled
 
     @unit
-    Scenario: The explicit any rule keeps a fixture and offers unknown
-      Given the no-explicit-any rule and the fixture that pins it
-      When the fixture gate reads them
-      Then the fixture states a refused annotation and an accepted one
-      And the rule's message offers unknown with narrowing instead
+    Scenario: The explicit-any rule is not in the workspace-wide config
+      Given the oxlint configuration
+      When its workspace-wide rules are read
+      Then the built-in typescript/no-explicit-any rule is not present
 
   Rule: `no-clickhouse-env-skip-guard` refuses an inverted skip guard
 

@@ -1,8 +1,10 @@
 # The ast-grep half of ADR-139: names and delegations that hide what a call
-# answers with. Two of these duplicate an enabled plugin rule and are kept for
-# what the review bot quotes back; ADR-135 records the duplication. The rules
-# are matched against real code by the ast-grep CI job; this spec is bound to
-# the fixture gate, which is what keeps a rule from silently going dead.
+# answers with. The rules are matched against real code by the ast-grep CI
+# job; this spec is bound to the fixture gate, which is what keeps a rule from
+# silently going dead. Two rules that used to live here duplicated an enabled
+# plugin rule and were deleted under ADR-135's class-A migration:
+# `no-try-prefixed-name` (= `langwatch/fallible-result-naming`) and
+# `no-same-name-delegation` (= `langwatch/layer-class`).
 
 Feature: The linter refuses a name that hides the answer
   As a platform maintainer
@@ -11,15 +13,6 @@ Feature: The linter refuses a name that hides the answer
 
   Background:
     Given the committed ast-grep rules and their fixtures under dev/lint/ast-grep
-
-  Rule: `no-try-prefixed-name` refuses a try prefix
-
-    @unit
-    Scenario: The try prefix rule keeps a fixture and says what the prefix hides
-      Given the no-try-prefixed-name rule and the fixture that pins it
-      When the fixture gate reads them
-      Then the fixture states a refused name and an accepted one
-      And the rule's message says the try prefix says nothing about what the call does
 
   Rule: `require-boolean-name-prefix` refuses a boolean with no is, has, should, can or will
 
@@ -38,12 +31,3 @@ Feature: The linter refuses a name that hides the answer
       When the fixture gate reads them
       Then the fixture states a refused function and an accepted one
       And the rule's message calls it an identity function
-
-  Rule: `no-same-name-delegation` refuses a class made of same-name forwards
-
-    @unit
-    Scenario: The delegation rule keeps a fixture and says a class of forwards is a layer
-      Given the no-same-name-delegation rule and the fixture that pins it
-      When the fixture gate reads them
-      Then the fixture states a refused method body and an accepted one
-      And the rule's message says a class made of forwards is a layer, not a component

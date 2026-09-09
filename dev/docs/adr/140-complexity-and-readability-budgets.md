@@ -47,7 +47,7 @@ rewritten. Both go stale, and neither is read at the moment it matters.
 | `langwatch/cognitive-complexity` | plugin | SonarSource cognitive complexity, maximum 15; 40 where the config says so. Reads the baseline. |
 | `langwatch/comment-block-size` | plugin | The stated maximum is 5 lines. A block of 9 or more, or a comment line past 100 columns, errors. |
 | `langwatch/comment-block-size-warning` | plugin | The 6 to 8 line tier of the same analysis. Warns, and says to put the narrative in an ADR the comment points to. A 4 to 5 line block is queued for review and fails nothing. |
-| `langwatch/nested-ternary` | plugin | A ternary inside another ternary's consequent or alternate, reported on the inner one. Reads the baseline. |
+| `no-nested-ternary` | oxlint built-in | A ternary inside another ternary's consequent or alternate. Enabled workspace-wide; does not read the baseline. |
 | `langwatch/unbounded-loop` | plugin | `for (;;)` and `while (true)` in strict server source: the exit belongs in the header. |
 | `langwatch/logical-statement-spacing` | plugin | One blank line around control flow, around a multi-line statement, and between chain groups. |
 | `langwatch/service-member-spacing` | plugin | One blank line between consecutive service methods, constructors and accessors. Fixable. Enabled nowhere today. |
@@ -57,10 +57,23 @@ rewritten. Both go stale, and neither is read at the moment it matters.
 `max-depth` (maximum 4) is enabled the same way, scoped by an `overrides`
 block rather than workspace-wide, and carries one baseline entry.
 
-Three of these rules read the shrink-only oxlint baseline directly, which is
-the whole reason `nested-ternary` is a plugin rule rather than the built-in
-`no-nested-ternary`: 342 of the ledger's entries are its, and oxlint has no
-baseline mechanism. See ADR-135.
+Two of these rules read the shrink-only oxlint baseline directly
+(`cognitive-complexity`, `comment-block-size`/`-warning`'s shared analysis).
+`nested-ternary` used to be a third: `langwatch/nested-ternary` existed only to
+consult the baseline in place of the built-in `no-nested-ternary`, because
+oxlint has no baseline mechanism of its own. ADR-135's class-A migration
+deleted the plugin rule, re-keyed its 342 baseline entries from
+`nested-ternary|` to `no-nested-ternary|`, and joined `no-nested-ternary` to
+`max-depth` and `complexity` on the `generate-native-baseline-overrides.mjs`
+list: a generated `overrides` block turns the rule off for exactly the 342
+baselined files, the same mechanism those two native rules already used, so
+the built-in is enabled directly and the entries it reads did not become
+2,586 hand-written override paths. Measured after the re-key and the
+generated override: nine files fire that neither the baseline nor the
+override cover, all nine already failing under the deleted plugin rule before
+this migration (the tenth pre-existing failure, in `modules/github`, no
+longer reproduces against the current tree). No new debt was introduced by
+the move.
 
 The three spacing rules and the statements-per-line rule are not formatting.
 oxfmt does not insert or remove blank lines between statements, so nothing else

@@ -534,59 +534,9 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
   ],
 });
 
-tester.run("runtime-undefined", plugin.rules["runtime-undefined"], {
-  valid: [
-    {
-      filename: "modules/agent/contract/src/example.ts",
-      code: `type Missing = undefined;
-interface Result { value?: undefined }
-const object = { undefined: 1 };
-object.undefined;
-export { value as undefined };`,
-    },
-    {
-      filename: "modules/agent/contract/src/example.ts",
-      code: `import { undefined as absent } from "fixture";
-export { undefined } from "fixture";
-const value = "undefined";`,
-    },
-    {
-      filename: "modules/agent/contract/src/example.ts",
-      code: `function read(undefined: unknown) { return undefined; }`,
-    },
-  ],
-  invalid: [
-    {
-      filename: "modules/agent/contract/src/example.ts",
-      code: `const a = undefined;
-const b = obj[undefined];
-const c = undefined as string;
-const d = ({ undefined });`,
-      output: `const a = void 0;
-const b = obj[void 0];
-const c = void 0 as string;
-const d = ({ undefined: void 0 });`,
-      errors: [
-        { messageId: "runtimeUndefined" },
-        { messageId: "runtimeUndefined" },
-        { messageId: "runtimeUndefined" },
-        { messageId: "runtimeUndefined" },
-      ],
-    },
-    {
-      filename: "modules/agent/contract/src/example.ts",
-      code: `function read(value = undefined) { return value; }
-if (value === undefined) throw undefined;`,
-      output: `function read(value = void 0) { return value; }
-if (value === void 0) throw void 0;`,
-      errors: [
-        { messageId: "runtimeUndefined" },
-        { messageId: "runtimeUndefined" },
-        { messageId: "runtimeUndefined" },
-      ],
-    },
-  ],
-});
+// "runtime-undefined" was deleted under ADR-135's class-A migration; the
+// built-in no-undefined that replaced it needs no fixture here, since oxlint
+// tests its own built-ins.
 
 tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"], {
   valid: [

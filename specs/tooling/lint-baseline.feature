@@ -1,14 +1,18 @@
 Feature: The oxlint baseline replaces the hand-written per-file registers
-  Debt for cognitive-complexity, condition-shape, nested-ternary, max-depth
-  and complexity used to live as ~2,400 hand-edited filenames spread across
-  oxlint config overrides, with no mechanical shrink-only check. It now lives
-  in one file, packages/architecture-lint/src/oxlint-baseline.json, keyed
-  `rule|file` with a `measured` date. A `defineRule` plugin rule
-  (cognitive-complexity, condition-shape, the new langwatch/nested-ternary)
-  consults it directly and reports nothing for a baselined file; the two
-  native rules that cannot read it (max-depth, complexity) still need a
-  config override, but that override is generated from the same baseline
-  file by generate-native-baseline-overrides.mjs rather than hand-maintained.
+  Debt for cognitive-complexity, condition-shape, max-depth and complexity
+  used to live as ~2,400 hand-edited filenames spread across oxlint config
+  overrides, with no mechanical shrink-only check. It now lives in one file,
+  packages/architecture-lint/src/oxlint-baseline.json, keyed `rule|file` with
+  a `measured` date. A `defineRule` plugin rule (cognitive-complexity,
+  condition-shape) consults it directly and reports nothing for a baselined
+  file; the two native rules that cannot read it (max-depth, complexity)
+  still need a config override, but that override is generated from the same
+  baseline file by generate-native-baseline-overrides.mjs rather than
+  hand-maintained. `langwatch/nested-ternary` used to be a third plugin rule
+  here, written only so it could read the baseline in place of the built-in
+  `no-nested-ternary`; ADR-135/ADR-140's class-A migration deleted it and
+  enabled the built-in directly, so the 342 entries it used to read are now
+  unconsulted by anything.
 
   Background:
     Given a workspace whose agent feature is at strict layout version 0
@@ -19,19 +23,13 @@ Feature: The oxlint baseline replaces the hand-written per-file registers
     When that rule runs over the file
     Then it reports nothing
 
-  Rule: `langwatch/nested-ternary` replaces the built-in so it can read the baseline
+  Rule: `no-nested-ternary` is the built-in that replaced the baseline-reading plugin rule
 
-  @unit
-  Scenario: A nested ternary is reported on the inner ternary
-    Given a ternary whose consequent or alternate is itself a ternary
-    When the nested-ternary rule runs over it
-    Then it reports nested on the inner ternary with the branch's position
-
-  @unit
-  Scenario: A ternary with no nested branch is left alone
-    Given a ternary whose branches are not ternaries
-    When the nested-ternary rule runs over it
-    Then it reports nothing
+    @unit
+    Scenario: The nested ternary rule is enabled workspace-wide
+      Given the oxlint configuration
+      When its workspace-wide rules are read
+      Then the built-in no-nested-ternary rule is enabled
 
   Rule: `oxlint` holds the ledger to a shrink-only ratchet
 

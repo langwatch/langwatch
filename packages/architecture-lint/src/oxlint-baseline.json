@@ -7103,7 +7103,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|modules/github/server/src/repositories/prisma/github-pull-requests.repository.ts",
+      "key": "id-generation-origin|modules/github/server/src/repositories/prisma/prisma.github-pull-requests.repository.ts",
       "measured": "2026-09-08"
     },
     {
@@ -7903,1371 +7903,1399 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "nested-ternary|apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/app-rest/__tests__/api-rest.teams-family.integration.test.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|apps/api/src/app/api-authoring-rest.composition.ts",
+      "key": "no-nested-ternary|apps/api/src/app/api-authoring-rest.composition.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/app/api-gateway.composition.ts",
+      "key": "no-nested-ternary|apps/api/src/app/api-gateway.composition.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/app/api-trace-ingest.composition.ts",
+      "key": "no-nested-ternary|apps/api/src/app/api-trace-ingest.composition.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/langy/langy.composition.ts",
+      "key": "no-nested-ternary|apps/api/src/features/langy/langy.composition.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/organization/__tests__/tenant-features.composition.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/features/organization/__tests__/tenant-features.composition.integration.test.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/role/__tests__/role.composition.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/features/role/__tests__/role.composition.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/scenario/__tests__/scenario.composition.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/features/scenario/__tests__/scenario.composition.integration.test.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/stored-object/__tests__/product-storage.composition.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/features/stored-object/__tests__/product-storage.composition.integration.test.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
+      "key": "no-nested-ternary|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/ui/e2e/langy/scenario-transcript.ts",
+      "key": "no-nested-ternary|apps/ui/e2e/langy/scenario-transcript.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|apps/ui/src/behavior/ui-scope-resolution.ts",
+      "key": "no-nested-ternary|apps/ui/src/behavior/ui-scope-resolution.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/ui/src/features/api-key/ui/sections/api-key-host.tsx",
+      "key": "no-nested-ternary|apps/ui/src/features/api-key/ui/sections/api-key-host.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/ui/src/features/authorize/ui/sections/authorize-host.tsx",
+      "key": "no-nested-ternary|apps/ui/src/features/authorize/ui/sections/authorize-host.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/ui/src/features/onboarding/ui/sections/onboarding-host.tsx",
+      "key": "no-nested-ternary|apps/ui/src/features/onboarding/ui/sections/onboarding-host.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/ui/src/ui/elements/ui-error-actions.tsx",
+      "key": "no-nested-ternary|apps/ui/src/ui/elements/ui-error-actions.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|apps/worker/src/app/worker-production.composition.ts",
+      "key": "no-nested-ternary|apps/worker/src/app/worker-production.composition.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/billing/contract/src/plan-types.ts",
+      "key": "no-nested-ternary|enterprise/modules/billing/contract/src/plan-types.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/billing/server/src/__tests__/planProvider.unit.test.ts",
+      "key": "no-nested-ternary|enterprise/modules/billing/server/src/__tests__/planProvider.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/billing/web/src/model/billing-plans.ts",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/model/billing-plans.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/billing/web/src/screens/billing/usage.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/screens/billing/usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/billing/web/src/surfaces/seat-proration-preview/seat-proration-preview.tsx",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/surfaces/seat-proration-preview/seat-proration-preview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/contract/src/persona-home.ts",
+      "key": "no-nested-ternary|enterprise/modules/governance/contract/src/persona-home.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/server/src/adapters/databricks-genie-puller.adapter.ts",
+      "key": "no-nested-ternary|enterprise/modules/governance/server/src/adapters/databricks-genie-puller.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-source-activity.repository.ts",
+      "key": "no-nested-ternary|enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-source-activity.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ingestion-templates-editor.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ingestion-templates-editor.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/tool-catalog-editor.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/tool-catalog-editor.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/features/ottl/ui/elements/ottl-editor.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/features/ottl/ui/elements/ottl-editor.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/features/source-events/behavior/use-source-events-pager.ts",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/features/source-events/behavior/use-source-events-pager.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/features/source-events/ui/sections/source-events-table.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/features/source-events/ui/sections/source-events-table.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-anomaly-rules.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-anomaly-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-ingestion-source.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-ingestion-source.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-people.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-people.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-team.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-team.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-teams.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-user.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-user.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-users.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-users.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/licensing/web/src/ui/elements/license-details-card.tsx",
+      "key": "no-nested-ternary|enterprise/modules/licensing/web/src/ui/elements/license-details-card.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/scim/server/src/repositories/prisma/scim.repository.ts",
+      "key": "no-nested-ternary|enterprise/modules/scim/server/src/repositories/prisma/scim.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/scim/server/src/services/scim-grants.service.ts",
+      "key": "no-nested-ternary|enterprise/modules/scim/server/src/services/scim-grants.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|enterprise/modules/scim/server/src/transport/api-rest/__tests__/scim-webhook-intake.api.unit.test.ts",
+      "key": "no-nested-ternary|enterprise/modules/scim/server/src/transport/api-rest/__tests__/scim-webhook-intake.api.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/langwatch-api.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/langwatch-api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/tools/create-annotation.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/tools/create-annotation.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/tools/get-experiment-results.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/tools/get-experiment-results.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/tools/list-annotations.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/tools/list-annotations.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/tools/list-api-keys.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/tools/list-api-keys.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/tools/list-simulation-runs.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/tools/list-simulation-runs.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|mcp/typescript/src/utils/format-evaluations.ts",
+      "key": "no-nested-ternary|mcp/typescript/src/utils/format-evaluations.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/agent/server/src/services/connected-agent-parameter-spec.service.ts",
+      "key": "no-nested-ternary|modules/agent/server/src/services/connected-agent-parameter-spec.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/agent/web/src/features/management/ui/blocks/agent-push-dialog.tsx",
+      "key": "no-nested-ternary|modules/agent/web/src/features/management/ui/blocks/agent-push-dialog.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/analytics/contract/src/analytics.precondition-matchers.ts",
+      "key": "no-nested-ternary|modules/analytics/contract/src/analytics.precondition-matchers.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/analytics/contract/src/analytics.timeseries.ts",
+      "key": "no-nested-ternary|modules/analytics/contract/src/analytics.timeseries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/annotation/server/src/repositories/prisma/prisma.annotation-queue.repository.ts",
+      "key": "no-nested-ternary|modules/annotation/server/src/repositories/prisma/prisma.annotation-queue.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/annotation/server/src/transport/api-trpc/annotation.api.ts",
+      "key": "no-nested-ternary|modules/annotation/server/src/transport/api-trpc/annotation.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/annotation/web/src/model/annotation-export.ts",
+      "key": "no-nested-ternary|modules/annotation/web/src/model/annotation-export.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/annotation/web/src/ui/blocks/annotation-score-editor.tsx",
+      "key": "no-nested-ternary|modules/annotation/web/src/ui/blocks/annotation-score-editor.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/annotation/web/src/ui/sections/annotation-list.tsx",
+      "key": "no-nested-ternary|modules/annotation/web/src/ui/sections/annotation-list.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/api-key/server/src/app/api-key.app.ts",
+      "key": "no-nested-ternary|modules/api-key/server/src/app/api-key.app.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/api-key/server/src/services/api-key-grant-policy.service.ts",
+      "key": "no-nested-ternary|modules/api-key/server/src/services/api-key-grant-policy.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/auth/web/src/behavior/auth-client.tsx",
+      "key": "no-nested-ternary|modules/auth/web/src/behavior/auth-client.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/auth/web/src/screens/auth/signup.screen.tsx",
+      "key": "no-nested-ternary|modules/auth/web/src/screens/auth/signup.screen.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/auth/web/src/ui/sections/sign-up-credential-form.tsx",
+      "key": "no-nested-ternary|modules/auth/web/src/ui/sections/sign-up-credential-form.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/authz/contract/src/authz.commands.ts",
+      "key": "no-nested-ternary|modules/authz/contract/src/authz.commands.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/authz/contract/src/walk.ts",
+      "key": "no-nested-ternary|modules/authz/contract/src/walk.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/authz/web/src/surfaces/scope-picker/provider-scope-chips.tsx",
+      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/provider-scope-chips.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-filter-address.ts",
+      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-filter-address.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-filter.tsx",
+      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-filter.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/contract/src/templating/template-context.ts",
+      "key": "no-nested-ternary|modules/automation/contract/src/templating/template-context.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/server/src/processes/trigger-settlement.process.ts",
+      "key": "no-nested-ternary|modules/automation/server/src/processes/trigger-settlement.process.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/__tests__/provider-parity.unit.test.ts",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/__tests__/provider-parity.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/model/condition-query.ts",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/model/condition-query.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/blocks/cadence-section.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/blocks/cadence-section.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/sections/automation-drawer.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/sections/automation-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/sections/delivery-picker.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/sections/delivery-picker.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/sections/main-section-list.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/sections/main-section-list.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/sections/subject-section.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/sections/subject-section.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/features/liquid-editor/model/liquid-json-substitution.ts",
+      "key": "no-nested-ternary|modules/automation/web/src/features/liquid-editor/model/liquid-json-substitution.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/model/relative-time.ts",
+      "key": "no-nested-ternary|modules/automation/web/src/model/relative-time.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/screens/automations/automations.screen.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/screens/automations/automations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/automation/web/src/screens/automations/unsubscribe.screen.tsx",
+      "key": "no-nested-ternary|modules/automation/web/src/screens/automations/unsubscribe.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/server/src/projections/coding-agent-session-state.projection.ts",
+      "key": "no-nested-ternary|modules/coding-agent/server/src/projections/coding-agent-session-state.projection.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts",
+      "key": "no-nested-ternary|modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
+      "key": "no-nested-ternary|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/server/src/subscribers/coding-agent-metric-facts-dispatch.subscriber.ts",
+      "key": "no-nested-ternary|modules/coding-agent/server/src/subscribers/coding-agent-metric-facts-dispatch.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/web/src/pull-request-detail-drawer.tsx",
+      "key": "no-nested-ternary|modules/coding-agent/web/src/pull-request-detail-drawer.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/web/src/trace/session-view.tsx",
+      "key": "no-nested-ternary|modules/coding-agent/web/src/trace/session-view.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/web/src/trace/terminal-session.ts",
+      "key": "no-nested-ternary|modules/coding-agent/web/src/trace/terminal-session.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/coding-agent/web/src/trace/terminal-view.tsx",
+      "key": "no-nested-ternary|modules/coding-agent/web/src/trace/terminal-view.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/data-privacy/web/src/model/data-privacy-rule-config.ts",
+      "key": "no-nested-ternary|modules/data-privacy/web/src/model/data-privacy-rule-config.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/data-privacy/web/src/ui/blocks/privacy-rule-drawer.tsx",
+      "key": "no-nested-ternary|modules/data-privacy/web/src/ui/blocks/privacy-rule-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/data-retention/server/src/repositories/prisma/prisma.data-retention-directory.repository.ts",
+      "key": "no-nested-ternary|modules/data-retention/server/src/repositories/prisma/prisma.data-retention-directory.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
+      "key": "no-nested-ternary|modules/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/data-retention/web/src/ui/blocks/retention-and-usage-card.tsx",
+      "key": "no-nested-ternary|modules/data-retention/web/src/ui/blocks/retention-and-usage-card.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/data-retention/web/src/ui/sections/data-retention.screen.tsx",
+      "key": "no-nested-ternary|modules/data-retention/web/src/ui/sections/data-retention.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/dataset/server/src/adapters/dataset-content.adapter.ts",
+      "key": "no-nested-ternary|modules/dataset/server/src/adapters/dataset-content.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/dataset/server/src/rules/dataset-selection.rules.ts",
+      "key": "no-nested-ternary|modules/dataset/server/src/rules/dataset-selection.rules.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/entitlement/server/src/services/usage-meter-policy.service.ts",
+      "key": "no-nested-ternary|modules/entitlement/server/src/services/usage-meter-policy.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/entitlement/server/src/services/usage-stats.service.ts",
+      "key": "no-nested-ternary|modules/entitlement/server/src/services/usage-stats.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluation/server/src/ports/__tests__/support/evaluation-execution.fixtures.ts",
+      "key": "no-nested-ternary|modules/evaluation/server/src/ports/__tests__/support/evaluation-execution.fixtures.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluation/server/src/repositories/clickhouse/evaluation-run-write.repository.ts",
+      "key": "no-nested-ternary|modules/evaluation/server/src/repositories/clickhouse/evaluation-run-write.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluation/server/src/rules/evaluation-causality.rules.ts",
+      "key": "no-nested-ternary|modules/evaluation/server/src/rules/evaluation-causality.rules.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
+      "key": "no-nested-ternary|modules/evaluation/server/src/transport/api-rest/evaluations-legacy.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
+      "key": "no-nested-ternary|modules/evaluation/server/src/transport/api-trpc/evaluation.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/contract/src/evaluator.ts",
+      "key": "no-nested-ternary|modules/evaluator/contract/src/evaluator.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/server/src/services/evaluator-code.service.ts",
+      "key": "no-nested-ternary|modules/evaluator/server/src/services/evaluator-code.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/server/src/services/evaluator.service.ts",
+      "key": "no-nested-ternary|modules/evaluator/server/src/services/evaluator.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/screens/evaluation-edit/evaluation-edit.screen.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/blocks/evaluator-list-item.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/blocks/evaluator-list-item.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/blocks/evaluator-type-picker.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/blocks/evaluator-type-picker.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/checks/check-config-form.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/checks/check-config-form.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/checks/dynamic-zod-form.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/checks/dynamic-zod-form.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/checks/evaluation-manual-integration.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/checks/evaluation-manual-integration.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/checks/try-it-out.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/checks/try-it-out.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/evaluation-edit.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/evaluations/online-evaluation-drawer.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/evaluations/online-evaluation-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/evaluator-list-drawer.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/evaluator-list-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/evaluator/web/src/ui/sections/evaluator-push-to-copies-dialog.tsx",
+      "key": "no-nested-ternary|modules/evaluator/web/src/ui/sections/evaluator-push-to-copies-dialog.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/contract/src/workbench/actions/__tests__/manifest.unit.test.ts",
+      "key": "no-nested-ternary|modules/experiment/contract/src/workbench/actions/__tests__/manifest.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/contract/src/workbench/actions/projection.ts",
+      "key": "no-nested-ternary|modules/experiment/contract/src/workbench/actions/projection.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/server/src/processes/experiment-connected-target.process.ts",
+      "key": "no-nested-ternary|modules/experiment/server/src/processes/experiment-connected-target.process.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/server/src/services/experiment-cell-plan.service.ts",
+      "key": "no-nested-ternary|modules/experiment/server/src/services/experiment-cell-plan.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/server/src/services/experiment-execution-data.service.ts",
+      "key": "no-nested-ternary|modules/experiment/server/src/services/experiment-execution-data.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/elements/experiments/batch-evaluation-v2.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/elements/experiments/batch-evaluation.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/elements/experiments/batch-evaluation.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/elements/experiments/ds-py-experiment.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/elements/navigation-footer.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/elements/navigation-footer.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/batch-results/batch-runs-sidebar.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-header.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments-v3/TargetSection/target-header.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/feature-flag/web/src/experiments-dialog.tsx",
+      "key": "no-nested-ternary|modules/feature-flag/web/src/experiments-dialog.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/rules/gateway-config-wire.rules.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/rules/gateway-config-wire.rules.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/services/gateway-applicable-budgets.service.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/services/gateway-applicable-budgets.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/services/gateway-budget-overview.service.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/services/gateway-budget-overview.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/services/gateway-usage.service.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/services/gateway-usage.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/services/gateway.service.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/services/gateway.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/server/src/services/virtual-key-provisioning.service.ts",
+      "key": "no-nested-ternary|modules/gateway/server/src/services/virtual-key-provisioning.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/budgets/ui/sections/budget-create-drawer.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/budgets/ui/sections/budget-create-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/routing-policies/behavior/use-routing-policy-drawer-form.ts",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/routing-policies/behavior/use-routing-policy-drawer-form.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/blocks/virtual-key-ownership-section.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/blocks/virtual-key-provider-access-section.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/blocks/virtual-key-provider-access-section.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/elements/virtual-key-expiration-section.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/elements/virtual-key-expiration-section.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/features/webhooks/ui/sections/webhook-deliveries-drawer.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/features/webhooks/ui/sections/webhook-deliveries-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/model/format-time-ago.ts",
+      "key": "no-nested-ternary|modules/gateway/web/src/model/format-time-ago.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-budgets.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-budgets.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-cache-rules.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-cache-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-guardrails.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-guardrails.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-routing-policies.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-routing-policies.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/github/web/src/screens/integrations/integrations.screen.tsx",
+      "key": "no-nested-ternary|modules/github/web/src/ui/sections/integrations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/hosted-mcp/server/src/transport/api-mcp/__tests__/hosted-mcp.api.integration.test.ts",
+      "key": "no-nested-ternary|modules/hosted-mcp/server/src/transport/api-mcp/__tests__/hosted-mcp.api.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/contract/src/cards/digest.ts",
+      "key": "no-nested-ternary|modules/langy/contract/src/cards/digest.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/contract/src/cards/handled-error.ts",
+      "key": "no-nested-ternary|modules/langy/contract/src/cards/handled-error.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/contract/src/event-sourcing/folds/turn-fold.ts",
+      "key": "no-nested-ternary|modules/langy/contract/src/event-sourcing/folds/turn-fold.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/server/src/adapters/langy-effect.adapter.ts",
+      "key": "no-nested-ternary|modules/langy/server/src/adapters/langy-effect.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/server/src/adapters/langy-turn-relay.adapter.ts",
+      "key": "no-nested-ternary|modules/langy/server/src/adapters/langy-turn-relay.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/server/src/services/langy-local-session.service.ts",
+      "key": "no-nested-ternary|modules/langy/server/src/services/langy-local-session.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/server/src/services/langy-turn-preparation.service.ts",
+      "key": "no-nested-ternary|modules/langy/server/src/services/langy-turn-preparation.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/server/src/services/langy-turn-start.service.ts",
+      "key": "no-nested-ternary|modules/langy/server/src/services/langy-turn-start.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/server/src/subscribers/langy-conversation.subscriber.ts",
+      "key": "no-nested-ternary|modules/langy/server/src/subscribers/langy-conversation.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
+      "key": "no-nested-ternary|modules/langy/web/src/features/langy/ui/sections/langy-panel.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/log/server/src/adapters/canonical-log.adapter.ts",
+      "key": "no-nested-ternary|modules/log/server/src/adapters/canonical-log.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/metric/server/src/adapters/metric-attributes.adapter.ts",
+      "key": "no-nested-ternary|modules/metric/server/src/adapters/metric-attributes.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/metric/server/src/adapters/metric-values.adapter.ts",
+      "key": "no-nested-ternary|modules/metric/server/src/adapters/metric-values.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/model-provider/contract/src/model-provider-display-names.ts",
+      "key": "no-nested-ternary|modules/model-provider/contract/src/model-provider-display-names.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/model-provider/server/src/adapters/codex-oauth.model-provider-token-refresher.adapter.ts",
+      "key": "no-nested-ternary|modules/model-provider/server/src/adapters/codex-oauth.model-provider-token-refresher.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts",
+      "key": "no-nested-ternary|modules/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/model-provider/server/src/rules/litellm-audio-prices.rules.ts",
+      "key": "no-nested-ternary|modules/model-provider/server/src/rules/litellm-audio-prices.rules.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/model-provider/server/src/services/model-provider-command.service.ts",
+      "key": "no-nested-ternary|modules/model-provider/server/src/services/model-provider-command.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/monitor/web/src/screens/online-evaluations/online-evaluations.screen.tsx",
+      "key": "no-nested-ternary|modules/monitor/web/src/ui/elements/online-evaluation-performance-preview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/monitor/web/src/ui/elements/online-evaluation-performance-preview.tsx",
+      "key": "no-nested-ternary|modules/monitor/web/src/ui/sections/online-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/navigation/web/src/ui/sections/command-palette.tsx",
+      "key": "no-nested-ternary|modules/navigation/web/src/ui/sections/command-palette.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/onboarding/web/src/screens/onboarding/project.screen.tsx",
+      "key": "no-nested-ternary|modules/onboarding/web/src/screens/onboarding/project.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/onboarding/web/src/ui/blocks/onboarding-container.tsx",
+      "key": "no-nested-ternary|modules/onboarding/web/src/ui/blocks/onboarding-container.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/onboarding/web/src/ui/elements/shared/selectable-icon-card.tsx",
+      "key": "no-nested-ternary|modules/onboarding/web/src/ui/elements/shared/selectable-icon-card.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/onboarding/web/src/ui/sections/via-platform-screen.tsx",
+      "key": "no-nested-ternary|modules/onboarding/web/src/ui/sections/via-platform-screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/onboarding/web/src/ui/sections/welcome-screen.tsx",
+      "key": "no-nested-ternary|modules/onboarding/web/src/ui/sections/welcome-screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/ops/server/src/transport/api-rest/admin.api.ts",
+      "key": "no-nested-ternary|modules/ops/server/src/transport/api-rest/admin.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/organization/server/src/repositories/__tests__/prisma.organization-membership.repository.purge.unit.test.ts",
+      "key": "no-nested-ternary|modules/organization/server/src/repositories/__tests__/prisma.organization-membership.repository.purge.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/organization/server/src/services/organization-group-binding.service.ts",
+      "key": "no-nested-ternary|modules/organization/server/src/services/organization-group-binding.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/organization/web/src/screens/organization/audit-log.screen.tsx",
+      "key": "no-nested-ternary|modules/organization/web/src/screens/organization/audit-log.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/organization/web/src/screens/organization/teams.screen.tsx",
+      "key": "no-nested-ternary|modules/organization/web/src/screens/organization/teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/organization/web/src/ui/sections/group-detail-dialog.tsx",
+      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/group-detail-dialog.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/organization/web/src/ui/sections/member-detail-dialog.tsx",
+      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/member-detail-dialog.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/briefing/attention-inbox.ts",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/briefing/attention-inbox.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/briefing/components/home-overview-card.tsx",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/briefing/components/home-overview-card.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/briefing/hooks/use-langy-briefing.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/components/home-page-banners.tsx",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/components/home-page-banners.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/components/langy-home-hero.tsx",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/components/langy-home-hero.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/components/traces-overview.tsx",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/components/traces-overview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/project/web/src/screens/home/home.screen.tsx",
+      "key": "no-nested-ternary|modules/project/web/src/screens/home/home.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/prompt/web/src/model/prompt-version-diff.ts",
+      "key": "no-nested-ternary|modules/prompt/web/src/model/prompt-version-diff.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/scenario/server/src/adapters/finish-run.adapter.ts",
+      "key": "no-nested-ternary|modules/scenario/server/src/adapters/finish-run.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/server/src/adapters/prompt-template.adapter.ts",
+      "key": "no-nested-ternary|modules/scenario/server/src/adapters/prompt-template.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/server/src/adapters/serialized-connected-agent.adapter.ts",
+      "key": "no-nested-ternary|modules/scenario/server/src/adapters/serialized-connected-agent.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/server/src/services/scenario-prefetch-completion.service.ts",
+      "key": "no-nested-ternary|modules/scenario/server/src/services/scenario-prefetch-completion.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/behavior/agent-testing/use-agent-testing-routing.ts",
+      "key": "no-nested-ternary|modules/scenario/web/src/behavior/agent-testing/use-agent-testing-routing.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
+      "key": "no-nested-ternary|modules/scenario/web/src/behavior/agents/use-workflow-target-agent-data.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/behavior/suites/use-suite-routing.ts",
+      "key": "no-nested-ternary|modules/scenario/web/src/behavior/suites/use-suite-routing.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/model/agent-testing/run/parameter-line.ts",
+      "key": "no-nested-ternary|modules/scenario/web/src/model/agent-testing/run/parameter-line.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/model/scenario-message-display.ts",
+      "key": "no-nested-ternary|modules/scenario/web/src/model/scenario-message-display.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/elements/media-part-placeholder.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/elements/media-part-placeholder.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/elements/scenario-table.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/elements/scenario-table.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/elements/simulation-console/status-display.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/elements/simulation-console/status-display.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/results/grouped-rows-table.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/results/grouped-rows-table.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/results/results-list.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/results/results-list.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/results/run-plan-run-results.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/results/run-plan-run-results.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/run/target-section.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/run/target-section.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/run/use-compare-rows.ts",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agent-testing/run/use-compare-rows.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agents/__tests__/agent-editor-test-panel.integration.test.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agents/__tests__/agent-editor-test-panel.integration.test.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/agents/agent-list-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/scenarios/scenario-form-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/shared/ai-create-modal.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/shared/ai-create-modal.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/simulations/scenario-run-detail-drawer.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/simulations/scenario-run-detail-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/suites/run-history-panel.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/suites/run-history-panel.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/scenario/web/src/ui/sections/suites/simulations-page.tsx",
+      "key": "no-nested-ternary|modules/scenario/web/src/ui/sections/suites/simulations-page.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/secret/web/src/ui/sections/secrets-screen.tsx",
+      "key": "no-nested-ternary|modules/secret/web/src/ui/sections/secrets-screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/share/server/src/services/share.service.ts",
+      "key": "no-nested-ternary|modules/share/server/src/services/share.service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/share/web/src/share-links-list.tsx",
+      "key": "no-nested-ternary|modules/share/web/src/share-links-list.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
+      "key": "no-nested-ternary|modules/stored-object/server/src/adapters/azure-blob.stored-object-driver.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/suite/contract/src/target-key.ts",
+      "key": "no-nested-ternary|modules/stored-object/server/src/adapters/stored-object-storage.port.adapter.ts",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|modules/suite/contract/src/target-key.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/suite/web/src/model/run-history-transforms.ts",
+      "key": "no-nested-ternary|modules/suite/web/src/model/run-history-transforms.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/suite/web/src/ui/elements/pickers/target-picker.tsx",
+      "key": "no-nested-ternary|modules/suite/web/src/ui/elements/pickers/target-picker.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/suite/web/src/ui/elements/runs/message-preview.tsx",
+      "key": "no-nested-ternary|modules/suite/web/src/ui/elements/runs/message-preview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/suite/web/src/ui/elements/runs/run-metrics-summary.tsx",
+      "key": "no-nested-ternary|modules/suite/web/src/ui/elements/runs/run-metrics-summary.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/suite/web/src/ui/elements/runs/simulation-card.tsx",
+      "key": "no-nested-ternary|modules/suite/web/src/ui/elements/runs/simulation-card.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
+      "key": "no-nested-ternary|modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/topic/web/src/ui/sections/topic-clustering.screen.tsx",
+      "key": "no-nested-ternary|modules/topic/web/src/ui/sections/topic-clustering.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/contract/src/trace-collector-common.ts",
+      "key": "no-nested-ternary|modules/trace/contract/src/trace-collector-common.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/server/src/adapters/trace-query-evaluation.adapter.ts",
+      "key": "no-nested-ternary|modules/trace/server/src/adapters/trace-query-evaluation.adapter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/server/src/repositories/clickhouse/__tests__/trace-full-record.repository.unit.test.ts",
+      "key": "no-nested-ternary|modules/trace/server/src/repositories/clickhouse/__tests__/trace-full-record.repository.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/server/src/repositories/clickhouse/trace-full-record.mapper.ts",
+      "key": "no-nested-ternary|modules/trace/server/src/repositories/clickhouse/trace-full-record.mapper.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
+      "key": "no-nested-ternary|modules/trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts",
+      "key": "no-nested-ternary|modules/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/attribute-value-row.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/attribute-value-row.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/event-drilldown.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/event-drilldown.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-row.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-row.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/section-renderer.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/explorer/filter-sidebar/section-renderer.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/traces/span-details.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/traces/span-details.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/trace/web/src/ui/sections/traces/traces-mapping.tsx",
+      "key": "no-nested-ternary|modules/trace/web/src/ui/sections/traces/traces-mapping.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/user/server/src/transport/api-trpc/user.api.ts",
+      "key": "no-nested-ternary|modules/user/server/src/transport/api-trpc/user.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/user/web/src/ui/sections/devices-panel.tsx",
+      "key": "no-nested-ternary|modules/user/web/src/ui/sections/devices-panel.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
+      "key": "no-nested-ternary|modules/user/web/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|modules/user/web/src/ui/sections/personal-workspace/personal-sessions.screen.tsx",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|modules/user/web/src/ui/sections/personal-workspace/project-pull-requests.screen.tsx",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|modules/user/web/src/ui/sections/personal-workspace/project-sessions.screen.tsx",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|modules/webhook/server/src/transport/api-rest/__tests__/webhook-events.api.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/server/src/transport/api-trpc/workflow.api.ts",
+      "key": "no-nested-ternary|modules/workflow/server/src/transport/api-trpc/workflow.api.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/behavior/workflow-store.ts",
+      "key": "no-nested-ternary|modules/workflow/web/src/behavior/workflow-store.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/model/code/python-provider.code-actions.ts",
+      "key": "no-nested-ternary|modules/workflow/web/src/model/code/python-provider.code-actions.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/elements/code/liquid-condition-editor.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/elements/code/liquid-condition-editor.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/executable-panel/execution-output-panel.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/executable-panel/execution-output-panel.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/evaluate.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/evaluate.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/history.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/history.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/optimization-studio.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/optimization-studio.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/optimize.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/optimize.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/workflow-autosave.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/workflow-autosave.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/workflow-node-execution.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/workflow-node-execution.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|modules/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
+      "key": "no-nested-ternary|modules/workflow/web/src/ui/sections/workflow-run-until-here-dialog.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|packages/api/src/rest/family-error-handler.ts",
+      "key": "no-nested-ternary|packages/api/src/rest/family-error-handler.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/api/src/rest/pipeline.ts",
+      "key": "no-nested-ternary|packages/api/src/rest/pipeline.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/api/src/rest/security/rest-api-service.ts",
+      "key": "no-nested-ternary|packages/api/src/rest/security/rest-api-service.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/api/src/trpc/trpc-call-logging.ts",
+      "key": "no-nested-ternary|packages/api/src/trpc/audit.ts",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|packages/api/src/trpc/runtime.ts",
+      "measured": "2026-09-09"
+    },
+    {
+      "key": "no-nested-ternary|packages/api/src/trpc/trpc-call-logging.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/api/src/trpc/trpc-error-formatter.ts",
+      "key": "no-nested-ternary|packages/api/src/trpc/trpc-error-formatter.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|packages/api/src/trpc/trpc-service-builder.ts",
+      "key": "no-nested-ternary|packages/api/src/trpc/trpc-service-builder.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/cli.ts",
+      "key": "no-nested-ternary|packages/architecture-lint/src/cli.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/policies/api-transport.ts",
+      "key": "no-nested-ternary|packages/architecture-lint/src/policies/api-transport.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
+      "key": "no-nested-ternary|packages/architecture-lint/src/policies/frontend/frontend-ui-boundaries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/architecture-lint/src/policies/quality/composed-exports.ts",
+      "key": "no-nested-ternary|packages/architecture-lint/src/policies/quality/composed-exports.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|packages/design-system/src/components/delayed.tsx",
+      "key": "no-nested-ternary|packages/design-system/src/components/delayed.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/design-system/src/components/messages/message-role-label.tsx",
+      "key": "no-nested-ternary|packages/design-system/src/components/messages/message-role-label.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/design-system/src/components/toaster.tsx",
+      "key": "no-nested-ternary|packages/design-system/src/components/toaster.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/pipeline/staticBuilder.ts",
+      "key": "no-nested-ternary|packages/eventing/src/pipeline/staticBuilder.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/process-manager/processManagerService.ts",
+      "key": "no-nested-ternary|packages/eventing/src/process-manager/processManagerService.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/projections/eventTypeTransforms.ts",
+      "key": "no-nested-ternary|packages/eventing/src/projections/eventTypeTransforms.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/projections/foldProjectionExecutor.ts",
+      "key": "no-nested-ternary|packages/eventing/src/projections/foldProjectionExecutor.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/projections/projectionRouter.ts",
+      "key": "no-nested-ternary|packages/eventing/src/projections/projectionRouter.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/services/queues/queueManager.ts",
+      "key": "no-nested-ternary|packages/eventing/src/services/queues/queueManager.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/eventing/src/stores/repositories/eventRepositoryMemory.ts",
+      "key": "no-nested-ternary|packages/eventing/src/stores/repositories/eventRepositoryMemory.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/group-queue/src/groupQueue.ts",
+      "key": "no-nested-ternary|packages/group-queue/src/groupQueue.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/handled-error/src/presentation.ts",
+      "key": "no-nested-ternary|packages/handled-error/src/presentation.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/handled-error/src/read-handled-error.ts",
+      "key": "no-nested-ternary|packages/handled-error/src/read-handled-error.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|packages/mail/src/templates/onboarding/highlight.ts",
+      "key": "no-nested-ternary|packages/mail/src/templates/onboarding/highlight.ts",
       "measured": "2026-09-07"
     },
     {
-      "key": "nested-ternary|packages/test-harness/src/mock-specifier-scan.ts",
+      "key": "no-nested-ternary|packages/test-harness/src/mock-specifier-scan.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/agent/protocol.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/agent/protocol.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/analytics/query.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/analytics/query.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/analytics/timeseriesShape.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/analytics/timeseriesShape.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/annotations/get.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/annotations/get.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/annotations/list.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/annotations/list.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/api-keys/list.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/api-keys/list.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/charts/run.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/charts/run.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/dataset/get.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/dataset/get.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/dataset/records-list.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/dataset/records-list.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/dataset/upload.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/dataset/upload.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/experiment/results.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/experiment/results.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/experiment/status.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/experiment/status.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/gateway-budgets/list.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/gateway-budgets/list.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/ingestion/context.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/ingestion/context.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/ingestion/install.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/ingestion/install.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/langy/__tests__/approval.unit.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/langy/__tests__/approval.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/langy/__tests__/policy.unit.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/langy/__tests__/policy.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/push.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/push.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/scenarios/update.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/scenarios/update.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/simulation-runs/get.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/simulation-runs/get.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/simulation-runs/list.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/simulation-runs/list.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/skills/installer.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/skills/installer.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/spend-events/list.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/spend-events/list.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/ui/call.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/ui/call.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/virtual-keys/_shared.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/virtual-keys/_shared.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/virtual-keys/update.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/virtual-keys/update.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/commands/webhooks/deliveries.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/commands/webhooks/deliveries.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/daemon/execution.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/daemon/execution.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/daemon/server.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/daemon/server.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/errorSuggestions.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/errorSuggestions.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/governance/__tests__/cli-api.unit.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/governance/__tests__/cli-api.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/governance/__tests__/session-api.unit.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/governance/__tests__/session-api.unit.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/governance/codex-rollout.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/governance/codex-rollout.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/governance/login-flow.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/governance/login-flow.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/governance/wrapper-mode.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/governance/wrapper-mode.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/output.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/output.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/cli/utils/outputScope.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/cli/utils/outputScope.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/client-sdk/services/_shared/format-api-error.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/comparison-harness.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/comparison-harness.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.e2e.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.e2e.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.origin.integration.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.origin.integration.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.trace.e2e.test.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.trace.e2e.test.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "nested-ternary|sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts",
+      "key": "no-nested-ternary|sdks/typescript/src/observability-sdk/instrumentation/langchain/index.ts",
       "measured": "2026-09-06"
     },
     {

@@ -52,17 +52,21 @@ quotes a customer a different number on a different page.
 | `require-fetch-timeout` | ast-grep | `fetch(...)` carries `signal: AbortSignal.timeout(ms)`, or it hangs as long as the peer holds the socket. |
 | `no-export-star-shim` | ast-grep | `export * from "..."` is a backwards-compatibility shim; update the consumers instead. |
 | `no-double-type-assertion` | ast-grep | `x as unknown as T` switches the type checker off; a single `as T` at least has to prove an overlap. |
-| `no-explicit-any` | ast-grep | Prefer `unknown` and narrowing, or a real type. |
 | `no-clickhouse-env-skip-guard` | ast-grep | An inverted ClickHouse skip guard means "always skip", so the suite reports green having run nothing. |
 
 Every plugin rule here is a candidate for oxlint configuration and is
 deliberately not written there yet: ADR-135 records the classification, the
 718 baseline entries in the way, and the message-quality cost.
 
-`no-explicit-any` is in ast-grep rather than as `typescript/no-explicit-any`
-for one measured reason: the built-in fires 1,395 times, so it is off in the
-config. The ast-grep rule is a warning that reaches review on changed lines
-instead of a failure nobody can clear.
+`no-explicit-any` was deleted from ast-grep under ADR-135's class-A migration
+and its built-in replacement, `typescript/no-explicit-any`, was measured
+rather than adopted: 1,782 findings across 336 files, 294 of them beyond
+anything the ast-grep rule ever matched (751 findings/175 files), and no
+`oxlint-baseline.json` rows to re-key, since ast-grep never wrote to that
+file. `pnpm lint:oxlint` runs `--quiet`, which makes a "warn" severity
+invisible and an unbaselined "error" a hard failure on every one of the
+1,782 - neither is what "enabled" should mean, so `typescript/no-explicit-any`
+carries no row here and no config line. See `specs/tooling/lint-platform-invariants.feature`.
 
 ## Consequences
 

@@ -58,7 +58,6 @@ one neighbour reads is a hop too.
 | `langwatch/service-quality` | plugin | No duplicate class member or object key; a class with `static create` has a private constructor. Enabled nowhere today. |
 | `langwatch/layer-class` | plugin | A class whose public methods almost all forward under the same name to the same collaborator is a hop, not a layer. |
 | `langwatch/namespace-class` | plugin | A class with only static members is a module wearing a class. |
-| `no-same-name-delegation` | ast-grep | The same shape as `layer-class`, as a review comment. Duplicate; see ADR-135. |
 | `feature-layout` | architecture-lint | A server file outside the folder-and-kind grammar, or a root exporting a private repository, store or projection. |
 | `feature-app-contract` | architecture-lint | A module's contract is exactly one `*.api.ts` interface of callable operations named `<Feature>Api`. |
 | `feature-setup-infrastructure` | architecture-lint | An App factory's `FeatureSetup` declares concrete technical records, never a peer API or service capability. |

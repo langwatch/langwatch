@@ -80,8 +80,8 @@ declaration itself. `no-restricted-imports` gives one flat string.
 | Registry | Where | Count | Enforced by |
 | --- | --- | --- | --- |
 | oxlint built-ins | `.oxlintrc.architecture.json` `rules` and `overrides` | 1 workspace-wide, the rest scoped | `pnpm lint` |
-| `langwatch` plugin | `packages/lint-core/src/rules/*.rule.mjs` | 36 defined, 31 enabled | `pnpm lint` |
-| ast-grep | `dev/lint/ast-grep/rules/*.yml` | 18 rules in 29 files | the `ast-grep` CI job and CodeRabbit |
+| `langwatch` plugin | `packages/lint-core/src/rules/*.rule.mjs` | 34 defined, 30 enabled | `pnpm lint` |
+| ast-grep | `dev/lint/ast-grep/rules/*.yml` | 13 rules in 21 files | the `ast-grep` CI job and CodeRabbit |
 | architecture-lint | `packages/architecture-lint/src/policies/index.ts` | 31 policies | `pnpm lint:architecture` |
 
 ### The baseline is a ratchet, not an amnesty
@@ -102,7 +102,18 @@ why the mechanism survives even if every class A and B rule below moves.
 | `oxlint` | architecture-lint | The oxlint baseline is shrink-only and every entry carries a measured date. |
 | `comment-block-root` | architecture-lint | The allowed roots for long comment blocks are a ratcheted list, not a free-for-all. |
 | `comment-block-review` | architecture-lint | The 4 to 5 line review tier is registered so it can be listed and queried; it never fails a run. |
-| `langwatch/runtime-undefined` | plugin | Ambient `undefined` is written `void 0`. Defined, tested and documented, wired into no config. |
+
+`langwatch/runtime-undefined` used to hold a fourth row here: a plugin rule,
+defined and tested, wired into no config. ADR-135's class-A migration deleted
+it outright and measured its built-in replacement, `no-undefined`, at 11,568
+findings across 3,591 files. That is not a rule this table can carry: a
+register that size is exactly the hand-written override the oxlint baseline
+mechanism exists to replace, `no-undefined` has no baseline entries to re-key,
+and neither of `pnpm lint:oxlint`'s two severities makes a register that size
+usable (`--quiet` hides "warn", and an unbaselined "error" is a hard failure
+on every one of them). The built-in is measured and not adopted; `no-undefined`
+carries no row here because it is not enabled anywhere and is not a registered
+rule. See `specs/tooling/lint-no-undefined.feature`.
 
 ### A decision table has one shape, and the guard reads it
 
@@ -136,34 +147,51 @@ The layering rule is not retrospective. The classification behind this ADR
 found rules sitting above the layer that could express them, and moving them is
 a separate change with its own cost, recorded here rather than done here:
 
-- **Two ast-grep rules duplicate a plugin rule that was written later.**
-  `no-same-name-delegation` is `langwatch/layer-class`; `no-try-prefixed-name`
-  is `langwatch/fallible-result-naming`. Both plugin rules are enabled. The
-  ast-grep pair can be deleted with no replacement, at the cost of what
-  CodeRabbit quotes in review.
-- **Three ast-grep rules have a built-in equivalent.** `no-explicit-any` is
-  `typescript/no-explicit-any` (off in the config at 1,395 hits, which is the
-  actual reason it lives in ast-grep); `no-empty-test` and
-  `no-test-without-assertion` are both covered by `vitest/expect-expect`.
-- **Seven plugin rules could be oxlint configuration.** `temporal-only`,
+- **Two ast-grep rules duplicated a plugin rule that was written later, and
+  were deleted with no replacement.** `no-same-name-delegation` was
+  `langwatch/layer-class`; `no-try-prefixed-name` was
+  `langwatch/fallible-result-naming`. Both plugin rules stay enabled; what is
+  lost is what CodeRabbit used to quote in review.
+- **Three ast-grep rules had a built-in equivalent, and were deleted with the
+  built-in measured rather than adopted.** `no-explicit-any` and
+  `typescript/no-explicit-any` (1,782 findings/336 files; the ast-grep rule
+  only ever matched 751/175) share no baseline rows, and `pnpm lint:oxlint`
+  runs `--quiet`, which hides a "warn" and hard-fails an unbaselined "error"  - 
+  so the built-in stays out of the config, measured but not adopted.
+  `no-empty-test` and `no-test-without-assertion` were true duplicates of
+  `vitest/expect-expect`, which was already enabled by oxlint's own default at
+  warn and already covered both shapes before this change; no config line was
+  added, since one would be redundant and, under `--quiet`, invisible either
+  way.
+- **`langwatch/nested-ternary` moved to its built-in; `langwatch/runtime-undefined`
+  did not.** `nested-ternary` only existed to consult the baseline in place of
+  `no-nested-ternary`; its 342 baseline entries were re-keyed from
+  `nested-ternary|` to `no-nested-ternary|`, a generated `overrides` block (the
+  same mechanism `max-depth` and `complexity` already used) suppresses every
+  baselined file, and the built-in is now enabled directly with zero new
+  findings beyond nine pre-existing, already-failing files the plugin rule was
+  not baseline-covering either. `runtime-undefined` was never wired into any
+  config, and its built-in, `no-undefined`, measured at 11,568 findings across
+  3,591 files with no baseline entries to re-key - too large a register to
+  adopt by this change. It was deleted; `no-undefined` was not enabled.
+- **Six plugin rules could still be oxlint configuration.** `temporal-only`,
   `environment-boundaries`, `id-generation-origin`, `prisma-containment`,
-  `web-imports-server-shaped-value`, `service-dependencies` and
-  `nested-ternary` are all "this file kind may not name that thing", verified
-  expressible with `no-restricted-*` and an `overrides` allowlist. Moving them
-  deletes about 677 lines across seven rule files and seven suites.
-  It also costs three things: 718 of the 2,586 baseline entries belong to
-  those rules and would become either a hard failure or 718 hand-written
-  override paths, which is exactly what the baseline replaced; the structured
-  `{what, why, fix}` message becomes one flat string; and
-  `package-boundaries` cannot follow them, because its `sealedExports` check
-  reads the *target* package's `exports` map and its `featureLayer` check
-  needs the layer rank of both ends.
+  `web-imports-server-shaped-value` and `service-dependencies` are all "this
+  file kind may not name that thing", verified expressible with
+  `no-restricted-*` and an `overrides` allowlist. Moving them deletes about
+  642 lines across six rule files and six suites. It also costs three things:
+  376 of the 2,586 baseline entries belong to those rules and would become
+  either a hard failure or 376 hand-written override paths, which is exactly
+  what the baseline replaced; the structured `{what, why, fix}` message
+  becomes one flat string; and `package-boundaries` cannot follow them,
+  because its `sealedExports` check reads the *target* package's `exports`
+  map and its `featureLayer` check needs the layer rank of both ends.
 - **`no-dupe-class-members` is available and not enabled**, while
   `langwatch/service-quality` reimplements half of it.
-- **Five plugin rules are registered and enabled nowhere**:
-  `awaited-return-chain`, `max-statements-per-line`, `service-member-spacing`,
-  `service-quality` and `runtime-undefined`. They are tested, documented and
-  inert. Each needs a decision: wire it or delete it.
+- **Four plugin rules are registered and enabled nowhere**:
+  `awaited-return-chain`, `max-statements-per-line`, `service-member-spacing`
+  and `service-quality`. They are tested, documented and inert. Each needs a
+  decision: wire it or delete it.
 
 None of these is a licence to delete a rule quietly. Each is a change with an
 ADR amendment attached.
