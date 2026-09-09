@@ -79,12 +79,18 @@ import {
   StagedLedgerWriter,
   type StagedSender,
 } from "./staged-ledger-writer";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
 const logger = createLogger("langwatch:identity:ledger");
 
-/** The read-your-writes window, the grants ledger's convergence shape. */
-export const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const IDENTITY_CONVERGENCE_POLL_MS = 25;
+/**
+ * A person is on the other end of every identity ceremony this ledger writes
+ * — a sign-in, an address being attached — so it waits on the interactive
+ * window. The values used to be stated here, and identically in three sibling
+ * ledgers; see `_shared/read-your-writes-window.ts` for why one number could
+ * not have been right for all five callers.
+ */
+const IDENTITY_CONVERGENCE = INTERACTIVE_READ_YOUR_WRITES;
 
 const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [ATTACH_IDENTIFIER_COMMAND_TYPE]: "attachIdentifier",
@@ -161,10 +167,7 @@ export class IdentityLedgerWriter
   private readonly provisionalHeads: ProvisionalHeadsWriter;
 
   constructor(deps: IdentityLedgerWriterDeps) {
-    const convergence = deps.convergence ?? {
-      timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
-      pollMs: IDENTITY_CONVERGENCE_POLL_MS,
-    };
+    const convergence = deps.convergence ?? IDENTITY_CONVERGENCE;
     super({
       stagedSender: deps.stagedSender ?? resolveStagedSender,
       // No append of its own: the staged command is the sole appender
