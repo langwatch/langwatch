@@ -48,7 +48,12 @@ func TestClassifyBifrostError_ProductionFailuresAreNotTimeouts(t *testing.T) {
 				Error:          &bfschemas.ErrorField{Message: "deployments not set"},
 				ExtraFields:    bfschemas.BifrostErrorExtraFields{Provider: bfschemas.Azure},
 			},
-			want: domain.ErrProviderConfigInvalid,
+			// A bare Message-only rejection with no status, Go error, or vendor
+			// code is a provider row Bifrost refused before dialing. The PR spec
+			// (azure-deployment-map-control-plane-path.feature §G) pins this to
+			// provider_misconfigured — permanent, non-retryable, surfaced 502 —
+			// classified by shape rather than the substring table.
+			want: domain.ErrProviderMisconfigured,
 		},
 		{
 			name: "an operation the provider does not implement",
@@ -396,10 +401,17 @@ func TestClassifyBifrostError_ClampedModelStaysValidUTF8(t *testing.T) {
 // address; the response-side messages describe a body the gateway could not
 // read. Neither is the customer's to see, and both are already on the log line
 // via faults.go#handledCause.
+//
+// The fixture carries the wrapped Go net error the mid-stream read actually
+// fails on, which is how this arrives in production. That non-bare shape keeps
+// it on the retryable provider_error code (the bare Message-only shape is the
+// permanent provider_misconfigured bucket, see bfErrorCode), while the customer
+// copy stays the fixed sentence — the internal address never reaches meta.
 func TestClassifyBifrostError_UnrecognizedFailuresDoNotRelayEngineProse(t *testing.T) {
 	berr := &bfschemas.BifrostError{
 		Error: &bfschemas.ErrorField{
 			Message: "Error reading stream: read tcp 10.42.0.7:52344->10.42.9.1:443: connection reset by peer",
+			Error:   errors.New("read tcp 10.42.0.7:52344->10.42.9.1:443: connection reset by peer"),
 		},
 	}
 
