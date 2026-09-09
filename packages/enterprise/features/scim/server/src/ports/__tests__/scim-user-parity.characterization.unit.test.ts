@@ -101,7 +101,7 @@ function harness(
     provenOffboarding: options.provenOffboarding ?? false,
   });
   if (options.membership !== void 0) {
-    vi.mocked(repo.tryFindMembership).mockResolvedValue(options.membership as never);
+    vi.mocked(repo.findMembership).mockResolvedValue(options.membership as never);
   }
   return { repo, users, auth, governance, writer, service };
 }
@@ -312,7 +312,7 @@ describe("SCIM user parity", () => {
   /** @scenario "With the flag off the previous write path answers exactly as before" */
   it("deactivates and removes a member on delete, sweeping visible grants", async () => {
     const repo = repository({
-      tryFindMembership: vi.fn(async () => ({
+      findMembership: vi.fn(async () => ({
         userId: "user-1",
         organizationId: "org-1",
         user: user(),

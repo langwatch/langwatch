@@ -14,25 +14,25 @@ const now = new Date("2026-08-25T12:00:00.000Z");
 
 function repository(overrides: Record<string, unknown> = {}): ScimRepositoryPort {
   return {
-    tryFindOrganizationBySsoDomain: vi.fn(),
+    findOrganizationBySsoDomain: vi.fn(),
     createToken: vi.fn(async () => ({ id: "token_1" })),
     listTokens: vi.fn(async () => []),
-    tryFindToken: vi.fn(async () => null),
+    findToken: vi.fn(async () => null),
     revokeToken: vi.fn(async () => false),
     revokeTokensForConnection: vi.fn(async () => 0),
-    tryFindTokenByHash: vi.fn(async () => null),
+    findTokenByHash: vi.fn(async () => null),
     recordTokenUse: vi.fn(async () => undefined),
     scimConnectionExists: vi.fn(async () => true),
-    tryFindDirectoryUserId: vi.fn(async () => null),
+    findDirectoryUserId: vi.fn(async () => null),
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
     listDirectoryConnectionsForUser: vi.fn(async () => []),
-    tryFindMembership: vi.fn(async () => null),
+    findMembership: vi.fn(async () => null),
     listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
-    tryFindGroup: vi.fn(async () => null),
+    findGroup: vi.fn(async () => null),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
     createGroup: vi.fn(),
     renameGroup: vi.fn(async () => undefined),
@@ -116,7 +116,7 @@ describe("SCIM characterization: token lifecycle", () => {
           lastUsedAt: null,
         },
       ]),
-      tryFindTokenByHash: vi.fn(async () => ({
+      findTokenByHash: vi.fn(async () => ({
         id: "token_1",
         organizationId: "org_1",
         connectionId: "connection_1",
@@ -158,7 +158,7 @@ describe("SCIM characterization: token lifecycle", () => {
       revoked = vi.fn(async () => undefined);
     })();
     const repo = repository({
-      tryFindToken: vi.fn(async () => ({
+      findToken: vi.fn(async () => ({
         id: "token_1",
         organizationId: "org_1",
         connectionId: "connection_1",
@@ -200,7 +200,7 @@ describe("SCIM characterization: token lifecycle", () => {
   /** @scenario "Entitlement is checked whenever a token is exercised" */
   it("distinguishes invalid credentials, lapsed plans, and unknown revocation", async () => {
     const repo = repository({
-      tryFindTokenByHash: vi.fn(async () => ({
+      findTokenByHash: vi.fn(async () => ({
         id: "token_1",
         organizationId: "org_1",
         connectionId: "connection_1",

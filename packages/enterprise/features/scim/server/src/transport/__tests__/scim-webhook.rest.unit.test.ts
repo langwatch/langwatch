@@ -36,7 +36,7 @@ class DirectoryFake extends ScimServiceFake {
       : ({ status: "invalid_token" } as const);
   });
   override readonly createUser = vi.fn(async () => ({}) as never);
-  override readonly tryFindOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_victim" }));
+  override readonly findOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_victim" }));
 }
 
 function signature(body: string, options: { secret?: string; atSeconds?: number } = {}): string {
@@ -105,7 +105,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
       expect(api.scim.createUser).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org_attacker" }),
       );
-      expect(api.scim.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+      expect(api.scim.findOrganizationBySsoDomain).not.toHaveBeenCalled();
     });
   });
 

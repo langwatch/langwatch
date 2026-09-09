@@ -16,7 +16,7 @@ import { nowInstant } from "@langwatch/time";
 function groupsRepository(): ScimDirectoryRepository {
   return {
     listGroupMemberIds: vi.fn(async () => ["user_1"]),
-    tryFindGroup: vi.fn(async () => ({
+    findGroup: vi.fn(async () => ({
       id: "group_1",
       organizationId: "org_1",
       name: "Provisioned",
@@ -66,7 +66,7 @@ const scimUserList: ScimListResponse<ScimUser> = {
 };
 
 class ScimServiceFake extends ScimService {
-  readonly tryFindOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_1" }));
+  readonly findOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_1" }));
   readonly createUser: ScimService["createUser"] = vi.fn(async () => scimUser);
   readonly listUsers: ScimService["listUsers"] = vi.fn(async () => scimUserList);
   readonly deleteUser = vi.fn(async () => {});

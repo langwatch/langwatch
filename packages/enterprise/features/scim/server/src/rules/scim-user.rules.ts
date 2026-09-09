@@ -63,7 +63,7 @@ function splitName(fullName: string): {
   };
 }
 
-export function tryParseUserNameFilter(filter?: string): string | null {
+export function parseUserNameFilter(filter?: string): string | null {
   if (!filter) {
     return null;
   }

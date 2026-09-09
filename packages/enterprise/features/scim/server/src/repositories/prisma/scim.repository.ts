@@ -99,14 +99,14 @@ export class PrismaScimRepository extends ScimRepositoryPort {
     return new PrismaScimRepository(database);
   }
 
-  tryFindOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null> {
+  findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null> {
     return this.prisma.organization.findUnique({
       where: { ssoDomain: input.domain },
       select: { id: true },
     });
   }
 
-  tryFindMembership(input: {
+  findMembership(input: {
     organizationId: string;
     userId: string;
   }): Promise<ScimMembershipRecord | null> {
@@ -152,7 +152,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       where: { userId_organizationId: input },
     });
   }
-  async tryFindGroup(input: {
+  async findGroup(input: {
     organizationId: string;
     id: string;
   }): Promise<ScimGroupRecord | null> {
@@ -315,7 +315,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       ).count > 0
     );
   }
-  tryFindToken(input: {
+  findToken(input: {
     organizationId: string;
     tokenId: string;
   }): Promise<ScimTokenIdentity | null> {
@@ -331,7 +331,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
     const result = await this.prisma.scimToken.deleteMany({ where: input });
     return result.count;
   }
-  tryFindTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
+  findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
     return this.prisma.scimToken.findFirst({
       where: { hashedToken },
       select: { id: true, organizationId: true, connectionId: true },
@@ -358,7 +358,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
     return connection !== null;
   }
 
-  async tryFindDirectoryUserId(input: {
+  async findDirectoryUserId(input: {
     connectionId: string;
     externalId: string;
   }): Promise<string | null> {

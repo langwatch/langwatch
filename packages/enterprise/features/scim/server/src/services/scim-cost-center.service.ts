@@ -52,7 +52,7 @@ export class ScimCostCenterService {
     });
   }
 
-  tryFromRequest(request: ScimCreateUserRequest): string | null | undefined {
+  findFromRequest(request: ScimCreateUserRequest): string | null | undefined {
     const extension = Reflect.get(request, SCIM_ENTERPRISE_USER_SCHEMA);
     if (extension === null || typeof extension !== "object" || !("costCenter" in extension)) {
       return undefined;

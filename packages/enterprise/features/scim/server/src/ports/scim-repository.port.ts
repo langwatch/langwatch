@@ -79,10 +79,10 @@ export abstract class ScimGrantRepositoryPort {
 }
 
 export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
-  abstract tryFindOrganizationBySsoDomain(input: {
+  abstract findOrganizationBySsoDomain(input: {
     domain: string;
   }): Promise<{ id: string } | null>;
-  abstract tryFindMembership(input: {
+  abstract findMembership(input: {
     organizationId: string;
     userId: string;
   }): Promise<ScimMembershipRecord | null>;
@@ -98,7 +98,7 @@ export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
     role: string;
   }): Promise<void>;
   abstract removeMembership(input: { organizationId: string; userId: string }): Promise<void>;
-  abstract tryFindGroup(input: {
+  abstract findGroup(input: {
     organizationId: string;
     id: string;
   }): Promise<ScimGroupRecord | null>;
@@ -135,7 +135,7 @@ export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
     description: string | null;
   }): Promise<{ id: string }>;
   abstract listTokens(organizationId: string): Promise<ScimTokenRecord[]>;
-  abstract tryFindToken(input: {
+  abstract findToken(input: {
     organizationId: string;
     tokenId: string;
   }): Promise<ScimTokenIdentity | null>;
@@ -144,13 +144,13 @@ export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
     organizationId: string;
     connectionId: string;
   }): Promise<number>;
-  abstract tryFindTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
+  abstract findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
   abstract recordTokenUse(input: { tokenId: string; usedAt: Instant }): Promise<void>;
   abstract scimConnectionExists(input: {
     organizationId: string;
     connectionId: string;
   }): Promise<boolean>;
-  abstract tryFindDirectoryUserId(input: {
+  abstract findDirectoryUserId(input: {
     connectionId: string;
     externalId: string;
   }): Promise<string | null>;

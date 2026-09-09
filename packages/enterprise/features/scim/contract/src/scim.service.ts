@@ -13,7 +13,7 @@ import type { ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 /** The portable provisioning capability used by every SCIM transport. */
 export abstract class ScimService {
   /** Resolve an Auth0 SCIM webhook's verified e-mail domain to its tenant. */
-  abstract tryFindOrganizationBySsoDomain(input: {
+  abstract findOrganizationBySsoDomain(input: {
     domain: string;
   }): Promise<{ id: string } | null>;
   abstract generateToken(input: {

@@ -14,7 +14,7 @@ export class ScimServiceFake extends ScimService {
     status: "invalid_token" as const,
   }));
   readonly createUser = vi.fn();
-  readonly tryFindOrganizationBySsoDomain = vi.fn();
+  readonly findOrganizationBySsoDomain = vi.fn();
   readonly listUsers = vi.fn();
   readonly deleteUser = vi.fn();
   readonly generateToken = vi.fn();

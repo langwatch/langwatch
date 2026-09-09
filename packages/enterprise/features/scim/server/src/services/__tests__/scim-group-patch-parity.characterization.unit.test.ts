@@ -22,7 +22,7 @@ const group = {
 
 function repository(): ScimDirectoryRepository {
   return {
-    tryFindGroup: vi.fn(async () => group),
+    findGroup: vi.fn(async () => group),
     listGroupMemberIds: vi.fn(async () => ["user-1", "user-2"]),
     listGroupMembers: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
@@ -69,7 +69,7 @@ describe("SCIM group PATCH parity", () => {
   it("ignores an unrelated attribute while preserving the supported group", async () => {
     const { repo, update } = harness();
     await update([{ op: "replace", path: "externalId", value: "abc-123" }]);
-    expect(repo.tryFindGroup).toHaveBeenCalled();
+    expect(repo.findGroup).toHaveBeenCalled();
   });
 
   it("renames a group through a no-path value object without touching members", async () => {

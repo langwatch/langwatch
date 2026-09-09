@@ -35,7 +35,7 @@ import {
   isUniqueViolation,
   nameFromScimRequest,
   scimUserOf,
-  tryParseUserNameFilter,
+  parseUserNameFilter,
 } from "../rules/scim-user.rules.ts";
 
 export class ScimProvisioningService {
@@ -164,7 +164,7 @@ export class ScimProvisioningService {
     organizationId: string;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser> {
-    const existingMembership = await this.prisma.tryFindMembership({
+    const existingMembership = await this.prisma.findMembership({
       userId: existingUser.id,
       organizationId,
     });
@@ -205,7 +205,7 @@ export class ScimProvisioningService {
     await this.costCenters.sync({
       userId: existingUser.id,
       organizationId,
-      costCenter: this.costCenters.tryFromRequest(request),
+      costCenter: this.costCenters.findFromRequest(request),
     });
 
     const reloadedUser = await this.userService.tryFindById({ id: existingUser.id });
@@ -252,14 +252,14 @@ export class ScimProvisioningService {
     await this.costCenters.sync({
       userId: newUser.id,
       organizationId,
-      costCenter: this.costCenters.tryFromRequest(request),
+      costCenter: this.costCenters.findFromRequest(request),
     });
 
     return this.toScimUser(newUser);
   }
 
   async getUser({ id, organizationId }: { id: string; organizationId: string }): Promise<ScimUser> {
-    const membership = await this.prisma.tryFindMembership({
+    const membership = await this.prisma.findMembership({
       userId: id,
       organizationId,
     });
@@ -282,7 +282,7 @@ export class ScimProvisioningService {
     startIndex?: number;
     count?: number;
   }): Promise<ScimListResponse<ScimUser>> {
-    const emailFilter = tryParseUserNameFilter(filter);
+    const emailFilter = parseUserNameFilter(filter);
 
     const { rows: memberships, total: totalCount } = await this.prisma.listMemberships({
       organizationId,
@@ -311,7 +311,7 @@ export class ScimProvisioningService {
     request: ScimCreateUserRequest;
     connectionId?: string | null;
   }): Promise<ScimUser> {
-    const membership = await this.prisma.tryFindMembership({
+    const membership = await this.prisma.findMembership({
       userId: id,
       organizationId,
     });
@@ -347,7 +347,7 @@ export class ScimProvisioningService {
     await this.costCenters.sync({
       userId: id,
       organizationId,
-      costCenter: this.costCenters.tryFromRequest(request),
+      costCenter: this.costCenters.findFromRequest(request),
     });
 
     const reloadedUser = await this.userService.tryFindById({ id });
@@ -369,7 +369,7 @@ export class ScimProvisioningService {
     patchRequest: ScimPatchRequest;
     connectionId?: string | null;
   }): Promise<ScimUser> {
-    const membership = await this.prisma.tryFindMembership({
+    const membership = await this.prisma.findMembership({
       userId: id,
       organizationId,
     });
@@ -399,7 +399,7 @@ export class ScimProvisioningService {
     organizationId: string;
     connectionId?: string | null;
   }): Promise<void> {
-    const membership = await this.prisma.tryFindMembership({
+    const membership = await this.prisma.findMembership({
       userId: id,
       organizationId,
     });

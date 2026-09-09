@@ -36,7 +36,7 @@ class EnterpriseEntitlements extends EntitlementService {
 
 function groupRepository(): ScimDirectoryRepository {
   return {
-    tryFindGroup: vi.fn(async () => ({
+    findGroup: vi.fn(async () => ({
       id: "group-1",
       organizationId: "org-1",
       name: "Engineering",
@@ -121,7 +121,7 @@ describe("SCIM PATCH operation casing parity", () => {
   it("applies a capitalized Replace to user deactivation", async () => {
     const repo = scimRepositoryFixture({
       ...groupRepository(),
-      tryFindMembership: vi.fn(async () => ({
+      findMembership: vi.fn(async () => ({
         userId: "user-1",
         organizationId: "org-1",
         user: {

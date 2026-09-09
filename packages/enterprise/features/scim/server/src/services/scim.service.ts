@@ -108,8 +108,8 @@ export class ScimService extends ScimServiceContract {
     return new ScimService(options);
   }
 
-  tryFindOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null> {
-    return this.repository.tryFindOrganizationBySsoDomain(input);
+  findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null> {
+    return this.repository.findOrganizationBySsoDomain(input);
   }
 
   async generateToken(input: {
@@ -153,7 +153,7 @@ export class ScimService extends ScimServiceContract {
     organizationId: string;
     tokenId: string;
   }): Promise<{ success: true }> {
-    const token = await this.repository.tryFindToken(input);
+    const token = await this.repository.findToken(input);
     if (!(await this.repository.revokeToken(input))) {
       throw new ScimTokenNotFoundError(input.tokenId);
     }
@@ -185,7 +185,7 @@ export class ScimService extends ScimServiceContract {
   }
 
   async verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
-    const stored = await this.repository.tryFindTokenByHash(this.hashToken(input.token));
+    const stored = await this.repository.findTokenByHash(this.hashToken(input.token));
     if (!stored) {
       return { status: "invalid_token" };
     }
@@ -279,7 +279,7 @@ export class ScimService extends ScimServiceContract {
     const externalId = input.request.externalId;
     const mappedUserId =
       input.connectionId && externalId
-        ? await this.identities.tryGetUserId({
+        ? await this.identities.findUserId({
             connectionId: input.connectionId,
             externalId,
           })

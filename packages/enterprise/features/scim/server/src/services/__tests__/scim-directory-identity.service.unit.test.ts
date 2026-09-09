@@ -29,7 +29,7 @@ function createStore() {
   return {
     rows,
     repository: {
-      tryFindDirectoryUserId: async (input: { connectionId: string; externalId: string }) =>
+      findDirectoryUserId: async (input: { connectionId: string; externalId: string }) =>
         rows.find((row) => keyOf(row) === keyOf(input))?.userId ?? null,
       listDirectoryConnectionsForUser: async ({ userId }: { userId: string }) =>
         rows.filter((row) => row.userId === userId).map((row) => row.connectionId),
@@ -71,7 +71,7 @@ describe("ScimDirectoryIdentityService", () => {
 
       // The second push carries a new address and the same identifier; only
       // the identifier is looked up, so the address never enters into it.
-      const resolved = await service.tryGetUserId({
+      const resolved = await service.findUserId({
         connectionId: OKTA,
         externalId: "u-1",
       });
@@ -95,10 +95,10 @@ describe("ScimDirectoryIdentityService", () => {
         userId: "user_sam",
       });
 
-      await expect(service.tryGetUserId({ connectionId: OKTA, externalId: "u-1" })).resolves.toBe(
+      await expect(service.findUserId({ connectionId: OKTA, externalId: "u-1" })).resolves.toBe(
         "user_sam",
       );
-      await expect(service.tryGetUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
+      await expect(service.findUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
         "user_sam",
       );
       expect(store.rows).toHaveLength(2);
@@ -119,10 +119,10 @@ describe("ScimDirectoryIdentityService", () => {
         userId: "user_kim",
       });
 
-      await expect(service.tryGetUserId({ connectionId: OKTA, externalId: "u-1" })).resolves.toBe(
+      await expect(service.findUserId({ connectionId: OKTA, externalId: "u-1" })).resolves.toBe(
         "user_sam",
       );
-      await expect(service.tryGetUserId({ connectionId: ENTRA, externalId: "u-1" })).resolves.toBe(
+      await expect(service.findUserId({ connectionId: ENTRA, externalId: "u-1" })).resolves.toBe(
         "user_kim",
       );
     });
@@ -138,7 +138,7 @@ describe("ScimDirectoryIdentityService", () => {
       });
 
       await expect(
-        service.tryGetUserId({ connectionId: ENTRA, externalId: "u-new" }),
+        service.findUserId({ connectionId: ENTRA, externalId: "u-new" }),
       ).resolves.toBeNull();
     });
   });
@@ -228,9 +228,9 @@ describe("ScimDirectoryIdentityService", () => {
       await service.forget({ connectionId: OKTA, externalId: "u-1" });
 
       await expect(
-        service.tryGetUserId({ connectionId: OKTA, externalId: "u-1" }),
+        service.findUserId({ connectionId: OKTA, externalId: "u-1" }),
       ).resolves.toBeNull();
-      await expect(service.tryGetUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
+      await expect(service.findUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
         "user_sam",
       );
     });

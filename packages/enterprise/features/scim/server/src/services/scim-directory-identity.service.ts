@@ -10,8 +10,8 @@ export class ScimDirectoryIdentityService {
     return new ScimDirectoryIdentityService(repository);
   }
 
-  tryGetUserId(input: { connectionId: string; externalId: string }): Promise<string | null> {
-    return this.repository.tryFindDirectoryUserId(input);
+  findUserId(input: { connectionId: string; externalId: string }): Promise<string | null> {
+    return this.repository.findDirectoryUserId(input);
   }
 
   remember(input: { connectionId: string; externalId: string; userId: string }): Promise<void> {

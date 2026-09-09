@@ -35,7 +35,7 @@ export type ScimDirectoryRepository = Pick<
   | "listGroups"
   | "listRoleBindings"
   | "renameGroup"
-  | "tryFindGroup"
+  | "findGroup"
 > &
   ScimGroupMembershipRepository;
 
@@ -103,7 +103,7 @@ export class ScimDirectoryService {
     organizationId: string;
     excludeMembers?: boolean;
   }): Promise<ScimGroup> {
-    const group = await this.tryFindGroup({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -166,7 +166,7 @@ export class ScimDirectoryService {
     organizationId: string;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup> {
-    const group = await this.tryFindGroup({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -181,7 +181,7 @@ export class ScimDirectoryService {
       memberIds: (request.members ?? []).map((member) => member.value),
     });
 
-    const updatedGroup = (await this.tryFindGroup({ externalScimId, organizationId }))!;
+    const updatedGroup = (await this.findGroup({ externalScimId, organizationId }))!;
     const members = await this.prisma.listGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(updatedGroup, members);
@@ -196,7 +196,7 @@ export class ScimDirectoryService {
     organizationId: string;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup> {
-    const group = await this.tryFindGroup({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -205,7 +205,7 @@ export class ScimDirectoryService {
       await this.membership.applyPatch({ group, operation, organizationId });
     }
 
-    const updatedGroup = (await this.tryFindGroup({ externalScimId, organizationId }))!;
+    const updatedGroup = (await this.findGroup({ externalScimId, organizationId }))!;
     const members = await this.prisma.listGroupMembers({ groupId: group.id });
 
     return this.toScimGroup(updatedGroup, members);
@@ -218,7 +218,7 @@ export class ScimDirectoryService {
     externalScimId: string;
     organizationId: string;
   }): Promise<void> {
-    const group = await this.tryFindGroup({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
     if (!group) {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
@@ -242,14 +242,14 @@ export class ScimDirectoryService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  private async tryFindGroup({
+  private async findGroup({
     externalScimId,
     organizationId,
   }: {
     externalScimId: string;
     organizationId: string;
   }): Promise<ScimGroupRecord | null> {
-    return this.prisma.tryFindGroup({ id: externalScimId, organizationId });
+    return this.prisma.findGroup({ id: externalScimId, organizationId });
   }
 
   private toScimGroup(
