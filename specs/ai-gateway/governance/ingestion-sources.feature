@@ -67,6 +67,30 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And each locked entry says it needs an Enterprise plan
     And picking a locked entry does not open the composer
 
+  # --- Types that are defined but must not be offered ---
+
+  @unit
+  Scenario: A source type nothing reads can no longer be chosen
+    Given a source type whose data path was never finished
+    When the admin opens the "Add source" menu on any plan
+    Then that type is not offered
+    And its blurb says the source is not available rather than describing
+      a fetch it cannot perform
+    # Not locked, offered-but-locked is a sales message about what an
+    # Enterprise plan unlocks, and a source that cannot deliver data is not
+    # something to sell. The two Enterprise Compliance types, for OpenAI and
+    # for Anthropic Claude, are hidden this way: an admin who picked either
+    # got a source that stayed silent, and the Claude one collects a
+    # workspace key that never reaches the adapter that would use it.
+
+  @unit
+  Scenario: Sources already configured on an unread type still display
+    Given an ingestion source already configured on one of those types
+    When an admin opens the inventory
+    Then that source still shows its name and vendor mark rather than a blank
+    # Which is why the entry is hidden rather than deleted: the label map is
+    # built from the same list and read without a fallback.
+
   @unit
   Scenario: The composer and the menu share one plan gate
     Given the org is on a non-enterprise plan
