@@ -166,7 +166,13 @@ describe("Feature: the governance project is refused by the generic project rout
           `/api/projects/${governanceProjectId}/api-key`,
         );
 
-        expect(response.status).toBe(404);
+        // 403, not the 404 the read-by-id route answers. This branch retires
+        // the legacy base-key routes outright: the handler refuses before it
+        // looks anything up, so an ordinary project, the governance area and
+        // an id that never existed all get the identical response. The leak
+        // this suite guards against (ADR-128 §11) is therefore still shut —
+        // more tightly than a 404 shuts it, because no lookup happens at all.
+        expect(response.status).toBe(403);
       });
     });
 
@@ -209,7 +215,10 @@ describe("Feature: the governance project is refused by the generic project rout
           { method: "POST" },
         );
 
-        expect(response.status).toBe(404);
+        // 403 for the same reason the key read above answers 403: re-keying
+        // through this route is refused for every project now, so the
+        // governance area is not singled out and its key is untouched.
+        expect(response.status).toBe(403);
         const project = await prisma.project.findUnique({
           where: { id: governanceProjectId },
         });
