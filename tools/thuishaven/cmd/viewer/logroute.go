@@ -24,7 +24,7 @@ const AllApps = "all"
 
 // laneDefaults is the application a lane's line belongs to when the line itself
 // does not say. For a lane hosting one application it is that application; for
-// the two that host a pair it is the one a person means by the lane's name  - 
+// the two that host a pair it is the one a person means by the lane's name  -
 // the front door, whose absence is what they would notice.
 var laneDefaults = map[string]string{
 	"backend": "api", "go": "gateway", "ui": "ui", "langy": "langy",

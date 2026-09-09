@@ -205,7 +205,7 @@ func renderCapturedLine(line sources.LogLine) string {
 }
 
 // sessionStores reports the managed database servers from whatever the live
-// session snapshot last saw. The ports are not known when the viewer is built  - 
+// session snapshot last saw. The ports are not known when the viewer is built  -
 // a stack still provisioning has none - so the source resolves them on every
 // poll rather than being handed a set that would be stale by the first frame.
 type sessionStores struct{ model *viewerModel }
@@ -487,7 +487,7 @@ func (m *viewerModel) currentTab() string { return viewer.TabNames[m.selected] }
 func (m *viewerModel) onSessionTab() bool { return m.currentTab() == viewer.SessionTab }
 
 // onDashboard is whether the session screen is showing AND has an action
-// surface behind it. A viewer with no session still opens on the session tab  - 
+// surface behind it. A viewer with no session still opens on the session tab  -
 // it says the stack is provisioning - but has no rows to move a cursor over.
 func (m *viewerModel) onDashboard() bool { return m.session != nil && m.onSessionTab() }
 

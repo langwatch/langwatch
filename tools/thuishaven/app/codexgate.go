@@ -14,7 +14,7 @@ func (o *Orchestrator) GateCodex(stdin io.Reader, stdout io.Writer) {
 	if err := json.Unmarshal(encoded.Bytes(), &reply); err != nil {
 		return
 	}
-	// Gate itself already leaves PermissionDecision unset for a neutral call  - 
+	// Gate itself already leaves PermissionDecision unset for a neutral call  -
 	// there is nothing left here to strip.
 	//
 	// Codex preserves execution options around the rewritten command. Claude's
