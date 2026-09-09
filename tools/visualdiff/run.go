@@ -30,6 +30,11 @@ type Options struct {
 	BootTimeout  time.Duration
 	Identity     SeedIdentity
 	TraceCount   int
+	// UseHaven boots each stack as a haven stack under its own run-scoped
+	// slug instead of provisioning its own ports and sharing the developer's
+	// own Postgres, ClickHouse and Redis. Default wherever haven is
+	// installed; see haven.go for why.
+	UseHaven bool
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -53,6 +58,11 @@ type Deps struct {
 	Layout        func(dir string) (Layout, error)
 	Now           func() time.Time
 	AllocateRedis func(ctx context.Context) (RedisAllocation, error)
+	// Environ is the process environment haven commands are composed from on
+	// the haven path. Defaults to os.Environ; tests supply their own so a
+	// developer's own DATABASE_URL etc. never has to exist on the machine
+	// running the test.
+	Environ func() []string
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -120,6 +130,9 @@ func (deps *Deps) fill() {
 	if deps.AllocateRedis == nil {
 		deps.AllocateRedis = ResolveRedisAllocation
 	}
+	if deps.Environ == nil {
+		deps.Environ = os.Environ
+	}
 }
 
 func (options *Options) fill(now func() time.Time) {
@@ -146,48 +159,37 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	request.Options.fill(request.Deps.Now)
 	options, config, deps := request.Options, request.Config, request.Deps
 
-	base, candidate := PlanStacks(options.BasePort, Refs{Base: options.BaseRef, Candidate: options.CandidateRef}, options.RunDir)
-	plan := Plan{
-		Base: base, Candidate: candidate, Viewport: options.Viewport, RunDir: options.RunDir,
-		RoutesOnly: options.RoutesOnly, RouteCount: len(config.Routes), FlowIDs: flowIDs(config),
-	}
-	if options.RoutesOnly {
-		plan.FlowIDs = nil
-	}
+	plan := buildPlan(options, config)
 	result := Result{Plan: plan}
 
 	if options.DryRun {
 		writePlan(streams.Out, plan, options.RoutesOnly)
 		return result, nil
 	}
-	if held := heldPorts(plan.AllPorts(), deps.Listening); len(held) > 0 {
-		return result, fmt.Errorf("ports %s are already in use — another stack is up; pass -base-port to move both stacks",
-			renderPorts(held))
+	if !options.UseHaven {
+		// The haven path never reaches here at all: haven owns both the
+		// ports and each stack's Redis database.
+		if err := resolvePortBasedInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}); err != nil {
+			return result, err
+		}
 	}
-
-	// Allocated last, right before anything boots: a dry run never reaches
-	// here, so it never opens a Redis connection or shells out to haven.
-	redisAllocation, err := deps.AllocateRedis(ctx)
-	if err != nil {
-		return result, fmt.Errorf("redis allocation: %w", err)
-	}
-	plan.Base.RedisDBIndex = strconv.Itoa(redisAllocation.Base)
-	plan.Candidate.RedisDBIndex = strconv.Itoa(redisAllocation.Candidate)
 	result.Plan = plan
-	fmt.Fprintf(streams.Err, "redis: base db %s, candidate db %s\n", plan.Base.RedisDBIndex, plan.Candidate.RedisDBIndex)
 
-	run := &session{request: request, streams: streams, plan: plan}
-	teardown := Teardown{Root: options.Root, Run: deps.Run, Listening: deps.Listening, Log: streams.Err, Keep: options.Keep}
-	// Registered first, so it runs last: the lanes are stopped, and only then
-	// are the ports checked and the worktrees removed.
+	run := &session{request: request, streams: streams, plan: plan, runID: plan.RunID}
+	// Registered first, so it runs last: the lanes (or the haven stacks) are
+	// stopped, and only then are the worktrees removed.
 	defer func() {
-		if err := teardown.Do(context.WithoutCancel(ctx), plan.AllPorts(), run.created); err != nil {
+		if err := run.teardown(context.WithoutCancel(ctx)); err != nil {
 			fmt.Fprintln(streams.Err, err)
 		}
 	}()
 	defer run.stopAll()
 
-	if err := run.bringUp(ctx); err != nil {
+	bringUp := run.bringUp
+	if options.UseHaven {
+		bringUp = run.bringUpHaven
+	}
+	if err := bringUp(ctx); err != nil {
 		return result, err
 	}
 	stream, err := run.capture(ctx)
@@ -197,14 +199,82 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	return run.report(stream)
 }
 
+// buildPlan decides both stacks' identities: ports and a Redis placeholder on
+// the port-based path, a run-scoped haven slug and no port of its own on the
+// haven path. Carrying the port-based plan's numbers forward on the haven
+// path would read as this tool having allocated them.
+func buildPlan(options Options, config *Config) Plan {
+	runID := RunID(options.RunDir)
+	base, candidate := PlanStacks(options.BasePort, Refs{Base: options.BaseRef, Candidate: options.CandidateRef}, options.RunDir)
+	if options.UseHaven {
+		base.HavenSlug, base.Ports, base.BasePort = HavenSlug(runID, base.Name), Ports{}, 0
+		candidate.HavenSlug, candidate.Ports, candidate.BasePort = HavenSlug(runID, candidate.Name), Ports{}, 0
+	}
+	plan := Plan{
+		Base: base, Candidate: candidate, Viewport: options.Viewport, RunDir: options.RunDir,
+		RoutesOnly: options.RoutesOnly, RouteCount: len(config.Routes), FlowIDs: flowIDs(config),
+		UseHaven: options.UseHaven, RunID: runID,
+	}
+	if options.RoutesOnly {
+		plan.FlowIDs = nil
+	}
+	return plan
+}
+
+// portInfraInputs carries resolvePortBasedInfra's inputs, grouped so the
+// function itself stays within this repository's argument-count limit.
+type portInfraInputs struct {
+	plan   *Plan
+	deps   Deps
+	stderr io.Writer
+}
+
+// resolvePortBasedInfra is the port-based path's only two shared-machine
+// concerns: refusing a port something else already holds, and allocating
+// this run's two Redis databases. Allocated last, right before anything
+// boots: a dry run never reaches here.
+func resolvePortBasedInfra(ctx context.Context, inputs portInfraInputs) error {
+	plan := inputs.plan
+	if held := heldPorts(plan.AllPorts(), inputs.deps.Listening); len(held) > 0 {
+		return fmt.Errorf("ports %s are already in use - another stack is up; pass -base-port to move both stacks",
+			renderPorts(held))
+	}
+	redisAllocation, err := inputs.deps.AllocateRedis(ctx)
+	if err != nil {
+		return fmt.Errorf("redis allocation: %w", err)
+	}
+	plan.Base.RedisDBIndex = strconv.Itoa(redisAllocation.Base)
+	plan.Candidate.RedisDBIndex = strconv.Itoa(redisAllocation.Candidate)
+	fmt.Fprintf(inputs.stderr, "redis: base db %s, candidate db %s\n", plan.Base.RedisDBIndex, plan.Candidate.RedisDBIndex)
+	return nil
+}
+
+// teardown frees whatever this run started: the haven stacks and the
+// worktrees on the haven path, the local lanes and the worktrees otherwise.
+func (run *session) teardown(ctx context.Context) error {
+	if run.request.Options.UseHaven {
+		return run.teardownHaven(ctx)
+	}
+	options, deps := run.request.Options, run.request.Deps
+	teardown := Teardown{Root: options.Root, Run: deps.Run, Listening: deps.Listening, Log: run.streams.Err, Keep: options.Keep}
+	return teardown.Do(ctx, run.plan.AllPorts(), run.created)
+}
+
 // session is one run in progress: the plan it decided, the worktrees it has
-// created so far, and the lanes it has started.
+// created so far, and the lanes it has started (or, on the haven path, the
+// haven stacks it has started).
 type session struct {
 	request Request
 	streams Streams
 	plan    Plan
 	created []string
 	stops   []func()
+	// runID identifies this run for haven slug naming (see haven.go). Empty
+	// runs never reach the haven path.
+	runID string
+	// havenSlugs are the stacks this run started, in order. Teardown destroys
+	// these and nothing else.
+	havenSlugs []string
 }
 
 func (run *session) stopAll() {
@@ -366,7 +436,11 @@ func writePlan(stdout io.Writer, plan Plan, routesOnly bool) {
 	fmt.Fprintf(stdout, "visual diff plan (dry run — nothing started)\n")
 	fmt.Fprintf(stdout, "  run dir   %s\n", plan.RunDir)
 	fmt.Fprintf(stdout, "  viewport  %s\n", plan.Viewport)
-	for _, stack := range []Stack{plan.Base, plan.Candidate} {
+	for _, stack := range []*Stack{&plan.Base, &plan.Candidate} {
+		if plan.UseHaven {
+			fmt.Fprintf(stdout, "  %-9s %s - haven stack %s\n", stack.Name, stack.Ref, stack.HavenSlug)
+			continue
+		}
 		fmt.Fprintf(stdout, "  %-9s %s — ui :%d, api :%d, worker :%d, redis db %s\n",
 			stack.Name, stack.Ref, stack.Ports.UI, stack.Ports.API, stack.Ports.Worker, stack.RedisDBIndex)
 	}

@@ -3,13 +3,10 @@ package apidiff
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 
-	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
 // Booting the two instances on the developer's OWN Postgres, ClickHouse and
@@ -29,7 +26,7 @@ import (
 const (
 	// havenCommand is the orchestrator binary. Its presence on PATH is what
 	// selects this path.
-	havenCommand = "haven"
+	havenCommand = havenrun.Command
 
 	// havenSlugPrefix opens every slug a run allocates. It is what makes the
 	// teardown provably narrow: a stack apidiff may destroy is one apidiff
@@ -40,18 +37,18 @@ const (
 	// havenReadyPoll is how often the readiness loop asks haven for the
 	// backend lane. A stack's boot is minutes of install, codegen, migrate and
 	// seed; a second between questions is already generous.
-	havenReadyPoll = time.Second
+	havenReadyPoll = havenrun.DefaultReadyPoll
 
 	// havenFailureLogLines is how much of a failed stack's backend log the
 	// timeout error carries. Enough to name the failure, short enough to read.
-	havenFailureLogLines = 40
+	havenFailureLogLines = havenrun.DefaultFailureLogLines
 )
 
 // HavenSlug names the haven stack one instance runs as. Run-scoped so two
 // concurrent runs never share a stack, and instance-scoped so the branch and
 // the base never share one either.
 func HavenSlug(runID, instance string) string {
-	return domain.SanitizeSlug(havenSlugPrefix + "-" + runID + "-" + instance)
+	return havenrun.Slug(havenSlugPrefix, runID, instance)
 }
 
 // havenSelected decides where the infrastructure comes from. haven is the
@@ -59,23 +56,12 @@ func HavenSlug(runID, instance string) string {
 // reach another stack's data. -no-haven opts out, and so does naming the three
 // external servers, which is an explicit choice of somebody else's.
 func havenSelected(havenOnPath, noHaven, externalGiven bool) bool {
-	return havenOnPath && !noHaven && !externalGiven
+	return havenrun.Selected(havenOnPath, noHaven, externalGiven)
 }
 
 // havenOnPath reports whether the orchestrator is installed.
 func havenOnPath() bool {
-	_, err := exec.LookPath(havenCommand)
-	return err == nil
-}
-
-// havenManagedEnvKeys are stripped from the environment every haven command
-// inherits. haven decides where a stack's datastores are; a DATABASE_URL,
-// CLICKHOUSE_URL, REDIS_URL or REDIS_DB_INDEX carried in from the developer's
-// shell is exactly the input that would let this tool point an instance at
-// their data again.
-var havenManagedEnvKeys = []string{
-	"DATABASE_URL", "CLICKHOUSE_URL", "REDIS_URL", "REDIS_DB_INDEX",
-	"LANGWATCH_SLUG", "LANGWATCH_INSTANCE_ADMIN_API_KEY",
+	return havenrun.OnPath()
 }
 
 // havenEnv composes the environment one instance's haven commands run with:
@@ -89,71 +75,43 @@ var havenManagedEnvKeys = []string{
 // ends up holding the same throwaway key - which is what makes the
 // instance-admin operations comparable rather than symmetrically unauthorized.
 func havenEnv(inherit []string, slug string) []string {
-	managed := map[string]bool{}
-	for _, key := range havenManagedEnvKeys {
-		managed[key] = true
-	}
-	env := make([]string, 0, len(inherit)+2)
-	for _, entry := range inherit {
-		name, _, _ := strings.Cut(entry, "=")
-		if managed[name] {
-			continue
-		}
-		env = append(env, entry)
-	}
-	return append(env,
-		"LANGWATCH_SLUG="+slug,
-		"LANGWATCH_INSTANCE_ADMIN_API_KEY="+throwawayInstanceAdminKey,
-	)
+	return havenrun.Env(inherit, slug, havenrun.EnvOptions{
+		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY"},
+		Extra:            []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY=" + throwawayInstanceAdminKey},
+	})
 }
 
 // havenUpArgs brings one instance's stack up and returns. --agent is plain,
 // token-free output; --detach backgrounds the stack instead of attaching the
 // log viewer, which is what makes this a call rather than a session.
-func havenUpArgs() []string { return []string{"up", "--agent", "--detach"} }
+func havenUpArgs() []string { return havenrun.UpArgs() }
 
 // havenStatusArgs asks for the machine-readable one-shot report.
-func havenStatusArgs() []string { return []string{"status", "--agent", "--json"} }
+func havenStatusArgs() []string { return havenrun.StatusArgs() }
 
 // havenDestroyArgs stops one stack and drops the databases haven made for it.
 // The slug is the whole safety story: nothing is derived from a directory, so
 // a run can only destroy what it named.
 func havenDestroyArgs(slug string) []string {
-	return []string{"destroy", slug, "--agent", "--yes"}
+	return havenrun.DestroyArgs(slug)
 }
 
 // havenBackendLogArgs reads one stack's backend lane log, for a boot that
 // never became ready.
 func havenBackendLogArgs(slug string) []string {
-	return []string{"logs", "backend", "--agent", "--stack", slug}
+	return havenrun.BackendLogArgs(slug)
 }
 
 // havenStatus is the slice of `haven status --json` this tool reads.
-type havenStatus struct {
-	Stacks []havenStackStatus `json:"stacks"`
-}
+type havenStatus = havenrun.Status
 
-type havenStackStatus struct {
-	Slug     string             `json:"slug"`
-	APIPort  int                `json:"apiPort"`
-	Live     bool               `json:"live"`
-	Lanes    []havenLaneStatus  `json:"lanes"`
-	Services []havenServiceItem `json:"services"`
-}
+type havenStackStatus = havenrun.StackStatus
 
-type havenLaneStatus struct {
-	Name      string `json:"name"`
-	Listening bool   `json:"listening"`
-}
-
-type havenServiceItem struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
+type havenLaneStatus = havenrun.LaneStatus
 
 // havenBackendLane is the lane that answers "is the application actually
 // serving": the api and worker applications in one local process.
-const havenBackendLane = "backend"
+const havenBackendLane = havenrun.BackendLane
 
 // havenStackReady reports the base URL to probe once the named stack's backend
 // lane is up. Ready is haven's own answer - the stack live and its backend
@@ -164,36 +122,22 @@ const havenBackendLane = "backend"
 // routed app.<slug> hostname reaches the same application, but only over the
 // proxy's own TLS, which this tool's HTTP client has no reason to trust.
 func havenStackReady(report havenStatus, slug string) (string, bool) {
-	for _, stack := range report.Stacks {
-		if stack.Slug != slug || !stack.Live || stack.APIPort == 0 {
-			continue
-		}
-		for _, lane := range stack.Lanes {
-			if lane.Name == havenBackendLane && lane.Listening {
-				return fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort), true
-			}
-		}
+	stack, ready := havenrun.StackReady(report, slug, havenBackendLane)
+	if !ready || stack.APIPort == 0 {
+		return "", false
 	}
-	return "", false
+	return fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort), true
 }
 
 // parseHavenStatus decodes a `haven status --json` report.
 func parseHavenStatus(output []byte) (havenStatus, error) {
-	var report havenStatus
-	if err := json.Unmarshal(output, &report); err != nil {
-		return havenStatus{}, fmt.Errorf("haven status --json: %w", err)
-	}
-	return report, nil
+	return havenrun.ParseStatus(output)
 }
 
 // lastLines returns at most count trailing non-empty lines of text, for an
 // error that has to say what the stack died of.
 func lastLines(text string, count int) string {
-	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
-	if len(lines) > count {
-		lines = lines[len(lines)-count:]
-	}
-	return strings.Join(lines, "\n")
+	return havenrun.LastLines(text, count)
 }
 
 // --- boot stages -------------------------------------------------------------
@@ -293,11 +237,7 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 // left of the boot timeout - so a short timeout fails when it says it will
 // rather than one whole poll interval later.
 func pollDelay(deadline time.Time) time.Duration {
-	remaining := time.Until(deadline)
-	if remaining > 0 && remaining < havenReadyPoll {
-		return remaining
-	}
-	return havenReadyPoll
+	return havenrun.PollDelay(deadline, havenReadyPoll)
 }
 
 // havenStatus runs one `haven status --json` and decodes it.

@@ -19,7 +19,10 @@ func TestCLIDryRunPrintsThePlan(t *testing.T) {
 	root := writeRepoConfig(t)
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
 
-	code := Run(context.Background(), []string{"run", "-root", root, "-dry-run"}, Streams{Out: stdout, Err: stderr})
+	// -no-haven keeps this deterministic regardless of whether the machine
+	// running the test happens to have haven on PATH: this test is about the
+	// flow list, not about which boot path is selected.
+	code := Run(context.Background(), []string{"run", "-root", root, "-dry-run", "-no-haven"}, Streams{Out: stdout, Err: stderr})
 
 	if code != ExitClean {
 		t.Fatalf("exit %d: %s", code, stderr.String())
@@ -33,7 +36,7 @@ func TestCLIRefusesAnUnknownFlowName(t *testing.T) {
 	root := writeRepoConfig(t)
 	stderr := &bytes.Buffer{}
 
-	code := Run(context.Background(), []string{"run", "-root", root, "-flows", "nope", "-dry-run"}, Streams{Out: &bytes.Buffer{}, Err: stderr})
+	code := Run(context.Background(), []string{"run", "-root", root, "-flows", "nope", "-dry-run", "-no-haven"}, Streams{Out: &bytes.Buffer{}, Err: stderr})
 
 	if code != ExitOperational {
 		t.Fatalf("exit %d", code)
@@ -46,7 +49,7 @@ func TestCLIViewportOverridesTheConfiguredOne(t *testing.T) {
 	root := writeRepoConfig(t)
 	stdout := &bytes.Buffer{}
 
-	code := Run(context.Background(), []string{"run", "-root", root, "-viewport", "390x844", "-dry-run"}, Streams{Out: stdout, Err: &bytes.Buffer{}})
+	code := Run(context.Background(), []string{"run", "-root", root, "-viewport", "390x844", "-dry-run", "-no-haven"}, Streams{Out: stdout, Err: &bytes.Buffer{}})
 
 	if code != ExitClean {
 		t.Fatalf("exit %d", code)
@@ -59,7 +62,7 @@ func TestCLIFallsBackToTheConfiguredViewport(t *testing.T) {
 	root := writeRepoConfig(t)
 	stdout := &bytes.Buffer{}
 
-	Run(context.Background(), []string{"run", "-root", root, "-dry-run"}, Streams{Out: stdout, Err: &bytes.Buffer{}})
+	Run(context.Background(), []string{"run", "-root", root, "-dry-run", "-no-haven"}, Streams{Out: stdout, Err: &bytes.Buffer{}})
 
 	mustContain(t, stdout.String(), "1440x900")
 }

@@ -59,14 +59,35 @@ type Stack struct {
 	Ports        Ports
 	Layout       Layout
 	RedisDBIndex string
+	// HavenSlug is the haven stack this ref runs as, set once the plan
+	// decides to boot through haven. Empty on the port-based path.
+	HavenSlug string
+	// HavenURL is the app hostname haven allocated for this stack, adopted
+	// once its ui and backend lanes are reported listening. Empty until then
+	// and always empty on the port-based path.
+	HavenURL string
 }
 
-// URL is the origin the runner drives. The UI and its API share one origin in
-// the modular layout; the monolith serves both from the same port too.
-func (stack Stack) URL() string { return "http://localhost:" + strconv.Itoa(stack.Ports.UI) }
+// URL is the origin the runner drives: the routed app hostname on the haven
+// path, since that is where the browser actually renders the screens; on the
+// port-based path, the UI and its API share one origin in the modular
+// layout, and the monolith serves both from the same port too.
+func (stack Stack) URL() string {
+	if stack.HavenURL != "" {
+		return stack.HavenURL
+	}
+	return "http://localhost:" + strconv.Itoa(stack.Ports.UI)
+}
 
-// APIURL is the origin the seeder posts fixtures to.
-func (stack Stack) APIURL() string { return "http://localhost:" + strconv.Itoa(stack.Ports.API) }
+// APIURL is the origin the seeder posts fixtures to. haven serves the API
+// under /api on the same routed origin as the UI, so it is the same address
+// as URL() there.
+func (stack Stack) APIURL() string {
+	if stack.HavenURL != "" {
+		return stack.HavenURL
+	}
+	return "http://localhost:" + strconv.Itoa(stack.Ports.API)
+}
 
 // Plan is everything a run decided before it started anything.
 type Plan struct {
@@ -77,6 +98,10 @@ type Plan struct {
 	RoutesOnly bool
 	RouteCount int
 	FlowIDs    []string
+	// UseHaven and RunID are set once the plan decides to boot through haven;
+	// RunID is what both stacks' haven slugs are derived from (see haven.go).
+	UseHaven bool
+	RunID    string
 }
 
 // DefaultBasePort is where the base stack starts. The candidate stack sits

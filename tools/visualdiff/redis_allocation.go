@@ -13,7 +13,7 @@ import (
 // serves (0-15) - matches tools/thuishaven/domain.RedisDBCount.
 const redisDBCount = 16
 
-// DefaultRedisURL is used when REDIS_URL is not set in the environment  - 
+// DefaultRedisURL is used when REDIS_URL is not set in the environment  -
 // the same default a bare local Redis listens on.
 const DefaultRedisURL = "redis://localhost:6379"
 
@@ -110,13 +110,10 @@ func freeRedisDBs(taken map[int]bool, size RedisDBSize) ([]int, error) {
 	return free, nil
 }
 
-// havenOnPath reports whether the haven binary is reachable, so a checkout
-// with no local haven install can still run visualdiff - the registry step
-// is simply skipped, and only the DBSIZE probe guards the allocation.
-func havenOnPath() bool {
-	_, err := exec.LookPath("haven")
-	return err == nil
-}
+// havenOnPath (defined in haven.go) reports whether the haven binary is
+// reachable, so a checkout with no local haven install can still run
+// visualdiff - the registry step below is simply skipped, and only the
+// DBSIZE probe guards the allocation.
 
 // havenStatusReport is the slice of `haven status --agent --json` this
 // package reads: one redisDb per registered stack.
