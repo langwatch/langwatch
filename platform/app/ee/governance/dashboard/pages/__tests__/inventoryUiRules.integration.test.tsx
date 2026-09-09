@@ -301,8 +301,11 @@ describe("given an admin on the Inventory page", () => {
         await screen.findByRole("menuitem", { name: /Anthropic Admin API/ }),
       );
       await screen.findByRole("dialog");
-      const advanced = screen.queryByRole("button", { name: /Advanced/ });
-      if (advanced) await userEvent.click(advanced);
+      // Required, not probed. `anthropic_admin` always puts PullCadenceField
+      // behind Advanced, so the old `if (advanced)` never fired — it only
+      // stood ready to swallow a rename, dropping the group out of the sweep
+      // below while the test stayed green.
+      await userEvent.click(screen.getByRole("button", { name: /Advanced/ }));
       // Prove the cadence field is actually on screen before declaring it
       // native-free. Without this the test passes just as loudly on a drawer
       // that never rendered the control, which is how the narrow version of
