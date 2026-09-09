@@ -249,11 +249,10 @@ describe("identity service layering", () => {
           ),
       );
       expect(
-        ratchet(offenders, [
-          // The existing shadow adapter predates this migration and remains
-          // the rollback path for current SSO customers.
-          "server/better-auth/signInRouterShadow.ts",
-        ]),
+        // No allowance left: the shadow adapter that held the last one was
+        // deleted with `IDENTITY_ROUTER_V2`, so nothing under better-auth
+        // reaches into the identity runtime any more.
+        ratchet(offenders, []),
       ).toEqual(CLEAN);
     });
   });

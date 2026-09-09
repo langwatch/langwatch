@@ -361,11 +361,14 @@
 			// driving it, and the seam would be drawn to satisfy a line count
 			// rather than to name a part anybody reuses.
 			//
-			// REMOVE THIS BLOCK when IDENTITY_ROUTER_V2 retires and the legacy
-			// screens go: the surviving components stop carrying both the
-			// flagged and unflagged paths, and should come back under the
-			// limits on their own. If they do not, split them then -- with the
-			// flag gone there is one shape to split rather than two.
+			// IDENTITY_ROUTER_V2 has since retired and the legacy screens are
+			// gone, so the reason this block was granted has expired: these
+			// files no longer carry both a flagged and an unflagged path.
+			// They did not come back under the limits on their own, so what
+			// is left is ordinary length, not a flag's two shapes -- and the
+			// instruction this block came with says to split them now. The
+			// largest is VerificationFirstSignUp.tsx, whose 17 state slots
+			// want a reducer hook before its markup is worth dividing.
 			"includes": [
 				"src/components/me/PasskeysSection.tsx",
 				"src/components/me/SignInMethodsSection.tsx",

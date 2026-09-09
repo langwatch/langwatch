@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 import { normalizeIdentifierValue } from "../identifier";
 import {
   type AccountSignInMethods,
-  compareToLegacy,
   rankAccountMethods,
   type RoutableConnection,
   type RoutingDecision,
   type SignInMethod,
   type SignInMethodPolicy,
-  legacyProviderOf,
   routeSignIn,
   routingIdentifierOf,
 } from "../signin-routing";
@@ -420,70 +418,6 @@ describe("the identifier-first sign-in router", () => {
       });
 
       expect(decision.reasonCode).toBe("no_domain_match");
-    });
-  });
-
-  describe("when a decision is projected onto the legacy path's one answer", () => {
-    it("reads a redirect as the provider the legacy page redirects to", () => {
-      const decision = route({
-        raw: "sam@acme.com",
-        domainConnection: connection(),
-      });
-
-      expect(legacyProviderOf(decision)).toBe("okta");
-    });
-
-    it("reads a local picker as email mode", () => {
-      expect(legacyProviderOf(route({ raw: "sam@home.net" }))).toBe("email");
-    });
-
-    it("reads a sole-federated default set as that provider", () => {
-      const decision = route({
-        raw: "sam@home.net",
-        methodPolicy: policy({ defaultMethods: [okta] }),
-      });
-
-      expect(legacyProviderOf(decision)).toBe("okta");
-    });
-
-    it("reads a multi-method picker as email mode, since no legacy page had one", () => {
-      const decision = route({
-        raw: "sam@home.net",
-        methodPolicy: policy({ defaultMethods: [PASSWORD, okta] }),
-      });
-
-      expect(legacyProviderOf(decision)).toBe("email");
-    });
-  });
-
-  describe("when shadow mode compares a decision against the legacy outcome", () => {
-    it("agrees when both answer the same provider", () => {
-      const decision = route({
-        raw: "sam@acme.com",
-        domainConnection: connection(),
-      });
-
-      expect(
-        compareToLegacy({ decision, legacyProvider: "okta" }),
-      ).toEqual({
-        matches: true,
-        routerProvider: "okta",
-        legacyProvider: "okta",
-        reasonCode: "domain_routed",
-      });
-    });
-
-    it("carries both answers and the reason code when they disagree", () => {
-      const decision = route({ raw: "sam@home.net" });
-
-      expect(
-        compareToLegacy({ decision, legacyProvider: "okta" }),
-      ).toEqual({
-        matches: false,
-        routerProvider: "email",
-        legacyProvider: "okta",
-        reasonCode: "no_domain_match",
-      });
     });
   });
 });

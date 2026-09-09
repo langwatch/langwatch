@@ -479,9 +479,7 @@ export {
 
 export {
   type AccountSignInMethods,
-  compareToLegacy,
   isLocalSignInMethod,
-  legacyProviderOf,
   rankAccountMethods,
   type RoutableConnection,
   type RoutingDecision,
@@ -493,7 +491,6 @@ export {
   SIGNIN_ROUTING_OUTCOMES,
   SIGNIN_ROUTING_REASON_CODES,
   SSO_CONNECTION_ROUTING_STATES,
-  type ShadowComparison,
   type SignInMethod,
   type SignInMethodKind,
   type SignInMethodPolicy,
