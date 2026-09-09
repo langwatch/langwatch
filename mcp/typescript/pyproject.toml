@@ -22,6 +22,7 @@ exclude-newer = "7 days"
 constraint-dependencies = [
     "python-dotenv>=1.2.2",  # security: python-dotenv advisory (#934)
     "python-liquid>=2.2.1",  # security: python-liquid advisory (#1528)
+    "tornado>=6.5.8",  # security: tornado advisories (#2159, #2173, #2233)
 ]
 
 [tool.uv.sources]
