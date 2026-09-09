@@ -20,6 +20,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   OCSF_EXPORT: "OCSF compliance export requires an Enterprise plan",
   MANAGEMENT_API: "The management API requires an Enterprise plan",
   GROUPS: "Groups require an Enterprise plan",
+  ROUTING_POLICIES: "Routing policies require an Enterprise plan",
 } as const;
 
 export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
