@@ -11925,7 +11925,7 @@ Governance sits behind a single fence on each surface:
 
 ---
 title: From zero to your first governed request (admin)
-description: A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
+description: A 30-minute admin walkthrough to publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 sidebarTitle: First 30 minutes (admin)
 ---
 

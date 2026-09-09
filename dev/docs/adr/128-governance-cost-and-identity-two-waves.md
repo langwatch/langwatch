@@ -299,7 +299,7 @@ flowchart LR
   B["Billed card<br/>every provider's own reported total,<br/>summed across the window"]
   M["Metered card<br/>gateway total"]
   ST["Seat card<br/>counts only, never money"]
-  N["Notices: sources that stopped pulling,<br/>unpriced window, Azure bill note"]
+  N["Notices: sources with failing pulls,<br/>unpriced window, Azure bill note"]
   SP["Spender breakdown<br/>(provider, rawActorId, agent)"]
 
   R -->|"sumDaysByLane: CostSource = pulled"| S
