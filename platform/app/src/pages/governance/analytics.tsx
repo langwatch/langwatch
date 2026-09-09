@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Copy, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -41,7 +40,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  * The explore surface before there is an engine under it.
  *
  * The controls are real and drive the title and the query line; the chart
- * body is not, and says so. Nothing here runs a query.
+ * body is not, and says so. Nothing here runs a query, so the page carries
+ * the Preview badge and no control that cannot act.
  *
  * Spec: specs/governance/governance-platform-placeholders.feature
  */
@@ -63,10 +63,15 @@ function AnalyticsPage() {
       <VStack align="stretch" gap={5} width="full">
         <HStack justify="space-between" align="start" gap={6}>
           <VStack align="start" gap={1}>
-            <Heading size="md">Analytics</Heading>
+            <HStack gap={2}>
+              <Heading size="md">Analytics</Heading>
+              <Badge colorPalette="purple" size="sm" variant="surface">
+                Preview
+              </Badge>
+            </HStack>
             <Text color="fg.muted">
-              Explore anything in {orgName} using the same engine that powers
-              every chart, dashboard, signal and alert.
+              A preview of how you will explore activity in {orgName}. The
+              controls below shape a query; running it is coming.
             </Text>
           </VStack>
           <SegmentedControl
@@ -114,7 +119,7 @@ function AnalyticsPage() {
             />
           </Tabs.Content>
           <Tabs.Content value="dashboards" paddingTop={4}>
-            <Text color="fg.muted">No dashboards yet.</Text>
+            <Text color="fg.muted">Dashboards are not available yet.</Text>
           </Tabs.Content>
         </Tabs.Root>
       </VStack>
@@ -167,15 +172,6 @@ function ExploreTab({
           onChange={(value) => patch({ interval: value as ExploreInterval })}
           options={EXPLORE_INTERVALS}
         />
-        <Button
-          size="sm"
-          variant="outline"
-          borderStyle="dashed"
-          fontWeight="normal"
-        >
-          <Filter size={14} />
-          Add filter
-        </Button>
       </HStack>
       <ExploreChart
         selection={selection}
@@ -226,7 +222,7 @@ function TemplateChips({
   );
 }
 
-/** The chart body is not real yet and says so. */
+/** The chart body is not connected to anything yet and says so. */
 function ExploreChart({
   selection,
   orgName,
@@ -251,7 +247,9 @@ function ExploreChart({
         {orgName} · last {timeWindow}
       </Text>
       <Box flex={1} display="flex" alignItems="center" justifyContent="center">
-        <Text color="fg.muted">No data yet</Text>
+        <Text color="fg.muted">
+          This chart is not connected to your data yet
+        </Text>
       </Box>
     </VStack>
   );
@@ -276,12 +274,9 @@ function QueryLine({ selection }: { selection: ExploreSelection }) {
           {exploreQueryLine(selection)}
         </Text>
       </HStack>
-      <HStack gap={2} color="fg.muted">
-        <Copy size={14} />
-        <Text fontSize="sm">
-          every surface (dashboards, signals, alerts, Langy) compiles to this
-        </Text>
-      </HStack>
+      <Text fontSize="sm" color="fg.muted">
+        the query these controls describe, once queries run
+      </Text>
     </HStack>
   );
 }

@@ -47,6 +47,11 @@ const fmtRelative = (date: Date | string | null): string => {
  * deep-link. Detail-data depth (per-day spend, per-user breakdown,
  * model mix) defers to a follow-up; this page exists today to honor
  * the bird's-eye click-through invariant.
+ *
+ * Every control on the page is a link that navigates; the copy names only
+ * what the page shows today and marks the rest as not available yet.
+ *
+ * Spec: specs/ai-governance/dashboard/team-detail-page.feature
  */
 function GovernanceTeamDetailPage() {
   const router = useRouter();
@@ -159,8 +164,8 @@ function GovernanceTeamDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this team
-                will land here in a follow-up.
+                Per-day spend, per-user breakdown and model mix for this team
+                are not available yet.
               </Text>
               {teamProjectSlug && (
                 <>
@@ -178,9 +183,9 @@ function GovernanceTeamDetailPage() {
                     marginTop={1}
                     marginBottom={3}
                   >
-                    The trace explorer opens with the team's data. A 'Viewing as
-                    admin' banner stays present + the access is logged to
-                    /settings/audit-log.
+                    The trace explorer opens with this team's data. A 'Viewing
+                    as admin' banner stays on screen, and the access is recorded
+                    in your audit log.
                   </Text>
                 </>
               )}
@@ -193,8 +198,8 @@ function GovernanceTeamDetailPage() {
                 See this team in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data through
-                one orthogonal lens until the dedicated drilldown ships.
+                The chart's {`'By team'`} view shows this team's spend next to
+                every other team's.
               </Text>
             </Box>
           </>

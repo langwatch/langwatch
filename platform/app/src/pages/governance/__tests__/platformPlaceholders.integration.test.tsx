@@ -20,6 +20,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -116,6 +118,7 @@ vi.mock("~/components/ModelSelector", () => ({
   ),
 }));
 
+import { EXPLORE_TEMPLATES } from "~/components/governance/platform/exploreQuery";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import AnalyticsPage from "../analytics";
 import InsightsPage from "../insights";
@@ -220,8 +223,11 @@ describe("given the Insights screen", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Every morning a background job reads yesterday's traffic and files a couple of high-signal insights: not fifteen a day.",
+        "A couple of things worth acting on each day, never a feed of fifteen. Nothing has been filed here yet.",
       ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Langy will write your brief here"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Push back on one/)).not.toBeInTheDocument();
     expect(
@@ -350,9 +356,7 @@ describe("given the Signals & Alerts screen", () => {
       screen.getByRole("heading", { name: "Signals & Alerts" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "No rules scoped here yet. Create one from any chart's bell icon.",
-      ),
+      screen.getByText("No rules here yet. Creating one is coming."),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Insights inbox" }),
@@ -372,7 +376,9 @@ describe("given the Analytics screen", () => {
       screen.getByRole("heading", { name: "Analytics" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Cost by department · weekly")).toBeInTheDocument();
-    expect(screen.getByText("No data yet")).toBeInTheDocument();
+    expect(
+      screen.getByText("This chart is not connected to your data yet"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("usage | summarize sum(cost) by department, bin(1w)"),
     ).toBeInTheDocument();
@@ -390,5 +396,119 @@ describe("given the Analytics screen", () => {
     expect(
       screen.getByText("usage | summarize count() by model, bin(1d)"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("given a Platform screen a member can press things on", () => {
+  /**
+   * Every control the screen offers, by accessible name, so the assertion
+   * below is about the WHOLE surface rather than the controls a test
+   * remembered to name. Buttons only: links carry an href a reader can see,
+   * and the tabs and selects are covered by the scenarios above.
+   */
+  const controlNames = (Page: React.ComponentType) => {
+    renderPage(Page);
+    const names = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent?.trim() ?? "");
+    cleanup();
+    return names;
+  };
+
+  /**
+   * A control is inert when it is offered, looks pressable, and answers a
+   * press with nothing. That is a property of the SOURCE — a `<Button>` with
+   * no `onClick` — so it is read there rather than inferred from a render:
+   * a render can only prove that the controls a test happened to name do
+   * something, and the ones nobody named are exactly the ones that rot.
+   *
+   * Signals is not scanned. Its two header actions are inert and are owned
+   * by the page-header restyle, not by this file.
+   */
+  const buttonTagsIn = (page: string) => {
+    // Resolved from the package root (vitest's cwd), because under the
+    // jsdom environment `import.meta.url` carries the served path, not the
+    // filesystem one, and reading it silently misses the file.
+    const source = readFileSync(
+      join(process.cwd(), "src/pages/governance", page),
+      "utf-8",
+    );
+    return source.match(/<Button\b[^>]*>/g) ?? [];
+  };
+
+  /** @scenario "Every control the Platform screens offer does something when pressed" */
+  it("offers no control without a handler on Insights or Analytics", () => {
+    for (const page of ["insights.tsx", "analytics.tsx"]) {
+      const tags = buttonTagsIn(page);
+      // The guard against a vacuous pass: a scan that matched nothing would
+      // otherwise report every page clean, including a page of dead buttons.
+      expect(tags.length).toBeGreaterThan(0);
+      for (const tag of tags) {
+        expect(tag).toMatch(/onClick=/);
+      }
+    }
+  });
+
+  /** @scenario "Every control the Platform screens offer does something when pressed" */
+  it("offers exactly the controls the tests above press", () => {
+    // The render-side half of the same guard: a control added later shows up
+    // here as an unexpected name, so it cannot slip in unpressed. Each name
+    // below is pressed by a test in this file.
+    renderPage(InsightsPage);
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent?.trim() ?? ""),
+    ).toEqual([
+      "Inbox0",
+      "Stale0",
+      "Archived0",
+      "Alerts0",
+      "Notifications0",
+      "Set up data",
+      "Open Langy",
+    ]);
+    // Offered here, and did nothing when pressed.
+    expect(
+      screen.queryByRole("button", { name: /sample inbox/ }),
+    ).not.toBeInTheDocument();
+    cleanup();
+
+    renderPage(AnalyticsPage);
+    expect(
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent?.trim() ?? ""),
+    ).toEqual(EXPLORE_TEMPLATES.map((template) => template.label));
+    expect(
+      screen.queryByRole("button", { name: "Add filter" }),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The Platform screens describe unbuilt work in the future tense" */
+  it("never says a rule fires, a job runs or a query executes today", () => {
+    // Present-tense claims about work that does not exist. Each one was on
+    // one of these screens before: a morning job, a chart's bell icon, a
+    // query engine behind the explore controls.
+    const promises = [
+      /background job/i,
+      /bell icon/i,
+      /alerts notify/i,
+      /automations act/i,
+      /the same engine that powers/i,
+      /compiles to this/i,
+    ];
+
+    for (const Page of [InsightsPage, AnalyticsPage, SignalsPage]) {
+      renderPage(Page);
+      const shown = document.body.textContent ?? "";
+      // The guard: prove the screen rendered before asserting an absence.
+      expect(shown.length).toBeGreaterThan(50);
+      for (const promise of promises) {
+        expect(shown).not.toMatch(promise);
+      }
+      expect(screen.getAllByText("Preview").length).toBeGreaterThan(0);
+      cleanup();
+    }
   });
 });

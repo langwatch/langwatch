@@ -1,4 +1,12 @@
-import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -25,7 +33,8 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
  * A placeholder for the brief Langy will write: one card that says what
  * will land here and offers the two ways in. The Setup drawer's values
  * live in this page's state for the sitting and nowhere else — there is
- * no store behind them yet, and nothing here says otherwise.
+ * no store behind them yet, and nothing here says otherwise. The page
+ * carries the Preview badge and offers no control that cannot act.
  *
  * Spec: specs/governance/governance-platform-placeholders.feature
  */
@@ -39,10 +48,15 @@ function InsightsPage() {
     <GovernanceLayout pageTitle="Insights · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <VStack align="start" gap={1}>
-          <Heading size="md">Insights</Heading>
+          <HStack gap={2}>
+            <Heading size="md">Insights</Heading>
+            <Badge colorPalette="purple" size="sm" variant="surface">
+              Preview
+            </Badge>
+          </HStack>
           <Text color="fg.muted">
-            Langy&apos;s brief: a few things worth acting on, kept fresh, never
-            a feed. Alerts and notifications ride on top.
+            A preview of the inbox where Langy will file the few things worth
+            acting on. Nothing is filed yet.
           </Text>
         </VStack>
 
@@ -119,7 +133,7 @@ function InboxEmptyBrief({
             textAlign="center"
             marginTop={4}
           >
-            Langy writes your brief here
+            Langy will write your brief here
           </Text>
           <Text
             textStyle="sm"
@@ -130,8 +144,8 @@ function InboxEmptyBrief({
             maxWidth="380px"
             marginTop={2}
           >
-            Every morning a background job reads yesterday&apos;s traffic and
-            files a couple of high-signal insights: not fifteen a day.
+            A couple of things worth acting on each day, never a feed of
+            fifteen. Nothing has been filed here yet.
           </Text>
           <HStack gap={2} marginTop={6}>
             <Button size="sm" colorPalette="orange" onClick={onSetup}>
@@ -141,15 +155,6 @@ function InboxEmptyBrief({
               Open Langy
             </Button>
           </HStack>
-          <Button
-            variant="plain"
-            size="xs"
-            fontWeight="400"
-            color="fg.subtle"
-            marginTop={3}
-          >
-            or preview a sample inbox
-          </Button>
         </VStack>
       </LangyPanelSurface>
     </>
