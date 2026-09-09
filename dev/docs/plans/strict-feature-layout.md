@@ -324,6 +324,25 @@ memory twin ships with a contract test; `source-folder-shape` applies; one
 `pnpm install` per package.json change; report in the skill's shape with exact
 wiring lines for the root session.
 
+## 8a. Wire deltas against main recorded by the conversion lanes (09-09)
+
+Every conversion keeps paths, methods, statuses and bodies; these are the deliberate exceptions, each named in the
+lane report and the wiring note under `$CLAUDE_JOB_DIR/tmp/wiring/`:
+
+- A wrong method on a converted family answers 405 with `Allow` (was Hono's 404). Every family.
+- A foreign `projectId` in a chart path is 403 `scope_input_mismatch` from the runtime (was 404 `project_not_found`). analytics.
+- `timeWindow` on `/api/v1/query` and `analytics.lwql.query` is strict; unknown keys are rejected (were stripped).
+- api-key REST's two forbidden refusals carry codes (`api_key_permission_denied`, `api_key_admin_required`) instead of `{error:"Forbidden"}`.
+- `validateApiKey`'s refusal is `model_provider_scope_forbidden` (was `permission_denied`); `/api/playground` now appears in the published document.
+- coding-agent's v1 family answers `X-API-Version: 2026-08-07` (was `v1`); its operation ids are declared, so the frozen document's path-derived ids change.
+- licensing's past-expiry refusal is 422 `validation_error` (was tRPC `BAD_REQUEST`); `previewProration`, `getLastSubscription`, `prospective` declare `z.unknown()` outputs.
+- hosted-mcp's authorization code is 32 random bytes base64url (was a UUID); a non-object JSON body is 400 `Invalid body` (was a 500).
+- github's membership refusal wire message is the code slug `forbidden`; `/api/github/install` records as `publicEndpoint` in the route registry.
+- project's REST by-id path parameter is `{projectId}` in the published document (URLs unchanged).
+- scim: the Enterprise plan gate is unattached until the entitlement seam (Part D) lands; role and role-binding share the gap. OPEN, security.
+- The management audit rows on api-key read and update are re-established at the mount (wave 1); the Codex connect audit row on model-provider is OPEN (`TARGET_KIND_BY_ROUTER`).
+- Every converted family carries `X-API-Version` headers; description-only OpenAPI answers publish `"content": {}`.
+
 ## 9. Decisions open for Alex
 
 Ordered by what they unblock.
