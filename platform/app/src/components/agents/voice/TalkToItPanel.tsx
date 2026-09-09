@@ -268,10 +268,30 @@ async function runEndCall({
   await finish(isCutAtLimit);
 }
 
+/**
+ * Chromium exposes the document's effective Permissions-Policy. When it says
+ * the microphone is off for this page, getUserMedia rejects without a prompt,
+ * so we tell the user that instead of asking them to allow something the
+ * browser never offered. Other browsers return undefined here and fall
+ * through to the plain request.
+ */
+function isMicBlockedByPolicy(): boolean {
+  const policy = (
+    document as Document & {
+      featurePolicy?: { allowsFeature: (feature: string) => boolean };
+    }
+  ).featurePolicy;
+  return policy?.allowsFeature("microphone") === false;
+}
+
 /** Ask for the mic first so a denial is a clean, retryable state (AC27). */
 async function requestMic(
   dispatch: (event: TalkEvent) => void,
 ): Promise<boolean> {
+  if (isMicBlockedByPolicy()) {
+    dispatch({ type: "MIC_BLOCKED" });
+    return false;
+  }
   try {
     const media = await navigator.mediaDevices?.getUserMedia({ audio: true });
     media?.getTracks().forEach((t) => {

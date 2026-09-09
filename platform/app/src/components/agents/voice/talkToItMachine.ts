@@ -15,6 +15,13 @@ import type { VoiceTurn } from "./voice-transport-client.registry";
 
 export const MIC_DENIED_MESSAGE =
   "Microphone access was denied. Allow it in the browser and try again.";
+/**
+ * The page itself is not allowed to use the microphone (a Permissions-Policy
+ * header or an embedding frame without allow="microphone"). The browser never
+ * prompts in this case, so "allow it and try again" would be a dead end.
+ */
+export const MIC_BLOCKED_MESSAGE =
+  "This page is not allowed to use the microphone. Check the Permissions-Policy header on the LangWatch host or reverse proxy, then reload.";
 export const NO_KEY_MESSAGE = "No ElevenLabs key in this project";
 export const CONSENT_NOTICE =
   "This call is recorded and sent to ElevenLabs. LangWatch gateway guardrails do not apply to this session.";
@@ -28,6 +35,7 @@ export const MINT_FAILED_PREFIX = "Could not start the call";
 /** Why an error state exists — steers which copy and link the panel shows. */
 export type ErrorCode =
   | "mic_denied"
+  | "mic_blocked"
   | "key_missing"
   | "mint_failed"
   | "save_failed";
@@ -64,6 +72,7 @@ export type TalkState =
 export type TalkEvent =
   | { type: "START" }
   | { type: "MIC_DENIED" }
+  | { type: "MIC_BLOCKED" }
   | {
       type: "MINT_FAILED";
       code: "key_missing" | "mint_failed";
@@ -113,6 +122,12 @@ const talkHandlers: TalkHandlers = {
     kind: "error",
     code: "mic_denied",
     message: MIC_DENIED_MESSAGE,
+  }),
+
+  MIC_BLOCKED: () => ({
+    kind: "error",
+    code: "mic_blocked",
+    message: MIC_BLOCKED_MESSAGE,
   }),
 
   MINT_FAILED: (_state, event) => ({
