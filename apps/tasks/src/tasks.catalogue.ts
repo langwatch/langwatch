@@ -1,7 +1,4 @@
-import {
-  AgentAuditLogBackfillRepository,
-  AgentAuditLogIdsBackfillTask,
-} from "@langwatch/agent-server";
+import { AgentAuditLogIdsBackfillTask } from "./tasks/agent-audit-log-ids-backfill.task.ts";
 import { LwqlProvisionTask } from "@langwatch/analytics-server";
 import { SlackAlertTask } from "@langwatch/automation-server";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
@@ -27,7 +24,6 @@ import {
 import { PostgresProcessManagerPurgeAdapter, ProcessManagerPurgeTask } from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
 import { PostgresUserDataEraseAdapter, UserDataEraseTask } from "@langwatch/user-server";
-import { buildAnnotationClickHouseBackfillTask } from "./platform/annotation-clickhouse-backfill.composition.ts";
 import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition.ts";
 import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate.composition.ts";
 import { buildStalledRunsBackfillTask } from "./platform/stalled-runs-backfill.composition.ts";
@@ -66,7 +62,6 @@ export function buildTasksCatalogue({
     SlackAlertTask.create({ baseHost: process.env.BASE_HOST ?? "" }),
     buildObjectStorageMigrateTask({ host }),
     buildStalledRunsBackfillTask({ host, eventing }),
-    buildAnnotationClickHouseBackfillTask({ host, eventing }),
     buildDatasetContentBackfillTask({ host }),
     buildSystemMigrationsPassTask({ host, eventing }),
     ProcessManagerPurgeTask.create({
@@ -74,7 +69,8 @@ export function buildTasksCatalogue({
         PostgresProcessManagerPurgeAdapter.create({ database: host.requirePrisma() }),
     }),
     AgentAuditLogIdsBackfillTask.create({
-      repository: () => AgentAuditLogBackfillRepository.create({ database: host.requirePrisma() }),
+      database: () => host.requirePrisma(),
+      redis: host.redis ?? null,
     }),
     DuplicateSubscriptionsReportTask.create({
       repository: () =>

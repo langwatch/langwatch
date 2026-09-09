@@ -1,12 +1,14 @@
-import { AgentService } from "@langwatch/agent-contract";
-import { ScenarioFailureHandlerService } from "@langwatch/scenario-server/composition/scenario-failure-handler";
 import { SimulationClickHouseAdapter } from "@langwatch/scenario-server/composition/simulation-clickhouse";
 import { SimulationStalledRunAdapter } from "@langwatch/scenario-server/composition/simulation-eventing";
 import { SimulationExecutionPort } from "@langwatch/scenario-server/composition/simulation-execution-port";
 import { SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
 import { StalledRunsBackfillTask } from "@langwatch/scenario-server/composition/stalled-runs-backfill";
+import { nowInstant } from "@langwatch/time";
 import {
   ScenarioExecutionService,
+  ScenarioRunStatus,
+  buildFailureResults,
+  type SimulationService,
   type ScenarioExecutionJob,
   type ScenarioExecutionPrefetchInput,
   type ScenarioExecutionPrefetchResult,
@@ -22,87 +24,11 @@ import {
   type SimulationTextMessageEnd,
   type SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition.ts";
+import {
+  TASKS_PROCESS_NAME,
+  type TasksEventingInfrastructure,
+} from "./tasks-eventing.composition.ts";
 import type { TasksHost } from "./tasks-host.composition.ts";
-
-/**
- * `finishUnsuccessfulRun` only reads `AgentService` when the input carries a `target`, and this
- * task's finder never resolves one — so the lookup never fires. Every method still refuses by
- * name rather than composing the Agent feature into this process for a read it cannot reach.
- */
-class UnreachableTasksAgentService extends AgentService {
-  private refuse(capability: string): Promise<never> {
-    return Promise.reject(
-      new Error(
-        `apps/tasks composes no Agent feature; ${capability} is unreachable from stalled-runs-backfill.`,
-      ),
-    );
-  }
-
-  getById(): Promise<never> {
-    return this.refuse("getById");
-  }
-  getAll(): Promise<never> {
-    return this.refuse("getAll");
-  }
-  getReferenceStates(): Promise<never> {
-    return this.refuse("getReferenceStates");
-  }
-  getNamesByIds(): Promise<never> {
-    return this.refuse("getNamesByIds");
-  }
-  exists(): Promise<never> {
-    return this.refuse("exists");
-  }
-  list(): Promise<never> {
-    return this.refuse("list");
-  }
-  create(): Promise<never> {
-    return this.refuse("create");
-  }
-  update(): Promise<never> {
-    return this.refuse("update");
-  }
-  archive(): Promise<never> {
-    return this.refuse("archive");
-  }
-  relatedEntities(): Promise<never> {
-    return this.refuse("relatedEntities");
-  }
-  cascadeArchive(): Promise<never> {
-    return this.refuse("cascadeArchive");
-  }
-  getCopies(): Promise<never> {
-    return this.refuse("getCopies");
-  }
-  getSourceOfCopy(): Promise<never> {
-    return this.refuse("getSourceOfCopy");
-  }
-  copy(): Promise<never> {
-    return this.refuse("copy");
-  }
-  pushToCopies(): Promise<never> {
-    return this.refuse("pushToCopies");
-  }
-  syncFromSource(): Promise<never> {
-    return this.refuse("syncFromSource");
-  }
-  getHistory(): Promise<never> {
-    return this.refuse("getHistory");
-  }
-  registerConnected(): Promise<never> {
-    return this.refuse("registerConnected");
-  }
-  ownersOf(): Promise<never> {
-    return this.refuse("ownersOf");
-  }
-  getConnectedByNameAndEnvironment(): Promise<never> {
-    return this.refuse("getConnectedByNameAndEnvironment");
-  }
-  getConnectedByName(): Promise<never> {
-    return this.refuse("getConnectedByName");
-  }
-}
 
 /**
  * The eight simulation writes, dispatched onto this process's own producer-only registration.
@@ -152,18 +78,28 @@ class TasksSimulationExecution extends SimulationExecutionPort {
   }
 }
 
-/**
- * Wraps `ScenarioFailureHandlerService` as a `ScenarioExecutionService`: the
- * task's only reachable capability is `finishUnsuccessfulRun`, and the
- * other four belong to the run EXECUTOR — a pool this process never composes.
- */
+/** Completes historical stalled runs without resolving a target or starting execution. */
 class TasksScenarioExecution extends ScenarioExecutionService {
-  constructor(private readonly failures: ScenarioFailureHandlerService) {
+  constructor(private readonly simulations: SimulationService) {
     super();
   }
 
   finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void> {
-    return this.failures.finishUnsuccessfulRun(input);
+    if (input.target) {
+      throw new Error("Stalled-run backfill cannot classify a live execution target.");
+    }
+
+    return this.simulations.finishRun({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      occurredAt: nowInstant().epochMilliseconds,
+      status: input.cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR,
+      results: buildFailureResults({
+        cancelled: input.cancelled ?? false,
+        error: input.error,
+        targetHasDevTunnel: false,
+      }),
+    });
   }
 
   private refuse(capability: string): Promise<never> {
@@ -220,12 +156,7 @@ export function buildStalledRunsBackfillTask({
       const simulations = SimulationClickHouseAdapter.createNull({
         execution: new TasksSimulationExecution(registered.commands.finishRun),
       });
-      return new TasksScenarioExecution(
-        ScenarioFailureHandlerService.create({
-          agents: new UnreachableTasksAgentService(),
-          simulations,
-        }),
-      );
+      return new TasksScenarioExecution(simulations);
     },
   });
 }

@@ -18,7 +18,10 @@ import {
 } from "@langwatch/ops-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition.ts";
+import {
+  TASKS_PROCESS_NAME,
+  type TasksEventingInfrastructure,
+} from "./tasks-eventing.composition.ts";
 import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
@@ -43,16 +46,17 @@ export function buildSystemMigrationsPassTask({
     return identity;
   };
   let sweep: ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> | undefined;
+  let organizationMigrations: readonly SystemMigration[] | undefined;
   return SystemMigrationsPassTask.create({
     pass: () => {
       const database = host.requirePrisma();
-      const migrations = registeredMigrations({ host, eventing });
+      organizationMigrations ??= registeredMigrations({ host, eventing });
       const userMigrations = registeredUserMigrations({ database, eventing: identityEventing() });
       const runner = PostgresSystemMigrationsAdapter.create({
         database,
         redis: host.redis ?? null,
         isSaaS: () => host.config.isSaaS,
-        migrations: () => migrations,
+        migrations: () => organizationMigrations ?? [],
         userMigrations: () => userMigrations,
         // Read per pass rather than captured at boot, so a route added to the
         // deployment reaches the next pass without a restart.
