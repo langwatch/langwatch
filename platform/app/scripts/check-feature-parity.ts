@@ -462,6 +462,12 @@ const LEGACY_INERT: string[] = [
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
+  // PLANNED, NOT YET BUILT (ADR-135). Every scenario is @unimplemented because
+  // the dispatch-and-read write path does not exist yet — tagging them now
+  // would report bindings that are not there. Each scenario names the tag it
+  // becomes; the implementation swaps them and DELETES THIS ENTRY. If this
+  // line is still here when the change is called done, the change is not done.
+  "specs/identity/one-decision-per-write.feature",
   "specs/identity/org-admin-identity-surface.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
