@@ -26,6 +26,7 @@ export const APP_ERROR_CODES = [
   "agent_disconnected",
   "agent_environment_unresolved",
   "agent_instance_lost",
+  "agent_listing_unavailable",
   "agent_not_found",
   "agent_offline",
   "agent_owner_only",

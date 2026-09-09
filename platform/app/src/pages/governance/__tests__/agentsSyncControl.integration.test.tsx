@@ -22,7 +22,7 @@
  * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -326,6 +326,60 @@ describe("the agents page's empty table", () => {
       const empty = screen.getByTestId("agents-empty-unlisted");
       expect(empty).toHaveTextContent("Sync agents");
       expect(empty).not.toHaveTextContent("No agents registered yet");
+    });
+
+    /**
+     * Compared against the header's own control rather than against a named
+     * variant, which is the form the rule is written in: an empty pane
+     * repeating the header's action must look like the header's action,
+     * whatever the section decides that looks like next. Both buttons are on
+     * this one rendered page, so the reference cannot drift away from what a
+     * reader actually sees.
+     */
+    /** @scenario "An empty pane's action is weighted by what it does" */
+    it("draws the ask at the same weight the header draws it", () => {
+      harness.queryResults["governanceAgents.syncSources"] = { data: [GENIE] };
+      renderAgents();
+
+      const inPane = within(
+        screen.getByTestId("agents-empty-unlisted"),
+      ).getByRole("button", { name: /Sync agents/ });
+
+      // Self-check first: a className comparison that passed because one side
+      // was empty would prove nothing.
+      expect(syncButton().className).not.toBe("");
+      expect(inPane.className).toBe(syncButton().className);
+    });
+  });
+
+  describe("given a reader without the manage grant and a connected provider", () => {
+    beforeEach(() => {
+      harness.permissions = VIEWER;
+      harness.queryResults["governanceAgents.syncSources"] = { data: [GENIE] };
+    });
+
+    /**
+     * The control is drawn for this reader, disabled and carrying its own
+     * reason, and that half was already right. The paragraph above it was not:
+     * it ended "Ask now to find out what they hold" for everyone, which points
+     * a reader at a press they cannot make.
+     */
+    /** @scenario "An empty pane explains itself rather than sitting blank" */
+    it("names the grant instead of telling them to ask", () => {
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-unlisted");
+      expect(empty).toHaveTextContent("Only an administrator can ask it");
+      expect(empty).not.toHaveTextContent("Ask now");
+    });
+
+    /** @scenario "An empty pane explains itself rather than sitting blank" */
+    it("still names the connected provider and claims nothing about the tenant", () => {
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-unlisted");
+      expect(empty).toHaveTextContent("Prod Genie");
+      expect(empty).toHaveTextContent("no agent has been listed from it");
     });
   });
 

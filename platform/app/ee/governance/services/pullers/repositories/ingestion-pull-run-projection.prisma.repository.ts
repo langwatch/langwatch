@@ -30,9 +30,19 @@ function completenessOf(
  * GENERATED client, not by `schema.prisma`. Add a column to the schema and this
  * function stops compiling -- `state` is missing the new field -- which reads
  * exactly like a missing-fields bug in this file and is not one. The fix is to
- * regenerate (`pnpm run prisma:generate:typescript`), never to name the new
- * fields here. A hand-written state literal elsewhere, such as a test fixture,
- * genuinely does have to list them; this one does not.
+ * regenerate (`pnpm run prisma:generate:typescript`) rather than to name the
+ * new fields here. A hand-written state literal elsewhere, such as a test
+ * fixture, genuinely does have to list them; this one does not.
+ *
+ * THE LIMIT OF THAT RULE. Regenerating is the whole fix only where the
+ * generated column type is already the type the projection declares, which is
+ * every column the spread currently carries. A column stored WIDER than the
+ * interface -- a plain `String` in Postgres standing in for a union here -- is
+ * not fixed by regenerating, because the generated type will faithfully say
+ * `string` and the interface wants one of three words. That column needs an
+ * explicit narrowing at this boundary, and a helper doing that narrowing is
+ * load-bearing rather than redundant with the spread. Do not delete one on the
+ * strength of the paragraph above.
  */
 function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   const {

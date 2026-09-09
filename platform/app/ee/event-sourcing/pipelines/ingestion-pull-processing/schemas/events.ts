@@ -190,12 +190,28 @@ export const ingestionPullPeopleListedEventDataSchema = listingEnvelope.extend({
    * provider naming nobody, which is a false statement about a system working
    * exactly as intended, and it sends an admin to debug a healthy provider.
    *
-   * Safe to record because it is a count carrying no identity, and safe to
-   * show as a CURRENT figure. It must never be shown as a series: this number
-   * moving from zero to one at a known moment says an erasure happened then,
-   * which on a small tenant identifies the person as surely as a name would.
-   * So no trend line, no history drawer, no per-run export, and never beside
-   * a per-person list, where a drop from 500 to 499 is the same disclosure.
+   * Where this number may go is decided by who can read the sink, not by
+   * whether the sink holds one figure or a history. Our own stores may keep
+   * it per run: this event log and the run status row sit inside our
+   * boundary, under our retention, readable only by those we granted this
+   * tenant's data to. That per-run history is deliberate — an operator
+   * entitled to it needs to see the count move.
+   *
+   * It must not reach a sink outside that boundary, telemetry export above
+   * all: a span leaves over a plain exporter to a backend with its own
+   * retention and a reader set of every engineer with a dashboard login. The
+   * test is the reach, not the shape, so even a single current figure on a
+   * span is already too far.
+   *
+   * What that reach would expose: this number stepping from N to N+1 at a
+   * known moment says an erasure happened then, and on a small tenant that
+   * identifies the person as surely as a name would. The same fact limits
+   * what the product may draw with it — a CURRENT figure only, no trend line,
+   * no history drawer, and never beside a per-person list, where a drop from
+   * 500 to 499 is the same disclosure.
+   *
+   * Adding a new sink: ask who can read it. If that is anyone beyond the
+   * readers of this tenant's data, the count does not go there.
    */
   withheldPersonCount: z.number().int().nonnegative(),
 });

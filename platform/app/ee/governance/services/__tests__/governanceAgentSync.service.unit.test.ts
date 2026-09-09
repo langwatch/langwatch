@@ -67,13 +67,13 @@ const OTEL: FakeSource = {
 
 function serviceFor(client: PrismaClient) {
   const dispatched: AgentListingRequestCommand[] = [];
-  const service = GovernanceAgentSyncService.create(
-    client,
-    async (command) => {
+  const service = GovernanceAgentSyncService.create({
+    prisma: client,
+    dispatch: async (command) => {
       dispatched.push(command);
     },
-    () => "req-fixed",
-  );
+    newRequestId: () => "req-fixed",
+  });
   return { service, dispatched };
 }
 

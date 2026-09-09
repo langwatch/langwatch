@@ -280,11 +280,18 @@ function useAgentsScreen() {
  *
  * `asked` is remembered for the life of the mounted page rather than timed
  * out. A second request arriving while one is in flight is DROPPED by the
- * process manager, not queued, and this page has no way to learn when the
- * first one settled — no read surfaces the listing outcome (the events are in
- * the log and no projection folds them). A timer would be a guess at when
- * pressing works again; a reload is the thing that actually shows the result,
- * and it clears this too.
+ * process manager, not queued, and this page still has no way to learn when
+ * the first one settled.
+ *
+ * The reason for that has moved. It is no longer that the outcome is unfolded:
+ * `IngestionPullRunStatusFoldProjection` folds all four listing outcome events
+ * into eleven columns on the pull-run-status row, so when a listing settled,
+ * and with what outcome, is recorded per source. What is missing is a READ —
+ * no repository method, service or `governanceAgents` procedure returns
+ * `LastAgentsListingAt` or `LastAgentsListingOutcome` — so this hook has
+ * nothing to poll or compare against. Until one exists, a timer would still be
+ * a guess at when pressing works again; a reload is the thing that actually
+ * shows the result, and it clears this too.
  *
  * The sources read is on the view grant and runs for every reader, because the
  * empty pane needs to name the connected providers whether or not the reader
@@ -437,9 +444,10 @@ function AgentsPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
+  const canManage = hasAnyPermission("governance:manage");
   const sync = useAgentSync({
     orgId: organization?.id ?? "",
-    canManage: hasAnyPermission("governance:manage"),
+    canManage,
   });
   const { sample, rows, isLoading, error } = useAgentsScreen();
   const { filters, setFilter, clearFilters } = useAgentFilters();
@@ -453,13 +461,22 @@ function AgentsPage() {
   // WHICH nothing this is. A reader with a provider connected and a reader
   // with none have different moves available, and offering the wrong one is
   // the page failing to notice what it already knows. The third possibility —
-  // a provider that refused to answer — cannot be told apart from an empty
-  // tenant here, because nothing surfaces the listing outcome; see
-  // `agentsUnlistedCopy`, which is worded so it never claims either.
+  // a provider that refused to answer — still cannot be told apart from an
+  // empty tenant here, but the reason is now narrower than it was: the
+  // outcome IS folded and stored per source (eleven columns on the
+  // pull-run-status row), and what is missing is a read that hands those
+  // columns to this screen. Nothing in `governanceAgents` returns them, so
+  // there is still nothing to branch on; see `agentsUnlistedCopy`, which is
+  // worded so it never claims either.
   const noAgents =
     sync.connected.length > 0
       ? {
-          copy: agentsUnlistedCopy(sync.connected.map((source) => source.name)),
+          copy: agentsUnlistedCopy({
+            providerNames: sync.connected.map((source) => source.name),
+            // The sentence follows the grant, not the momentary state of the
+            // button: "asking" and "asked" are both readers who may ask.
+            canAsk: canManage,
+          }),
           onAct: sync.press,
           actionDisabled: sync.state !== "ready",
           testId: "agents-empty-unlisted",

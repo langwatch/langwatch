@@ -38,9 +38,10 @@ export interface GovernanceEmptyStateCopy {
   /**
    * How heavily that action is drawn.
    *
-   * Solid is for an action that creates something of the organization's own,
-   * which is the same rule the page headers follow; anything that merely
-   * changes what is shown is quieter than solid. Declared here, beside the
+   * The house header button is for an action that creates something of the
+   * organization's own, which is the same rule the page headers follow;
+   * anything that merely changes what is shown, or that repeats a control the
+   * header already draws ghost, is quieter than it. Declared here, beside the
    * words, because weight is part of a state's voice and the call site is
    * where the next state added is the one that forgets it. Left undeclared,
    * "Clear filters" drew as the same orange solid as "Register agent" and
@@ -79,35 +80,68 @@ export const AGENTS_EMPTY_COPY: GovernanceEmptyStateCopy = {
  * Providers that can list agents are connected, and the page holds none.
  *
  * A THIRD nothing, and the reason it earns its own words is that the page
- * cannot currently tell the two possibilities apart. A provider that answered
- * "this tenant has no agents" and a provider that refused to answer are
- * different facts, one about the tenant and one about the credential, and this
- * page has no read that distinguishes them: the outcome events exist in the
- * log and no projection folds them (see `ingestionPullRunStatus`). So the copy
- * says only what is known — these providers are connected, and nothing has
- * been listed from them — and offers the ask rather than asserting the tenant
- * is empty. Claiming emptiness on a refusal would be exactly the collapse the
- * three-outcome listing was built to prevent.
+ * cannot yet tell the two possibilities apart. A provider that answered "this
+ * tenant has no agents" and a provider that refused to answer are different
+ * facts, one about the tenant and one about the credential.
  *
- * When a read for the last outcome exists, this state splits: a listed-empty
- * arm may say the tenant has none, and a refused arm names the credential and
- * what to do about it. Neither may be written before the page can tell which
- * it is looking at.
+ * WHERE THAT STANDS NOW. The gap is no longer in the log or the fold.
+ * `IngestionPullRunStatusFoldProjection` folds all four listing outcome events
+ * — agents listed, agents refused, people listed, people refused — into eleven
+ * columns on the pull-run-status row, so for each source the last agents
+ * listing's outcome, count, reason and status are recorded and queryable.
+ *
+ * The remaining gap is THIS PAGE, and precisely one thing: nothing reads those
+ * columns. No repository method, service or tRPC procedure returns
+ * `LastAgentsListingOutcome` and its siblings, so `governanceAgents` has no
+ * read to hand the screen and the screen has nothing to branch on. Until a
+ * read exists, the copy still says only what is known — these providers are
+ * connected, nothing has been listed from them — and offers the ask rather
+ * than asserting the tenant is empty. Claiming emptiness on a refusal would be
+ * exactly the collapse the three-outcome listing was built to prevent.
+ *
+ * When that read lands, this state splits: a listed-empty arm may say the
+ * tenant has none, and a refused arm names the credential and what to do about
+ * it. Neither may be written before the page can tell which it is looking at.
  *
  * A factory rather than a constant, because the sentence names the providers
  * and a fixed string would either omit them or invent them.
+ *
+ * THE LAST SENTENCE CHANGES WITH THE GRANT. A reader who cannot press the
+ * control is not told to press it. The control itself is drawn for them,
+ * disabled and carrying its own reason, but a paragraph ending "Ask now"
+ * beside a button they cannot use reads as the page not knowing who it is
+ * talking to.
+ * Rule: specs/ai-governance/dashboard/governance-ui-controls.feature,
+ * "An empty pane explains itself rather than sitting blank".
  */
-export function agentsUnlistedCopy(
-  providerNames: readonly string[],
-): GovernanceEmptyStateCopy {
+export function agentsUnlistedCopy({
+  providerNames,
+  canAsk,
+}: {
+  providerNames: readonly string[];
+  /** Whether this reader holds the grant that makes the sync control pressable. */
+  canAsk: boolean;
+}): GovernanceEmptyStateCopy {
+  const one = providerNames.length === 1;
+  const them = one ? "it" : "them";
+  const holds = one ? "what it holds" : "what they hold";
   return {
     icon: Bot,
     headline: "No agents to show yet",
-    description: `${spokenList([...providerNames])} ${providerNames.length === 1 ? "is" : "are"} connected, and no agent has been listed from ${providerNames.length === 1 ? "it" : "them"} yet. Nothing has registered itself here either. Ask now to find out what they hold.`,
+    description: `${spokenList([...providerNames])} ${one ? "is" : "are"} connected, and no agent has been listed from ${them} yet. Nothing has registered itself here either. ${
+      canAsk
+        ? `Ask now to find out ${holds}.`
+        : `Only an administrator can ask ${them} ${holds}.`
+    }`,
     actionLabel: "Sync agents",
-    // Asking is how this organization's own agents get here, which is the same
-    // weight registering one carries on the state above.
-    emphasis: "primary",
+    // Ghost, matching the header's own sync control rather than the create
+    // action beside it. Asking a provider what it already has creates nothing
+    // of the organization's own — that is why `GovernanceSyncButton` draws
+    // ghost in the header — and an empty pane repeating the header's action
+    // has to look like the header's action. Drawn primary, this pane put the
+    // outlined house button on a sync while the header put it on Register
+    // agent, so the same press had two weights on one screen.
+    emphasis: "secondary",
   };
 }
 
