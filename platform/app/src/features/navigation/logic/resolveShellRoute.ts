@@ -1,4 +1,5 @@
 import {
+  isOrganizationScopedProduct,
   isPathUnder,
   isSettingsShellRoute,
   type ProductId,
@@ -48,8 +49,9 @@ export function resolveShellRoute({
   // The product the ADDRESS names, before any sticky scope is applied.
   const addressedProductId = productFromPathname(pathname);
   /**
-   * Gateway and Governance are organization-wide surfaces, so a personal
-   * scope can never be the one they are read in.
+   * Products the registry marks organization-wide (Gateway, Governance) are
+   * read across the whole organization, so a personal scope can never be the
+   * one they are read in.
    *
    * This matters because `isOnOwnPersonalProject` is a fact about the sticky
    * ambient team, not about the address: a reader whose last project was their
@@ -59,8 +61,7 @@ export function resolveShellRoute({
    * the address said Gateway. Settings was already excluded for exactly this
    * reason and on exactly this line.
    */
-  const isOrgScopedProduct =
-    addressedProductId === "gateway" || addressedProductId === "governance";
+  const isOrgScopedProduct = isOrganizationScopedProduct(addressedProductId);
   const isPersonalScopeRoute =
     !isSettingsRoute &&
     !isOrgScopedProduct &&
@@ -73,8 +74,7 @@ export function resolveShellRoute({
   const isOrgScopeRoute =
     isOrgScope ||
     isSettingsRoute ||
-    activeProductId === "gateway" ||
-    activeProductId === "governance";
+    isOrganizationScopedProduct(activeProductId);
 
   return {
     isSettingsRoute,
