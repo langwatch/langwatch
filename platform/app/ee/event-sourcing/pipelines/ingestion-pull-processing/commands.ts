@@ -217,14 +217,23 @@ export const RecordIngestionPullPeopleListedCommand = defineCommand({
     }),
   // Counts, never a name. The people themselves are rows in the identity
   // tables behind the erasure machinery; a span is neither erasable nor
-  // scoped, so nothing about a person may travel on one. Both counts are
-  // carried under names that say which is which, so a trace cannot be read
-  // as the provider having named only the people we kept.
+  // scoped, so nothing about a person may travel on one.
+  //
+  // The withheld count is deliberately NOT here, and "no names" is not a
+  // sufficient test for it. Spans are emitted per run and retained with
+  // timestamps, which makes any number on one readable as a series — the
+  // exact reading this feature forbids for that field everywhere else. A
+  // withheld count stepping from N to N+1 at a known moment says an erasure
+  // happened then, and on a small tenant that identifies the person as surely
+  // as a name would. The directory count stays because it is what the
+  // provider named, which our erasure does not move.
+  //
+  // The operator has not lost it: `LastPeopleWithheldCount` on the run status
+  // row carries it as a current figure, which is the one shape it is safe in.
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.request_id": data.requestId,
     "payload.directory_person_count": data.directoryPersonCount,
-    "payload.withheld_person_count": data.withheldPersonCount,
   }),
   makeJobId: (data) =>
     identity({
