@@ -1,4 +1,5 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import type { AgentsListingOutcome } from "@ee/governance/services/pullers/agentsListingOutcome";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -11,6 +12,8 @@ import {
   type AgentsLayout,
   AgentsLayoutControl,
   AgentsList,
+  agentsListedEmptyCopy,
+  agentsRefusedCopy,
   agentsUnlistedCopy,
   applyAgentFilters,
   DEFAULT_AGENTS_LAYOUT,
@@ -283,19 +286,19 @@ function useAgentsScreen() {
  * process manager, not queued, and this page still has no way to learn when
  * the first one settled.
  *
- * The reason for that has moved. It is no longer that the outcome is unfolded:
- * `IngestionPullRunStatusFoldProjection` folds all four listing outcome events
- * into eleven columns on the pull-run-status row, so when a listing settled,
- * and with what outcome, is recorded per source. What is missing is a READ —
- * no repository method, service or `governanceAgents` procedure returns
- * `LastAgentsListingAt` or `LastAgentsListingOutcome` — so this hook has
- * nothing to poll or compare against. Until one exists, a timer would still be
- * a guess at when pressing works again; a reload is the thing that actually
- * shows the result, and it clears this too.
+ * The reason for that has moved twice. It is no longer that the outcome is
+ * unfolded, and no longer that nothing reads it: `syncSources` now carries the
+ * last agents-listing outcome per source, which is what lets the empty pane
+ * tell a refusal from an empty tenant. What it does not carry is a way to know
+ * that THIS press has settled — the outcome is per source and not per request,
+ * so a freshly refused row and a row refused last week look the same from
+ * here. Latching on it would clear the button on somebody else's old refusal.
+ * A reload is still the thing that actually shows the result, and it clears
+ * this too.
  *
  * The sources read is on the view grant and runs for every reader, because the
- * empty pane needs to name the connected providers whether or not the reader
- * may press anything.
+ * empty pane needs to name the connected providers — and say which of them
+ * refused — whether or not the reader may press anything.
  */
 function useAgentSync({
   orgId,
@@ -436,6 +439,114 @@ function AgentsPane({
   );
 }
 
+/**
+ * WHICH nothing this is — the four-way decision this page exists to get right.
+ *
+ * A reader looking at an empty agents table is owed an answer to "why", and
+ * the four answers demand different things of them:
+ *
+ *   no connected provider   — nothing can list agents, so writing the
+ *                             registration is the only move.
+ *   nothing asked yet       — providers are connected and none has answered.
+ *                             Nothing is known about what they hold.
+ *   every provider answered — they hold no agents. This is the ONLY branch
+ *                             allowed to say the organization has none.
+ *   a provider refused      — the page cannot say what that provider holds,
+ *                             and somebody has to act.
+ *
+ * A REFUSAL BEATS EVERY OTHER READING, even when another provider answered
+ * cleanly. The reader's next move is the same either way — go and fix the
+ * refusing connection — and an "everything is fine, you have no agents" pane
+ * beside a dead credential is the exact defect this branch was built to end.
+ * Agents behind the refusing provider are missing from the list above, so the
+ * quieter states would all be overclaiming.
+ *
+ * `every` rather than `some` for the answered branch, for the same reason. One
+ * provider saying "none" while another has never been asked does not make the
+ * organization empty; the unasked one could be running a dozen. Only this
+ * function sees the whole set, which is why the gate is here and not in the
+ * copy.
+ *
+ * MIXED CAUSES RESOLVE TO `access`. Two providers refusing for different
+ * reasons produce one pane, and it has to carry the instruction that is worth
+ * acting on: a permission that will keep refusing forever outranks a provider
+ * that was briefly unreachable, and "ask again in a moment" would bury it.
+ *
+ * The copy itself lives in `emptyStates.ts`; what belongs here is the reading
+ * of the page's own state, and the press that goes with each one.
+ */
+function chooseNoAgentsState({
+  connected,
+  canAsk,
+  onRegister,
+  onSync,
+  syncDisabled,
+}: {
+  connected: readonly {
+    name: string;
+    lastListing: AgentsListingOutcome | null;
+  }[];
+  canAsk: boolean;
+  onRegister: () => void;
+  onSync: () => void;
+  syncDisabled: boolean;
+}) {
+  if (connected.length === 0) {
+    return {
+      copy: AGENTS_EMPTY_COPY,
+      onAct: onRegister,
+      actionDisabled: false,
+      testId: "agents-empty",
+    };
+  }
+
+  const refused = connected.filter(
+    (source) => source.lastListing?.outcome === "refused",
+  );
+  if (refused.length > 0) {
+    return {
+      copy: agentsRefusedCopy({
+        // Only the ones that refused. Naming a provider that answered would
+        // blame it for a fault it does not have, and send its owner to audit a
+        // credential that is working.
+        providerNames: refused.map((source) => source.name),
+        cause: refused.some(
+          (source) =>
+            source.lastListing?.outcome === "refused" &&
+            source.lastListing.cause === "access",
+        )
+          ? "access"
+          : "unreachable",
+        canAsk,
+      }),
+      onAct: onSync,
+      actionDisabled: syncDisabled,
+      testId: "agents-empty-refused",
+    };
+  }
+
+  if (connected.every((source) => source.lastListing?.outcome === "listed")) {
+    return {
+      copy: agentsListedEmptyCopy({
+        providerNames: connected.map((source) => source.name),
+      }),
+      onAct: onRegister,
+      actionDisabled: false,
+      testId: "agents-empty-listed",
+    };
+  }
+
+  return {
+    copy: agentsUnlistedCopy({
+      providerNames: connected.map((source) => source.name),
+      canAsk,
+    }),
+    onAct: onSync,
+    actionDisabled: syncDisabled,
+    testId: "agents-empty-unlisted",
+  };
+}
+
 function AgentsPage() {
   const { layout, selectLayout } = useAgentsLayout();
   const { openDrawer } = useDrawer();
@@ -458,35 +569,15 @@ function AgentsPage() {
   const showControls = rows.length > 0;
   // Over the whole fleet, not the filtered view — see `summarizeAgentFleet`.
   const summary = rows.length > 0 ? summarizeAgentFleet({ rows }) : null;
-  // WHICH nothing this is. A reader with a provider connected and a reader
-  // with none have different moves available, and offering the wrong one is
-  // the page failing to notice what it already knows. The third possibility —
-  // a provider that refused to answer — still cannot be told apart from an
-  // empty tenant here, but the reason is now narrower than it was: the
-  // outcome IS folded and stored per source (eleven columns on the
-  // pull-run-status row), and what is missing is a read that hands those
-  // columns to this screen. Nothing in `governanceAgents` returns them, so
-  // there is still nothing to branch on; see `agentsUnlistedCopy`, which is
-  // worded so it never claims either.
-  const noAgents =
-    sync.connected.length > 0
-      ? {
-          copy: agentsUnlistedCopy({
-            providerNames: sync.connected.map((source) => source.name),
-            // The sentence follows the grant, not the momentary state of the
-            // button: "asking" and "asked" are both readers who may ask.
-            canAsk: canManage,
-          }),
-          onAct: sync.press,
-          actionDisabled: sync.state !== "ready",
-          testId: "agents-empty-unlisted",
-        }
-      : {
-          copy: AGENTS_EMPTY_COPY,
-          onAct: openRegister,
-          actionDisabled: false,
-          testId: "agents-empty",
-        };
+  const noAgents = chooseNoAgentsState({
+    connected: sync.connected,
+    // The sentence follows the grant, not the momentary state of the button:
+    // "asking" and "asked" are both readers who may ask.
+    canAsk: canManage,
+    onRegister: openRegister,
+    onSync: sync.press,
+    syncDisabled: sync.state !== "ready",
+  });
 
   return (
     <GovernanceLayout pageTitle="Agents · AI Governance · LangWatch">

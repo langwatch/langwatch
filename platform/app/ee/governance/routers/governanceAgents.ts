@@ -79,12 +79,24 @@ export const governanceAgentsRouter = createTRPCRouter({
     }),
 
   /**
-   * Which providers this organization has that can be asked about agents.
+   * Which providers this organization has that can be asked about agents, and
+   * how the last ask of each one ended.
    *
    * On the view grant, not the manage one. A reader who cannot press the
    * button still needs the empty table to say which providers it is speaking
    * for, and gating the sentence on the grant that draws the button would take
    * that away from exactly the reader least able to work it out.
+   *
+   * The outcome rides on this read rather than on a procedure of its own
+   * because it is the same per-source fact about the same set: a second
+   * procedure would let the sentence naming the providers and the sentence
+   * explaining them disagree about which providers exist.
+   *
+   * WHAT DOES NOT COME BACK. No HTTP status and no provider error body. The
+   * service narrows a refusal to what a person can act on before it ever
+   * reaches this file — see `agentsListingOutcome` — which is why this router,
+   * a customer-facing tree the privacy guard scans, names none of those
+   * columns.
    */
   syncSources: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -92,7 +104,9 @@ export const governanceAgentsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return await GovernanceAgentSyncService.forReads(
         ctx.prisma,
-      ).listableSources({ organizationId: input.organizationId });
+      ).listableSourcesWithLastListing({
+        organizationId: input.organizationId,
+      });
     }),
 
   requestListing: protectedProcedure

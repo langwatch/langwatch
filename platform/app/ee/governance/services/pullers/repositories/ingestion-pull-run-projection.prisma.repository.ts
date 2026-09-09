@@ -1,4 +1,5 @@
 import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
+import type { AgentsListingSummary } from "@ee/governance/services/pullers/agentsListingOutcome";
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -70,6 +71,58 @@ export class PrismaIngestionPullRunProjectionRepository
       },
     });
     return row ? fromRow(row) : null;
+  }
+
+  /**
+   * The last agents listing for each of several sources, in one query.
+   *
+   * Beside {@link load} rather than expressed through it, and the reason is
+   * cost rather than taste: `load` reads a whole projection row per call, and
+   * the agents screen wants a two-column answer for every provider an
+   * organization has connected. Looping `load` would fetch every run-status
+   * column — cursor, error prose, both listing sets — once per source to
+   * render one sentence.
+   *
+   * THE SELECT IS THE POINT. It names the two columns a customer-facing
+   * decision reads and no others, so the status column never enters the
+   * process that serves the page at all. That is the cheapest possible form of
+   * the rule the privacy guard enforces by scanning names: a value that was
+   * never selected cannot be forwarded by a later edit.
+   *
+   * `projectId` is the tenant predicate and is not optional. It is the
+   * organization's hidden governance project — the same tenant the fold writes
+   * under — and without it a source id from another organization would read
+   * that organization's row.
+   *
+   * Sources with no row are absent from the map rather than present with a
+   * null, because no row means no listing has ever been recorded for that
+   * source, and `agentsListingOutcome` reads an absent row as exactly that.
+   */
+  async findAgentsListings({
+    sourceIds,
+    projectId,
+  }: {
+    sourceIds: readonly string[];
+    projectId: string;
+  }): Promise<Map<string, AgentsListingSummary>> {
+    if (sourceIds.length === 0) return new Map();
+    const rows = await this.prisma.ingestionPullRunProjection.findMany({
+      where: { sourceId: { in: [...sourceIds] }, projectId },
+      select: {
+        sourceId: true,
+        LastAgentsListingOutcome: true,
+        LastAgentsListingReason: true,
+      },
+    });
+    return new Map(
+      rows.map((row): [string, AgentsListingSummary] => [
+        row.sourceId,
+        {
+          LastAgentsListingOutcome: row.LastAgentsListingOutcome,
+          LastAgentsListingReason: row.LastAgentsListingReason,
+        },
+      ]),
+    );
   }
 
   async store(

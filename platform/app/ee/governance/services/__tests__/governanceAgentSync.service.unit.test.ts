@@ -28,22 +28,52 @@ interface FakeSource {
   sourceType: string;
 }
 
+/** One run-status row, reduced to the columns the listing read selects. */
+interface FakeListingRow {
+  sourceId: string;
+  projectId: string;
+  LastAgentsListingOutcome: string | null;
+  LastAgentsListingReason: string | null;
+}
+
 /**
- * Enough client for the two reads this service makes: the org's sources, and
- * the hidden governance project the ask is tenanted to.
+ * Enough client for the three reads this service makes: the org's sources, the
+ * hidden governance project the ask is tenanted to, and the run-status rows
+ * that say how the last listing of each source ended.
+ *
+ * The projection fake APPLIES the where clause rather than returning whatever
+ * it was given. A fake that ignored `projectId` would make the tenancy
+ * assertion below pass against a query with no tenant predicate at all, which
+ * is the exact bug that assertion exists to catch.
  */
 function fakeClient({
   sources,
   govProjectId = "gov-project-1",
+  listings = [],
 }: {
   sources: FakeSource[];
   govProjectId?: string | null;
+  listings?: FakeListingRow[];
 }) {
   return {
     ingestionSource: { findMany: vi.fn(async () => sources) },
     project: {
       findFirst: vi.fn(async () =>
         govProjectId ? { id: govProjectId } : null,
+      ),
+    },
+    ingestionPullRunProjection: {
+      findMany: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { sourceId: { in: string[] }; projectId: string };
+        }) =>
+          listings.filter(
+            (row) =>
+              row.projectId === where.projectId &&
+              where.sourceId.in.includes(row.sourceId),
+          ),
       ),
     },
   } as unknown as PrismaClient;
@@ -178,6 +208,143 @@ describe("requesting an agent listing", () => {
       ).resolves.toEqual([
         { id: "src-genie", name: "Prod Genie", sourceType: "databricks_genie" },
       ]);
+    });
+  });
+
+  /**
+   * The read the agents page branches its empty state on.
+   *
+   * A DECORATOR over `listableSources`, so what is pinned here is the join:
+   * the same set of sources, each carrying how its last ask ended, narrowed to
+   * what a person can act on. The narrowing itself is proven next door in
+   * `pullers/__tests__/agentsListingOutcome.unit.test.ts`.
+   */
+  describe("given a read of how the last listing of each source ended", () => {
+    const listedRow = (sourceId: string, projectId = "gov-project-1") => ({
+      sourceId,
+      projectId,
+      LastAgentsListingOutcome: "listed",
+      LastAgentsListingReason: null,
+    });
+
+    /** @scenario "A provider that refused is never reported as an empty organization" */
+    it("carries a refusal and an answer as different outcomes", async () => {
+      const service = GovernanceAgentSyncService.forReads(
+        fakeClient({
+          sources: [GENIE, COPILOT],
+          listings: [
+            listedRow("src-copilot"),
+            {
+              sourceId: "src-genie",
+              projectId: "gov-project-1",
+              LastAgentsListingOutcome: "refused",
+              LastAgentsListingReason: "unauthorized",
+            },
+          ],
+        }),
+      );
+
+      await expect(
+        service.listableSourcesWithLastListing({ organizationId: "org-1" }),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          id: "src-genie",
+          lastListing: { outcome: "refused", cause: "access" },
+        }),
+        expect.objectContaining({
+          id: "src-copilot",
+          lastListing: { outcome: "listed" },
+        }),
+      ]);
+    });
+
+    /** @scenario "A source nobody has asked reports nothing known rather than an answer" */
+    it("reports nothing known for a source with no recorded listing", async () => {
+      const service = GovernanceAgentSyncService.forReads(
+        fakeClient({ sources: [GENIE, COPILOT], listings: [] }),
+      );
+
+      const read = await service.listableSourcesWithLastListing({
+        organizationId: "org-1",
+      });
+
+      expect(read.map((source) => source.lastListing)).toEqual([null, null]);
+    });
+
+    /**
+     * Self-check first, and it is load-bearing: asserting "no outcome leaked"
+     * against a fixture that holds no outcome at all would pass forever. The
+     * same row is read back under its own tenant to prove the fixture is real
+     * before the other tenant is asked for it.
+     */
+    /** @scenario "The last listing outcome is read only from this organizations own records" */
+    it("never reads an outcome recorded under another organization", async () => {
+      const rowOfAnotherOrg = {
+        sourceId: "src-genie",
+        projectId: "gov-project-of-someone-else",
+        LastAgentsListingOutcome: "refused",
+        LastAgentsListingReason: "unauthorized",
+      };
+
+      const theirs = await GovernanceAgentSyncService.forReads(
+        fakeClient({
+          sources: [GENIE],
+          govProjectId: "gov-project-of-someone-else",
+          listings: [rowOfAnotherOrg],
+        }),
+      ).listableSourcesWithLastListing({ organizationId: "org-2" });
+      expect(theirs[0]?.lastListing).toEqual({
+        outcome: "refused",
+        cause: "access",
+      });
+
+      const ours = await GovernanceAgentSyncService.forReads(
+        fakeClient({
+          sources: [GENIE],
+          govProjectId: "gov-project-1",
+          listings: [rowOfAnotherOrg],
+        }),
+      ).listableSourcesWithLastListing({ organizationId: "org-1" });
+      expect(ours[0]?.lastListing).toBeNull();
+    });
+
+    /**
+     * An organization that has never ingested anything has no governance
+     * project, so there is no row to read. That is the same reading as a
+     * source nobody has asked, and it must not raise: the page has a sentence
+     * for it that an exception would replace with a red box.
+     */
+    /** @scenario "A source nobody has asked reports nothing known rather than an answer" */
+    it("reports nothing known when the organization has no governance project", async () => {
+      const service = GovernanceAgentSyncService.forReads(
+        fakeClient({ sources: [GENIE], govProjectId: null }),
+      );
+
+      await expect(
+        service.listableSourcesWithLastListing({ organizationId: "org-1" }),
+      ).resolves.toEqual([
+        expect.objectContaining({ id: "src-genie", lastListing: null }),
+      ]);
+    });
+
+    /** @scenario "An organization with no listing provider is told so" */
+    it("reads no projection at all when nothing can be asked", async () => {
+      const client = fakeClient({ sources: [OTEL] });
+
+      await expect(
+        GovernanceAgentSyncService.forReads(
+          client,
+        ).listableSourcesWithLastListing({ organizationId: "org-1" }),
+      ).resolves.toEqual([]);
+      expect(
+        (
+          client as unknown as {
+            ingestionPullRunProjection: {
+              findMany: { mock: { calls: unknown[] } };
+            };
+          }
+        ).ingestionPullRunProjection.findMany.mock.calls,
+      ).toEqual([]);
     });
   });
 });
