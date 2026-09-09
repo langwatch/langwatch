@@ -1,7 +1,7 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { SimpleLogRecordProcessor, BatchLogRecordProcessor, type LogRecordProcessor, ConsoleLogRecordExporter, LoggerProvider } from "@opentelemetry/sdk-logs";
 import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
-import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
+import { type SetupObservabilityOptions, type ObservabilityHandle, LANGWATCH_DISABLED } from "./types";
 import { trace } from "@opentelemetry/api";
 import {
   ConsoleSpanExporter,
@@ -24,9 +24,135 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
   },
 });
 
-const getLangWatchConfig = (options: SetupObservabilityOptions) => {
-  const isDisabled = options.langwatch === 'disabled';
-  const config = typeof options.langwatch === 'object' ? options.langwatch : {};
+/**
+ * The three keys the options object is made of. A value carrying one of them is
+ * a request to configure the exporter whatever it was constructed from.
+ */
+const LANGWATCH_OPTION_KEYS = ["apiKey", "endpoint", "processorType"] as const;
+
+/**
+ * Whether `value` can be read as the options object.
+ *
+ * A plain record is the ordinary case: an object literal, a JSON payload, a
+ * spread, `Object.create(null)`. Everything else has to earn it by carrying at
+ * least one option key, which keeps a configuration built by a class working
+ * while `new Date()`, `new Map()`, `new Set()`, a regular expression and a
+ * boxed string are turned away. None of those carries a key, so each one used
+ * to read as an empty configuration and export on the environment's API key,
+ * which is the same hole as the array by a different route.
+ *
+ * An empty `{}` stays valid: it is the documented way to say "configure me from
+ * the environment", so emptiness on its own cannot be the signal.
+ *
+ * Every question asked here throws on a revoked proxy, including
+ * `Array.isArray`. A throw would escape the resolver and take down setup rather
+ * than disable it, so the answer for a value that cannot even be inspected is
+ * the same as for one that can: it is not a configuration.
+ */
+const isLangWatchOptions = (value: object): boolean => {
+  try {
+    if (Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value) as unknown;
+    if (prototype === Object.prototype || prototype === null) return true;
+    return LANGWATCH_OPTION_KEYS.some((key) => key in value);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Names a rejected object by a type the runtime owns.
+ *
+ * Not by `constructor.name`, and not by `Object.prototype.toString`. Both read
+ * a string the caller supplies: `date.constructor = { name: "sk-live-..." }`
+ * and `{ [Symbol.toStringTag]: "sk-live-..." }` each put that string straight
+ * into the report. `instanceof` asks the global constructor instead, so a
+ * tampered `Date` is still reported as a Date and nothing the caller wrote is
+ * echoed. Anything not on this list is just "an object".
+ */
+const describeObject = (value: object): string => {
+  if (value instanceof Date) return "a Date";
+  if (value instanceof Map) return "a Map";
+  if (value instanceof Set) return "a Set";
+  if (value instanceof RegExp) return "a RegExp";
+  if (value instanceof String) return "a String";
+  if (value instanceof Number) return "a Number";
+  if (value instanceof Boolean) return "a Boolean";
+  if (value instanceof Promise) return "a Promise";
+  if (value instanceof Error) return "an Error";
+  return "an object";
+};
+
+/**
+ * Names the KIND of a rejected value, never its contents.
+ *
+ * The contents cannot be logged. `langwatch: process.env.LANGWATCH_API_KEY` is
+ * an easy thing to write by mistake, and a report that echoed the value would
+ * put the API key in the application's logs, turning a misconfiguration into a
+ * credential leak. The kind is enough to act on, because the message names the
+ * one string the option accepts right beside it.
+ *
+ * This runs on the path that exists to explain a problem, so it must not become
+ * one. `typeof` is the only question here that a revoked proxy answers.
+ */
+const describeRejectedValue = (value: unknown): string => {
+  if (value === null) return "null";
+  if (typeof value !== "object") return `a ${typeof value}`;
+
+  try {
+    return Array.isArray(value) ? "an array" : describeObject(value);
+  } catch {
+    return "an object";
+  }
+};
+
+/**
+ * Whether `langwatch` names the disable sentinel, an options object, or neither.
+ *
+ * The third case is why this exists. `langwatch: "disable"` used to satisfy
+ * neither branch of the old two-line resolution: it is not the sentinel, so it
+ * did not disable, and `typeof` said `string`, so it fell to `{}` and the
+ * exporter came up on the environment's API key. A caller who asked to send
+ * nothing sent everything, and nothing said so. TypeScript rejects that typo,
+ * but this value routinely arrives from config, JSON or plain JavaScript, where
+ * nothing does.
+ *
+ * `null` was the same shape of hole from the other side: `typeof null` is
+ * `"object"`, so it reached the property reads below and threw a TypeError
+ * naming neither the option nor the value. Every other non-record object was
+ * the same hole again, by a longer route: an array, a `Date`, a `Map`, a
+ * regular expression and a boxed string all read as a configuration whose
+ * every field was `undefined`, so the API key fell through to the environment
+ * and the exporter came up. `isLangWatchOptions` is what turns those away.
+ *
+ * An unrecognised value is treated as disabled rather than guessed at. It is the
+ * only safe reading: every value that lands here is a caller who did not
+ * successfully ask for the exporter, and exporting anyway is the failure worth
+ * avoiding. It is reported at `error`, and setup's existing "disabled with no
+ * alternative exporter" guidance then explains what to do next.
+ */
+const resolveLangWatchOption = (
+  langwatch: SetupObservabilityOptions["langwatch"],
+  logger: Logger,
+): { disabled: boolean; config: Exclude<typeof langwatch, string | undefined> } => {
+  if (langwatch === void 0 || langwatch === LANGWATCH_DISABLED) {
+    return { disabled: langwatch === LANGWATCH_DISABLED, config: {} };
+  }
+
+  if (typeof langwatch === "object" && langwatch !== null && isLangWatchOptions(langwatch)) {
+    return { disabled: false, config: langwatch };
+  }
+
+  logger.error(
+    `Invalid \`langwatch\` option: got ${describeRejectedValue(langwatch)}.\n` +
+      `Expected an options object, or "${LANGWATCH_DISABLED}" to turn the integration off.\n` +
+      `Treating it as "${LANGWATCH_DISABLED}", because a value that is neither cannot be read as a request to export.`,
+  );
+  return { disabled: true, config: {} };
+};
+
+const getLangWatchConfig = (options: SetupObservabilityOptions, logger: Logger) => {
+  const { disabled: isDisabled, config } = resolveLangWatchOption(options.langwatch, logger);
 
   return {
     disabled: isDisabled,
@@ -289,7 +415,7 @@ function setupDedicatedProvider(
   options: SetupObservabilityOptions,
   logger: Logger,
 ): ObservabilityHandle {
-  const langwatch = getLangWatchConfig(options);
+  const langwatch = getLangWatchConfig(options, logger);
   const addedProcessors: SpanProcessor[] = [];
 
   const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
@@ -394,7 +520,7 @@ function attachToExistingProvider(
     }
   };
 
-  const langwatch = getLangWatchConfig(options);
+  const langwatch = getLangWatchConfig(options, logger);
   const addedProcessors: SpanProcessor[] = [];
 
   if (!langwatch.disabled) {
@@ -456,7 +582,7 @@ export function createAndStartNodeSdk(
   logger: Logger,
   resource: Resource,
 ): NodeSDK {
-  const langwatch = getLangWatchConfig(options);
+  const langwatch = getLangWatchConfig(options, logger);
 
   if (langwatch.disabled) {
     logger.warn("LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors");
