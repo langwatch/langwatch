@@ -621,7 +621,7 @@ func (s *Store) AppendRunHistory(rec domain.RunRecord) error {
 }
 
 // RunHistory reads the recent history newest-last. Absent or unreadable is an
-// empty history — every caller already treats that as "cannot estimate"
+// empty history - every caller already treats that as "cannot estimate"
 // rather than an error.
 func (s *Store) RunHistory() []domain.RunRecord { return s.readRunHistory() }
 
