@@ -71,6 +71,20 @@ export function createWorkerCodingAgentApp(options: {
       billing: options.billing,
       scopeDirectory: new WorkerCodingAgentScopeDirectory(options.database),
       scopePermissions: new WorkerCodingAgentScopePermissions(options.authorization),
+      // The worker serves nobody: it projects sessions and never answers a read
+      // on behalf of a viewer, so a visibility question here is a wiring bug
+      // rather than a redaction, and the audit trail belongs to the door that
+      // does answer one.
+      visibility: {
+        readVisibility: () =>
+          Promise.reject(
+            new Error("The worker resolves no viewer, so it reads no content visibility"),
+          ),
+      },
+      audit: {
+        auditLog: () =>
+          Promise.reject(new Error("The worker answers no read that names people")),
+      },
     },
     dependencies: { github, projects: options.projects },
     config: undefined,

@@ -447,7 +447,6 @@ function fullCollaborators(): ApiPackagedRestCollaborators {
       automation: anyService,
       broadcast: anyService,
       codingAgents: anyService,
-      codingAgentAudit: anyService,
       dashboard: anyService,
       datasets: anyService,
       evaluators: anyService,

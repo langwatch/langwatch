@@ -14,6 +14,11 @@ import { secretRest, secretsAliasRest } from "@langwatch/secret-server";
 
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
 import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
+import {
+  mountCodingAgentRest,
+  mountCodingAgentRollupRest,
+  mountCodingAgentV1Rest,
+} from "../features/coding-agent/coding-agent-rest.mount.ts";
 import { mountDashboardRest } from "../features/dashboard/dashboard-rest.mount.ts";
 import { mountGithubInstallRest } from "../features/github/github-rest.mount.ts";
 import { apiDiscoveryRest } from "../features/discovery/api-discovery.rest.ts";
@@ -24,7 +29,13 @@ import { mountHealthProbeRest } from "../features/health/health-probe-rest.mount
 import { mountImageProxyRest } from "../features/image-proxy/image-proxy-rest.mount.ts";
 import { mountMcpAuthorizeRest } from "../features/mcp/mcp-authorize-rest.mount.ts";
 import { mountPlatformHealthRest } from "../features/platform-health/platform-health-rest.mount.ts";
+import { mountProjectRest } from "../features/project/project-rest.mount.ts";
 import { mountRumRest } from "../features/rum/rum-rest.mount.ts";
+import {
+  mountScimProtocolRest,
+  mountScimTokenRest,
+  mountScimWebhookRest,
+} from "../features/enterprise/scim-rest.mount.ts";
 import { mountStoredObjectFileRest } from "../features/stored-object/stored-object-file-rest.mount.ts";
 import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
 import { mountSuiteRest } from "../features/suite/suite-rest.mount.ts";
@@ -193,7 +204,20 @@ export const API_REST_DOORS = [
   { family: "governance-cli", owner: "process", paths: ["/api/v1/governance/*"] },
   { family: "auth", owner: "process", paths: ["/api/auth/*"] },
   { family: "governance-ingest", owner: "process", paths: ["/api/ingest/otel", "/api/ingest/webhook"] },
-  { family: "scim", owner: "process", paths: ["/api/scim/v2/*", "/api/webhooks/auth0-scim"] },
+  {
+    family: "scim",
+    owner: "module",
+    paths: ["/api/scim/v2/*"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.scim ? [mountScimProtocolRest(runtime, packaged.services.scim)] : null,
+  },
+  {
+    family: "scim-webhook",
+    owner: "module",
+    paths: ["/api/webhooks/auth0-scim"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.scim ? [mountScimWebhookRest(runtime, packaged.services.scim)] : null,
+  },
   { family: "traces", owner: "process", paths: ["/api/traces", "/api/v1/traces"] },
   { family: "trace-legacy", owner: "process", paths: ["/api/trace/*", "/api/thread/:id"] },
   {
@@ -204,8 +228,33 @@ export const API_REST_DOORS = [
   { family: "agent-cache", owner: "module", paths: ["/api/agent-cache", "/api/v1/agent-cache"] },
   { family: "agents", owner: "module", paths: ["/api/agents"] },
   { family: "agents-v1", owner: "module", paths: ["/api/v1/agents"] },
-  { family: "coding-agent", owner: "module", paths: ["/api/coding-agent"] },
-  { family: "coding-agent-v1", owner: "module", paths: ["/api/v1/coding-agent"] },
+  {
+    family: "coding-agent",
+    owner: "module",
+    paths: ["/api/coding-agent/sessions/:sessionId/events"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.codingAgents
+        ? [mountCodingAgentRest(runtime, packaged.services.codingAgents)]
+        : null,
+  },
+  {
+    family: "coding-agent-rollup",
+    owner: "module",
+    paths: ["/api/coding-agent/pull-request-usage"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.codingAgents
+        ? [mountCodingAgentRollupRest(runtime, packaged.services.codingAgents)]
+        : null,
+  },
+  {
+    family: "coding-agent-v1",
+    owner: "module",
+    paths: ["/api/v1/coding-agent/pull-request-usage"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.codingAgents
+        ? [mountCodingAgentV1Rest(runtime, packaged.services.codingAgents)]
+        : null,
+  },
   {
     family: "dashboards",
     owner: "module",
@@ -272,10 +321,32 @@ export const API_REST_DOORS = [
     },
   },
   { family: "organizations", owner: "module", paths: ["/api/organizations", "/api/v1/organizations"] },
-  { family: "projects", owner: "module", paths: ["/api/projects", "/api/v1/projects"] },
+  {
+    family: "projects",
+    owner: "module",
+    paths: ["/api/projects"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const projects = packaged?.services.projects;
+      const apiKeys = packaged?.services.apiKeys;
+      if (!projects || !apiKeys) return null;
+
+      return [mountProjectRest(runtime, { projects, apiKeys, errors: packaged.ports.legacyErrors })];
+    },
+  },
   { family: "scenario-events", owner: "module", paths: ["/api/scenario-events", "/api/v1/scenario-events"] },
   { family: "scenarios", owner: "module", paths: ["/api/scenarios", "/api/v1/scenarios"] },
-  { family: "scim-tokens", owner: "module", paths: ["/api/scim-tokens", "/api/v1/scim-tokens"] },
+  {
+    family: "scim-tokens",
+    owner: "module",
+    paths: ["/api/scim-tokens", "/api/v1/scim-tokens"],
+    // BOTH, or neither: a deployment that composed no Enterprise plan gate
+    // leaves the family off rather than mounting it ungated — the same rule
+    // groups, roles and role bindings answer to.
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.scim && packaged.ports.enterpriseGate
+        ? [mountScimTokenRest(runtime, packaged.services.scim)]
+        : null,
+  },
   { family: "simulation-runs", owner: "module", paths: ["/api/simulation-runs", "/api/v1/simulation-runs"] },
   {
     family: "user-avatar",

@@ -20,8 +20,6 @@ import type {
   GovernanceIngestRestPorts,
 } from "@langwatch/enterprise-governance-server";
 
-import type { ApiScimRestPorts } from "../app/api-scim.composition.ts";
-
 import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount.ts";
 
 import type { CronRestPorts } from "../features/cron/cron-rest.ts";
@@ -297,11 +295,6 @@ export type ApiRestPorts = Readonly<{
    * collection (which is where the spans go).
    */
   governanceIngest?: GovernanceIngestRestPorts | undefined;
-  /**
-   * The SCIM 2.0 provisioning surface's collaborators, or none. None where this process
-   * composed no Enterprise SCIM application.
-   */
-  scim?: ApiScimRestPorts | undefined;
   /**
    * The deployment's public origin, where it declared one. Deep links on a REST response
    * are built from it.

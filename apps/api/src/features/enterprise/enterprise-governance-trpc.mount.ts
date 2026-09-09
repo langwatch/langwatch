@@ -15,11 +15,11 @@ import {
 } from "@langwatch/api/trpc";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Every context requirement the fourteen surfaces place on the process. */
+/** Every context requirement the thirteen surfaces place on the process. */
 export type EnterpriseGovernanceMountContext = EnterpriseGatewayTrpcContext &
   EnterpriseGovernanceTrpcContext;
 
-/** The fourteen Enterprise governance namespaces this process mounts. */
+/** The thirteen Enterprise governance namespaces this process mounts. */
 export function createEnterpriseGovernanceTrpcRouters<
   TContext extends EnterpriseGovernanceMountContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -56,6 +56,5 @@ export function createEnterpriseGovernanceTrpcRouters<
     personalVirtualKeys: gateway.personalVirtualKeys,
     routingPolicy: gateway.routingPolicy,
     sessionPolicy: governance.sessionPolicy,
-    webhookEndpoints: gateway.webhookEndpoints,
   };
 }

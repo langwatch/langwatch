@@ -5,18 +5,20 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
-import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import {
-  AnalyticsApp,
+  filterFieldsEnum,
   LangWatchQLNotEnabledError,
-  lwqlEnabled,
-  MAX_LWQL_LENGTH,
-  filterFieldRequiresKey,
-  filterFieldRequiresSubkey,
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
+  MAX_LWQL_LENGTH,
   sharedFiltersInputSchema,
   timeseriesInputSchema,
+} from "@langwatch/analytics-contract";
+import {
+  AnalyticsApp,
+  lwqlEnabled,
+  filterFieldRequiresKey,
+  filterFieldRequiresSubkey,
   type LangWatchQLService,
 } from "@langwatch/analytics-server";
 import type { LangWatchQLTrpcPorts } from "@langwatch/analytics-server/api-trpc/langwatch-ql";

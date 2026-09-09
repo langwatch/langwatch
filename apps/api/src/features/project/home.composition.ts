@@ -3,8 +3,7 @@
  * one read: the entities this person last opened, across every vertical that records one.
  */
 import { HandledError } from "@langwatch/handled-error";
-import type { RecentItem } from "@langwatch/project-contract";
-import { PostgresRecentItemsAdapter, type HomeTrpcPorts } from "@langwatch/project-server";
+import { PostgresRecentItemsAdapter, type ProjectHomeApi } from "@langwatch/project-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { createHomeTrpcRouter } from "./project-trpc.mount.ts";
@@ -19,14 +18,12 @@ export function composeHomeFeature(options: {
     database: options.infrastructure.prisma,
   }).build();
 
-  const ports: HomeTrpcPorts = {
-    getRecentItems: (
-      _ctx,
-      input: Readonly<{ userId: string; projectId: string; limit: number }>,
-    ): Promise<RecentItem[]> => recentItems.getRecentItems(input),
+  return {
+    router: (mount) =>
+      createHomeTrpcRouter(mount.runtime, {
+        getRecentItems: (input) => recentItems.getRecentItems(input),
+      }),
   };
-
-  return { router: (mount) => createHomeTrpcRouter({ ...mount, ports }) };
 }
 
 /**
@@ -35,17 +32,11 @@ export function composeHomeFeature(options: {
  * "you have opened nothing".
  */
 export function refusingHomeFeature(): ComposedHomeFeature {
-  return {
-    router: (mount) =>
-      createHomeTrpcRouter({
-        ...mount,
-        ports: {
-          getRecentItems: () => {
-            throw new ApiHomeUnavailableError();
-          },
-        } as HomeTrpcPorts,
-      }),
+  const refusing: ProjectHomeApi = {
+    getRecentItems: () => Promise.reject(new ApiHomeUnavailableError()),
   };
+
+  return { router: (mount) => createHomeTrpcRouter(mount.runtime, refusing) };
 }
 
 /** The recent-items strip reached on a process that composed no connection. */

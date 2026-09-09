@@ -5,7 +5,12 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 
-import { ScimApp, type ScimService } from "@langwatch/enterprise-api";
+import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
+import {
+  ScimProtocolError,
+  type ScimApi,
+  type ScimService,
+} from "@langwatch/enterprise-scim-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
@@ -184,21 +189,64 @@ function inMemoryScim(): ScimService {
   }) as never;
 }
 
+/**
+ * The directory application both doors reach, over the one in-memory service.
+ * Hand-built rather than the module's own class: a server package exports its
+ * installer and its declarations, never its app.
+ */
+function scimApplication(scim: ScimService): ScimApi {
+  const app = {
+    isEnterpriseEntitled: async () => true,
+    recordTokenAudit: () => {},
+    authenticateDirectory: async ({ authorization }: { authorization: string | null }) => {
+      const token = authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+      if (!token) throw scimRefusal(401, "Bearer token is required");
+
+      const entitlement = await scim.verifyToken({ token });
+      if (entitlement.status === "invalid_token") {
+        throw scimRefusal(401, "Bearer token is not valid");
+      }
+      if (entitlement.status === "plan_not_entitled") {
+        throw scimRefusal(403, ENTERPRISE_FEATURE_ERRORS.SCIM);
+      }
+
+      return { organizationId: entitlement.organizationId };
+    },
+  };
+
+  return new Proxy(app, {
+    get: (target, property, receiver) =>
+      Reflect.get(target, property, receiver) ??
+      Reflect.get(scim as object, property, scim as object),
+  }) as never;
+}
+
+/** The protocol's own document for one refusal, at one status. */
+function scimRefusal(status: number, detail: string): ScimProtocolError {
+  return new ScimProtocolError({
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    status: String(status),
+    detail,
+  });
+}
+
 function mountScimFamilies() {
-  const scim = inMemoryScim();
+  const app = scimApplication(inMemoryScim());
+
   return mountRestFamily({
-    packaged: {
-      scim: () =>
-        ScimApp.create({
-          scim,
-          planProvider: { getActivePlan: async () => ({ type: "ENTERPRISE" }) },
-        }),
-    },
-    processPorts: {
-      scim: {
-        scim: () => scim,
-        webhookSecret: undefined,
+    packaged: { scim: () => app },
+    // One organization key, holding every permission the management routes
+    // declare: this suite is about the token lifecycle, not the door.
+    organizationCredential: async () => ({
+      ok: true,
+      resolved: {
+        apiKeyId: "apikey-scim",
+        userId: "user-owner",
+        organizationId: TEST_ORGANIZATION_ID,
       },
-    },
+      markUsed: () => {},
+    }),
+    directoryCredential: ({ request }) =>
+      app.authenticateDirectory({ authorization: request.headers.get("authorization") }),
   });
 }

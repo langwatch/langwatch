@@ -6,6 +6,7 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { getRoutePolicy } from "@langwatch/api/rest";
+import type { ScimApi } from "@langwatch/enterprise-api";
 import {
   EventSourcing,
   type EventSourcedQueueDefinition,
@@ -22,10 +23,10 @@ import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.a
 import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition.ts";
 import {
   ApiScimAbsenceReport,
-  composeApiScimRest,
+  installApiScim,
   type ApiScimCompositionOptions,
-  type ApiScimRestPorts,
 } from "../../../app/api-scim.composition.ts";
+import { packagedRestPorts } from "../../../app-rest/__tests__/support/rest-family.harness.ts";
 
 const ORGANIZATION_ID = "organization-acme";
 /** The connection a token is minted against, and the whole of its authority. */
@@ -39,8 +40,8 @@ const WEBHOOK_SECRET = "auth0-shared-secret";
 describe("given a directory holding this organization's SCIM bearer token", () => {
   describe("when it lists the organization's users", () => {
     it("answers the members as SCIM resources, and records the token's use", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.get("/api/scim/v2/Users", BEARER);
 
@@ -73,8 +74,8 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 
   describe("when it provisions a person the organization has never seen", () => {
     it("creates the account, the membership and the organization grant", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.post(
         "/api/scim/v2/Users",
@@ -116,8 +117,8 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 
   describe("when the person is already a member of this organization", () => {
     it("answers the SCIM conflict and attaches no second grant", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
       const body = {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
         userName: "ada@acme.test",
@@ -139,8 +140,8 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 describe("given a request the directory did not authenticate", () => {
   describe("when the bearer is missing", () => {
     it("answers the SCIM-shaped 401 before the organization's plan is read", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.get("/api/scim/v2/Users");
 
@@ -158,8 +159,8 @@ describe("given a request the directory did not authenticate", () => {
 
   describe("when the bearer is not a token this deployment minted", () => {
     it("answers 401 rather than 403, so a bad token cannot probe a plan", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.get("/api/scim/v2/Users", "Bearer not-a-token");
 
@@ -175,8 +176,8 @@ describe("given a request the directory did not authenticate", () => {
 describe("given a valid token for an organization that is not on Enterprise", () => {
   describe("when it lists users", () => {
     it("answers 403 with the plan's own message, and reads no member", async () => {
-      const world = scimWorld({ planType: "FREE" });
-      const api = mount(world.ports);
+      const world = await scimWorld({ planType: "FREE" });
+      const api = mount(world.app);
 
       const response = await api.get("/api/scim/v2/Users", BEARER);
 
@@ -193,8 +194,8 @@ describe("given a valid token for an organization that is not on Enterprise", ()
 describe("given an identity provider negotiating capabilities", () => {
   describe("when it reads the service provider configuration with no credential", () => {
     it("answers, because the negotiation happens before a token exists", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.get("/api/scim/v2/ServiceProviderConfig");
 
@@ -217,8 +218,8 @@ describe("given an identity provider negotiating capabilities", () => {
     it.each(DISCOVERY_PATHS)(
       "answers %s without credentials, and declares itself public",
       async (path) => {
-        const world = scimWorld();
-        const api = mount(world.ports);
+        const world = await scimWorld();
+        const api = mount(world.app);
 
         const response = await api.get(path);
 
@@ -235,21 +236,22 @@ describe("given an identity provider negotiating capabilities", () => {
       },
     );
 
-    it("keeps the provisioning routes declared internal in the registry", () => {
+    it("keeps the provisioning routes credentialled in the registry", async () => {
       // The counterpart the public declaration is only safe next to: opening
-      // discovery says nothing about Users and Groups, and this is what keeps
-      // a future edit from widening the policy to the whole family.
-      const world = scimWorld();
-      mount(world.ports);
+      // discovery says nothing about Users and Groups. The bearer IS the
+      // authority here, so the family's own door answers rather than a
+      // permission — which the registry records as handler-managed.
+      const world = await scimWorld();
+      mount(world.app);
 
       const provisioning = getRoutePolicy("GET", "/api/scim/v2/Users")?.policy;
 
-      expect(provisioning?.kind).toBe("internal");
+      expect(provisioning?.kind).toBe("handlerManaged");
     });
 
     it("refuses an anonymous call to a provisioning route", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.get("/api/scim/v2/Users");
 
@@ -262,8 +264,8 @@ describe("given an identity provider negotiating capabilities", () => {
 describe("given the Auth0 log-stream intake", () => {
   describe("when this deployment configured no shared secret", () => {
     it("answers 404, so a probe cannot learn the path is served here", async () => {
-      const world = scimWorld({ webhookSecret: undefined });
-      const api = mount(world.ports);
+      const world = await scimWorld({ webhookSecret: undefined });
+      const api = mount(world.app);
 
       const response = await api.post("/api/webhooks/auth0-scim", auth0CreateEvent());
 
@@ -274,8 +276,8 @@ describe("given the Auth0 log-stream intake", () => {
 
   describe("when the delivery is signed with another secret", () => {
     it("answers 401 and provisions nobody", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.postSigned("/api/webhooks/auth0-scim", auth0CreateEvent(), {
         secret: "wrong",
@@ -289,8 +291,8 @@ describe("given the Auth0 log-stream intake", () => {
 
   describe("when the delivery is signed with the configured secret and carries the directory token", () => {
     it("provisions the person through the same service the protocol routes use", async () => {
-      const world = scimWorld();
-      const api = mount(world.ports);
+      const world = await scimWorld();
+      const api = mount(world.app);
 
       const response = await api.postSigned("/api/webhooks/auth0-scim", auth0CreateEvent(), {
         secret: WEBHOOK_SECRET,
@@ -310,14 +312,14 @@ describe("given a deployment that composed no Enterprise application", () => {
       const reasons: string[] = [];
       const report = new RecordingScimAbsence(reasons);
 
-      const ports = composeApiScimRest({
-        ...scimWorld().compositionOptions,
+      const app = await installApiScim({
+        ...(await scimWorld()).compositionOptions,
         governance: undefined,
         report,
       });
-      const api = mount(ports);
+      const api = mount(app);
 
-      expect(ports).toBeUndefined();
+      expect(app).toBeUndefined();
       expect(reasons).toEqual(["Enterprise governance application"]);
       expect((await api.get("/api/scim/v2/Users", BEARER)).status).toBe(404);
       expect((await api.get("/api/scim/v2/ServiceProviderConfig")).status).toBe(404);
@@ -338,8 +340,8 @@ describe("given an API process that registered the directory-sync pipeline produ
     /** @scenario "A directory push's history lands on this process's own event stack" */
     it("stages the command on the sender the registration produced, and reports no missing sender", async () => {
       const queue = producerEventing();
-      const world = scimWorld({ eventing: queue.eventing });
-      const api = mount(world.ports);
+      const world = await scimWorld({ eventing: queue.eventing });
+      const api = mount(world.app);
       const losses = recordLedgerLosses();
 
       // The mounted family is real and answers over this same graph: the
@@ -347,7 +349,7 @@ describe("given an API process that registered the directory-sync pipeline produ
       // are served from, not a second construction.
       expect((await api.get("/api/scim/v2/Users", BEARER)).status).toBe(200);
 
-      await world.ports!.scim().createUser({
+      await requireScim(world.app).createUser({
         organizationId: ORGANIZATION_ID,
         connectionId: CONNECTION_ID,
         request: {
@@ -406,11 +408,11 @@ describe("given an API process that registered the directory-sync pipeline produ
   describe("when this process composed no queue at all", () => {
     /** @scenario "A process with no queue loses the directory-sync history loudly" */
     it("lets the push through and records the loss at error, naming the pipeline and the sender", async () => {
-      const world = scimWorld();
+      const world = await scimWorld();
       const losses = recordLedgerLosses();
 
       await expect(
-        world.ports!.scim().createUser({
+        requireScim(world.app).createUser({
           organizationId: ORGANIZATION_ID,
           connectionId: CONNECTION_ID,
           request: {
@@ -437,8 +439,8 @@ describe("given a directory pushing on a token bound to a connection", () => {
      */
     it("states no directory-sync fact, because the door forwards no connection", async () => {
       const queue = producerEventing();
-      const world = scimWorld({ eventing: queue.eventing });
-      const api = mount(world.ports);
+      const world = await scimWorld({ eventing: queue.eventing });
+      const api = mount(world.app);
 
       const response = await api.post(
         "/api/scim/v2/Users",
@@ -516,7 +518,7 @@ function recordLedgerLosses() {
  * Doubles at the DATABASE and at the process's own services — never at `ScimService`,
  * which is the thing under test.
  */
-function scimWorld(
+async function scimWorld(
   overrides: {
     planType?: string;
     webhookSecret?: string | undefined;
@@ -706,6 +708,7 @@ function scimWorld(
       ({
         tryPipelineCommand: () => Promise.resolve(null),
       } as never),
+    managementAudit: () => {},
     provenOffboarding: false,
     auth0WebhookSecret: "webhookSecret" in overrides ? overrides.webhookSecret : WEBHOOK_SECRET,
   };
@@ -718,7 +721,7 @@ function scimWorld(
     get planReads() {
       return planReads;
     },
-    ports: composeApiScimRest(compositionOptions),
+    app: await installApiScim(compositionOptions),
   };
 }
 
@@ -768,18 +771,33 @@ function auth0CreateEvent() {
   };
 }
 
-function mount(scim: ApiScimRestPorts | undefined) {
+/** The installed application, or the wiring bug that this scenario composed none. */
+function requireScim(app: ScimApi | undefined): ScimApi {
+  if (!app) throw new Error("this scenario composed no SCIM application");
+
+  return app;
+}
+
+function mount(scim: ScimApi | undefined) {
   const hono = new Hono();
-  for (const app of openTestRestDoors({
+  for (const mounted of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the SCIM families resolve their own credential.");
       },
       rateLimit: async () => ({ allowed: true }),
-      ...(scim ? { scim } : {}),
     },
+    ...(scim
+      ? {
+          packaged: { services: { scim: () => scim }, ports: packagedRestPorts() },
+          directoryCredential: ({ request }) =>
+            scim.authenticateDirectory({
+              authorization: request.headers.get("authorization"),
+            }),
+        }
+      : {}),
   })) {
-    hono.route("/", app);
+    hono.route("/", mounted);
   }
 
   const fetchAt = (path: string, init?: RequestInit) =>

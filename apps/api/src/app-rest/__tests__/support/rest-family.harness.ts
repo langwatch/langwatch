@@ -15,7 +15,11 @@ import {
   type ApiRestAbsenceReport,
   type ApiRestFamilyName,
 } from "../../api-rest.doors.ts";
-import { createApiRestRuntime } from "../../api-rest.runtime.ts";
+import {
+  createApiRestRuntime,
+  type ApiOrganizationCredentialPort,
+  type ApiScimDirectoryCredentialPort,
+} from "../../api-rest.runtime.ts";
 import type {
   ApiPackagedRestCollaborators,
   ApiPackagedRestPorts,
@@ -170,6 +174,10 @@ export function mountRestFamily(options: {
   services?: ApiRestServices | undefined;
   /** Process-level ports a family reads instead of a service (`scim`, ...). */
   processPorts?: Record<string, unknown> | undefined;
+  /** The directory bearer, for a suite driving the SCIM 2.0 protocol family. */
+  directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
+  /** The organization door, for a suite driving a family that answers behind one. */
+  organizationCredential?: ApiOrganizationCredentialPort | undefined;
   caller?: RestFamilyCaller | undefined;
   absence?: ApiRestAbsenceReport | undefined;
 }): MountedRestFamily {
@@ -182,9 +190,22 @@ export function mountRestFamily(options: {
     projectCredential: () => {
       throw new Error("These families authenticate through the framework chain.");
     },
-    organizationCredential: () => {
+    organizationCredential:
+      options.organizationCredential ??
+      (() => {
+        throw new Error("These families authenticate through the framework chain.");
+      }),
+    organizationIdentity: () => {
       throw new Error("These families authenticate through the framework chain.");
     },
+    routeAuthorization: () => {
+      throw new Error("These families authenticate through the framework chain.");
+    },
+    directoryCredential:
+      options.directoryCredential ??
+      (() => {
+        throw new Error("These families authenticate through the framework chain.");
+      }),
     errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
     ...(ports.dualAuth ? { dualCredential: ports.dualAuth } : {}),
   });

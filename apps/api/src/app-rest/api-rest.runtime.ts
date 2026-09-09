@@ -21,7 +21,7 @@ import type {
   ResolvedApiKeyCredential,
   ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission, PermissionDecision } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -62,11 +62,42 @@ export type ApiOrganizationCredentialPort = (input: {
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
 >;
 
+/**
+ * The same organization credential, resolved and asked nothing: a route that
+ * answers any authenticated caller has no permission for the door to ask.
+ */
+export type ApiOrganizationIdentityPort = (input: {
+  request: Request;
+}) => Promise<
+  | Readonly<{ ok: true; resolved: ResolvedOrganizationApiKeyToken; markUsed: () => void }>
+  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
+>;
+
+/**
+ * Whether the organization credential in hand holds one permission at the
+ * PROJECT a route's own path named — the second question a family whose door
+ * is one tier wider than its resources asks.
+ */
+export type ApiRestRouteAuthorizationPort = (input: {
+  credential: ResolvedOrganizationApiKeyToken;
+  permission: AuthzPermission;
+  projectId: string;
+}) => Promise<PermissionDecision>;
+
+/**
+ * The directory bearer an identity provider presents on `/api/scim/v2`. It
+ * names a TENANT and nobody inside it, which is why the answer is the
+ * organization it may provision rather than a person.
+ */
+export type ApiScimDirectoryCredentialPort = (input: {
+  request: Request;
+}) => Promise<Readonly<{ organizationId: string }>>;
+
 /** Every door a REST declaration may name, opened by this process or not. */
 export type ApiRestDoor = RestDoorCredential | "public";
 
 /**
- * Which doors this process opens. The three it does not are named rather than
+ * Which doors this process opens. The two it does not are named rather than
  * omitted: a declaration reaching for one is refused at MOUNT, by door name,
  * instead of reaching a request that resolves nobody.
  */
@@ -75,8 +106,8 @@ const OPENED_DOORS = {
   session: true,
   public: true,
   organizationKey: true,
+  scimToken: true,
   internalSecret: false,
-  scimToken: false,
   instanceAdminKey: false,
 } as const satisfies Record<ApiRestDoor, boolean>;
 
@@ -101,6 +132,10 @@ export type ApiRestRuntimePorts = Readonly<{
    * organization scope.
    */
   organizationCredential: ApiOrganizationCredentialPort;
+  /** Resolves the same credential with no permission asked of it. */
+  organizationIdentity: ApiOrganizationIdentityPort;
+  /** Answers the permission a route asks at the project its own path names. */
+  routeAuthorization: ApiRestRouteAuthorizationPort;
   /** The envelope a family answers a refusal in unless it names its own. */
   errors: RestErrorHandler;
   /**
@@ -109,6 +144,12 @@ export type ApiRestRuntimePorts = Readonly<{
    * the mount of the first family that names one.
    */
   dualCredential?: MiddlewareHandler | undefined;
+  /**
+   * Verifies the bearer an identity provider provisions with. Absent, this
+   * process opens no SCIM door and says so at the mount of the first family
+   * that names one.
+   */
+  directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
   /** The counter behind every route that declared how often one caller may ask. */
   rateLimiter?: RateLimiter | undefined;
   /** The store behind every route that declared how long its answer stands. */
@@ -160,6 +201,9 @@ export class ApiRestCredentialRefusal extends Error {
 export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime {
   const resolved = new WeakMap<Request, ResolvedApiKeyCredential>();
   const organizations = new WeakMap<Request, ResolvedOrganizationApiKeyToken>();
+  // Keyed on the CALLER the door answered with, because `identity.authorize` is
+  // handed that answer and not the request it came from.
+  const callerCredentials = new WeakMap<RestCaller, ResolvedOrganizationApiKeyToken>();
   const browserCallers = new WeakMap<Request, ApiRestBrowserCaller>();
   const stores = {
     ...(ports.rateLimiter ? { rateLimiter: ports.rateLimiter } : {}),
@@ -192,19 +236,55 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
     // kept against the request the declaration is handed.
     organizationKey: createRestRuntime({
       identity: {
-        authenticate: async ({ request, permission }): Promise<RestCaller> => {
-          const credential = await ports.organizationCredential({ request, permission });
-          if (!credential.ok) {
-            throw new ApiRestCredentialRefusal(credential.status, credential.body);
+        // The permission is asked of the credential at the ORGANIZATION, the
+        // only scope this door resolves. A route that names its own scope asks
+        // a SECOND question through `authorize` below rather than replacing
+        // this one, so such a route is the stricter of the two.
+        authenticate: async ({ request, permission }): Promise<RestCaller> =>
+          organizationCaller(
+            { organizations, callerCredentials },
+            request,
+            await ports.organizationCredential({ request, permission }),
+          ),
+        identify: async ({ request }): Promise<RestCaller> =>
+          organizationCaller(
+            { organizations, callerCredentials },
+            request,
+            await ports.organizationIdentity({ request }),
+          ),
+        authorize: ({ caller, permission, target }) => {
+          if (target.tier !== "project") {
+            throw new Error(
+              `The organization door answers a route-scoped permission at a project, and ` +
+                `"${permission}" was asked at a ${target.tier}`,
+            );
           }
-          organizations.set(request, credential.resolved);
+
+          return ports.routeAuthorization({
+            credential: credentialBehind(callerCredentials, caller),
+            permission,
+            projectId: target.id,
+          });
+        },
+      },
+      ...stores,
+    }),
+    // The SCIM 2.0 provisioning door. No permission is asked of the bearer:
+    // holding it IS the authority, so the twelve gated routes identify rather
+    // than authenticate, and the three discovery routes resolve nothing.
+    scimToken: createRestRuntime({
+      identity: {
+        authenticate: () => {
+          throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
+        },
+        identify: async ({ request }): Promise<RestCaller> => {
+          const directory = await directoryOf(ports)({ request });
 
           return {
-            actor: credential.resolved.userId
-              ? { type: "user", id: credential.resolved.userId }
-              : null,
-            scope: { tier: "organization", id: credential.resolved.organizationId },
-            markUsed: credential.markUsed,
+            // A directory bearer stands for its tenant and for nobody inside
+            // it, so the credential IS the organization it provisions.
+            actor: { type: "api_key", id: directory.organizationId },
+            scope: { tier: "organization", id: directory.organizationId },
           };
         },
       },
@@ -245,7 +325,10 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
     organizationCredentialOf: (request) => organizationCredentialOf(organizations, request),
     browserCallerOf: (request) => browserCallers.get(request) ?? {},
     mount: (declaration, app, options = {}) => {
-      const door = openDoorFor(declaration, verifier !== null);
+      const door = openDoorFor(declaration, {
+        verified: verifier !== null,
+        directory: ports.directoryCredential !== undefined,
+      });
 
       return openDoors[door].mount(declaration, {
         app,
@@ -266,7 +349,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
  */
 function openDoorFor<Api>(
   declaration: RestTransportDeclaration<Api>,
-  verified: boolean,
+  opened: Readonly<{ verified: boolean; directory: boolean }>,
 ): OpenApiRestDoor {
   const door = doorOf(declaration);
 
@@ -277,14 +360,29 @@ function openDoorFor<Api>(
     );
   }
 
-  if (door === "session" && !verified) {
+  if (door === "session" && !opened.verified) {
     throw new Error(
       `REST "${declaration.namespace}" answers behind a browser session, and this process ` +
         "composed no dual-credential verifier to open one with",
     );
   }
 
+  if (door === "scimToken" && !opened.directory) {
+    throw new Error(
+      `REST "${declaration.namespace}" answers behind a directory bearer, and this process ` +
+        "composed no SCIM application to verify one with",
+    );
+  }
+
   return door;
+}
+
+/** The directory verifier, or the wiring bug that this door was opened without one. */
+function directoryOf(ports: ApiRestRuntimePorts): ApiScimDirectoryCredentialPort {
+  const directory = ports.directoryCredential;
+  if (!directory) throw new Error("The SCIM door was opened with no directory verifier");
+
+  return directory;
 }
 
 /**
@@ -320,6 +418,47 @@ function doorOf<Api>(declaration: RestTransportDeclaration<Api>): ApiRestDoor {
   return declaration.routes.every((route) => route.access?.kind === "public")
     ? "public"
     : declaration.credential;
+}
+
+/**
+ * What the organization door answers with, and the two places the credential
+ * behind it is kept: against the REQUEST, for the facts a family binds, and
+ * against the CALLER, for the second permission a route asks at its project.
+ */
+function organizationCaller(
+  kept: Readonly<{
+    organizations: WeakMap<Request, ResolvedOrganizationApiKeyToken>;
+    callerCredentials: WeakMap<RestCaller, ResolvedOrganizationApiKeyToken>;
+  }>,
+  request: Request,
+  credential:
+    | Readonly<{ ok: true; resolved: ResolvedOrganizationApiKeyToken; markUsed: () => void }>
+    | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>,
+): RestCaller {
+  if (!credential.ok) throw new ApiRestCredentialRefusal(credential.status, credential.body);
+
+  kept.organizations.set(request, credential.resolved);
+
+  const caller: RestCaller = {
+    actor: credential.resolved.userId ? { type: "user", id: credential.resolved.userId } : null,
+    scope: { tier: "organization", id: credential.resolved.organizationId },
+    markUsed: credential.markUsed,
+  };
+
+  kept.callerCredentials.set(caller, credential.resolved);
+
+  return caller;
+}
+
+/** The credential this door answered with, or the wiring bug that it did not. */
+function credentialBehind(
+  callerCredentials: WeakMap<RestCaller, ResolvedOrganizationApiKeyToken>,
+  caller: RestCaller,
+): ResolvedOrganizationApiKeyToken {
+  const credential = callerCredentials.get(caller);
+  if (!credential) throw new Error("The organization door authorized a caller it did not resolve");
+
+  return credential;
 }
 
 /** The credential the project door resolved, or the wiring bug that it did not. */

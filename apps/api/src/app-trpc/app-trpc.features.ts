@@ -24,6 +24,10 @@ import {
   subscriptionTrpcTransport,
   type BillingSubscriptionApi,
 } from "@langwatch/enterprise-billing-server";
+import {
+  scimTokenTrpcTransport,
+  webhookEndpointTrpcTransport,
+} from "@langwatch/enterprise-api";
 import { HandledError } from "@langwatch/handled-error";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition.ts";
@@ -60,7 +64,6 @@ export function createAppTrpcFeatures(options: {
   const roleRouters = composed.role.routers(mount);
   const secretRouters = composed.secret.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
-  const enterprise = composed.enterprise.routers(mount);
   const automationRouters = composed.automation.routers(mount);
   const authRouters = composed.auth.routers(mount);
   const userRouters = composed.user.routers(mount);
@@ -119,7 +122,10 @@ export function createAppTrpcFeatures(options: {
     licenseEnforcement: createLicenseEnforcementTrpcRouter(mount.runtime),
     organization: composed.organization.router(mount),
     project: composed.project.router(mount),
-    scimToken: enterprise.scimToken,
+    // The directory-sync credentials the settings page mints, over the SAME
+    // application the `/api/scim-tokens` management family answers from.
+    // OWED: the Enterprise plan gate — see `scim-rest.mount.ts`.
+    scimToken: mount.runtime.mount(scimTokenTrpcTransport, (ctx) => ctx.app.scim),
     // The back office's connection ledger. Mounted by the process rather than
     // forwarded from the Enterprise composition: the procedures are declared in
     // the feature's own contract, and `ctx.app.sso` is what answers them.
@@ -162,7 +168,9 @@ export function createAppTrpcFeatures(options: {
     personalVirtualKeys: governance.personalVirtualKeys,
     routingPolicy: governance.routingPolicy,
     sessionPolicy: governance.sessionPolicy,
-    webhookEndpoints: governance.webhookEndpoints,
+    // Where a spend event is delivered. The entitlement gate is inside the
+    // handlers now, so nothing decorates this mount.
+    webhookEndpoints: mount.runtime.mount(webhookEndpointTrpcTransport, (ctx) => ctx.app.webhooks),
     // `governance` has two owners on one wire name: the five packaged
     // procedures above and this process's own `/` landing decision. Merged
     // HERE rather than inside either mount, so nothing outside this record can

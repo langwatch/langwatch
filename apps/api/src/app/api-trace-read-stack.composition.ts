@@ -318,6 +318,17 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     });
   }
 
+  /** The same resolution for a viewer the caller already named. */
+  readViewerProtections(
+    input: Readonly<{ projectId: string; userId: string }>,
+  ): Promise<Protections> {
+    return this.protections.resolve({
+      projectId: input.projectId,
+      userId: input.userId,
+      publiclyShared: false,
+    });
+  }
+
   tryGetShareViewerProtections(input: {
     projectId: string;
     session: { user?: { id: string } } | null | undefined;

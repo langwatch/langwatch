@@ -8,7 +8,11 @@ import {
   type ResolvedApiKeyCredential,
   type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
-import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
+import type {
+  AuthzPermission,
+  AuthzService,
+  PermissionDecision,
+} from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
@@ -114,6 +118,52 @@ export class ApiHandlerManagedCredentials {
       resolved,
       markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
     };
+  }
+
+  /**
+   * The same credential, resolved and asked NOTHING. A family whose routes
+   * answer any authenticated caller — `/api/projects` lists what the key
+   * reaches — has no permission for the door to ask at the organization.
+   */
+  async identifyOrganization(input: { request: Request }): Promise<OrganizationManagedCredential> {
+    const credentials = extractApiKeyRequestCredentials(input.request);
+    if (!credentials) return refusal(new ApiOrganizationMissingCredentialsError());
+
+    const resolution = await this.resolveOrganization(credentials.token);
+    if (!resolution.ok) return refusal(resolution.error);
+
+    const resolved = resolution.resolved;
+    const known = await this.organizationExists(resolved.organizationId);
+    if (!known.ok) return refusal(known.error);
+
+    return {
+      ok: true,
+      resolved,
+      markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+    };
+  }
+
+  /**
+   * Whether the resolved credential holds one permission at the PROJECT a
+   * route's own path named. The project is checked to belong to the credential's
+   * organization first, so a key cannot reach across tenants by naming an id.
+   */
+  async authorizeOrganizationRoute(input: {
+    credential: ResolvedOrganizationApiKeyToken;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<PermissionDecision> {
+    const decision = await this.authz.getApiKeyProjectDecision({
+      apiKeyId: input.credential.apiKeyId,
+      organizationId: input.credential.organizationId,
+      projectId: input.projectId,
+      permission: input.permission,
+    });
+
+    // No `denialReason`: this door answers from the KEY's grants, and none of
+    // the five reasons the vocabulary names — membership, binding, ceiling —
+    // is the one that decided a project the key may not reach.
+    return { permitted: decision.outcome === "allowed", organizationRole: null };
   }
 
   /** The organization credential the token stands for, or the refusal it earns. */

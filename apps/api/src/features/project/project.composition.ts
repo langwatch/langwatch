@@ -3,11 +3,6 @@
  * feature.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  declareAuthzMiddleware,
-  type AuthzPermission,
-  type AuthzService,
-} from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -19,9 +14,9 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { ApiAuditPort } from "../../api-request.policy.ts";
 
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
+import { createProjectTrpcRouter, type ProjectBrowserPorts } from "./project-trpc.mount.ts";
 
 /** The other services one project's own surfaces reach. */
 export type ProjectPeers = Readonly<{
@@ -68,9 +63,79 @@ export function composeProjectFeature(options: {
     },
   });
 
-  // The namespace, its ports and its two data-dependent checks went with the
-  // transport that took them; they return with the converted one.
-  return { app };
+  return { app, router: (mount) => createProjectTrpcRouter(mount.runtime, projectPorts(options, logger)) };
+}
+
+/**
+ * The six answers `project.*` needs that the project does not own, over this
+ * process's own cipher, AuthZ service, protections resolver and audit trail.
+ */
+function projectPorts(
+  options: Readonly<{ infrastructure: ApiTrpcInfrastructure; peers: ProjectPeers }>,
+  logger: Logger,
+): ProjectBrowserPorts {
+  const { peers } = options;
+  const audit: ApiAuditPort | undefined = options.infrastructure.audit;
+
+  return {
+    encryptProjectSecret: (value) => {
+      const encryption = peers.encryption;
+      if (!encryption) {
+        throw new ApiProjectUnavailableError(
+          "stored-secret key, so it cannot store a project's object-storage credentials",
+        );
+      }
+      return encryption.encrypt(value);
+    },
+    probePermission: ({ userId, permission, scope }) =>
+      options.infrastructure.authz.hasPermission({
+        userId,
+        permission,
+        ...scopeIdOf(scope),
+      }),
+    getFieldProtections: (input) => {
+      const protections = peers.viewerProtections;
+      if (!protections) {
+        return Promise.reject(
+          new ApiProjectUnavailableError(
+            "content-protections resolver, so it cannot say what this viewer may read of a project",
+          ),
+        );
+      }
+      return protections.readViewerProtections(input);
+    },
+    // Best effort by the port's own contract: a project is created whether or
+    // not Langy gets a key, and the credential service mints one on the first
+    // chat call.
+    provisionLangyVirtualKey: (input) => {
+      logger.debug(
+        { projectId: input.projectId },
+        "no gateway virtual-key provisioner is composed: this project starts without a Langy key, and one is minted on its first chat call",
+      );
+      return Promise.resolve();
+    },
+    recordApiKeyRegenerated: async ({ userId, projectId }) => {
+      await audit?.record({
+        actorId: userId,
+        path: "project.apiKey.regenerated",
+        input: { projectId },
+        error: null,
+      });
+    },
+    reportTopicClusteringFailure: (error, context) => {
+      logger.error({ error, projectId: context.projectId }, "a clustering request failed");
+    },
+  };
+}
+
+/** The one id field the AuthZ probe names for the tier a scope was asked at. */
+function scopeIdOf(
+  scope: Readonly<{ tier: "project" | "team" | "organization"; id: string }>,
+): Readonly<{ projectId?: string; teamId?: string; organizationId?: string }> {
+  if (scope.tier === "project") return { projectId: scope.id };
+  if (scope.tier === "team") return { teamId: scope.id };
+
+  return { organizationId: scope.id };
 }
 
 /**
@@ -83,7 +148,12 @@ export function refusingProjectFeature(): ComposedProjectFeature {
     throw new ApiProjectUnavailableError("project directory");
   };
 
-  return { app: new Proxy({}, { get: () => refuse, has: () => true }) as ProjectApi };
+  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
+
+  return {
+    app: refuseEvery<ProjectApi>(),
+    router: (mount) => createProjectTrpcRouter(mount.runtime, refuseEvery<ProjectBrowserPorts>()),
+  };
 }
 
 

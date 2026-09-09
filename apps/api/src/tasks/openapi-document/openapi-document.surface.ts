@@ -68,7 +68,6 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       automation: refuse("Automations"),
       broadcast: refuse("Broadcast"),
       codingAgents: refuse("Coding agents"),
-      codingAgentAudit: refuse("Coding agent audit"),
       dashboard: refuse("Dashboards"),
       // NOT stood up: `/api/dataset`'s eight undeclarable routes are still
       // described from the frozen document, and mounting the declared half here
@@ -290,6 +289,9 @@ export function composeOpenApiDocumentSurface(): OpenApiDocumentSurface {
   const runtime = createApiRestRuntime({
     projectCredential: refuse("The project credential door"),
     organizationCredential: refuse("The organization credential door"),
+    organizationIdentity: refuse("The organization credential door"),
+    routeAuthorization: refuse("Route-scoped authorization"),
+    directoryCredential: refuse("The SCIM directory bearer"),
     errors: refuse("Error rendering") as never,
     dualCredential: noopMiddleware,
   });

@@ -1,25 +1,19 @@
 /**
- * App-process transport mount for the coding-agent read vertical (ADR-056).
- *
- * Behaviour is package-owned (`@langwatch/coding-agent-server`); this supplies
- * the process's root, authenticated procedure, policy chain and the ports the
- * coding-agent package does not own — which organization a project belongs to,
- * the caller's permission cut over it, and what one viewer may see of one
- * project.
+ * Binds the feature's declared procedures to this process's execution path.
+ * Every `codingAgents.*` procedure is project-scoped and carries the permission
+ * the declaration names, so nothing is decided here.
  */
-import {
-  CodingAgentTrpcApi,
-  type CodingAgentTrpcContext,
-  type CodingAgentTrpcPorts,
-} from "@langwatch/coding-agent-server";
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import { codingAgentTrpcTransport, type CodingAgentApp } from "@langwatch/coding-agent-server";
+
+/** The one slice of the process context this namespace reads. */
+export interface CodingAgentHostContext {
+  app: Readonly<{ codingAgentApp: CodingAgentApp }>;
+}
 
 /** Mounts `codingAgents.*` on the app process's tRPC root. */
-export function createCodingAgentTrpcRouter<
-  TContext extends CodingAgentTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<CodingAgentTrpcPorts>) {
-  return CodingAgentTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+export function createCodingAgentTrpcRouter<TContext extends CodingAgentHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(codingAgentTrpcTransport, (ctx) => ctx.app.codingAgentApp);
 }

@@ -9,7 +9,7 @@
  *   webhooks       the endpoint registry, its delivery health, and the emitted-envelope log
  *   backoffice     the operator's single sign-on connection ledger
  *
- * The other five — `governance`, `governanceApp`, `scimApp`, `licensing`, `usageLimits` —
+ * The other four — `governance`, `governanceApp`, `licensing`, `usageLimits` —
  * stay absent, and absent is a composed answer rather than an oversight: each waits on an
  * implementation no application in this repository has written yet (a licence storage port,
  * the billing notification graph, the fifteen governance ports). The consumer of each
@@ -239,9 +239,9 @@ export class LoggedApiEnterpriseApplicationAbsence extends ApiEnterpriseApplicat
   withoutUnbuiltMembers(): void {
     this.logger.info(
       {
-        members: ["governance", "governanceApp", "scimApp", "licensing", "usageLimits"],
+        members: ["governance", "governanceApp", "licensing", "usageLimits"],
       },
-      "API composes no Enterprise governance capability, governance application, SCIM application, licence store or usage-limit store: each waits on an implementation no application in this repository has written, and every surface over them refuses by name",
+      "API composes no Enterprise governance capability, governance application, licence store or usage-limit store: each waits on an implementation no application in this repository has written, and every surface over them refuses by name",
     );
   }
 }

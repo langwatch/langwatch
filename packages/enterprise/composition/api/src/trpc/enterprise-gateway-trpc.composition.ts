@@ -2,12 +2,12 @@
  * The gateway vertical's Enterprise tRPC surfaces, composed for the legacy web
  * application's router root.
  *
- * Three transports live here: routing policies (`routingPolicy`), personal
- * virtual keys (`personalVirtualKeys`) and webhook endpoints
- * (`webhookEndpoints`). Each router's behaviour — procedure names, input and
- * output shapes, refusals — belongs to its Enterprise feature package. What
- * this composition owns is the wiring: which policy wraps which declaration,
- * and which process capability answers each port.
+ * Two transports live here: routing policies (`routingPolicy`) and personal
+ * virtual keys (`personalVirtualKeys`). `webhookEndpoints` is declared and the
+ * process mounts it on its own runtime. Each router's behaviour — procedure
+ * names, input and output shapes, refusals — belongs to its Enterprise feature
+ * package. What this composition owns is the wiring: which policy wraps which
+ * declaration, and which process capability answers each port.
  *
  * It sits in the Enterprise API composition rather than in `apps/api` for the
  * same reason its sibling does: a core package may not depend on an Enterprise
@@ -24,16 +24,11 @@ import {
   type PersonalVirtualKeyTrpcContext,
   type RoutingPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
-import {
-  WebhookEndpointTrpcApi,
-  type WebhookEndpointTrpcContext,
-} from "@langwatch/webhook-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Every context requirement the three surfaces place on the process. */
+/** Every context requirement the two surfaces place on the process. */
 export type EnterpriseGatewayTrpcContext = PersonalVirtualKeyTrpcContext &
-  RoutingPolicyTrpcContext &
-  WebhookEndpointTrpcContext;
+  RoutingPolicyTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
@@ -77,29 +72,6 @@ export class EnterpriseGatewayTrpcComposition {
         protected: protectedProcedure,
         policy,
         resolverAuthorizedPolicy,
-        validateOutput,
-      }),
-      webhookEndpoints: WebhookEndpointTrpcApi.create(root, {
-        protected: protectedProcedure,
-        policy,
-        // The one place the webhook entitlement check becomes a decorator. It
-        // reads the webhook application's own gate, and is applied AFTER the
-        // permission check so membership is established when it runs.
-        entitlementGate: <TProcedure>(procedure: TProcedure): TProcedure =>
-          (procedure as unknown as { use: (m: unknown) => TProcedure }).use(
-            async ({
-              ctx,
-              input,
-              next,
-            }: {
-              ctx: WebhookEndpointTrpcContext;
-              input: { organizationId: string };
-              next: () => Promise<unknown>;
-            }) => {
-              await ctx.app.webhooks.assertEntitled(input.organizationId);
-              return next();
-            },
-          ),
         validateOutput,
       }),
     };

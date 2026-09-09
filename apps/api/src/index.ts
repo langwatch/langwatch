@@ -241,10 +241,7 @@ export {
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 export { type AgentPlatformUrlBuilder } from "@langwatch/agent-server";
 export { createTriggerRestApp } from "@langwatch/automation-server";
-export {
-  type CodingAgentCallerScope,
-  createCodingAgentRestApp,
-} from "@langwatch/coding-agent-server";
+export { type CodingAgentCallerScope } from "@langwatch/coding-agent-server";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export {
   createEventsRestApp,
@@ -266,8 +263,6 @@ export {
   type OrganizationProvisioningPort,
   type OrganizationProvisioningSummary,
 } from "@langwatch/organization-server";
-export { createProjectRestApp } from "@langwatch/project-server";
-export { createScimTokensRestApp } from "@langwatch/enterprise-api";
 export { createTeamsRestApp } from "@langwatch/organization-server";
 export {
   createUserAvatarRestApp,

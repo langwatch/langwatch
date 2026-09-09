@@ -1,4 +1,8 @@
-import { EnterpriseApiAuditLog, EnterpriseApiSso } from "@langwatch/enterprise-api";
+import {
+  EnterpriseApiAuditLog,
+  EnterpriseApiSso,
+  type ScimApi,
+} from "@langwatch/enterprise-api";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LocalFeatureApis, type BootedRuntime } from "@langwatch/runtime-composition";
@@ -371,11 +375,7 @@ import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-fl
 import { composeApiAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount.ts";
 import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount.ts";
-import {
-  composeApiScimRest,
-  LoggedApiScimAbsence,
-  type ApiScimRestPorts,
-} from "./api-scim.composition.ts";
+import { installApiScim, LoggedApiScimAbsence } from "./api-scim.composition.ts";
 import { composeApiAudit, LoggedApiAuditAbsence } from "./api-audit.composition.ts";
 import type { PlatformOperatorPort } from "@langwatch/identity-server";
 import {
@@ -740,6 +740,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedCodingAgent!: ComposedCodingAgentFeature;
   private composedAutomation!: ComposedAutomationFeature;
   private composedEnterprise!: ComposedEnterpriseFeature;
+  /**
+   * The directory-sync application, where this process composed one. Read by
+   * the three SCIM REST families, by the `scimToken` namespace and by the SCIM
+   * door's own bearer verification — one object, so the four cannot disagree.
+   */
+  private composedScim: ScimApi | undefined;
   /**
    * The process's ONE invitation service, or none. Held rather than composed per door because
    * both doors administer the same invitations: `organization.*` creates and lists them over
@@ -1247,7 +1253,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The setup checklist. Its provider step is answered by the model-provider feature's OWN
     // persistence rather than by a `prisma.modelProvider` read written in the checklist: the
     // question is one existence read over the project's scope cascade, and that table holds
-    // every stored credential in the deployment. A reviewer's comments, scores and queues.
+    // every stored credential in the deployment.
+    // Directory sync, over the SAME grant ledger every other membership change
+    // is recorded on. HERE because its gate is the Enterprise governance
+    // application the tenant half just opened.
+    this.composedScim = await this.installScim(options.config.serviceName);
+    // A reviewer's comments, scores and queues.
     this.composedAnnotation = await this.installAnnotation(infrastructure);
     // A project's dashboards, the graphs on them, the saved workbench charts
     // they place and the explorer's stored filter sets. It installs HERE
@@ -1779,11 +1790,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // composition above already built — the same `trace_processing` producer
     // registration, never a second one.
     const governanceIngest = this.composeGovernanceIngestRest(otlpIngest?.otlp.traces);
-    // The SCIM 2.0 provisioning surface, over the SAME directory the members
-    // screen writes through and the SAME grant ledger every other membership
-    // change is recorded on. Absent without an Enterprise governance
-    // application, which is this family's gate — see the composition.
-    const scim = this.composeScimRest(serviceName);
     // The charted reads and the prompt library, over the SAME applications the
     // browser's `analytics.getTimeseries` and `prompts.*` procedures resolve
     // on. Taken from the halves rather than built a second time: two analytics
@@ -2159,6 +2165,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       automation: this.composedAutomation,
       codingAgent: this.composedCodingAgent,
       enterprise: this.composedEnterprise,
+      scim: this.composedScim,
       ...(this.composedDataset ? { dataset: this.composedDataset } : {}),
       ...(this.composedEvaluator ? { evaluator: this.composedEvaluator } : {}),
       ...(this.composedMonitor ? { monitor: this.composedMonitor } : {}),
@@ -2189,12 +2196,26 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The process's ONE REST runtime: every door on the registry is opened
     // through it, so identity, refusal rendering and the project facts are
     // resolved once for the whole process rather than once per family.
+    const scim = this.composedScim;
     const restRuntime = createApiRestRuntime({
       projectCredential: (input) => handlerManagedCredentials.authenticate(input),
       organizationCredential: (input) =>
         handlerManagedCredentials.authenticateOrganization(input),
+      organizationIdentity: (input) => handlerManagedCredentials.identifyOrganization(input),
+      routeAuthorization: (input) => handlerManagedCredentials.authorizeOrganizationRoute(input),
       errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
       ...(packaged.ports.dualAuth ? { dualCredential: packaged.ports.dualAuth } : {}),
+      // The SAME application the three SCIM families answer from: the bearer a
+      // door accepts and the tenant a route then provisions cannot be resolved
+      // by two objects.
+      ...(scim
+        ? {
+            directoryCredential: ({ request }: { request: Request }) =>
+              scim.authenticateDirectory({
+                authorization: request.headers.get("authorization"),
+              }),
+          }
+        : {}),
     });
 
     // Taken once rather than read off the root inside a provider: the three
@@ -2267,7 +2288,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...(governanceCli ? { governanceCli } : {}),
           ...(authRest ? { auth: authRest } : {}),
           ...(governanceIngest ? { governanceIngest } : {}),
-          ...(scim ? { scim } : {}),
           ...(publicBaseUrl ? { publicBaseUrl } : {}),
           ...(healthProbes ? { healthProbes } : {}),
           ...(this.composedOpsExplain
@@ -2738,11 +2758,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The SCIM 2.0 provisioning surface's collaborators, or none.
+   * The SCIM 2.0 provisioning application, or none.
    */
-  private composeScimRest(serviceName: string): ApiScimRestPorts | undefined {
+  private installScim(serviceName: string): Promise<ScimApi | undefined> {
     const session = this.composedAuth?.compose();
-    return composeApiScimRest({
+    return installApiScim({
       prisma: this.composedDatabase?.connection.client,
       grants: this.composedAuthz?.grants,
       users: session?.users,
@@ -2750,6 +2770,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       governance: this.resolveEnterprise()?.governance,
       plans: this.composedPlanProvider,
       eventing: this.composedIdentityEventing,
+      managementAudit: this.composeManagementAudit(),
       provenOffboarding: this.composedScimEnvironment.provenOffboarding,
       auth0WebhookSecret: this.composedScimEnvironment.auth0WebhookSecret,
       report: LoggedApiScimAbsence.create(createLogger(serviceName)),
@@ -3543,6 +3564,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedCodingAgent = composeCodingAgentFeature({
       infrastructure,
       defaultRetentionDays: options.config.platformDefaultRetentionDays,
+      // The SAME trail every other completed mutation on this process is
+      // recorded on: a read that names people is written where they are.
+      audit: this.resolveAudit(),
       peers: {
         projects: tenancy.projects,
         github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),

@@ -69,25 +69,35 @@ export class EnterpriseApiComposition {
  * and on nothing enterprise below it — `enterprise-direction` is what says so, and it was
  * reporting five direct dependencies on SCIM, webhook and governance packages.
  */
-export { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-server";
+export {
+  scimServer,
+  type ScimInfrastructure,
+  type ScimManagementAuditPort,
+  type ScimPlanProvider,
+} from "@langwatch/enterprise-scim-server";
 /**
  * The SCIM 2.0 provisioning family, the Auth0 intake beside it, and the two pieces an API-role
- * process composes the directory-sync service from.
+ * process composes the directory-sync service from. The four declared doors are inert until
+ * the process mounts them on its own runtime.
  */
 export {
-  createScimProtocolRestApp,
-  createScimWebhookRestApp,
   PostgresScimAdapter,
+  scimProtocolErrorHandler,
+  scimProtocolRest,
+  scimTokenRest,
+  scimTokenRestActor,
+  scimTokenTrpcTransport,
+  scimWebhookRest,
   ScimSyncLifecycleAdapter,
   ScimSyncLifecyclePort,
   type PostgresScimAdapterOptions,
   type ScimSyncLifecycleAdapterDeps,
-  type ScimWebhookRestPorts,
 } from "@langwatch/enterprise-scim-server";
-export type { ScimService } from "@langwatch/enterprise-scim-contract";
+export type { ScimApi, ScimService } from "@langwatch/enterprise-scim-contract";
 export { eventMatches } from "@langwatch/webhook-contract";
 export {
   createWebhookRestApp,
+  webhookEndpointTrpcTransport,
   WebhookApp,
   WebhookEnvelopeService,
   type SendBatchPayload,

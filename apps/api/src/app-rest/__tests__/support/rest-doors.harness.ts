@@ -14,7 +14,10 @@ import {
 import {
   createApiRestRuntime,
   type ApiOrganizationCredentialPort,
+  type ApiOrganizationIdentityPort,
+  type ApiRestRouteAuthorizationPort,
   type ApiRestRuntime,
+  type ApiScimDirectoryCredentialPort,
 } from "../../api-rest.runtime.ts";
 import type { ApiPackagedRestCollaborators } from "../../api-rest.packaged-services.ts";
 import type { ApiRestPorts, ApiRestServices } from "../../api-rest.services.ts";
@@ -32,6 +35,15 @@ export function openTestRestRuntime(): ApiRestRuntime {
     organizationCredential: () => {
       throw new Error("This suite composed no organization credential door.");
     },
+    organizationIdentity: () => {
+      throw new Error("This suite composed no organization credential door.");
+    },
+    routeAuthorization: () => {
+      throw new Error("This suite authorizes no route-scoped permission.");
+    },
+    directoryCredential: () => {
+      throw new Error("This suite verifies no directory bearer.");
+    },
     errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
   });
 }
@@ -44,6 +56,12 @@ export function openTestRestDoors(options: {
   absence?: ApiRestAbsenceReport | undefined;
   /** The organization door, for a suite driving a family that answers behind one. */
   organizationCredential?: ApiOrganizationCredentialPort | undefined;
+  /** The same door with no permission asked, for a family that answers any caller. */
+  organizationIdentity?: ApiOrganizationIdentityPort | undefined;
+  /** The permission a route asks at the project its own path names. */
+  routeAuthorization?: ApiRestRouteAuthorizationPort | undefined;
+  /** The directory bearer, for a suite driving the SCIM 2.0 protocol family. */
+  directoryCredential?: ApiScimDirectoryCredentialPort | undefined;
 }): MountableRestApp[] {
   const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
   const dualCredential = options.packaged?.ports.dualAuth;
@@ -64,6 +82,21 @@ export function openTestRestDoors(options: {
         options.organizationCredential ??
         (() => {
           throw new Error("This suite composed no organization credential door.");
+        }),
+      organizationIdentity:
+        options.organizationIdentity ??
+        (() => {
+          throw new Error("This suite composed no organization credential door.");
+        }),
+      routeAuthorization:
+        options.routeAuthorization ??
+        (() => {
+          throw new Error("This suite authorizes no route-scoped permission.");
+        }),
+      directoryCredential:
+        options.directoryCredential ??
+        (() => {
+          throw new Error("This suite verifies no directory bearer.");
         }),
       errors,
       ...(dualCredential ? { dualCredential } : {}),

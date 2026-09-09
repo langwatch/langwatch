@@ -4,6 +4,21 @@ import type { Protections } from "@langwatch/trace-contract";
  * The caller's read-time redactions for one project.
  */
 export abstract class ApiViewerProtectionsPort {
+  /**
+   * The same redactions for a viewer the caller has ALREADY resolved. A
+   * surface that holds a user id rather than a request context reads through
+   * this one.
+   */
+  abstract readViewerProtections(
+    input: Readonly<{ projectId: string; userId: string }>,
+  ): Promise<
+    Readonly<{
+      canSeeCosts?: boolean | null;
+      canSeeCapturedInput?: boolean | null;
+      canSeeCapturedOutput?: boolean | null;
+    }>
+  >;
+
   abstract getViewerProtections(
     ctx: unknown,
     input: Readonly<{ projectId: string }>,
@@ -35,12 +50,21 @@ export class ApiTraceReadViewerProtections extends ApiViewerProtectionsPort {
     super();
   }
 
+  readViewerProtections(
+    input: Readonly<{ projectId: string; userId: string }>,
+  ): Promise<Protections> {
+    return this.reads.readViewerProtections(input);
+  }
+
   getViewerProtections(ctx: unknown, input: Readonly<{ projectId: string }>): Promise<Protections> {
     return this.reads.getViewerProtections(ctx, input);
   }
 }
 
-/** The one read this adapter takes off the trace read stack. */
+/** The two reads this adapter takes off the trace read stack. */
 type ApiTraceViewerProtectionsSource = Readonly<{
   getViewerProtections(ctx: unknown, input: Readonly<{ projectId: string }>): Promise<Protections>;
+  readViewerProtections(
+    input: Readonly<{ projectId: string; userId: string }>,
+  ): Promise<Protections>;
 }>;

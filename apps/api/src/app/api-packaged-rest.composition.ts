@@ -16,6 +16,7 @@ import {
   type AuthzPermission,
   type AuthzService,
 } from "@langwatch/authz-contract";
+import type { ScimApi } from "@langwatch/enterprise-api";
 import { createEnterprisePlanGate } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
@@ -102,6 +103,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   automation: ComposedAutomationFeature;
   codingAgent: ComposedCodingAgentFeature;
   enterprise: ComposedEnterpriseFeature;
+  /** The directory-sync application, where this process installed the feature. */
+  scim: ScimApi | undefined;
   /** A project's datasets, where this process installed the feature. */
   dataset: ComposedDatasetFeature | undefined;
   /** A project's evaluators, where this process composed the feature. */
@@ -162,6 +165,7 @@ export function composeApiPackagedRest(
     plans: options.plans,
   });
   const agentCache = composeAgentCache(options);
+  const scim = options.scim;
   const storedObjectBytes = options.storedObject.bytes;
   const dualAuth = options.session
     ? createApiDualCredentialAuth({
@@ -186,23 +190,7 @@ export function composeApiPackagedRest(
       apiKeys: () => options.apiKeys,
       ...(options.automation.service ? { automation: () => options.automation.service! } : {}),
       ...(options.codingAgent.service ? { codingAgents: () => options.codingAgent.service! } : {}),
-      ...(options.enterprise.scim ? { scim: () => options.enterprise.scim! } : {}),
-      // REST audits a read that names people; tRPC does not, which is why this
-      // is a port of the family rather than something the application does.
-      codingAgentAudit: () => ({
-        auditLog: async (entry) => {
-          await options.audit?.record({
-            actorId: entry.userId,
-            path: entry.action,
-            input: {
-              organizationId: entry.organizationId,
-              targetId: entry.targetId,
-              ...entry.args,
-            },
-            error: null,
-          });
-        },
-      }),
+      ...(scim ? { scim: () => scim } : {}),
       ...(options.dashboard ? { dashboard: options.dashboard.restServices.dashboard } : {}),
       ...(options.dataset ? { datasets: () => options.dataset!.app } : {}),
       ...(options.evaluator ? { evaluators: options.evaluator.restServices.evaluators } : {}),

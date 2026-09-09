@@ -14,10 +14,10 @@ import type {
 } from "@langwatch/api/rest";
 import type { AutomationApp } from "@langwatch/automation-server";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import type { CodingAgentApp, CodingAgentRestAuditPort } from "@langwatch/coding-agent-server";
+import type { CodingAgentApp } from "@langwatch/coding-agent-server";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
-import type { GovernanceApp, ScimApp, WebhookApp } from "@langwatch/enterprise-api";
+import type { GovernanceApp, ScimApi, WebhookApp } from "@langwatch/enterprise-api";
 import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
@@ -78,8 +78,6 @@ export type ApiPackagedRestServices = Readonly<{
   broadcast?: (() => AppRestBroadcast) | undefined;
   /** The coding-agent reads, plus the cross-project cuts they answer over. */
   codingAgents?: (() => CodingAgentApp) | undefined;
-  /** Records who read an answer that names people. REST audits; tRPC does not. */
-  codingAgentAudit?: (() => CodingAgentRestAuditPort) | undefined;
   dashboard?: (() => DashboardApi) | undefined;
   datasets?: (() => DatasetApp) | undefined;
   evaluators?: (() => EvaluatorApp) | undefined;
@@ -99,7 +97,7 @@ export type ApiPackagedRestServices = Readonly<{
   scenarios?: (() => ScenarioService) | undefined;
   scenarioTabs?: (() => ScenarioTabRegistry) | undefined;
   /** The SCIM provisioning tokens an identity provider authenticates with. */
-  scim?: (() => ScimApp) | undefined;
+  scim?: (() => ScimApi) | undefined;
   simulations?: (() => SimulationService) | undefined;
   storedObjects?: (() => StoredObjectApp) | undefined;
   /**

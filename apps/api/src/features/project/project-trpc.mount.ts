@@ -1,95 +1,76 @@
 /**
- * Package-owned (`@langwatch/project-server`); adds the two readers it
- * doesn't own — recent activity (walks the audit trail) and the setup
- * rollup (fans out across the verticals holding the evidence).
+ * Binds the project module's three declared namespaces to this process's
+ * execution path. `project.*` reaches six deployment answers the module does
+ * not own, and each is asked of the caller the runtime already resolved.
  */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
+import type { TrpcRuntime } from "@langwatch/api/trpc";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  HomeTrpcApi,
-  IntegrationsChecksTrpcApi,
-  ProjectTrpcApi,
-  type HomeTrpcContext,
-  type HomeTrpcPorts,
-  type IntegrationsChecksTrpcContext,
-  type IntegrationsChecksTrpcPorts,
-  type ProjectTrpcContext,
+  homeTrpcTransport,
+  integrationsChecksTrpcTransport,
+  projectTrpcTransport,
+  type IntegrationsChecksApi,
+  type ProjectBrowserApi,
+  type ProjectHomeApi,
 } from "@langwatch/project-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Mounts `home.*` on the app process's tRPC root. */
-export function createHomeTrpcRouter<
-  TContext extends HomeTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<HomeTrpcPorts>) {
-  return HomeTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+/** The slices of the process context these namespaces read. */
+export interface ProjectHostContext {
+  actor(): Readonly<{ id: string }>;
+  app: Readonly<{ projects: ProjectApi }>;
 }
 
 /**
- * Mounts `integrationsChecks.*`. `TCheckStatus` is inferred from the
- * process's own reader so the checklist keeps its real shape.
+ * The six answers `project.*` needs that the project does not own, each already
+ * bound to the process's own graph. The caller is not among them: the runtime
+ * resolves it, and the mount reads it off the request.
  */
-export function createIntegrationsChecksTrpcRouter<
-  TContext extends IntegrationsChecksTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TCheckStatus,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<IntegrationsChecksTrpcPorts<TCheckStatus>>,
-) {
-  return IntegrationsChecksTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
-}
+export type ProjectBrowserPorts = Readonly<{
+  encryptProjectSecret(value: string): string;
+  probePermission(
+    input: { userId: string } & Parameters<ProjectBrowserApi["probePermission"]>[0],
+  ): Promise<boolean>;
+  getFieldProtections(
+    input: { userId: string; projectId: string },
+  ): ReturnType<ProjectBrowserApi["getFieldProtections"]>;
+  provisionLangyVirtualKey: ProjectBrowserApi["provisionLangyVirtualKey"];
+  recordApiKeyRegenerated: ProjectBrowserApi["recordApiKeyRegenerated"];
+  reportTopicClusteringFailure: ProjectBrowserApi["reportTopicClusteringFailure"];
+}>;
 
-/**
- * `create` resolves its permission tier at runtime (team vs org).
- * `traceSharingEnabled` adds `project:manage` AFTER `project:update`.
- */
-export function createProjectTrpcRouter<
-  TContext extends ProjectTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<ProjectTrpcMountPorts> &
-    Readonly<{ checks: ProjectTrpcChecks }>,
+/** Mounts `project.*` on the app process's tRPC root. */
+export function createProjectTrpcRouter<TContext extends ProjectHostContext>(
+  runtime: TrpcRuntime<TContext>,
+  ports: ProjectBrowserPorts,
 ) {
-  const service = createTrpcApiService(mount);
-
-  return ProjectTrpcApi.create(
-    mount.root,
-    {
-      protected: service.protected,
-      policy: service.policy,
-      validateOutput: service.validateOutput,
-      createPolicy: service.custom(mount.checks.create),
-      updatePolicy: <TProcedure>(procedure: TProcedure): TProcedure =>
-        (service.policy("project:update")(procedure) as unknown as ChainableProcedure).use(
-          mount.checks.traceSharing,
-        ) as unknown as TProcedure,
-    },
-    mount.ports,
+  return runtime.mount(
+    projectTrpcTransport,
+    (ctx): ProjectBrowserApi => ({
+      projects: () => ctx.app.projects,
+      encryptProjectSecret: (value) => ports.encryptProjectSecret(value),
+      probePermission: (input) => ports.probePermission({ userId: ctx.actor().id, ...input }),
+      getFieldProtections: (input) =>
+        ports.getFieldProtections({ userId: ctx.actor().id, projectId: input.projectId }),
+      provisionLangyVirtualKey: (input) => ports.provisionLangyVirtualKey(input),
+      recordApiKeyRegenerated: (entry) => ports.recordApiKeyRegenerated(entry),
+      reportTopicClusteringFailure: (error, context) =>
+        ports.reportTopicClusteringFailure(error, context),
+    }),
   );
 }
 
-/**
- * The `.use()` surface every tRPC procedure builder shares. Named at the one
- * seam that chains the trace-sharing demand onto a builder whose input
- * generics belong to the feature package, so the policy above needs no `any`.
- */
-type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
+/** Mounts `home.*` on the app process's tRPC root. */
+export function createHomeTrpcRouter<TContext extends object>(
+  runtime: TrpcRuntime<TContext>,
+  recentItems: ProjectHomeApi,
+) {
+  return runtime.mount(homeTrpcTransport, () => recentItems);
+}
 
-/**
- * Middlewares, not descriptions: `declaredCheckFrom` refuses to build a
- * custom check from one, since the claim of what enforces the scope has to
- * be written where the enforcement runs.
- */
-export type ProjectTrpcChecks = Readonly<{
-  /** `project.create`'s own `kind: "custom"` declaration and its resolution. */
-  create: unknown;
-  /** The extra `project:manage` demand a trace-sharing flip carries. */
-  traceSharing: unknown;
-}>;
-
-/** The process capabilities `project.*` reaches that the project does not own. */
-export type ProjectTrpcMountPorts = Parameters<typeof ProjectTrpcApi.create>[2];
+/** Mounts `integrationsChecks.*` on the app process's tRPC root. */
+export function createIntegrationsChecksTrpcRouter<TContext extends object>(
+  runtime: TrpcRuntime<TContext>,
+  checklist: IntegrationsChecksApi,
+) {
+  return runtime.mount(integrationsChecksTrpcTransport, () => checklist);
+}

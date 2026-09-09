@@ -1,13 +1,17 @@
 /**
  * The SCIM 2.0 directory-sync application this process serves the fifteen
- * `/api/scim/v2/**` routes and the Auth0 intake from.
+ * `/api/scim/v2/**` routes, the `/api/scim-tokens` management family and the
+ * Auth0 intake from. One installation, four declared doors.
  */
+import type { AppRestManagementAuditPort } from "@langwatch/api/rest";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   PostgresScimAdapter,
   ScimSyncLifecycleAdapter,
-  type ScimService,
+  scimServer,
+  type ScimApi,
+  type ScimInfrastructure,
 } from "@langwatch/enterprise-api";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -20,21 +24,8 @@ import {
 } from "@langwatch/identity-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp } from "@langwatch/runtime-composition";
 import type { UserService } from "@langwatch/user-contract";
-
-/**
- * Everything the two SCIM REST families reach that they do not own.
- */
-export type ApiScimRestPorts = Readonly<{
-  /**
-   * The directory-sync service the fifteen protocol routes read.
-   */
-  scim: () => ScimService;
-  /**
-   * The shared secret Auth0 presents on its log stream, or none.
-   */
-  webhookSecret: () => string | undefined;
-}>;
 
 /** Reports the composition decision an absent collaborator would otherwise hide. */
 export abstract class ApiScimAbsenceReport {
@@ -79,6 +70,8 @@ export type ApiScimCompositionOptions = Readonly<{
    * The event stack the directory-sync history is appended and staged through.
    */
   eventing: IdentityEventingPort | undefined;
+  /** Where minting and revoking a token are recorded, as the process writes it. */
+  managementAudit: AppRestManagementAuditPort;
   /** D08's `SCIM_V2_GRANTS`: whether a deactivation revokes grants first. */
   provenOffboarding: boolean;
   /** The shared secret Auth0 presents, where this deployment configured one. */
@@ -87,12 +80,12 @@ export type ApiScimCompositionOptions = Readonly<{
 }>;
 
 /**
- * Composes the two SCIM families' ports, or none. Absent without any one of the seven
- * collaborators, and the report says which.
+ * Installs the SCIM feature over this process's own graph, or nothing. Absent without any
+ * one of the seven collaborators, and the report says which.
  */
-export function composeApiScimRest(
+export async function installApiScim(
   options: ApiScimCompositionOptions,
-): ApiScimRestPorts | undefined {
+): Promise<ScimApi | undefined> {
   const { prisma, grants, users, auth, governance, plans, eventing } = options;
   if (!prisma) return absent(options, "database connection");
   if (!grants) return absent(options, "AuthZ grant ledger");
@@ -119,10 +112,21 @@ export function composeApiScimRest(
     provenOffboarding: options.provenOffboarding,
   }).build();
 
-  return {
-    scim: () => scim,
+  const infrastructure: ScimInfrastructure = {
+    scim,
+    planProvider: { getActivePlan: (input) => plans.getActivePlan(input) },
+    // A function rather than a value, so a rotation without a restart works,
+    // and its absence is what makes the intake answer 404 rather than 401.
     webhookSecret: () => options.auth0WebhookSecret,
+    managementAudit: options.managementAudit,
   };
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure(infrastructure)
+    .withFeature(scimServer)
+    .boot({ role: "api" });
+
+  return runtime.feature(scimServer).provided;
 }
 
 /**

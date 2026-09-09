@@ -1,7 +1,7 @@
 /**
- * The three Enterprise tenant namespaces, composed as their own feature.
- * license.* / licenseEnforcement.*   what this instance is licensed for
- * scimToken.*                        the directory-sync credentials
+ * The Enterprise tenant surfaces this process composes as their own feature:
+ * `license.*` and `licenseEnforcement.*`, over what this instance is licensed
+ * for. Directory sync is its own installation now (`api-scim.composition.ts`).
  */
 import type {
   LicensingCaller,
@@ -9,10 +9,6 @@ import type {
   LimitType,
 } from "@langwatch/enterprise-licensing-contract";
 import { LicensingApp, type LicenseStoragePort } from "@langwatch/enterprise-licensing-server";
-import {
-  ENTERPRISE_FEATURE_ERRORS,
-  assertEnterprisePlanType,
-} from "@langwatch/enterprise-plan-gate";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { ResourceScope } from "@langwatch/runtime-composition";
@@ -51,8 +47,6 @@ export abstract class ApiSeatAllowancePort {
 export abstract class ApiEnterpriseApplicationPort {
   /** Reading and writing this instance's licence. */
   abstract readonly licensing?: ApiTrpcFeatureApplication["licensing"] | undefined;
-  /** The directory-sync application a SCIM token is listed and minted through. */
-  abstract readonly scimApp?: ApiTrpcFeatureApplication["scimApp"] | undefined;
   /** Where a resource-limit notification is reported. */
   abstract readonly usageLimits?: ApiTrpcFeatureApplication["usageLimits"] | undefined;
   /** The governance capability the console's ten surfaces read. */
@@ -69,7 +63,7 @@ export abstract class ApiEnterpriseApplicationPort {
 
 import type { ComposedEnterpriseFeature } from "./enterprise.composition.types.ts";
 
-/** Composes the three Enterprise tenant surfaces over this deployment's graph. */
+/** Composes the Enterprise tenant surfaces over this deployment's graph. */
 export function composeEnterpriseFeature(options: {
   /** The Enterprise application, where the deployment composed one. */
   enterprise?: ApiEnterpriseApplicationPort | undefined;
@@ -83,7 +77,7 @@ export function composeEnterpriseFeature(options: {
   const logger = createLogger("langwatch:api:enterprise");
   const application = enterpriseApplication(options.enterprise, options, logger);
 
-  return { application, scim: application.scimApp };
+  return { application };
 }
 
 /**
@@ -95,17 +89,13 @@ export function refusingEnterpriseFeature(): ComposedEnterpriseFeature {
   return {
     application: {
       licensing: refuse("Enterprise licence store, so it cannot read or write an instance licence"),
-      scimApp: refuse("Enterprise SCIM application, so it can neither list nor mint a token"),
       usageLimits: refuse("Enterprise usage-limit store, so it cannot report a limit"),
-    } as Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">,
+    } as Pick<ApiTrpcFeatureApplication, "licensing" | "usageLimits">,
   };
 }
 
-// The SCIM-token plan gate went with the tRPC mount it was the port for; it
-// returns with the converted transport.
-
 /**
- * The three Enterprise `ctx.app` slices, or a refusal per capability.
+ * The two Enterprise `ctx.app` slices, or a refusal per capability.
  */
 function enterpriseApplication(
   enterprise: ApiEnterpriseApplicationPort | undefined,
@@ -114,24 +104,17 @@ function enterpriseApplication(
     "seats" | "licensingStore" | "licensePublicKey"
   >,
   logger: Logger,
-): Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits"> {
+): Pick<ApiTrpcFeatureApplication, "licensing" | "usageLimits"> {
   const { seats } = options;
   const licensing = enterprise?.licensing;
-  const scimApp = enterprise?.scimApp;
   const usageLimits = enterprise?.usageLimits;
 
   // One line per absent member, at boot. A deployment reads which capability it
-  // does not have rather than inferring three from one sentence about Enterprise.
+  // does not have rather than inferring both from one sentence about Enterprise.
   if (!licensing) {
     logger.info(
       { member: "licensing", seatAllowances: Boolean(seats) },
       "API composed no Enterprise licence store: reading and writing this instance's licence refuses by name, and the seat allowances answer from this process's own plan provider",
-    );
-  }
-  if (!scimApp) {
-    logger.info(
-      { member: "scimApp" },
-      "API composed no Enterprise SCIM application: listing and minting a directory-sync token refuse by name",
     );
   }
   if (!usageLimits) {
@@ -159,13 +142,8 @@ function enterpriseApplication(
         : refusingApplicationSlice(
             "Enterprise licence store, so it cannot read or write an instance licence",
           ))) as ApiTrpcFeatureApplication["licensing"],
-    scimApp:
-      scimApp ??
-      refusingApplicationSlice(
-        "Enterprise SCIM application, so it can neither list nor mint a token",
-      ),
     usageLimits: notifier,
-  } as Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">;
+  } as Pick<ApiTrpcFeatureApplication, "licensing" | "usageLimits">;
 }
 
 /**

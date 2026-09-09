@@ -19,7 +19,7 @@ import type {
   CurrencyRequest,
 } from "@langwatch/enterprise-billing-server";
 import type {
-  EnterpriseTrpcContext,
+  ScimApi,
   SsoApi,
   GovernanceApp,
   GovernanceService,
@@ -148,6 +148,12 @@ export type ApiTrpcFeatureApplication = Readonly<{
   /** The rules an organization bounds its members' sessions by. */
   sessionPolicy: OrganizationSessionPolicyService;
   /**
+   * The directory-sync application. One object for both of its doors, so the
+   * settings page and the management REST family cannot drift on what minting
+   * a provisioning token means.
+   */
+  scim: ScimApi;
+  /**
    * Where a spend event is delivered, as the endpoint surface registers and
    * lists them.
    */
@@ -254,12 +260,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * the transport already receives instead of a second channel.
    */
   config: Readonly<{ opsSidebarEmails?: readonly string[] | undefined }>;
-}> &
-  /**
-   * The slices the four Enterprise surfaces read, taken from the ONE seam a core process
-   * may see them through.
-   */
-  EnterpriseTrpcContext["app"];
+}>;
 
 /**
  * The request member the quoted-currency surface reads. The headers a CDN
