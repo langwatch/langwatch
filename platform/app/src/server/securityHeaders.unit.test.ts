@@ -33,18 +33,20 @@ describe("buildSecurityHeaders", () => {
   });
 
   describe("given a development response", () => {
-    /** @scenario Development responses report the production CSP without enforcing it */
-    it("reports the production policy instead of enforcing it", () => {
-      const dev = buildSecurityHeaders({ dev: true, environment: {} });
-      const prod = buildSecurityHeaders({ dev: false, environment: {} });
+    describe("when the CSP is built", () => {
+      /** @scenario Development responses report the production CSP without enforcing it */
+      it("reports the production policy instead of enforcing it", () => {
+        const dev = buildSecurityHeaders({ dev: true, environment: {} });
+        const prod = buildSecurityHeaders({ dev: false, environment: {} });
 
-      expect(dev["Content-Security-Policy"]).toBeUndefined();
-      expect(dev["Content-Security-Policy-Report-Only"]).toBe(
-        prod["Content-Security-Policy"]?.replace(
-          "upgrade-insecure-requests; ",
-          "",
-        ),
-      );
+        expect(dev["Content-Security-Policy"]).toBeUndefined();
+        expect(dev["Content-Security-Policy-Report-Only"]).toBe(
+          prod["Content-Security-Policy"]?.replace(
+            "upgrade-insecure-requests; ",
+            "",
+          ),
+        );
+      });
     });
   });
 

@@ -65,6 +65,7 @@ Feature: MCP outbound request and browser capability hardening
       And payment is disabled
       And USB is disabled
 
+    @unit @regression
     Scenario: Development responses report the production CSP without enforcing it
       Given LangWatch is running in development mode
       When a client requests the application root

@@ -176,6 +176,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then its Permissions-Policy allows the microphone for the app's own origin
     And its Content-Security-Policy connect-src admits https://api.elevenlabs.io and wss://api.elevenlabs.io
 
+  @unit @regression
   Scenario: The app's own headers allow the ElevenLabs audio worklets
     Given a production response from the LangWatch app
     And the ElevenLabs browser client registers its audio worklets from a blob: URL
