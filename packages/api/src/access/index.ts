@@ -7,6 +7,7 @@ export {
   AuthenticationRequiredError,
   anyAuthenticated,
   assertRouteScopePermission,
+  declareAccessMiddleware,
   decide,
   deferredScope,
   optionalCredential,
@@ -14,6 +15,7 @@ export {
   routeScopeOf,
   SCOPE_INPUT_FIELDS,
   securityRequirement,
+  sharedGrantTiers,
   type AccessActor,
   type AccessDecision,
   type AccessDeclaration,
@@ -24,6 +26,7 @@ export {
   type Credential,
   type DeferredScopeAccess,
   type OptionalCredentialAccess,
+  type PermissionAllDeclaration,
   type PublicRouteAccess,
   type RouteAccess,
 } from "./access.ts";

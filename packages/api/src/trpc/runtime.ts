@@ -6,11 +6,11 @@
 import { actorSchema, toLedgerActor, type Actor } from "@langwatch/actor";
 import {
   declaredScopeIdSchema,
-  declareAuthzMiddleware,
   type AuthzDeclaration,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
   type EnforcedScopeFields,
+  type ScopeTierField,
 } from "@langwatch/authz-contract";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
@@ -43,15 +43,19 @@ import type {
   MiddlewareResult,
   ProcedureType,
 } from "@trpc/server/unstable-core-do-not-import";
-import type { z } from "zod";
+import { z } from "zod";
 
 import {
   AuthenticationRequiredError,
   decide,
+  declareAccessMiddleware,
+  SCOPE_INPUT_FIELDS,
+  sharedGrantTiers,
   type AccessDeclaration,
   type AccessDenialPort,
   type AuthorizePort,
   type Caller,
+  type PublicRouteAccess,
 } from "../access/access.ts";
 import type { TrpcContract, TrpcContractMember } from "../contract/trpc-contract.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
@@ -187,6 +191,68 @@ export async function parseGovernedOutput<TSchema extends z.ZodType>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Declared facts: what a procedure asks the PROCESS for beyond its own input,
+// bound once at the mount. The same split REST makes — the procedure declares
+// what it needs, the mount says where it comes from — so nothing a caller sends
+// can stand in for a fact and no handler reaches for the request itself.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One fact: the name a mount binds it by, and the schema its value is parsed with. */
+export interface TrpcFact<Schema extends z.ZodType = z.ZodType> {
+  readonly name: string;
+  readonly schema: Schema;
+}
+
+export function defineTrpcFact<Schema extends z.ZodType>(
+  name: string,
+  schema: Schema,
+): TrpcFact<Schema> {
+  return Object.freeze({ name, schema });
+}
+
+/** Where one fact's value comes from, as this process's mount reads it. */
+export interface TrpcFactBinding<TContext = never> {
+  readonly fact: TrpcFact;
+  resolve(ctx: TContext): unknown | Promise<unknown>;
+}
+
+/** A mount binds request access; handlers receive only the parsed result. */
+export function bindTrpcFact<Schema extends z.ZodType, TContext>(
+  fact: TrpcFact<Schema>,
+  resolve: (ctx: TContext) => z.input<Schema> | Promise<z.input<Schema>>,
+): TrpcFactBinding<TContext> {
+  return { fact, resolve };
+}
+
+/**
+ * The twin of REST's `bindRestHeader`: the mount names the header, so which
+ * proxy header this deployment trusts is the process's answer and not a
+ * feature's. A header the request did not carry resolves to null.
+ */
+export function bindTrpcHeader<Schema extends z.ZodType>(
+  fact: TrpcFact<Schema>,
+  header: string,
+): TrpcFactBinding<TrpcRuntimeContext> {
+  return { fact, resolve: (ctx) => headerValue(ctx.req?.headers[header]) };
+}
+
+function headerValue(value: string | readonly string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * The browser session row this request arrived on. A fact, not part of the
+ * actor: one person on two tabs is one actor and two sessions, so "end every
+ * session but this one" is a question about the request, not about who asked.
+ */
+export const browserSessionFact = defineTrpcFact("browserSession", z.string().nullable());
+
+/** Where the request came from, as the process's own mount reads the address. */
+export const callerAddressFact = defineTrpcFact("callerAddress", z.string().nullable());
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The server half of a tRPC contract: a permission and a handler bound to a
 // procedure the contract already named.
 // Design: packages/api/adrs/20260908-transport-declaration-split.md.
@@ -207,6 +273,29 @@ export type TrpcContractHandlerArguments<Input, App> = Omit<
   "actor"
 > &
   Readonly<{ actor: TrpcHandlerActor }>;
+
+/**
+ * What a procedure that runs with no caller is handed. Both halves are null
+ * together, so a handler cannot read one and assume the other, and the runtime
+ * builds no actor to hand it.
+ */
+export type TrpcAnonymousHandlerArguments<Input, App> = Omit<
+  ApiHandlerArguments<Input, App>,
+  "actor" | "scope"
+> &
+  Readonly<{ actor: null; scope: null }>;
+
+/** Whether the procedure's declaration opens a door at all. */
+type TrpcCallerKind = "authenticated" | "anonymous";
+
+type HandlerArgumentsFor<Caller extends TrpcCallerKind, Input, App> = Caller extends "anonymous"
+  ? TrpcAnonymousHandlerArguments<Input, App>
+  : TrpcContractHandlerArguments<Input, App>;
+
+/** The facts a handler is handed beside its input, in the order it declared them. */
+type TrpcFactValues<Facts extends readonly TrpcFact[]> = {
+  [Index in keyof Facts]: z.output<Facts[Index]["schema"]>;
+};
 
 type ValueResult<Output extends z.ZodType> = z.input<Output> | Promise<z.input<Output>>;
 type StreamResult<Output extends z.ZodType> =
@@ -264,10 +353,19 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   /** The dotted name an output refusal and an audit row are written with. */
   procedure: string;
   member: TrpcContractMember;
-  access: AccessDeclaration;
-  handle(args: never): unknown;
+  access: TrpcAccess;
+  /** What the procedure asks the process for; the mount binds each one. */
+  facts: readonly TrpcFact[];
+  handle(args: never, ...facts: never[]): unknown;
   app(ctx: TContext): unknown;
 }>;
+
+/**
+ * What a procedure declares instead of a permission. `publicRoute` is REST's
+ * own word for it, and means the same here: no credential is resolved, no
+ * actor is built, and the handler is told so.
+ */
+export type TrpcAccess = AccessDeclaration | PublicRouteAccess;
 
 /**
  * What a runtime offers a declaration: one built procedure per member, and the
@@ -305,7 +403,7 @@ type Undeclared<Contract extends TrpcContract, Implemented extends string> = Exc
 export interface TrpcRouterBuilder<Api, Contract extends TrpcContract, Implemented extends string> {
   procedure<Name extends Undeclared<Contract, Implemented>>(
     name: Name,
-  ): TrpcRouterAccess<Api, Contract, Implemented, Name>;
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, []>;
   build(
     this: [Undeclared<Contract, Implemented>] extends [never]
       ? TrpcRouterBuilder<Api, Contract, Implemented>
@@ -322,21 +420,47 @@ export interface TrpcRouterAccess<
   Contract extends TrpcContract,
   Implemented extends string,
   Name extends keyof Contract["members"] & string,
+  Facts extends readonly TrpcFact[],
 > {
+  /**
+   * What this procedure needs the process to resolve, beside its own input:
+   * the address the caller reached us at, the session row it arrived on. Each
+   * one is bound at the mount, and reaches the handler after its arguments.
+   */
+  withFacts<const Added extends readonly TrpcFact[]>(
+    ...facts: Added
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Facts, ...Added]>;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
-  ): TrpcRouterImplementation<Api, Contract, Implemented, Name>;
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  /**
+   * Every one of them, asked before the handler at the one scope the input
+   * names. Naming an array is what says AND; a single permission is declared
+   * on its own.
+   */
+  withPermission(
+    permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
+    options?: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  /**
+   * Runs with no caller at all: the sign-up that predates the account it
+   * creates. `publicRoute({ reason })` is the same declaration REST writes,
+   * and the reason is what a reviewer reads.
+   */
+  withAccess(
+    access: PublicRouteAccess,
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "anonymous">;
   /** Authenticated and deliberately unchecked, with the reason it needs none. */
   noPermission(declaration: {
     reason: string;
     allow?: Record<string, string>;
-  }): TrpcRouterImplementation<Api, Contract, Implemented, Name>;
+  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   /** The handler proves standing itself; `enforces` records which fields it covers. */
   serviceAuthorized(declaration: {
     reason: string;
     permissions: readonly AuthzPermission[];
     enforces?: EnforcedScopeFields;
-  }): TrpcRouterImplementation<Api, Contract, Implemented, Name>;
+  }): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
 }
 
 /** The handler, over the contract's parsed input and declared answer. */
@@ -345,17 +469,21 @@ export interface TrpcRouterImplementation<
   Contract extends TrpcContract,
   Implemented extends string,
   Name extends keyof Contract["members"] & string,
+  Facts extends readonly TrpcFact[] = [],
+  Caller extends TrpcCallerKind = "authenticated",
 > {
   handle(
     handler: (
-      args: TrpcContractHandlerArguments<z.output<Contract["members"][Name]["input"]>, Api>,
+      args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api>,
+      ...facts: TrpcFactValues<Facts>
     ) => MemberResult<Contract["members"][Name]>,
   ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
 }
 
 type Implementation = Readonly<{
-  access: AccessDeclaration;
-  handle(args: never): unknown;
+  access: TrpcAccess;
+  facts: readonly TrpcFact[];
+  handle(args: never, ...facts: never[]): unknown;
 }>;
 
 function mountRouter<Api, Contract extends TrpcContract>(
@@ -381,6 +509,7 @@ function mountRouter<Api, Contract extends TrpcContract>(
         procedure: `${contract.namespace}.${name}`,
         member,
         access: implementation.access,
+        facts: implementation.facts,
         handle: implementation.handle,
         app,
       });
@@ -393,46 +522,59 @@ function mountRouter<Api, Contract extends TrpcContract>(
   };
 }
 
+type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPermission[];
+
 function routerBuilder<Api, Contract extends TrpcContract, Implemented extends string>(
   api: TrpcFeatureApiWitness<Api>,
   contract: Contract,
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterBuilder<Api, Contract, Implemented> {
-  const implement = (name: string) => (access: AuthzPermission | AuthzDeclaration) => ({
-    handle: (handle: (args: never) => unknown) =>
-      routerBuilder(
-        api,
-        contract,
-        new Map(implementations).set(name, { access: accessDeclarationOf(access), handle }),
-      ),
-  });
+  /** One selected procedure, with the facts it has named so far. */
+  const selected = (name: string, facts: readonly TrpcFact[]) => {
+    const implement = (access: TrpcAccess) => ({
+      handle: (handle: (args: never, ...values: never[]) => unknown) =>
+        routerBuilder(api, contract, new Map(implementations).set(name, { access, facts, handle })),
+    });
+
+    return {
+      withFacts: (...added: readonly TrpcFact[]) => {
+        assertFactsDistinct({ contract, name, facts: [...facts, ...added] });
+
+        return selected(name, [...facts, ...added]);
+      },
+      withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
+        implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
+      withAccess: (access: PublicRouteAccess) => {
+        assertAnonymousProcedure({ contract, name });
+
+        return implement(access);
+      },
+      noPermission: (declaration: { reason: string; allow?: Record<string, string> }) =>
+        implement({
+          kind: "no-permission",
+          reason: declaration.reason,
+          allow: declaration.allow ? { ...declaration.allow } : undefined,
+        }),
+      serviceAuthorized: (declaration: {
+        reason: string;
+        permissions: readonly AuthzPermission[];
+        enforces?: EnforcedScopeFields;
+      }) =>
+        implement({
+          kind: "service-authorized",
+          reason: declaration.reason,
+          permissions: declaration.permissions,
+          ...(declaration.enforces === undefined ? {} : { enforces: declaration.enforces }),
+        }),
+    };
+  };
 
   return {
     procedure: (name: string) => {
       assertDeclared(contract, name);
       assertUnimplemented(contract, name, implementations);
-      const access = implement(name);
 
-      return {
-        withPermission: access,
-        noPermission: (declaration: { reason: string; allow?: Record<string, string> }) =>
-          access({
-            kind: "no-permission",
-            reason: declaration.reason,
-            allow: declaration.allow ? { ...declaration.allow } : undefined,
-          }),
-        serviceAuthorized: (declaration: {
-          reason: string;
-          permissions: readonly AuthzPermission[];
-          enforces?: EnforcedScopeFields;
-        }) =>
-          access({
-            kind: "service-authorized",
-            reason: declaration.reason,
-            permissions: declaration.permissions,
-            ...(declaration.enforces === undefined ? {} : { enforces: declaration.enforces }),
-          }),
-      };
+      return selected(name, []);
     },
     build: () => ({
       protocol: "trpc",
@@ -443,19 +585,119 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   } as TrpcRouterBuilder<Api, Contract, Implemented>;
 }
 
+function isPermissionList(access: PermissionArgument): access is readonly AuthzPermission[] {
+  return Array.isArray(access);
+}
+
 /**
- * A bare permission is the one-permission declaration spelled short. `custom`
- * is refused: a custom check IS its own middleware, and the one execution path
- * has no seam for one.
+ * A bare permission is the one-permission declaration spelled short, an array
+ * is the AND. `custom` is refused: a custom check IS its own middleware, and
+ * the one execution path has no seam for one.
  */
-function accessDeclarationOf(access: AuthzPermission | AuthzDeclaration): AccessDeclaration {
+function permissionDeclarationOf({
+  contract,
+  name,
+  access,
+  via,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  via?: ScopeTierField;
+}): AccessDeclaration {
   if (typeof access === "string") return { kind: "permission", permission: access };
+
+  if (isPermissionList(access)) {
+    return permissionAllOf({ contract, name, permissions: access, via });
+  }
 
   if (access.kind === "custom") {
     throw new Error("a tRPC router cannot declare a custom access check");
   }
 
   return access;
+}
+
+/**
+ * Every one of them, at one scope. A set that names fewer than two, repeats
+ * one, or shares no tier it could all be asked at is refused where it is
+ * written rather than at the request that first fails on it.
+ */
+function permissionAllOf({
+  contract,
+  name,
+  permissions,
+  via,
+}: {
+  contract: TrpcContract;
+  name: string;
+  permissions: readonly AuthzPermission[];
+  via?: ScopeTierField;
+}): AccessDeclaration {
+  const address = `tRPC ${contract.namespace}.${name}`;
+
+  if (permissions.length < 2) {
+    throw new Error(`${address} names ${permissions.length} permissions to check together`);
+  }
+
+  if (new Set(permissions).size !== permissions.length) {
+    throw new Error(`${address} names one permission twice among the ones it checks together`);
+  }
+
+  if (sharedGrantTiers(permissions).length === 0) {
+    throw new Error(
+      `${address} checks ${permissions.join(" and ")} together, and no one scope grants them all`,
+    );
+  }
+
+  const [first, second, ...rest] = permissions as [
+    AuthzPermission,
+    AuthzPermission,
+    ...AuthzPermission[],
+  ];
+
+  return { kind: "permission-all", permissions: [first, second, ...rest], ...(via ? { via } : {}) };
+}
+
+/**
+ * A procedure that runs with no caller may not ask a question about a tenant:
+ * nothing resolved a scope for it, so a scope id in its input would be a claim
+ * the runtime has no way to check. The same refusal REST makes of a public
+ * route, made here against the contract's declared parser.
+ */
+function assertAnonymousProcedure({
+  contract,
+  name,
+}: {
+  contract: TrpcContract;
+  name: string;
+}): void {
+  const input = contract.members[name]?.input;
+  const shape = input instanceof z.ZodObject ? Object.keys(input.shape) : [];
+  const scoped = SCOPE_INPUT_FIELDS.filter((field) => shape.includes(field));
+
+  if (scoped.length > 0) {
+    throw new Error(
+      `tRPC ${contract.namespace}.${name} runs with no caller and its input names ${scoped.join(", ")}`,
+    );
+  }
+}
+
+/** Two facts of one name would reach the handler as one argument twice. */
+function assertFactsDistinct({
+  contract,
+  name,
+  facts,
+}: {
+  contract: TrpcContract;
+  name: string;
+  facts: readonly TrpcFact[];
+}): void {
+  const names = facts.map((fact) => fact.name);
+
+  if (new Set(names).size !== names.length) {
+    throw new Error(`tRPC ${contract.namespace}.${name} declares one fact twice`);
+  }
 }
 
 function assertDeclared(contract: TrpcContract, name: string): void {
@@ -551,11 +793,18 @@ export type TrpcRuntimePorts<TContext> = Readonly<{
   }>;
 }>;
 
+/** What one mount supplies beyond the application slice. */
+export type TrpcMountOptions<TContext> = Readonly<{
+  /** One binding per fact the mounted declaration's procedures name. */
+  facts?: readonly TrpcFactBinding<TContext>[];
+}>;
+
 /** Mounts declared namespaces on one process's root. */
 export interface TrpcRuntime<TContext extends object> extends TrpcProcedureFactory<TContext> {
   mount<Api, Contract extends TrpcContract>(
     declaration: TrpcRouterDeclaration<Api, Contract>,
     app: (ctx: TContext) => Api,
+    options?: TrpcMountOptions<TContext>,
   ): TRPCBuiltRouter<
     AnyTRPCRootTypes,
     TRPCDecorateCreateRouterOptions<TrpcContractProcedures<Contract>>
@@ -576,6 +825,7 @@ export function createTrpcRuntime<
 >({
   root,
   procedure,
+  anonymousProcedure,
   ports,
 }: {
   root: TRPCRootObject<TContext, object, TOptions, TRoot>;
@@ -586,43 +836,121 @@ export function createTrpcRuntime<
    * authenticated procedure from an anonymous one.
    */
   procedure: TrpcBuildableProcedure;
+  /**
+   * The process's PUBLIC procedure, for a declaration that runs with no
+   * caller. A runtime given none refuses such a declaration at mount, naming
+   * the procedure, rather than answering it behind the authenticated door.
+   */
+  anonymousProcedure?: TrpcBuildableProcedure;
   ports: TrpcRuntimePorts<TContext>;
 }): TrpcRuntime<TContext> {
   const trace = tracer(ports);
-  const log = requestLog(ports);
   const handledError = handledErrors(ports);
-  const audit = auditTrail(ports);
 
-  const runtime: TrpcRuntime<TContext> = {
-    procedure: (request) => {
-      // The parser FIRST, then the check: a check installed ahead of `.input()`
-      // reads `undefined` and silently authorizes nothing.
-      const built = procedure
-        .input(request.member.input)
-        .use(trace)
-        .use(log)
-        .use(handledError)
-        .use(access({ ports, declaration: request.access, app: request.app }))
-        .use(audit);
+  const build = (
+    request: TrpcProcedureRequest<TContext>,
+    bound: ReadonlyMap<string, TrpcFactBinding<TContext>>,
+  ): unknown => {
+    const anonymous = request.access.kind === "public";
+    const facts = boundFacts({ request, bound });
 
-      const handle = guardOutput({
-        procedure: request.procedure,
-        kind: request.member.kind,
-        output: request.member.output,
-        handler: request.handle,
-      });
+    // The parser FIRST, then the check: a check installed ahead of `.input()`
+    // reads `undefined` and silently authorizes nothing.
+    const built = doorOf({ anonymous, procedure, anonymousProcedure, request })
+      .input(request.member.input)
+      .use(trace)
+      .use(requestLog(ports, { anonymous }))
+      .use(handledError)
+      .use(access({ ports, declaration: request.access, app: request.app, facts }))
+      .use(auditTrail(ports, { anonymous }));
 
-      if (request.member.kind === "query") return built.query(handle);
+    const handle = guardOutput({
+      procedure: request.procedure,
+      kind: request.member.kind,
+      output: request.member.output,
+      handler: request.handle,
+    });
 
-      if (request.member.kind === "mutation") return built.mutation(handle);
+    if (request.member.kind === "query") return built.query(handle);
 
-      return built.subscription(handle);
-    },
-    router: (record) => root.router(record as TRPCRouterRecord),
-    mount: (declaration, app) => declaration.router(runtime, app),
+    if (request.member.kind === "mutation") return built.mutation(handle);
+
+    return built.subscription(handle);
   };
 
-  return runtime;
+  const router = (record: Readonly<Record<string, unknown>>) =>
+    root.router(record as TRPCRouterRecord);
+
+  return {
+    procedure: (request) => build(request, new Map()),
+    router,
+    mount: (declaration, app, options) =>
+      declaration.router(
+        {
+          procedure: (request: TrpcProcedureRequest<TContext>) =>
+            build(request, factBindings(options)),
+          router,
+        },
+        app,
+      ),
+  };
+}
+
+/** The bindings this mount supplied, by the fact name each one answers for. */
+function factBindings<TContext>(
+  options: TrpcMountOptions<TContext> | undefined,
+): ReadonlyMap<string, TrpcFactBinding<TContext>> {
+  return new Map((options?.facts ?? []).map((binding) => [binding.fact.name, binding] as const));
+}
+
+/**
+ * Every fact the procedure declared, paired with the binding that answers it.
+ * A fact the mount bound no value for is refused here, naming the fact and the
+ * procedure, rather than reaching a handler as an unset argument.
+ */
+function boundFacts<TContext extends object>({
+  request,
+  bound,
+}: {
+  request: TrpcProcedureRequest<TContext>;
+  bound: ReadonlyMap<string, TrpcFactBinding<TContext>>;
+}): readonly Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<TContext> }>[] {
+  return request.facts.map((fact) => {
+    const binding = bound.get(fact.name);
+
+    if (!binding) {
+      throw new Error(
+        `tRPC ${request.procedure} declares the fact "${fact.name}", and this mount bound no value for it`,
+      );
+    }
+
+    return { fact, binding };
+  });
+}
+
+/**
+ * Which of the process's procedures this declaration is built on. A procedure
+ * that runs with no caller cannot be built on the authenticated one — the door
+ * would refuse the very caller it exists to serve.
+ */
+function doorOf<TContext extends object>({
+  anonymous,
+  procedure,
+  anonymousProcedure,
+  request,
+}: {
+  anonymous: boolean;
+  procedure: TrpcBuildableProcedure;
+  anonymousProcedure: TrpcBuildableProcedure | undefined;
+  request: TrpcProcedureRequest<TContext>;
+}): TrpcBuildableProcedure {
+  if (!anonymous) return procedure;
+
+  if (anonymousProcedure) return anonymousProcedure;
+
+  throw new Error(
+    `tRPC ${request.procedure} answers with no caller, and this runtime was given no anonymous procedure to build it on`,
+  );
 }
 
 /**
@@ -647,13 +975,18 @@ type TrpcParsedProcedure = Readonly<{
 type HandlerArguments = Readonly<{
   app: unknown;
   input: unknown;
-  actor: Actor & { id: string };
+  actor: (Actor & { id: string }) | null;
   scope: unknown;
   signal: AbortSignal | undefined;
 }>;
 
-/** What the access step establishes, and the handler is then handed. */
-type AccessFacts = Omit<HandlerArguments, "input" | "signal">;
+/**
+ * What the access step establishes: the handler's own arguments, and the facts
+ * it declared, resolved after the decision so a refused request never asks the
+ * process for anything.
+ */
+type ResolvedAccess = Omit<HandlerArguments, "input" | "signal"> &
+  Readonly<{ facts: readonly unknown[] }>;
 
 /**
  * The resolver's own options. `handlerArguments` is written onto the context by
@@ -676,22 +1009,28 @@ function access<TContext extends object>({
   ports,
   declaration,
   app,
+  facts,
 }: {
   ports: TrpcRuntimePorts<TContext>;
-  declaration: AccessDeclaration;
+  declaration: TrpcAccess;
   app: (ctx: TContext) => unknown;
+  facts: readonly BoundFact<TContext>[];
 }) {
-  return declareAuthzMiddleware(declaration, check({ ports, declaration, app }));
+  return declareAccessMiddleware(declaration, check({ ports, declaration, app, facts }));
 }
+
+type BoundFact<TContext> = Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<TContext> }>;
 
 function check<TContext extends object>({
   ports,
   declaration,
   app,
+  facts,
 }: {
   ports: TrpcRuntimePorts<TContext>;
-  declaration: AccessDeclaration;
+  declaration: TrpcAccess;
   app: (ctx: TContext) => unknown;
+  facts: readonly BoundFact<TContext>[];
 }) {
   return async ({
     ctx,
@@ -701,23 +1040,59 @@ function check<TContext extends object>({
     ctx: TContext;
     input: unknown;
     next: (options: {
-      ctx: { handlerArguments: AccessFacts };
+      ctx: { handlerArguments: ResolvedAccess };
     }) => Promise<MiddlewareResult<object>>;
   }): Promise<MiddlewareResult<object>> => {
+    // Nothing is authenticated for a public procedure and no actor is built
+    // for it: the handler is told there is no one behind the request rather
+    // than handed a guess.
+    if (declaration.kind === "public") {
+      const anonymous: ResolvedAccess = {
+        app: app(ctx),
+        actor: null,
+        scope: null,
+        facts: await resolveFacts({ facts, ctx }),
+      };
+
+      return next({ ctx: { handlerArguments: anonymous } });
+    }
+
     const decision = await authorized({ ports, declaration, ctx, input });
 
     if (!decision.actor) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
     }
 
-    const handlerArguments: AccessFacts = {
+    const handlerArguments: ResolvedAccess = {
       app: app(ctx),
       actor: decision.actor,
       scope: decision.scope,
+      facts: await resolveFacts({ facts, ctx }),
     };
 
     return next({ ctx: { handlerArguments } });
   };
+}
+
+/**
+ * The declared facts, in declaration order, each parsed by the schema that
+ * declared it. A value the schema refuses is the mount's fault, and it is
+ * raised here rather than reaching a handler that trusted the type.
+ */
+async function resolveFacts<TContext extends object>({
+  facts,
+  ctx,
+}: {
+  facts: readonly BoundFact<TContext>[];
+  ctx: TContext;
+}): Promise<readonly unknown[]> {
+  const resolved: unknown[] = [];
+
+  for (const { fact, binding } of facts) {
+    resolved.push(fact.schema.parse(await binding.resolve(ctx)));
+  }
+
+  return resolved;
 }
 
 /**
@@ -795,10 +1170,13 @@ function guardOutput({
   procedure: string;
   kind: TrpcContractMember["kind"];
   output: z.ZodType | undefined;
-  handler: (args: never) => unknown;
+  handler: (args: never, ...facts: never[]) => unknown;
 }): (opts: ResolverOptions) => unknown {
-  const invoke = (opts: ResolverOptions): unknown =>
-    (handler as (args: HandlerArguments) => unknown)(handlerArguments(opts));
+  const invoke = (opts: ResolverOptions): unknown => {
+    const { args, facts } = invocation(opts);
+
+    return (handler as (args: HandlerArguments, ...values: unknown[]) => unknown)(args, ...facts);
+  };
 
   if (!output) {
     return async (opts: ResolverOptions) => voidOutput({ procedure, value: await invoke(opts) });
@@ -836,27 +1214,33 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
   return value;
 }
 
-function handlerArguments(request: ResolverOptions): HandlerArguments {
-  const facts = accessFactsOf(request.ctx);
+/** The handler's own arguments, and the facts that follow them. */
+function invocation(request: ResolverOptions): {
+  args: HandlerArguments;
+  facts: readonly unknown[];
+} {
+  const resolved = resolvedAccessOf(request.ctx);
 
-  if (!facts) throw new Error("tRPC procedure reached its handler with no access decision");
+  if (!resolved) throw new Error("tRPC procedure reached its handler with no access decision");
 
-  return { ...facts, input: request.input, signal: request.signal };
+  const { facts, ...access } = resolved;
+
+  return { args: { ...access, input: request.input, signal: request.signal }, facts };
 }
 
 /** Reads back what the access step wrote, and nothing it did not write. */
-function accessFactsOf(ctx: object): AccessFacts | undefined {
+function resolvedAccessOf(ctx: object): ResolvedAccess | undefined {
   if (!("handlerArguments" in ctx)) return undefined;
 
-  const facts = ctx.handlerArguments;
+  const resolved = ctx.handlerArguments;
 
-  return isAccessFacts(facts) ? facts : undefined;
+  return isResolvedAccess(resolved) ? resolved : undefined;
 }
 
-function isAccessFacts(value: unknown): value is AccessFacts {
+function isResolvedAccess(value: unknown): value is ResolvedAccess {
   const named = typeof value === "object" && value !== null;
 
-  return named && "app" in value && "actor" in value && "scope" in value;
+  return named && "app" in value && "actor" in value && "scope" in value && "facts" in value;
 }
 
 /** Puts a failed call on its span the way the log line already puts it in Loki. */
@@ -959,6 +1343,7 @@ function spanAttributes({ path, type }: { path: string; type: string }) {
 
 function requestLog<TContext extends TrpcRuntimeContext & object>(
   ports: TrpcRuntimePorts<TContext>,
+  { anonymous }: { anonymous: boolean },
 ) {
   return async ({
     ctx,
@@ -975,10 +1360,12 @@ function requestLog<TContext extends TrpcRuntimeContext & object>(
   }): Promise<MiddlewareResult<object>> => {
     const scopeIds = auditScopeIds(input);
 
+    // A procedure that runs with no caller asks the process nothing about who
+    // is calling — not even to leave the field blank in the log line.
     const requestContext: RequestContext = {
       organizationId: scopeIds.organizationId,
       projectId: scopeIds.projectId,
-      userId: ports.identity.caller(ctx).actor?.id,
+      userId: anonymous ? undefined : ports.identity.caller(ctx).actor?.id,
     };
 
     return runWithContext(requestContext, async () => {
@@ -1079,6 +1466,7 @@ function trpcCodeOf(error: HandledError): TRPCError["code"] {
 /** Writes the audit row for a mutation, with the arguments the owner redacted. */
 function auditTrail<TContext extends TrpcRuntimeContext & object>(
   ports: TrpcRuntimePorts<TContext>,
+  { anonymous }: { anonymous: boolean },
 ) {
   return async ({
     ctx,
@@ -1095,6 +1483,10 @@ function auditTrail<TContext extends TrpcRuntimeContext & object>(
     input: unknown;
     getRawInput: GetRawInputFn;
   }): Promise<MiddlewareResult<object>> => {
+    // There is nobody to attribute a public procedure's write to, so the trail
+    // is not asked who it was.
+    if (anonymous) return next();
+
     const actor = ports.identity.caller(ctx).actor;
 
     if (type !== "mutation" || !actor || ports.audit.exempt(path)) return next();

@@ -12,13 +12,19 @@ import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { publicRoute } from "../../access/access.ts";
 import { defineTrpcContract } from "../../contract/trpc-contract.ts";
 import {
+  bindTrpcFact,
+  bindTrpcHeader,
+  browserSessionFact,
+  callerAddressFact,
   createTrpcErrorFormatter,
   createTrpcRuntime,
   defineTrpcRouter,
   TrpcRootDefinition,
   type TrpcProcedureFactory,
+  type TrpcRouterDeclaration,
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimePorts,
 } from "../runtime.ts";
@@ -438,6 +444,380 @@ describe("the tRPC error formatter", () => {
       const formatted = format(new TeapotError());
 
       expect(formatted.message).toBe("validation_error");
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The four capabilities the declared path grew for the surfaces that could not
+// state themselves honestly: a procedure with no caller, the facts a mount
+// resolves, and an AND-composed permission.
+//
+// Spec: packages/api/specs/trpc-framework.feature.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AccountApi {
+  register(input: { email: string }): Promise<{ id: string }>;
+}
+
+const AccountApi = featureApi<AccountApi>("user");
+
+const accountContract = defineTrpcContract("account")
+  .mutation("register")
+  .withInput(z.object({ email: z.string() }))
+  .withOutput(z.object({ id: z.string() }))
+
+  .mutation("changePassword")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(z.object({ done: z.boolean() }))
+
+  .query("performance")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(z.object({ score: z.number() }))
+  .build();
+
+type AccountContext = {
+  actor: { id: string } | null;
+  req?: { headers: Record<string, string | string[] | undefined> };
+  sessionId?: string;
+};
+
+const accountRoot = TrpcRootDefinition.forContext<AccountContext>().create({});
+
+const accountApp: AccountApi = { register: async () => ({ id: "user-1" }) };
+
+/** Records every permission the path asked about, and what it was told. */
+function accountHarness({
+  caller,
+  permitted = () => true,
+}: {
+  caller?: (ctx: AccountContext) => { actor: { type: "user"; id: string } | null };
+  permitted?: (permission: string) => boolean;
+} = {}) {
+  const asked: string[] = [];
+  const rows: TrpcRuntimeAuditEntry[] = [];
+
+  const ports: TrpcRuntimePorts<AccountContext> = {
+    identity: {
+      caller:
+        caller ?? ((ctx) => ({ actor: ctx.actor ? { type: "user", id: ctx.actor.id } : null })),
+    },
+    authorization: {
+      forRequest: () => ({
+        getDecision: async ({ permission }) => {
+          asked.push(permission);
+
+          return { permitted: permitted(permission), organizationRole: null };
+        },
+        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      }),
+    },
+    denials: {
+      membershipDisabled: () => new Error("membership disabled"),
+      liteMemberRestricted: () => new Error("lite member"),
+    },
+    audit: {
+      record: async (entry) => {
+        rows.push(entry);
+      },
+      redact: ({ args }) => args,
+      exempt: () => false,
+    },
+    errors: {
+      report: () => {},
+      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+      translate: () => undefined,
+    },
+  };
+
+  return {
+    asked,
+    rows,
+    ports,
+    runtime: (anonymousProcedure?: typeof accountRoot.procedure) =>
+      createTrpcRuntime({
+        root: accountRoot,
+        procedure: accountRoot.procedure,
+        ...(anonymousProcedure ? { anonymousProcedure } : {}),
+        ports,
+      }),
+  };
+}
+
+/** The three procedures, with whatever each capability's test needs of them. */
+function accountRouter(
+  declare: (builder: ReturnType<typeof defineTrpcRouter<AccountApi, typeof accountContract>>) => {
+    build(): TrpcRouterDeclaration<AccountApi, typeof accountContract>;
+  },
+) {
+  return declare(defineTrpcRouter(AccountApi, accountContract)).build();
+}
+
+const plainAccountRouter = () =>
+  accountRouter((builder) =>
+    builder
+      .procedure("register")
+      .withAccess(publicRoute({ reason: "signing up predates the account it creates" }))
+      .handle((async () => ({ id: "user-1" })) as never)
+
+      .procedure("changePassword")
+      .withPermission("annotations:update")
+      .handle((async () => ({ done: true })) as never)
+
+      .procedure("performance")
+      .withPermission(["evaluations:view", "analytics:view"])
+      .handle((async () => ({ score: 1 })) as never),
+  );
+
+describe("a procedure that runs with no caller", () => {
+  describe("given the runtime was given the process's anonymous procedure", () => {
+    /** @scenario "A procedure that runs with no caller is declared, not assumed" */
+    it("hands the handler a null actor and a null scope, and asks identity nothing", async () => {
+      const seen: Record<string, unknown>[] = [];
+
+      const harness = accountHarness({
+        caller: () => {
+          throw new Error("the identity port was asked about an anonymous caller");
+        },
+      });
+
+      const declaration = accountRouter((builder) =>
+        builder
+          .procedure("register")
+          .withAccess(publicRoute({ reason: "signing up predates the account it creates" }))
+          .handle((async (args: Record<string, unknown>) => {
+            seen.push({ ...args });
+
+            return { id: "user-1" };
+          }) as never)
+
+          .procedure("changePassword")
+          .withPermission("annotations:update")
+          .handle((async () => ({ done: true })) as never)
+
+          .procedure("performance")
+          .withPermission(["evaluations:view", "analytics:view"])
+          .handle((async () => ({ score: 1 })) as never),
+      );
+
+      const caller = harness
+        .runtime(accountRoot.procedure)
+        .mount(declaration, () => accountApp)
+        .createCaller({ actor: null });
+
+      await expect(caller.register({ email: "someone@example.com" })).resolves.toEqual({
+        id: "user-1",
+      });
+
+      expect(seen[0]).toMatchObject({ actor: null, scope: null });
+    });
+
+    /** @scenario "A procedure that runs with no caller is declared, not assumed" */
+    it("writes no audit row for it, because nobody is behind the request", async () => {
+      const harness = accountHarness({
+        caller: () => {
+          throw new Error("the identity port was asked about an anonymous caller");
+        },
+      });
+
+      const caller = harness
+        .runtime(accountRoot.procedure)
+        .mount(plainAccountRouter(), () => accountApp)
+        .createCaller({ actor: null });
+
+      await caller.register({ email: "someone@example.com" });
+
+      expect(harness.rows).toEqual([]);
+    });
+  });
+
+  describe("given the runtime was given no anonymous procedure", () => {
+    /** @scenario "A procedure that runs with no caller is declared, not assumed" */
+    it("refuses the mount, naming the procedure", () => {
+      const harness = accountHarness();
+
+      expect(() => harness.runtime().mount(plainAccountRouter(), () => accountApp)).toThrow(
+        /account\.register answers with no caller, and this runtime was given no anonymous procedure/,
+      );
+    });
+  });
+
+  describe("given the declaration is written badly", () => {
+    /** @scenario "A procedure that runs with no caller is declared, not assumed" */
+    it("refuses a blank reason, and an input that names a tenant", () => {
+      expect(() => publicRoute({ reason: "  " })).toThrow(/needs a written reason/);
+
+      expect(() =>
+        defineTrpcRouter(AccountApi, accountContract)
+          .procedure("changePassword")
+          .withAccess(publicRoute({ reason: "the sign-up form calls it" })),
+      ).toThrow(/account\.changePassword runs with no caller and its input names projectId/);
+    });
+  });
+});
+
+describe("a procedure that declares a fact", () => {
+  const sessionRouter = () =>
+    accountRouter((builder) =>
+      builder
+        .procedure("register")
+        .withFacts(callerAddressFact)
+        .withAccess(publicRoute({ reason: "signing up predates the account it creates" }))
+        .handle((async (_args: never, address: string | null) => ({
+          id: address ?? "none",
+        })) as never)
+
+        .procedure("changePassword")
+        .withFacts(browserSessionFact, callerAddressFact)
+        .withPermission("annotations:update")
+        .handle((async (_args: never, session: string | null, address: string | null) => ({
+          done: session === "session-1" && address === "203.0.113.7",
+        })) as never)
+
+        .procedure("performance")
+        .withPermission(["evaluations:view", "analytics:view"])
+        .handle((async () => ({ score: 1 })) as never),
+    );
+
+  describe("given the mount bound one value for each", () => {
+    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    it("hands them to the handler after its arguments, in the order it declared them", async () => {
+      const harness = accountHarness();
+
+      const caller = harness
+        .runtime(accountRoot.procedure)
+        .mount(sessionRouter(), () => accountApp, {
+          facts: [
+            bindTrpcFact(browserSessionFact, (ctx: AccountContext) => ctx.sessionId ?? null),
+            bindTrpcHeader(callerAddressFact, "x-forwarded-for"),
+          ],
+        })
+        .createCaller({
+          actor: { id: "user-1" },
+          sessionId: "session-1",
+          req: { headers: { "x-forwarded-for": "203.0.113.7" } },
+        });
+
+      await expect(caller.changePassword({ projectId: "project-1" })).resolves.toEqual({
+        done: true,
+      });
+    });
+
+    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    it("reads the address off the header the mount named, for an anonymous procedure too", async () => {
+      const harness = accountHarness();
+
+      const caller = harness
+        .runtime(accountRoot.procedure)
+        .mount(sessionRouter(), () => accountApp, {
+          facts: [
+            bindTrpcFact(browserSessionFact, () => null),
+            bindTrpcHeader(callerAddressFact, "x-forwarded-for"),
+          ],
+        })
+        .createCaller({ actor: null, req: { headers: { "x-forwarded-for": "198.51.100.4" } } });
+
+      await expect(caller.register({ email: "someone@example.com" })).resolves.toEqual({
+        id: "198.51.100.4",
+      });
+    });
+  });
+
+  describe("given the mount bound no value for one of them", () => {
+    /** @scenario "A tRPC procedure reads a fact its mount resolved, never the request" */
+    it("refuses the mount, naming the fact and the procedure", () => {
+      const harness = accountHarness();
+
+      expect(() =>
+        harness.runtime(accountRoot.procedure).mount(sessionRouter(), () => accountApp, {
+          facts: [bindTrpcFact(browserSessionFact, () => null)],
+        }),
+      ).toThrow(
+        /account\.register declares the fact "callerAddress", and this mount bound no value for it/,
+      );
+    });
+  });
+});
+
+describe("a procedure that names several permissions together", () => {
+  describe("given the caller holds every one of them", () => {
+    /** @scenario "A procedure may require several permissions together" */
+    it("asks about each before the handler runs, at the scope the input names", async () => {
+      const harness = accountHarness();
+
+      const caller = harness
+        .runtime(accountRoot.procedure)
+        .mount(plainAccountRouter(), () => accountApp)
+        .createCaller({ actor: { id: "user-1" } });
+
+      await expect(caller.performance({ projectId: "project-1" })).resolves.toEqual({ score: 1 });
+      expect(harness.asked).toEqual(["evaluations:view", "analytics:view"]);
+    });
+  });
+
+  describe("given the caller holds only the first", () => {
+    /** @scenario "A procedure may require several permissions together" */
+    it("refuses with one code, naming the permission it stopped on, and never runs the handler", async () => {
+      const ran: string[] = [];
+
+      const harness = accountHarness({
+        permitted: (permission) => permission === "evaluations:view",
+      });
+
+      const declaration = accountRouter((builder) =>
+        builder
+          .procedure("register")
+          .withAccess(publicRoute({ reason: "signing up predates the account it creates" }))
+          .handle((async () => ({ id: "user-1" })) as never)
+
+          .procedure("changePassword")
+          .withPermission("annotations:update")
+          .handle((async () => ({ done: true })) as never)
+
+          .procedure("performance")
+          .withPermission(["evaluations:view", "analytics:view"])
+          .handle((async () => {
+            ran.push("performance");
+
+            return { score: 1 };
+          }) as never),
+      );
+
+      const caller = harness
+        .runtime(accountRoot.procedure)
+        .mount(declaration, () => accountApp)
+        .createCaller({ actor: { id: "user-1" } });
+
+      const failure = await caller.performance({ projectId: "project-1" }).catch((error) => error);
+
+      expect(HandledError.isHandled((failure as { cause?: unknown }).cause)).toBe(true);
+      expect((failure as { cause: { code: string } }).cause.code).toBe("permission_denied");
+
+      expect((failure as { cause: { meta: Record<string, unknown> } }).cause.meta).toMatchObject({
+        permission: "analytics:view",
+      });
+      expect(ran).toEqual([]);
+      expect(harness.asked).toEqual(["evaluations:view", "analytics:view"]);
+    });
+  });
+
+  describe("given the set could never be asked at one scope", () => {
+    /** @scenario "A procedure may require several permissions together" */
+    it("refuses a set of one, a repeat, and one no single scope grants", () => {
+      const select = () => defineTrpcRouter(AccountApi, accountContract).procedure("performance");
+
+      expect(() => select().withPermission(["evaluations:view"] as never)).toThrow(
+        /names 1 permissions to check together/,
+      );
+
+      expect(() =>
+        select().withPermission(["evaluations:view", "evaluations:view"] as never),
+      ).toThrow(/names one permission twice/);
+
+      expect(() => select().withPermission(["evaluations:view", "ops:view"] as never)).toThrow(
+        /no one scope grants them all/,
+      );
     });
   });
 });

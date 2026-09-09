@@ -8,7 +8,10 @@
 // nothing here mirrors them.
 import type { Actor } from "@langwatch/actor";
 import {
+  AUTHZ_DECLARATION,
   BlankScopeIdError,
+  declareAuthzMiddleware,
+  permissionGrantTiers,
   PermissionDeniedError,
   resolveDeclaredScope,
   SCOPE_TIER_BY_FIELD,
@@ -18,8 +21,10 @@ import {
   type AuthzDenialReason,
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
+  type AuthzPermission,
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
+  type BindingScopeTier,
   type DeclaredScopeId,
   type PermissionDecision,
   type ScopeTierField,
@@ -31,10 +36,56 @@ import { ScopeInputMismatchError } from "../errors.ts";
 const logger = createLogger("langwatch:authz");
 
 /**
+ * Every one of these permissions, asked at the one scope the input names,
+ * before the handler. The authz vocabulary has no arm for an AND yet, so the
+ * kind is declared here until it lands beside the other four.
+ */
+export type PermissionAllDeclaration = Readonly<{
+  kind: "permission-all";
+  permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
+  via?: ScopeTierField;
+}>;
+
+/**
  * What a router may declare. `custom` is deliberately absent: a custom check
  * IS its own middleware, and the one execution path has no seam for one.
  */
-export type AccessDeclaration = Exclude<AuthzDeclaration, { kind: "custom" }>;
+export type AccessDeclaration =
+  | Exclude<AuthzDeclaration, { kind: "custom" }>
+  | PermissionAllDeclaration;
+
+/**
+ * Stamps the marker the router sweep reads back off a mounted procedure. The
+ * authz package owns four of the five kinds and brands them itself; the AND is
+ * this package's, so it is branded here with the same symbol and the same
+ * wrap-rather-than-mutate rule.
+ */
+export function declareAccessMiddleware<M extends (params: never) => Promise<unknown>>(
+  declaration: AccessDeclaration | PublicRouteAccess,
+  middleware: M,
+): M {
+  if (declaration.kind !== "permission-all" && declaration.kind !== "public") {
+    return declareAuthzMiddleware(declaration, middleware);
+  }
+
+  const declared = ((params: never) => middleware(params)) as M;
+
+  return Object.assign(declared, { [AUTHZ_DECLARATION]: declaration });
+}
+
+/**
+ * The tiers every one of these permissions can be granted at. An AND is asked
+ * at ONE scope, so a set sharing no tier is a declaration no scope can answer.
+ */
+export function sharedGrantTiers(
+  permissions: readonly AuthzPermission[],
+): readonly BindingScopeTier[] {
+  return permissions.reduce<readonly BindingScopeTier[]>(
+    (shared, permission) =>
+      shared.filter((tier) => permissionGrantTiers(permission).includes(tier)),
+    permissions[0] ? permissionGrantTiers(permissions[0]) : [],
+  );
+}
 
 /** Which credential reaches a REST route, as the document names it. */
 export type Credential =
@@ -167,9 +218,10 @@ export function routeScopeOf({
   param: ScopeTierField;
   input: unknown;
 }): DeclaredScopeId {
-  const named = typeof input === "object" && input !== null
-    ? (input as Record<string, unknown>)[param]
-    : undefined;
+  const named =
+    typeof input === "object" && input !== null
+      ? (input as Record<string, unknown>)[param]
+      : undefined;
 
   // Present and empty is something the caller sent; absent is a declaration
   // whose path parameter and permission target disagree, which is ours.
@@ -260,6 +312,8 @@ export async function decide({
       return decidePermission({ declaration, caller, input, authorize, denials });
     case "permission-any":
       return decidePermissionAny({ declaration, caller, input, authorize, denials });
+    case "permission-all":
+      return decidePermissionAll({ declaration, caller, input, authorize, denials });
     case "no-permission":
       assertNoSensitiveScope({ declaration, input });
       return { actor: caller.actor, scope: credentialScope };
@@ -366,6 +420,44 @@ async function decidePermissionAny({
 
   if (!decision.permitted) {
     throw denied({ permission: first, scope, decision, denials });
+  }
+
+  return { actor, scope };
+}
+
+/**
+ * Every permission the declaration named, asked at the one scope its first
+ * permission resolves. Sequential on purpose: the FIRST refusal is the answer,
+ * so a caller granted none of them is told about one permission rather than
+ * handed the whole set to work through.
+ */
+async function decidePermissionAll({
+  declaration,
+  caller,
+  input,
+  authorize,
+  denials,
+}: {
+  declaration: PermissionAllDeclaration;
+  caller: Caller;
+  input: unknown;
+  authorize?: AuthorizePort;
+  denials?: AccessDenialPort;
+}): Promise<AccessDecision> {
+  const { actor } = requireCaller(caller);
+  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
+  const [first] = declaration.permissions;
+
+  const scope = requireDeclaredScope({
+    permission: first,
+    input,
+    ...(declaration.via ? { via: declaration.via } : {}),
+  });
+
+  for (const permission of declaration.permissions) {
+    const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+
+    if (!decision.permitted) throw denied({ permission, scope, decision, denials });
   }
 
   return { actor, scope };
@@ -545,6 +637,7 @@ function declaredPermissionOf(declaration: AccessDeclaration): string {
     case "permission":
       return declaration.permission;
     case "permission-any":
+    case "permission-all":
     case "service-authorized":
       return declaration.permissions[0] ?? "";
     case "no-permission":

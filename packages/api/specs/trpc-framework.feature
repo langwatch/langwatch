@@ -16,6 +16,31 @@ Feature: tRPC framework boundary
     And the procedure does not compile
 
   @unit
+  Scenario: A procedure that runs with no caller is declared, not assumed
+    Given a sign-up that predates the account it creates
+    When it declares that it answers without a credential, with the written reason that is safe
+    Then nothing is asked about who is calling, and its handler is handed no caller and no scope
+    And no row is written to the audit trail, because nobody is behind the request
+    And a declaration with no written reason, or whose input names a tenant, is refused where it is written
+    And a process whose runtime has no anonymous procedure is refused at the mount, naming the procedure
+
+  @unit
+  Scenario: A tRPC procedure reads a fact its mount resolved, never the request
+    Given a procedure that needs the address a caller reached us at, and one that needs the browser session it arrived on
+    When each declares the facts it needs and the process binds one value for each at the mount
+    Then each handler is handed the facts it declared, parsed, after its own arguments and in the order it declared them
+    And where an address comes from is the mount's answer, so the header a deployment trusts is named once, by it
+    And a mount that bound no value for a declared fact is refused, naming the fact and the procedure
+
+  @unit
+  Scenario: A procedure may require several permissions together
+    Given a read that needs standing on two features at once
+    When it names both permissions in one declaration
+    Then each is asked before the handler runs, at the scope the input names
+    And the first one the caller lacks is the whole answer, with one refusal code, and the handler never runs
+    And a set naming fewer than two, repeating one, or sharing no scope that grants them all is refused where it is written
+
+  @unit
   Scenario: A secret typed into a scalar field never reaches the audit trail
     Given a mutation whose action path carries its secret in a top-level field
     When its arguments are prepared for the audit trail
