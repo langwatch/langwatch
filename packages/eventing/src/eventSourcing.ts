@@ -250,116 +250,134 @@ export class EventSourcing {
           "pipeline.aggregate_type": definition.metadata.aggregateType,
         },
       },
-      () => {
-        if (definition.processManagers.size > 0) {
-          if (this._processManagerMode === "producer-only") {
-            this.declineProcessManagers(definition);
-          } else {
-            this.requireProcessStore();
-          }
-        }
-        createEventCatalogue([
-          ...this._definitions.map((registered) => registered.aggregate),
-          definition.aggregate,
-        ]);
-        this._definitions.push(definition);
-
-        type ReturnType = PipelineWithCommandHandlers<
-          RegisteredPipeline<EventType, ProjectionTypes>,
-          [Commands] extends [NoCommands]
-            ? Record<string, EventSourcedQueueProcessor<any>>
-            : CommandsToProcessors<Commands>
-        >;
-
-        if (!this._enabled || !this.eventStore) {
-          logger.warn(
-            {
-              pipeline: definition.metadata.name,
-              isEnabled: this._enabled,
-              hasEventStore: !!this.eventStore,
-            },
-            "Returning DisabledPipeline - commands will be silently dropped",
-          );
-          this.logDisabledWarning({
-            pipeline: definition.metadata.name,
-          });
-          const disabled = new DisabledPipeline<EventType, ProjectionTypes>(
-            definition.metadata.name,
-            definition.metadata.aggregateType,
-            definition.metadata,
-          ) as ReturnType;
-          this.pipelines.set(definition.metadata.name, disabled);
-          return disabled;
-        }
-
-        const eventStore = this.eventStore as EventStore<EventType>;
-
-        const serviceOptions = buildServiceOptions(definition);
-
-        // Process managers consume their declaring pipeline's committed
-        // events directly through generated live subscribers. A producer folds
-        // nothing and subscribes to nothing, so it generates neither — the
-        // decline above is what says so, once, by name.
-        if (definition.processManagers.size > 0 && this._processManagerMode === "run") {
-          const artifacts = this.processRuntime.registerPipeline<EventType>({
-            pipelineName: definition.metadata.name,
-            processManagers: definition.processManagers,
-          });
-          if (artifacts.subscribers.length > 0) {
-            serviceOptions.subscribers = [
-              ...(serviceOptions.subscribers ?? []),
-              ...artifacts.subscribers,
-            ];
-          }
-        }
-
-        // Initialize the projection registry if it has projections and hasn't been initialized yet
-        if (
-          this.projectionRegistry.hasProjections &&
-          !this.projectionRegistry.isInitialized &&
-          this._globalQueue
-        ) {
-          this.projectionRegistry.initialize(
-            this._globalQueue,
-            this._globalJobRegistry,
-            this._executionTarget,
-          );
-        }
-
-        // Create the pipeline
-        const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
-          name: definition.metadata.name,
-          aggregateType: definition.metadata.aggregateType,
-          allowedEventTypes: definition.aggregate.events.map((event) => event.type),
-          eventStore,
-          ...serviceOptions,
-          globalQueue: this._globalQueue,
-          globalJobRegistry: this._globalJobRegistry,
-          metadata: definition.metadata,
-          globalRegistry: this.projectionRegistry,
-          executionTarget: this._executionTarget,
-          replayMarkerChecker: this._replayMarkerChecker,
-          retentionPolicyResolver: this._retentionPolicyResolver,
-          killSwitch: this._killSwitch,
-          warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
-          prepareEventForProjection: definition.prepareEventForProjection,
-        });
-
-        // Get command dispatchers
-        const commandProcessors = pipeline.service.getCommandQueues();
-        const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
-        for (const [commandName, processor] of commandProcessors.entries()) {
-          dispatchers[commandName] = processor;
-        }
-
-        const result = Object.assign(pipeline, {
-          commands: dispatchers,
-        }) as ReturnType;
-
-        this.pipelines.set(definition.metadata.name, result);
-        return result;
-      },
+      () => this.registerPipelineInSpan(definition),
     );
+  }
+
+  /**
+   * The body of `register()`, run inside its tracing span. Extracted to a
+   * named method so its branching is counted on its own rather than folded
+   * into `register`'s complexity.
+   */
+  private registerPipelineInSpan<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand = NoCommands,
+  >(
+    definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
+  ): PipelineWithCommandHandlers<
+    RegisteredPipeline<EventType, ProjectionTypes>,
+    [Commands] extends [NoCommands]
+      ? Record<string, EventSourcedQueueProcessor<any>>
+      : CommandsToProcessors<Commands>
+  > {
+    if (definition.processManagers.size > 0) {
+      if (this._processManagerMode === "producer-only") {
+        this.declineProcessManagers(definition);
+      } else {
+        this.requireProcessStore();
+      }
+    }
+    createEventCatalogue([
+      ...this._definitions.map((registered) => registered.aggregate),
+      definition.aggregate,
+    ]);
+    this._definitions.push(definition);
+
+    type ReturnType = PipelineWithCommandHandlers<
+      RegisteredPipeline<EventType, ProjectionTypes>,
+      [Commands] extends [NoCommands]
+        ? Record<string, EventSourcedQueueProcessor<any>>
+        : CommandsToProcessors<Commands>
+    >;
+
+    if (!this._enabled || !this.eventStore) {
+      logger.warn(
+        {
+          pipeline: definition.metadata.name,
+          isEnabled: this._enabled,
+          hasEventStore: !!this.eventStore,
+        },
+        "Returning DisabledPipeline - commands will be silently dropped",
+      );
+      this.logDisabledWarning({
+        pipeline: definition.metadata.name,
+      });
+      const disabled = new DisabledPipeline<EventType, ProjectionTypes>(
+        definition.metadata.name,
+        definition.metadata.aggregateType,
+        definition.metadata,
+      ) as ReturnType;
+      this.pipelines.set(definition.metadata.name, disabled);
+      return disabled;
+    }
+
+    const eventStore = this.eventStore as EventStore<EventType>;
+
+    const serviceOptions = buildServiceOptions(definition);
+
+    // Process managers consume their declaring pipeline's committed
+    // events directly through generated live subscribers. A producer folds
+    // nothing and subscribes to nothing, so it generates neither — the
+    // decline above is what says so, once, by name.
+    if (definition.processManagers.size > 0 && this._processManagerMode === "run") {
+      const artifacts = this.processRuntime.registerPipeline<EventType>({
+        pipelineName: definition.metadata.name,
+        processManagers: definition.processManagers,
+      });
+      if (artifacts.subscribers.length > 0) {
+        serviceOptions.subscribers = [
+          ...(serviceOptions.subscribers ?? []),
+          ...artifacts.subscribers,
+        ];
+      }
+    }
+
+    // Initialize the projection registry if it has projections and hasn't been initialized yet
+    if (
+      this.projectionRegistry.hasProjections &&
+      !this.projectionRegistry.isInitialized &&
+      this._globalQueue
+    ) {
+      this.projectionRegistry.initialize(
+        this._globalQueue,
+        this._globalJobRegistry,
+        this._executionTarget,
+      );
+    }
+
+    // Create the pipeline
+    const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
+      name: definition.metadata.name,
+      aggregateType: definition.metadata.aggregateType,
+      allowedEventTypes: definition.aggregate.events.map((event) => event.type),
+      eventStore,
+      ...serviceOptions,
+      globalQueue: this._globalQueue,
+      globalJobRegistry: this._globalJobRegistry,
+      metadata: definition.metadata,
+      globalRegistry: this.projectionRegistry,
+      executionTarget: this._executionTarget,
+      replayMarkerChecker: this._replayMarkerChecker,
+      retentionPolicyResolver: this._retentionPolicyResolver,
+      killSwitch: this._killSwitch,
+      warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
+      prepareEventForProjection: definition.prepareEventForProjection,
+    });
+
+    // Get command dispatchers
+    const commandProcessors = pipeline.service.getCommandQueues();
+    const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
+    for (const [commandName, processor] of commandProcessors.entries()) {
+      dispatchers[commandName] = processor;
+    }
+
+    const result = Object.assign(pipeline, {
+      commands: dispatchers,
+    }) as ReturnType;
+
+    this.pipelines.set(definition.metadata.name, result);
+    return result;
   }
 
   /**
@@ -548,91 +566,117 @@ export class EventSourcing {
 
     const definition = {
       name: queueName,
-      groupKey: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return "__unknown__";
-        return result.entry.groupKeyFn(result.clean);
-      },
-      score: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return nowInstant().epochMilliseconds;
-        return result.entry.scoreFn(result.clean);
-      },
-      spanAttributes: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return {};
-        if (!result.entry.spanAttributes) return {};
-        return result.entry.spanAttributes(result.clean);
-      },
-      process: async (payload: Record<string, unknown>, delivery?: JobDelivery) => {
-        const result = this.lookupEntry(payload);
-        if (!result) {
-          this.rejectUnroutableJob(payload, queueName);
-        }
-        // Forward the delivery. Dropping it here silently pinned
-        // `deliveryAttempt` at 1 for every registry entry, which disabled the
-        // fold store's merge-on-retry applied-id handling in the running
-        // system (#6578) — the entries forward it, this wrapper was the only
-        // point of loss.
-        await result.entry.process(result.clean, delivery);
-      },
-      coalesceMaxBatch: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return 1;
-        // `clean`, not `payload`: a resolver sees the same shape the handler
-        // will, without this queue's routing metadata.
-        return resolveCoalesceMaxBatch(result.entry, result.clean);
-      },
-      coalesceMaxBytes: (payload: Record<string, unknown>) => {
-        // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
-        // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
-        const result = this.lookupEntry(payload);
-        return result?.entry.coalesceMaxBytes;
-      },
-      processBatch: async (payloads: Record<string, unknown>[], delivery?: JobDelivery) => {
-        if (payloads.length === 0) return;
-        // A coalesced batch is always one group → one registry entry. Resolve
-        // every payload and guard against a mixed/unknown batch (should never
-        // happen — the GroupQueue only coalesces same-group jobs — but a stray
-        // payload must never be misrouted to the wrong handler). On any mismatch
-        // fall back to per-item processing.
-        // Reject unroutable payloads UP FRONT so everything below works with a
-        // fully-resolved list. `rejectUnroutableJob` returns `never`, so this
-        // narrows `routed` to non-null for the compiler rather than for the
-        // reader only — which is what lets the rest of this function drop its
-        // non-null assertions (#6699). Behaviour is unchanged: a null entry
-        // could only ever reach the heterogeneous branch, which rejected it
-        // there anyway.
-        const routed = payloads.map((payload) => {
-          const result = this.lookupEntry(payload);
-          if (!result) this.rejectUnroutableJob(payload, queueName);
-          return result;
-        });
-
-        // A coalesced batch is always one group → one registry entry. Guard
-        // against a mixed batch (should never happen — the GroupQueue only
-        // coalesces same-group jobs — but a stray payload must never be
-        // misrouted to the wrong handler) and fall back to per-item processing.
-        const firstEntry = routed[0]?.entry;
-        const batchHandler = firstEntry?.processBatch;
-        if (!batchHandler || !routed.every((r) => r.entry === firstEntry)) {
-          for (const result of routed) {
-            await result.entry.process(result.clean, delivery);
-          }
-          return;
-        }
-
-        // Forward the delivery — see the `process` wrapper above (#6578).
-        await batchHandler(
-          routed.map((r) => r.clean),
-          delivery,
-        );
-      },
+      groupKey: (payload: Record<string, unknown>) => this.globalQueueGroupKey(payload),
+      score: (payload: Record<string, unknown>) => this.globalQueueScore(payload),
+      spanAttributes: (payload: Record<string, unknown>) => this.globalQueueSpanAttributes(payload),
+      process: async (payload: Record<string, unknown>, delivery?: JobDelivery) =>
+        this.processGlobalQueuePayload(payload, delivery, queueName),
+      coalesceMaxBatch: (payload: Record<string, unknown>) =>
+        this.globalQueueCoalesceMaxBatch(payload),
+      coalesceMaxBytes: (payload: Record<string, unknown>) =>
+        this.globalQueueCoalesceMaxBytes(payload),
+      processBatch: async (payloads: Record<string, unknown>[], delivery?: JobDelivery) =>
+        this.processGlobalQueueBatch(payloads, delivery, queueName),
     };
 
     this._globalQueue = this._queueFactory
       ? this._queueFactory(definition)
       : new EventSourcedQueueProcessorMemory(definition);
+  }
+
+  private globalQueueGroupKey(payload: Record<string, unknown>): string {
+    const result = this.lookupEntry(payload);
+    if (!result) return "__unknown__";
+    return result.entry.groupKeyFn(result.clean);
+  }
+
+  private globalQueueScore(payload: Record<string, unknown>): number {
+    const result = this.lookupEntry(payload);
+    if (!result) return nowInstant().epochMilliseconds;
+    return result.entry.scoreFn(result.clean);
+  }
+
+  private globalQueueSpanAttributes(payload: Record<string, unknown>) {
+    const result = this.lookupEntry(payload);
+    if (!result) return {};
+    if (!result.entry.spanAttributes) return {};
+    return result.entry.spanAttributes(result.clean);
+  }
+
+  private async processGlobalQueuePayload(
+    payload: Record<string, unknown>,
+    delivery: JobDelivery | undefined,
+    queueName: string,
+  ): Promise<void> {
+    const result = this.lookupEntry(payload);
+    if (!result) {
+      this.rejectUnroutableJob(payload, queueName);
+    }
+    // Forward the delivery. Dropping it here silently pinned
+    // `deliveryAttempt` at 1 for every registry entry, which disabled the
+    // fold store's merge-on-retry applied-id handling in the running
+    // system (#6578) — the entries forward it, this wrapper was the only
+    // point of loss.
+    await result.entry.process(result.clean, delivery);
+  }
+
+  private globalQueueCoalesceMaxBatch(payload: Record<string, unknown>): number {
+    const result = this.lookupEntry(payload);
+    if (!result) return 1;
+    // `clean`, not `payload`: a resolver sees the same shape the handler
+    // will, without this queue's routing metadata.
+    return resolveCoalesceMaxBatch(result.entry, result.clean);
+  }
+
+  private globalQueueCoalesceMaxBytes(payload: Record<string, unknown>): number | undefined {
+    // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
+    // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
+    const result = this.lookupEntry(payload);
+    return result?.entry.coalesceMaxBytes;
+  }
+
+  private async processGlobalQueueBatch(
+    payloads: Record<string, unknown>[],
+    delivery: JobDelivery | undefined,
+    queueName: string,
+  ): Promise<void> {
+    if (payloads.length === 0) return;
+    // A coalesced batch is always one group → one registry entry. Resolve
+    // every payload and guard against a mixed/unknown batch (should never
+    // happen — the GroupQueue only coalesces same-group jobs — but a stray
+    // payload must never be misrouted to the wrong handler). On any mismatch
+    // fall back to per-item processing.
+    // Reject unroutable payloads UP FRONT so everything below works with a
+    // fully-resolved list. `rejectUnroutableJob` returns `never`, so this
+    // narrows `routed` to non-null for the compiler rather than for the
+    // reader only — which is what lets the rest of this function drop its
+    // non-null assertions (#6699). Behaviour is unchanged: a null entry
+    // could only ever reach the heterogeneous branch, which rejected it
+    // there anyway.
+    const routed = payloads.map((payload) => {
+      const result = this.lookupEntry(payload);
+      if (!result) this.rejectUnroutableJob(payload, queueName);
+      return result;
+    });
+
+    // A coalesced batch is always one group → one registry entry. Guard
+    // against a mixed batch (should never happen — the GroupQueue only
+    // coalesces same-group jobs — but a stray payload must never be
+    // misrouted to the wrong handler) and fall back to per-item processing.
+    const firstEntry = routed[0]?.entry;
+    const batchHandler = firstEntry?.processBatch;
+    if (!batchHandler || !routed.every((r) => r.entry === firstEntry)) {
+      for (const result of routed) {
+        await result.entry.process(result.clean, delivery);
+      }
+      return;
+    }
+
+    // Forward the delivery — see the `process` wrapper above (#6578).
+    await batchHandler(
+      routed.map((r) => r.clean),
+      delivery,
+    );
   }
 
   private logDisabledWarning(context: { pipeline?: string; command?: string }): void {

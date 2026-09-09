@@ -4,6 +4,7 @@ import {
   type Attributes,
   context,
   propagation,
+  type Span,
   SpanKind,
   SpanStatusCode,
   type Tracer,
@@ -60,6 +61,24 @@ export type SignalHandleResult<State> =
 
 const SLOW_PROCESS_MANAGER_OPERATION_MS = 1_000;
 export const DEFAULT_SIGNAL_REVISION_RETRIES = 3;
+
+/** Metric/log label for each evolve outcome, keyed by the result's own `outcome` tag. */
+const EVOLVE_OUTCOME_METRIC_LABEL: Record<
+  HandleResult["outcome"] | SignalHandleResult<unknown>["outcome"],
+  | "committed"
+  | "duplicate_event"
+  | "duplicate_signal"
+  | "process_not_found"
+  | "revision_conflict"
+  | "stale_wake"
+> = {
+  committed: "committed",
+  duplicateEvent: "duplicate_event",
+  staleWake: "stale_wake",
+  revisionConflict: "revision_conflict",
+  duplicateSignal: "duplicate_signal",
+  processNotFound: "process_not_found",
+};
 
 export interface ProcessManagerServiceOptions<State> {
   definition: ProcessDefinition<State>;
@@ -268,77 +287,141 @@ export class ProcessManagerService<State> {
         "project.id": ref.projectId,
         ...(signal.userId ? { "user.id": signal.userId } : {}),
       },
-      run: async () => {
-        ensureJsonSafe(signal.payload);
-        const sourceEventId = `external-signal:${signal.signalId}`;
-
-        for (let conflictCount = 0; conflictCount <= this.signalRevisionRetries; conflictCount++) {
-          if (await this.store.hasConsumedSource({ ref, sourceEventId })) {
-            const winning = await this.store.findByRef<State>({ ref });
-            if (!winning) return { outcome: "processNotFound" as const };
-            return {
-              outcome: "duplicateSignal" as const,
-              state: winning.state,
-              revision: winning.revision,
-            };
-          }
-
-          const existing = await this.store.findByRef<State>({ ref });
-          if (!existing && !createIfMissing) {
-            return { outcome: "processNotFound" as const };
-          }
-
-          const evolution = evolveSignal({
-            previousState: existing?.state ?? this.definition.initialState,
-            signal,
-            now,
-            ref,
-          });
-          const result = await this.commitEvolution({
-            ref,
-            tenantId: existing?.tenantId ?? signal.projectId,
-            userId: signal.userId ?? existing?.userId,
-            sourceEventId,
-            expectedRevision: existing?.revision ?? 0,
-            evolution,
-            now,
-          });
-
-          if (result.outcome === "committed") {
-            return { ...result, state: evolution.state };
-          }
-
-          if (result.outcome === "duplicateEvent") {
-            // The response to the first call may have been lost. Re-read so
-            // the retry still receives a durable winning state.
-            const winning = await this.store.findByRef<State>({ ref });
-            if (!winning) return { outcome: "processNotFound" as const };
-            return {
-              outcome: "duplicateSignal" as const,
-              state: winning.state,
-              revision: winning.revision,
-            };
-          }
-
-          if (result.outcome !== "revisionConflict") {
-            throw new Error(`External signal produced unexpected outcome "${result.outcome}"`);
-          }
-
-          if (conflictCount < this.signalRevisionRetries) continue;
-
-          const winning = await this.store.findByRef<State>({ ref });
-          if (!winning) return { outcome: "processNotFound" as const };
-          return {
-            outcome: "revisionConflict" as const,
-            actualRevision: winning.revision,
-            state: winning.state,
-          };
-        }
-
-        // The loop always returns; this guards future edits to its bounds.
-        throw new Error("External signal retry loop terminated unexpectedly");
-      },
+      run: () =>
+        this.runSignalRetryLoop({
+          ref,
+          signal,
+          now,
+          createIfMissing,
+          evolveSignal,
+        }),
     });
+  }
+
+  /**
+   * The body of `handleSignal`'s evolve span: retries a signal against the
+   * winning revision on CAS loss, up to `signalRevisionRetries` times.
+   * Extracted so its branching is counted on its own rather than folded into
+   * `handleSignal`'s complexity.
+   */
+  private async runSignalRetryLoop({
+    ref,
+    signal,
+    now,
+    createIfMissing,
+    evolveSignal,
+  }: {
+    ref: ProcessRef;
+    signal: ProcessSignalEnvelope;
+    now: number;
+    createIfMissing: boolean;
+    evolveSignal: NonNullable<ProcessDefinition<State>["evolveSignal"]>;
+  }): Promise<SignalHandleResult<State>> {
+    ensureJsonSafe(signal.payload);
+    const sourceEventId = `external-signal:${signal.signalId}`;
+
+    for (let conflictCount = 0; conflictCount <= this.signalRevisionRetries; conflictCount++) {
+      const attempt = await this.attemptSignalCommit({
+        ref,
+        signal,
+        now,
+        createIfMissing,
+        evolveSignal,
+        sourceEventId,
+        isLastAttempt: conflictCount >= this.signalRevisionRetries,
+      });
+      if (attempt.done) return attempt.result;
+    }
+
+    // The loop always returns; this guards future edits to its bounds.
+    throw new Error("External signal retry loop terminated unexpectedly");
+  }
+
+  /**
+   * One iteration of `runSignalRetryLoop`: read, evolve, commit, and resolve
+   * the outcome — or signal that the caller should retry against the
+   * revision that won. Extracted so its branching is counted on its own
+   * rather than folded into the loop's complexity.
+   */
+  private async attemptSignalCommit({
+    ref,
+    signal,
+    now,
+    createIfMissing,
+    evolveSignal,
+    sourceEventId,
+    isLastAttempt,
+  }: {
+    ref: ProcessRef;
+    signal: ProcessSignalEnvelope;
+    now: number;
+    createIfMissing: boolean;
+    evolveSignal: NonNullable<ProcessDefinition<State>["evolveSignal"]>;
+    sourceEventId: string;
+    isLastAttempt: boolean;
+  }): Promise<{ done: true; result: SignalHandleResult<State> } | { done: false }> {
+    if (await this.store.hasConsumedSource({ ref, sourceEventId })) {
+      return { done: true, result: await this.duplicateSignalResult(ref) };
+    }
+
+    const existing = await this.store.findByRef<State>({ ref });
+    if (!existing && !createIfMissing) {
+      return { done: true, result: { outcome: "processNotFound" as const } };
+    }
+
+    const evolution = evolveSignal({
+      previousState: existing?.state ?? this.definition.initialState,
+      signal,
+      now,
+      ref,
+    });
+    const result = await this.commitEvolution({
+      ref,
+      tenantId: existing?.tenantId ?? signal.projectId,
+      userId: signal.userId ?? existing?.userId,
+      sourceEventId,
+      expectedRevision: existing?.revision ?? 0,
+      evolution,
+      now,
+    });
+
+    if (result.outcome === "committed") {
+      return { done: true, result: { ...result, state: evolution.state } };
+    }
+
+    if (result.outcome === "duplicateEvent") {
+      // The response to the first call may have been lost. Re-read so
+      // the retry still receives a durable winning state.
+      return { done: true, result: await this.duplicateSignalResult(ref) };
+    }
+
+    if (result.outcome !== "revisionConflict") {
+      throw new Error(`External signal produced unexpected outcome "${result.outcome}"`);
+    }
+
+    if (!isLastAttempt) return { done: false };
+
+    const winning = await this.store.findByRef<State>({ ref });
+    if (!winning) return { done: true, result: { outcome: "processNotFound" as const } };
+    return {
+      done: true,
+      result: {
+        outcome: "revisionConflict" as const,
+        actualRevision: winning.revision,
+        state: winning.state,
+      },
+    };
+  }
+
+  /** Re-reads the winning row for a duplicate signal/event and reports it. */
+  private async duplicateSignalResult(ref: ProcessRef): Promise<SignalHandleResult<State>> {
+    const winning = await this.store.findByRef<State>({ ref });
+    if (!winning) return { outcome: "processNotFound" as const };
+    return {
+      outcome: "duplicateSignal" as const,
+      state: winning.state,
+      revision: winning.revision,
+    };
   }
 
   /**
@@ -522,83 +605,87 @@ export class ProcessManagerService<State> {
     return await this.tracer.startActiveSpan(
       `process ${this.definition.name} evolve`,
       { kind: SpanKind.INTERNAL, attributes: params.attributes },
-      async (span) => {
-        const startedAt = performance.now();
-        try {
-          const result = await params.run();
-          const outcome =
-            result.outcome === "duplicateEvent"
-              ? "duplicate_event"
-              : result.outcome === "duplicateSignal"
-                ? "duplicate_signal"
-                : result.outcome === "processNotFound"
-                  ? "process_not_found"
-                  : result.outcome === "staleWake"
-                    ? "stale_wake"
-                    : result.outcome === "revisionConflict"
-                      ? "revision_conflict"
-                      : "committed";
-          incrementEsProcessManagerTotal({
+      (span) => this.runEvolveSpanBody(params, span),
+    );
+  }
+
+  /**
+   * The body of `inEvolveSpan`'s active span. Extracted to a named method so
+   * its branching is counted on its own rather than folded into
+   * `inEvolveSpan`'s complexity.
+   */
+  private async runEvolveSpanBody<T extends HandleResult | SignalHandleResult<State>>(
+    params: {
+      inputKind: "event" | "wake" | "signal";
+      logContext: Record<string, string | number | undefined>;
+      attributes: Attributes;
+      run: () => Promise<T>;
+    },
+    span: Span,
+  ): Promise<T> {
+    const startedAt = performance.now();
+    try {
+      const result = await params.run();
+      const outcome = EVOLVE_OUTCOME_METRIC_LABEL[result.outcome];
+      incrementEsProcessManagerTotal({
+        processName: this.definition.name,
+        inputKind: params.inputKind,
+        outcome,
+      });
+      if (outcome === "revision_conflict") {
+        this.logger.warn(
+          {
             processName: this.definition.name,
             inputKind: params.inputKind,
             outcome,
-          });
-          if (outcome === "revision_conflict") {
-            this.logger.warn(
-              {
-                processName: this.definition.name,
-                inputKind: params.inputKind,
-                outcome,
-                ...params.logContext,
-              },
-              "Process-manager evolution hit a revision conflict",
-            );
-          }
-          return result;
-        } catch (error) {
-          incrementEsProcessManagerTotal({
+            ...params.logContext,
+          },
+          "Process-manager evolution hit a revision conflict",
+        );
+      }
+      return result;
+    } catch (error) {
+      incrementEsProcessManagerTotal({
+        processName: this.definition.name,
+        inputKind: params.inputKind,
+        outcome: "failed",
+      });
+      const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
+      span.recordException({
+        name: errorType,
+        message: errorMessage,
+      });
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      this.logger.warn(
+        {
+          processName: this.definition.name,
+          inputKind: params.inputKind,
+          errorType,
+          errorMessage,
+          ...params.logContext,
+        },
+        "Process-manager evolution failed",
+      );
+      throw error;
+    } finally {
+      const durationMs = performance.now() - startedAt;
+      observeEsProcessManagerDuration({
+        processName: this.definition.name,
+        inputKind: params.inputKind,
+        durationMs,
+      });
+      if (durationMs >= SLOW_PROCESS_MANAGER_OPERATION_MS) {
+        this.logger.warn(
+          {
             processName: this.definition.name,
             inputKind: params.inputKind,
-            outcome: "failed",
-          });
-          const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
-          span.recordException({
-            name: errorType,
-            message: errorMessage,
-          });
-          span.setStatus({ code: SpanStatusCode.ERROR });
-          this.logger.warn(
-            {
-              processName: this.definition.name,
-              inputKind: params.inputKind,
-              errorType,
-              errorMessage,
-              ...params.logContext,
-            },
-            "Process-manager evolution failed",
-          );
-          throw error;
-        } finally {
-          const durationMs = performance.now() - startedAt;
-          observeEsProcessManagerDuration({
-            processName: this.definition.name,
-            inputKind: params.inputKind,
-            durationMs,
-          });
-          if (durationMs >= SLOW_PROCESS_MANAGER_OPERATION_MS) {
-            this.logger.warn(
-              {
-                processName: this.definition.name,
-                inputKind: params.inputKind,
-                durationMs: Math.round(durationMs),
-                ...params.logContext,
-              },
-              "Process-manager evolution is slow",
-            );
-          }
-          span.end();
-        }
-      },
-    );
+            durationMs: Math.round(durationMs),
+            ...params.logContext,
+          },
+          "Process-manager evolution is slow",
+        );
+      }
+      span.end();
+    }
   }
 }

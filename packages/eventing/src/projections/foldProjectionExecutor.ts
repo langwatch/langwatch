@@ -8,6 +8,7 @@ import {
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
 import type { Event } from "../domain/types.ts";
+import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
@@ -43,7 +44,7 @@ type HistoryReadGap = {
  */
 function compareArrival(a: Event, b: Event): number {
   if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  return compareOrdinal(a.id, b.id);
 }
 
 function compareFoldEvents<State, E extends Event>(
@@ -424,28 +425,16 @@ export class FoldProjectionExecutor {
       incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
     }
 
-    if (loaded === null && !absentTrusted && this.shouldRefoldOnMiss(projection)) {
-      const refolded = await this.refoldUpToDelivered(projection, [event], context);
-      // The ADR-066 transitional net, made observable: its deletion condition is
-      // "it stopped firing", which is otherwise indistinguishable from a
-      // regression to the pre-ADR-066 steady state of refolding on every miss.
-      incrementEsFoldRefoldOnMissTotal(projection.name, refolded === null ? "absent" : "performed");
-      if (refolded !== null) {
-        await projection.store.store(
-          refolded,
-          withAppliedEventIds(
-            context,
-            this.appliedIdsForCommit({
-              context,
-              loadedAppliedIds: appliedEventIds,
-              deliveredIds: [event.id],
-            }),
-          ),
-        );
-        return refolded;
-      }
-      this.assertUndecodableWasRebuilt(projection, miss);
-    }
+    const missResult = await this.handleAbsentMiss({
+      projection,
+      event,
+      context,
+      loaded,
+      miss,
+      absentTrusted,
+      appliedEventIds,
+    });
+    if (missResult.handled) return missResult.state;
 
     // A redelivery of an event already folded into the loaded state: the state
     // is already correct, so there is nothing to apply and nothing to write.
@@ -468,35 +457,14 @@ export class FoldProjectionExecutor {
 
     let state = projection.apply(loadedState, event);
 
-    // Detect out-of-order: event's occurredAt is STRICTLY LESS than what we've already seen.
-    // Same occurredAt (==) does NOT trigger re-fold — arrival order is the correct
-    // tiebreaker for events at the same logical instant (e.g., SDK sends snapshot and
-    // finished with identical occurredAt). The +1 on UpdatedAt in apply() guarantees
-    // distinct ClickHouse rows regardless.
-    const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
-    if (
-      projection.options?.eventOrdering !== "acceptedAt" &&
-      typeof eventOccurredAt === "number" &&
-      eventOccurredAt > 0 &&
-      typeof prevLastOccurred === "number" &&
-      eventOccurredAt < prevLastOccurred &&
-      canRefold(projection, context)
-    ) {
-      // CanRefold returns false without an eventLoader.
-      const refolded = await this.refoldWithDelivered({
-        projection,
-        delivered: [event],
-        context,
-        occurredAtMs: eventOccurredAt,
-        loadedAppliedIds: appliedEventIds,
-        stateFrontierOccurredAtMs: prevLastOccurred,
-        logFields: { eventType: event.type, eventOccurredAt, prevLastOccurred },
-        message: "Out-of-order event detected, re-folding from scratch",
-      });
-      // An incomplete history read returns null: the loaded state stays the
-      // base and the event stays applied on top, out of order but not lost.
-      if (refolded !== null) state = refolded;
-    }
+    state = await this.applyOutOfOrderRefold({
+      projection,
+      event,
+      context,
+      state,
+      prevLastOccurred,
+      appliedEventIds,
+    });
 
     await projection.store.store(
       state,
@@ -510,6 +478,104 @@ export class FoldProjectionExecutor {
       ),
     );
     return state;
+  }
+
+  /**
+   * The absent-miss re-fold branch of `execute`: when nothing is loaded, the
+   * miss is not trusted absent, and the projection opts into refolding on
+   * miss, re-folds from scratch and commits it. Extracted so its branching
+   * is counted on its own rather than folded into `execute`'s complexity.
+   */
+  private async handleAbsentMiss<State, E extends Event>({
+    projection,
+    event,
+    context,
+    loaded,
+    miss,
+    absentTrusted,
+    appliedEventIds,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    event: E;
+    context: ProjectionStoreContext;
+    loaded: State | null;
+    miss: "absent" | "undecodable" | undefined;
+    absentTrusted: boolean;
+    appliedEventIds: readonly string[];
+  }): Promise<{ handled: true; state: State } | { handled: false }> {
+    if (loaded !== null || absentTrusted || !this.shouldRefoldOnMiss(projection)) {
+      return { handled: false };
+    }
+
+    const refolded = await this.refoldUpToDelivered(projection, [event], context);
+    // The ADR-066 transitional net, made observable: its deletion condition is
+    // "it stopped firing", which is otherwise indistinguishable from a
+    // regression to the pre-ADR-066 steady state of refolding on every miss.
+    incrementEsFoldRefoldOnMissTotal(projection.name, refolded === null ? "absent" : "performed");
+    if (refolded !== null) {
+      await projection.store.store(
+        refolded,
+        withAppliedEventIds(
+          context,
+          this.appliedIdsForCommit({
+            context,
+            loadedAppliedIds: appliedEventIds,
+            deliveredIds: [event.id],
+          }),
+        ),
+      );
+      return { handled: true, state: refolded };
+    }
+    this.assertUndecodableWasRebuilt(projection, miss);
+    return { handled: false };
+  }
+
+  /**
+   * The out-of-order re-fold branch of `execute`: event's occurredAt is
+   * STRICTLY LESS than what we've already seen. Same occurredAt (==) does
+   * NOT trigger re-fold — arrival order is the correct tiebreaker for events
+   * at the same logical instant. Extracted for the same reason as {@link
+   * handleAbsentMiss}.
+   */
+  private async applyOutOfOrderRefold<State, E extends Event>({
+    projection,
+    event,
+    context,
+    state,
+    prevLastOccurred,
+    appliedEventIds,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    event: E;
+    context: ProjectionStoreContext;
+    state: State;
+    prevLastOccurred: unknown;
+    appliedEventIds: readonly string[];
+  }): Promise<State> {
+    const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
+    const isOutOfOrder =
+      projection.options?.eventOrdering !== "acceptedAt" &&
+      typeof eventOccurredAt === "number" &&
+      eventOccurredAt > 0 &&
+      typeof prevLastOccurred === "number" &&
+      eventOccurredAt < prevLastOccurred &&
+      canRefold(projection, context);
+    if (!isOutOfOrder) return state;
+
+    // CanRefold returns false without an eventLoader.
+    const refolded = await this.refoldWithDelivered({
+      projection,
+      delivered: [event],
+      context,
+      occurredAtMs: eventOccurredAt as number,
+      loadedAppliedIds: appliedEventIds,
+      stateFrontierOccurredAtMs: prevLastOccurred as number,
+      logFields: { eventType: event.type, eventOccurredAt, prevLastOccurred },
+      message: "Out-of-order event detected, re-folding from scratch",
+    });
+    // An incomplete history read returns null: the loaded state stays the
+    // base and the event stays applied on top, out of order but not lost.
+    return refolded !== null ? refolded : state;
   }
 
   /**

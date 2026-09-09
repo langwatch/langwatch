@@ -3,6 +3,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
   ROOT_CONTEXT,
+  type Span,
   SpanKind,
   SpanStatusCode,
   type Tracer,
@@ -481,152 +482,234 @@ export class OutboxDispatcherService {
         },
       },
       remoteParent,
-      async (span) => {
-        const startedAt = performance.now();
-        // Commit → first-dispatch delay (ADR-054): the substrate's direct
-        // "is the outbox draining" signal. First attempt only — retries
-        // re-enter with deliberate backoff, which is not queueing delay.
-        if (attempt === 1) {
-          observeEsProcessOutboxDispatchLag({
-            processName: message.processName,
-            lagMs: now - message.createdAt,
-          });
-        }
-        try {
-          const handler = this.handlers[message.intentType];
-          if (!handler) {
-            throw new Error(`No handler registered for intent type "${message.intentType}"`);
-          }
-          await handler({
-            message: {
-              processName: message.processName,
-              projectId: message.projectId,
-              processKey: message.processKey,
-              tenantId: message.tenantId,
-              userId: message.userId,
-              messageKey: message.messageKey,
-              intentType: message.intentType,
-              payload: message.payload,
-              sourceEventId: message.sourceEventId,
-              attempt,
-            },
-          });
-          const { applied } = await this.store.markDispatched({
-            identity,
-            leaseToken: message.leaseToken,
-            now,
-          });
-          if (!applied) {
-            this.countFenced({
-              message,
-              report,
-              phase: "dispatched",
-              durationMs: performance.now() - startedAt,
-            });
-            return;
-          }
-          report.dispatched.push(message.messageKey);
-          incrementEsProcessOutboxTotal({
-            processName: message.processName,
-            intentType: message.intentType,
-            status: "dispatched",
-          });
-        } catch (error) {
-          const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
-          span.recordException({
-            name: errorType,
-            message: errorMessage,
-          });
-          span.setStatus({ code: SpanStatusCode.ERROR });
-          const dead = attempt >= this.maxAttempts || isTerminalError(error);
-          const retryDelayMs = Math.max(this.retryDelayMs({ attempt }), retryAfterMsOf(error) ?? 0);
-          const { applied } = await this.store.markFailed({
-            identity,
-            leaseToken: message.leaseToken,
-            now,
-            nextAttemptAt: now + retryDelayMs,
-            dead,
-          });
-          if (!applied) {
-            this.countFenced({
-              message,
-              report,
-              phase: "failed",
-              durationMs: performance.now() - startedAt,
-            });
-            return;
-          }
-          (dead ? report.dead : report.retried).push(message.messageKey);
-          incrementEsProcessOutboxTotal({
-            processName: message.processName,
-            intentType: message.intentType,
-            status: dead ? "dead" : "retried",
-          });
-          const attemptRetryAfterMs = retryAfterMsOf(error);
-          const attemptDiagnostic = toAttemptDiagnostic(error);
-          await this.recordAttemptBestEffort({
-            message,
-            attempt: {
-              attempt,
-              occurredAt: now,
-              outcome: dead ? "dead" : "retry_scheduled",
-              ...attemptDiagnostic,
-              ...(attemptRetryAfterMs !== undefined ? { retryAfterMs: attemptRetryAfterMs } : {}),
-            },
-          });
-          if (dead || attempt === 1) {
-            // Intentionally retain this opaque operational ID for delivery diagnostics.
-            const fields = {
-              processName: message.processName,
-              processKey: message.processKey,
-              projectId: message.projectId,
-              tenantId: message.tenantId,
-              userId: message.userId,
-              messageKey: message.messageKey,
-              sourceEventId: message.sourceEventId,
-              intentType: message.intentType,
-              attempt,
-              outcome: dead ? "dead" : "retry_scheduled",
-              errorType,
-              errorMessage,
-            };
-            if (dead) {
-              this.logger.error(
-                fields,
-                "Process-manager outbox message exhausted delivery attempts",
-              );
-            } else {
-              this.logger.warn(fields, "Process-manager outbox delivery failed; retry scheduled");
-            }
-          }
-        } finally {
-          const durationMs = performance.now() - startedAt;
-          observeEsProcessOutboxDuration({
-            processName: message.processName,
-            intentType: message.intentType,
-            durationMs,
-          });
-          if (durationMs >= SLOW_OUTBOX_DELIVERY_MS) {
-            // Intentionally retain this opaque operational ID for slow-delivery diagnostics.
-            this.logger.warn(
-              {
-                processName: message.processName,
-                processKey: message.processKey,
-                projectId: message.projectId,
-                tenantId: message.tenantId,
-                userId: message.userId,
-                messageKey: message.messageKey,
-                sourceEventId: message.sourceEventId,
-                intentType: message.intentType,
-                attempt,
-                durationMs: Math.round(durationMs),
-              },
-              "Process-manager outbox delivery is slow",
-            );
-          }
-          span.end();
-        }
-      },
+      (span) =>
+        this.dispatchWithinSpan({
+          message,
+          now,
+          report,
+          attempt,
+          identity,
+          span,
+        }),
     );
+  }
+
+  private async dispatchWithinSpan({
+    message,
+    now,
+    report,
+    attempt,
+    identity,
+    span,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    report: DispatchReport;
+    attempt: number;
+    identity: OutboxMessageIdentity;
+    span: Span;
+  }): Promise<void> {
+    const startedAt = performance.now();
+    // Commit → first-dispatch delay (ADR-054): the substrate's direct
+    // "is the outbox draining" signal. First attempt only — retries
+    // re-enter with deliberate backoff, which is not queueing delay.
+    if (attempt === 1) {
+      observeEsProcessOutboxDispatchLag({
+        processName: message.processName,
+        lagMs: now - message.createdAt,
+      });
+    }
+    try {
+      const handler = this.handlers[message.intentType];
+      if (!handler) {
+        throw new Error(`No handler registered for intent type "${message.intentType}"`);
+      }
+      await handler({
+        message: {
+          processName: message.processName,
+          projectId: message.projectId,
+          processKey: message.processKey,
+          tenantId: message.tenantId,
+          userId: message.userId,
+          messageKey: message.messageKey,
+          intentType: message.intentType,
+          payload: message.payload,
+          sourceEventId: message.sourceEventId,
+          attempt,
+        },
+      });
+      const { applied } = await this.store.markDispatched({
+        identity,
+        leaseToken: message.leaseToken,
+        now,
+      });
+      if (!applied) {
+        this.countFenced({
+          message,
+          report,
+          phase: "dispatched",
+          durationMs: performance.now() - startedAt,
+        });
+        return;
+      }
+      report.dispatched.push(message.messageKey);
+      incrementEsProcessOutboxTotal({
+        processName: message.processName,
+        intentType: message.intentType,
+        status: "dispatched",
+      });
+    } catch (error) {
+      await this.handleDispatchFailure({
+        message,
+        now,
+        report,
+        attempt,
+        identity,
+        span,
+        startedAt,
+        error,
+      });
+    } finally {
+      this.finishDispatchSpan({ message, attempt, span, startedAt });
+    }
+  }
+
+  private async handleDispatchFailure({
+    message,
+    now,
+    report,
+    attempt,
+    identity,
+    span,
+    startedAt,
+    error,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    report: DispatchReport;
+    attempt: number;
+    identity: OutboxMessageIdentity;
+    span: Span;
+    startedAt: number;
+    error: unknown;
+  }): Promise<void> {
+    const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
+    span.recordException({
+      name: errorType,
+      message: errorMessage,
+    });
+    span.setStatus({ code: SpanStatusCode.ERROR });
+    const dead = attempt >= this.maxAttempts || isTerminalError(error);
+    const retryDelayMs = Math.max(this.retryDelayMs({ attempt }), retryAfterMsOf(error) ?? 0);
+    const { applied } = await this.store.markFailed({
+      identity,
+      leaseToken: message.leaseToken,
+      now,
+      nextAttemptAt: now + retryDelayMs,
+      dead,
+    });
+    if (!applied) {
+      this.countFenced({
+        message,
+        report,
+        phase: "failed",
+        durationMs: performance.now() - startedAt,
+      });
+      return;
+    }
+    (dead ? report.dead : report.retried).push(message.messageKey);
+    incrementEsProcessOutboxTotal({
+      processName: message.processName,
+      intentType: message.intentType,
+      status: dead ? "dead" : "retried",
+    });
+    const attemptRetryAfterMs = retryAfterMsOf(error);
+    const attemptDiagnostic = toAttemptDiagnostic(error);
+    await this.recordAttemptBestEffort({
+      message,
+      attempt: {
+        attempt,
+        occurredAt: now,
+        outcome: dead ? "dead" : "retry_scheduled",
+        ...attemptDiagnostic,
+        ...(attemptRetryAfterMs !== undefined ? { retryAfterMs: attemptRetryAfterMs } : {}),
+      },
+    });
+    if (dead || attempt === 1) {
+      this.logDispatchFailure({ message, attempt, dead, errorType, errorMessage });
+    }
+  }
+
+  private logDispatchFailure({
+    message,
+    attempt,
+    dead,
+    errorType,
+    errorMessage,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    attempt: number;
+    dead: boolean;
+    errorType: string;
+    errorMessage: string;
+  }): void {
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    const fields = {
+      processName: message.processName,
+      processKey: message.processKey,
+      projectId: message.projectId,
+      tenantId: message.tenantId,
+      userId: message.userId,
+      messageKey: message.messageKey,
+      sourceEventId: message.sourceEventId,
+      intentType: message.intentType,
+      attempt,
+      outcome: dead ? "dead" : "retry_scheduled",
+      errorType,
+      errorMessage,
+    };
+    if (dead) {
+      this.logger.error(fields, "Process-manager outbox message exhausted delivery attempts");
+    } else {
+      this.logger.warn(fields, "Process-manager outbox delivery failed; retry scheduled");
+    }
+  }
+
+  private finishDispatchSpan({
+    message,
+    attempt,
+    span,
+    startedAt,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    attempt: number;
+    span: Span;
+    startedAt: number;
+  }): void {
+    const durationMs = performance.now() - startedAt;
+    observeEsProcessOutboxDuration({
+      processName: message.processName,
+      intentType: message.intentType,
+      durationMs,
+    });
+    if (durationMs >= SLOW_OUTBOX_DELIVERY_MS) {
+      // Intentionally retain this opaque operational ID for slow-delivery diagnostics.
+      this.logger.warn(
+        {
+          processName: message.processName,
+          processKey: message.processKey,
+          projectId: message.projectId,
+          tenantId: message.tenantId,
+          userId: message.userId,
+          messageKey: message.messageKey,
+          sourceEventId: message.sourceEventId,
+          intentType: message.intentType,
+          attempt,
+          durationMs: Math.round(durationMs),
+        },
+        "Process-manager outbox delivery is slow",
+      );
+    }
+    span.end();
   }
 }

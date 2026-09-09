@@ -63,7 +63,7 @@ export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime
 export { EventSourcing } from "./eventSourcing.ts";
 // Pipeline (static definitions)
-export { definePipeline } from "./pipeline/staticBuilder.ts";
+export { definePipeline, type PipelineBuilder } from "./pipeline/staticBuilder.ts";
 export type { ProcessManagerApplier } from "./pipeline/processBuilder.ts";
 export type { SubscriberSpec, TriggerContext } from "./pipeline/processManagerDefinition.ts";
 export type {

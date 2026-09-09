@@ -163,11 +163,32 @@ export class PrismaProcessStore implements ProcessStore {
 
   async commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult> {
     try {
-      return await this.#prisma.$transaction(async (tx) => {
-        // This lock only serializes commits for the same process reference.
-        // Revision remains an explicit compare-and-swap below; the lock also
-        // closes the absent-row race for the first commit.
-        await tx.$queryRaw`
+      return await this.#prisma.$transaction(
+        (tx) => this.commitWithinTransaction(tx, commit),
+        COMMIT_TRANSACTION_OPTIONS,
+      );
+    } catch (error) {
+      if (error instanceof DuplicateInboxRollback) {
+        return { outcome: "duplicateEvent" };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The body of `commit`'s transaction: advisory lock, inbox dedup, CAS'd
+   * instance upsert, and outbox inserts. Extracted to a named method so its
+   * branching is counted on its own rather than folded into `commit`'s
+   * complexity.
+   */
+  private async commitWithinTransaction<State = unknown>(
+    tx: Prisma.TransactionClient,
+    commit: ProcessCommit<State>,
+  ): Promise<CommitResult> {
+    // This lock only serializes commits for the same process reference.
+    // Revision remains an explicit compare-and-swap below; the lock also
+    // closes the absent-row race for the first commit.
+    await tx.$queryRaw`
           -- @tenancy: advisory-lock helper, key is process-ref-bounded
           WITH process_lock AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(
@@ -177,157 +198,178 @@ export class PrismaProcessStore implements ProcessStore {
           SELECT 1 AS "acquired" FROM process_lock
         `;
 
-        if (commit.sourceEventId !== null) {
-          const duplicate = await tx.processManagerInbox.findUnique({
-            where: {
-              projectId: commit.ref.projectId,
-              processName_projectId_sourceEventKey: {
-                processName: commit.ref.processName,
-                projectId: commit.ref.projectId,
-                sourceEventKey: deriveInboxKey(commit.sourceEventId),
-              },
-            },
-            select: { id: true },
-          });
-          if (duplicate) return { outcome: "duplicateEvent" as const };
-        }
-
-        const existing = await tx.processManagerInstance.findUnique({
-          where: {
+    if (commit.sourceEventId !== null) {
+      const duplicate = await tx.processManagerInbox.findUnique({
+        where: {
+          projectId: commit.ref.projectId,
+          processName_projectId_sourceEventKey: {
+            processName: commit.ref.processName,
             projectId: commit.ref.projectId,
-            processName_projectId_processKey: refWhere(commit.ref),
+            sourceEventKey: deriveInboxKey(commit.sourceEventId),
           },
-          select: { revision: true },
-        });
-        const actualRevision = existing?.revision ?? 0;
-        if (actualRevision !== commit.expectedRevision) {
-          return {
-            outcome: "revisionConflict" as const,
-            actualRevision,
-          };
-        }
-
-        const revision = actualRevision + 1;
-        const instanceData = {
-          tenantId: commit.tenantId,
-          userId: commit.userId ?? null,
-          state: toJsonInput(commit.state as JsonValue),
-          revision,
-          nextWakeAt: commit.nextWakeAt === null ? null : asDate(commit.nextWakeAt),
-          updatedAt: asDate(commit.now),
-        };
-
-        if (actualRevision === 0) {
-          const inserted = await tx.processManagerInstance.createMany({
-            data: [
-              {
-                id: generate(PROCESS_MANAGER_INSTANCE_KSUID_RESOURCE).toString(),
-                ...refWhere(commit.ref),
-                ...instanceData,
-              },
-            ],
-            skipDuplicates: true,
-          });
-          if (inserted.count !== 1) {
-            const current = await tx.processManagerInstance.findUnique({
-              where: {
-                projectId: commit.ref.projectId,
-                processName_projectId_processKey: refWhere(commit.ref),
-              },
-              select: { revision: true },
-            });
-            return {
-              outcome: "revisionConflict" as const,
-              actualRevision: current?.revision ?? 0,
-            };
-          }
-        } else {
-          const updated = await tx.processManagerInstance.updateMany({
-            where: {
-              ...refWhere(commit.ref),
-              revision: commit.expectedRevision,
-            },
-            data: instanceData,
-          });
-          if (updated.count !== 1) {
-            const current = await tx.processManagerInstance.findUnique({
-              where: {
-                projectId: commit.ref.projectId,
-                processName_projectId_processKey: refWhere(commit.ref),
-              },
-              select: { revision: true },
-            });
-            return {
-              outcome: "revisionConflict" as const,
-              actualRevision: current?.revision ?? 0,
-            };
-          }
-        }
-
-        if (commit.sourceEventId !== null) {
-          const inbox = await tx.processManagerInbox.createMany({
-            data: [
-              {
-                id: generate(PROCESS_MANAGER_INBOX_KSUID_RESOURCE).toString(),
-                ...refWhere(commit.ref),
-                tenantId: commit.tenantId,
-                sourceEventId: commit.sourceEventId,
-                sourceEventKey: deriveInboxKey(commit.sourceEventId),
-                consumedAt: asDate(commit.now),
-              },
-            ],
-            skipDuplicates: true,
-          });
-          // The source-event uniqueness spans process keys. If another ref
-          // won that race, roll back the state CAS before reporting duplicate.
-          if (inbox.count !== 1) throw new DuplicateInboxRollback();
-        }
-
-        const insertedMessageKeys: string[] = [];
-        const duplicateMessageKeys: string[] = [];
-        for (const message of commit.messages) {
-          const inserted = await tx.processManagerOutbox.createMany({
-            data: [
-              {
-                id: generate(PROCESS_MANAGER_OUTBOX_KSUID_RESOURCE).toString(),
-                ...refWhere(commit.ref),
-                tenantId: commit.tenantId,
-                userId: message.userId ?? null,
-                messageKey: message.messageKey,
-                intentType: message.intentType,
-                payload: toJsonInput(message.payload),
-                traceCarrier: message.traceCarrier,
-                sourceEventId: commit.sourceEventId,
-                status: "pending",
-                attempts: 0,
-                nextAttemptAt: asDate(commit.now),
-                leasedUntil: null,
-                leaseToken: null,
-                dispatchedAt: null,
-                createdAt: asDate(commit.now),
-                updatedAt: asDate(commit.now),
-              },
-            ],
-            skipDuplicates: true,
-          });
-          (inserted.count === 1 ? insertedMessageKeys : duplicateMessageKeys).push(
-            message.messageKey,
-          );
-        }
-
-        return {
-          outcome: "committed" as const,
-          revision,
-          insertedMessageKeys,
-          duplicateMessageKeys,
-        };
-      }, COMMIT_TRANSACTION_OPTIONS);
-    } catch (error) {
-      if (error instanceof DuplicateInboxRollback) {
-        return { outcome: "duplicateEvent" };
-      }
-      throw error;
+        },
+        select: { id: true },
+      });
+      if (duplicate) return { outcome: "duplicateEvent" as const };
     }
+
+    const existing = await tx.processManagerInstance.findUnique({
+      where: {
+        projectId: commit.ref.projectId,
+        processName_projectId_processKey: refWhere(commit.ref),
+      },
+      select: { revision: true },
+    });
+    const actualRevision = existing?.revision ?? 0;
+    if (actualRevision !== commit.expectedRevision) {
+      return {
+        outcome: "revisionConflict" as const,
+        actualRevision,
+      };
+    }
+
+    const revision = actualRevision + 1;
+    const instanceData = {
+      tenantId: commit.tenantId,
+      userId: commit.userId ?? null,
+      state: toJsonInput(commit.state as JsonValue),
+      revision,
+      nextWakeAt: commit.nextWakeAt === null ? null : asDate(commit.nextWakeAt),
+      updatedAt: asDate(commit.now),
+    };
+
+    const conflict = await this.upsertInstanceRow(tx, commit, actualRevision, instanceData);
+    if (conflict) return conflict;
+
+    if (commit.sourceEventId !== null) {
+      const inbox = await tx.processManagerInbox.createMany({
+        data: [
+          {
+            id: generate(PROCESS_MANAGER_INBOX_KSUID_RESOURCE).toString(),
+            ...refWhere(commit.ref),
+            tenantId: commit.tenantId,
+            sourceEventId: commit.sourceEventId,
+            sourceEventKey: deriveInboxKey(commit.sourceEventId),
+            consumedAt: asDate(commit.now),
+          },
+        ],
+        skipDuplicates: true,
+      });
+      // The source-event uniqueness spans process keys. If another ref
+      // won that race, roll back the state CAS before reporting duplicate.
+      if (inbox.count !== 1) throw new DuplicateInboxRollback();
+    }
+
+    const { insertedMessageKeys, duplicateMessageKeys } = await this.insertOutboxMessages(
+      tx,
+      commit,
+    );
+
+    return {
+      outcome: "committed" as const,
+      revision,
+      insertedMessageKeys,
+      duplicateMessageKeys,
+    };
+  }
+
+  /**
+   * Inserts or updates the instance row for the CAS'd revision. Returns a
+   * `revisionConflict` result if another commit won the race, or `null` on
+   * success. Extracted so its branching is counted on its own rather than
+   * folded into `commitWithinTransaction`'s complexity.
+   */
+  private async upsertInstanceRow<State>(
+    tx: Prisma.TransactionClient,
+    commit: ProcessCommit<State>,
+    actualRevision: number,
+    instanceData: {
+      tenantId: string;
+      userId: string | null;
+      state: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+      revision: number;
+      nextWakeAt: Date | null;
+      updatedAt: Date;
+    },
+  ): Promise<CommitResult | null> {
+    if (actualRevision === 0) {
+      const inserted = await tx.processManagerInstance.createMany({
+        data: [
+          {
+            id: generate(PROCESS_MANAGER_INSTANCE_KSUID_RESOURCE).toString(),
+            ...refWhere(commit.ref),
+            ...instanceData,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (inserted.count === 1) return null;
+    } else {
+      const updated = await tx.processManagerInstance.updateMany({
+        where: {
+          ...refWhere(commit.ref),
+          revision: commit.expectedRevision,
+        },
+        data: instanceData,
+      });
+      if (updated.count === 1) return null;
+    }
+    return this.reportRevisionConflict(tx, commit.ref);
+  }
+
+  /** Re-reads the current revision after a lost CAS and reports the conflict. */
+  private async reportRevisionConflict(
+    tx: Prisma.TransactionClient,
+    ref: ProcessRef,
+  ): Promise<CommitResult> {
+    const current = await tx.processManagerInstance.findUnique({
+      where: {
+        projectId: ref.projectId,
+        processName_projectId_processKey: refWhere(ref),
+      },
+      select: { revision: true },
+    });
+    return {
+      outcome: "revisionConflict" as const,
+      actualRevision: current?.revision ?? 0,
+    };
+  }
+
+  /** Inserts the commit's outbox messages, sorting each into inserted vs. duplicate. */
+  private async insertOutboxMessages<State>(
+    tx: Prisma.TransactionClient,
+    commit: ProcessCommit<State>,
+  ): Promise<{ insertedMessageKeys: string[]; duplicateMessageKeys: string[] }> {
+    const insertedMessageKeys: string[] = [];
+    const duplicateMessageKeys: string[] = [];
+    for (const message of commit.messages) {
+      const inserted = await tx.processManagerOutbox.createMany({
+        data: [
+          {
+            id: generate(PROCESS_MANAGER_OUTBOX_KSUID_RESOURCE).toString(),
+            ...refWhere(commit.ref),
+            tenantId: commit.tenantId,
+            userId: message.userId ?? null,
+            messageKey: message.messageKey,
+            intentType: message.intentType,
+            payload: toJsonInput(message.payload),
+            traceCarrier: message.traceCarrier,
+            sourceEventId: commit.sourceEventId,
+            status: "pending",
+            attempts: 0,
+            nextAttemptAt: asDate(commit.now),
+            leasedUntil: null,
+            leaseToken: null,
+            dispatchedAt: null,
+            createdAt: asDate(commit.now),
+            updatedAt: asDate(commit.now),
+          },
+        ],
+        skipDuplicates: true,
+      });
+      (inserted.count === 1 ? insertedMessageKeys : duplicateMessageKeys).push(message.messageKey);
+    }
+    return { insertedMessageKeys, duplicateMessageKeys };
   }
 
   /**

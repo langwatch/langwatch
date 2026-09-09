@@ -135,18 +135,7 @@ export class ProcessOutboxWorker {
   private triggerDrain(): void {
     if (!this.started) return;
     if (this.abandonedDrains >= MAX_ABANDONED_DRAINS) {
-      if (!this.isRefusingToDrain) {
-        this.isRefusingToDrain = true;
-        this.logger.error(
-          {
-            processName: this.name,
-            abandonedDrains: this.abandonedDrains,
-          },
-          "ProcessOutboxWorker has abandoned too many drains without any of " +
-            "them settling; refusing to start another. Deliveries in this " +
-            "domain are hanging and the process manager needs attention.",
-        );
-      }
+      this.refuseToDrain();
       return;
     }
     if (this.inFlight !== null) {
@@ -159,48 +148,66 @@ export class ProcessOutboxWorker {
     this.inFlight = drain;
     // The watchdog belongs to THIS drain, so an abandoned drain settling
     // late can never disarm its successor's watchdog.
-    const watchdog = setTimeout(() => {
-      if (this.inFlight !== drain) return;
-      // Abandon the stuck drain: clear the single-flight slot so polling
-      // resumes. The drain's `finally` guard sees `inFlight !== drain` when
-      // it eventually settles, and any acknowledgement it still makes is
-      // fenced by its lapsed lease (and counted as such).
-      this.inFlight = null;
-      this.abandonedDrains += 1;
-      incrementEsProcessOutboxStuckDrains({ processName: this.name });
-      this.logger.error(
-        {
-          processName: this.name,
-          stuckDrainTimeoutMs: this.stuckDrainTimeoutMs,
-          abandonedDrains: this.abandonedDrains,
-        },
-        "ProcessOutboxWorker drain did not settle within the stuck-drain " +
-          "threshold — abandoning it and resuming polling. A delivery in " +
-          "this domain is not settling.",
-      );
-      if (this.drainRequested) {
-        this.drainRequested = false;
-        this.triggerDrain();
-      }
-    }, this.stuckDrainTimeoutMs);
+    const watchdog = setTimeout(() => this.abandonStuckDrain(drain), this.stuckDrainTimeoutMs);
     watchdog.unref();
-    void drain.finally(() => {
-      clearTimeout(watchdog);
-      if (this.inFlight !== drain) {
-        // An abandoned drain settled after all: it no longer retains its
-        // batch, so give its slot back and let polling recover on its own.
-        this.abandonedDrains = Math.max(0, this.abandonedDrains - 1);
-        if (this.abandonedDrains < MAX_ABANDONED_DRAINS) {
-          this.isRefusingToDrain = false;
-        }
-        return;
+    void drain.finally(() => this.settleDrain(drain, watchdog));
+  }
+
+  private refuseToDrain(): void {
+    if (this.isRefusingToDrain) return;
+    this.isRefusingToDrain = true;
+    this.logger.error(
+      {
+        processName: this.name,
+        abandonedDrains: this.abandonedDrains,
+      },
+      "ProcessOutboxWorker has abandoned too many drains without any of " +
+        "them settling; refusing to start another. Deliveries in this " +
+        "domain are hanging and the process manager needs attention.",
+    );
+  }
+
+  private abandonStuckDrain(drain: Promise<void>): void {
+    if (this.inFlight !== drain) return;
+    // Abandon the stuck drain: clear the single-flight slot so polling
+    // resumes. The drain's `finally` guard sees `inFlight !== drain` when
+    // it eventually settles, and any acknowledgement it still makes is
+    // fenced by its lapsed lease (and counted as such).
+    this.inFlight = null;
+    this.abandonedDrains += 1;
+    incrementEsProcessOutboxStuckDrains({ processName: this.name });
+    this.logger.error(
+      {
+        processName: this.name,
+        stuckDrainTimeoutMs: this.stuckDrainTimeoutMs,
+        abandonedDrains: this.abandonedDrains,
+      },
+      "ProcessOutboxWorker drain did not settle within the stuck-drain " +
+        "threshold — abandoning it and resuming polling. A delivery in " +
+        "this domain is not settling.",
+    );
+    if (this.drainRequested) {
+      this.drainRequested = false;
+      this.triggerDrain();
+    }
+  }
+
+  private settleDrain(drain: Promise<void>, watchdog: NodeJS.Timeout): void {
+    clearTimeout(watchdog);
+    if (this.inFlight !== drain) {
+      // An abandoned drain settled after all: it no longer retains its
+      // batch, so give its slot back and let polling recover on its own.
+      this.abandonedDrains = Math.max(0, this.abandonedDrains - 1);
+      if (this.abandonedDrains < MAX_ABANDONED_DRAINS) {
+        this.isRefusingToDrain = false;
       }
-      this.inFlight = null;
-      if (this.drainRequested) {
-        this.drainRequested = false;
-        this.triggerDrain();
-      }
-    });
+      return;
+    }
+    this.inFlight = null;
+    if (this.drainRequested) {
+      this.drainRequested = false;
+      this.triggerDrain();
+    }
   }
 
   private async runDrain(): Promise<void> {

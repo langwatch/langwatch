@@ -22,18 +22,24 @@ const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
  * OTLP data contains stringValue fields that hold JSON-encoded content (e.g., message arrays).
  * These must remain as strings to preserve the OTLP schema semantics.
  */
+/**
+ * Converts a numeric-looking string to a number, when it is short enough to
+ * be worth the regex test and the parse round-trips finitely. Anything else
+ * — including JSON-encoded content — passes through unchanged.
+ */
+function normalizeNumericString(value: string): unknown {
+  if (value.length === 0 || value.length >= 32 || !NUMERIC_STRING_REGEX.test(value)) {
+    return value;
+  }
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : value;
+}
+
 function normalizePayloadValue(value: unknown): unknown {
   if (typeof value === "string") {
     // Only convert numeric strings to numbers
     // Do NOT parse JSON strings - they should remain as strings
-    // Simple length check to skip long strings early
-    if (value.length > 0 && value.length < 32 && NUMERIC_STRING_REGEX.test(value)) {
-      const numberValue = Number(value);
-      if (Number.isFinite(numberValue)) {
-        return numberValue;
-      }
-    }
-    return value;
+    return normalizeNumericString(value);
   }
 
   if (Array.isArray(value)) {

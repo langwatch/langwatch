@@ -97,12 +97,12 @@ export class EventRepositoryMemory implements EventRepository {
       // SQL does, so the bound can never drop one. Null and 0 are both
       // "unknown" here — the column is non-null in ClickHouse, but the memory
       // record type allows null.
-      if (
+      const droppedByLowerBound =
         hasLowerBound &&
         record.EventOccurredAt != null &&
         record.EventOccurredAt !== 0 &&
-        record.EventOccurredAt < occurredAtFromMs
-      ) {
+        record.EventOccurredAt < occurredAtFromMs;
+      if (droppedByLowerBound) {
         return false;
       }
       if (record.EventTimestamp < upToTimestamp) {
@@ -185,7 +185,7 @@ export class EventRepositoryMemory implements EventRepository {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId < b.EventId ? -1 : a.EventId > b.EventId ? 1 : 0;
+      return compareOrdinal(a.EventId, b.EventId);
     });
 
     return sorted.slice(0, limit).map((record) => ({ ...record }));

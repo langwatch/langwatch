@@ -1,4 +1,4 @@
-import type IORedis from "ioredis";
+import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { Event } from "../domain/types.ts";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
@@ -146,7 +146,7 @@ export interface DiscoveryResult {
  * state lane) receive from `ReplayService`.
  */
 export interface ReplayContext {
-  redis: IORedis;
+  redis: ReplayRedis;
   eventSource: ReplayEventSource;
   /** Accumulator options carrying the retention resolver (if wired). */
   accumulatorOpts: { retentionResolver?: RetentionPolicyResolver };

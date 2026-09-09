@@ -1,4 +1,4 @@
-import type IORedis from "ioredis";
+import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
 import type { ProjectionKind } from "./types.ts";
 import { nowInstant } from "@langwatch/time";
@@ -40,7 +40,7 @@ async function hasActiveGroups({
   projectionName,
   scannedGroupPath,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   tenantIds: Iterable<string>;
   projectionName: string;
   /** Fold groups are checked directly; only these custom-key lanes need a scan. */
@@ -67,7 +67,7 @@ export async function pauseProjection({
   redis,
   pauseKey,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   pauseKey: string;
 }): Promise<void> {
   const pausedSetKey = `${GQ_KEY_PREFIX}paused-jobs`;
@@ -81,7 +81,7 @@ export async function unpauseProjection({
   redis,
   pauseKey,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   pauseKey: string;
 }): Promise<void> {
   const pausedSetKey = `${GQ_KEY_PREFIX}paused-jobs`;
@@ -102,7 +102,7 @@ export async function waitForActiveJobs({
   kind,
   maxWaitMs = 60_000,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   aggregates: DiscoveredAggregate[];
   projectionName: string;
   kind: ProjectionKind;
@@ -164,7 +164,7 @@ export async function waitForAllActiveJobs({
   projections,
   maxWaitMs = 60_000,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   aggregates: DiscoveredAggregate[];
   projections: Array<{ projectionName: string; kind: ProjectionKind }>;
   maxWaitMs?: number;

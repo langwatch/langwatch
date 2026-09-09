@@ -111,44 +111,16 @@ export class EventSourcedQueueProcessorMemory<
 
     // Simple job deduplication: squash onto existing job with same deduplication ID
     if (deduplicationId) {
-      const suppressedUntil = this.suppressedUntilByDeduplicationId.get(deduplicationId);
-      if (suppressedUntil !== undefined) {
-        if (suppressedUntil > now) {
-          this.logger.debug(
-            { queueName: this.queueName, jobId, deduplicationId },
-            "Discarded send: dedup id still suppressed after dispatch",
-          );
-          return;
-        }
-        this.suppressedUntilByDeduplicationId.delete(deduplicationId);
-      }
-
-      const existingJob = this.pendingJobsByDeduplicationId.get(deduplicationId);
-      if (existingJob) {
-        const expired =
-          existingJob.dedupExpiresAt !== undefined && existingJob.dedupExpiresAt <= now;
-        if (expired) {
-          // The window closed while the job waited. It still runs, but it
-          // stops absorbing sends so this one stages as genuinely new.
-          this.pendingJobsByDeduplicationId.delete(deduplicationId);
-        } else {
-          if (dedup?.replace !== false) {
-            existingJob.payload = payload;
-          }
-          // `extend` moves the DEADLINE, matching GroupQueue. Left off, the
-          // window stays pinned to the send that opened it, so a continuous
-          // stream cannot defer its own job indefinitely.
-          if (dedup?.extend !== false) {
-            existingJob.dispatchAt = dispatchAt;
-            existingJob.dedupExpiresAt = dedupExpiresAt;
-          }
-          this.logger.debug(
-            { queueName: this.queueName, jobId, deduplicationId },
-            "Squashed onto existing job with same deduplication ID",
-          );
-          return;
-        }
-      }
+      const squashed = this.applyDeduplication({
+        deduplicationId,
+        jobId,
+        payload,
+        dedup,
+        now,
+        dispatchAt,
+        dedupExpiresAt,
+      });
+      if (squashed) return;
     }
 
     // Queue job and process asynchronously
@@ -176,6 +148,69 @@ export class EventSourcedQueueProcessorMemory<
 
   async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
     await Promise.all(payloads.map((payload) => this.send(payload, options)));
+  }
+
+  /**
+   * Squashes a send onto an existing pending job with the same deduplication
+   * ID, or clears a lapsed suppression/expired job so the send stages as
+   * genuinely new. Returns whether the send was squashed (the caller must
+   * not queue a new job).
+   */
+  private applyDeduplication({
+    deduplicationId,
+    jobId,
+    payload,
+    dedup,
+    now,
+    dispatchAt,
+    dedupExpiresAt,
+  }: {
+    deduplicationId: string;
+    jobId: string;
+    payload: Payload;
+    dedup: DeduplicationConfig<Payload> | undefined;
+    now: number;
+    dispatchAt: number;
+    dedupExpiresAt: number | undefined;
+  }): boolean {
+    const suppressedUntil = this.suppressedUntilByDeduplicationId.get(deduplicationId);
+    if (suppressedUntil !== undefined) {
+      if (suppressedUntil > now) {
+        this.logger.debug(
+          { queueName: this.queueName, jobId, deduplicationId },
+          "Discarded send: dedup id still suppressed after dispatch",
+        );
+        return true;
+      }
+      this.suppressedUntilByDeduplicationId.delete(deduplicationId);
+    }
+
+    const existingJob = this.pendingJobsByDeduplicationId.get(deduplicationId);
+    if (!existingJob) return false;
+
+    const expired = existingJob.dedupExpiresAt !== undefined && existingJob.dedupExpiresAt <= now;
+    if (expired) {
+      // The window closed while the job waited. It still runs, but it
+      // stops absorbing sends so this one stages as genuinely new.
+      this.pendingJobsByDeduplicationId.delete(deduplicationId);
+      return false;
+    }
+
+    if (dedup?.replace !== false) {
+      existingJob.payload = payload;
+    }
+    // `extend` moves the DEADLINE, matching GroupQueue. Left off, the
+    // window stays pinned to the send that opened it, so a continuous
+    // stream cannot defer its own job indefinitely.
+    if (dedup?.extend !== false) {
+      existingJob.dispatchAt = dispatchAt;
+      existingJob.dedupExpiresAt = dedupExpiresAt;
+    }
+    this.logger.debug(
+      { queueName: this.queueName, jobId, deduplicationId },
+      "Squashed onto existing job with same deduplication ID",
+    );
+    return true;
   }
 
   /**
@@ -270,7 +305,10 @@ export class EventSourcedQueueProcessorMemory<
    * Processes a single job with tracing and error handling. The delay is
    * already spent — the scheduler holds a job in the queue until it is due.
    */
-  private async processJob(job: QueuedJob<Payload>): Promise<void> {
+  /** Base + custom span attributes for a job, tolerating a throwing `spanAttributes`. */
+  private collectSpanAttributes(
+    job: QueuedJob<Payload>,
+  ): Record<string, string | number | boolean> {
     const baseAttributes: Record<string, string | number | boolean> = {
       "queue.name": this.queueName,
       "queue.job_id": job.jobId ?? "unknown",
@@ -301,7 +339,11 @@ export class EventSourcedQueueProcessorMemory<
         );
       }
     }
-    const attributes = { ...baseAttributes, ...customAttributes };
+    return { ...baseAttributes, ...customAttributes };
+  }
+
+  private async processJob(job: QueuedJob<Payload>): Promise<void> {
+    const attributes = this.collectSpanAttributes(job);
 
     try {
       await this.tracer.withActiveSpan(

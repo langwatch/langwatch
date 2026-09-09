@@ -62,6 +62,20 @@ export class MapProjectionExecutor {
       throw new Error("Map projection batch events and contexts must align");
     }
 
+    const mapped = await this.mapBatchItems(projection, events, contexts);
+    if (mapped.length === 0) return [];
+
+    await this.persistMappedBatch(projection, mapped);
+
+    return mapped.map(({ event, record }) => ({ event, record }));
+  }
+
+  /** Maps each event in a batch, skipping duplicate deliveries and null records. */
+  private async mapBatchItems<Record, E extends Event>(
+    projection: MapProjectionDefinition<Record, E>,
+    events: readonly E[],
+    contexts: readonly ProjectionStoreContext[],
+  ): Promise<Array<{ event: E; record: Record; context: ProjectionStoreContext }>> {
     const mapped: Array<{
       event: E;
       record: Record;
@@ -79,9 +93,14 @@ export class MapProjectionExecutor {
       const record = projection.map(event);
       if (record !== null) mapped.push({ event, record, context });
     }
+    return mapped;
+  }
 
-    if (mapped.length === 0) return [];
-
+  /** Persists a mapped batch, via `bulkAppend` when the store exposes one. */
+  private async persistMappedBatch<Record, E extends Event>(
+    projection: MapProjectionDefinition<Record, E>,
+    mapped: Array<{ event: E; record: Record; context: ProjectionStoreContext }>,
+  ): Promise<void> {
     if (projection.store.bulkAppend) {
       const first = mapped[0]!.context;
       const bulkContext: BulkAppendContext = {
@@ -102,8 +121,6 @@ export class MapProjectionExecutor {
         await projection.store.append(record, context);
       }
     }
-
-    return mapped.map(({ event, record }) => ({ event, record }));
   }
 
   /**

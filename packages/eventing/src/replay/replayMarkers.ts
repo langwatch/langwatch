@@ -1,4 +1,4 @@
-import type IORedis from "ioredis";
+import type { ReplayRedis } from "./replay-redis.port.ts";
 import {
   COMPLETED_KEY_PREFIX,
   CUTOFF_KEY_PREFIX,
@@ -10,7 +10,7 @@ import type { ReplayLogWriter } from "./replayLog.ts";
 
 /** Throw if any command in a pipeline result has an error. */
 function checkPipelineErrors(
-  results: [error: Error | null, result: unknown][] | null,
+  results: readonly [error: Error | null, result: unknown][] | null,
   operation: string,
 ): void {
   if (!results) throw new Error(`Pipeline returned null during ${operation}`);
@@ -45,7 +45,7 @@ export async function markPendingBatch({
   projectionName,
   aggKeys,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
   aggKeys: string[];
 }): Promise<void> {
@@ -70,7 +70,7 @@ export async function markCutoffBatch({
   projectionName,
   cutoffs,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
   cutoffs: Map<string, { timestamp: number; eventId: string }>;
 }): Promise<void> {
@@ -91,7 +91,7 @@ export async function unmarkBatch({
   projectionName,
   aggKeys,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
   aggKeys: string[];
 }): Promise<void> {
@@ -130,7 +130,7 @@ export async function markCompletedBatch({
   projectionName,
   cutoffs,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
   cutoffs: Map<string, { timestamp: number; eventId: string }>;
 }): Promise<void> {
@@ -167,7 +167,7 @@ export async function removeInFlightMarkers({
   projectionNames,
   aggKeys,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionNames: string[];
   aggKeys: string[];
 }): Promise<void> {
@@ -191,7 +191,7 @@ export async function clearFailedBatchMarkers({
   aggKeys,
   log,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionNames: string[];
   aggKeys: string[];
   log: ReplayLogWriter;
@@ -217,7 +217,7 @@ export async function getCompletedSet({
   redis,
   projectionName,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
 }): Promise<Set<string>> {
   const members = await redis.smembers(completedKey(projectionName));
@@ -229,7 +229,7 @@ export async function getCutoffMarkers({
   redis,
   projectionName,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
 }): Promise<Map<string, string>> {
   const all = await redis.hgetall(cutoffKey(projectionName));
@@ -242,7 +242,7 @@ export async function removeStaleMarker({
   projectionName,
   aggKey,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
   aggKey: string;
 }): Promise<void> {
@@ -254,7 +254,7 @@ export async function cleanupAll({
   redis,
   projectionName,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
 }): Promise<void> {
   await redis.del(cutoffKey(projectionName));
@@ -266,7 +266,7 @@ export async function hasPreviousRun({
   redis,
   projectionName,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionName: string;
 }): Promise<{ completedCount: number; markerCount: number }> {
   const [completedCount, markerCount] = await Promise.all([
@@ -285,7 +285,7 @@ export async function markPendingForProjections({
   redis,
   aggKeysByProjection,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   aggKeysByProjection: Map<string, string[]>;
 }): Promise<void> {
   const pipeline = redis.pipeline();
@@ -309,7 +309,7 @@ export async function markCutoffForProjections({
   redis,
   cutoffsByProjection,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   cutoffsByProjection: Map<string, Map<string, { timestamp: number; eventId: string }>>;
 }): Promise<void> {
   const pipeline = redis.pipeline();
@@ -337,7 +337,7 @@ export async function markCompletedForProjections({
   redis,
   cutoffsByProjection,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   cutoffsByProjection: Map<string, Map<string, { timestamp: number; eventId: string }>>;
 }): Promise<void> {
   const pipeline = redis.pipeline();
@@ -371,7 +371,7 @@ export async function unmarkForProjections({
   redis,
   aggKeysByProjection,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   aggKeysByProjection: Map<string, string[]>;
 }): Promise<void> {
   const pipeline = redis.pipeline();
@@ -396,7 +396,7 @@ export async function getCompletedSets({
   redis,
   projectionNames,
 }: {
-  redis: IORedis;
+  redis: ReplayRedis;
   projectionNames: string[];
 }): Promise<Map<string, Set<string>>> {
   const sets = new Map<string, Set<string>>();

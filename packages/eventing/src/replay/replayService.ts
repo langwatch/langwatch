@@ -1,4 +1,4 @@
-import type IORedis from "ioredis";
+import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import { discoverProjectionAggregates } from "./replayDiscovery.ts";
 import { runFoldMapReplay } from "./replayEngine.ts";
@@ -53,7 +53,7 @@ export class ReplayService {
 
   constructor(deps: {
     eventSource: ReplayEventSource;
-    redis: IORedis;
+    redis: ReplayRedis;
     /**
      * Resolves per-tenant retention so replay-rebuilt rows honour the tenant's
      * policy instead of the platform default. Optional — when absent, stores

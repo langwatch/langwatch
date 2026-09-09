@@ -19,6 +19,136 @@ import type {
 } from "./types.ts";
 
 /**
+ * Replays one tenant's aggregates through a shared accumulator, batch by
+ * batch, and flushes once at the end — the per-tenant body of
+ * `replayStateProjection`, extracted so the caller's loop stays flat.
+ */
+async function replayTenantForState({
+  ctx,
+  projection,
+  projectionIndex,
+  totalProjections,
+  tenantId,
+  tenantAggregates,
+  allAggregates,
+  byTenant,
+  aggregateBatchSize,
+  batchSize,
+  startTime,
+  aggregatesCompletedSoFar,
+  totalEventsReplayedSoFar,
+  batchErrorsSoFar,
+  firstErrorSoFar,
+  log,
+  onProgress,
+  onBatchComplete,
+}: {
+  ctx: ReplayContext;
+  projection: RegisteredStateProjection;
+  projectionIndex: number;
+  totalProjections: number;
+  tenantId: string;
+  tenantAggregates: DiscoveredAggregate[];
+  allAggregates: DiscoveredAggregate[];
+  byTenant: Map<string, DiscoveredAggregate[]>;
+  aggregateBatchSize: number;
+  batchSize: number;
+  startTime: number;
+  aggregatesCompletedSoFar: number;
+  totalEventsReplayedSoFar: number;
+  batchErrorsSoFar: number;
+  firstErrorSoFar: string | undefined;
+  log: ReplayLogWriter;
+  onProgress?: (progress: ReplayProgress) => void;
+  onBatchComplete?: (info: BatchCompleteInfo) => void;
+}): Promise<
+  | { ok: true; aggregatesCompleted: number; totalEventsReplayed: number }
+  | { ok: false; errorMsg: string }
+> {
+  // One accumulator per tenant: a projection key may group several aggregates,
+  // so we fold the whole tenant before writing one row per key.
+  const accumulator = new StateAccumulator(projection.definition, ctx.accumulatorOpts);
+  const totalBatches = Math.ceil(tenantAggregates.length / aggregateBatchSize);
+  let aggregatesCompleted = aggregatesCompletedSoFar;
+  let totalEventsReplayed = totalEventsReplayedSoFar;
+
+  try {
+    for (let i = 0; i < tenantAggregates.length; i += aggregateBatchSize) {
+      const batch = tenantAggregates.slice(i, i + aggregateBatchSize);
+      const batchNum = Math.floor(i / aggregateBatchSize) + 1;
+      const batchStartTime = nowInstant().epochMilliseconds;
+
+      const emitBatchProgress = (
+        batchPhase: ReplayProgress["batchPhase"],
+        batchEventsProcessed: number,
+      ) => {
+        onProgress?.({
+          phase: "replaying",
+          currentProjectionName: projection.projectionName,
+          currentProjectionKind: "state",
+          currentProjectionIndex: projectionIndex,
+          totalProjections,
+          totalAggregates: allAggregates.length,
+          tenantCount: byTenant.size,
+          currentBatch: batchNum,
+          totalBatches,
+          batchAggregates: batch.length,
+          batchPhase,
+          batchEventsProcessed,
+          aggregatesCompleted,
+          totalEventsReplayed,
+          elapsedSec: (nowInstant().epochMilliseconds - startTime) / 1000,
+          skippedCount: 0,
+          batchErrors: batchErrorsSoFar,
+          firstError: firstErrorSoFar,
+        });
+      };
+
+      const eventsInBatch = await replayStateBatch({
+        eventSource: ctx.eventSource,
+        projection,
+        batch,
+        tenantId,
+        batchSize,
+        accumulator,
+        onProgress: (processed) => emitBatchProgress("replay", processed),
+      });
+
+      totalEventsReplayed += eventsInBatch;
+      aggregatesCompleted += batch.length;
+
+      onBatchComplete?.({
+        projectionName: projection.projectionName,
+        projectionKind: "state",
+        batchNum,
+        totalBatches,
+        aggregatesInBatch: batch.length,
+        eventsInBatch,
+        durationSec: (nowInstant().epochMilliseconds - batchStartTime) / 1000,
+      });
+    }
+
+    // WRITE — one StoredProjection per key for this tenant, from init().
+    await accumulator.flush();
+    log.write({
+      step: "replay-state-tenant",
+      tenant: tenantId,
+      count: tenantAggregates.length,
+    });
+    return { ok: true, aggregatesCompleted, totalEventsReplayed };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    log.write({
+      step: "error",
+      tenant: tenantId,
+      aggregate: projection.projectionName,
+      error: errorMsg,
+    });
+    return { ok: false, errorMsg };
+  }
+}
+
+/**
  * Replays a single Postgres operational state projection into its
  * `StateProjectionStore`.
  *
@@ -134,83 +264,30 @@ export async function replayStateProjection({
   const tenants = [...byTenant.entries()];
 
   for (const [tenantId, tenantAggregates] of tenants) {
-    // One accumulator per tenant: a projection key may group several aggregates,
-    // so we fold the whole tenant before writing one row per key.
-    const accumulator = new StateAccumulator(projection.definition, ctx.accumulatorOpts);
+    const result = await replayTenantForState({
+      ctx,
+      projection,
+      projectionIndex,
+      totalProjections,
+      tenantId,
+      tenantAggregates,
+      allAggregates,
+      byTenant,
+      aggregateBatchSize,
+      batchSize,
+      startTime,
+      aggregatesCompletedSoFar: aggregatesCompleted,
+      totalEventsReplayedSoFar: totalEventsReplayed,
+      batchErrorsSoFar: batchErrors,
+      firstErrorSoFar: firstError,
+      log,
+      onProgress,
+      onBatchComplete,
+    });
 
-    const totalBatches = Math.ceil(tenantAggregates.length / aggregateBatchSize);
-
-    try {
-      for (let i = 0; i < tenantAggregates.length; i += aggregateBatchSize) {
-        const batch = tenantAggregates.slice(i, i + aggregateBatchSize);
-        const batchNum = Math.floor(i / aggregateBatchSize) + 1;
-        const batchStartTime = nowInstant().epochMilliseconds;
-
-        const emit = (batchPhase: ReplayProgress["batchPhase"], batchEventsProcessed: number) => {
-          const progress: ReplayProgress = {
-            phase: "replaying",
-            currentProjectionName: projection.projectionName,
-            currentProjectionKind: "state",
-            currentProjectionIndex: projectionIndex,
-            totalProjections,
-            totalAggregates: allAggregates.length,
-            tenantCount: byTenant.size,
-            currentBatch: batchNum,
-            totalBatches,
-            batchAggregates: batch.length,
-            batchPhase,
-            batchEventsProcessed,
-            aggregatesCompleted,
-            totalEventsReplayed,
-            elapsedSec: (nowInstant().epochMilliseconds - startTime) / 1000,
-            skippedCount: 0,
-            batchErrors,
-            firstError,
-          };
-          onProgress?.(progress);
-        };
-
-        const eventsInBatch = await replayStateBatch({
-          eventSource: ctx.eventSource,
-          projection,
-          batch,
-          tenantId,
-          batchSize,
-          accumulator,
-          onProgress: (processed) => emit("replay", processed),
-        });
-
-        totalEventsReplayed += eventsInBatch;
-        aggregatesCompleted += batch.length;
-
-        onBatchComplete?.({
-          projectionName: projection.projectionName,
-          projectionKind: "state",
-          batchNum,
-          totalBatches,
-          aggregatesInBatch: batch.length,
-          eventsInBatch,
-          durationSec: (nowInstant().epochMilliseconds - batchStartTime) / 1000,
-        });
-      }
-
-      // WRITE — one StoredProjection per key for this tenant, from init().
-      await accumulator.flush();
-      log.write({
-        step: "replay-state-tenant",
-        tenant: tenantId,
-        count: tenantAggregates.length,
-      });
-    } catch (error) {
+    if (!result.ok) {
       batchErrors++;
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (!firstError) firstError = errorMsg;
-      log.write({
-        step: "error",
-        tenant: tenantId,
-        aggregate: projection.projectionName,
-        error: errorMsg,
-      });
+      if (!firstError) firstError = result.errorMsg;
       await unpauseProjection({
         redis: ctx.redis,
         pauseKey: projection.pauseKey,
@@ -223,6 +300,9 @@ export async function replayStateProjection({
         touchedTenants: tenants.map(([tid]) => tid),
       };
     }
+
+    aggregatesCompleted = result.aggregatesCompleted;
+    totalEventsReplayed = result.totalEventsReplayed;
   }
 
   await unpauseProjection({
