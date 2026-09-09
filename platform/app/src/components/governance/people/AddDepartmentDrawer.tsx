@@ -84,7 +84,13 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Add department</Drawer.Title>
-          <Drawer.CloseTrigger onClick={closeDrawer} />
+          {/* No `onClick` of its own. The trigger closes the drawer, which
+              fires `onOpenChange` above, and wiring `closeDrawer` here as well
+              called it twice for one dismissal. `closeDrawer` pushes a history
+              entry, so the second call left a duplicate one: a reader who
+              closed the drawer and pressed Back saw nothing happen, and on the
+              second Back the drawer reopened. */}
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           {canManage ? (

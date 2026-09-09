@@ -149,7 +149,25 @@ describe("the create-department drawer", () => {
           input: { organizationId: "org-1", name: "Engineering" },
         }),
       );
-      expect(harness.closed).toBeGreaterThan(0);
+      // Exactly once, not merely at least once. `closeDrawer` pushes a
+      // history entry, so a second call for one dismissal leaves a duplicate
+      // the reader has to press Back through. A `toBeGreaterThan(0)` here
+      // passed for as long as the close control was double-wired.
+      expect(harness.closed).toBe(1);
+    });
+
+    // No scenario of its own: the spec says the drawer closes, and how many
+    // times it says so to the navigation is an implementation detail. It still
+    // needs a test, because this is the control that was double-wired and
+    // Create was not — a guard on the Create path alone would have gone green
+    // on the defect.
+    it("dismisses through the close control exactly once", async () => {
+      renderDrawer();
+
+      await screen.findByRole("dialog");
+      await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+      expect(harness.closed).toBe(1);
     });
 
     /** @scenario "A department with no name is refused at the field" */
