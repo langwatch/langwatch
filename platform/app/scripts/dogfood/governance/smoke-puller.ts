@@ -159,6 +159,7 @@ async function main(): Promise<void> {
         SELECT
           EventId,
           ActorEmail,
+          ActorUserId,
           ActionName,
           TargetName,
           SourceType,
@@ -178,7 +179,7 @@ async function main(): Promise<void> {
     );
     for (const row of rows) {
       console.log(
-        `  - ${row.EventId} | actor=${row.ActorEmail} | model=${row.TargetName} | trace=${row.TraceId}`,
+        `  - ${row.EventId} | actor=${row.ActorEmail || row.ActorUserId} | model=${row.TargetName} | trace=${row.TraceId}`,
       );
     }
 
