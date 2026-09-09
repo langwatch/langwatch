@@ -1,8 +1,8 @@
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { Lock } from "react-feather";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useFieldRedaction } from "./use-field-redaction.ts";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import NextLink from "../elements/next-link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

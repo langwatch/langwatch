@@ -14,6 +14,16 @@ const mocks = vi.hoisted(() => ({
   storedComments: [] as unknown[],
 }));
 
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1" },
+    hasPermission: (permission: string) =>
+      permission === "annotations:manage" ? mocks.canManage : true,
+  }),
+}));
+
+// `useTextTranslation` (IOViewer) still reads scope through the trace-scoped
+// host — it is only ever rendered inside a trace screen.
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },

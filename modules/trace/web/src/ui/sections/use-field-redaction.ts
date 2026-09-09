@@ -1,5 +1,5 @@
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "../../behavior/trace-api.ts";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
 export const useFieldRedaction = (field: "input" | "output") => {
   const isSharePage = typeof window !== "undefined" && window.location.pathname.includes("/share/");

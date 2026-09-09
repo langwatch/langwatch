@@ -8,6 +8,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", slug: "acme" },
+    hasPermission: () => true,
+  }),
+}));
+
+// The redacted marker itself (`RedactedInline`) still reads scope through the
+// trace-scoped host — it is only ever rendered inside a trace screen.
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },

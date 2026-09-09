@@ -10,6 +10,15 @@ import "@testing-library/jest-dom/vitest";
 
 // RedactedInline (rendered by the cells when redacted) looks up the org's
 // permissions to decide whether to show the "Open privacy settings" link.
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1" },
+    hasPermission: () => false,
+  }),
+}));
+
+// The redacted marker itself (`RedactedInline`) still reads scope through the
+// trace-scoped host — it is only ever rendered inside a trace screen.
 vi.mock("../../../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },

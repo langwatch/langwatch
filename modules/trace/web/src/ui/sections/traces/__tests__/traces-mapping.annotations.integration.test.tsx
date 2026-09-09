@@ -50,7 +50,7 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
   }),

@@ -12,7 +12,7 @@ import "@testing-library/jest-dom/vitest";
 import type { MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "acme" },
   }),

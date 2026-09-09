@@ -18,6 +18,15 @@ vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
 }));
 
 // RedactedInline looks up org permissions for the settings link.
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1" },
+    hasPermission: () => false,
+  }),
+}));
+
+// The redacted marker itself (`RedactedInline`) still reads scope through the
+// trace-scoped host — it is only ever rendered inside a trace screen.
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },

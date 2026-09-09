@@ -21,7 +21,7 @@ const PROJECT_SPAN_NAMES = [
   },
 ];
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
   }),

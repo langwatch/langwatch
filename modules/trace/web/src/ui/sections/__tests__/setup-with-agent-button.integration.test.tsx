@@ -34,7 +34,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
     selector({ askLangy: askLangyMock }),
 }));
 
-vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1" },
     organization: { id: "org_1" },
