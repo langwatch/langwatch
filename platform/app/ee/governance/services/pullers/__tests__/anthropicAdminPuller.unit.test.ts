@@ -1008,4 +1008,138 @@ describe("the Anthropic Admin puller", () => {
       );
     });
   });
+
+  describe("when a page returns its buckets out of order", () => {
+    const USAGE_ROW = USAGE_PAGE.data[0]!.results[0]!;
+    /**
+     * Newest in the MIDDLE, oldest last. Anthropic promises no order within a
+     * page, and reading the last element as the newest gets 2026-08-01 here —
+     * behind two buckets this very run already emitted.
+     */
+    const OUT_OF_ORDER = [
+      { starting_at: "2026-08-02T00:00:00Z", results: [USAGE_ROW] },
+      { starting_at: "2026-08-03T00:00:00Z", results: [USAGE_ROW] },
+      { starting_at: "2026-08-01T00:00:00Z", results: [USAGE_ROW] },
+    ];
+    const config = {
+      adapter: "anthropic_admin" as const,
+      report: "usage" as const,
+      bucketWidth: "1d" as const,
+      schedule: "0 * * * *",
+      startingAt: "2026-08-01T00:00:00.000Z",
+    };
+
+    it("resumes a drained window from the newest bucket, not the last one in the array", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ data: OUT_OF_ORDER, has_more: false, next_page: null }),
+      );
+
+      const run = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
+
+      // The last element would send the next run back to 2026-08-01 and
+      // re-read two buckets — on the usage report that is duplicated spend
+      // rather than a restatement, because a re-read lands beside the rows it
+      // repeats instead of replacing them.
+      expect(run.events).toHaveLength(3);
+      expect(JSON.parse(run.cursor!)).toMatchObject({
+        startingAt: "2026-08-03T00:00:00Z",
+        watermark: null,
+      });
+    });
+
+    it("records the newest bucket as the in-window watermark when the run is cut off", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ data: OUT_OF_ORDER, has_more: true, next_page: "p2" }),
+      );
+
+      const run = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
+
+      // The watermark is what a later query-identity mismatch resumes from,
+      // so an understated one widens the re-read it exists to bound.
+      expect(JSON.parse(run.cursor!)).toMatchObject({
+        page: "p2",
+        watermark: "2026-08-03T00:00:00Z",
+      });
+    });
+  });
+
+  describe("when one page holds two rows the cost key cannot tell apart", () => {
+    const COST_ROW = COST_PAGE.data[0]!.results[0]!;
+    const config = {
+      adapter: "anthropic_admin" as const,
+      report: "cost" as const,
+      bucketWidth: "1d" as const,
+      schedule: "0 * * * *",
+    };
+    /** One bucket, whose rows differ only outside the key. */
+    function pageWith(rows: unknown[]) {
+      return {
+        data: [{ starting_at: "2026-08-01T00:00:00Z", results: rows }],
+        has_more: false,
+        next_page: null,
+      };
+    }
+
+    it("refuses the page rather than letting the second row overwrite the first", async () => {
+      // `model` is parsed by `costResultSchema` and is NOT a cost dimension,
+      // so these two rows join to one `source_event_id` — the sink's dedup
+      // key — and only the last one written survives.
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          pageWith([
+            { ...COST_ROW, model: "anthropic/claude-sonnet-5" },
+            {
+              ...COST_ROW,
+              model: "anthropic/claude-opus-5",
+              amount: "10000.000000",
+            },
+          ]),
+        ),
+      );
+
+      let error: unknown;
+      try {
+        await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
+      } catch (thrown) {
+        error = thrown;
+      }
+
+      // A plain Error, not a HandledError: nobody outside can act on a
+      // provider contract that moved.
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).name).toBe("Error");
+      const message = (error as Error).message;
+      // The count and the key's dimension NAMES, so an operator can see which
+      // coordinates failed to separate the rows.
+      expect(message).toContain("1 restatement key");
+      expect(message).toContain("workspaceId");
+      expect(message).toContain("costType");
+      // …and none of the values, which are customer billing coordinates and
+      // money. This string reaches logs and the source's error state.
+      for (const value of [
+        "ws_1",
+        "Claude usage",
+        "claude-opus-5",
+        "412.80",
+        "100.00",
+      ]) {
+        expect(message).not.toContain(value);
+      }
+    });
+
+    it("accepts a row the provider repeated with the same amount", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(pageWith([COST_ROW, COST_ROW])));
+
+      const run = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
+
+      // Same key, same money: whichever survives the upsert the figure
+      // recorded is identical, so a repeat costs nothing and must not fail a
+      // window of real spend.
+      expect(run.errorCount).toBe(0);
+      expect(run.events).toHaveLength(2);
+      expect(run.events[0]!.source_event_id).toBe(
+        run.events[1]!.source_event_id,
+      );
+    });
+  });
 });

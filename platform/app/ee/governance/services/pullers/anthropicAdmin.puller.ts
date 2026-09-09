@@ -442,6 +442,37 @@ const pageSchema = z.object({
 });
 
 /**
+ * The newest bucket start in one page.
+ *
+ * NOT the last element of the array. Anthropic does not promise an order
+ * within a page, and reading the last bucket as the newest is only correct
+ * while the page happens to ascend. On an out-of-order page it hands back an
+ * earlier instant than one already emitted, and the watermark it mints either
+ * re-reads the window — which, on the usage report, is duplicated spend rather
+ * than a restatement — or, once a later page overwrites it, resumes past
+ * buckets that were never read. The maximum is the only value every bucket on
+ * the page is at or behind, which is exactly what a watermark has to mean.
+ *
+ * Instants that do not parse are ignored rather than compared as strings: a
+ * value we cannot order cannot be certified as a resume point. A page where
+ * none parse yields null, and null resumes from the window start — a re-read,
+ * never a skip.
+ */
+function newestBucketStart(
+  buckets: z.infer<typeof bucketSchema>[],
+): string | null {
+  let newest: string | null = null;
+  let newestMs = Number.NEGATIVE_INFINITY;
+  for (const bucket of buckets) {
+    const ms = Date.parse(bucket.starting_at);
+    if (Number.isNaN(ms) || ms <= newestMs) continue;
+    newest = bucket.starting_at;
+    newestMs = ms;
+  }
+  return newest;
+}
+
+/**
  * Dimension values are the identity of a bucket, so an absent one has to be a
  * STABLE token rather than an omitted key: dropping "workspace_id" from one
  * pull and including it as null on the next would mint two keys for one
@@ -467,6 +498,93 @@ function dimension(value: string | null): string {
  */
 function dimensionPath(dimensions: Record<string, string>): string {
   return Object.values(dimensions).map(encodeURIComponent).join(":");
+}
+
+/** The hint this adapter attaches under `PULLED_USAGE_HINT_KEY`, read back. */
+interface EmittedUsageHint {
+  dimensions?: Record<string, string>;
+  tokensCacheRead?: number;
+  tokensCacheWrite?: number;
+}
+
+/**
+ * The hint off an event this adapter emitted. `extra` is an untyped bag on the
+ * shared event shape, so reading our own hint back needs the cast; every event
+ * built below carries one.
+ */
+function emittedHint(event: NormalizedPullEvent): EmittedUsageHint | undefined {
+  return event.extra?.[PULLED_USAGE_HINT_KEY] as EmittedUsageHint | undefined;
+}
+
+/**
+ * Everything a row contributes to the ledger, with none of its identity.
+ *
+ * Two rows sharing a key AND this signature are interchangeable: whichever one
+ * survives the upsert, the money and the quantities recorded are the same, so
+ * a provider that repeats a row costs nothing. Two rows sharing a key and
+ * differing here are two different figures competing for one cell, and only
+ * the last one written survives.
+ */
+function amountSignature(event: NormalizedPullEvent): string {
+  const hint = emittedHint(event);
+  return JSON.stringify([
+    event.cost_usd,
+    event.tokens_input,
+    event.tokens_output,
+    hint?.tokensCacheRead ?? 0,
+    hint?.tokensCacheWrite ?? 0,
+  ]);
+}
+
+/**
+ * Refuse a page whose own rows cannot be told apart.
+ *
+ * A row is stored under the dimensions `usageEvent`/`costEvent` build, and on
+ * the cost report that set is narrower than what the endpoint hands back:
+ * `costResultSchema` parses a `model` that no dimension carries, and the schema
+ * is `passthrough`, so any further coordinate Anthropic breaks a row out by
+ * without being asked — a tier, a token type, a region — is outside the key
+ * too. Two such rows collapse onto one `source_event_id`, which is the sink's
+ * dedup key, and the second silently overwrites the first: spend that was
+ * fetched, parsed, and then dropped with nothing anywhere reporting a loss.
+ *
+ * WIDENING the key is not the fix, and deliberately not done here. The
+ * dimensions ARE the restatement identity: adding one re-keys every cell
+ * already stored, so every later correction would land beside the figure it
+ * corrects instead of replacing it. That migration is owned separately. Until
+ * it lands, the page fails loudly — the run records an error and an operator
+ * sees a figure that is missing rather than one that is quietly wrong.
+ *
+ * A plain `Error`, not a `HandledError`: there is no named cause a caller can
+ * act on, only a provider contract we did not anticipate.
+ *
+ * The message carries the count and the dimension NAMES. Never the values —
+ * workspace ids and free-text descriptions are customer billing coordinates,
+ * and this string travels into logs and the source's error state.
+ */
+function assertRowsAreDistinguishable({
+  events,
+  report,
+}: {
+  events: NormalizedPullEvent[];
+  report: AnthropicAdminPullConfig["report"];
+}): void {
+  const amountByKey = new Map<string, string>();
+  const collidingKeys = new Set<string>();
+  for (const event of events) {
+    const amount = amountSignature(event);
+    const seen = amountByKey.get(event.source_event_id);
+    if (seen === undefined) {
+      amountByKey.set(event.source_event_id, amount);
+      continue;
+    }
+    if (seen !== amount) collidingKeys.add(event.source_event_id);
+  }
+  if (collidingKeys.size === 0) return;
+  const dimensionNames = Object.keys(emittedHint(events[0]!)?.dimensions ?? {});
+  throw new Error(
+    `anthropic ${report}_report returned one page holding ${collidingKeys.size} restatement key(s) shared by rows reporting different amounts; the key is built from ${dimensionNames.join(", ")}, so the provider is distinguishing these rows by something outside it and recording the page would drop spend`,
+  );
 }
 
 /**
@@ -645,11 +763,14 @@ export class AnthropicAdminPuller
     const events = parsed.data.flatMap((bucket) =>
       this.bucketEvents({ bucket, config }),
     );
+    // Same class of refusal as the `has_more` check above: not a window to
+    // retry, a shape whose rows we cannot store without losing one of them.
+    assertRowsAreDistinguishable({ events, report: config.report });
     return {
       ok: true,
       events,
       nextPage: parsed.next_page,
-      watermark: parsed.data.at(-1)?.starting_at ?? null,
+      watermark: newestBucketStart(parsed.data),
     };
   }
 
