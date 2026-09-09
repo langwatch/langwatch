@@ -1,5 +1,7 @@
-import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget as GatewayBudgetRow } from "@langwatch/gateway-contract";
 import { VirtualKeyDirectBudgetRepository } from "../gateway-virtual-key-direct-budget.repository.ts";
+import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice the direct-budget read binds to. */
 export type VirtualKeyDirectBudgetDatabase = Pick<PrismaClient, "gatewayBudget" | "project">;
@@ -16,14 +18,14 @@ export class PrismaVirtualKeyDirectBudgetRepository extends VirtualKeyDirectBudg
     super();
   }
 
-  findBudgetsTargetingKeys({
+  async findBudgetsTargetingKeys({
     organizationId,
     virtualKeyIds,
   }: {
     organizationId: string;
     virtualKeyIds: string[];
-  }): Promise<GatewayBudget[]> {
-    return this.database.gatewayBudget.findMany({
+  }): Promise<GatewayBudgetRow[]> {
+    const rows = await this.database.gatewayBudget.findMany({
       where: {
         organizationId,
         archivedAt: null,
@@ -34,6 +36,8 @@ export class PrismaVirtualKeyDirectBudgetRepository extends VirtualKeyDirectBudg
       },
       orderBy: { createdAt: "asc" },
     });
+
+    return rows.map(toGatewayBudgetRow);
   }
 
   async findProjectIdsInOrganization({

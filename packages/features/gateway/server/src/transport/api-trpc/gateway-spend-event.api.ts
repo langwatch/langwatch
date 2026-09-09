@@ -3,6 +3,7 @@
  * over `gateway_spend`. Project-scoped, like the neighbouring usage reads; organization-wide
  * rollups are a later fast-follow.
  */
+import { toDate } from "@langwatch/time";
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { gatewaySpendEventPageSchema } from "@langwatch/gateway-contract";
@@ -73,7 +74,7 @@ export class GatewaySpendEventTrpcApi {
           .withOutput(gatewaySpendEventPageSchema)
           .withPermission("gatewayUsage:view")
           .handle(async ({ ctx, input }) => {
-            const service = ctx.app.gateway.spendEvents;
+            const service = ctx.app.gateway.getSpendEventsService();
             if (!service) {
               return {
                 rows: [],
@@ -97,9 +98,7 @@ export class GatewaySpendEventTrpcApi {
             // The ids come from this project's own tenant-filtered spend rows,
             // and the Project service resolves the owning-organization fence
             // without exposing Project persistence to this transport.
-            const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(
-              input.projectId,
-            );
+            const organizationId = await ctx.app.gateway.tryGetProjectOrganization(input.projectId);
             const vks =
               vkIds.length && organizationId
                 ? await ctx.app.gateway.resolveVirtualKeyNames({
@@ -109,7 +108,14 @@ export class GatewaySpendEventTrpcApi {
                 : [];
             const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
 
-            return { rows, nextCursor, virtualKeyNames, clickHouseDisabled: false };
+            // The wire still carries a Date on this row, so the instant the
+            // ledger reads becomes one here rather than anywhere above.
+            return {
+              rows: rows.map((row) => ({ ...row, occurredAt: toDate(row.occurredAt) })),
+              nextCursor,
+              virtualKeyNames,
+              clickHouseDisabled: false,
+            };
           }),
       )
       .build();

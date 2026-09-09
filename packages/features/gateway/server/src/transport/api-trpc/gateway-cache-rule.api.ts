@@ -106,7 +106,7 @@ export class GatewayCacheRuleTrpcApi {
           .withPermission("gatewayCacheRules:view")
           .handle(async ({ ctx, input }) => {
             await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-            const rows = await ctx.app.gateway.budgetDecisions.cacheRuleList(input.organizationId);
+            const rows = await ctx.app.gateway.listCacheRules(input.organizationId);
             return rows.map(toDto);
           }),
       )
@@ -117,7 +117,7 @@ export class GatewayCacheRuleTrpcApi {
           .withPermission("gatewayCacheRules:view")
           .handle(async ({ ctx, input }) => {
             await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-            const row = await ctx.app.gateway.budgetDecisions.tryCacheRuleGet({
+            const row = await ctx.app.gateway.tryGetCacheRule({
               id: input.id,
               organizationId: input.organizationId,
             });
@@ -144,7 +144,7 @@ export class GatewayCacheRuleTrpcApi {
           .withPermission("gatewayCacheRules:create")
           .handle(async ({ ctx, input }) => {
             await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-            const row = await ctx.app.gateway.budgetDecisions.cacheRuleCreate({
+            const row = await ctx.app.gateway.createCacheRule({
               organizationId: input.organizationId,
               name: input.name,
               description: input.description ?? null,
@@ -175,7 +175,7 @@ export class GatewayCacheRuleTrpcApi {
           .withPermission("gatewayCacheRules:update")
           .handle(async ({ ctx, input }) => {
             await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-            const row = await ctx.app.gateway.budgetDecisions.cacheRuleUpdate({
+            const row = await ctx.app.gateway.updateCacheRule({
               id: input.id,
               organizationId: input.organizationId,
               name: input.name,
@@ -196,7 +196,7 @@ export class GatewayCacheRuleTrpcApi {
           .withPermission("gatewayCacheRules:delete")
           .handle(async ({ ctx, input }) => {
             await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-            const row = await ctx.app.gateway.budgetDecisions.cacheRuleArchive({
+            const row = await ctx.app.gateway.archiveCacheRule({
               id: input.id,
               organizationId: input.organizationId,
               actorUserId: ctx.actor().id,

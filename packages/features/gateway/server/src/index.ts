@@ -1,4 +1,5 @@
 export { GatewayService } from "./services/gateway.service.ts";
+export { gatewayServer } from "./gateway.server.ts";
 export {
   PrismaGatewayAdapter,
   type GatewayPersistence,
@@ -70,63 +71,13 @@ export {
   GatewayApp,
   type GatewayActor,
   type GatewayAppDependencies,
+  type GatewayInfrastructure,
   type GatewayApplicableBudgetTarget,
   type GatewayVirtualKeyBudgetInput,
   type GatewayVirtualKeyOperations,
 } from "./app/gateway.app.ts";
-
-/**
- * The app-process tRPC transports this feature owns. The process supplies its
- * root, authenticated procedure and policy chain; the procedure names, input
- * schemas, access declarations and delegation are the feature's.
- */
-export {
-  GatewayBudgetTrpcApi,
-  type GatewayBudgetTrpcContext,
-} from "./transport/api-trpc/gateway-budget.api.ts";
-export {
-  GatewayCacheRuleTrpcApi,
-  type GatewayCacheRuleTrpcContext,
-} from "./transport/api-trpc/gateway-cache-rule.api.ts";
-export {
-  GatewayGuardrailTrpcApi,
-  type GatewayGuardrailTrpcContext,
-} from "./transport/api-trpc/gateway-guardrail.api.ts";
-export {
-  GatewaySpendEventTrpcApi,
-  type GatewaySpendEventTrpcContext,
-} from "./transport/api-trpc/gateway-spend-event.api.ts";
-export {
-  GatewayUsageTrpcApi,
-  type GatewayUsageTrpcContext,
-} from "./transport/api-trpc/gateway-usage.api.ts";
-export {
-  VirtualKeyTrpcApi,
-  type VirtualKeyTrpcContext,
-} from "./transport/api-trpc/virtual-key.api.ts";
-
-/** The public REST family this feature owns; routes and access declarations mirror tRPC's. */
-export { createGatewayPlatformRestApp } from "./transport/api-rest/gateway-platform.api.ts";
-export {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-  createGatewayInternalRestApp,
-  GATEWAY_SIGNATURE_WINDOW_SECONDS,
-  type GatewayInternalRestPorts,
-  type GatewaySpendCommandSender,
-} from "./transport/api-rest/gateway-internal.api.ts";
 export { GatewayInternalStorePort } from "./ports/gateway-internal-store.port.ts";
 export { PrismaGatewayInternalStoreAdapter } from "./adapters/postgres.gateway-internal-store.adapter.ts";
-export {
-  createGatewaySpendRestApp,
-  type GatewaySpendEnvelope,
-  type GatewaySpendRestPorts,
-  type GatewaySpendWebhookDelivery,
-  type GatewaySpendWebhookEndpoint,
-  type GatewaySpendWebhookEndpoints,
-  type GatewaySpendWebhookEvents,
-} from "./transport/api-rest/gateway-spend.api.ts";
-export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api.ts";
 
 /**
  * The gateway control plane: virtual keys, budgets, guardrail evaluation, realtime voice
@@ -214,11 +165,6 @@ export {
   NO_RATE_RULE_CODE,
   UNPRICED_QUANTITIES_CODE,
 } from "./adapters/model-catalog.gateway-spend-rating.adapter.ts";
-export {
-  createElevenLabsWebhookRestApp,
-  verifyElevenLabsSignature,
-  type ElevenLabsWebhookRestPorts,
-} from "./transport/api-rest/elevenlabs-webhook.api.ts";
 
 // The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
 export {

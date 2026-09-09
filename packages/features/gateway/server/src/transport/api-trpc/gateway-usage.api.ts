@@ -3,6 +3,7 @@
  * project since traces land in a key's trace destination, not the viewer's selected project.
  * Visibility follows the same membership rule as the keys table, so the two agree.
  */
+import { Temporal, toEpochMs } from "@langwatch/time";
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -105,12 +106,12 @@ export class GatewayUsageTrpcApi {
                 organizationId: input.organizationId,
                 userId: ctx.actor().id,
               });
-              return ctx.app.gateway.usage.summary({
+              return ctx.app.gateway.usageSummary({
                 organizationId: input.organizationId,
                 virtualKeyIds: keys.map((k) => k.id),
                 window: {
-                  fromDate: new Date(input.fromDate),
-                  toDate: new Date(input.toDate),
+                  fromDate: Temporal.Instant.fromEpochMilliseconds(toEpochMs(input.fromDate)),
+                  toDate: Temporal.Instant.fromEpochMilliseconds(toEpochMs(input.toDate)),
                 },
               });
             }),
@@ -130,7 +131,7 @@ export class GatewayUsageTrpcApi {
             .handle(async ({ ctx, input }) => {
               // Same visibility rule as virtualKeys.get: a key the caller can't
               // see is indistinguishable from one that doesn't exist.
-              const vk = await ctx.app.gateway.virtualKeys.tryGetById(
+              const vk = await ctx.app.gateway.tryGetVirtualKeyById(
                 input.virtualKeyId,
                 input.organizationId,
               );
@@ -145,12 +146,12 @@ export class GatewayUsageTrpcApi {
               if (!visible) {
                 throw new VirtualKeyNotFoundError();
               }
-              return ctx.app.gateway.usage.summaryForVirtualKey({
+              return ctx.app.gateway.usageSummaryForVirtualKey({
                 organizationId: input.organizationId,
                 virtualKeyId: input.virtualKeyId,
                 window: {
-                  fromDate: new Date(input.fromDate),
-                  toDate: new Date(input.toDate),
+                  fromDate: Temporal.Instant.fromEpochMilliseconds(toEpochMs(input.fromDate)),
+                  toDate: Temporal.Instant.fromEpochMilliseconds(toEpochMs(input.toDate)),
                 },
                 model: input.model,
               });

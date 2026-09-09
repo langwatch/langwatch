@@ -3,6 +3,14 @@
  * so it happens in the resolver. The plaintext key is returned only by create and rotate,
  * once at mint; every other procedure answers the DTO only.
  */
+import { type Instant, nowInstant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
+/** The expiry a request carries, as the service reads it: absent, cleared, or a moment. */
+function expiryInstant(value: TimeInput | null | undefined): Instant | null | undefined {
+  return value === undefined || value === null
+    ? value
+    : Temporal.Instant.fromEpochMilliseconds(toEpochMs(value));
+}
+
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -163,7 +171,7 @@ export class VirtualKeyTrpcApi {
               // Without the ClickHouse spend source there is no number to report.
               // Failing loudly lets the column render "unavailable" instead of a
               // confident $0.00 that cannot be told apart from a zero-spend key.
-              const spendRepo = ctx.app.gateway.virtualKeySpend;
+              const spendRepo = ctx.app.gateway.getVirtualKeySpendService();
               if (!spendRepo) {
                 throw new TRPCError({
                   code: "PRECONDITION_FAILED",
@@ -174,7 +182,7 @@ export class VirtualKeyTrpcApi {
                 organizationId: input.organizationId,
                 userId: ctx.actor().id,
               });
-              const now = new Date();
+              const now = nowInstant();
               const virtualKeyIds = keys.map((k) => k.id);
               const [spend, directBudgets] = await Promise.all([
                 ctx.app.gateway.spendByVirtualKey({
@@ -293,7 +301,7 @@ export class VirtualKeyTrpcApi {
                 traceProjectId: input.traceProjectId,
                 guardrailAttachments: input.config?.guardrailAttachments,
               });
-              const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.create({
+              const { virtualKey, secret } = await ctx.app.gateway.createVirtualKey({
                 organizationId: input.organizationId,
                 name: input.name,
                 description: input.description ?? null,
@@ -302,7 +310,7 @@ export class VirtualKeyTrpcApi {
                 traceProjectId: input.traceProjectId ?? null,
                 routingPolicyId: input.routingPolicyId ?? null,
                 routingMode: input.routingMode,
-                expiresAt: input.expiresAt ?? null,
+                expiresAt: expiryInstant(input.expiresAt) ?? null,
                 budget: input.budget ?? null,
                 config: input.config,
                 actorUserId,
@@ -336,7 +344,7 @@ export class VirtualKeyTrpcApi {
                 traceProjectId: input.traceProjectId,
                 guardrailAttachments: input.config?.guardrailAttachments,
               });
-              const updated = await ctx.app.gateway.virtualKeys.update({
+              const updated = await ctx.app.gateway.updateVirtualKey({
                 id: input.id,
                 organizationId: input.organizationId,
                 name: input.name,
@@ -345,7 +353,7 @@ export class VirtualKeyTrpcApi {
                 traceProjectId: input.traceProjectId,
                 routingPolicyId: input.routingPolicyId,
                 routingMode: input.routingMode,
-                expiresAt: input.expiresAt,
+                expiresAt: expiryInstant(input.expiresAt),
                 budget: input.budget,
                 config: input.config,
                 actorUserId,
@@ -372,7 +380,7 @@ export class VirtualKeyTrpcApi {
                 id: input.id,
                 permission: "virtualKeys:rotate",
               });
-              const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.rotate({
+              const { virtualKey, secret } = await ctx.app.gateway.rotateVirtualKey({
                 id: input.id,
                 organizationId: input.organizationId,
                 actorUserId,
@@ -400,7 +408,7 @@ export class VirtualKeyTrpcApi {
                 id: input.id,
                 permission: "virtualKeys:delete",
               });
-              const updated = await ctx.app.gateway.virtualKeys.revoke({
+              const updated = await ctx.app.gateway.revokeVirtualKey({
                 id: input.id,
                 organizationId: input.organizationId,
                 actorUserId,
@@ -427,7 +435,7 @@ export class VirtualKeyTrpcApi {
                 id: input.id,
                 permission: "virtualKeys:update",
               });
-              const updated = await ctx.app.gateway.virtualKeys.disable({
+              const updated = await ctx.app.gateway.disableVirtualKey({
                 id: input.id,
                 organizationId: input.organizationId,
                 actorUserId,
@@ -455,7 +463,7 @@ export class VirtualKeyTrpcApi {
                 id: input.id,
                 permission: "virtualKeys:update",
               });
-              const updated = await ctx.app.gateway.virtualKeys.enable({
+              const updated = await ctx.app.gateway.enableVirtualKey({
                 id: input.id,
                 organizationId: input.organizationId,
                 actorUserId,

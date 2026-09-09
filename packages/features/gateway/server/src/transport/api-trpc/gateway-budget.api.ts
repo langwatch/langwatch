@@ -3,6 +3,7 @@
  * scopeType + the typed column is the service's job, not this transport's, which only parses
  * input and delegates to the one budget-decision service.
  */
+import { toDate } from "@langwatch/time";
 import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -73,13 +74,13 @@ function toDto(b: GatewayBudgetWithSeats) {
     spentUsd: b.spentUsd.toString(),
     timezone: b.timezone,
     providerKey: b.providerKey,
-    currentPeriodStartedAt: period.currentPeriodStartedAt.toISOString(),
-    resetsAt: period.resetsAt.toISOString(),
+    currentPeriodStartedAt: toDate(period.currentPeriodStartedAt).toISOString(),
+    resetsAt: toDate(period.resetsAt).toISOString(),
     /** Null is calendar alignment; set, it is the phase the window cycles on. */
-    cycleAnchorAt: b.cycleAnchorAt?.toISOString() ?? null,
-    lastResetAt: b.lastResetAt?.toISOString() ?? null,
-    archivedAt: b.archivedAt?.toISOString() ?? null,
-    createdAt: b.createdAt.toISOString(),
+    cycleAnchorAt: b.cycleAnchorAt ? toDate(b.cycleAnchorAt).toISOString() : null,
+    lastResetAt: b.lastResetAt ? toDate(b.lastResetAt).toISOString() : null,
+    archivedAt: b.archivedAt ? toDate(b.archivedAt).toISOString() : null,
+    createdAt: toDate(b.createdAt).toISOString(),
     // Per-person templates only: how many end users the template saw this
     // period and how many are over their own cap.
     endUsersSeen: b.endUsersSeen ?? null,
@@ -113,8 +114,8 @@ export class GatewayBudgetTrpcApi {
             .handle(async ({ ctx, input }) => {
               await ctx.app.gateway.assertOrganizationExists(input.organizationId);
               const { budgets, spendAvailable, scopeReach } =
-                await ctx.app.gateway.budgetDecisions.listWithHealth(input.organizationId);
-              const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
+                await ctx.app.gateway.listBudgetsWithHealth(input.organizationId);
+              const scopeTargets = await ctx.app.gateway.listBudgetScopeTargets(
                 budgets,
                 input.organizationId,
               );
@@ -138,15 +139,15 @@ export class GatewayBudgetTrpcApi {
             .withPermission("gatewayBudgets:view")
             .handle(async ({ ctx, input }) => {
               const { budgets, spendAvailable, scopeReach } =
-                await ctx.app.gateway.budgetDecisions.listForProjectWithHealth(input.projectId);
+                await ctx.app.gateway.listProjectBudgetsWithHealth(input.projectId);
               // The organization the project belongs to, so VIRTUAL_KEY / GROUP /
               // PRINCIPAL targets resolve inside the right tenant. Read through the
               // Project service rather than a Prisma client, which this transport
               // does not hold.
-              const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(
+              const organizationId = await ctx.app.gateway.tryGetProjectOrganization(
                 input.projectId,
               );
-              const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
+              const scopeTargets = await ctx.app.gateway.listBudgetScopeTargets(
                 budgets,
                 organizationId ?? null,
               );
@@ -170,7 +171,7 @@ export class GatewayBudgetTrpcApi {
             .withPermission("gatewayBudgets:view")
             .handle(async ({ ctx, input }) => {
               await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-              const detail = await ctx.app.gateway.budgetDecisions.tryGetDetail({
+              const detail = await ctx.app.gateway.tryGetBudgetDetail({
                 id: input.id,
                 organizationId: input.organizationId,
               });
@@ -195,7 +196,7 @@ export class GatewayBudgetTrpcApi {
                   amountUsd: l.amountUsd.toString(),
                   model: l.model,
                   status: l.status,
-                  occurredAt: l.occurredAt.toISOString(),
+                  occurredAt: toDate(l.occurredAt).toISOString(),
                 })),
               };
             }),
@@ -217,7 +218,7 @@ export class GatewayBudgetTrpcApi {
             .withOutput(gatewayBudgetDtoResponseSchema)
             .withPermission("gatewayBudgets:create")
             .handle(async ({ ctx, input }) => {
-              const row = await ctx.app.gateway.budgetDecisions.create({
+              const row = await ctx.app.gateway.createBudget({
                 organizationId: input.organizationId,
                 scope: input.scope,
                 name: input.name,
@@ -240,7 +241,7 @@ export class GatewayBudgetTrpcApi {
             .withOutput(gatewayBudgetDtoResponseSchema)
             .withPermission("gatewayBudgets:update")
             .handle(async ({ ctx, input }) => {
-              const row = await ctx.app.gateway.budgetDecisions.update({
+              const row = await ctx.app.gateway.updateBudget({
                 ...input,
                 actorUserId: ctx.actor().id,
               });
@@ -253,7 +254,7 @@ export class GatewayBudgetTrpcApi {
             .withOutput(gatewayBudgetDtoResponseSchema)
             .withPermission("gatewayBudgets:delete")
             .handle(async ({ ctx, input }) => {
-              const row = await ctx.app.gateway.budgetDecisions.archive({
+              const row = await ctx.app.gateway.archiveBudget({
                 ...input,
                 actorUserId: ctx.actor().id,
               });
@@ -266,7 +267,7 @@ export class GatewayBudgetTrpcApi {
             .withOutput(gatewayBudgetDtoResponseSchema)
             .withPermission("gatewayBudgets:update")
             .handle(async ({ ctx, input }) => {
-              const row = await ctx.app.gateway.budgetDecisions.reset({
+              const row = await ctx.app.gateway.resetBudget({
                 id: input.id,
                 organizationId: input.organizationId,
                 actorUserId: ctx.actor().id,

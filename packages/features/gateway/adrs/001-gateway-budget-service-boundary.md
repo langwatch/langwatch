@@ -59,6 +59,12 @@ dependency, not a second budget service.
 
 ## Public surfaces and transports
 
+The server root exposes process composition and services. REST and tRPC
+transports are imported through explicit `@langwatch/gateway-server/api-rest/*`
+and `@langwatch/gateway-server/api-trpc/*` exports, so a worker naming the
+server root does not also load those handlers. The subpaths resolve to the
+same implementation files used by the API process.
+
 Existing REST, tRPC, Go Gateway and CLI names and response shapes do not change.
 Those transports call the same process-owned service.
 

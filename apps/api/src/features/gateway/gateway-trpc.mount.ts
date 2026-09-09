@@ -5,19 +5,29 @@
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import {
   GatewayBudgetTrpcApi,
-  GatewayCacheRuleTrpcApi,
-  GatewayGuardrailTrpcApi,
-  GatewaySpendEventTrpcApi,
-  GatewayUsageTrpcApi,
-  VirtualKeyTrpcApi,
   type GatewayBudgetTrpcContext,
+} from "@langwatch/gateway-server/api-trpc/gateway-budget";
+import {
+  GatewayCacheRuleTrpcApi,
   type GatewayCacheRuleTrpcContext,
+} from "@langwatch/gateway-server/api-trpc/gateway-cache-rule";
+import {
+  GatewayGuardrailTrpcApi,
   type GatewayGuardrailTrpcContext,
+} from "@langwatch/gateway-server/api-trpc/gateway-guardrail";
+import {
+  GatewaySpendEventTrpcApi,
   type GatewaySpendEventTrpcContext,
+} from "@langwatch/gateway-server/api-trpc/gateway-spend-event";
+import {
+  GatewayUsageTrpcApi,
   type GatewayUsageTrpcContext,
+} from "@langwatch/gateway-server/api-trpc/gateway-usage";
+import {
+  VirtualKeyTrpcApi,
   type VirtualKeyTrpcContext,
   type VirtualKeyTrpcSchemas,
-} from "@langwatch/gateway-server";
+} from "@langwatch/gateway-server/api-trpc/virtual-key";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Every context requirement the six surfaces place on the process. */

@@ -49,7 +49,7 @@ import {
   type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
   type GatewaySpendProcessingEvent as WebhookGatewaySpendProcessingEvent,
-} from "@langwatch/enterprise-webhook-server";
+} from "@langwatch/webhook-server";
 
 /** The vertical's rating seam, standing in for the static catalog behind it. */
 class TestSpendRating extends GatewaySpendRatingPort {

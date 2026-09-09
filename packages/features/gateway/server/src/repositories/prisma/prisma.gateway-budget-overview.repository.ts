@@ -1,5 +1,7 @@
-import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget as GatewayBudgetRow } from "@langwatch/gateway-contract";
 import { GatewayBudgetOverviewRepository } from "../gateway-budget-overview.repository.ts";
+import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice the budget-detail overview binds to. */
 export type GatewayBudgetOverviewDatabase = Pick<PrismaClient, "gatewayBudget">;
@@ -16,15 +18,17 @@ export class PrismaGatewayBudgetOverviewRepository extends GatewayBudgetOverview
     super();
   }
 
-  tryFindBudget({
+  async tryFindBudget({
     organizationId,
     budgetId,
   }: {
     organizationId: string;
     budgetId: string;
-  }): Promise<GatewayBudget | null> {
-    return this.database.gatewayBudget.findFirst({
+  }): Promise<GatewayBudgetRow | null> {
+    const row = await this.database.gatewayBudget.findFirst({
       where: { id: budgetId, organizationId },
     });
+
+    return row ? toGatewayBudgetRow(row) : null;
   }
 }

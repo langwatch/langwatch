@@ -66,9 +66,7 @@ export class GatewayGuardrailTrpcApi {
           .withInput(projectScopeSchema)
           .withOutput(gatewayGuardrailResourceSchema.array())
           .withPermission("gatewayGuardrails:view")
-          .handle(async ({ ctx, input }) =>
-            ctx.app.gateway.budgetDecisions.guardrailList(input.projectId),
-          ),
+          .handle(async ({ ctx, input }) => ctx.app.gateway.listGuardrails(input.projectId)),
       )
       .query("get", (p) =>
         p
@@ -76,7 +74,7 @@ export class GatewayGuardrailTrpcApi {
           .withOutput(gatewayGuardrailResourceSchema.nullable())
           .withPermission("gatewayGuardrails:view")
           .handle(async ({ ctx, input }) =>
-            ctx.app.gateway.budgetDecisions.tryGuardrailGet({
+            ctx.app.gateway.tryGetGuardrail({
               id: input.id,
               projectId: input.projectId,
             }),
@@ -97,7 +95,7 @@ export class GatewayGuardrailTrpcApi {
           .withOutput(gatewayGuardrailResourceSchema)
           .withPermission("gatewayGuardrails:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.gateway.budgetDecisions.guardrailCreate({
+            ctx.app.gateway.createGuardrail({
               projectId: input.projectId,
               name: input.name,
               description: input.description ?? null,
@@ -124,7 +122,7 @@ export class GatewayGuardrailTrpcApi {
           .withOutput(gatewayGuardrailResourceSchema)
           .withPermission("gatewayGuardrails:manage")
           .handle(async ({ ctx, input }) =>
-            ctx.app.gateway.budgetDecisions.guardrailUpdate({
+            ctx.app.gateway.updateGuardrail({
               id: input.id,
               projectId: input.projectId,
               name: input.name,
@@ -142,7 +140,7 @@ export class GatewayGuardrailTrpcApi {
           .withOutput(z.object({ ok: z.literal(true) }).strict())
           .withPermission("gatewayGuardrails:manage")
           .handle(async ({ ctx, input }) => {
-            await ctx.app.gateway.budgetDecisions.guardrailArchive({
+            await ctx.app.gateway.archiveGuardrail({
               id: input.id,
               projectId: input.projectId,
               actorUserId: ctx.actor().id,
