@@ -33,21 +33,23 @@ describe("buildSecurityHeaders", () => {
   });
 
   describe("given the voice agents panel (#7947)", () => {
-    /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
-    it("allows the microphone for the app's own origin", () => {
-      const headers = buildSecurityHeaders({ dev: false, environment: {} });
+    describe("when building production headers", () => {
+      /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
+      it("allows the microphone for the app's own origin", () => {
+        const headers = buildSecurityHeaders({ dev: false, environment: {} });
 
-      expect(headers["Permissions-Policy"]).toContain("microphone=(self)");
-    });
+        expect(headers["Permissions-Policy"]).toContain("microphone=(self)");
+      });
 
-    /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
-    it("admits the ElevenLabs API into connect-src", () => {
-      const csp = buildSecurityHeaders({ dev: false, environment: {} })[
-        "Content-Security-Policy"
-      ];
+      /** @scenario The app's own headers allow the microphone and the ElevenLabs socket */
+      it("admits the ElevenLabs API into connect-src", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
 
-      expect(csp).toMatch(/connect-src [^;]*wss:\/\/api\.elevenlabs\.io/);
-      expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.elevenlabs\.io/);
+        expect(csp).toMatch(/connect-src [^;]*wss:\/\/api\.elevenlabs\.io/);
+        expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.elevenlabs\.io/);
+      });
     });
   });
 

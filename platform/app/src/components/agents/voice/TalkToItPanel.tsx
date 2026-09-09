@@ -255,7 +255,7 @@ async function runEndCall({
 }: {
   refs: TalkRefs;
   dispatch: (event: TalkEvent) => void;
-  finish: (isCutAtLimit: boolean) => Promise<void>;
+  finish: (args: { isCutAtLimit: boolean }) => Promise<void>;
   isCutAtLimit: boolean;
 }): Promise<void> {
   stopTick(refs);
@@ -265,7 +265,7 @@ async function runEndCall({
   } catch {
     // The socket may already be closed; the finish still runs.
   }
-  await finish(isCutAtLimit);
+  await finish({ isCutAtLimit });
 }
 
 /**
@@ -469,8 +469,13 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    (isCutAtLimit: boolean, nameOverride?: string) =>
-      runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
+    ({
+      isCutAtLimit,
+      nameOverride,
+    }: {
+      isCutAtLimit: boolean;
+      nameOverride?: string;
+    }) => runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(
@@ -491,9 +496,9 @@ function useTalkToItCall(props: TalkToItPanelProps) {
     });
   }, [props, refs, endCall]);
   const saveWithName = useCallback(
-    (isCutAtLimit: boolean, name: string) => {
+    ({ isCutAtLimit, name }: { isCutAtLimit: boolean; name: string }) => {
       dispatch({ type: "HANG_UP" }); // back to saving
-      void finish(isCutAtLimit, name);
+      void finish({ isCutAtLimit, nameOverride: name });
     },
     [finish],
   );
@@ -610,7 +615,7 @@ function NeedsNameView({
   state: Extract<TalkState, { kind: "needsName" }>;
   pendingName: string;
   setPendingName: (value: string) => void;
-  onSave: (isCutAtLimit: boolean, name: string) => void;
+  onSave: (args: { isCutAtLimit: boolean; name: string }) => void;
 }) {
   return (
     <VStack align="stretch" gap={2} data-testid="talk-needs-name">
@@ -624,7 +629,9 @@ function NeedsNameView({
       <Button
         colorPalette="blue"
         disabled={pendingName.trim().length === 0}
-        onClick={() => onSave(state.isCutAtLimit, pendingName.trim())}
+        onClick={() =>
+          onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })
+        }
         data-testid="talk-name-save"
       >
         Save
