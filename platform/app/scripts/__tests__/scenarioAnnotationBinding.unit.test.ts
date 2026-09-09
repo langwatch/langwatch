@@ -57,9 +57,13 @@ const APP_ROOT = resolve(HERE, "../..");
  * WHAT A GREEN RUN HERE DOES NOT MEAN. Running this same predicate over the
  * whole app at the time of writing returned 98 dangling annotations across
  * 3,582 test files, none of them under these three trees. A second session
- * measured the same population with a blunter instrument and got 113, which it
- * withdrew as an upper bound once it found a prose fragment among its titles.
- * Either way the order is the same and the debt is real.
+ * measured the same population independently and got 103 across 3,880 files;
+ * the remaining gap is which files each walk collected, not the rule. Its
+ * first attempt reported 113 by reaching for the annotation's end offset
+ * through a fallback rather than the `end` the extractor returns, which starts
+ * the walk inside the annotation and over-reports — it was withdrawn once a
+ * fragment of somebody's prose turned up among the titles. Both corrected runs
+ * agree that nothing under these three trees dangles.
  *
  * Some of it is not hygiene. These four requirements had a passing test and
  * nothing bound to them:
