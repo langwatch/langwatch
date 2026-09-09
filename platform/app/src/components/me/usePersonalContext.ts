@@ -141,8 +141,15 @@ export function usePersonalContext(): PersonalContext {
   // `enabled` therefore gates on `userId` too: an enabled query with an
   // undefined target is precisely the sweep, so the request has to wait
   // until the session says who is asking.
+  //
+  // The `?? ""` is not cosmetic. `undefined` is the exact value that MEANS
+  // sweep, so passing it through while the session resolves would leave the
+  // whole guarantee resting on `enabled` alone — one refactor that flips a
+  // gate reopens the hole. `""` fails closed instead: it takes the
+  // `targetUserId !== undefined` branch, which is FORBIDDEN for a member and
+  // zero rows for a holder. Never the sweep.
   const personalKeysQuery = api.personalVirtualKeys.list.useQuery(
-    { organizationId: orgId, targetUserId: userId },
+    { organizationId: orgId, targetUserId: userId ?? "" },
     {
       enabled: !!organization && !!userId,
       refetchOnWindowFocus: false,
