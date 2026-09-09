@@ -37,6 +37,9 @@ const {
 vi.mock("~/utils/api", () => ({
   api: {
     auth: {
+      // No prior session explains any of these arrivals, which is the ordinary
+      // case and the one that leaves the passkey flows exactly as they were.
+      priorSession: { useQuery: () => ({ data: undefined }) },
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,

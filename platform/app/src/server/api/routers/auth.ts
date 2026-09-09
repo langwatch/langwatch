@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity";
+import { getSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
+import {
+  type PriorSession,
+  PriorSessionService,
+} from "~/server/app-layer/identity/prior-session.service";
 import {
   localSignUpDecision,
   signInRouter,
@@ -423,5 +428,43 @@ export const authRouter = createTRPCRouter({
       });
 
       return { asked: true };
+    }),
+
+  /**
+   * "Does a prior session of mine explain why I am looking at this screen?"
+   *
+   * Takes **no input** on purpose, and that is the whole of its safety argument:
+   * it reads the session cookie the caller themselves presented, so the most it
+   * can describe is a session that caller already holds. There is no address to
+   * pass in, so there is no question to ask about anybody else — this is not an
+   * enumeration surface and cannot be turned into one without adding a parameter.
+   *
+   * It is also not rate-limited, unlike its neighbours, for the same reason:
+   * there is no budget to exhaust on somebody else's behalf. A caller can only
+   * ever ask about the one cookie they are holding, and the answer to that
+   * question does not change however many times they ask it.
+   *
+   * `PriorSessionService` decides what may be said; see its docblock for why a
+   * REVOKED session answers the same as no session at all.
+   */
+  priorSession: publicProcedure
+    .noPermission({
+      reason:
+        "classifies the caller's OWN session cookie so an expired session can carry its address to the sign-in screen; takes no input, names nobody the caller is not already holding a token for, and mints nothing",
+    })
+    .query(async ({ ctx }): Promise<PriorSession> => {
+      // better-auth owns the cookie's name, its `__Secure-` variant and its
+      // dotted/dashed spellings. Ask it rather than hardcoding any of that; a
+      // wrong guess here would fail open into "unknown", which looks exactly
+      // like working correctly.
+      const cookieHeader = ctx.req?.headers?.cookie;
+      const headers = new Headers(
+        cookieHeader ? { cookie: String(cookieHeader) } : {},
+      );
+
+      return await new PriorSessionService({
+        prisma: ctx.prisma,
+        now: () => new Date(),
+      }).explain({ sessionCookie: getSessionCookie(headers) });
     }),
 });

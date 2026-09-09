@@ -25,6 +25,7 @@ const {
   sessionRef,
   searchParamsRef,
   publicEnvRef,
+  priorSessionRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
@@ -36,11 +37,18 @@ const {
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
   publicEnvRef: { current: { IS_SAAS: true } as Record<string, unknown> },
+  // Undefined is the answer for every arrival the screen cannot explain — no
+  // cookie, a revoked session, a forgery — which is what all but one of these
+  // tests are. Set it to name somebody for the recovery case only.
+  priorSessionRef: { current: undefined as unknown },
 }));
 
 vi.mock("~/utils/api", () => ({
   api: {
     auth: {
+      priorSession: {
+        useQuery: () => ({ data: priorSessionRef.current }),
+      },
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,
@@ -194,10 +202,90 @@ describe("given the identifier-first sign-in screen", () => {
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true };
+    priorSessionRef.current = undefined;
     window.localStorage.clear();
   });
 
   afterEach(() => cleanup());
+
+  describe("when an expired session of this browser's explains the arrival", () => {
+    /** @scenario "An expired session is recognised and the address carried forward" */
+    it("carries the address to the method step without anybody typing it", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      // Two answers: the instance question the screen always asks on mount,
+      // then the one the recovered address asks.
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+
+      // The address step is skipped entirely — the person lands where they
+      // would have landed had they typed what we already knew.
+      await waitFor(() => {
+        expect(routeMock).toHaveBeenCalledWith(
+          expect.objectContaining({ identifier: "sam@acme.com" }),
+        );
+      });
+      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "The expired notice replaces the greeting, not the error copy" */
+    it("says the session ran out, and does not greet a stranger or report a fault", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
+      expect(screen.getByText(/session expired/i)).toBeInTheDocument();
+      // Not the first-time greeting, and not an error: nothing went wrong, and
+      // an error tone sends somebody looking for a fault that does not exist.
+      expect(screen.queryByText(/log in to langwatch/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Recognition is not authentication" */
+    it("still demands a credential, and signs nobody in on its own", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+      await screen.findByText(/welcome back/i);
+
+      // Knowing who somebody is is not proof that they are. The password form
+      // the picker renders is the proof, and nothing has been signed in.
+      // Exact label: /password/i also catches the "Forgot password?" link.
+      expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+      expect(signInMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * THE SECURITY ONE. Revocation deletes the session row, so the server
+     * answers `unknown` — the same answer a forgery and a cookie-less stranger
+     * get. The screen must therefore look exactly like the cold one: ending
+     * every session is what somebody does when they think a machine is not
+     * theirs, and naming the account on it afterwards would undo that.
+     */
+    /** @scenario "A revoked session is given the cold screen and no address" */
+    it("gives a revoked session the cold screen, naming nobody", async () => {
+      priorSessionRef.current = { kind: "unknown" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(
+        await screen.findByText(/log in to langwatch/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/welcome back/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/acme\.com/i)).not.toBeInTheDocument();
+      // And no address was handed to the router on anybody's behalf.
+      expect(routeMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ identifier: expect.stringContaining("@") }),
+      );
+    });
+  });
 
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
