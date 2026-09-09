@@ -26,6 +26,7 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "nanoid": "^6.0.0",

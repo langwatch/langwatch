@@ -1,5 +1,5 @@
 import { DatasetService } from "@langwatch/dataset-contract";
-import { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import { type ExperimentService as ExperimentServiceContract } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -12,6 +12,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { randomUUID } from "node:crypto";
@@ -23,11 +24,6 @@ import { ExperimentService } from "../../services/experiment.service.ts";
 import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter.ts";
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 
-/**
- * The Postgres half of archiving: what `archiveActive` actually leaves behind. The cascade into a backing workflow and monitor is covered by
- * `app/__tests__/experiment.app.unit.test.ts` against a stubbed repository, since that cascade lives in `ExperimentApp`, not this repository.
- * @see specs/experiments-v3/experiment-archive.feature
- */
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -53,7 +49,7 @@ const database = (): PrismaClient => {
 
 const references = {
   prompts: Object.create(PromptService.prototype) as PromptService,
-  agents: Object.create(AgentService.prototype) as AgentService,
+  agents: createApiFixture<AgentApi>(),
   evaluators: Object.create(EvaluatorService.prototype) as EvaluatorService,
   workflows: Object.create(WorkflowService.prototype) as WorkflowService,
   dataset: Object.create(DatasetService.prototype) as DatasetService,

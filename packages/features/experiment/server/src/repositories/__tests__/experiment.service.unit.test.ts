@@ -14,18 +14,18 @@ import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
 import { ExperimentExecutionPort } from "../../ports/experiment-execution.port.ts";
-import { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 import type { Instant } from "@langwatch/time";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const prompts: PromptService = Object.create(PromptService.prototype);
 prompts.getAllPrompts = async () => [];
-const agents: AgentService = Object.create(AgentService.prototype);
-agents.exists = async () => false;
+const agents = createApiFixture<AgentApi>({ exists: async () => false });
 const evaluators: EvaluatorService = Object.create(EvaluatorService.prototype);
 evaluators.getById = async () => {
   throw new Error("missing");

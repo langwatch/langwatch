@@ -6,7 +6,7 @@ import type {
   ExperimentService as ExperimentServiceContract,
   SerializedHandledError,
 } from "@langwatch/experiment-contract";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
@@ -154,7 +154,7 @@ export type PostgresExperimentAdapterOptions = {
   now?: () => Date;
   references: {
     prompts: PromptService;
-    agents: AgentService;
+    agents: AgentApi;
     evaluators: EvaluatorService;
     workflows: WorkflowService;
     dataset: DatasetService;

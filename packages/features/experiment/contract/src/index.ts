@@ -13,6 +13,7 @@ export * from "./experiment-run-eventing.events.ts";
 export * from "./experiment-execution.errors.ts";
 export * from "./experiment.errors.ts";
 export * from "./experiment.service.ts";
+export * from "./experiment.api.ts";
 export * from "./human-readable-id.ts";
 export * from "./workbench/connected-agent-target.ts";
 export * from "./workbench/empty-row-detection.ts";

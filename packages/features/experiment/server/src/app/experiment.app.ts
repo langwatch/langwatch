@@ -2,40 +2,42 @@
  * The experiment feature's application: what both of its doors call.
  */
 import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
-import type {
-  CommitWorkbenchVersionInput,
-  CompleteExperimentRunInput,
-  CreateEvaluationsV3Input,
-  DSPyRunsSummary,
-  Experiment,
-  ExperimentDspyStep,
-  ExperimentDspyStepLookup,
-  ExperimentDspyStepsLookup,
-  ExperimentLookup,
-  ExperimentPage,
-  ExperimentPageInput,
-  ExperimentRun,
-  ExperimentRunAggregate,
-  ExperimentRunListInput,
-  ExperimentRunLookup,
-  ExperimentRunSlugPageInput,
-  ExperimentRunWithItems,
+import {
+  ExperimentApi,
+  type CommitWorkbenchVersionInput,
+  type CompleteExperimentRunInput,
+  type CreateEvaluationsV3Input,
+  type DSPyRunsSummary,
+  type Experiment,
+  type ExperimentDspyStep,
+  type ExperimentDspyStepLookup,
+  type ExperimentDspyStepsLookup,
+  type ExperimentLookup,
+  type ExperimentPage,
+  type ExperimentPageInput,
+  type ExperimentRun,
+  type ExperimentRunAggregate,
+  type ExperimentRunListInput,
+  type ExperimentRunLookup,
+  type ExperimentRunSlugPageInput,
+  type ExperimentRunWithItems,
   ExperimentService,
-  ExperimentSlugLookup,
-  ExperimentType,
-  GetWorkbenchStateInput,
-  ListWorkbenchVersionsInput,
-  RecordEvaluatorResultInput,
-  RecordTargetResultInput,
-  RestoreWorkbenchVersionInput,
-  SaveExperimentInput,
-  SaveWorkbenchStateInput,
-  StartExperimentRunInput,
-  WorkbenchActor,
-  WorkbenchSaveResult,
-  WorkbenchStateView,
-  WorkbenchVersionsPage,
+  type ExperimentSlugLookup,
+  type ExperimentType,
+  type GetWorkbenchStateInput,
+  type ListWorkbenchVersionsInput,
+  type RecordEvaluatorResultInput,
+  type RecordTargetResultInput,
+  type RestoreWorkbenchVersionInput,
+  type SaveExperimentInput,
+  type SaveWorkbenchStateInput,
+  type StartExperimentRunInput,
+  type WorkbenchActor,
+  type WorkbenchSaveResult,
+  type WorkbenchStateView,
+  type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import {
   WorkflowNotFoundError,
   type WorkflowService,
@@ -91,52 +93,61 @@ export interface ExperimentAppDependencies {
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
 const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
-export class ExperimentApp {
-  static create(dependencies: ExperimentAppDependencies): ExperimentApp {
-    return new ExperimentApp(dependencies);
+export class ExperimentApp implements ExperimentApi {
+  static readonly contract = ExperimentApi;
+  static readonly dependencies = {} as const;
+
+  static create(
+    setup: FeatureSetup<Readonly<Record<never, never>>, ExperimentAppDependencies, undefined>,
+  ): ExperimentApp {
+    return new ExperimentApp(setup.infrastructure);
   }
 
-  private constructor(private readonly dependencies: ExperimentAppDependencies) {}
+  #dependencies: ExperimentAppDependencies;
+
+  private constructor(dependencies: ExperimentAppDependencies) {
+    this.#dependencies = dependencies;
+  }
 
   /**
    * The service itself, for the process functions that still take it whole.
    */
   get experimentService(): ExperimentService {
-    return this.dependencies.experiments;
+    return this.#dependencies.experiments;
   }
 
   // ── Experiments ────────────────────────────────────────────────
 
   /** Every active experiment in the project. */
   list(input: Readonly<{ projectId: string }>): Promise<Experiment[]> {
-    return this.dependencies.experiments.list(input);
+    return this.#dependencies.experiments.list(input);
   }
 
   /** One page of the project's experiments. */
   getPage(input: ExperimentPageInput): Promise<ExperimentPage> {
-    return this.dependencies.experiments.getPage(input);
+    return this.#dependencies.experiments.getPage(input);
   }
 
   /** One experiment by id. */
   getById(input: ExperimentLookup): Promise<Experiment> {
-    return this.dependencies.experiments.getById(input);
+    return this.#dependencies.experiments.getById(input);
   }
 
   /** One experiment by id, or null when it is archived or absent. */
   tryGetById(input: ExperimentLookup): Promise<Experiment | null> {
-    return this.dependencies.experiments.tryGetById(input);
+    return this.#dependencies.experiments.tryGetById(input);
   }
 
   /** One experiment by slug. */
   getBySlug(input: ExperimentSlugLookup): Promise<Experiment> {
-    return this.dependencies.experiments.getBySlug(input);
+    return this.#dependencies.experiments.getBySlug(input);
   }
 
   /**
    * One experiment by slug, or null when the project has none by that name.
    */
   tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null> {
-    return this.dependencies.experiments.tryGetBySlug(input);
+    return this.#dependencies.experiments.tryGetBySlug(input);
   }
 
   /**
@@ -145,39 +156,39 @@ export class ExperimentApp {
   tryGetBySlugAndType(
     input: ExperimentSlugLookup & Readonly<{ type: ExperimentType }>,
   ): Promise<Experiment | null> {
-    return this.dependencies.experiments.tryGetBySlugAndType(input);
+    return this.#dependencies.experiments.tryGetBySlugAndType(input);
   }
 
   /** One experiment's id and slug, for a caller that holds only the slug. */
   tryGetIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
-    return this.dependencies.experiments.tryGetIdBySlug(input);
+    return this.#dependencies.experiments.tryGetIdBySlug(input);
   }
 
   /**
    * Whether the experiment is still live — present and not archived.
    */
   isActive(input: ExperimentLookup): Promise<boolean> {
-    return this.dependencies.experiments.isActive(input);
+    return this.#dependencies.experiments.isActive(input);
   }
 
   /** One experiment by whichever identifier the caller holds. */
   getBySlugOrId(input: Readonly<{ projectId: string; slugOrId: string }>): Promise<Experiment> {
-    return this.dependencies.experiments.getBySlugOrId(input);
+    return this.#dependencies.experiments.getBySlugOrId(input);
   }
 
   /** The project's most recent experiment, or null when it has none. */
   tryGetLatest(input: Readonly<{ projectId: string }>): Promise<Experiment | null> {
-    return this.dependencies.experiments.tryGetLatest(input);
+    return this.#dependencies.experiments.tryGetLatest(input);
   }
 
   /** The name the next unnamed experiment in the project gets. */
   findNextDraftName(input: Readonly<{ projectId: string }>): Promise<string> {
-    return this.dependencies.experiments.findNextDraftName(input);
+    return this.#dependencies.experiments.findNextDraftName(input);
   }
 
   /** Creates or replaces an experiment. */
   save(input: SaveExperimentInput): Promise<Experiment> {
-    return this.dependencies.experiments.save(input);
+    return this.#dependencies.experiments.save(input);
   }
 
   /**
@@ -185,17 +196,17 @@ export class ExperimentApp {
    * the monitor it was published as.
    */
   async archive(input: ExperimentLookup): Promise<{ success: true }> {
-    const experiment = await this.dependencies.experiments.tryGetById(input);
-    const result = await this.dependencies.experiments.archive(input);
+    const experiment = await this.#dependencies.experiments.tryGetById(input);
+    const result = await this.#dependencies.experiments.archive(input);
 
     if (experiment?.workflowId) {
-      await this.dependencies.workflows.archive({
+      await this.#dependencies.workflows.archive({
         id: experiment.workflowId,
         projectId: input.projectId,
       });
     }
     if (experiment) {
-      await this.dependencies.monitors.deleteForExperiment({
+      await this.#dependencies.monitors.deleteForExperiment({
         projectId: input.projectId,
         experimentId: input.id,
       });
@@ -208,12 +219,12 @@ export class ExperimentApp {
 
   /** The runs of each named experiment, keyed by experiment id. */
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
-    return this.dependencies.experiments.listRuns(input);
+    return this.#dependencies.experiments.listRuns(input);
   }
 
   /** One run of one experiment. A missing run reads as null. */
   tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
-    return this.dependencies.experiments.tryGetRun(input);
+    return this.#dependencies.experiments.tryGetRun(input);
   }
 
   /**
@@ -224,7 +235,7 @@ export class ExperimentApp {
     runs: ExperimentRun[];
     totalHits: number;
   }> {
-    return this.dependencies.experiments.getRunsPageBySlug(input);
+    return this.#dependencies.experiments.getRunsPageBySlug(input);
   }
 
   /**
@@ -235,7 +246,7 @@ export class ExperimentApp {
   ): Promise<ExperimentWithRuns[]> {
     if (input.experiments.length === 0) return [];
 
-    const aggregates = await this.dependencies.experiments.getRunAggregates({
+    const aggregates = await this.#dependencies.experiments.getRunAggregates({
       projectId: input.projectId,
       experimentIds: input.experiments.map((experiment) => experiment.id),
     });
@@ -258,46 +269,46 @@ export class ExperimentApp {
 
   /** Opens a run: the row every later result is written against. */
   startExperimentRun(input: StartExperimentRunInput): Promise<void> {
-    return this.dependencies.experiments.startExperimentRun(input);
+    return this.#dependencies.experiments.startExperimentRun(input);
   }
 
   /** One target's output for one dataset row. */
   recordTargetResult(input: RecordTargetResultInput): Promise<void> {
-    return this.dependencies.experiments.recordTargetResult(input);
+    return this.#dependencies.experiments.recordTargetResult(input);
   }
 
   /** One evaluator's verdict on one target's output. */
   recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void> {
-    return this.dependencies.experiments.recordEvaluatorResult(input);
+    return this.#dependencies.experiments.recordEvaluatorResult(input);
   }
 
   /** Closes a run, whether it finished or was stopped. */
   completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
-    return this.dependencies.experiments.completeExperimentRun(input);
+    return this.#dependencies.experiments.completeExperimentRun(input);
   }
 
   // ── Optimization runs ──────────────────────────────────────────
 
   /** The optimization runs recorded against one experiment. */
   listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]> {
-    return this.dependencies.experiments.listDspyRuns(input);
+    return this.#dependencies.experiments.listDspyRuns(input);
   }
 
   /** One optimization step. */
   getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {
-    return this.dependencies.experiments.getDspyStep(input);
+    return this.#dependencies.experiments.getDspyStep(input);
   }
 
   // ── Workbench ──────────────────────────────────────────────────
 
   /** The workbench state a page opens on. */
   getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView> {
-    return this.dependencies.experiments.getWorkbenchState(input);
+    return this.#dependencies.experiments.getWorkbenchState(input);
   }
 
   /** The version history of one experiment's workbench. */
   listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage> {
-    return this.dependencies.experiments.listWorkbenchVersions(input);
+    return this.#dependencies.experiments.listWorkbenchVersions(input);
   }
 
   /** Writes the workbench, attributed to the caller who asked for it. */
@@ -305,7 +316,7 @@ export class ExperimentApp {
     input: Omit<SaveWorkbenchStateInput, "actor">,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
-    return this.dependencies.experiments.saveWorkbenchState({
+    return this.#dependencies.experiments.saveWorkbenchState({
       ...input,
       actor: ExperimentApp.actorFor(by),
     });
@@ -321,7 +332,7 @@ export class ExperimentApp {
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
     const { state, ...rest } = input;
-    return this.dependencies.experiments.createEvaluationsV3({
+    return this.#dependencies.experiments.createEvaluationsV3({
       ...rest,
       state: state ?? createBlankWorkbenchState(rest.name ? { name: rest.name } : {}),
       actor: ExperimentApp.actorFor(by),
@@ -333,7 +344,7 @@ export class ExperimentApp {
     input: Omit<CommitWorkbenchVersionInput, "actor">,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
-    return this.dependencies.experiments.commitWorkbenchVersion({
+    return this.#dependencies.experiments.commitWorkbenchVersion({
       ...input,
       actor: ExperimentApp.actorFor(by),
     });
@@ -344,7 +355,7 @@ export class ExperimentApp {
     input: Omit<RestoreWorkbenchVersionInput, "actor">,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
-    return this.dependencies.experiments.restoreWorkbenchVersion({
+    return this.#dependencies.experiments.restoreWorkbenchVersion({
       ...input,
       actor: ExperimentApp.actorFor(by),
     });
@@ -359,7 +370,7 @@ export class ExperimentApp {
     input: Readonly<{ id: string; projectId: string; includeVersion?: boolean }>,
   ): Promise<WorkflowWithVersion | null> {
     try {
-      return await this.dependencies.workflows.getById(input);
+      return await this.#dependencies.workflows.getById(input);
     } catch (error) {
       if (error instanceof WorkflowNotFoundError) return null;
       throw error;
@@ -370,14 +381,14 @@ export class ExperimentApp {
 
   /** The named datasets of one project. */
   getDatasets(input: Readonly<{ projectId: string; datasetIds: string[] }>): Promise<Dataset[]> {
-    return this.dependencies.dataset.getByIds(input);
+    return this.#dependencies.dataset.getByIds(input);
   }
 
   /** Renames one dataset, so a renamed experiment's datasets follow it. */
   renameDataset(
     input: Readonly<{ datasetId: string; projectId: string; name: string }>,
   ): Promise<Dataset> {
-    return this.dependencies.dataset.renameDataset(input);
+    return this.#dependencies.dataset.renameDataset(input);
   }
 
   /** Copies a dataset into another project. */
@@ -388,19 +399,19 @@ export class ExperimentApp {
       targetProjectId: string;
     }>,
   ): Promise<Dataset> {
-    return this.dependencies.dataset.copyDataset(input);
+    return this.#dependencies.dataset.copyDataset(input);
   }
 
   // ── Broadcast ──────────────────────────────────────────────────
 
   /** The project's signal fan-out, for a tab following workbench writes. */
   getTenantEmitter(projectId: string): NodeJS.EventEmitter {
-    return this.dependencies.broadcast.getTenantEmitter(projectId);
+    return this.#dependencies.broadcast.getTenantEmitter(projectId);
   }
 
   /** Releases the fan-out once the last subscriber has gone. */
   cleanupTenantEmitter(projectId: string): void {
-    this.dependencies.broadcast.cleanupTenantEmitter(projectId);
+    this.#dependencies.broadcast.cleanupTenantEmitter(projectId);
   }
 
   /**

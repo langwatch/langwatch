@@ -82,19 +82,6 @@ type TargetHeaderProps = {
   isRunning?: boolean;
 };
 
-/** Tooltip text for the play/stop button, based on run and mapping state. */
-function runButtonTooltip(params: { isRunning: boolean; hasMissingMappings: boolean }): string {
-  if (params.isRunning) return "Stop evaluation";
-  if (params.hasMissingMappings) return "Configure missing mappings first";
-  return "Run evaluation";
-}
-
-const EDIT_LABELS: Record<string, string> = { prompt: "Edit Prompt", evaluator: "Edit Evaluator" };
-const SWITCH_LABELS: Record<string, string> = {
-  prompt: "Switch Prompt",
-  evaluator: "Switch Evaluator",
-};
-
 /** Resolves each variant id to its live target row, in the variant's declared order. */
 function resolveVariantTargets<T extends { id: string }>(
   variantIds: string[],
@@ -266,9 +253,6 @@ export const TargetHeader = memo(function TargetHeader({
     if (!targetComparison) return null;
     return computeComparisonTargetAggregate(target, results, effectiveRowCount);
   }, [target, targetComparison, results, effectiveRowCount]);
-  // Only render the comparison summary once it has decided rows to show.
-  const activeComparisonAggregate =
-    comparisonAggregate && comparisonAggregate.decidedRows > 0 ? comparisonAggregate : null;
 
   // Show aggregates only when we have results or errors or running
   const hasAggregates =
@@ -366,8 +350,19 @@ export const TargetHeader = memo(function TargetHeader({
     return "cyan.emphasized";
   };
 
-  const editLabel = EDIT_LABELS[target.type] ?? "Edit Agent";
-  const switchLabel = SWITCH_LABELS[target.type] ?? "Switch Agent";
+  const editLabel =
+    target.type === "prompt"
+      ? "Edit Prompt"
+      : target.type === "evaluator"
+        ? "Edit Evaluator"
+        : "Edit Agent";
+
+  const switchLabel =
+    target.type === "prompt"
+      ? "Switch Prompt"
+      : target.type === "evaluator"
+        ? "Switch Evaluator"
+        : "Switch Agent";
 
   const headerRow = (
     <HStack
@@ -542,14 +537,14 @@ export const TargetHeader = memo(function TargetHeader({
           the shared Rows / Avg Latency / Total Cost / Execution Time
           popover — dogfood ask "I also want the cost metric in pairwise
           compare in v3". Other columns keep the single popover. */}
-      {activeComparisonAggregate && (
+      {comparisonAggregate && comparisonAggregate.decidedRows > 0 ? (
         // Shrinkable too: a comparison column carries the most header content
         // ("<winner> wins" + latency + cost), and pinning it would push the
         // play button out of the column on a narrow viewport. Only the play
         // button is truly unshrinkable.
         <HStack gap={2} minWidth={0} overflow="hidden">
           <ComparisonScoreboard
-            aggregate={activeComparisonAggregate}
+            aggregate={comparisonAggregate}
             variantTargets={variantTargets}
             variantNames={variantNames}
             variantDisplayNames={variantDisplayNames}
@@ -558,14 +553,19 @@ export const TargetHeader = memo(function TargetHeader({
             <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
           )}
         </HStack>
-      )}
-      {!activeComparisonAggregate && hasAggregates && (
+      ) : hasAggregates ? (
         <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
-      )}
+      ) : null}
 
       {/* Play/Stop button on far right */}
       <Tooltip
-        content={runButtonTooltip({ isRunning, hasMissingMappings })}
+        content={
+          isRunning
+            ? "Stop evaluation"
+            : hasMissingMappings
+              ? "Configure missing mappings first"
+              : "Run evaluation"
+        }
         positioning={{ placement: "top" }}
         openDelay={200}
       >

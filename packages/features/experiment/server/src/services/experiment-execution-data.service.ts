@@ -2,7 +2,7 @@
  * Shared data loading utilities for Evaluations V3 execution.
  */
 
-import type { Agent, AgentService } from "@langwatch/agent-contract";
+import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
 import {
@@ -173,7 +173,7 @@ export type ExecutionDataInputs = {
 export type ExecutionDataServices = {
   datasets: DatasetService;
   prompts: PromptService;
-  agents: AgentService;
+  agents: AgentApi;
   /** The committed studio DSL a workflow target runs, once per dataset row. */
   workflows: ExperimentWorkflowDslPort;
   evaluators?: EvaluatorService;

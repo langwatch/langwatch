@@ -1,4 +1,4 @@
-import { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { randomUUID } from "node:crypto";
@@ -52,7 +53,7 @@ const database = (): PrismaClient => {
 
 const references = {
   prompts: Object.create(PromptService.prototype) as PromptService,
-  agents: Object.create(AgentService.prototype) as AgentService,
+  agents: createApiFixture<AgentApi>(),
   evaluators: Object.create(EvaluatorService.prototype) as EvaluatorService,
   workflows: Object.create(WorkflowService.prototype) as WorkflowService,
   dataset: Object.create(DatasetService.prototype) as DatasetService,

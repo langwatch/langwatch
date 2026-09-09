@@ -2,7 +2,7 @@
  * Whether everything a workbench state points at still exists.
  */
 
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorNotFoundError, type EvaluatorService } from "@langwatch/evaluator-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
@@ -15,7 +15,7 @@ import {
 
 export type ExperimentWorkbenchReferenceServices = {
   prompts: PromptService;
-  agents: AgentService;
+  agents: AgentApi;
   evaluators: EvaluatorService;
   workflows: WorkflowService;
   dataset: DatasetService;

@@ -3,7 +3,7 @@
  * @vitest-environment node
  */
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
-import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
@@ -32,7 +32,7 @@ const apiKeyToken = ({
 }: {
   userId: string | null;
   isLangySessionKey: boolean;
-}): ResolvedApiKeyToken => ({
+}): ResolvedApiKeyCredential => ({
   type: "apiKey",
   apiKeyId: "key-1",
   userId,

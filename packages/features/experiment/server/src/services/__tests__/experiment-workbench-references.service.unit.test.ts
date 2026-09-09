@@ -3,7 +3,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorNotFoundError, EvaluatorService } from "@langwatch/evaluator-contract";
 import { PromptService } from "@langwatch/prompt-contract";
@@ -27,8 +28,7 @@ function servicesAnswering(answers: Answers = {}) {
   const prompts: PromptService = Object.create(PromptService.prototype);
   prompts.getAllPrompts = async () => (answers.prompts ?? []) as never;
 
-  const agents: AgentService = Object.create(AgentService.prototype);
-  agents.exists = async () => answers.agentExists ?? false;
+  const agents = createApiFixture<AgentApi>({ exists: async () => answers.agentExists ?? false });
 
   const dataset: DatasetService = Object.create(DatasetService.prototype);
   dataset.getByIds = async ({ datasetIds }: { datasetIds: string[] }) =>
