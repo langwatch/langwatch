@@ -17,7 +17,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [LangWatch CLI](https://langwatch.ai/docs/integration/cli.md): The `langwatch` CLI is a single tool that drives LangWatch from the terminal, for you and for your coding assistant. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 - [LangWatch MCP Server](https://langwatch.ai/docs/integration/mcp.md): Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
-- [Better Agents](https://langwatch.ai/docs/better-agents/overview.md): Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development
 
 ## Agent Testing
 
@@ -61,6 +60,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Optimization Algorithms](https://langwatch.ai/docs/improve-your-agent/algorithms.md): What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
 
 - [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
+- [Voice Agents in the App](https://langwatch.ai/docs/agent-testing/voice-agents-in-app.md): Test an ElevenLabs Conversational AI agent from the LangWatch app: talk to it, call it from a run, or run scenarios with a simulated caller.
 - [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 
 ## Observability
@@ -232,7 +232,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Go
 
 - [Go Integration Guide](https://langwatch.ai/docs/integration/go/guide.md): Use the LangWatch Go SDK to trace LLM calls, measure performance, and support observability-driven AI agent testing.
-- [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including core functions, OpenAI instrumentation, and span types.
+- [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including the exporter, tracer, span helpers, provider instrumentations, data capture and the REST client.
 
 - [Metadata and Labels](https://langwatch.ai/docs/integration/metadata-and-labels.md): Add custom metadata, user IDs, conversation threads, and labels to your traces for filtering, analytics, and debugging.
 
@@ -331,6 +331,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Instructor AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/instructor.md): Instrument Instructor AI with LangWatch to track structured outputs, detect errors, and enhance AI agent testing workflows.
 - [SmolAgents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/smolagents.md): Add SmolAgents tracing with LangWatch to analyze behaviors, detect errors, and improve AI agent testing accuracy.
 - [Google Agent Development Kit (ADK) Instrumentation](https://langwatch.ai/docs/integration/python/integrations/google-ai.md): Integrate Google ADK agents into LangWatch to trace actions, tools, and interactions for structured AI agent evaluations.
+- [Firebase Genkit Integration](https://langwatch.ai/docs/integration/go/integrations/genkit.md): Export Firebase Genkit Go traces to LangWatch to observe flows, models, and tools for AI agent evaluation.
 - [Other OpenTelemetry Instrumentors](https://langwatch.ai/docs/integration/python/integrations/other.md): Use any OpenTelemetry-compatible instrumentor with LangWatch to standardize tracing and centralize AI agent testing observability.
 
 ## Model Providers
@@ -358,11 +359,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Google Cloud
 
 - [Google Vertex AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/vertex-ai.md): The LangWatch Python SDK instruments Google Vertex AI API calls through OpenInference.
-- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
+- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 
 ### Amazon Web Services
 
 - [AWS Bedrock Instrumentation](https://langwatch.ai/docs/integration/python/integrations/aws-bedrock.md): Instrument AWS Bedrock calls using OpenInference and LangWatch to capture metrics and behaviors for AI agent testing workflows.
+- [Amazon Bedrock Integration](https://langwatch.ai/docs/integration/go/integrations/amazon-bedrock.md): Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
 
 - [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for LLM observability, cost tracking, and agent evaluation insights.
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture traces and improve AI agent evaluations.
@@ -709,6 +711,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Register the GitHub App](https://langwatch.ai/docs/self-hosting/langy/github-app.md): Deployment-time guide for the GitHub App the organization connects, covering registration, permissions, the GITHUB_LANGY env vars, GitHub Enterprise Server, restricted networks, install, verify, and disconnect.
 - [Langy Environment Variables](https://langwatch.ai/docs/self-hosting/langy/environment-variables.md): The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
 - [Langy Networking and Egress](https://langwatch.ai/docs/self-hosting/langy/networking-and-egress.md): The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
+- [Langy Health Check](https://langwatch.ai/docs/self-hosting/langy/health-check.md): An endpoint an uptime monitor can poll that sends Langy a real greeting and reports whether it answered.
 
 # API Reference
 

@@ -6,6 +6,8 @@ import type {
   SerializedReason,
 } from "@langwatch/handled-error";
 
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
+
 import type { AppErrorCode } from "./codes";
 import {
   type HandledErrorShape,
@@ -379,7 +381,7 @@ const presentations = {
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
-      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+      "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -392,7 +394,7 @@ const presentations = {
   lwql_granularity_parameter_type: {
     title: "The granularity has to be declared as UInt32",
     describe: () =>
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}, and run the query again.",
   },
   lwql_granularity_too_fine: {
     title: "That granularity would return too many datapoints",
@@ -402,7 +404,7 @@ const presentations = {
   lwql_granularity_requires_window: {
     title: "Granularity needs the period parameters",
     describe: () =>
-      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
+      "A query declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
   },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
@@ -434,6 +436,21 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
   },
+  saved_workbench_charts_disabled_for_playground: {
+    title: "Saved charts are off while the playground is on",
+    describe: () =>
+      "This project has the custom chart playground enabled, which turns off saved workbench charts. Use the playground to build a chart instead.",
+  },
+  dashboard_widget_not_found: {
+    title: "That dashboard widget isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of dashboard widgets.",
+  },
+  dashboard_widget_definition_invalid: {
+    title: "This dashboard widget can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the widget and save it again.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
@@ -441,6 +458,15 @@ const presentations = {
     title: "Analytics SQL isn't available here",
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
+  },
+  lwql_provisioning_incomplete: {
+    // Deliberately does NOT name the workspace administrator: unlike
+    // lwql_unavailable, this fires on a deployment where the feature IS
+    // provisioned and working — one dataset behind it is not fully readable
+    // yet, which is entirely on us, not something a customer's admin can fix.
+    title: "This query couldn't read one of its datasets",
+    describe: () =>
+      "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
   cli_key_selection_invalid: {
     title: "Check the access selection",
@@ -1124,6 +1150,16 @@ const presentations = {
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
     describe: () => "Edit the role and save it again.",
+  },
+  custom_chart_playground_not_enabled: {
+    title: "Custom chart playground isn't switched on here",
+    describe: () =>
+      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
+  },
+  custom_graph_writes_disabled_for_playground: {
+    title: "Dashboard graph editing is off while the playground is on",
+    describe: () =>
+      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
   },
   custom_role_not_found: {
     title: "Custom role not found",
@@ -2245,6 +2281,15 @@ const presentations = {
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
   },
+  dataset_too_large_to_search: {
+    // A limit, not a breakage: the search would have had to read more of the
+    // dataset than one search reads. Saying so beats returning the matches
+    // found before giving up, which reads as a complete answer and is not one.
+    // Paging still works, so the copy points at the way through.
+    title: "This dataset is too large to search",
+    describe: () =>
+      "Page through the rows, or split the dataset into smaller ones.",
+  },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
     // retrying changes nothing and there is no customer-side setting to fix.
@@ -2523,6 +2568,15 @@ const presentations = {
   langy_dispatch_rejected: {
     title: "That request couldn't be understood",
     describe: () => "Rephrase and try again.",
+  },
+  langy_skill_not_available: {
+    title: "That capability isn't turned on yet",
+    describe: (error) => {
+      const skillId = str(error, "skillId", "");
+      return skillId
+        ? `The "${skillId}" capability isn't enabled for this project. Try describing what you want a different way.`
+        : "That capability isn't enabled for this project.";
+    },
   },
   langy_rate_limited: {
     // Raised when someone sends faster than their own Langy allowance. The
@@ -3127,6 +3181,40 @@ const presentations = {
   gateway_budget_not_found: {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  voice_agents_disabled: {
+    // voiceAgents.message has zero imports of its own, so pulling it in here
+    // never drags server-only Prisma code into this client-bundled registry.
+    title: VOICE_AGENTS_DISABLED_MESSAGE,
+    describe: () => "Ask an admin to turn the feature on for this project.",
+  },
+  voice_key_missing: {
+    title: "No key configured for this voice provider",
+    describe: () => "Add a provider key for this project, then try again.",
+  },
+  voice_mint_failed: {
+    title: "Could not start the call",
+    describe: () => "The voice provider refused the request. Try again.",
+  },
+  voice_name_required: {
+    title: "A name is required to save the agent",
+    describe: () => "",
+  },
+  voice_recording_unavailable: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_recording_key_missing: {
+    title: "The call recording is not available",
+    describe: () => "",
+  },
+  voice_conversation_mismatch: {
+    title: "This conversation does not belong to the minted session",
+    describe: () => "",
+  },
+  voice_session_invalid: {
+    title: "The session is invalid or has expired",
+    describe: () => "Start the call again.",
   },
   gateway_budget_cycle_anchor_invalid: {
     // Names the window back, because the fix is to change one of the two:

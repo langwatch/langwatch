@@ -13,6 +13,7 @@ import {
   Code,
   Globe,
   MessageSquare,
+  Mic,
   MoreVertical,
   Pencil,
   Plus,
@@ -312,6 +313,7 @@ const agentTypeIcons: Record<AgentType, typeof MessageSquare> = {
   workflow: Workflow,
   http: Globe,
   connected: Bot,
+  voice: Mic,
 };
 
 const agentTypeLabels: Record<AgentType, string> = {
@@ -320,6 +322,7 @@ const agentTypeLabels: Record<AgentType, string> = {
   workflow: "Workflow",
   http: "HTTP",
   connected: "Connected",
+  voice: "Voice agent",
 };
 
 type AgentCardProps = {

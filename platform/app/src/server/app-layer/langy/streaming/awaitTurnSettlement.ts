@@ -20,9 +20,11 @@
  * buffer-first promptness, fold-only authority. Without Redis it degrades to a
  * plain fold poll at the fallback cadence.
  *
- * The signal is honored everywhere (the follow() block, the delays, the fold
- * loop), so an abandoned caller — client disconnect or deadline — stops
- * costing reads immediately.
+ * The signal is honored between steps (the follow() block, the delays, the
+ * fold loop's re-check), so an abandoned caller — client disconnect or
+ * deadline — stops costing reads after the read in flight. A single fold read
+ * takes no signal, so a caller with a hard budget must race this promise as
+ * well as signal it.
  */
 
 import type { LangyEventCursor } from "@langwatch/langy";

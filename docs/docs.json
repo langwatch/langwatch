@@ -93,8 +93,7 @@
                 ]
               },
               "integration/cli",
-              "integration/mcp",
-              "better-agents/overview"
+              "integration/mcp"
             ]
           },
           {
@@ -149,6 +148,7 @@
                 ]
               },
               "agent-testing/voice-agents",
+              "agent-testing/voice-agents-in-app",
               "agent-testing/red-teaming"
             ]
           },
@@ -504,6 +504,7 @@
               "integration/python/integrations/instructor",
               "integration/python/integrations/smolagents",
               "integration/python/integrations/google-ai",
+              "integration/go/integrations/genkit",
               "integration/python/integrations/other"
             ]
           },
@@ -545,7 +546,8 @@
               {
                 "group": "Amazon Web Services",
                 "pages": [
-                  "integration/python/integrations/aws-bedrock"
+                  "integration/python/integrations/aws-bedrock",
+                  "integration/go/integrations/amazon-bedrock"
                 ]
               },
               "integration/go/integrations/groq",
@@ -1023,7 +1025,8 @@
               "self-hosting/langy/setup",
               "self-hosting/langy/github-app",
               "self-hosting/langy/environment-variables",
-              "self-hosting/langy/networking-and-egress"
+              "self-hosting/langy/networking-and-egress",
+              "self-hosting/langy/health-check"
             ]
           }
         ]
@@ -1666,7 +1669,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1788756758",
+      "source": "/ci/cache/busted/1788919739",
       "destination": "/introduction"
     },
     {
@@ -2116,6 +2119,10 @@
     {
       "source": "/ai-governance/departments",
       "destination": "/ai-governance/people"
+    },
+    {
+      "source": "/better-agents/overview",
+      "destination": "/skills/directory"
     }
   ]
 }

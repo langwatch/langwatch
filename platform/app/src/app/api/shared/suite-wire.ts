@@ -44,7 +44,7 @@ import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
  */
 export const suiteTargetSchema = z.object({
   type: z
-    .enum(["prompt", "http", "code", "workflow", "connected"])
+    .enum(["prompt", "http", "code", "workflow", "connected", "voice"])
     .describe(
       "What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.",
     ),

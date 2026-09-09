@@ -79,8 +79,17 @@ async function bootScenarioProcessor(
   const { SCENARIO_WORKER } = await import(
     "~/server/scenarios/scenario.constants"
   );
+  const { VoiceConcurrencyGate } = await import(
+    "~/server/scenarios/execution/voice-concurrency-gate"
+  );
+  const { voiceRunsMaxConcurrent } = await import(
+    "~/server/scenarios/voice/voice-limits"
+  );
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
+    // A voice run holds an ElevenLabs socket for the length of a call, so cap
+    // how many a project runs at once; the rest wait in the queue.
+    voiceGate: new VoiceConcurrencyGate({ max: voiceRunsMaxConcurrent() }),
   });
   getScenarioExecutionPool()?.set(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor({

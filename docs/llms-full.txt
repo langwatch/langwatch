@@ -53,8 +53,8 @@ LangWatch has four areas, and you can use each one on its own.
     Everything you need to ship and improve an LLM application:
 
     - [Observability](/observability/overview): every LLM call, tool call and user interaction as a trace.
-    - [Evaluations](/evaluations/overview): experiments on datasets, and monitors on production traffic.
     - [Agent Testing](/agent-testing/overview): multi-turn conversations against your agent with a simulated user.
+    - [Evaluations](/evaluations/overview): experiments on datasets, and monitors on production traffic.
     - [Prompt Management](/prompt-management/overview): versioned prompts your code loads at runtime.
   </Card>
   <Card title="Coding Agents" icon="terminal" href="/coding-agents/overview">
@@ -406,9 +406,9 @@ The internal-architecture decision behind this is captured in [ADR-018](https://
 - [Observability quickstart](/integration/quick-start): set up `/api/otel/v1/traces` from a Python or TypeScript app.
 - [Governance → Ingestion sources](/ai-governance/ingestion-sources/index): set up `/api/ingest/otel/:sourceId` for an external platform.
 - [Generic OTel ingestion source](/ai-governance/ingestion-sources/otel-generic): copy-paste curl that pushes a canonical 5-attribute body to the governance endpoint.
-- [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses out of the box.
+- [Compliance architecture](/ai-governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses out of the box.
 - [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept, and the scoped policies that decide it.
-- [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest tail <id>` consumes the governance data; `langwatch ingest health <id>` shows per-source 24h/7d/30d volume.
+- [Governance CLI debug](/ai-governance/cli-debug): `langwatch ingest tail <id>` consumes the governance data; `langwatch ingest health <id>` shows per-source 24h/7d/30d volume.
 
 ---
 
@@ -1099,7 +1099,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
 | DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
-| ElevenLabs | API key, optional webhook secret |
+| ElevenLabs | API key, optional webhook secret. See [Voice Agents in the App](/agent-testing/voice-agents-in-app) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
@@ -2842,7 +2842,7 @@ POST /virtual-keys/:id/revoke
 
 **Revoke** is one-way. It also archives the key's own budgets and discards any rotation grace.
 
-All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
+All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#rotate-disable-expire-and-revoke).
 
 ## Budgets
 
@@ -2930,7 +2930,7 @@ Body:
 
 `group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period).
 
-`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#anchoring-a-cycle-to-your-own-date) for the clamping rules.
+`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#windows-and-cycles) for the clamping rules.
 
 ### Get
 
@@ -2961,7 +2961,7 @@ On calendar windows this truncates the running period and the next boundary stay
 
 ### End-user spend
 
-Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
+Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#read-events-over-rest), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
 
 ### Archive
 
@@ -3016,7 +3016,7 @@ All responses follow the OpenAI-compatible envelope, with `type` as the status c
 }
 ```
 
-Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#control-plane-codes).
+Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#error-codes).
 
 ## Audit
 
@@ -3024,7 +3024,7 @@ Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetK
 
 ## Rate limits
 
-Management endpoints are rate-limited to 100 req/min/token. For bulk operations, use the `--format json` CLI with `xargs -P4` (the CLI sleeps 250 ms between retries on 429).
+Management endpoints are rate-limited to 100 requests per minute per token. For bulk operations, use the `--format json` CLI with `xargs -P4` (the CLI sleeps 250 ms between retries on 429).
 
 ## Shared service layer
 
@@ -4335,7 +4335,7 @@ langwatch virtual-keys list --format json \
   | jq --arg p "vk-lw-01HZX9N" '.[] | select(.display_prefix == $p)'
 ```
 
-In the app, open **AI Gateway → Virtual Keys** and match the prefix column. The row opens the [key detail page](/ai-gateway/virtual-keys#vk-detail-page).
+In the app, open **AI Gateway → Virtual Keys** and match the prefix column. The row opens the [key detail page](/ai-gateway/virtual-keys#edit-a-key).
 
 ## Step 2: capture the state before you change anything
 
@@ -4446,7 +4446,7 @@ Three questions to answer from it:
 
 ## See also
 
-- [Virtual keys](/ai-gateway/virtual-keys#rotation): the rotate, disable and revoke operations in full.
+- [Virtual keys](/ai-gateway/virtual-keys#rotate-disable-expire-and-revoke): the rotate, disable and revoke operations in full.
 - [Audit log](/ai-gateway/audit): what is recorded and how to query it.
 - [RBAC](/ai-gateway/rbac): who can act on which keys.
 - [Troubleshooting](/ai-gateway/troubleshooting#403-virtual_key_revoked-or-virtual_key_disabled): what callers see after each operation.
@@ -4765,7 +4765,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
     {
       "type": "timeseries",
       "title": "Goroutines per pod",
-      "description": "Monotonic climb = goroutine leak. See Production runbook Recipe 2.",
+      "description": "Monotonic climb = goroutine leak. See the AI Gateway troubleshooting page.",
       "datasource": "$datasource",
       "gridPos": { "x": 16, "y": 63, "w": 8, "h": 7 },
       "targets": [{
@@ -4782,7 +4782,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
     {
       "type": "timeseries",
       "title": "Draining pods",
-      "description": "gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see Production runbook Recipe 7).",
+      "description": "gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see the AI Gateway troubleshooting page).",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 71, "w": 12, "h": 7 },
       "targets": [{
@@ -5018,7 +5018,7 @@ Your receiver does three things, in order:
 
 1. **Verify the signature.** The `X-LangWatch-Signature` header is `t=<unix seconds>,v1=<hex>`; the HMAC-SHA256 is computed over `<t>.<raw body>` with your endpoint secret. Reject a timestamp older than 300 seconds. For 24 hours after you roll the secret, the header carries two `v1=` values and either one is valid. Copy the verifier from the [webhooks reference](/features/webhooks#verifying-signatures) or from the demo repository.
 2. **Dedup by envelope `id`** and ingest. Delivery is at least once and ids are stable, so an upsert keyed on `id` is enough; retries and replays become no-ops. Each delivery also carries `X-LangWatch-Delivery-Id` and `X-LangWatch-Delivery-Attempt`.
-3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-spend-event).
+3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-event-payload).
 
 Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time. The `usage` object on a delivered event has five fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` and `reasoning_tokens`. Reasoning tokens are reported for display and are never priced separately.
 
@@ -5026,7 +5026,7 @@ A delivery that fails is retried after 1 minute, 5 minutes, 30 minutes, 2 hours,
 
 ## 5. Reconcile
 
-Nightly, or at period close, reconcile in two grains against the ledger (details: [reconciliation](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger)):
+Nightly, or at period close, reconcile in two grains against the ledger (details: [Reconcile with the SDKs](/ai-gateway/billing-events#reconcile-with-the-sdks)):
 
 ```bash
 # Fast path: per-tenant checksums for the closed period
@@ -5039,7 +5039,7 @@ Matching totals mean no aggregate divergence. They do not prove both systems hol
 
 On divergence, walk `spend-events` for that key and window by cursor and compare the count per `gateway_request_id`. One request dropped and another booked twice leaves the id sets looking close and the money wrong; the ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, compare `cost.nano_usd` per id. Both reads take the same filters, so you can narrow the walk to what the checksum covered.
 
-For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint and let your dedup absorb the duplicates.
+For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#read-events-over-rest) the gap window to your endpoint and let your dedup absorb the duplicates.
 
 ### Narrowing and grouping
 
@@ -5129,7 +5129,7 @@ The pair every tenant dashboard wants, current spend against the cap:
 
 - Per tenant: `GET /api/gateway/v1/budgets?scope_type=virtual_key&external_id=acme-4171` returns each budget with live `spent_usd` and `limit_usd`. `spend_available: false` means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
 - Per tenant, one number: `GET /api/gateway/v1/virtual-keys/{id}/spend` returns `{virtual_key_id, spent_usd, requests, window: {from, to}}` for the current UTC month by default, or the `from` and `to` you pass. The same value is shown on the key in the Virtual Keys page, so what you invoice matches what you see.
-- Per end user: `GET /api/gateway/v1/end-users/{id}/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
+- Per end user: `GET /api/gateway/v1/end-users/{id}/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#read-events-over-rest).
 
 Rating stays in your billing system: you define the markup over the gateway-reported cost, or bill passthrough plus a fee, and events carry `rate_version` so cost is re-derivable.
 
@@ -6314,7 +6314,7 @@ The gateway has no retention setting of its own. Each record it produces lives i
 | Record | What it holds | Where it lives | Governed by |
 |---|---|---|---|
 | Traces | One trace per request, with the model, the tokens, the cost and the request and response content, in the project the virtual key is scoped to. A successful `/v1/chat/completions` or `/v1/messages` request that returns no output, no completion tokens and no cost is dropped before export and stores no trace | Trace store | The [data retention policy](/platform/data-retention) of the project, its team or the organization |
-| Spend records | One spend event per request: cost, tokens, model, virtual key, end user | Spend store | A fixed 13 months. Exempt from the data retention policy. See [Billing and spend events](/ai-gateway/billing-events#retention) |
+| Spend records | One spend event per request: cost, tokens, model, virtual key, end user | Spend store | A fixed 13 months. Exempt from the data retention policy. See [Billing and spend events](/ai-gateway/billing-events) |
 | Budget ledger | The debits each budget enforces against | Budget ledger | No expiry |
 | Audit log | Who created, rotated, revoked or changed a virtual key, budget, provider, cache rule or guardrail | Postgres audit log | Not subject to the data retention policy. See [Audit log](/ai-gateway/audit) |
 | OCSF events | One OCSF row per trace that arrives through an ingestion source | OCSF event store | No expiry. See [OCSF export](/ai-gateway/governance/ocsf-export) |
@@ -6582,7 +6582,7 @@ Open **AI Gateway → Routing Policies**, select a policy and edit **Model name 
 
 Write the target as a full model id, for example `openai/gpt-5-mini`. The target can use any form from [Model Naming](/ai-gateway/model-naming): a provider family, an instance handle, or a bare model id.
 
-The same fields are `modelAliases` on `trpc.routingPolicy.create` and `trpc.routingPolicy.update`. See [Manage with tRPC](/ai-gateway/governance/routing-policies#manage-with-trpc).
+The same fields are `modelAliases` on `trpc.routingPolicy.create` and `trpc.routingPolicy.update`. See [Model name mapping](/ai-gateway/governance/routing-policies#model-name-mapping).
 
 ## How a request resolves
 
@@ -8506,7 +8506,7 @@ sidebarTitle: RBAC
 
 The LangWatch AI Gateway uses the LangWatch permission model: a permission is `<resource>:<action>`, a role is a set of permissions, and a role binding gives a person a role on an organization, a team or a project. A grant at a higher scope covers the scopes below it: `virtualKeys:manage` on the organization covers every team and project in it.
 
-The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Roles and permissions](/platform/rbac) for the model and role bindings.
+The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Access Control (RBAC)](/platform/rbac) for the model and role bindings.
 
 ## Resources
 
@@ -8597,7 +8597,7 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 ```
 
 <Note>
-**Also check:** [Roles and permissions](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
+**Also check:** [Access Control (RBAC)](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
 </Note>
 
 ---
@@ -10247,7 +10247,7 @@ event: warning
 data: {"warning":"provider_did_not_report_usage_on_stream"}
 ```
 
-That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#streaming).
+That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#traffic-and-lifecycle).
 
 ## Requests without `stream`
 
@@ -10676,7 +10676,7 @@ sidebarTitle: Anomaly rules
 
 <Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
 This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
@@ -10768,7 +10768,7 @@ C3 (in flight on the [governance platform](https://github.com/langwatch/langwatc
 }
 ```
 
-Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. Setting a real Slack webhook today does **nothing**: you'll think alerts are wired and they aren't.
+Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
 
 ## Verify a rule is firing
 
@@ -10781,7 +10781,7 @@ Two angles, same data:
 To verify it yourself, end to end:
 
 1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
-2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-gateway/governance/ingestion-sources/otel-generic#test-it-now--copy-paste-curl).
+2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-governance/ingestion-sources/otel-generic#test-it-now-copy-paste-curl).
 3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
 5. Reload `/governance`, the alert should appear in "Recent anomalies" with `state: open` and a populated `detail.ratio`.
@@ -10832,14 +10832,14 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
 | Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
-| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/ai-governance/audit-log) |
+| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/platform/audit-log) |
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
 | Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
 | Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
-| Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
-| Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
+| Members | `/api/governance/members` | [Members and Teams](/platform/members-and-teams) |
+| Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
+| Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
 | AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
 | Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
 | Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
@@ -10848,7 +10848,7 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 
 ## Verb shape: worked example
 
-The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). The verb set:
+The first surface to ship is `ingestion-templates` (Lane B-1 commit). The verb set:
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
@@ -10866,7 +10866,7 @@ A few resource-shape notes that generalise across the namespace:
 - **Resource-specific verbs**: `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain, admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
 - **Error mapping**: `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType`, validation. All map to a common `errorSchema` with `{ type, code, message }`.
 
-The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
+The second resource to ship is `ingestion-keys` (Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
@@ -10922,7 +10922,7 @@ SELECT * FROM "AuditLog"
 
 All four rows have **identical** payload shapes apart from the `metadata.surface` field, same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
 
-The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of Sergey's Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
+The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of the Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
 
 ## Verifying the contract
 
@@ -10944,7 +10944,9 @@ The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:man
 
 **Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
 
-**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
+**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`, and asserts all three audit rows fall back to `metadata.surface === "hono"`.
+
+That locks the `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags. The only value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test, this pins the umbrella spec's `@audit-uniform` invariant for v1.
 
 To run locally:
 
@@ -10963,8 +10965,8 @@ Use these files as the authoritative reference when implementing a CLI command o
 
 - [Governance CLI](/ai-governance/cli): `langwatch governance <resource> <verb>` thin shell
 - [Governance MCP server](/ai-governance/mcp): same surface as MCP tools for agent use
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes that gate each verb
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes that gate each verb
+- [Audit log](/platform/audit-log): where state-change rows land
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)
@@ -10980,9 +10982,9 @@ description: Inspect IngestionSources, tail recent OCSF events, and read the org
 sidebarTitle: CLI debug
 ---
 
-<Info>**Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is shared between Gateway and Governance, `login` and `logout` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
+<Info>**Pairs with:** [AI Gateway → CLI Integrations](/coding-agents/overview). The `langwatch` CLI is shared between Gateway and Governance, `login` and `logout` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
 
-A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render, so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
+A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-governance/ingestion-sources/index) already render, so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
 
 ## When to use
 
@@ -10991,7 +10993,7 @@ A small set of read-only commands for SREs, governance admins, and on-call engin
 - **"Has anyone in this org started using governance yet?"**: `langwatch governance status` mirrors the OR-of-flags that drives the MainMenu Govern entry promotion in the web app.
 - **"I need machine output for a runbook step, SIEM script"**: every command accepts `--json` and is contract-stable against the equivalent tRPC procedure.
 
-These commands are **not** for end-user developers, they don't proxy completions, debit budgets, or mutate state. For coding-CLI integration, see [Coding CLI Integrations](/ai-gateway/cli/overview).
+These commands are **not** for end-user developers, they don't proxy completions, debit budgets, or mutate state. For coding-CLI integration, see [Coding CLI Integrations](/coding-agents/overview).
 
 ## Prerequisites
 
@@ -11197,7 +11199,7 @@ Error: HTTP 409, no_default_routing_policy
 3. Create at least one routing policy and toggle it to **Default**.
 4. Ask the developer to re-run `langwatch login --device`.
 
-The CLI does not fall back to a non-default policy; selection is explicit. See the [admin prerequisites callout in the AI Governance overview](/ai-governance/overview#admin-prerequisites) for the rest of the org-bootstrap checklist.
+The CLI does not fall back to a non-default policy; selection is explicit. See [Getting started as an admin](/ai-governance/getting-started-admin) for the rest of the org-bootstrap checklist.
 
 The 409 contract is asserted in `specs/ai-gateway/governance/personal-keys.feature` (sign-in scenarios).
 
@@ -11318,7 +11320,7 @@ Use `--json` in scripts and CI; the human table is for interactive exploration.
 
 ## Resource × verb matrix (v1 preview)
 
-The first preview ships with the two governance resources Sergey wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
+The first preview ships with the two governance resources wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
 
 | Resource | Verbs (shipped in preview) | RBAC |
 |---|---|---|
@@ -11330,7 +11332,9 @@ Resources expected to fold into the same namespace as their REST surfaces ship: 
 
 ## Audit emission
 
-Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
+Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell: it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header.
+
+The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum, which rejects in-process spoofing of `trpc` and `mcp`, and threads the value into the service-layer `surface` parameter added at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
 
 The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `sdks/typescript/src/cli/utils/governance/surface.ts`.
 
@@ -11367,8 +11371,8 @@ The same script runs against SaaS or self-hosted deployments, the CLI's `~/.lang
 - [Governance REST API](/ai-governance/api): the API the CLI shells over
 - [Governance MCP server](/ai-governance/mcp): same surface for agent, MCP-client invocation
 - [`langwatch ingest …`](/ai-governance/cli-debug): separate namespace for ingestion-source debugging
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes the CLI enforces
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes the CLI enforces
+- [Audit log](/platform/audit-log): where state-change rows land
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 
 ---
@@ -11665,7 +11669,7 @@ genuinely don't trust.
 ## Tier 1: Gateway proxy (where the CLI lives)
 
 Tier 1 is everything documented under
-[Coding CLI Integrations](/ai-gateway/cli/overview). The CLI's job
+[Coding CLI Integrations](/coding-agents/overview). The CLI's job
 is to acquire a virtual key, then `exec` the underlying tool with
 the gateway's base URL injected:
 
@@ -11696,7 +11700,7 @@ Why Tier 1 wins:
   exceeded). Tier 3 only sees the call after it happened.
 - **One credential covers every tool the dev uses.** Same VK for
   Claude Code, Codex, Cursor, Gemini CLI, see the matrix on the
-  [CLI overview](/ai-gateway/cli/overview).
+  [CLI overview](/coding-agents/overview).
 
 The CLI itself is documented end-to-end at
 [Personal IDE keys](/ai-gateway/governance/personal-keys) and
@@ -11788,7 +11792,7 @@ Two important Tier 4 sub-cases:
   bearer token in the workspace settings, every Cowork install in
   the org streams to LangWatch. **No per-desktop config required.**
 - **In-house agents using the LangWatch SDKs**: the existing
-  `langwatch` SDK setup; nothing governance-specific needed.
+  `langwatch` SDK setup, with no governance-specific step on top.
 
 ## Tier 5: Sandboxed runtime (Open Managed Agents)
 
@@ -11904,7 +11908,7 @@ Governance sits behind a single fence on each surface:
 - For the routing-policy DSL that lets one VK serve multiple tools:
   [Routing policies](/ai-gateway/governance/routing-policies).
 - For per-tool CLI config (env vars, dialect notes):
-  [Coding CLI Integrations](/ai-gateway/cli/overview).
+  [Coding CLI Integrations](/coding-agents/overview).
 - For the read-only CLI checks on ingestion sources
   (`langwatch governance status`, `langwatch ingest list | health |
   tail`): [CLI ingest debug](/ai-governance/cli-debug).
@@ -12006,7 +12010,7 @@ Once invited, point them at the [developer walkthrough](/ai-governance/getting-s
 After your colleague runs `langwatch login` and makes one Claude Code request, two surfaces should update within seconds:
 
 - **`/governance`**, the [governance home](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) shows org-wide spend, anomalies, ingestion-source health, per-user breakdown.
-- **`/settings/audit-log`**, the [audit log](/ai-governance/audit-log) records every governance mutation (member invited, routing policy published, ingestion source created, virtual key minted, budget created…) with timestamp, actor, target kind, target ID, and IP.
+- **`/settings/audit-log`**, the [audit log](/platform/audit-log) records every governance mutation (member invited, routing policy published, ingestion source created, virtual key minted, budget created…) with timestamp, actor, target kind, target ID, and IP.
 
 If you don't see the request, the [CLI debug commands](/ai-governance/cli-debug) take 30 seconds to localise the problem:
 
@@ -12074,8 +12078,8 @@ The detector starts evaluating from the next ingest event. When today's 24h spen
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
 | `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
-| Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
-| `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
+| Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver-at-a-glance): three rows are setup-contract-only as of this release. |
+| `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing-the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2-7 above, you'll have 4. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |
 
 ---
@@ -12098,7 +12102,7 @@ When you finish you will have:
 
 If you are an admin trying to make the org *ready* for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
 
-<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that runs underneath every step here) and [Coding CLI Integrations](/ai-gateway/cli/overview) (the deep reference for each supported assistant).</Info>
+<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that runs underneath every step here) and [Coding CLI Integrations](/coding-agents/overview) (the deep reference for each supported assistant).</Info>
 
 ## Prerequisites
 
@@ -12169,7 +12173,7 @@ Run it. The wrapper:
 
 You should see Claude Code's normal startup banner. Make a request. The gateway proxies it transparently to Anthropic (or to whatever provider your admin's [Routing Policy](/ai-gateway/governance/routing-policies) sends it to, the CLI doesn't care).
 
-The same pattern works for [Codex](/ai-gateway/cli/codex) (`langwatch codex`), [Gemini CLI](/ai-gateway/cli/gemini-cli) (`langwatch gemini`), [Cursor](/ai-gateway/cli/cursor), and [opencode](/ai-gateway/cli/opencode). The full matrix lives in [Coding CLI Integrations](/ai-gateway/cli/overview).
+The same pattern works for [Codex](/coding-agents/openai-codex) (`langwatch codex`), [Gemini CLI](/coding-agents/gemini-cli) (`langwatch gemini`), [Cursor](/coding-agents/overview), and [opencode](/coding-agents/opencode). The full matrix lives in [Coding CLI Integrations](/coding-agents/overview).
 
 <Tip>
 **Capture without the wrapper.** If you'd rather not type `langwatch claude` every time, write the telemetry wiring once:
@@ -12189,11 +12193,11 @@ Refresh `/me`. You should see:
 - **Spending over time**: today's bar updated.
 - **My Usage**: request count incremented, spend updated.
 
-If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug) tell you exactly where it stopped: `langwatch governance status` shows whether your org has data at all, and the [audit log](/ai-governance/audit-log) under `/settings/audit-log` (admin-only) shows every gateway action with timestamp, actor, and target.
+If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug) tell you exactly where it stopped: `langwatch governance status` shows whether your org has data at all, and the [audit log](/platform/audit-log) under `/settings/audit-log` (admin-only) shows every gateway action with timestamp, actor, and target.
 
 ## Where to next
 
-- **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/ai-gateway/cli/claude-code), [Codex](/ai-gateway/cli/codex), [Gemini CLI](/ai-gateway/cli/gemini-cli), [Cursor](/ai-gateway/cli/cursor), [opencode](/ai-gateway/cli/opencode), [Aider](/ai-gateway/cli/aider).
+- **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/coding-agents/claude-code), [Codex](/coding-agents/openai-codex), [Gemini CLI](/coding-agents/gemini-cli), [Cursor](/coding-agents/overview), [opencode](/coding-agents/opencode), [Aider](/coding-agents/overview).
 - **Want to use a model provider directly from your code?** Click the provider tile on `/me` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
 - **Want to share a key with your team?** Don't use a personal VK, create a project and a project-scoped VK instead. The portal nudges you toward this with a "building an app for your team? Consider creating a project" hint.
 - **Want to know which devices are signed in?** [/me/devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
@@ -12229,7 +12233,7 @@ The `/governance` route is the **org governance daily home**: the read-mostly ov
 
 It is intentionally distinct from the **admin-authoring** surface at `/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
 
-<Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map, [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip, and [Departments](/ai-governance/departments) for how the **Spend by department** card attributes spend across the org.</Info>
+<Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map, [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip, and [Departments](/ai-governance/people) for how the **Spend by department** card attributes spend across the org.</Info>
 
 <Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Governance** admin pages instead until they have data flowing.</Note>
 
@@ -12272,7 +12276,7 @@ A status row per active IngestionSource:
 - **Last event**: relative timestamp of the most recent successful ingest.
 - **Event count**: 24h, 7d, 30d, picked from the same `ingestionSources.healthMetrics` tRPC procedure that `langwatch ingest health` uses (so the CLI and the web UI are byte-for-byte identical on `--json`).
 
-A red dot on a source means the receiver hasn't seen events in the configured window, see the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) for the timeline + the receiver-side error log.
+A red dot on a source means the receiver hasn't seen events in the configured window, see the [per-source detail page](/ai-governance/ingestion-sources/index) for the timeline + the receiver-side error log.
 
 ### 4. Anomalies
 
@@ -12336,7 +12340,7 @@ If the dashboard surfaces something you want to *act* on (rotate a key, edit a r
 - **Inspect ingestion-source health from the terminal**: [CLI debug](/ai-governance/cli-debug).
 - **Export to your SIEM**: [Compliance architecture](/ai-governance/compliance-architecture).
 - **Tighten privacy**: [No-spy mode](/ai-governance/no-spy-mode).
-- **Audit who did what when**: [Audit log](/ai-governance/audit-log).
+- **Audit who did what when**: [Audit log](/platform/audit-log).
 
 ---
 
@@ -12403,7 +12407,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic).
+- **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-governance/ingestion-sources/otel-generic).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
@@ -12570,7 +12574,7 @@ description: Per-platform integration matrix for LangWatch governance receivers.
 sidebarTitle: Ingestion sources
 ---
 
-<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, Databricks Genie, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
+<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, Databricks Genie, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/platform/audit-log): S3 audit log feeds (Workato, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
 <Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.</Note>
 
@@ -12584,16 +12588,16 @@ Each supported `sourceType` below states what is wired up today, what is still e
 
 | Source type | Delivery | OTLP shape | Storage | State |
 |---|---|---|---|---|
-| [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
+| [`otel_generic`](/ai-governance/ingestion-sources/otel-generic) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
 | `claude_code` | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
-| [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
-| [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
-| [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
+| [`claude_cowork`](/ai-governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
+| [`workato`](/ai-governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
+| [`s3_custom`](/ai-governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
 | [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
 | `anthropic_admin` | Pull (Admin API) | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports |
 | `databricks_genie` | Pull (Genie API) | Spans | `recorded_spans` | **Production-ready**: reads Genie conversations as traces |
-| [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
-| [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
+| [`openai_compliance`](/ai-governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
+| [`claude_compliance`](/ai-governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
 | `http_custom` | Pull (BYO REST API) | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping |
 
 **Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost, token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
@@ -12629,7 +12633,7 @@ All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (th
 
 ## Verification: same loop for every active source
 
-Once a source is active, verify with the [governance CLI debug helpers](/ai-gateway/governance/cli-debug):
+Once a source is active, verify with the [governance CLI debug helpers](/ai-governance/cli-debug):
 
 ```bash
 # What does the org see?
@@ -12671,10 +12675,10 @@ If you need an unwired adapter, file an issue tagged `governance/ingestion/adapt
 ## Cross-references
 
 - [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion): picking the right OTel URL
-- [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses
+- [Compliance architecture](/ai-governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses
 - [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept
 - [OCSF, SIEM export](/ai-gateway/governance/ocsf-export): pulling governance events into Splunk, Datadog Security, etc.
-- [Governance CLI debug](/ai-gateway/governance/cli-debug): `langwatch ingest list/health/tail` commands
+- [Governance CLI debug](/ai-governance/cli-debug): `langwatch ingest list/health/tail` commands
 
 ---
 
@@ -12755,7 +12759,7 @@ sidebarTitle: Generic OTel
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-governance/ingestion-sources/claude-cowork)).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
@@ -12955,13 +12959,13 @@ The composer collects:
 | Polling cadence (seconds) | no | `payloadConfig.pollEverySec` | (future puller) |
 | Parser DSL | no | `payloadConfig.parserDsl` | (future parser) |
 
-The one-time-reveal modal exposes the same `lw_is_<secret>` and webhook URL as the [Workato](/ai-gateway/governance/ingestion-sources/workato) source type.
+The one-time-reveal modal exposes the same `lw_is_<secret>` and webhook URL as the [Workato](/ai-governance/ingestion-sources/workato) source type.
 
 The S3 + role ARN fields are **persisted but not yet used**: they reflect the configuration the puller will need when it ships. Setting them today doesn't cause any AWS calls.
 
 ## Event shape we accept today
 
-In callback mode, identical to the Workato envelope-only shape, see [Workato → Event shape](/ai-gateway/governance/ingestion-sources/workato#event-shape-we-accept-today).
+In callback mode, identical to the Workato envelope-only shape, see [Workato → Event shape](/ai-governance/ingestion-sources/workato#event-shape-we-accept-today).
 
 ## What is still envelope-only, follow-up work
 
@@ -13508,7 +13512,7 @@ sidebarTitle: MCP server
 
 <Info>**Pairs with:** [Governance REST API](/ai-governance/api) and [Governance CLI](/ai-governance/cli): all three surfaces dispatch through the same service-layer functions, with audit emission tagged `metadata.surface = "trpc" | "hono" | "cli" | "mcp"` for incident response. Distinct from LangWatch's general MCP server, this is a governance-namespaced toolset specifically for setting up and querying governance state.</Info>
 
-<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `platform/app/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
+<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `platform/app/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches the explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
 
 <Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain `list`/`get` read tools are available to a project API key without a user. No tool can bypass the service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API protects the MCP surface, even though MCP doesn't go through the REST surface.</Note>
 
@@ -13607,7 +13611,7 @@ The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
 ## Audit emission
 
-Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Sergey's Lane B-3 at `fc6d54100`):
+Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Lane B-3 at `fc6d54100`):
 
 | Tool | Audit row |
 |---|---|
@@ -13628,7 +13632,7 @@ An agent connecting through the OAuth flow as an admin can fully configure gover
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create`, rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
-5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
+5. `governance_audit_log_query`, verify steps 2-4 all emitted audit rows
 
 If every step succeeds and step 5 returns the matching audit rows, an agent can run the whole setup without a single UI click.
 
@@ -13636,8 +13640,8 @@ If every step succeeds and step 5 returns the matching audit rows, an agent can 
 
 - [Governance REST API](/ai-governance/api): the API the MCP tools shell over
 - [Governance CLI](/ai-governance/cli): same surface for shell invocation
-- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes the MCP server enforces
-- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Access Control (RBAC)](/platform/rbac): RBAC scopes the MCP server enforces
+- [Audit log](/platform/audit-log): where state-change rows land
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 
@@ -13654,12 +13658,12 @@ sidebarTitle: No-spy mode
 **No-spy mode** is the privacy posture for organizations that must
 not store conversational content from employee LLM interactions,
 even briefly: one Organization-scope rule in the
-[data privacy policy](/ai-governance/data-privacy) that sets
+[data privacy policy](/platform/data-privacy) that sets
 **Input**, **Output**, and **System instructions** to **Drop**. The
 content is stripped in the ingestion pipeline, before it ever lands
 in storage.
 
-<Info>**Also check:** [Data privacy policy](/ai-governance/data-privacy) (the full reference for scopes, dispositions, audiences, and redaction), [Compliance architecture](/ai-governance/compliance-architecture) (the observability substrate this posture operates against), and [Self-hosting compliance](/self-hosting/compliance) (where this fits in the SOC 2, ISO 27001, HIPAA mapping).</Info>
+<Info>**Also check:** [Data privacy policy](/platform/data-privacy) (the full reference for scopes, dispositions, audiences, and redaction), [Compliance architecture](/ai-governance/compliance-architecture) (the observability substrate this posture operates against), and [Self-hosting compliance](/self-hosting/compliance) (where this fits in the SOC 2, ISO 27001, HIPAA mapping).</Info>
 
 ## Setting it up
 
@@ -13699,7 +13703,7 @@ anyone being able to read what was asked or what the model answered.
 ## Scoping the posture
 
 A drop rule applies to **every ingestion path** for the projects in
-its scope: AI gateway traffic, the OpenTelemetry endpoint, the REST
+its scope: AI Gateway traffic, the OpenTelemetry endpoint, the REST
 collector, ingestion keys, and coding-agent logs (for example Claude
 Code request bodies).
 
@@ -13715,7 +13719,7 @@ The rule's scope decides which projects those are:
 
 <Note>If the requirement is "only a small audience may read it"
 rather than "it must not exist", set the categories to **Restrict**
-with a narrow [audience](/ai-governance/data-privacy#audiences)
+with a narrow [audience](/platform/data-privacy#audience)
 instead. Restriction keeps the content for the chosen reviewers and
 applies retroactively to traces already stored.</Note>
 
@@ -13745,7 +13749,7 @@ rule at `acme` has no effect on `globex`.
 
 ## Where to next
 
-- [Data privacy policy](/ai-governance/data-privacy): cascade
+- [Data privacy policy](/platform/data-privacy): cascade
   resolution, audiences, PII levels, secrets redaction, and the
   defaults.
 - [Compliance architecture](/ai-governance/compliance-architecture):
@@ -14570,7 +14574,7 @@ override the default.
 |---------|------------------|-----------------|------------------|
 | **Org admin** (governance-relevant role on at least one org) | `RoleBinding` carries `organization:manage` OR `governance:view` | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary. |
 | **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
-| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me. |
+| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLM Ops Trace Explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me. |
 | **Mixed** (personal + project membership) | Combination of above | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
 
 ## How detection works
@@ -14857,7 +14861,7 @@ LangWatch organizes everything around three workspace scopes. Every Virtual Key,
 
 Every workspace lives **inside an organization**. Think of the org as the tenant boundary; the three workspaces are the inner partitions.
 
-<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (who lives in your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's gateway behaviour inherits).</Info>
+<Info>**Pairs with:** [Members and Teams](/platform/members-and-teams) (who lives in your org) and [Routing policies](/ai-gateway/governance/routing-policies) (the shape every workspace's gateway behaviour inherits).</Info>
 
 ## When to pick which
 
@@ -14915,7 +14919,7 @@ Teams are groups of people. They:
 - Inherit the org's default Routing Policy unless a team-scoped policy overrides it.
 - Carry their own audit log scope, budgets, and tool-catalog entries when admin-scoped to the team.
 
-Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/ai-governance/members-and-invites#adding-a-single-member).
+Create a team at `/settings/teams` (admin-only). Add members from the existing org member list, invites you make from within the team flow have a `Team Assignment` block in the same drawer documented at [Members & invites](/platform/members-and-teams#invite-people).
 
 Teams scope down what an `aiTools:view` permission shows on `/me`. A team-scoped tile catalog entry appears only for members of that team; an org-scoped tile catalog entry appears for everyone. When a team-scoped entry shares a slug with an org-scoped entry, the team override wins for members of that team, the recommended pattern for "engineering gets Cursor, everyone else gets Copilot."
 
@@ -14978,8 +14982,8 @@ A virtual key's effective policy is the deepest applicable: VK > Project > Team 
 - **Make a key, mint VKs in the right scope**: [Personal IDE keys](/ai-gateway/governance/personal-keys), [Virtual Keys](/ai-gateway/virtual-keys).
 - **Cap spend**: [Budgets](/ai-gateway/budgets).
 - **Override the routing chain for a team or project**: [Routing Policies](/ai-gateway/governance/routing-policies).
-- **Audit who did what to which workspace**: [Audit log](/ai-governance/audit-log).
-- **Invite someone into a team**: [Members & invites](/ai-governance/members-and-invites).
+- **Audit who did what to which workspace**: [Audit log](/platform/audit-log).
+- **Invite someone into a team**: [Members and Teams](/platform/members-and-teams).
 
 ---
 
@@ -15795,7 +15799,7 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 The setup sets `GEMINI_TELEMETRY_LOG_PROMPTS=true`, which is what puts the text of your prompts on the wire; without it, Gemini CLI reports the prompt as a length and no text. It also sets `GEMINI_TELEMETRY_TRACES_ENABLED=true`, which adds the tool call details to the spans.
 
-Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt text off. To keep content out of storage organization-wide, use the [data privacy policy](/ai-governance/data-privacy). Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt text off. To keep content out of storage organization-wide, use the [data privacy policy](/platform/data-privacy). Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
 
 ## Route through the LangWatch AI Gateway
 
@@ -16354,7 +16358,7 @@ cd <repo>/.claude/worktrees/<name> && codex
 
 A pull request from a fork has no branch on `origin`. For one of those, fetch `refs/pull/<number>/head` from `origin` and use `FETCH_HEAD` in place of `origin/<branch>`, and keep `-B <branch>` at the name of the pull request's own branch so the attribution still matches.
 
-Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/integration/tools/integrations/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
+Claude Code sessions can switch natively instead, with the EnterWorktree tool. Codex has no equivalent, so the restart is the way. See [the Claude Code page](/coding-agents/claude-code#attribute-sessions-to-pull-requests) for the Claude Code rules.
 
 ## Content and privacy
 
@@ -16561,7 +16565,7 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 ## Content and privacy
 
-OpenCode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+OpenCode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/platform/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
 
 ## Route through the LangWatch AI Gateway
 
@@ -16830,7 +16834,7 @@ Permissions gate what any viewer sees even inside an allowed project: a viewer w
 
 ## What the organization can remove
 
-An organization that must not store conversational content sets input, output and system instructions to **Drop** in the [data privacy policy](/ai-governance/data-privacy). LangWatch strips dropped content at ingestion, before storage, on every ingestion path, coding-agent telemetry included.
+An organization that must not store conversational content sets input, output and system instructions to **Drop** in the [data privacy policy](/platform/data-privacy). LangWatch strips dropped content at ingestion, before storage, on every ingestion path, coding-agent telemetry included.
 
 What survives is metadata: model, tokens, cost, latency, timings, status, identity. The rollups keep working, and no person can read what was asked or answered.
 
@@ -16850,7 +16854,7 @@ Credentials that appear in prompts or tool output are replaced with a `[SECRET]`
 
 Stored data expires on a schedule the organization sets, resolved per project. See [Data retention](/platform/data-retention).
 
-**Also check:** [Data privacy policy](/ai-governance/data-privacy) for the full policy reference: scopes, dispositions, audiences and PII redaction.
+**Also check:** [Data privacy policy](/platform/data-privacy) for the full policy reference: scopes, dispositions, audiences and PII redaction.
 
 ---
 
@@ -16986,7 +16990,7 @@ Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 
 - **Run plain commands with reporting on.** `langwatch instrument <tool>` writes the connection and exits, so `claude` without the wrapper reports too. Each agent's page covers it, for example [Claude Code](/coding-agents/claude-code).
 - **Send a machine to a team project** with `--project`, or wire servers and CI with no login. See [Team projects](/coding-agents/team-projects) and [Headless machines and CI](/coding-agents/headless-and-ci).
-- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback. See the [coding CLI gateway integrations](/ai-gateway/cli/overview).
+- **Route the model calls through the LangWatch AI Gateway** for budgets, model policies and provider fallback. See the [coding CLI gateway integrations](/coding-agents/overview).
 - **Control what gets stored.** [Privacy](/coding-agents/privacy) states who can read your sessions, and you can drop the conversation content while keeping the cost and token counts.
 
 ---
@@ -17070,7 +17074,7 @@ keywords:
 
 Coding-agent traces carry live credentials: a key pasted into a prompt, an `.env` file a tool read, a connection string in a stack trace. Redaction runs in the ingestion pipeline, before storage, and replaces each credential it recognizes with a `[SECRET]` marker. The text around the marker stays intact, and detection uses three layers, from exact vendor rules to context.
 
-It is on by default. A [data privacy rule](/ai-governance/data-privacy#secrets-redaction) can turn redaction off for its scope.
+It is on by default. A [data privacy rule](/platform/data-privacy#secrets-redaction) can turn redaction off for its scope.
 
 ## How detection works
 
@@ -17104,7 +17108,7 @@ A data privacy rule can disable secrets redaction for its scope.
 
 `langwatch report`, the command that sends an issue report to LangWatch, runs the same redaction rules on the title, summary and transcript **on your machine**, before anything is uploaded. Run it with `--dry-run` to read exactly what would leave.
 
-**Also check:** [Privacy](/coding-agents/privacy) for who can read what, and [Data privacy policy](/ai-governance/data-privacy) for PII redaction and the drop controls.
+**Also check:** [Privacy](/coding-agents/privacy) for who can read what, and [Data privacy policy](/platform/data-privacy) for PII redaction and the drop controls.
 
 ---
 
@@ -17251,7 +17255,7 @@ langwatch instrument claude --personal
 
 This removes the project pin on this device and writes the personal connection again.
 
-**Also check:** [Headless machines and CI](/coding-agents/headless-and-ci) for machines that never log in, and [Roles and permissions](/ai-governance/roles-and-permissions) for what `traces:create` covers.
+**Also check:** [Headless machines and CI](/coding-agents/headless-and-ci) for machines that never log in, and [Access Control (RBAC)](/platform/rbac) for what `traces:create` covers.
 
 ---
 
@@ -17449,7 +17453,7 @@ mode: "wide"
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved.
@@ -17502,7 +17506,7 @@ LangWatch helps you understand every user interaction (**Thread**), each individ
   </Step>
 
   <Step title="Install the LangWatch SDK">
-    We have official SDKs for Python and Node.js ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
+    We have official SDKs for Python, Node.js, and Go ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
 
     <CodeGroup>
 ```bash Python
@@ -17512,6 +17516,10 @@ uv add langwatch
 ```
 ```bash JavaScript
 npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+```
+```bash Go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
 ```
     </CodeGroup>
   </Step>
@@ -17564,6 +17572,58 @@ const result = await generateText({
     isEnabled: true, // Ensure telemetry is active for relevant operations
   },
 });
+```
+```go Go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
+
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Setup LangWatch tracing (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx)
+
+	// Add the middleware to your OpenAI client (captures request + response).
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		oaioption.WithMiddleware(otelopenai.Middleware("your-app-name")),
+	)
+
+	// Optionally wrap your operation in a span.
+	tracer := langwatch.Tracer("your-app-name")
+	ctx, span := tracer.Start(ctx, "ChatWithUser")
+	defer span.End()
+
+	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT5Mini,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("How many calories do I burn jumping to conclusions?"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("chat completion failed: %v", err)
+	}
+	log.Printf("Response: %s", resp.Choices[0].Message.Content)
+}
 ```
     </CodeGroup>
   </Step>
@@ -17646,7 +17706,13 @@ Below are some examples for integrating LangWatch into your project.
   ### Go
 
     <CardGroup cols={3}>
-      <Card title="LangWatch Go SDK" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/examples" />
+      <Card title="OpenAI Simple" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/e2e/openai-simple" />
+      <Card title="OpenAI Streaming" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/e2e/openai-streaming" />
+      <Card title="OpenAI Threads" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/e2e/openai-threads" />
+      <Card title="OpenAI Responses" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/e2e/openai-responses" />
+      <Card title="OpenAI Filtered" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/e2e/openai-filtered" />
+      <Card title="Custom Input/Output" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/e2e/custom-input-output" />
+      <Card title="Span Filtering" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdks/go/examples/filtering" />
     </CardGroup>
 
   ### OpenTelemetry
@@ -17676,7 +17742,7 @@ keywords: agno, openinference, langwatch, python, tracing, observability
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with Agno through OpenInference instrumentation to capture traces from your Agno agents automatically.
@@ -19048,7 +19114,7 @@ keywords: langchain, instrumentation, callback, langwatch, python, tracing
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with Langchain to provide detailed observability into your chains, agents, LLM calls, and tool usage.
@@ -19135,7 +19201,7 @@ keywords: langgraph, instrumentation, callback, langwatch, python, tracing
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with LangGraph to provide detailed observability into your graph-based agents, LLM calls, and tool usage.
@@ -19775,7 +19841,7 @@ keywords: openai, instrumentation, autotrack, langwatch, python
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with OpenAI to automatically capture detailed information about your LLM calls.
@@ -21316,12 +21382,12 @@ if __name__ == "__main__":
 
 The `add_evaluation()` method is available on both `LangWatchSpan` and `LangWatchTrace` objects (when using on a trace, you must specify the target `span`). For detailed parameter descriptions, please refer to the API reference:
 
-- [`LangWatchSpan.add_evaluation()`](/integration/python/reference#add_evaluation-1)
-- [`LangWatchTrace.add_evaluation()`](/integration/python/reference#add_evaluation)
+- [`LangWatchSpan.add_evaluation()`](/integration/python/reference#langwatchspan-object-methods)
+- [`LangWatchTrace.add_evaluation()`](/integration/python/reference#langwatchtrace-object-methods)
 
 ## 2. Server-Side Managed Evaluations (`evaluate` & `async_evaluate`)
 
-LangWatch allows you to trigger evaluations that are performed by the LangWatch backend. These can be [built-in evaluators](/evaluations/evaluators/list) (e.g., for faithfulness, relevance) or [custom evaluators you define](/evaluations/evaluators/custom-evaluators) in your LangWatch project settings.
+LangWatch allows you to trigger evaluations that are performed by the LangWatch backend. These can be [built-in evaluators](/evaluations/evaluators/list) (e.g., for faithfulness, relevance) or [custom evaluators you define](/evaluations/evaluators/custom-scoring) in your LangWatch project settings.
 
 You use the `evaluate()` (synchronous) or `async_evaluate()` (asynchronous) functions for this. These functions send the necessary data to the LangWatch API, which then processes the evaluation. These server-side evaluations are a core part of setting up [real-time monitoring and evaluations in production](/evaluations/online-evaluation/setup-monitors).
 
@@ -21393,14 +21459,16 @@ if __name__ == "__main__":
 
 The `evaluate()` and `async_evaluate()` methods are available on both `LangWatchSpan` and `LangWatchTrace` objects. They can also be imported from `langwatch.evaluations` and called as `langwatch.evaluate()` or `langwatch.async_evaluate()`, where you would then explicitly pass the `span` or `trace` argument. For detailed parameter descriptions, refer to the API reference:
 
-- [`LangWatchSpan.evaluate()`](/integration/python/reference#evaluate-1) and [`LangWatchSpan.async_evaluate()`](/integration/python/reference#async_evaluate-1)
-- [`LangWatchTrace.evaluate()`](/integration/python/reference#evaluate) and [`LangWatchTrace.async_evaluate()`](/integration/python/reference#async_evaluate)
+- [`LangWatchSpan.evaluate()`](/integration/python/reference#langwatchspan-object-methods) and [`LangWatchSpan.async_evaluate()`](/integration/python/reference#langwatchspan-object-methods)
+- [`LangWatchTrace.evaluate()`](/integration/python/reference#langwatchtrace-object-methods) and [`LangWatchTrace.async_evaluate()`](/integration/python/reference#langwatchtrace-object-methods)
 
 <Tip>
   **Understanding the `data` Parameter:**
 
   The core parameters like `slug`, `data`, `settings`, `as_guardrail`, `span`, and `trace` are generally consistent.
-  For the `data` parameter specifically: while `BasicEvaluateData` is commonly used to provide a standardized structure for `input`, `output`, and `contexts` (which many built-in or common evaluators expect), it's important to know that `data` can be **any dictionary**. This flexibility allows you to pass arbitrary data structures tailored to custom server-side evaluators you might define. Using `BasicEvaluateData` with fields like `expected_output` is particularly useful when [evaluating if the LLM is generating the right answers](/evaluations/experiments/ui/answer-correctness) against a set of expected outputs. For scenarios where a golden answer isn't available, LangWatch also supports more open-ended evaluations, such as using an [LLM-as-a-judge](/evaluations/experiments/ui/llm-as-a-judge).
+  For the `data` parameter specifically: `BasicEvaluateData` gives `input`, `output` and `contexts` a standardized structure, which is what many built-in evaluators expect. But `data` can be **any dictionary**, so you can pass arbitrary structures tailored to the custom server-side evaluators you define.
+
+  `BasicEvaluateData` with fields like `expected_output` is useful when [evaluating if the LLM is generating the right answers](/evaluations/experiments/ui/answer-correctness) against a set of expected outputs. Where a golden answer is not available, use an open-ended evaluation instead, such as [LLM-as-a-judge](/evaluations/experiments/ui/llm-as-a-judge).
 </Tip>
 
 The `slug` parameter refers to the unique identifier of the evaluator configured in your LangWatch project settings. You can find a list of available evaluator types and learn how to configure them in our [LLM Evaluation documentation](/evaluations/evaluators/list).
@@ -21428,7 +21496,9 @@ if pii_check_result.passed is False:
     # Take action: sanitize response, return a canned message, etc.
     return "Response redacted due to PII."
 ```
-A key behavior of `as_guardrail=True` for server-side evaluations is that if the *evaluation process itself* encounters an error (e.g., the evaluator service is down), the result will have `status="error"` but `passed` will default to `True`. This is a fail-safe to prevent your application from breaking due to an issue in the guardrail execution itself, assuming a "pass by default on error" stance is desired. For more on setting up safety-focused real-time evaluations like PII detection or prompt injection monitors, see our guide on [Setting up Real-Time Evaluations](/evaluations/online-evaluation/setup-monitors).
+`as_guardrail=True` changes what happens when the *evaluation process itself* fails, for example when the evaluator service is down. The result carries `status="error"` and `passed` defaults to `True`, so a broken guardrail does not break your application. That is a "pass by default on error" stance, which is the right one when the guardrail is advisory rather than a hard gate.
+
+For safety-focused real-time evaluations such as PII detection or prompt injection monitors, see [Setting up Real-Time Evaluations](/evaluations/online-evaluation/setup-monitors).
 
 **Using Client-Side `add_evaluation` as Guardrails:**
 Set `is_guardrail=True` when calling `add_evaluation`.
@@ -21749,7 +21819,7 @@ main_flow()
 ```
 
 <Note>
-  Refer to the API reference for [`@langwatch.trace()`](/integration/python/reference#%40langwatch-trace-%2F-langwatch-trace) and [`@langwatch.span()`](/integration/python/reference#%40langwatch-span-%2F-langwatch-span) for more details on `capture_input` and `capture_output` parameters.
+  Refer to the [Tracing section of the API reference](/integration/python/reference#tracing) for more details on the `capture_input` and `capture_output` parameters of `@langwatch.trace()` and `@langwatch.span()`.
 </Note>
 
 ## Explicitly Setting Inputs and Outputs
@@ -21861,7 +21931,7 @@ run_pipeline({"a": 1, "b": None, "c": 3})
 ```
 
 <Note>
-  The `update()` method on `LangWatchTrace` and `LangWatchSpan` objects is versatile. See the reference for [`LangWatchTrace` methods](/integration/python/reference#%40langwatch-trace-%2F-langwatch-trace) and [`LangWatchSpan` methods](/integration/python/reference#%40langwatch-span-%2F-langwatch-span).
+  The `update()` method on `LangWatchTrace` and `LangWatchSpan` objects is versatile. See the reference for [`LangWatchTrace` methods](/integration/python/reference#langwatchtrace-object-methods) and [`LangWatchSpan` methods](/integration/python/reference#langwatchspan-object-methods).
 </Note>
 
 ## Handling Different Data Formats
@@ -22930,7 +23000,7 @@ The `thread_id` is typically the conversation or session ID from your applicatio
 Once traces share a `thread_id`, you can:
 
 - **View the full conversation** in the LangWatch dashboard by clicking on any trace in the thread
-- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/by-thread))
+- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/setup-monitors))
 - **Build datasets from threads** for testing multi-turn scenarios (see [Dataset Threads](/datasets/dataset-threads))
 - **Filter and search** traces by conversation in the messages view
 
@@ -23557,7 +23627,7 @@ keywords: langchain, instrumentation, callback, langwatch, typescript, tracing
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with Langchain to provide detailed observability into your chains, agents, LLM calls, and tool usage.
@@ -23725,7 +23795,7 @@ keywords: mastra, langwatch, tracing, observability, typescript, agent framework
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 LangWatch integrates with Mastra through OpenTelemetry to capture traces from your Mastra agents automatically.
@@ -23949,7 +24019,7 @@ keywords: vercel ai sdk, langwatch, tracing, observability, vercel, ai, sdk
 ---
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
@@ -25446,7 +25516,7 @@ For more debugging techniques and advanced troubleshooting:
 - **[Integration Guide](/integration/typescript/guide)** - Basic setup and common issues
 - **[API Reference](/integration/typescript/reference)** - Configuration options and error handling
 - **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Debugging manual span management
-- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific debugging guides
+- **[Framework Integrations](/integration/overview)** - Framework-specific debugging guides
 - **[OpenTelemetry Migration](/integration/typescript/tutorials/opentelemetry-migration)** - Troubleshooting migration issues
 
 <Tip>
@@ -26164,7 +26234,7 @@ For more advanced observability patterns and best practices:
 - **[API Reference](/integration/typescript/reference)** - Complete API documentation
 - **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - Standardized attribute naming guidelines
 - **[Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript)** - Debug manual instrumentation issues
-- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific instrumentation approaches
+- **[Framework Integrations](/integration/overview)** - Framework-specific instrumentation approaches
 
 <Tip>
 Combine manual instrumentation with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent, maintainable observability across your application.
@@ -27001,7 +27071,7 @@ For practical examples and advanced usage patterns:
 - **[Integration Guide](/integration/typescript/guide)** - Basic setup and core concepts
 - **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Practical examples of semantic conventions in action
 - **[API Reference](/integration/typescript/reference)** - Complete API documentation with attribute details
-- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific semantic conventions
+- **[Framework Integrations](/integration/overview)** - Framework-specific semantic conventions
 - **[Capturing RAG](/integration/typescript/tutorials/capturing-rag)** - RAG-specific attributes and conventions
 
 <Tip>
@@ -27104,7 +27174,7 @@ The `threadId` is typically the conversation or session ID from your application
 Once traces share a `thread_id`, you can:
 
 - **View the full conversation** in the LangWatch dashboard by clicking on any trace in the thread
-- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/by-thread))
+- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/setup-monitors))
 - **Build datasets from threads** for testing multi-turn scenarios (see [Dataset Threads](/datasets/dataset-threads))
 - **Filter and search** traces by conversation in the messages view
 
@@ -27528,6 +27598,117 @@ This will display the tool call with a tool icon in the trace visualization and 
 
 ---
 
+# FILE: ./integration/go/integrations/amazon-bedrock.mdx
+
+---
+title: Amazon Bedrock Integration
+sidebarTitle: Go
+description: Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
+icon: golang
+keywords: go, golang, aws, amazon bedrock, bedrockruntime, instrumentation, langwatch, smithy, converse
+---
+
+LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly, so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/bedrock
+go get github.com/aws/aws-sdk-go-v2/service/bedrockruntime
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY` before running, and ensure your AWS credentials and region are configured (e.g. via `AWS_REGION` and the standard AWS credential chain).
+</Info>
+
+Instrument an `aws.Config` once with `InstrumentConfig`, and every Bedrock Runtime client built from it is traced:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	"github.com/langwatch/langwatch/sdks/go/instrumentation/bedrock"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add the tracing middleware to the config.
+	bedrock.InstrumentConfig(&cfg)
+
+	client := bedrockruntime.NewFromConfig(cfg)
+
+	_, err = client.Converse(ctx, &bedrockruntime.ConverseInput{
+		ModelId: aws.String("us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+		Messages: []types.Message{{
+			Role:    types.ConversationRoleUser,
+			Content: []types.ContentBlock{&types.ContentBlockMemberText{Value: "Hello, Bedrock!"}},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+### Instrumenting a single client or operation
+
+If you do not want to mutate the shared `aws.Config`, add the middleware to a single client (or call) via `APIOptions`:
+
+```go
+client := bedrockruntime.NewFromConfig(cfg, func(o *bedrockruntime.Options) {
+	o.APIOptions = append(o.APIOptions, bedrock.WithTracing())
+})
+```
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `bedrock.WithDataCapture(langwatch.DataCaptureNone)` to `InstrumentConfig` / `WithTracing` to opt out. Use `bedrock.WithGenAIProvider(...)` to attribute spans to the underlying foundation-model vendor instead of `aws.bedrock`.
+</Note>
+
+<Warning>
+**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled, so always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
+</Warning>
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Bedrock applications
+
+---
+
 # FILE: ./integration/go/integrations/anthropic.mdx
 
 ---
@@ -27535,15 +27716,17 @@ title: Anthropic (Claude) Integration
 sidebarTitle: Go
 description: Instrument Anthropic Claude API calls in Go using LangWatch to track performance, detect errors, and improve AI agent testing.
 icon: golang
-keywords: go, golang, anthropic, claude, instrumentation, langwatch, openai-compatible
+keywords: go, golang, anthropic, claude, instrumentation, langwatch, messages api, native
 ---
 
-LangWatch supports tracing Anthropic Claude API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to Anthropic's API endpoint.
+LangWatch provides **native** instrumentation for the official Anthropic Go SDK (`github.com/anthropics/anthropic-sdk-go`). It wires a middleware that records request and response attributes for the Messages API (`/v1/messages`), both buffered and streamed, including the full token-usage breakdown (input, output, cache-read and cache-creation) and thinking content.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/anthropic
+go get github.com/anthropics/anthropic-sdk-go
 ```
 
 ## Usage
@@ -27560,51 +27743,55 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdks/go"
-	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelanthropic "github.com/langwatch/langwatch/sdks/go/instrumentation/anthropic"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Anthropic client via OpenAI-compatible API
-	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("ANTHROPIC_BASE_URL")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("anthropic"),
-		)),
+	// Create an instrumented Anthropic client. By default the middleware
+	// captures both request (input) and response (output) content.
+	client := anthropic.NewClient(
+		option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
+		option.WithMiddleware(otelanthropic.Middleware()),
 	)
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "claude-4-5-sonnet",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Claude!"),
+	message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeHaiku4_5,
+		MaxTokens: 1024,
+		System:    []anthropic.TextBlockParam{{Text: "You are a helpful assistant."}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock("Hello, Claude!")),
 		},
 	})
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatalf("messages call failed: %v", err)
 	}
 
-	log.Printf("Response: %s", response.Choices[0].Message.Content)
+	log.Printf("Response: %v", message)
 }
 ```
+
+Streaming works identically: drive `client.Messages.NewStreaming(...)` and drain it; the span is recorded once the stream concludes.
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `otelanthropic.WithDataCapture(langwatch.DataCaptureNone)` to opt out. If your client points at an Anthropic-compatible gateway (e.g. AWS Bedrock or Google Vertex), set the provider with `otelanthropic.WithGenAIProvider(...)`.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -27612,8 +27799,8 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Anthropic applications
 
 ---
@@ -27625,15 +27812,17 @@ title: Azure OpenAI Integration
 sidebarTitle: Go
 description: Instrument Azure OpenAI API calls in Go using LangWatch to monitor model usage, latency, and AI agent evaluation metrics.
 icon: golang
-keywords: go, golang, azure, azure openai, instrumentation, langwatch, openai-compatible
+keywords: go, golang, azure, azure openai, instrumentation, langwatch, native
 ---
 
-LangWatch supports tracing Azure OpenAI API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to your Azure endpoint.
+LangWatch provides native instrumentation for **Azure OpenAI** accessed through the official `openai-go/v3` client's `azure` subpackage. The `azureopenai` module is a thin wrapper over the [OpenAI](/integration/go/integrations/open-ai) instrumentation: all of OpenAI's chat / responses / embeddings capture applies unchanged, and the provider is recorded as `azure.openai`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/azureopenai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -27641,6 +27830,8 @@ go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 <Info>
 Set `LANGWATCH_API_KEY`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_ENDPOINT` environment variables before running.
 </Info>
+
+Build the Azure client with the `azure` connection options and wire in `azureopenai.Middleware` via `option.WithMiddleware`:
 
 ```go
 package main
@@ -27650,39 +27841,43 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdks/go"
-	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/azure"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	azureopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/azureopenai"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Azure OpenAI client
+	// Create an instrumented Azure OpenAI client. The provider is recorded as
+	// "azure.openai"; by default the middleware captures both input and output.
+	const apiVersion = "2024-06-01"
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("AZURE_OPENAI_ENDPOINT")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("azure"),
-		)),
+		azure.WithEndpoint(os.Getenv("AZURE_OPENAI_ENDPOINT"), apiVersion),
+		azure.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
+		// Or authenticate with an Azure Identity TokenCredential:
+		// azure.WithTokenCredential(tokenCredential),
+		option.WithMiddleware(azureopenai.Middleware("my-app")),
 	)
 
+	// The Model is your Azure *deployment* name; the azure subpackage rewrites
+	// the request path to /openai/deployments/{deployment}/chat/completions.
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: openai.ChatModelGPT5,
+		Model: "my-gpt4o-deployment",
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage("You are a helpful assistant."),
 			openai.UserMessage("Hello, Azure OpenAI!"),
@@ -27696,7 +27891,11 @@ func main() {
 }
 ```
 
-Set `AZURE_OPENAI_ENDPOINT` to your Azure OpenAI resource endpoint URL (e.g., `https://your-resource.openai.azure.com/openai/deployments/your-deployment`).
+Set `AZURE_OPENAI_ENDPOINT` to your Azure OpenAI resource endpoint (e.g., `https://your-resource.openai.azure.com`); the `Model` you pass is your deployment name.
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `azureopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -27704,9 +27903,88 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Azure OpenAI applications
+
+---
+
+# FILE: ./integration/go/integrations/genkit.mdx
+
+---
+title: Firebase Genkit Integration
+sidebarTitle: Genkit
+description: Export Firebase Genkit Go traces to LangWatch to observe flows, models, and tools for AI agent evaluation.
+keywords: go, golang, genkit, firebase, instrumentation, langwatch, opentelemetry, native, flows
+---
+
+[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing**; it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/genkit
+go get github.com/firebase/genkit/go
+```
+
+## Usage
+
+<Info>
+Set the `LANGWATCH_API_KEY` environment variable before running.
+</Info>
+
+Register LangWatch once, after `genkit.Init`:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+
+	lwgenkit "github.com/langwatch/langwatch/sdks/go/instrumentation/genkit"
+)
+
+func main() {
+	ctx := context.Background()
+
+	g := genkit.Init(ctx, genkit.WithPlugins(&googlegenai.GoogleAI{}))
+
+	// Export Genkit's OTEL spans to LangWatch (reads LANGWATCH_API_KEY from env).
+	if err := lwgenkit.RegisterLangWatch(g); err != nil {
+		log.Fatalf("failed to register LangWatch: %v", err)
+	}
+
+	// Define and run flows as usual; their spans are exported to LangWatch.
+}
+```
+
+`RegisterLangWatch` reads `LANGWATCH_API_KEY` (and `LANGWATCH_ENDPOINT`) from the environment by default. To forward exporter options (API key, endpoint, data capture, filters), pass `WithExporterOptions`:
+
+```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
+lwgenkit.RegisterLangWatch(g,
+	lwgenkit.WithExporterOptions(
+		langwatch.WithAPIKey("sk-lw-..."),
+		langwatch.WithDataCapture(langwatch.DataCaptureNone), // structure/metrics only
+	),
+)
+```
+
+<Note>
+LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
+</Note>
+
+## Related
+
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and data capture
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails
 
 ---
 
@@ -27714,18 +27992,20 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ---
 title: Google Gemini Integration
-sidebarTitle: Google Gemini
-description: Instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
+sidebarTitle: Go
+description: Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 icon: golang
-keywords: go, golang, google, gemini, vertex ai, instrumentation, langwatch, openai-compatible
+keywords: go, golang, google, gemini, vertex ai, genai, instrumentation, langwatch, native
 ---
 
-LangWatch supports tracing Google Gemini models through Google Cloud Vertex AI's OpenAI-compatible endpoint.
+LangWatch provides **native** instrumentation for Google's unified Gen AI Go SDK (`google.golang.org/genai`), which covers both the **Gemini Developer API** and **Vertex AI** behind one client. It traces at the HTTP layer the `genai` client uses, recording request and response attributes, including all token kinds Gemini reports (prompt, candidates, cached content, and `thoughts` as reasoning tokens), with full streaming support.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/googlegenai
+go get google.golang.org/genai
 ```
 
 ## Usage
@@ -27733,6 +28013,8 @@ go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 <Info>
 Set `LANGWATCH_API_KEY` and `GEMINI_API_KEY` environment variables before running.
 </Info>
+
+`WrapClientConfig` sets the client's HTTP transport to a traced one in place, preserving any transport you already configured. Register your LangWatch tracer provider first, then wrap the `genai.ClientConfig`:
 
 ```go
 package main
@@ -27743,50 +28025,47 @@ import (
 	"os"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
-	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/langwatch/langwatch/sdks/go/instrumentation/googlegenai"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"google.golang.org/genai"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Gemini client via OpenAI-compatible API
-	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("GEMINI_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("GEMINI_BASE_URL")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("google"),
-		)),
-	)
+	cc := &genai.ClientConfig{
+		APIKey:  os.Getenv("GEMINI_API_KEY"),
+		Backend: genai.BackendGeminiAPI,
+	}
+	googlegenai.WrapClientConfig(cc) // uses the global TracerProvider by default
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "gemini-2.5-flash",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Gemini!"),
-		},
-	})
+	client, err := genai.NewClient(ctx, cc)
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatal(err)
 	}
 
-	log.Printf("Response: %s", response.Choices[0].Message.Content)
+	resp, err := client.Models.GenerateContent(ctx, "gemini-2.5-flash", genai.Text("Hello, Gemini!"), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Response: %s", resp.Text())
 }
 ```
+
+<Note>
+For the **Vertex AI** backend set `Backend: genai.BackendVertexAI`. If you build the `*http.Client` yourself, use `googlegenai.NewTransport()` (or `NewTransportWithBase(base, opts...)` to chain an authenticated transport for Vertex). The instrumentation captures input and output **by default**; pass `googlegenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -27794,8 +28073,8 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Google Gemini applications
 
 ---
@@ -27809,12 +28088,14 @@ description: Instrument Grok (xAI) API calls in Go using LangWatch to capture tr
 keywords: go, golang, grok, xai, instrumentation, langwatch, openai-compatible
 ---
 
-LangWatch supports tracing Grok (xAI) API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to the xAI endpoint.
+LangWatch supports tracing Grok (xAI) API calls through xAI's OpenAI-compatible endpoint. Reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at the xAI base URL and label the spans with `WithGenAIProvider`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -27833,32 +28114,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Grok client via OpenAI-compatible API
+	// Create a Grok client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("XAI_API_KEY")),
-		oaioption.WithBaseURL("https://api.grok.com/v1"),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("xai"),
+		option.WithBaseURL("https://api.x.ai/v1"),
+		option.WithAPIKey(os.Getenv("XAI_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("x_ai")),
 		)),
 	)
 
@@ -27877,15 +28158,19 @@ func main() {
 }
 ```
 
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
+
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
 </Warning>
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
-- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Grok applications
+- [Go Integration Guide](/integration/go/guide#openai-compatible-providers)
+- [Go SDK API Reference](/integration/go/reference#openai-middleware)
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails)
 
 ---
 
@@ -27898,12 +28183,14 @@ description: Instrument Groq API calls in Go using LangWatch for LLM observabili
 keywords: go, golang, groq, instrumentation, langwatch, openai-compatible
 ---
 
-LangWatch traces calls to the Groq API. Groq provides an OpenAI-compatible endpoint, so you can reuse the `otelopenai` middleware with minimal changes.
+LangWatch traces calls to the Groq API. Groq provides an OpenAI-compatible endpoint, so you reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at Groq's base URL and label the spans with `WithGenAIProvider`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -27922,32 +28209,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Groq client via OpenAI-compatible API
+	// Create a Groq client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithBaseURL("https://api.groq.com/openai/v1"),
-		oaioption.WithAPIKey(os.Getenv("GROQ_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("groq"),
+		option.WithBaseURL("https://api.groq.com/openai/v1"),
+		option.WithAPIKey(os.Getenv("GROQ_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("groq")),
 		)),
 	)
 
@@ -27966,14 +28253,18 @@ func main() {
 }
 ```
 
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
+
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
 </Warning>
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag)
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata)
+- [Go Integration Guide](/integration/go/guide#openai-compatible-providers)
+- [Go SDK API Reference](/integration/go/reference#openai-middleware)
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails)
 
 ---
@@ -27984,34 +28275,43 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 title: Ollama (Local Models) Integration
 sidebarTitle: Ollama (Local)
 description: Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
-keywords: go, golang, ollama, local llm, instrumentation, langwatch, openai-compatible
+keywords: go, golang, ollama, local llm, instrumentation, langwatch, native, ndjson streaming
 ---
 
-LangWatch supports tracing local models served by Ollama through its OpenAI-compatible endpoint.
+LangWatch provides **native** instrumentation for the official Ollama Go client (`github.com/ollama/ollama/api`), covering its native `/api/chat`, `/api/generate` and `/api/embed` endpoints. It captures the model parameters, token counts (`prompt_eval_count` / `eval_count`), server-side phase durations, and tool calls, with NDJSON streaming reconstruction.
+
+<Note>
+This page covers Ollama's **native** API. If you talk to Ollama through an OpenAI client instead (the `/v1/*` compatibility shim), use the [OpenAI](/integration/go/integrations/open-ai) instrumentation with `option.WithBaseURL("http://localhost:11434/v1")` and `otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("ollama"))`.
+</Note>
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/ollama
+go get github.com/ollama/ollama/api
 ```
 
 ## Usage
 
 <Info>
-Set `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally so no API key is needed for the model.
+Set the `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally, so no API key is needed for the model (the SDK reads `OLLAMA_HOST`, default `http://localhost:11434`).
 </Info>
+
+`NewHTTPClient` returns a ready `*http.Client` to pass to `api.NewClient`. Register your LangWatch tracer provider first:
 
 ```go
 package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/url"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
-	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/langwatch/langwatch/sdks/go/instrumentation/ollama"
+	"github.com/ollama/ollama/api"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -28019,40 +28319,36 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Ollama client via OpenAI-compatible API
-	client := openai.NewClient(
-		oaioption.WithBaseURL(os.Getenv("OLLAMA_BASE_URL")),
-		oaioption.WithAPIKey("ollama"), // Ollama doesn't require a real key
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("ollama"),
-		)),
-	)
+	base, _ := url.Parse("http://localhost:11434")
+	client := api.NewClient(base, ollama.NewHTTPClient()) // uses the global TracerProvider
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "openai/gpt-5",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Ollama!"),
-		},
+	stream := false
+	err = client.Chat(ctx, &api.ChatRequest{
+		Model:    "llama3.2",
+		Stream:   &stream,
+		Messages: []api.Message{{Role: "user", Content: "Hello, Ollama!"}},
+	}, func(resp api.ChatResponse) error {
+		fmt.Print(resp.Message.Content)
+		return nil
 	})
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatal(err)
 	}
-
-	log.Printf("Response: %s", response.Choices[0].Message.Content)
 }
 ```
+
+<Note>
+If you'd rather build the `*http.Client` yourself, use `ollama.NewTransport()` (or `WrapHTTPClient(client, opts...)` to preserve an existing client's settings). The instrumentation captures input and output **by default**; pass `ollama.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -28060,8 +28356,8 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Ollama applications
 
 ---
@@ -28076,12 +28372,14 @@ icon: golang
 keywords: openai, instrumentation, golang, go, langwatch, middleware, streaming
 ---
 
-LangWatch provides automatic instrumentation for the official `openai-go` client library through a dedicated middleware that captures detailed information about your OpenAI API calls.
+LangWatch provides automatic instrumentation for the official `openai-go/v3` client library through a dedicated middleware that captures detailed information about your OpenAI API calls. It handles Chat Completions, the Responses API and Embeddings, with full streaming support.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -28100,8 +28398,9 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -28109,22 +28408,20 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create OpenAI client with LangWatch middleware
+	// Create an OpenAI client with the LangWatch middleware. By default the
+	// middleware captures both request (input) and response (output) content.
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-		)),
+		option.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app")),
 	)
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -28142,7 +28439,11 @@ func main() {
 }
 ```
 
-The middleware automatically captures request/response content, token usage, and model information. Streaming responses are fully supported and automatically accumulated.
+The middleware automatically captures request/response content, every token type (input / output / cached / reasoning), and model information. Streaming responses are fully supported and automatically accumulated.
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). To opt out, pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` (or `DataCaptureInput` / `DataCaptureOutput` to capture only one side).
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -28150,9 +28451,9 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
-- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your OpenAI applications
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#openai-middleware) - Middleware options and collected attributes
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails
 
 ---
 
@@ -28165,16 +28466,23 @@ description: Instrument OpenRouter model calls in Go with LangWatch to compare m
 keywords: go, golang, openrouter, model router, instrumentation, langwatch, opentelemetry, openai-compatible
 ---
 
-[OpenRouter](https://openrouter.ai) provides a unified API to access LLMs from many providers. LangWatch traces calls made through OpenRouter using its OpenAI-compatible endpoint.
+[OpenRouter](https://openrouter.ai) provides a unified API to access LLMs from many providers. LangWatch traces calls made through OpenRouter's OpenAI-compatible endpoint by reusing the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware.
 
 ## Setup
 
 You will need an OpenRouter API key from your [OpenRouter settings](https://openrouter.ai/keys).
 
-Set your OpenRouter API key as an environment variable:
+```bash
+export LANGWATCH_API_KEY="your-langwatch-api-key"
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+```
+
+## Installation
 
 ```bash
-export OPENROUTER_API_KEY="your-openrouter-api-key"
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -28183,7 +28491,7 @@ export OPENROUTER_API_KEY="your-openrouter-api-key"
 Set `LANGWATCH_API_KEY` and `OPENROUTER_API_KEY` environment variables before running.
 </Info>
 
-The key difference with OpenRouter is the model name, which is prefixed with the provider (e.g., `anthropic/claude-sonnet-4-20250514`).
+The key difference with OpenRouter is the model name, which is prefixed with the provider (e.g., `anthropic/claude-sonnet-4-20250514`). OpenRouter has no registered `gen_ai.provider.name`, so pass a custom value:
 
 ```go
 package main
@@ -28195,32 +28503,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create OpenRouter client via OpenAI-compatible API
+	// Create an OpenRouter client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithBaseURL("https://openrouter.ai/api/v1"),
-		oaioption.WithAPIKey(os.Getenv("OPENROUTER_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("openrouter"),
+		option.WithBaseURL("https://openrouter.ai/api/v1"),
+		option.WithAPIKey(os.Getenv("OPENROUTER_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("openrouter")),
 		)),
 	)
 
@@ -28237,6 +28545,10 @@ func main() {
 	log.Printf("Response: %s", response.Choices[0].Message.Content)
 }
 ```
+
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -28630,7 +28942,7 @@ After setting up your instrumentation, you can verify that traces are being sent
 ## Next Steps
 
 - Explore the [LangWatch dashboard](https://app.langwatch.ai/) to view your traces
-- Set up [custom evaluations](/evaluations) for your LLM calls
+- Set up [custom evaluations](/evaluations/overview) for your LLM calls
 
 ---
 
@@ -29491,7 +29803,7 @@ Instead of manually reading docs and writing boilerplate code, just ask your AI 
 <Step title="Get your API key">
 Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
 
-See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for step-by-step instructions.
+See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-step instructions.
 </Step>
 
 <Step title="Configure your MCP">
@@ -31787,7 +32099,7 @@ The SDK resolves the environment in this order:
 3. `APP_ENV`, then `ENVIRONMENT`, then `NODE_ENV`.
 4. `development`.
 
-`development` makes the agent **personal**. With a personal API key it belongs to the key's owner, and only that person can run it. With a project API key it belongs to the machine, and the team can see and run it. Every other environment name is shared by the whole project.
+`development` makes the agent **personal**. With a personal API key it belongs to the key's owner, and only that person can run it. With a project API key it belongs to the machine, and the team can see and run it. Every other environment name is shared by the whole project. On a project key the machine is identified by its hostname, which in a container changes every time the container is recreated, see [Containers and the machine identity](/agent-testing/environments#containers-and-the-machine-identity).
 
 For a development box the team runs against, give it a name of its own:
 
@@ -31937,6 +32249,7 @@ The run settings also record which instance served each run, so a result from a 
 | The row reads **Offline** | The process stopped, or its outbound connection is blocked by a proxy or a firewall. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`, see [Behind a proxy that blocks WebSockets](#behind-a-proxy-that-blocks-websockets). |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process, then run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name. |
+| A new agent row appears on every start, each with a different host label | The agent registered under `development` with a project key from a container, and the container's hostname changes on every recreate. | Set `LANGWATCH_AGENT_ENVIRONMENT` to a name other than `development`, or pin the container's hostname, see [Containers and the machine identity](/agent-testing/environments#containers-and-the-machine-identity). |
 | A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout`, up to 300 seconds, or make the agent answer faster. |
 | A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency` above its default of 10, or start more instances. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or it reports none at all. | Point the agent's tracing at the project that runs the scenarios. |
@@ -31965,7 +32278,7 @@ The run settings also record which instance served each run, so a result from a 
 ---
 title: Environments and Personal Agents
 sidebarTitle: Environments
-keywords: langwatch, agent simulations, environments, personal agents, development, staging, production, local development, comparison run
+keywords: langwatch, agent simulations, environments, personal agents, development, staging, production, local development, comparison run, docker, container, hostname
 description: One agent name, one row per environment. Your machine, staging and production are separate targets that a single run compares.
 ---
 
@@ -31995,7 +32308,7 @@ Environment names use lower-case letters, digits, dashes and underscores, up to 
 | The process authenticates with | The agent belongs to | Who can run it |
 |---|---|---|
 | A personal API key | The key's owner | The owner only |
-| A project API key | The machine that registered it | Everyone on the project |
+| A project API key | The machine that registered it, identified by its hostname | Everyone on the project |
 | Any key, environment other than `development` | The project | Everyone on the project |
 
 The platform refuses a run against a teammate's personal agent with `agent_owner_only`, and the message includes the owner's name. The rule applies at every door: the run dialog, the CLI, the REST API and the MCP server.
@@ -32005,8 +32318,36 @@ The run dialog shows teammates' personal agents disabled. The tooltip on the car
 For a development machine the whole team runs suites against, give it its own environment name and it is shared like any other:
 
 ```bash
-LANGWATCH_AGENT_ENVIRONMENT=dev-shared
+export LANGWATCH_AGENT_ENVIRONMENT=dev-shared
 ```
+
+## Containers and the machine identity
+
+For a development agent on a project key, the machine identity is the hostname the SDK reads from the operating system. On a laptop or a VM that hostname stays the same across restarts, so a process that stops and starts again lands on the same row.
+
+In a container the default hostname is the container id, and that id is new every time the container is recreated. Each start registers a new row, and the agents page fills with offline rows of the same name, one per host label. Kubernetes pods from a Deployment behave the same way, since a pod gets a new random suffix on every recreate.
+
+Two ways to keep one row:
+
+**Name the environment.** Give it a value other than `development`:
+
+```bash
+export LANGWATCH_AGENT_ENVIRONMENT=dev-alex
+```
+
+The row is then shared by everyone on the project who uses the same value, so a per-person value keeps people apart.
+
+**Pin the hostname.** In Docker Compose, set it on the service:
+
+```yaml
+services:
+  agent:
+    hostname: alex-dev
+```
+
+Use `docker run --hostname alex-dev` outside Compose; `container_name` does not set the hostname. On Kubernetes, a StatefulSet gives pods stable names, a Deployment does not.
+
+Old rows disappear from the agents page after 30 days unseen, or you can delete them. A deleted row comes back if a process registers under its identity again.
 
 ## The local loop
 
@@ -32678,7 +33019,7 @@ description: Test your agents through multi-turn conversations with a simulated 
 ---
 
 <Tip>
-  **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first scenario tests.
+  **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/directory) to add code-first scenario tests.
 </Tip>
 
 <video controls autoPlay muted loop playsInline width="100%">
@@ -33812,7 +34153,7 @@ description: Write scenarios with the Scenario SDK in Python or TypeScript, run 
 ---
 
 <Tip>
-  **Quick setup?** [Copy the scenarios prompt](/skills/code-prompts#add-scenario-tests) into your coding agent to add scenario tests automatically.
+  **Quick setup?** [Copy the scenarios prompt](/skills/directory) into your coding agent to add scenario tests automatically.
 </Tip>
 
 The Scenario SDK is open source and runs inside your own test runner and CI. To run scenarios from the platform against your agent's HTTP endpoint instead, with no test code, see [Connect your agent](/agent-testing/connect-your-agent).
@@ -34458,6 +34799,131 @@ Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenar
 
 ---
 
+# FILE: ./agent-testing/voice-agents-in-app.mdx
+
+---
+title: Voice Agents in the App
+sidebarTitle: Voice Agents (App)
+keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, conversational ai, feature flag
+description: "Test an ElevenLabs Conversational AI agent from the LangWatch app: talk to it, call it from a run, or run scenarios with a simulated caller."
+---
+
+<Note>
+  Testing another transport (Pipecat, OpenAI Realtime, Gemini Live, Twilio) from code? See [Voice Agent Testing](/agent-testing/voice-agents).
+</Note>
+
+## What it is
+
+A **Voice** agent type in **Agents** points at an ElevenLabs Conversational AI agent by its agent id. Three ways to test it:
+
+| Way | Where | Caller |
+|---|---|---|
+| **Talk to it** | The agent drawer | You, from the browser |
+| **Call it myself** | The Run dialog, on a scenario against a voice target | You, from the browser |
+| **Run a scenario** | Normal scenario run | A simulated caller, speaking the scenario with a caller voice |
+
+<Note>
+  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up, and the call is stored as a run in the **voice-calls** set with caller `human`, a transcript and a link to the recording.
+</Note>
+
+**Call it myself** opens the same panel from the Run dialog of a scenario, in scenario mode. The run is named after the scenario.
+
+A normal scenario run needs no manual call: the simulated caller speaks the scenario using the caller voice configured on it.
+
+## Turn it on
+
+In-app voice agents are in private beta. The feature sits behind the product flag `release_voice_agents_enabled`, off by default. To request access, reach out to support at support@langwatch.ai.
+
+
+  ### Self-hosted
+
+    Set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
+
+  ### Cloud
+
+    Ask LangWatch to enable it for your organization.
+
+
+
+<Warning>
+  With the flag off, the Voice agent type, **Talk to it**, **Call it myself** and the Caller voice controls are hidden, and the server refuses voice agents and voice runs.
+</Warning>
+
+## Credentials
+
+Add both under **Settings > Model Providers**. Never from environment variables.
+
+<Steps>
+  <Step title="ElevenLabs key">
+    The key needs `convai_read` to read the agent, `convai_write` to mint the browser conversation token and signed URL, and conversation read to fetch the transcript and recording after the call.
+
+    <Warning>
+      Without `convai_write`, every call fails at start with "ElevenLabs rejected the connection: The API key you used is missing the permission convai_write to execute this operation."
+    </Warning>
+
+    The agent must live in the same ElevenLabs workspace as the key. A wrong workspace shows as agent not found.
+  </Step>
+  <Step title="OpenAI key">
+    Required only for a simulated scenario run. The simulated caller's speech is synthesized with OpenAI text-to-speech (`gpt-4o-mini-tts`), and the agent's audio is transcribed with OpenAI for the judge. **Talk to it** and **Call it myself** use ElevenLabs only and need no OpenAI key.
+
+    Without it a simulated run fails with "The caller voice needs an OpenAI key. Add one in Settings > Model Providers."
+  </Step>
+</Steps>
+
+See [Model Providers](/platform/model-providers) for how to add and scope a provider.
+
+## Caller voice
+
+Set the caller voice on the scenario, under **Customize scenario**, or in the **Caller voice** block of the Agent Testing case editor. It is stored on the scenario, so every run of it uses the same caller.
+
+| Field | Values |
+|---|---|
+| **Voice** | An OpenAI text-to-speech voice: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`. Default `nova`. |
+| **Interrupts** | Probability from 0 to 1 that the caller talks over the agent. |
+| **Effects** | None, phone line, or background noise. |
+
+## Limits
+
+Set these as app environment variables.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `VOICE_CALL_MAX_SECONDS` | 300 | A call is cut at the limit. The run is marked "Cut at the call limit" and the judge still scores what was said. |
+| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Per execution process, per project. More voice runs queue instead of failing. Text runs are unaffected. Enforcement is local to each process and not shared across processes or pods, so the effective ceiling on a multi-process deployment is higher than this number. |
+
+`VOICE_CALL_MAX_SECONDS` is enforced by the server and governs a scenario run: the simulated caller, the judge and the recorded transcript all stop at that limit. A **Talk to it** or **Call it myself** call in the browser is bounded by the browser tab instead, up to ElevenLabs' own maximum call length: closing or reloading the tab, or losing the connection, ends the call at whatever point that happens, not at `VOICE_CALL_MAX_SECONDS`.
+
+<Note>
+  **Security**: projects in one organization that share a single ElevenLabs key share that workspace's agents and conversations, since ElevenLabs checks the key, not the project. A project-scoped key is the way to isolate a project's voice agents from the rest of the organization.
+</Note>
+
+## Traps
+
+- The ElevenLabs key needs `convai_read`, `convai_write` and conversation read. A key missing any of these fails at a different step, so check all three when a call breaks.
+- The agent must be in the same ElevenLabs workspace as the key.
+- An agent marked public in ElevenLabs still needs a token here; public access does not skip the credential check.
+- LangWatch never sends prompt overrides. Enabling overrides on the agent has no effect on these calls: the agent's own ElevenLabs prompt is what gets tested.
+- The recording can be unavailable for a short while after hang-up while ElevenLabs processes it. The run shows "Recording unavailable"; reload later.
+- The browser needs HTTPS or localhost and microphone permission. Autoplay policy can keep the agent silent until the page has been clicked.
+- Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes on your account. A simulated run also consumes OpenAI audio tokens.
+- Only one browser call per tab.
+- Self-hosted: voice turns carry audio, and audio is written to stored objects. If the stored-objects path is not writable (or no S3 bucket is configured), every voice message fails to ingest and the run shows "No response" even though the call happened. Check the api log for `EACCES` on the stored-objects directory.
+
+## Troubleshooting
+
+| Message | Cause | Fix |
+|---|---|---|
+| "...missing the permission convai_write..." | The ElevenLabs key lacks `convai_write` | Regenerate the key with `convai_write` |
+| "ElevenLabs rejected the connection: Status code: 401" | Wrong or revoked key | Check the key in Settings > Model Providers |
+| Agent not found | Wrong agent id, or the agent is in a different ElevenLabs workspace than the key | Confirm the agent id and workspace |
+| "The caller voice needs an OpenAI key..." | No OpenAI provider configured | Add an OpenAI provider in Settings > Model Providers |
+| "Recording unavailable" | ElevenLabs is still processing the recording | Reload the run after a short wait |
+| Run marked "Cut at the call limit" | The call reached `VOICE_CALL_MAX_SECONDS` | Raise the limit, or shorten the scenario |
+| Runs sit in queue | `VOICE_RUNS_MAX_CONCURRENT` is reached | Wait for a slot, or raise the limit |
+| "No response" after a call that clearly happened (self-hosted) | Audio could not be written to stored objects, so the voice messages were dropped | Make the stored-objects directory writable by the app user, or configure the S3 bucket |
+
+---
+
 # FILE: ./agent-testing/voice-agents.mdx
 
 ---
@@ -34470,6 +34936,10 @@ description: Scenario tests voice agents end to end over real audio, with the sa
 <Tip>
   **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. To do it by hand, follow the steps below.
 </Tip>
+
+<Note>
+  Prefer no code? You can register an ElevenLabs agent and test it from the app, see [Voice Agents in the App](/agent-testing/voice-agents-in-app).
+</Note>
 
 ## How a voice test runs
 
@@ -34679,7 +35149,7 @@ You set the type in the **New Dataset** drawer, in **Edit columns** on an existi
 
 ## How the image reaches the model
 
-A prompt or agent column in the Experiments workbench fetches the URL on the server and sends the image bytes to the model as image content, so the model sees the picture and not the link. This works for every model provider, whether or not the provider fetches URLs itself. The type of the file comes from the response, so a signed S3 or CDN URL without an extension works too.
+A prompt or agent column in the Experiments Workbench fetches the URL on the server and sends the image bytes to the model as image content, so the model sees the picture and not the link. This works for every model provider, whether or not the provider fetches URLs itself. The type of the file comes from the response, so a signed S3 or CDN URL without an extension works too.
 
 Audio and PDF URLs in a prompt are delivered the same way: an audio file reaches the model as audio, a PDF as a document.
 
@@ -34741,7 +35211,7 @@ description: Create a dataset by hand, from a CSV or JSON file, or from your tra
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 A dataset is a table of rows your experiments run on. Each column has a name and a type, and each row is one case: an input, the expected output when you have one, and any other field your prompt or evaluator reads.
@@ -34806,7 +35276,7 @@ Click a dataset in the list to open its page. The header shows the record count 
 | **Download as CSV** | Exports every row. |
 | **Add rows** | Opens **Add rows from CSV**. Each dataset column has a **Select column** control that lists the columns of your file and **Set empty**. Map every column, then click **Upload**, which stays disabled until the file is attached. |
 | **Edit columns** | Opens the dataset drawer to add, rename, retype or remove columns. |
-| **Run experiment** | Opens the Experiments workbench with this dataset loaded. See [Experiments](/evaluations/experiments/overview). |
+| **Run experiment** | Opens the Experiments Workbench with this dataset loaded. See [Experiments](/evaluations/experiments/overview). |
 
 <Frame>
 <img src="/images/datasets/dataset-add-rows-csv.png" alt="The Add rows from CSV modal with a CSV file attached and a Select column control for the input and expected_output columns" />
@@ -37662,7 +38132,7 @@ To recover:
 
 1. Fix the receiver.
 2. Re-enable: `PATCH /endpoints/:id {"status": "active"}`.
-3. Re-enabling does **not** re-send the gap. Replay it explicitly: for spend events, [`POST /api/gateway/v1/spend-events/replay`](/ai-gateway/billing-events#replay) with the gap window and this endpoint's id.
+3. Re-enabling does **not** re-send the gap. Replay it explicitly: for spend events, [`POST /api/gateway/v1/spend-events/replay`](/ai-gateway/billing-events#read-events-over-rest) with the gap window and this endpoint's id.
 
 ```mermaid
 stateDiagram-v2
@@ -37798,7 +38268,7 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 ## The events log
 
 <Warning>
-**Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
+**Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#read-events-over-rest), which include settled rows and keep 13 months.
 </Warning>
 
 `GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
@@ -38664,7 +39134,7 @@ description: Understand evaluators - the scoring functions that assess your LLM 
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 Evaluators are scoring functions that assess the quality of your LLM's outputs. They're the building blocks for [experiments](/evaluations/experiments/overview), [online evaluation](/evaluations/online-evaluation/overview), and [guardrails](/evaluations/guardrails/overview).
@@ -40091,7 +40561,7 @@ description: Run a dataset through your prompts and agents in the workbench, sco
 The clip above builds an experiment on a customer support dataset: a prompt column runs the ten rows, an LLM Answer Match evaluator scores each answer against the expected output, and the column header reads the pass rate, 70 percent on this run.
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 An experiment is a table. Each row is a dataset entry, and each column is a prompt, an agent, a comparison or an evaluator that runs on that entry. An evaluator attached to a prompt or an agent column scores the output of that column. You build the table in the workbench, run it, and read the pass rate per column.
@@ -40217,7 +40687,7 @@ description: Run experiments programmatically from notebooks or scripts to batch
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 The LangWatch SDK runs experiments from your Python or TypeScript code and tracks
@@ -41781,7 +42251,7 @@ description: Add guardrails to your LLM application to block harmful content in 
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 This guide shows how to integrate guardrails into your application using the LangWatch SDK. Guardrails run evaluators synchronously and return results you can act on immediately.
@@ -42237,7 +42707,7 @@ description: Block or modify harmful LLM responses in real-time to enforce safet
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 Guardrails are evaluators that run in real-time and **act** on the results - blocking, modifying, or rejecting responses that violate your safety or policy rules. Unlike [monitors](/evaluations/online-evaluation/overview) which only measure and alert, guardrails actively prevent harmful content from reaching users.
@@ -42476,7 +42946,7 @@ description: Score your production traffic as it arrives with monitors that run 
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
 A monitor is an evaluator attached to your production traffic. It scores the traces your live application sends, so you see quality and safety problems on real traffic and collect the failing cases to fix. To score a dataset before you deploy a change, see [Experiments](/evaluations/experiments/overview).
@@ -42710,10 +43180,10 @@ description: Score your prompts and agents on a dataset before you ship, score p
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/directory) into your coding agent to get started automatically.
 </Tip>
 
-An evaluation runs an evaluator on an input and an output and returns a verdict: a pass or fail, a score, a label, and the details behind it. LangWatch runs the same evaluators in three places: on a dataset in the Experiments workbench, on production traces as an online evaluation, and inside your request as a guardrail.
+An evaluation runs an evaluator on an input and an output and returns a verdict: a pass or fail, a score, a label, and the details behind it. LangWatch runs the same evaluators in three places: on a dataset in the Experiments Workbench, on production traces as an online evaluation, and inside your request as a guardrail.
 
 ## Where evaluations run
 
@@ -46215,322 +46685,6 @@ curl -X POST "https://app.langwatch.ai/api/track_event" \\
 
 ---
 
-# FILE: ./better-agents/overview.mdx
-
----
-title: "Better Agents"
-description: "Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development"
----
-
-## The Reliability Layer
-
-Better Agents is a CLI tool and a set of standards for building **reliable, testable, production-grade agents**, independent of which framework you use. It gives your coding assistant (Kilocode, Claude Code, Cursor, etc.) knowledge of any agent framework you choose (Agno, Mastra, LangGraph, etc.) and all their best practices.
-
-Use your preferred stack: Agno, Mastra, Vercel AI, Google ADK, or anything else. Better Agents adds project structure, tests, and prompt versioning on top of it.
-
-<Note>
-  **Already have an agent?** You don't need Better Agents -- go to [LangWatch Skills](/skills/directory) to add tracing, evaluations, scenarios, and prompt versioning to your existing project.
-</Note>
-
-## Quick Start
-
-### Installation
-
-Install Better Agents globally:
-
-```bash
-npm install -g @langwatch/better-agents
-```
-
-Or use with npx (no installation required):
-
-```bash
-npx @langwatch/better-agents init my-agent-project
-```
-
-### Initialize a New Project
-
-After installation, create a new Better Agents project:
-
-```bash
-# In current directory
-better-agents init .
-
-# In a new directory
-better-agents init my-better-agent
-```
-The CLI will guide you through selecting your programming language, agent framework, coding assistant, LLM provider, and API keys.
-
-### Create Your First Project
-
-After running the init command, navigate to your project:
-
-```bash
-cd my-better-agent
-```
-
-You'll see a structure like this:
-
-```text
-my-better-agent/
-├── app/                    # Your agent implementation (or src/ for TypeScript)
-│   └── agent.py            # Main agent code using your chosen framework
-│
-├── tests/
-│   ├── scenarios/          # End-to-end conversational tests
-│   │   └── example_scenario.test.py
-│   └── evaluations/        # Component-level evaluation notebooks
-│       └── example_eval.ipynb
-│
-├── prompts/                # Versioned prompt files (YAML format)
-│   └── sample_prompt.yaml
-│
-├── prompts.json            # Prompt registry (syncs with LangWatch)
-├── .mcp.json               # MCP configuration for coding assistants
-├── AGENTS.md               # Development guidelines and best practices
-├── .env                    # Environment variables (API keys, etc.)
-└── .gitignore
-```
-
-### Run Your First Scenario Test
-
-Better Agents projects come with example scenario tests. Run them to see how agent testing works:
-
-
-### Python
-
-```bash
-pytest tests/scenarios/ -v
-```
-
-
-### TypeScript
-
-```bash
-npm test
-```
-
-<Check>
-Once you run your first scenario, you'll see results appear in your LangWatch project under Agent Testing > Results.
-</Check>
-
-## Project Structure
-
-Every Better Agents project follows a tested, scalable, maintainable layout. Here's what each directory does:
-
-### `app/` or `src/`
-
-Your actual agent code, written using your chosen framework. This is where you implement your agent's logic, tools, and workflows.
-
-### `tests/scenarios/`
-
-**The core of real agent reliability.** These are conversational test cases that simulate real tasks and validate agent behavior across iterations, updates, or model swaps.
-
-Scenarios answer one question: *Does the agent still behave the way we expect?*
-
-Example scenario structure:
-
-
-### Python
-
-```python tests/scenarios/example_scenario.test.py
-import pytest
-import scenario
-
-@pytest.mark.agent_test
-@pytest.mark.asyncio
-async def test_customer_support_refund():
-    """Test that agent handles refund requests correctly."""
-
-    # Run the scenario
-    result = await scenario.run(
-        name="refund request",
-        description="Customer requests refund for defective product",
-        agents=[
-            CustomerSupportAgent(),
-            scenario.UserSimulatorAgent(),
-            scenario.JudgeAgent(criteria=[
-                "Agent should acknowledge the issue",
-                "Agent should check order status",
-                "Agent should initiate refund process",
-            ])
-        ],
-        script=[
-            scenario.user("I want a refund for my order"),
-            scenario.agent(),
-            verify_refund_initiated,
-            scenario.user("The product arrived damaged"),
-            scenario.agent(),
-            scenario.judge(),
-        ],
-    )
-
-    assert result.success, result.reasoning
-```
-
-
-### TypeScript
-
-```typescript tests/scenarios/example_scenario.test.ts
-import { describe, it, expect } from "vitest";
-import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
-import { openai } from "@ai-sdk/openai";
-
-describe("Customer Support Agent", () => {
-  it("should handle refund requests", async () => {
-    // Run the scenario
-    const result = await scenario.run({
-      name: "refund request",
-      description: "Customer requests refund for defective product",
-      agents: [
-        customerSupportAgent,
-        scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
-      ],
-      script: [
-        scenario.user("I want a refund for my order"),
-        scenario.agent(),
-        (state) => {
-          expect(state.hasToolCall("check_order_status")).toBe(true);
-        },
-        scenario.user("The product arrived damaged"),
-        scenario.agent(),
-        scenario.succeed("Agent correctly handled refund request"),
-      ],
-    });
-
-    expect(result.success).toBe(true);
-  });
-});
-```
-
-### `tests/evaluations/`
-
-Structured benchmarking for components like RAG correctness, retrieval F1 score, classification accuracy, and routing accuracy. LangWatch provides an extensive library of evaluators including answer correctness, LLM-as-judge, RAG quality metrics, safety checks, and more.
-
-<Note>
-See the complete list of available evaluators in [Evaluators List](/evaluations/evaluators/list).
-</Note>
-
-Evaluation notebooks allow teams to quantitatively test individual components:
-
-```python tests/evaluations/rag_correctness.ipynb
-import langwatch
-
-# Evaluate RAG retrieval accuracy
-results = langwatch.evaluate(
-    dataset="customer-support-dataset",
-    evaluator="rag_correctness",
-    metric="f1_score"
-)
-
-print(f"RAG F1 Score: {results.f1_score}")
-```
-
-### `prompts/`
-
-Versioned prompt files in YAML format for team collaboration. Prompts are tracked, shared, and collaboratively improved, like real software.
-
-Example prompt structure:
-
-```yaml prompts/customer-support.yaml
-handle: customer-support-bot
-scope: PROJECT
-model: openai/gpt-5-mini
-prompt: |
-  You are a helpful customer support agent.
-
-  User inquiry: {{user_message}}
-
-  Context:
-  {{context}}
-
-  Instructions:
-  - Be polite and professional
-  - Resolve the issue efficiently
-  - Escalate if necessary
-```
-
-### `prompts.json`
-
-Prompt registry that controls which prompts are active and versioned. This file is versioned along with your codebase while also syncing to the LangWatch platform playground for collaboration.
-
-### `.mcp.json`
-
-MCP server configuration that comes with all the right MCPs set up so your coding assistant becomes an expert in your framework of choice and in writing Scenario tests for your agent. It automatically discovers MCP tools and knows where to find new capabilities.
-
-### `AGENTS.md`
-
-Development guidelines that ensure every new feature is properly tested, evaluated, and that prompts are versioned. This file guides your coding assistant to follow Better Agents best practices.
-
-## Core Concepts
-
-### Scenarios
-
-Scenarios are end-to-end conversational tests that validate agent behavior in realistic, multi-turn conversations. Unlike static input-output tests, scenarios simulate how real users interact with your agent.
-
-**Why scenarios matter:**
-
-- Test agent behavior as a complete system
-- Catch regressions before they reach production
-- Validate complex workflows and edge cases
-- Ensure consistency across model updates
-
-Scenarios complement evaluations by testing the **agent as a whole system** rather than isolated parts.
-
-<Note>
-For detailed scenario testing documentation, see [Agent Testing](/agent-testing/overview).
-</Note>
-
-### Evaluations
-
-Evaluations provide structured benchmarking for specific components of your agent pipeline. Examples include:
-
-- **RAG correctness** - Measure retrieval and generation accuracy
-- **Retrieval F1 score** - Evaluate search quality
-- **Classification accuracy** - Test routing and categorization
-- **Routing accuracy** - Validate decision-making logic
-
-LangWatch offers an extensive library of evaluators covering answer correctness, LLM-as-judge metrics, RAG quality, safety checks, format validation, and more. See the [complete evaluators list](/evaluations/evaluators/list) for all available options.
-
-<Note>
-Learn more about evaluations in [LLM Evaluation](/evaluations/overview).
-</Note>
-
-### Prompt Versioning
-
-With Better Agents, prompts become:
-
-- **Tracked** - Full version history with rollback
-- **Reviewable** - Team collaboration on prompt improvements
-- **Documented** - Clear structure and purpose
-- **Synced** - Controlled by `prompts-lock.json`, versioned with codebase, synced to platform
-
-This enables prompt management workflows similar to dependency management in traditional software.
-
-<Note>
-For comprehensive prompt management features, see [Prompt Management](/prompt-management/overview).
-</Note>
-
-### MCP Integration
-
-The `.mcp.json` configuration enables your coding assistant to understand your agent framework and Better Agents standards.
-
-<Note>
-Learn more about MCP integration in [LangWatch MCP](/integration/mcp).
-</Note>
-
-## Next Steps
-
-- [Agent Testing](/agent-testing/overview)
-- [LLM Evaluation](/evaluations/overview)
-- [Prompt Management](/prompt-management/overview)
-- [LangWatch MCP](/integration/mcp)
-- [GitHub Repository](https://github.com/langwatch/better-agents)
-- [Discord Community](https://discord.com/invite/kT4PhDS2gH)
-
-
----
-
 # FILE: ./prompts/template-syntax.mdx
 
 ---
@@ -49598,7 +49752,7 @@ The split is enforced at three layers, see
 [Open-core licensing](/ai-governance/open-core-licensing) for
 the layered enforcement (UI gating + tRPC middleware + service-layer
 defense-in-depth + CLI 402 envelope), and
-[Per-file license headers](/ai-governance/overview#per-file-license-headers)
+[Per-file license headers](/ai-governance/open-core-licensing#per-file-license-headers)
 for the canonical SPDX header text on each tier.
 
 ## SOC 2 Type II: what self-hosted underwrites
@@ -51345,7 +51499,7 @@ If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kuber
 
 The langwatch chart needs two operator-managed Secrets in your target namespace before the first sync:
 
-- `langwatch-app-secrets` holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
+- `langwatch-app-secrets` holds the app keys + the AI Gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
 
 This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
@@ -51368,7 +51522,7 @@ kubectl -n langwatch create secret generic langwatch-clickhouse-creds \
   --from-literal=clusterSecret="$(openssl rand -hex 24)"
 ```
 
-If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional because only replicated ClickHouse uses it for Keeper inter-node auth. Creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
+If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional because only replicated ClickHouse uses it for Keeper inter-node auth. Creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
 
 Then apply the Application manifest:
 
@@ -51457,7 +51611,9 @@ Topic-specific configuration pages:
 
 ## Operator-managed Secrets via External Secrets / Sealed Secrets / Vault
 
-Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`). The preflight Job runs as an ArgoCD `PreSync` hook (mapped automatically from Helm's `pre-install` + `pre-upgrade` hooks, see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)) so a Secret that has not landed in time fails the sync with a clear missing-keys error.
+Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
+
+The preflight Job runs as an ArgoCD `PreSync` hook, mapped automatically from Helm's `pre-install` and `pre-upgrade` hooks (see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)). A Secret that has not landed in time fails the sync with a clear missing-keys error.
 
 The preflight Job runs during ArgoCD's `PreSync` phase, which Argo completes in full before any `Sync` phase manifest is applied. A regular `ExternalSecret` / `SealedSecret` / `vaultauth` resource is a `Sync`-phase manifest by default, so a `sync-wave` annotation on it cannot pull it ahead of the preflight, even at wave `-1000`. Pick one of:
 
@@ -51492,7 +51648,9 @@ The two `resourceVersion` values should be identical because the chart no longer
 
 ## Legacy: autogen.enabled=true under ArgoCD
 
-If you set `autogen.enabled=true` in your Argo Application values, the chart materialises the Secret itself using helm's `lookup`-or-`randAlphaNum` pattern. Under direct `helm upgrade` that pattern is idempotent: the lookup reads existing values from the live cluster and the manifest reuses them verbatim. Under ArgoCD it is NOT idempotent: the argocd-repo-server has no cluster access (by design, it is a sandboxed renderer), so `lookup` returns nil on every sync and the chart emits a fresh random pair every render. Without mitigation, every Argo sync rotates the credentials and rolls both app + gateway pods.
+If you set `autogen.enabled=true` in your Argo Application values, the chart materialises the Secret itself using helm's `lookup`-or-`randAlphaNum` pattern. Under direct `helm upgrade` that pattern is idempotent: the lookup reads existing values from the live cluster and the manifest reuses them verbatim.
+
+Under ArgoCD it is not idempotent. The argocd-repo-server has no cluster access, by design, because it is a sandboxed renderer, so `lookup` returns nil on every sync and the chart emits a fresh random pair every render. Without mitigation, every Argo sync rotates the credentials and rolls both the app and the gateway pods.
 
 The mitigation is the same trio that earlier chart versions required from the start: `ignoreDifferences` on the Secret's `/data` (Argo excludes it from the diff), `RespectIgnoreDifferences=true` in `syncOptions` (the sync operation itself omits the ignored field), and `ServerSideApply=true` (server-side apply honors `RespectIgnoreDifferences` reliably; client-side apply does not). Drop any one of the three and an ordinary sync rotates the live Secret. `argocd app sync --force` and `replace: true` bypass `RespectIgnoreDifferences` and rotate regardless.
 
@@ -51903,7 +52061,7 @@ For production, you should:
 
 ### 1. Create the app Secret
 
-One Secret holds every chart-required value (app keys + AI gateway shared-auth keys when the gateway sub-chart is enabled). Both `langwatch-app` and the gateway pod mount it.
+One Secret holds every chart-required value (app keys + AI Gateway shared-auth keys when the gateway sub-chart is enabled). Both `langwatch-app` and the gateway pod mount it.
 
 ```bash
 kubectl create namespace langwatch
@@ -51917,7 +52075,7 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
   --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
 ```
 
-If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
+If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines.
 
 For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart does not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
 
@@ -52246,7 +52404,9 @@ That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-en
 
 Three things to know before flipping it on:
 
-1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`) that also holds the app keys (`credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret`, `virtualKeyPepper`). The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a clear list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
+
+   The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
@@ -53091,6 +53251,59 @@ Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall p
 
 ---
 
+# FILE: ./self-hosting/langy/health-check.mdx
+
+---
+title: Langy Health Check
+description: An endpoint an uptime monitor can poll that sends Langy a real greeting and reports whether it answered.
+sidebarTitle: Health check
+keywords:
+  - langy health check
+  - langy uptime monitor
+  - langy canary
+---
+
+`GET /api/health/langy` sends one real user turn, "Hi Langy.", through the same path the browser and the API use, waits for the answer, and reports the result in a shape an uptime monitor can alert on. Point any HTTP monitor at it.
+
+## Configure the monitor
+
+| Setting | Value |
+| --- | --- |
+| Method and URL | `GET https://<your-langwatch-host>/api/health/langy` |
+| Headers | `X-Auth-Token: <API key>` and `X-Project-Id: <project id>` |
+| Expected status | `200` |
+| Request timeout | 75 seconds or more (the check itself gives up at 55, after the key has been authenticated) |
+| Check interval | 3 minutes or longer |
+
+The API key must be one issued to a user (Settings → API keys), that user must have Langy access, and the key must carry the `langy:create` permission. The turn runs as that user, so create a dedicated user and key for the monitor rather than reusing a person's. The project's own key from the project settings page has no owning user and is refused with `403`.
+
+`X-Project-Id` names the project the turn runs in. A key scoped to exactly one project may omit it; any other key without it is refused with `401`.
+
+The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be on for that project. While it is off, the endpoint answers `404` like any unmounted path.
+
+## What it answers
+
+| Status | Body | Meaning |
+| --- | --- | --- |
+| `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
+| `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
+| `429` | `{ "status": "busy" }` | A check for the same key is still running, or its last one timed out less than 55 seconds ago. Poll less often. |
+| `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
+
+Every response the probe answers itself carries `Cache-Control: no-store`. The one exception is the `404` while the surface flag is off, which is byte-identical to an unmounted path, headers included, so the response does not disclose whether the flag is on. The endpoint sits beside the other subsystem probes (`/api/health/collector`, `/api/health/scenarios`, and so on) and answers refusals in the same shape they do.
+
+The 55-second budget starts once the key is authenticated, so a slow database adds to the wall clock. If a reverse proxy in front of LangWatch has its own read timeout (ingress-nginx defaults to 60 seconds), raise it above the monitor's timeout, or a stalled check reaches the monitor as a `504` from the proxy instead of a `503` with `reason: "timeout"`. Either one still fails the check.
+
+## What each check costs
+
+Each poll is one real Langy turn: one worker boot and one model call, attributed to the monitor's user in the monitor's project. A 3-minute interval is 480 turns a day.
+
+A check that times out gives up waiting, but the turn it started keeps running until the worker finishes or fails it. So a check that arrives within 55 seconds of a timed-out one is answered `429` rather than starting a second turn, which caps what a monitor polling faster than the interval above can spend. At a 3-minute interval that never applies.
+
+Langy's first turn on a cold worker is the slowest part of the path, so a `timeout` under load or right after a deploy is worth a second look before it is treated as an outage. Most monitors confirm a failure from a second location before alerting, which covers that.
+
+---
+
 # FILE: ./self-hosting/langy/networking-and-egress.mdx
 
 ---
@@ -53665,7 +53878,7 @@ No visibility window, so LangWatch never redacts older trace content. Events are
 </Card>
 
 <Card title="The whole product surface" icon="grid-2">
-Observability, evaluations, prompt management, agent simulations, the Optimization Studio, and the AI Gateway.
+Observability, evaluations, prompt management, agent simulations, Workflows, and the AI Gateway.
 </Card>
 </CardGroup>
 
@@ -53674,7 +53887,7 @@ You never need a license just to run LangWatch. A license adds the enterprise ca
 <Note>
 An Enterprise license is priced per seat, so it carries the number of members you bought and the deployment enforces it. Everything else stays uncapped: volume, history, projects, teams, and every experimentation resource. Need more seats? [Talk to us](mailto:enterprise@langwatch.ai) and we reissue the license.
 
-Seats come in two kinds, and which one a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one. See [Seats](/ai-governance/roles-and-permissions#seats).
+Seats come in two kinds, and which one a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one. See [Seats](/platform/members-and-teams#lite-members).
 </Note>
 
 <Note>
@@ -54439,7 +54652,7 @@ Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 `examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
-Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
+Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
 </Tip>
 
 <Note>
@@ -54664,7 +54877,7 @@ The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regard
 ### Private control-plane paths are blocked at the ingress
 
 Everything under `/api/internal/*` is the app's private control plane: the Langy
-agent's callbacks and the AI gateway's usage callbacks. Those routes authenticate
+agent's callbacks and the AI Gateway's usage callbacks. Those routes authenticate
 with a shared secret, but they are never meant to be reachable from the internet.
 
 The chart blocks them at the ingress by default, via `ingress.blockedPaths`
@@ -54810,7 +55023,7 @@ One more toggle in the overlay isn't an admission failure but an unmet dependenc
 
 - **Gateway HPA** (`gateway.autoscaling.enabled`) scales on a custom metric via `prometheus-adapter`. Set it to `false` if you don't run one; the overlay pins `gateway.replicaCount: 2` instead.
 
-With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so nothing exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
+With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so no component exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
 
 In-cluster datastores satisfy read-only-root policies, but managed databases (the `postgres-external`, `redis-external`, and `clickhouse-external` overlays) are still the better production choice: you get backups, HA, and patching, and there are no datastore pods to admit.
 
@@ -56020,7 +56233,7 @@ Webhook and billing REST surfaces authenticate with an **organization API key** 
 
 ## Billing settlement window
 
-A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#settled-events-and-supersession)). The default grace is **30 minutes**. Tune it with:
+A gateway request that was admitted but never confirmed is settled after a grace window and delivered as `gateway.request.settled` with unknown cost (see [settled semantics](/ai-gateway/billing-events#event-lifecycle)). The default grace is **30 minutes**. Tune it with:
 
 ```
 LW_SPEND_SETTLEMENT_GRACE_MS=1800000
@@ -56626,7 +56839,7 @@ description: "Read what a coding agent session did and what it cost. Walk one se
 - [List coding agent session events](/api-reference/coding-agents/list-coding-agent-session-events): every model call, compaction, rate limit and tool run of one session, in time order, with input, output, cache-read and cache-creation tokens, cost, duration and model per row.
 - [Get pull request coding agent usage](/api-reference/coding-agents/get-pull-request-coding-agent-usage): the rollup of everything spent on a pull request over its lifetime, split by project, user and agent.
 
-Both authenticate with a project API key and read under the project's [data privacy policy](/ai-governance/data-privacy): an API key resolves as a public viewer, so it reads what the policy captures and never what it restricts or drops.
+Both authenticate with a project API key and read under the project's [data privacy policy](/platform/data-privacy): an API key resolves as a public viewer, so it reads what the policy captures and never what it restricts or drops.
 
 The same data renders in the product on the [sessions](/coding-agents/sessions) and [pull requests](/coding-agents/pull-requests) views, and over the command line as `langwatch session events <sessionId>` and `langwatch trace transcript <traceId>`.
 
@@ -60915,7 +61128,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
   <Accordion title="What is the difference between a full member and a lite member?">
     Which seat someone occupies follows from what they can do. A **full member** can change things: build prompts, run experiments, edit datasets, configure the gateway. A **lite member** can only look at what the team produces. They open the projects they are invited to and read traces, analytics, evaluations, scenario runs, datasets, prompts and experiments, and they can leave annotations on what they read. They cannot see costs, and they cannot create, edit or delete anything else.
 
-    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/ai-governance/roles-and-permissions#seats) for the full breakdown.
+    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/platform/members-and-teams#lite-members) for the full breakdown.
   </Accordion>
 
   <Accordion title="What counts as a billable event?">

@@ -171,7 +171,7 @@ Your receiver does three things, in order:
 
 1. **Verify the signature.** The `X-LangWatch-Signature` header is `t=<unix seconds>,v1=<hex>`; the HMAC-SHA256 is computed over `<t>.<raw body>` with your endpoint secret. Reject a timestamp older than 300 seconds. For 24 hours after you roll the secret, the header carries two `v1=` values and either one is valid. Copy the verifier from the [webhooks reference](/features/webhooks#verifying-signatures) or from the demo repository.
 2. **Dedup by envelope `id`** and ingest. Delivery is at least once and ids are stable, so an upsert keyed on `id` is enough; retries and replays become no-ops. Each delivery also carries `X-LangWatch-Delivery-Id` and `X-LangWatch-Delivery-Attempt`.
-3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-spend-event).
+3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-event-payload).
 
 Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time. The `usage` object on a delivered event has five fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` and `reasoning_tokens`. Reasoning tokens are reported for display and are never priced separately.
 
@@ -179,7 +179,7 @@ A delivery that fails is retried after 1 minute, 5 minutes, 30 minutes, 2 hours,
 
 ## 5. Reconcile
 
-Nightly, or at period close, reconcile in two grains against the ledger (details: [reconciliation](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger)):
+Nightly, or at period close, reconcile in two grains against the ledger (details: [Reconcile with the SDKs](/ai-gateway/billing-events#reconcile-with-the-sdks)):
 
 ```bash
 # Fast path: per-tenant checksums for the closed period
@@ -192,7 +192,7 @@ Matching totals mean no aggregate divergence. They do not prove both systems hol
 
 On divergence, walk `spend-events` for that key and window by cursor and compare the count per `gateway_request_id`. One request dropped and another booked twice leaves the id sets looking close and the money wrong; the ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, compare `cost.nano_usd` per id. Both reads take the same filters, so you can narrow the walk to what the checksum covered.
 
-For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint and let your dedup absorb the duplicates.
+For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#read-events-over-rest) the gap window to your endpoint and let your dedup absorb the duplicates.
 
 ### Narrowing and grouping
 
@@ -282,7 +282,7 @@ The pair every tenant dashboard wants, current spend against the cap:
 
 - Per tenant: `GET /api/gateway/v1/budgets?scope_type=virtual_key&external_id=acme-4171` returns each budget with live `spent_usd` and `limit_usd`. `spend_available: false` means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
 - Per tenant, one number: `GET /api/gateway/v1/virtual-keys/{id}/spend` returns `{virtual_key_id, spent_usd, requests, window: {from, to}}` for the current UTC month by default, or the `from` and `to` you pass. The same value is shown on the key in the Virtual Keys page, so what you invoice matches what you see.
-- Per end user: `GET /api/gateway/v1/end-users/{id}/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#per-end-user-spend).
+- Per end user: `GET /api/gateway/v1/end-users/{id}/spend` (organization key) returns the user's rolling-window usage and every applicable template cap at its current-period spend, in one call. See [per-end-user spend](/ai-gateway/billing-events#read-events-over-rest).
 
 Rating stays in your billing system: you define the markup over the gateway-reported cost, or bill passthrough plus a fee, and events carry `rate_version` so cost is re-derivable.
 

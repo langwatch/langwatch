@@ -15,6 +15,7 @@
 import { createLogger } from "@langwatch/observability";
 import { prisma } from "~/server/db";
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
+import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 import { isElevenLabsHost } from "~/server/modelProviders/registry";
 
 const logger = createLogger("langwatch:gateway:elevenlabs-credential");
@@ -69,6 +70,26 @@ export async function getElevenLabsWebhookSecret({
   const secret = row.keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
   if (typeof secret !== "string" || secret.length === 0) return null;
   return { secret, organizationId: row.organizationId };
+}
+
+/**
+ * The id of the enabled ElevenLabs provider row a project can reach, or null.
+ *
+ * A run resolves its credential in two steps: this finds the row that signs
+ * the project's sessions, and {@link getElevenLabsApiCredential} reads the key
+ * off it. Keeping them apart means the key value is fetched only where it is
+ * used, and the lookup uses the same scope chain (org, team, project) every
+ * other provider read does.
+ */
+export async function findElevenLabsProviderForProject({
+  projectId,
+}: {
+  projectId: string;
+}): Promise<{ id: string } | null> {
+  const repository = new ModelProviderRepository(prisma);
+  const rows = await repository.findAllAccessibleForProject(projectId);
+  const row = rows.find((r) => r.provider === "elevenlabs" && r.enabled);
+  return row?.id ? { id: row.id } : null;
 }
 
 /**

@@ -508,6 +508,17 @@ export const EditModelProviderForm = ({
           </Field.HelperText>
         </Field.Root>
 
+        {provider.provider === "elevenlabs" && (
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            data-testid="elevenlabs-voice-agents-note"
+          >
+            Voice agents sign their ElevenLabs sessions with this key. It needs
+            the convai_read and convai_write permissions.
+          </Text>
+        )}
+
         {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>
             <Switch

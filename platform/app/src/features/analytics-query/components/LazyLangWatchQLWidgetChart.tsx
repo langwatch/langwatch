@@ -9,9 +9,9 @@
  *
  * Mount this, not `LangWatchQLWidgetChart` — importing that directly is what
  * would put Vega back in the dashboard's entry chunk, and nothing would look
- * wrong. The sibling boundary for the workbench is
- * `LazyLangWatchQLChartMode.tsx`; they are separate because the two surfaces
- * mount different components, not because the chunk differs.
+ * wrong. This used to have a sibling boundary for the Custom query
+ * workbench (`LazyLangWatchQLChartMode.tsx`), removed along with that page —
+ * this is now the only surface that draws a Vega-Lite chart.
  *
  * Type re-exports below are type-only, so they are erased at build and pull
  * nothing eagerly.

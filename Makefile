@@ -387,6 +387,11 @@ sync-all-openapi:
 	cd platform/app && pnpm run task generateOpenAPISpec
 	cd sdks/typescript && pnpm run generate:openapi-types
 	cd sdks/python && make generate/api-client
+	# The Go client is generated and committed like the other two, and was
+	# missing here — which is why it drifted eight spec commits behind while
+	# TypeScript and Python stayed current. GOWORK=off because sdks/go/client
+	# is its own module and is deliberately absent from the repo-root go.work.
+	cd sdks/go/client && GOWORK=off go generate ./...
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

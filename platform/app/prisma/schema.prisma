@@ -2802,7 +2802,7 @@ model Agent {
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id])
   name              String
-  type              String // "signature" | "code" | "workflow" | "http"
+  type              String // "signature" | "code" | "workflow" | "http" | "connected" | "voice"
   config            Json // Node configuration (model, prompt, code, etc.)
   workflowId        String? // For "workflow" type - top level for joins
   workflow          Workflow? @relation(fields: [workflowId], references: [id])
@@ -2885,6 +2885,11 @@ model Scenario {
   // Values are text, numbers or booleans. A field with no value has no key.
   // Null reads as no values. See specs/scenarios/scenario-fields.feature.
   fields          Json?
+  // The simulated caller's voice for a voice target: { voiceModel,
+  // interruptProbability, effects }. Null for a non-voice scenario or one that
+  // keeps every caller default. See caller-voice.config.ts and
+  // specs/features/agents/voice-agents-v1.feature (AC17).
+  callerVoice     Json?
   // The test suite (a SimulationSuite with kind "test_suite") this scenario is
   // filed in, or null for an unfiled scenario. This column is the source of
   // truth for test suite membership; the test suite's scenarioIds is a

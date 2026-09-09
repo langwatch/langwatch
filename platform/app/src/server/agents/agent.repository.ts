@@ -15,10 +15,15 @@ import {
 } from "~/optimization_studio/types/dsl";
 import { connectedAgentVisibleWhere } from "./connected-agent-visibility";
 import { AgentRegisterOnlyError } from "./errors";
+import {
+  type VoiceAgentConfig,
+  voiceAgentConfigSchema,
+} from "./voice/voice-agent.config";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http,
- * plus "connected": an agent registered from code by the SDK (ADR-128).
+ * plus "connected": an agent registered from code by the SDK (ADR-128), and
+ * "voice": a voice agent reached through a transport (ADR: voice agents v1).
  */
 export const agentTypeSchema = z.enum([
   "signature",
@@ -26,6 +31,7 @@ export const agentTypeSchema = z.enum([
   "workflow",
   "http",
   "connected",
+  "voice",
 ]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
@@ -37,7 +43,8 @@ export type AgentComponentConfig =
   | CodeComponentConfig
   | CustomComponentConfig
   | HttpComponentConfig
-  | ConnectedComponentConfig;
+  | ConnectedComponentConfig
+  | VoiceAgentConfig;
 
 /**
  * Get the appropriate config schema based on agent type
@@ -54,6 +61,8 @@ export const getConfigSchemaForType = (type: AgentType) => {
       return httpComponentSchema;
     case "connected":
       return connectedComponentSchema;
+    case "voice":
+      return voiceAgentConfigSchema;
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unknown agent type: ${_exhaustive}`);

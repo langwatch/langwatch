@@ -39,17 +39,22 @@ export function buildSecurityHeaders({
     "frame-ancestors 'none'",
     ...(!dev ? ["upgrade-insecure-requests"] : []),
     `worker-src 'self' blob:${cdn}`,
+    // Voice agents: the browser talks to ElevenLabs directly over the signed
+    // ConvAI websocket the platform mints (#7947).
     `connect-src 'self' ${buildStorageConnectSrc(environment).join(
       " ",
-    )} https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
+    )} https://api.elevenlabs.io wss://api.elevenlabs.io https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
     "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
   ].join("; ");
 
   return {
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
+    // microphone=(self): the "Talk to it" voice panel captures audio on this
+    // origin. microphone=() makes getUserMedia reject with NotAllowedError
+    // without ever prompting, which reads as a user denial (#7947).
     "Permissions-Policy":
-      "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+      "geolocation=(), microphone=(self), camera=(), payment=(), usb=()",
     ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
     ...(!dev
       ? {

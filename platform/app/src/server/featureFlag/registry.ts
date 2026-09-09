@@ -185,6 +185,13 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
+  {
+    key: "release_voice_agents_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Voice agents: register an ElevenLabs agent, talk to it, call it from a run, and run scenarios with a simulated caller. Off by default; enable per project or organization via the operator store.",
+  },
   // Per-project gate for the transient S3 spool at the ingestion edge
   // (#4215 / ADR-022). ON by default, so a deployment with object storage
   // configured keeps oversized span content intact with no flag setup: a span
@@ -332,6 +339,15 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
+  {
+    key: "release_custom_chart_playground",
+    scope: "SYSTEM",
+    defaultValue: false,
+    envOverridable: false,
+    family: "Custom Chart Playground",
+    description:
+      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
   },
   {
     key: "release_ui_home_signal_focused_enabled",

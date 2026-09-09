@@ -8,7 +8,7 @@ sidebarTitle: Anomaly rules
 
 <Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
 This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
 
@@ -100,7 +100,7 @@ C3 (in flight on the [governance platform](https://github.com/langwatch/langwatc
 }
 ```
 
-Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. Setting a real Slack webhook today does **nothing**: you'll think alerts are wired and they aren't.
+Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
 
 ## Verify a rule is firing
 
@@ -113,7 +113,7 @@ Two angles, same data:
 To verify it yourself, end to end:
 
 1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
-2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-gateway/governance/ingestion-sources/otel-generic#test-it-now--copy-paste-curl).
+2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-governance/ingestion-sources/otel-generic#test-it-now-copy-paste-curl).
 3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
 5. Reload `/governance`, the alert should appear in "Recent anomalies" with `state: open` and a populated `detail.ratio`.

@@ -60,7 +60,7 @@ Feature: MCP outbound request and browser capability hardening
       When a client requests the application root
       Then the response contains the Permissions-Policy header
       And geolocation is disabled
-      And microphone is disabled
+      And microphone is allowed only for the app's own origin, for the voice agents panel
       And camera is disabled
       And payment is disabled
       And USB is disabled
