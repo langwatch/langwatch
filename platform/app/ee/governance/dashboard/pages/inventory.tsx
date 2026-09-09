@@ -195,6 +195,7 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "copilot_studio_dataverse",
   "openai_admin",
   "anthropic_admin",
+  "claude_compliance",
 ] as const;
 
 type PullConfigBuilderSourceType =
@@ -236,6 +237,14 @@ function resolvePullConfig(
       shouldRequireCredentials
         ? "An organization Admin API key is required, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
         : "The backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
+    ],
+    claude_compliance: [
+      () =>
+        buildClaudeCompliancePullConfig(composer, { shouldRequireCredentials }),
+      "Missing workspace API key",
+      shouldRequireCredentials
+        ? "The workspace API key is required — without it every run authenticates with an unresolved template."
+        : "Leave the workspace API key blank to keep the current one.",
     ],
     anthropic_admin: [
       () =>
@@ -2823,7 +2832,12 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   ],
   claude_compliance: [
     {
-      key: "workspaceApiKey",
+      // `credentials*` prefix, like every other secret this form collects:
+      // it is what routes the value into the encrypted `credentials` subtree
+      // the adapter's frozen `${{credentials.token}}` header reads. Under its
+      // old name the field was collected, dropped by `parserFieldValue` as a
+      // secret, and put back by nothing.
+      key: "credentialsToken",
       label: "Workspace API key",
       placeholder: "sk-ant-admin-...",
       hint: "Generate under Anthropic Admin Console → Compliance → Workspace API Keys. We hash this server-side.",
@@ -2892,10 +2906,13 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
     },
     {
-      // Named `credentials*` on purpose: `buildParserConfig` routes every
-      // `credentials*` field into the `credentials` subtree, which is the ONLY
-      // part of parserConfig the server encrypts before it reaches the
-      // database. A field named `clientId` would sit in the JSONB in plaintext.
+      // Named `credentials*` on purpose. `buildParserConfig` does not route
+      // these anywhere — it DROPS every secret field, so none is ever written
+      // to the plaintext part of parserConfig. Putting them back under
+      // `credentials`, the ONLY subtree the server encrypts before the row
+      // reaches the database, is this source type's pull-config builder's
+      // job. A field named `clientId` would be dropped just the same and
+      // never reach the adapter at all.
       key: "credentialsClientId",
       label: "Service principal client ID",
       placeholder: "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
@@ -3117,6 +3134,56 @@ function buildHttpCustomPullConfig(
     // on `pullConfig.credentials.*` and the adapter substitutes them into
     // the header template via the `${{credentials.<key>}}` syntax.
     credentials: { token },
+  };
+}
+
+/**
+ * The Claude Enterprise Compliance adapter config, or null when a new source
+ * names no workspace API key.
+ *
+ * The adapter's shape is frozen — `ClaudeComplianceReferencePuller.validateConfig`
+ * returns `CLAUDE_COMPLIANCE_PULL_CONFIG` whatever is stored — so the only
+ * thing this builder has to get right is the credential: the frozen header
+ * reads `${{credentials.token}}`, and `credentials` is the one subtree the
+ * server encrypts. Everything else the form collects (the polling cadence)
+ * keeps travelling through `buildParserConfig` exactly as before.
+ *
+ * The adapter id is written explicitly rather than copied from the frozen
+ * config, which names the generic `http_polling` adapter it is built on:
+ * `resolvePullAdapter` dispatches on this field, so copying it would run the
+ * generic puller in place of this one. The frozen config is not imported here
+ * at all — it lives in a server puller module, and pulling that into the
+ * inventory page would drag the puller stack into the browser bundle.
+ *
+ * `shouldRequireCredentials` carries the same meaning as it does for the two
+ * Admin builders below: on edit a blank key means "leave it alone", so the
+ * key is OMITTED rather than emitted empty, because `updateSource` carries the
+ * stored envelope across only for a key that is genuinely absent.
+ *
+ * NEITHER PATH REACHES THIS BUILDER TODAY. The type is `deprecated` in the
+ * catalog, so the create picker never offers it, and it is absent from
+ * `EDITABLE_PULL_CONFIG_SOURCE_TYPES`, so `buildEditSubmission` never asks
+ * for it. The builder exists so that the day the type is offered again, the
+ * secret already lands where the adapter reads it (#7583) instead of under
+ * the old `workspaceApiKey` name the adapter never looked at. The coverage
+ * guard in `pullConfigBuilderCoverage.unit.test.ts` is what keeps it wired.
+ */
+export function buildClaudeCompliancePullConfig(
+  c: ComposerState,
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
+): Record<string, unknown> | null {
+  const token = trimmedField(c.parserConfig, "credentialsToken");
+  if (!token && shouldRequireCredentials) return null;
+
+  return {
+    adapter: "claude_compliance",
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.claude_compliance ||
+      "*/15 * * * *",
+    ...(token ? { credentials: { token } } : {}),
   };
 }
 

@@ -135,8 +135,8 @@ function GovernanceUserDetailPage() {
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend trend and per-model breakdown for this user will
-                land here in a follow-up.
+                Per-day spend trend and per-model breakdown for this user are
+                not available yet.
               </Text>
               {personalProject && (
                 <>

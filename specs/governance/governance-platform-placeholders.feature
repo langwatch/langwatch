@@ -152,13 +152,23 @@ Feature: Platform placeholders — Insights, Analytics, Signals & Alerts
 
   @integration
   Scenario: Every control the Platform screens offer does something when pressed
-    When the member opens "/governance/analytics" or "/governance/insights"
-    Then pressing any control on the screen changes what the screen shows
-    And no control is offered that answers a press with nothing
+    When the member opens "/governance/analytics", "/governance/insights"
+      or "/governance/signals"
+    Then pressing any enabled control on the screen changes what the screen shows
+    And no enabled control is offered that answers a press with nothing
     # The Add filter chip on Analytics and the sample-inbox link on
-    # Insights were both offered and both did nothing. The Signals header
-    # actions are excluded here: they are owned by the page-header restyle,
-    # and are still inert.
+    # Insights were both offered and both did nothing. Signals was excluded
+    # from this scan while its header was being restyled, and its two
+    # actions stayed inert behind the exclusion. It is in the scan now.
+
+  @integration
+  Scenario: The Signals header actions are offered disabled until they do something
+    When the member opens "/governance/signals"
+    Then "New alert" and "New signal" are shown disabled
+    And pressing either changes nothing on the screen
+    # A control that looks live and does nothing reads as broken. Disabled,
+    # it reads as not yet built, which is the truth. The buttons stay on the
+    # page so the header keeps its shape and the reader sees what is coming.
 
   @integration
   Scenario: The Platform screens describe unbuilt work in the future tense

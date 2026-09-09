@@ -13,6 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { confirmArchiveSource } from "@ee/governance/dashboard/logic/confirmArchiveSource";
 import {
   SOURCE_HEALTH_REFRESH,
   sourceBadge,
@@ -188,12 +189,7 @@ function SourceDetailHeader({
             variant="ghost"
             colorPalette="red"
             onClick={() => {
-              if (
-                !confirm(
-                  `Archive "${source.name}"? Historical events stay readable.`,
-                )
-              )
-                return;
+              if (!confirmArchiveSource({ name: source.name })) return;
               onArchive();
             }}
             loading={isArchiving}

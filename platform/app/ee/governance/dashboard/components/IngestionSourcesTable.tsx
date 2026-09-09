@@ -14,6 +14,7 @@ import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
 import { ListTable } from "~/components/ui/ListTable";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
+import { confirmArchiveSource } from "../logic/confirmArchiveSource";
 import { shortPullCadence } from "../logic/pullCadence";
 import { sourceBadge } from "../logic/sourceHealthDisplay";
 import {
@@ -297,6 +298,7 @@ function SourceTableRow({
                 color="red.500"
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (!confirmArchiveSource({ name: source.name })) return;
                   onArchive();
                 }}
               >
