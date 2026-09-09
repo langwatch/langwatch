@@ -29,6 +29,7 @@ export const automationDailyCapStatusSchema = z.object({
   cap: z.number(),
   counts: z.record(z.string(), automationPersistCapCountSchema),
 });
+export type AutomationPersistCapStatus = z.infer<typeof automationDailyCapStatusSchema>;
 
 /** What `deleteById` answers with: the removal landed. */
 export const automationDeletedSchema = z.object({ success: z.boolean() }).strict();

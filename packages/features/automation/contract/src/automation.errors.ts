@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class AutomationNotFoundError extends Error {
   constructor() {
@@ -174,5 +174,215 @@ export class ProjectNotFoundError extends HandledError {
       httpStatus: 404,
     });
     this.name = "ProjectNotFoundError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The refusals the application names.
+//
+// Each one has a cause we can name and an action the caller can take, which is
+// what makes it a `HandledError` rather than a transport error a door builds
+// for itself. Every status below is the status that door already answered
+// with: this move renamed the channel, never the outcome.
+// ---------------------------------------------------------------------------
+
+/** One automation, looked up in a project that does not have it. */
+export class AutomationNotInProjectError extends NotFoundError {
+  declare readonly code: "automation_not_found";
+
+  constructor(triggerId: string, projectId: string) {
+    super("automation_not_found", "Automation", triggerId, { meta: { projectId } });
+    this.name = "AutomationNotInProjectError";
+  }
+}
+
+/** The custom graph a graph alert names does not belong to the project. */
+export class GraphNotInProjectError extends NotFoundError {
+  declare readonly code: "graph_not_found";
+
+  constructor(customGraphId: string, projectId: string) {
+    super("graph_not_found", "Graph", customGraphId, { meta: { projectId } });
+    this.name = "GraphNotInProjectError";
+  }
+}
+
+/**
+ * The legacy create mutation cannot carry the validated, encrypted webhook
+ * destination shape, so a webhook automation has to be written by the
+ * provider-aware upsert.
+ */
+export class AutomationWebhookUpsertRequiredError extends HandledError {
+  declare readonly code: "automation_webhook_upsert_required";
+
+  constructor() {
+    super(
+      "automation_webhook_upsert_required",
+      "Webhook automations must be created through the provider-aware upsert API.",
+      { httpStatus: 400 },
+    );
+    this.name = "AutomationWebhookUpsertRequiredError";
+  }
+}
+
+/** The webhook delivery channel is not switched on for this project (ADR-040 §7). */
+export class AutomationWebhookNotEnabledError extends HandledError {
+  declare readonly code: "automation_webhook_not_enabled";
+
+  constructor(projectId: string) {
+    super(
+      "automation_webhook_not_enabled",
+      "Webhook automations are not enabled for this project.",
+      { httpStatus: 403, meta: { projectId } },
+    );
+    this.name = "AutomationWebhookNotEnabledError";
+  }
+}
+
+/**
+ * Every condition on the saved automation names a field this platform no
+ * longer supports, so saving it would leave the automation matching nothing an
+ * author could still see.
+ */
+export class AutomationFiltersUnsupportedError extends HandledError {
+  declare readonly code: "automation_filters_unsupported";
+
+  constructor(unknownFields: readonly string[]) {
+    super(
+      "automation_filters_unsupported",
+      "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
+      { httpStatus: 400, meta: { fields: [...unknownFields] } },
+    );
+    this.name = "AutomationFiltersUnsupportedError";
+  }
+}
+
+/** The author's trace-filter query does not compile. */
+export class AutomationTraceFilterInvalidError extends HandledError {
+  declare readonly code: "automation_trace_filter_invalid";
+
+  constructor(reason: string) {
+    super("automation_trace_filter_invalid", `Invalid trace filter: ${reason}`, {
+      httpStatus: 400,
+      meta: { reason },
+    });
+    this.name = "AutomationTraceFilterInvalidError";
+  }
+}
+
+/** Resuming a report whose stored schedule can no longer be read. */
+export class ReportScheduleMissingError extends HandledError {
+  declare readonly code: "report_schedule_missing";
+
+  constructor() {
+    super(
+      "report_schedule_missing",
+      "This report has no valid schedule. Edit it and pick a schedule before resuming it.",
+      { httpStatus: 400 },
+    );
+    this.name = "ReportScheduleMissingError";
+  }
+}
+
+/** A report renders a notification, so it can only use a notification channel. */
+export class ReportChannelUnsupportedError extends HandledError {
+  declare readonly code: "report_channel_unsupported";
+
+  constructor() {
+    super("report_channel_unsupported", "Reports can only send Email or Slack notifications.", {
+      httpStatus: 400,
+    });
+    this.name = "ReportChannelUnsupportedError";
+  }
+}
+
+/** A graph alert fires a notification; there is no "add to dataset on a breach". */
+export class GraphAlertChannelUnsupportedError extends HandledError {
+  declare readonly code: "graph_alert_channel_unsupported";
+
+  constructor() {
+    super(
+      "graph_alert_channel_unsupported",
+      "Graph alerts only support notify channels (Email, Slack, or a webhook).",
+      { httpStatus: 400 },
+    );
+    this.name = "GraphAlertChannelUnsupportedError";
+  }
+}
+
+/** A graph alert without a threshold rule has no condition to fire on. */
+export class GraphAlertThresholdRequiredError extends HandledError {
+  declare readonly code: "graph_alert_threshold_required";
+
+  constructor() {
+    super(
+      "graph_alert_threshold_required",
+      "Graph alerts require a threshold rule (operator, threshold, time period, series).",
+      { httpStatus: 400 },
+    );
+    this.name = "GraphAlertThresholdRequiredError";
+  }
+}
+
+/** A graph alert says how loud it is; without a severity it cannot be routed. */
+export class GraphAlertSeverityRequiredError extends HandledError {
+  declare readonly code: "graph_alert_severity_required";
+
+  constructor() {
+    super("graph_alert_severity_required", "Graph alerts require an alert severity.", {
+      httpStatus: 400,
+    });
+    this.name = "GraphAlertSeverityRequiredError";
+  }
+}
+
+/**
+ * Hygiene on the test-fire button, not anti-abuse: the recipient is always the
+ * requester, so this exists to stop a stuck client looping on the mail
+ * provider or on a customer's own webhook receiver (ADR-040 §4).
+ */
+export class TestFireRateLimitedError extends HandledError {
+  declare readonly code: "test_fire_rate_limited";
+
+  constructor(message: string, resetAt: number) {
+    super("test_fire_rate_limited", message, {
+      httpStatus: 429,
+      retryable: true,
+      meta: { resetAt },
+    });
+    this.name = "TestFireRateLimitedError";
+  }
+}
+
+/**
+ * The unauthenticated unsubscribe pair, throttled per client address (ADR-031).
+ * Public, so it is a surface an attacker can hammer to brute-force tokens.
+ */
+export class UnsubscribeRateLimitedError extends HandledError {
+  declare readonly code: "unsubscribe_rate_limited";
+
+  constructor() {
+    super("unsubscribe_rate_limited", "Too many requests. Please try again shortly.", {
+      httpStatus: 429,
+      retryable: true,
+    });
+    this.name = "UnsubscribeRateLimitedError";
+  }
+}
+
+/**
+ * The token in an unsubscribe link is invalid, tampered with, or names a
+ * project that no longer exists.
+ *
+ * The status is the caller's, not the cause's: resolving a link that resolves
+ * to nothing has always been a 404, and confirming with a token that does not
+ * verify has always been a 400. One code, because it is one cause and one
+ * remedy - ask for the link again.
+ */
+export class UnsubscribeLinkInvalidError extends HandledError {
+  declare readonly code: "unsubscribe_link_invalid";
+
+  constructor(message: string, httpStatus: 400 | 404) {
+    super("unsubscribe_link_invalid", message, { httpStatus });
+    this.name = "UnsubscribeLinkInvalidError";
   }
 }

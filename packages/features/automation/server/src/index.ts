@@ -191,48 +191,42 @@ export {
   type UnsubscribeTokenPayload,
 } from "./ports/unsubscribe-token.port.ts";
 export { ScheduledJobStorePort, type ScheduledJobRecord } from "./ports/scheduled-jobs.port.ts";
-// The two tRPC transports are not exported: they still name the deleted legacy
-// builder.
 export { buildRetryAfterMessage } from "./rules/retry-after-message.rules.ts";
 
 /**
- * The feature's application: the one object all three of its doors call, and
- * the refusals it names. The process composes it from the services below.
+ * The feature's application: the one object all five of its doors call, and the
+ * technical infrastructure a process supplies it with. Its refusals are the
+ * contract's, beside every other error this feature names.
  */
 export {
   AutomationApp,
-  AutomationFiltersUnsupportedError,
-  AutomationNotInProjectError,
-  AutomationTraceFilterInvalidError,
-  AutomationWebhookNotEnabledError,
-  AutomationWebhookUpsertRequiredError,
-  GraphAlertChannelUnsupportedError,
-  GraphAlertSeverityRequiredError,
-  GraphAlertThresholdRequiredError,
-  GraphNotInProjectError,
-  ReportChannelUnsupportedError,
-  ReportScheduleMissingError,
-  TestFireRateLimitedError,
-  UnsubscribeLinkInvalidError,
-  UnsubscribeRateLimitedError,
-  type AutomationAppDependencies,
+  type AutomationActionParamsParse,
+  type AutomationActionParamsSchema,
+  type AutomationAuditSink,
+  type AutomationCallCounter,
   type AutomationProjectIdentity,
+  type AutomationProviderSecrets,
+  type AutomationSlackDirectory,
+  type AutomationTraceFilterCompiler,
 } from "./app/automation.app.ts";
 
 /**
- * The app-process REST family this feature owns. The process supplies the bound REST security
- * service, a resolver for the application and its own platform-URL builder; the base path,
- * access declarations, schemas and delegation are the feature's.
+ * The declared transports a process mounts. `/api/triggers` is a factory because
+ * its rows carry a platform URL only the mounting process can build; the other
+ * four are inert declarations, carried by `automationServer` too.
  */
-export { createTriggerRestApp } from "./transport/api-rest/automation.api.ts";
-export { createSlackTriggerRestApp } from "./transport/api-rest/slack-trigger.api.ts";
-// The RFC 8058 one-click unsubscribe door. Its own family rather than part of
-// the trigger surface: the HMAC token IS the authorization, so it authenticates
-// nobody and shares no policy with the credentialed routes beside it.
+export { createAutomationRest } from "./transport/automation.rest.ts";
 export {
-  createUnsubscribeRestApp,
-  type UnsubscribeRestPorts,
-} from "./transport/api-rest/unsubscribe.api.ts";
+  slackAutomationRest,
+  slackAutomationRestErrors,
+} from "./transport/slack-trigger.rest.ts";
+export {
+  unsubscribeCallerAddress,
+  unsubscribeRest,
+  unsubscribeRestErrors,
+} from "./transport/unsubscribe.rest.ts";
+export { automationCallerEmailFact, automationTrpcTransport } from "./transport/automation.trpc.ts";
+export { emailSuppressionTrpcTransport } from "./transport/email-suppression.trpc.ts";
 
 /** The scheduled-report handler and the two readers it renders from. */
 export {

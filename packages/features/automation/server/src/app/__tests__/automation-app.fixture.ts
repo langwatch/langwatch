@@ -176,6 +176,18 @@ export function createCanonicalAutomationApp(): {
     dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
     heartbeat: { tryResolveClickHouseClient: vi.fn() },
     redis: null,
+    providers: {
+      actionParamsSchemaFor: vi.fn(() => ({ safeParse: (data: unknown) => ({ success: true, data }) })),
+      persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
+      redactActionParamsFor: vi.fn((_action, params) => params),
+      findSlackBotToken: vi.fn(() => null),
+      decryptWebhookHeaders: vi.fn(() => ({})),
+      decryptWebhookSigningSecrets: vi.fn(() => []),
+    },
+    slackChannels: { list: vi.fn(async () => ({ channels: [], error: null, gaps: [] })) },
+    traceFilters: { assertCompiles: vi.fn() },
+    limits: { count: vi.fn(async () => ({ allowed: true, resetAt: 0 })) },
+    audit: { record: vi.fn(async () => undefined) },
   };
   const resources = new ResourceScope();
   resources.own("automation-test-database", () => database.$disconnect());

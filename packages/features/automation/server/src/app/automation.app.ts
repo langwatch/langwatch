@@ -1,311 +1,172 @@
 /**
- * The automation feature's application: what all three of its doors call.
- *
- * It holds every service the feature reaches, and it is the one typed thing a
- * transport is given. Before it, each door declared its own private bag —
- * `Readonly<{ automation; monitors; projects; featureFlags }>` in the
- * authoring surface, `Readonly<{ automation }>` in the email-suppression one,
- * and a bare `() => AutomationService` in the REST family — three descriptions
- * of the same composition, agreeing by attention rather than by construction,
- * and none of them reachable from the others.
- *
- * Most operations are the services' own, reached through the delegating
- * methods below. What lives here as a rule is what a door would otherwise have
- * to know, and did, twice or three times over:
- *
- *   - a trace automation needs a condition, on create and on edit. Both doors
- *     enforced it, in two copies of the same four-clause rule, and the REST
- *     family's copy would have been the one to silently rot;
- *   - "this automation is not in this project" is one refusal. The REST family
- *     treated a soft-deleted row as absent and the tRPC surface did not, so
- *     the same id answered "gone" at one door and "here it is" at the other;
- *   - the webhook delivery channel's flag gate, which the save path and the
- *     test-fire path each read for themselves.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The automation feature's application: the one typed thing all five of its
+ * doors are given. Every rule two doors used to keep a copy of each lives here
+ * or in the services below, and the caller arrives as an argument rather than
+ * being read from a session, so one operation serves a browser, an API key and
+ * a background job alike. @see adrs/001-automation-service-boundary.md
  */
 import {
-  hasActionableTriggerFilters,
-  ProjectNotFoundError,
+  automationServerConfigSchema,
+  AutomationApi as AutomationApiToken,
+  InvalidUnsubscribeTokenError,
+  UnsubscribeLinkInvalidError,
+  UnsubscribeRateLimitedError,
+  type AutomationApi,
+  type AutomationApiCreateInput,
+  type AutomationApiListSlackChannelsInput,
+  type AutomationApiTestFireInput,
+  type AutomationApiToggleTriggerInput,
+  type AutomationApiUpdateTriggerFiltersInput,
+  type AutomationApiUpsertInput,
+  type AutomationAction,
+  type AutomationAuthor,
+  type AutomationTestFireAuthor,
+  type UnsubscribeChannel,
+  type AutomationListRow,
+  type AutomationPersistCapCount,
+  type AutomationServerConfig,
   type AutomationService,
   type CreateTriggerCommand,
   type CustomGraphNameRef,
-  type EmailSuppression,
+  type EmailSuppressionRow,
   type ReportSchedule,
+  type SlackChannelListing,
   type TestFireInput,
   type TestFireResult,
   type TestFireTemplateDraft,
   type Trigger,
   type TriggerFire,
   type TriggerFireStats,
+  type UnsubscribeView,
   type UpdateTriggerCommand,
   type WebhookDeliveryRow,
-  type AutomationPersistCapCount,
-  TriggerFiltersRequiredError,
 } from "@langwatch/automation-contract";
-import {
-  FeatureFlagApi,
-  type FeatureFlagApi as FeatureFlagApiContract,
-} from "@langwatch/feature-flag-contract";
+import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   MonitorApi,
   type Monitor,
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
-import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import {
-  AutomationApi as AutomationApiToken,
-  type AutomationApi,
-  type AutomationServerConfig,
-} from "@langwatch/automation-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { AutomationPersistCapRedisPort } from "../services/persist-cap.service.ts";
+import type { Instant } from "@langwatch/time";
+
 import {
   PostgresAutomationAdapter,
   type AutomationDatabase,
 } from "../adapters/postgres.automation.adapter.ts";
-import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
-import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
-import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
 import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
-import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 import type {
+  AutomationDispatchErrorPort,
   AutomationGraphNotifierPort,
+  AutomationHeartbeatPort,
   AutomationLoggerPort,
   AutomationSlackBotTokenDecryptorPort,
-  AutomationDispatchErrorPort,
-  AutomationHeartbeatPort,
 } from "../ports/automation-graph.port.ts";
+import type { AutomationWebhookStoredParams } from "../ports/automation-provider.port.ts";
 import type { AutomationRunawayPort } from "../ports/automation-runaway.port.ts";
 import type { AutomationTestFirePort } from "../ports/automation-test-fire.port.ts";
-import { AnalyticsApi } from "@langwatch/analytics-contract";
-import { automationServerConfigSchema } from "@langwatch/automation-contract";
-import type { Instant } from "@langwatch/time";
+import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
+import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
+import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
+import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
+import {
+  AutomationRulesService,
+  type AutomationProjectIdentity,
+} from "../services/automation-rules.service.ts";
+import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
+import type { AutomationPersistCapRedisPort } from "../services/persist-cap.service.ts";
+
+export type { AutomationWebhookStoredParams };
+export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
-// The refusals this feature names.
-//
-// Each one has a cause we can name and an action the caller can take, which is
-// what makes it a `HandledError` rather than a transport error a door builds
-// for itself. Every status below is the status that door already answered
-// with: this move renames the channel, never the outcome.
+// The technical infrastructure the process supplies. None of it is automation's
+// own: a cipher, an HTTP client, a query compiler, a counter and an audit
+// ledger all belong to the deployment, and every one of them was a transport
+// port before - reachable from one door and invisible to the next.
 // ---------------------------------------------------------------------------
 
-/** One automation, looked up in a project that does not have it. */
-export class AutomationNotInProjectError extends NotFoundError {
-  declare readonly code: "automation_not_found";
+/**
+ * One `safeParse` outcome, described structurally rather than as a zod type:
+ * the schema comes from the process's provider registry, which is compiled
+ * against its own copy of zod.
+ */
+export type AutomationActionParamsParse =
+  | Readonly<{ success: true; data: unknown }>
+  | Readonly<{
+      success: false;
+      error: Readonly<{ issues: readonly Readonly<{ message: string }>[] }>;
+    }>;
 
-  constructor(triggerId: string, projectId: string) {
-    super("automation_not_found", "Automation", triggerId, { meta: { projectId } });
-    this.name = "AutomationNotInProjectError";
-  }
+/** The per-action `actionParams` parser the process's provider registry owns. */
+export interface AutomationActionParamsSchema {
+  safeParse(value: unknown): AutomationActionParamsParse;
 }
 
-/** The custom graph a graph alert names does not belong to the project. */
-export class GraphNotInProjectError extends NotFoundError {
-  declare readonly code: "graph_not_found";
-
-  constructor(customGraphId: string, projectId: string) {
-    super("graph_not_found", "Graph", customGraphId, { meta: { projectId } });
-    this.name = "GraphNotInProjectError";
-  }
+/** Every automation channel's at-rest secret handling, bound to one cipher. */
+export interface AutomationProviderSecrets {
+  /** The authoritative `actionParams` shape for one action. */
+  actionParamsSchemaFor(action: AutomationAction): AutomationActionParamsSchema;
+  /**
+   * Wire params in their at-rest shape: secrets encrypted, kept sentinels
+   * resolved against the saved row. Throws `HandledError` subclasses for the
+   * author-facing failures.
+   */
+  persistActionParamsFor(
+    action: AutomationAction,
+    args: Readonly<{ incoming: Record<string, unknown>; loadExisting: () => Promise<unknown> }>,
+  ): Promise<unknown>;
+  /** Stored params with every secret stripped, for a row on its way out. */
+  redactActionParamsFor(action: AutomationAction, params: unknown): unknown;
+  /** The stored Slack bot token in the clear, or nothing when none is stored. */
+  findSlackBotToken(actionParams: unknown): string | null;
+  /** The stored webhook header values in the clear, by header name. */
+  decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string>;
+  /** The stored webhook signing secrets in the clear, newest first. */
+  decryptWebhookSigningSecrets(stored: AutomationWebhookStoredParams): readonly string[];
 }
 
 /**
- * The legacy create mutation cannot carry the validated, encrypted webhook
- * destination shape, so a webhook automation has to be written by the
- * provider-aware upsert.
+ * The Slack conversations a bot token can see, through the process's own
+ * SSRF-checked HTTP client.
  */
-export class AutomationWebhookUpsertRequiredError extends HandledError {
-  declare readonly code: "automation_webhook_upsert_required";
-
-  constructor() {
-    super(
-      "automation_webhook_upsert_required",
-      "Webhook automations must be created through the provider-aware upsert API.",
-      { httpStatus: 400 },
-    );
-    this.name = "AutomationWebhookUpsertRequiredError";
-  }
-}
-
-/** The webhook delivery channel is not switched on for this project (ADR-040 §7). */
-export class AutomationWebhookNotEnabledError extends HandledError {
-  declare readonly code: "automation_webhook_not_enabled";
-
-  constructor(projectId: string) {
-    super(
-      "automation_webhook_not_enabled",
-      "Webhook automations are not enabled for this project.",
-      { httpStatus: 403, meta: { projectId } },
-    );
-    this.name = "AutomationWebhookNotEnabledError";
-  }
+export interface AutomationSlackDirectory {
+  list(token: string): Promise<SlackChannelListing>;
 }
 
 /**
- * Every condition on the saved automation names a field this platform no
- * longer supports, so saving it would leave the automation matching nothing an
- * author could still see.
+ * Compiles a trace-filter query, throwing when it cannot be parsed. A dry run:
+ * an unparseable query is refused with author feedback here rather than failing
+ * closed - matching nothing - at dispatch time.
  */
-export class AutomationFiltersUnsupportedError extends HandledError {
-  declare readonly code: "automation_filters_unsupported";
-
-  constructor(unknownFields: readonly string[]) {
-    super(
-      "automation_filters_unsupported",
-      "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
-      { httpStatus: 400, meta: { fields: [...unknownFields] } },
-    );
-    this.name = "AutomationFiltersUnsupportedError";
-  }
-}
-
-/** The author's trace-filter query does not compile. */
-export class AutomationTraceFilterInvalidError extends HandledError {
-  declare readonly code: "automation_trace_filter_invalid";
-
-  constructor(reason: string) {
-    super("automation_trace_filter_invalid", `Invalid trace filter: ${reason}`, {
-      httpStatus: 400,
-      meta: { reason },
-    });
-    this.name = "AutomationTraceFilterInvalidError";
-  }
-}
-
-/** Resuming a report whose stored schedule can no longer be read. */
-export class ReportScheduleMissingError extends HandledError {
-  declare readonly code: "report_schedule_missing";
-
-  constructor() {
-    super(
-      "report_schedule_missing",
-      "This report has no valid schedule. Edit it and pick a schedule before resuming it.",
-      { httpStatus: 400 },
-    );
-    this.name = "ReportScheduleMissingError";
-  }
-}
-
-/** A report renders a notification, so it can only use a notification channel. */
-export class ReportChannelUnsupportedError extends HandledError {
-  declare readonly code: "report_channel_unsupported";
-
-  constructor() {
-    super("report_channel_unsupported", "Reports can only send Email or Slack notifications.", {
-      httpStatus: 400,
-    });
-    this.name = "ReportChannelUnsupportedError";
-  }
-}
-
-/** A graph alert fires a notification; there is no "add to dataset on a breach". */
-export class GraphAlertChannelUnsupportedError extends HandledError {
-  declare readonly code: "graph_alert_channel_unsupported";
-
-  constructor() {
-    super(
-      "graph_alert_channel_unsupported",
-      "Graph alerts only support notify channels (Email, Slack, or a webhook).",
-      { httpStatus: 400 },
-    );
-    this.name = "GraphAlertChannelUnsupportedError";
-  }
-}
-
-/** A graph alert without a threshold rule has no condition to fire on. */
-export class GraphAlertThresholdRequiredError extends HandledError {
-  declare readonly code: "graph_alert_threshold_required";
-
-  constructor() {
-    super(
-      "graph_alert_threshold_required",
-      "Graph alerts require a threshold rule (operator, threshold, time period, series).",
-      { httpStatus: 400 },
-    );
-    this.name = "GraphAlertThresholdRequiredError";
-  }
-}
-
-/** A graph alert says how loud it is; without a severity it cannot be routed. */
-export class GraphAlertSeverityRequiredError extends HandledError {
-  declare readonly code: "graph_alert_severity_required";
-
-  constructor() {
-    super("graph_alert_severity_required", "Graph alerts require an alert severity.", {
-      httpStatus: 400,
-    });
-    this.name = "GraphAlertSeverityRequiredError";
-  }
+export interface AutomationTraceFilterCompiler {
+  assertCompiles(input: Readonly<{ query: string; projectId: string }>): void;
 }
 
 /**
- * Hygiene on the test-fire button, not anti-abuse: the recipient is always the
- * requester, so this exists to stop a stuck client looping on the mail
- * provider or on a customer's own webhook receiver (ADR-040 §4).
+ * The process's per-key fixed-window counter. Hygiene on the test-fire button,
+ * the outbound-flood cap on the webhook channel (ADR-040 §4) and the throttle
+ * on the unauthenticated unsubscribe pair (ADR-031).
  */
-export class TestFireRateLimitedError extends HandledError {
-  declare readonly code: "test_fire_rate_limited";
-
-  constructor(message: string, resetAt: number) {
-    super("test_fire_rate_limited", message, {
-      httpStatus: 429,
-      retryable: true,
-      meta: { resetAt },
-    });
-    this.name = "TestFireRateLimitedError";
-  }
+export interface AutomationCallCounter {
+  count(
+    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
 }
 
-/**
- * The unauthenticated unsubscribe pair, throttled per client IP (ADR-031).
- * Public, so it is a surface an attacker can hammer to brute-force tokens.
- */
-export class UnsubscribeRateLimitedError extends HandledError {
-  declare readonly code: "unsubscribe_rate_limited";
-
-  constructor() {
-    super("unsubscribe_rate_limited", "Too many requests. Please try again shortly.", {
-      httpStatus: 429,
-      retryable: true,
-    });
-    this.name = "UnsubscribeRateLimitedError";
-  }
-}
-
-/**
- * The token in an unsubscribe link is invalid, tampered with, or names a
- * project that no longer exists.
- *
- * The status is the caller's, not the cause's: resolving a link that resolves
- * to nothing has always been a 404, and confirming with a token that does not
- * verify has always been a 400. One code, because it is one cause and one
- * remedy — ask for the link again.
- */
-export class UnsubscribeLinkInvalidError extends HandledError {
-  declare readonly code: "unsubscribe_link_invalid";
-
-  constructor(message: string, httpStatus: 400 | 404) {
-    super("unsubscribe_link_invalid", message, { httpStatus });
-    this.name = "UnsubscribeLinkInvalidError";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The application
-// ---------------------------------------------------------------------------
-
-/** What the process composes this feature's application from. */
-export interface AutomationAppDependencies {
-  automation: AutomationService;
-  monitors: MonitorApiContract;
-  projects: ProjectApiContract;
-  featureFlags: FeatureFlagApiContract;
+/** Where a read of customer email addresses is written down. */
+export interface AutomationAuditSink {
+  record(
+    entry: Readonly<{
+      userId: string;
+      projectId?: string;
+      action: string;
+      args?: unknown;
+    }>,
+  ): Promise<void>;
 }
 
 export type AutomationInfrastructure = Readonly<{
@@ -322,8 +183,18 @@ export type AutomationInfrastructure = Readonly<{
   runaway: AutomationRunawayPort;
   testFire: AutomationTestFirePort;
   redis: AutomationPersistCapRedisPort | null;
+  providers: AutomationProviderSecrets;
+  slackChannels: AutomationSlackDirectory;
+  traceFilters: AutomationTraceFilterCompiler;
+  limits: AutomationCallCounter;
+  audit: AutomationAuditSink;
   // Peer APIs are resolved from setup.dependencies; infrastructure contains technical ports only.
 }>;
+
+/** How often the unauthenticated unsubscribe pair may be asked, per caller. */
+const UNSUBSCRIBE_WINDOW_SECONDS = 60;
+const UNSUBSCRIBE_RESOLVE_MAX = 30;
+const UNSUBSCRIBE_CONFIRM_MAX = 10;
 
 type AutomationDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
@@ -339,10 +210,14 @@ type AutomationSetup = FeatureSetup<
   AutomationServerConfig
 >;
 
-/** The project an automation names, as a test fire renders it. */
-export interface AutomationProjectIdentity {
-  readonly name: string;
-  readonly slug: string;
+/** What the application is composed from, once the process has supplied it. */
+interface AutomationAppCollaborators {
+  automation: AutomationService;
+  monitors: MonitorApiContract;
+  rules: AutomationRulesService;
+  authoring: AutomationAuthoringService;
+  audit: AutomationAuditSink;
+  limits: AutomationCallCounter;
 }
 
 export class AutomationApp implements AutomationApi {
@@ -386,52 +261,76 @@ export class AutomationApp implements AutomationApi {
       testFire: setup.infrastructure.testFire,
       persistCaps,
     }).build();
-    return new AutomationApp({
+    const rules = AutomationRulesService.create({
       automation,
-      monitors: setup.dependencies.monitors,
       projects: setup.dependencies.projects,
       featureFlags: setup.dependencies.featureFlags,
     });
+
+    return new AutomationApp({
+      automation,
+      rules,
+      authoring: AutomationAuthoringService.create({
+        automation,
+        rules,
+        monitors: setup.dependencies.monitors,
+        providers: setup.infrastructure.providers,
+        slackChannels: setup.infrastructure.slackChannels,
+        traceFilters: setup.infrastructure.traceFilters,
+        limits: setup.infrastructure.limits,
+      }),
+      monitors: setup.dependencies.monitors,
+      audit: setup.infrastructure.audit,
+      limits: setup.infrastructure.limits,
+    });
   }
 
-  #dependencies: AutomationAppDependencies;
+  #automation: AutomationService;
+  #rules: AutomationRulesService;
+  #authoring: AutomationAuthoringService;
+  #monitors: MonitorApiContract;
+  #audit: AutomationAuditSink;
+  #limits: AutomationCallCounter;
 
-  private constructor(dependencies: AutomationAppDependencies) {
-    this.#dependencies = dependencies;
+  private constructor(collaborators: AutomationAppCollaborators) {
+    this.#automation = collaborators.automation;
+    this.#rules = collaborators.rules;
+    this.#authoring = collaborators.authoring;
+    this.#monitors = collaborators.monitors;
+    this.#audit = collaborators.audit;
+    this.#limits = collaborators.limits;
   }
 
   // -- reads -----------------------------------------------------------------
 
   /** Every automation in the project, deleted rows excluded by the service. */
   getAllForProject(input: { projectId: string }): Promise<Trigger[]> {
-    return this.#dependencies.automation.getAllForProject(input);
+    return this.#automation.getAllForProject(input);
+  }
+
+  /** Every automation the list renders, redacted and enriched. */
+  listAutomations(input: { projectId: string }): Promise<AutomationListRow[]> {
+    return this.#authoring.listRows(input);
   }
 
   /** One automation, or null when the project does not have it. */
   tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    return this.#dependencies.automation.tryGetById(input);
+    return this.#automation.tryGetById(input);
   }
 
-  /**
-   * One LIVE automation, or null when the project does not have one.
-   *
-   * "Live" is the decision this method exists for. `tryGetById` answers with
-   * soft-deleted rows too, so every caller had to remember to test `deleted` —
-   * and the two doors did not agree: the REST family tested for it and the tRPC
-   * surface did not, so the same id answered "gone" at one door and "here it
-   * is" at the other. A door still chooses how to refuse; what "there" means is
-   * decided here.
-   */
-  async tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    const trigger = await this.#dependencies.automation.tryGetById(input);
-    return !trigger || trigger.deleted ? null : trigger;
+  /** One automation with every secret stripped, for a browser to read. */
+  findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+    return this.#authoring.findRedactedById(input);
+  }
+
+  /** One LIVE automation, or null when the project does not have one. */
+  tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+    return this.#rules.findLiveById(input);
   }
 
   /** One live automation, refusing when the project does not have it. */
-  async requireById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
-    const trigger = await this.tryGetLiveById(input);
-    if (!trigger) throw new AutomationNotInProjectError(input.triggerId, input.projectId);
-    return trigger;
+  requireById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+    return this.#rules.getById(input);
   }
 
   /** One automation by the custom graph it watches, or null. */
@@ -439,26 +338,19 @@ export class AutomationApp implements AutomationApi {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {
-    return this.#dependencies.automation.tryGetByCustomGraphId(input);
+    return this.#automation.tryGetByCustomGraphId(input);
   }
 
   getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {
-    return this.#dependencies.automation.getByCustomGraphIds(input);
+    return this.#automation.getByCustomGraphIds(input);
   }
 
-  /**
-   * Refuses a graph alert whose graph is not this project's.
-   *
-   * Without it a hostile client could attach an alert to another tenant's
-   * graph, so the check belongs where both doors reach it rather than in the
-   * one handler that happens to have it today.
-   */
-  async requireCustomGraphInProject(input: {
+  /** Refuses a graph alert whose graph is not this project's. */
+  requireCustomGraphInProject(input: {
     customGraphId: string;
     projectId: string;
   }): Promise<void> {
-    const exists = await this.#dependencies.automation.customGraphExistsInProject(input);
-    if (!exists) throw new GraphNotInProjectError(input.customGraphId, input.projectId);
+    return this.#rules.assertCustomGraphInProject(input);
   }
 
   /** The names of the custom graphs a list of automations points at. */
@@ -466,17 +358,17 @@ export class AutomationApp implements AutomationApi {
     customGraphIds: string[];
     projectId: string;
   }): Promise<CustomGraphNameRef[]> {
-    return this.#dependencies.automation.getCustomGraphNamesByIds(input);
+    return this.#automation.getCustomGraphNamesByIds(input);
   }
 
   /** The monitors an automation's conditions name. */
   getMonitorsByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
-    return this.#dependencies.monitors.getAllByIds(input);
+    return this.#monitors.getAllByIds(input);
   }
 
   /** The plan's daily ceiling on persist actions. */
   resolvePersistDailyCap(projectId: string): Promise<number> {
-    return this.#dependencies.automation.resolvePersistDailyCap(projectId);
+    return this.#automation.resolvePersistDailyCap(projectId);
   }
 
   /** Today's confirmed-match and skipped counts, per automation. */
@@ -486,12 +378,19 @@ export class AutomationApp implements AutomationApi {
     now: Instant;
     cap: number;
   }): Promise<Record<string, AutomationPersistCapCount>> {
-    return this.#dependencies.automation.readPersistCapCounts(input);
+    return this.#automation.readPersistCapCounts(input);
+  }
+
+  /** The ceiling and what each automation has spent of it today. */
+  readDailyCapStatus(input: {
+    projectId: string;
+  }): Promise<{ cap: number; counts: Record<string, AutomationPersistCapCount> }> {
+    return this.#authoring.readDailyCapStatus(input);
   }
 
   /** How often each automation has fired. */
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {
-    return this.#dependencies.automation.getFireStats(input);
+    return this.#automation.getFireStats(input);
   }
 
   /** The activity feed, for one automation or for the whole project. */
@@ -500,7 +399,7 @@ export class AutomationApp implements AutomationApi {
     triggerId?: string;
     limit: number;
   }): Promise<TriggerFire[]> {
-    return this.#dependencies.automation.getRecentFires(input);
+    return this.#automation.getRecentFires(input);
   }
 
   /** The per-attempt webhook delivery log for one automation (ADR-040 §6). */
@@ -509,12 +408,17 @@ export class AutomationApp implements AutomationApi {
     triggerId: string;
     limit: number;
   }): Promise<WebhookDeliveryRow[]> {
-    return this.#dependencies.automation.getRecentWebhookDeliveries(input);
+    return this.#automation.getRecentWebhookDeliveries(input);
   }
 
   /** When each report next runs and last ran, as the scheduler knows it. */
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]> {
-    return this.#dependencies.automation.getReportSchedules(input);
+    return this.#automation.getReportSchedules(input);
+  }
+
+  /** The Slack conversations a bot token can see, for the channel picker. */
+  listSlackChannels(input: AutomationApiListSlackChannelsInput): Promise<SlackChannelListing> {
+    return this.#authoring.listSlackChannels(input);
   }
 
   // -- writes ----------------------------------------------------------------
@@ -524,40 +428,54 @@ export class AutomationApp implements AutomationApi {
    * cache as part of the write, so nothing here has to remember to.
    */
   create(command: CreateTriggerCommand): Promise<Trigger> {
-    return this.#dependencies.automation.create(command);
+    return this.#automation.create(command);
   }
 
   /**
-   * Stores a new TRACE automation, which must say which traces it is about.
-   *
-   * Both doors enforced this for themselves, and both were right to: an
-   * automation with no condition matches every trace forever, so the easiest
-   * possible create call produced the most expensive possible automation.
-   * Graph alerts and reports are exempt — an alert's condition is its
-   * threshold and a report's is its schedule — so they use {@link create}.
+   * Stores a new TRACE automation, which must say which traces it is about: one
+   * with no condition matches every trace forever. Graph alerts and reports are
+   * exempt - a threshold and a schedule are their conditions - and use
+   * {@link create}.
    */
   async createTraceAutomation(command: CreateTriggerCommand): Promise<Trigger> {
     this.assertTraceConditionPresent(command.filters);
+
     return this.create(command);
+  }
+
+  /** The authoring surface's legacy create, with its per-action refusals. */
+  createAutomation(input: AutomationApiCreateInput, author: AutomationAuthor): Promise<Trigger> {
+    return this.#authoring.create({ input, author });
+  }
+
+  /** The authoring drawer's save: one row, whichever of the three kinds it is. */
+  saveAutomation(input: AutomationApiUpsertInput, author: AutomationAuthor): Promise<Trigger> {
+    return this.#authoring.save({ input, author });
+  }
+
+  /** Pausing and resuming, including the report's calendar entry. */
+  setAutomationActive(input: AutomationApiToggleTriggerInput): Promise<Trigger> {
+    return this.#authoring.setActive(input);
+  }
+
+  /** Replaces one automation's condition, keeping it from matching everything. */
+  replaceAutomationFilters(input: AutomationApiUpdateTriggerFiltersInput): Promise<Trigger> {
+    return this.#authoring.replaceFilters(input);
   }
 
   /** Updates an automation. The service invalidates as part of the write. */
   update(command: UpdateTriggerCommand): Promise<Trigger> {
-    return this.#dependencies.automation.update(command);
+    return this.#automation.update(command);
   }
 
   /**
-   * Removes an automation: the soft delete, and the retirement of any
-   * scheduled-report entry.
-   *
-   * Both, always. A report whose calendar entry was left behind keeps waking
-   * the scheduler forever, and the handler then reloads a row it can no longer
-   * parse and skips every cadence. Idempotent for an automation that was never
-   * a report, which costs one no-op deactivate.
+   * Removes an automation: the soft delete AND the retirement of any
+   * scheduled-report entry, always both. A calendar entry left behind keeps
+   * waking the scheduler forever. Idempotent for one that was never a report.
    */
   async delete(input: { triggerId: string; projectId: string }): Promise<void> {
-    await this.#dependencies.automation.softDeleteById(input);
-    await this.#dependencies.automation.removeReportSchedule({
+    await this.#automation.softDeleteById(input);
+    await this.#automation.removeReportSchedule({
       projectId: input.projectId,
       triggerId: input.triggerId,
     });
@@ -570,88 +488,64 @@ export class AutomationApp implements AutomationApi {
     cron: string;
     timezone: string;
   }): Promise<void> {
-    return this.#dependencies.automation.syncReportSchedule(input);
+    return this.#automation.syncReportSchedule(input);
   }
 
   /** Retires one report's calendar entry. Idempotent. */
   removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void> {
-    return this.#dependencies.automation.removeReportSchedule(input);
+    return this.#automation.removeReportSchedule(input);
   }
 
   /** Flushes the project's dispatch cache. */
   invalidate(projectId: string): Promise<void> {
-    return this.#dependencies.automation.invalidate(projectId);
+    return this.#automation.invalidate(projectId);
   }
 
   // -- rules -----------------------------------------------------------------
 
-  /**
-   * Refuses a trace automation with no condition.
-   *
-   * Named rather than inlined because three call sites need it and one of them
-   * — the edit path — reaches it through {@link assertConditionSurvivesEdit}.
-   */
+  /** Refuses a trace automation with no condition. */
   assertTraceConditionPresent(filters: Record<string, unknown> | undefined): void {
-    if (!hasActionableTriggerFilters(filters ?? {})) {
-      throw new TriggerFiltersRequiredError();
-    }
+    this.#rules.assertTraceConditionPresent(filters);
   }
 
-  /**
-   * Refuses an edit that would leave a trace automation matching everything.
-   *
-   * Editing is the other route to a match-everything automation: create it
-   * with a real condition, then clear the condition. The existing row decides
-   * whether that is allowed — an automation whose condition lives in its query
-   * keeps a legitimately empty structured set, and alerts and reports have no
-   * trace condition to require in the first place.
-   */
+  /** Refuses an edit that would leave a trace automation matching everything. */
   assertConditionSurvivesEdit(input: {
     existing: Trigger;
     filters: Record<string, unknown> | undefined;
   }): void {
-    if (input.filters === undefined) return;
-    if (hasActionableTriggerFilters(input.filters)) return;
-    if (input.existing.triggerKind !== "AUTOMATION") return;
-    if ((input.existing.filterQuery ?? "").trim() !== "") return;
-    throw new TriggerFiltersRequiredError();
+    this.#rules.assertConditionSurvivesEdit(input);
   }
 
   /** The template draft an author is about to save. Throws on a bad template. */
   validateTemplateDraft(draft: TestFireTemplateDraft): void {
-    this.#dependencies.automation.validateTemplateDraft(draft);
+    this.#automation.validateTemplateDraft(draft);
   }
 
-  /**
-   * Refuses the webhook delivery channel unless it is switched on for the
-   * project (ADR-040 §7).
-   *
-   * The picker is flag-gated client-side and both writing doors gate it too,
-   * so the flag cannot be bypassed by calling the API directly.
-   */
-  async assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
-    const allowed = await this.#dependencies.featureFlags.isEnabled("release_webhook_automations", {
-      kind: "project",
-      userId: input.userId,
-      projectId: input.projectId,
-    });
-    if (!allowed) throw new AutomationWebhookNotEnabledError(input.projectId);
+  /** Refuses the webhook delivery channel unless the project has it (ADR-040 §7). */
+  assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
+    return this.#rules.assertWebhookChannelEnabled(input);
   }
 
   // -- the project an automation belongs to ----------------------------------
 
   /** The project's name and slug, as a rendered notification quotes them. */
-  async getProjectIdentity(projectId: string): Promise<AutomationProjectIdentity> {
-    const project = await this.#dependencies.projects.tryGetSummaryById(projectId);
-    if (!project) throw new ProjectNotFoundError(projectId);
-    return { name: project.name, slug: project.slug };
+  getProjectIdentity(projectId: string): Promise<AutomationProjectIdentity> {
+    return this.#rules.getProjectIdentity(projectId);
   }
 
   // -- the test fire ---------------------------------------------------------
 
   /** Renders and delivers one test notification (ADR-031). */
   testFire(input: TestFireInput): Promise<TestFireResult> {
-    return this.#dependencies.automation.testFire(input);
+    return this.#automation.testFire(input);
+  }
+
+  /** The authoring drawer's test-fire button, throttled and self-addressed. */
+  sendTestFire(
+    input: AutomationApiTestFireInput,
+    author: AutomationTestFireAuthor,
+  ): Promise<TestFireResult> {
+    return this.#authoring.testFire({ input, author });
   }
 
   // -- email suppression (ADR-031) -------------------------------------------
@@ -662,23 +556,122 @@ export class AutomationApp implements AutomationApi {
     triggerName: string | null;
     email: string;
   } | null> {
-    return this.#dependencies.automation.tryResolveUnsubscribeView(input);
+    return this.#automation.tryResolveUnsubscribeView(input);
   }
 
-  /** Records the unsubscribe. Idempotent — the upsert collapses duplicates. */
+  /**
+   * The unsubscribe page's own read, throttled per caller.
+   *
+   * Public, so it is a surface an attacker can hammer to brute-force tokens;
+   * an unknown caller falls back to a shared bucket, because a missing address
+   * must still throttle rather than bypass.
+   */
+  async resolveUnsubscribeView(input: {
+    token: string;
+    callerAddress: string | null;
+  }): Promise<UnsubscribeView> {
+    await this.#countUnsubscribe({
+      action: "resolve",
+      callerAddress: input.callerAddress,
+      max: UNSUBSCRIBE_RESOLVE_MAX,
+    });
+
+    const view = await this.#automation.tryResolveUnsubscribeView({ token: input.token });
+
+    if (!view) {
+      throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid or has expired.", 404);
+    }
+
+    return view;
+  }
+
+  /** Records the unsubscribe. Idempotent - the upsert collapses duplicates. */
   confirmUnsubscribe(input: { token: string; scope: "trigger" | "project" }): Promise<void> {
-    return this.#dependencies.automation.confirmUnsubscribe(input);
+    return this.#automation.confirmUnsubscribe(input);
   }
 
-  /** The operator-facing suppression list, each row with its automation's name. */
-  getSuppressionsEnriched(input: {
+  /**
+   * The same confirmation from either affordance, throttled per caller.
+   *
+   * A bad or tampered token is the recipient's problem and they can act on it:
+   * ask for the link again. A downstream persistence failure is ours, has no
+   * action for them, and is re-raised exactly as it arrived so it degrades to
+   * "unknown" plus a trace id rather than masquerading as an invalid link.
+   */
+  async acceptUnsubscribe(input: {
+    token: string;
+    scope: "trigger" | "project";
+    callerAddress: string | null;
+    via: UnsubscribeChannel;
+  }): Promise<void> {
+    await this.#countUnsubscribe({
+      action: input.via === "one-click" ? "one-click" : "confirm",
+      callerAddress: input.callerAddress,
+      max: UNSUBSCRIBE_CONFIRM_MAX,
+    });
+
+    try {
+      await this.#automation.confirmUnsubscribe({ token: input.token, scope: input.scope });
+    } catch (err) {
+      if (err instanceof InvalidUnsubscribeTokenError) {
+        throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid.", 400);
+      }
+
+      throw err;
+    }
+  }
+
+  /**
+   * The operator-facing suppression list, each row with its automation's name.
+   *
+   * Audited explicitly rather than by the mutation trail: this is a query, and
+   * reading a suppression list means reading customer email addresses.
+   */
+  async listSuppressions(input: {
     projectId: string;
-  }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
-    return this.#dependencies.automation.getAllEnriched(input);
+    actorId: string;
+  }): Promise<EmailSuppressionRow[]> {
+    const rows = await this.#automation.getAllEnriched({ projectId: input.projectId });
+
+    void this.#audit.record({
+      userId: input.actorId,
+      projectId: input.projectId,
+      action: "emailSuppression.getAll",
+      args: {
+        recordCount: rows.length,
+        triggerIds: [
+          ...new Set(rows.map((row) => row.triggerId).filter((id): id is string => id != null)),
+        ],
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      triggerId: row.triggerId,
+      triggerName: row.triggerName,
+      reason: row.reason,
+      createdAt: row.createdAt,
+    }));
   }
 
-  /** Removing a suppression resumes delivery — a deliberate operator action. */
+  /** Removing a suppression resumes delivery - a deliberate operator action. */
   removeSuppression(input: { id: string; projectId: string }): Promise<void> {
-    return this.#dependencies.automation.removeSuppression(input);
+    return this.#automation.removeSuppression(input);
+  }
+
+  /** One attempt at the unauthenticated pair, counted before anything is read. */
+  async #countUnsubscribe(input: {
+    action: "resolve" | "confirm" | "one-click";
+    callerAddress: string | null;
+    max: number;
+  }): Promise<void> {
+    const limit = await this.#limits.count({
+      key: `unsubscribe:${input.action}:${input.callerAddress ?? "unknown"}`,
+      windowSeconds: UNSUBSCRIBE_WINDOW_SECONDS,
+      max: input.max,
+    });
+
+    if (!limit.allowed) throw new UnsubscribeRateLimitedError();
   }
 }
