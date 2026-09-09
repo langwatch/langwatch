@@ -29,6 +29,7 @@
  * or the one that reads it as it stands — is the ledger's own call and differs
  * between them today.
  */
+import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId } from "~/server/event-sourcing";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
@@ -301,5 +302,172 @@ export abstract class StagedLedgerWriter<
       wait.onUnreadableProjection({ aggregateId, error });
       return true;
     }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The convergent ledger, written once                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every convergent ledger, as configuration rather than as another copy.
+ *
+ * WHY THIS EXISTS. The docblock at the top of this file has always claimed to
+ * be "the machinery the five identity ledger writers share" — but it was
+ * extracted FROM those writers and only two of the five were ever moved onto
+ * it. The join-request, SSO-connection and directory-sync writers stayed as
+ * the originals it was generalised from, so the machinery existed twice: once
+ * here as a base class, and once more in each of them, character for
+ * character. The App-handle wait, the sender lookup, the append, the
+ * convergence loop and the cursor comparison were all four copies of the same
+ * twenty lines, and the three copies had no test of their own.
+ *
+ * Their PORTS say as much. `JoinRequestLedger`, `SsoConnectionLedger` and
+ * `MfaLedger` each describe their implementation in prose as "exactly the
+ * shape the identity, connection and grants ledgers already have" — three
+ * interfaces asserting they are the same shape is the shape asking to be one
+ * implementation.
+ *
+ * So it is one. What actually differs between these ledgers is not behaviour,
+ * it is six values: which pipeline stages them, which aggregate they append
+ * under, which envelope turns a command into events, which field of the
+ * command names the aggregate, what they call themselves, and how long they
+ * are willing to wait. All six are below.
+ *
+ * What is NOT here, deliberately: the identity ledger keeps its own subclass.
+ * Its commit writes a newborn's provisional heads before staging and exposes
+ * its two legs separately so ADR-116 §3's born-finalized entrance can put row
+ * writes between them. That is a different sequence, not a different
+ * configuration, and flattening it into this one would be the kind of sharing
+ * that has to be undone later.
+ */
+export interface ConvergentLedgerSpec<
+  TCommand extends StagedLedgerCommand & { data: { tenantId: string } },
+  TEvent extends Event,
+  TFactInput,
+> {
+  /** What this ledger calls itself in the errors and log lines it raises. */
+  noun: string;
+  /** The logger name, kept per ledger so its lines stay filterable. */
+  loggerName: string;
+  /** The pipeline whose senders stage this ledger's commands. */
+  pipelineName: string;
+  /** The aggregate the durable append writes under. */
+  aggregateType: AggregateType;
+  /** This ledger's command type to pipeline sender name. */
+  senderNames: Readonly<Record<TCommand["type"], string>>;
+  /** The envelope that turns a command and its decided facts into events. */
+  eventsFor: (args: { command: TCommand; facts: TFactInput[] }) => TEvent[];
+  /** Which field of `command.data` names the aggregate. */
+  aggregateIdOf: (command: TCommand) => string;
+  /**
+   * What that field is CALLED in log lines. Uniform `aggregateId` would read
+   * worse for an operator and would silently rename a field somebody may
+   * already be filtering on, so each ledger keeps its own noun.
+   */
+  aggregateIdField: string;
+}
+
+/**
+ * A ledger whose commit is the three legs in their usual order: append the
+ * facts durably, stage the command onto its aggregate's queue lane, then wait
+ * — bounded — for the projection to catch up with what was just decided.
+ *
+ * The wait is an OBSERVATION, not inline processing. A fold that cannot run
+ * makes it time out; the facts are still durable, the caller still succeeds,
+ * and the rows appear when the queue drains.
+ */
+export class ConvergentLedgerWriter<
+    TCommand extends StagedLedgerCommand & { data: { tenantId: string } },
+    TEvent extends Event,
+    TState,
+    TFactInput,
+    TFact,
+  >
+  extends StagedLedgerWriter<TCommand, TEvent, TState>
+{
+  private readonly spec: ConvergentLedgerSpec<TCommand, TEvent, TFactInput>;
+
+  constructor({
+    spec,
+    projectionStore,
+    convergence,
+    eventStore,
+    stagedSender,
+  }: {
+    spec: ConvergentLedgerSpec<TCommand, TEvent, TFactInput>;
+    projectionStore: StateProjectionStore<TState>;
+    convergence: { timeoutMs: number; pollMs: number };
+    /** Production resolves the App's event store lazily; tests hand one in. */
+    eventStore?: () => Promise<EventStore<TEvent>>;
+    stagedSender?: StagedSenderPort;
+  }) {
+    const logger = createLogger(spec.loggerName);
+    super({
+      stagedSender:
+        stagedSender ?? appPipelineSender({ pipelineName: spec.pipelineName }),
+      waitedAppend: {
+        eventStore:
+          eventStore ??
+          (() =>
+            resolveAppEventStore<TEvent>({
+              unavailableMessage: `${spec.noun} ledger cannot append: the event-sourcing stack is unavailable`,
+            })),
+        aggregateType: spec.aggregateType,
+      },
+      readYourWrites: {
+        projectionStore,
+        timeoutMs: convergence.timeoutMs,
+        pollMs: convergence.pollMs,
+        onTimeout: ({ aggregateId, eventCount }) => {
+          logger.warn(
+            { [spec.aggregateIdField]: aggregateId, commandCount: eventCount },
+            `${spec.noun} projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge`,
+          );
+        },
+        onUnreadableProjection: ({ aggregateId, error }) => {
+          logger.warn(
+            { [spec.aggregateIdField]: aggregateId, error },
+            `could not read the ${spec.noun} projection while waiting for convergence; continuing`,
+          );
+        },
+      },
+    });
+    this.spec = spec;
+  }
+
+  protected senderNameFor(command: TCommand): string {
+    return this.spec.senderNames[command.type as TCommand["type"]];
+  }
+
+  protected onMissingSender({ senderName }: { senderName: string }): never {
+    // A wiring defect, not a transient: the pipeline exposed no sender for a
+    // command type it declares. Loud, because nothing downstream folds.
+    throw new Error(
+      `${this.spec.noun} ledger cannot stage: the pipeline exposes no "${senderName}" sender`,
+    );
+  }
+
+  async commit({
+    command,
+    facts,
+  }: {
+    command: TCommand;
+    facts: TFactInput[];
+  }): Promise<TFact[]> {
+    const events = this.spec.eventsFor({ command, facts });
+    if (events.length === 0) return [];
+    const { tenantId } = command.data;
+
+    await this.append({ events, tenantId });
+    await this.stage({ command });
+    await this.awaitConvergence({
+      aggregateId: this.spec.aggregateIdOf(command),
+      tenantId,
+      events,
+    });
+    // The one cast, in one place. An event IS the fact it records; the two
+    // types differ only in which package names them.
+    return events as unknown as TFact[];
   }
 }

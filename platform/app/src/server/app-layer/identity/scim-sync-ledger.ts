@@ -1,29 +1,26 @@
 /**
- * The directory-sync ledger writer: the app's implementation of
- * `@langwatch/identity-server`'s ScimSyncLedger, in the shape the identity,
- * grants and connection ledgers already have (ADR-110, ADR-101):
+ * The directory-sync ledger writer.
  *
- *   1. the durable ClickHouse append, WAITED — the fact lands before the
- *      caller returns;
- *   2. the command staged onto the per-sync GroupQueue, awaited — the fold is
- *      the queue's, and nothing here applies a projection itself.
+ * This one is NOT a `ConvergentLedgerWriter`, and the difference is policy
+ * rather than plumbing — which is why it keeps a `commit` of its own while
+ * still taking the sender machinery from the shared base:
  *
- * NO read-your-writes wait, unlike the connection ledger. Nothing on the SCIM
- * request path reads this projection back: the endpoints answer from Postgres
- * exactly as they did before, and holding an identity provider's HTTP request
- * open while a fold converged would buy an unread row at the cost of the one
- * property the protocol surface has to keep — answering as it always did.
+ *   - NO read-your-writes wait. Nothing on the SCIM request path reads this
+ *     projection back: the endpoints answer from Postgres exactly as they did
+ *     before, and holding an identity provider's HTTP request open while a
+ *     fold converged would buy an unread row at the cost of the one property
+ *     the protocol surface has to keep — answering as it always did.
  *
- * A push must never fail because its HISTORY could not be written. What the
- * customer is owed is the membership consequence, which travels the grants
- * ledger and is already durable by the time this runs; a sync fact that
- * cannot land is logged and swallowed. The opposite choice — refusing a push
- * whose bookkeeping failed — would turn an event-stack blip into a directory
- * outage.
+ *   - EVERY failure is swallowed, loudly. A push must never fail because its
+ *     HISTORY could not be written. What the customer is owed is the
+ *     membership consequence, which travels the grants ledger and is already
+ *     durable by the time this runs. The opposite choice — refusing a push
+ *     whose bookkeeping failed — would turn an event-stack blip into a
+ *     directory outage.
  *
- * Like the identity ledger, the pipeline handle is resolved lazily off the
- * App: a bare script that never composes one must still be able to import
- * the runtime.
+ * Both of those are stated once, here, instead of being implied by the
+ * absence of code. What this no longer carries is its own copy of the sender
+ * lookup and the staging step: those are the base's, same as everywhere else.
  */
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
@@ -47,12 +44,13 @@ import {
 } from "~/server/event-sourcing/pipelines/scim-sync/schemas/constants";
 import type { ScimSyncEvent } from "~/server/event-sourcing/pipelines/scim-sync/schemas/events";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import {
+  appPipelineSender,
+  StagedLedgerWriter,
+  type StagedSenderPort,
+} from "./staged-ledger-writer";
 
 const logger = createLogger("langwatch:identity:scim-sync-ledger");
-
-export type ScimSyncStagedSender = {
-  send(data: unknown): Promise<unknown>;
-};
 
 const SENDER_NAME_BY_COMMAND: Record<ScimSyncCommandType, string> = {
   [ISSUE_SCIM_TOKEN_COMMAND_TYPE]: "issueScimToken",
@@ -62,6 +60,12 @@ const SENDER_NAME_BY_COMMAND: Record<ScimSyncCommandType, string> = {
   [REVOKE_SCIM_SYNC_COMMAND_TYPE]: "revokeScimSync",
 };
 
+/**
+ * Read as it stands rather than waited for, unlike every other ledger's. A
+ * ledger that swallows its failures has nothing to gain from waiting five
+ * seconds for an App handle: it would spend a directory push's latency to
+ * arrive at the same swallowed warning.
+ */
 function resolveEventStore(): EventStore<ScimSyncEvent> | null {
   const app = tryGetApp();
   return app?.eventSourcing?.isEnabled
@@ -69,32 +73,49 @@ function resolveEventStore(): EventStore<ScimSyncEvent> | null {
     : null;
 }
 
-function resolveStagedSender(name: string): ScimSyncStagedSender | null {
-  const app = tryGetApp();
-  if (!app?.eventSourcing?.isEnabled) return null;
-  try {
-    const pipeline = app.eventSourcing.getPipeline(
-      SCIM_SYNC_PIPELINE_NAME as never,
-    ) as unknown as { commands: Record<string, ScimSyncStagedSender> };
-    return pipeline.commands[name] ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export interface ScimSyncLedgerWriterDeps {
   /** Production resolves the App's event store lazily; tests hand one in. */
   eventStore?: () => EventStore<ScimSyncEvent> | null;
-  stagedSender?: (name: string) => ScimSyncStagedSender | null;
+  stagedSender?: StagedSenderPort;
 }
 
-export class ScimSyncLedgerWriter implements ScimSyncLedger {
+export class ScimSyncLedgerWriter
+  extends StagedLedgerWriter<ScimSyncCommand, ScimSyncEvent>
+  implements ScimSyncLedger
+{
   private readonly eventStore: () => EventStore<ScimSyncEvent> | null;
-  private readonly stagedSender: (name: string) => ScimSyncStagedSender | null;
 
   constructor(deps: ScimSyncLedgerWriterDeps = {}) {
+    super({
+      stagedSender:
+        deps.stagedSender ??
+        appPipelineSender({ pipelineName: SCIM_SYNC_PIPELINE_NAME }),
+      // Its own append, below, because an unavailable event store is a
+      // warning here rather than the error the shared resolver raises.
+      waitedAppend: null,
+      // Named `null` rather than forgotten: see the header.
+      readYourWrites: null,
+    });
     this.eventStore = deps.eventStore ?? resolveEventStore;
-    this.stagedSender = deps.stagedSender ?? resolveStagedSender;
+  }
+
+  protected senderNameFor(command: ScimSyncCommand): string {
+    return SENDER_NAME_BY_COMMAND[command.type];
+  }
+
+  protected onMissingSender({
+    command,
+    senderName,
+  }: {
+    command: ScimSyncCommand;
+    senderName: string;
+  }): void {
+    // Quiet, unlike its siblings: a fact that cannot be staged is history we
+    // are missing, never a reason to refuse the identity provider's push.
+    logger.warn(
+      { commandType: command.type, senderName },
+      "directory sync fact appended but not staged: the pipeline exposes no sender for it",
+    );
   }
 
   async commit({
@@ -133,22 +154,5 @@ export class ScimSyncLedgerWriter implements ScimSyncLedger {
         "could not record a directory sync fact; the push itself is unaffected",
       );
     }
-  }
-
-  private async stage({
-    command,
-  }: {
-    command: ScimSyncCommand;
-  }): Promise<void> {
-    const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = this.stagedSender(senderName);
-    if (!sender) {
-      logger.warn(
-        { commandType: command.type, senderName },
-        "directory sync fact appended but not staged: the pipeline exposes no sender for it",
-      );
-      return;
-    }
-    await sender.send(command.data);
   }
 }
